@@ -1,6 +1,6 @@
 ---
 approved_by: human
-approved_at: 2026-07-18T11:11:00.196Z
+approved_at: 2026-07-18T13:56:32.173Z
 gate_crossed: implementation → todo
 ---
 
@@ -17,6 +17,7 @@ files:
   - src/commands/menu.js
   - src/lib/start-screen.js
   - src/lib/decision-matrix.js
+  - src/lib/question-cadence.js
   - src/lib/streaming-gate.js
   - src/hooks/SessionStart.js
   - src/hooks/PreToolUse.Edit.js
@@ -27,6 +28,7 @@ files:
   - docs/AGENT_ARCHITECTURE.md
   - tests/start-screen.test.js
   - tests/decision-matrix.test.js
+  - tests/question-cadence.test.js
   - tests/ctoc-start-flow.test.js
   - tests/streaming-gate.test.js
   - tests/readme-numbers.test.js
@@ -72,6 +74,14 @@ Third problem: every question the streaming screen asks traps the human inside
 the offered options. The harness "Other" free text path exists but is never
 advertised as a first-class choice on the question itself.
 
+Fourth problem: the system cannot tell a trusted recommendation from an ignored
+one. A run of accepted recommendations is AMBIGUOUS evidence. It can mean the
+recommendations are right and trusted, or it can mean the questions stopped being
+worth reading and the human is clicking through. Those two states are
+indistinguishable from the system's side and imply OPPOSITE corrections — one says
+ask less on this topic, the other says the topic is under-explored and needs to be
+asked deeper. Only the human can disambiguate, and today he is never asked.
+
 ## What the human asked for, verbatim
 
 > "i want the ctoc:menu to become ctoc:start and then the user can choose between
@@ -81,7 +91,12 @@ advertised as a first-class choice on the question itself.
 > "and with the questions show pros cons recommendation in matrix, as
 > /ask-me-questions does, and always have an open field : 'something else?'"
 
-Build to those two sentences. Do not reinterpret them.
+> "just make real questions for decisions that are not clear enough, you know, when
+> the user state something like: i think you got this part , and that is why we deal
+> with 1 topic at a time , after 10 approves ask: do you think my recommendations
+> are good and that I understand it? or do you want more question on topic <topic>?"
+
+Build to those three sentences. Do not reinterpret them.
 
 ## Known upstream gap — the producer half is not yet whole
 
@@ -142,20 +157,29 @@ load-bearing rather than administrative.
     approval marker, and moves no plan file.
 11. `npm test` passes with zero failures, zero skipped, and coverage at or above
     the recorded floor.
+12. **Only real questions.** A question with fewer than two substantive options is
+    never presented. A question the human cannot actually decide is not asked.
+13. **One topic at a time.** A single screen never presents questions belonging to
+    two different topics, and never batches unrelated forks together.
+14. **Calibration check-in.** After ten consecutive accepted recommendations
+    within one topic, a check-in is presented before continuing, naming the topic
+    spelled out in full — never a code or a slug.
+15. The check-in resets that topic's counter, and its answer changes how much the
+    system asks about that topic thereafter.
 
 ## Scope
 
 **In scope.** The command rename; the two-shape start screen; a reusable decision
 matrix renderer; wiring that renderer into the streaming question screen so pros,
 cons and the recommendation survive to the human's eyes; the "Something else?"
-injection; and every documentation surface and test that carries the command
-name and would otherwise be wrong or would hard-break.
+injection; the question-cadence rules (only real questions, one topic at a time,
+the calibration check-in); and every documentation surface and test that carries
+the command name and would otherwise be wrong or would hard-break.
 
 **Out of scope.** The gate logic itself. The precompute producer path and the
 upstream gap recorded above (that is 00066). The question contract in
-`src/lib/streaming-precompute.js` (it already carries the fields the matrix
-needs). The classic `dashboard` route, which stays reachable exactly as it is
-today.
+`src/lib/streaming-precompute.js`. The classic `dashboard` route. Unifying the
+build-flow in-memory streak with the new persisted one (see Decision 12).
 
 ## Decisions Taken Under Ambiguity
 
@@ -250,10 +274,139 @@ This applies unconditionally, not only when the cap binds — `'Open the plan'` 
 removed from the question screen's option set entirely. No alternative is retained
 in this plan; the decision is closed.
 
-### Decision 8 — which files carrying `/ctoc:menu` are in this slice
+### Decision 8 — what makes a question REAL
 
-Nothing is hidden. Here is the complete inventory of files containing the literal
-string `/ctoc:menu`, and the disposition of each.
+The human's rule: "just make real questions for decisions that are not clear
+enough." A question that is not a decision trains him to stop reading questions,
+which destroys the value of the ones that matter.
+
+`isRealQuestion(question)` returns false — and the question is never presented —
+when **fewer than two substantive options remain after excluding the injected
+`'Something else?'` option.** A choice of one is not a choice. This test is
+objective and unarguable, which is why it is the hard filter rather than a
+heuristic about how "obvious" a recommendation looks.
+
+Above that hard filter, the TIER already in the contract does the rest of the work,
+and this slice uses it rather than inventing a parallel notion of obviousness:
+
+| Tier | Treatment | Why |
+|---|---|---|
+| `critical` | Always asked individually, one at a time, never batched | `isBlockingQuestion` already treats it as a real fork; `hasEnoughInformation` already refuses to pass with one unanswered |
+| `important` | Always asked individually | Same — a strong-preference fork is still the human's |
+| `normal`, has a recommended option | Eligible for the existing batch-approve offer rather than an individual ask | This is exactly `pendingBatchQuestions` in `src/lib/streaming-flow.js` line 371, which already excludes criticals and no-recommendation questions |
+| `normal`, no recommended option | Asked individually — the system has no answer to offer | Cannot be auto-answered; the human must pick |
+
+The judgement of "not clear enough" therefore lives with the PRODUCER, which sets
+the tier, and the render enforces the consequence. That is the correct division:
+the critique fleet knows whether a decision is genuinely open; the screen does not.
+
+### Decision 9 — one topic at a time, made explicit and asserted
+
+Already the shape of the streaming screen: `gateScreenAt` renders one decision,
+and `nextUnansweredQuestion` returns exactly one question. This slice does not
+change that behaviour — it PINS it, so no future change can interleave topics or
+batch unrelated forks onto one screen.
+
+Pinned by assertion, not by comment: `tests/question-cadence.test.js` and
+`tests/streaming-gate.test.js` assert that a rendered screen's `ask.questions`
+array has length one, and that every option in it routes to the SAME topic. The
+existing environment / compliance / stale-plans ride-alongs are the one documented
+exemption — `.ctoc/ask-me-questions.md` line 79 already exempts them as passing
+settings toggles that shape no design, and they are not topic questions.
+
+### Decision 10 — the answers log CANNOT derive the streak today; extend it
+
+**Verified, not assumed.** `streamAnswer` (`src/lib/streaming-gate.js` line 1029)
+appends exactly:
+
+```js
+{ ts, ref, questionId, optionKey }
+```
+
+There is no record of whether `optionKey` WAS the recommended option, and no topic
+identity beyond the plan ref. The streak the human asked for — consecutive
+*accepted recommendations* within one topic — is therefore **not derivable from the
+log as written**.
+
+It cannot be reconstructed after the fact either: the recommendation lived in the
+questions file, and that file is regenerated whenever the plan changes (a stale
+file is discarded and rewritten, `planQuestionsStatus` lines 372-377). The
+historical recommendation is genuinely gone.
+
+So the log line is EXTENDED, and the extra fields are captured at write time when
+the questions file is still fresh:
+
+```js
+{ ts, ref, questionId, optionKey,
+  topicKey,          // the topic identity — the plan ref for gate questions
+  topicLabel,        // the SPELLED-OUT topic name shown to the human
+  tier,              // 'critical' | 'important' | 'normal'
+  tookRecommended }  // boolean — was optionKey the recommended option?
+```
+
+Backward compatible by construction: the file is append-only JSONL, and every
+existing reader (`answeredQuestionIds`, `readAnsweredQuestionIds`) reads only `ref`
+and `questionId`, both unchanged. **A legacy line missing `tookRecommended` RESETS
+the streak** rather than being skipped. That direction is deliberate: an unknown
+can only ever DELAY the check-in, never fire one spuriously. A check-in that
+arrives late is a small annoyance; one that fires on evidence that does not exist
+is the system lying about what it observed.
+
+### Decision 11 — the threshold is a named constant, and the counter resets
+
+`CALIBRATION_THRESHOLD = 10`, declared once in `src/lib/question-cadence.js` and
+exported. It appears nowhere else — no literal `10` in any render path.
+
+**The counter RESETS to zero after a check-in.** This is not a preference; the
+alternative is broken. Without a reset the streak stays at or above ten forever
+and the check-in fires on every subsequent answer — a nag, which is exactly the
+failure mode the check-in exists to detect. Resetting makes it periodic: roughly
+every ten accepted recommendations per topic, the system asks whether it is still
+earning that trust.
+
+The check-in's ANSWER is recorded separately and durably (see Decision 12), so
+resetting the counter does not discard what he told us.
+
+### Decision 12 — the check-in verdict is stored, and per-topic
+
+`.ctoc/streaming/calibration.jsonl`, append-only, one line per check-in:
+`{ ts, topicKey, topicLabel, verdict }` where `verdict` is `'trusted'` or
+`'deeper'`. The latest line for a topic wins.
+
+- `'trusted'` — "your recommendations are good". Consequence: **ask less on that
+  topic.** Normal-tier questions with a recommended option take their
+  recommendation without an individual ask; criticals and importants are STILL
+  asked. Trust is never allowed to swallow a real fork — that is the whole point
+  of the tier.
+- `'deeper'` — "I want more questions on this topic". Consequence: **normal-tier
+  questions on that topic are asked individually**, and the batch-approve offer is
+  suppressed for it.
+
+The counter is keyed **per topic, never globally**. A global counter would let ten
+easy approvals on one topic silence questions on an unrelated one, which is the
+opposite of what he asked for.
+
+**Topic identity versus topic name.** These are deliberately two different things:
+the key is `ref` (stable, machine-safe); the label is the plan's TITLE, read by the
+existing `planTitle()` helper (`src/lib/streaming-gate.js` line ~121, matching
+`^#\s+(.+)$`). The human's standing rule is that he must never be shown an invented
+code or a slug — so the check-in prompt names the title, spelled out. The slug
+appears nowhere in the question text.
+
+**Known duplication, stated rather than hidden.** An in-memory streak already
+exists: `recommendedStreak` in `src/lib/streaming-flow.js` (line 201), with
+`DEFAULT_BATCH_THRESHOLD = 5` (line 359), driving the build-flow batch-approve
+offer. The new counter does NOT replace it, because they measure different things:
+the existing one is per-session within the build flow's topics; the new one is
+persisted per-topic across sessions for the gate flow. Two mechanisms measuring
+adjacent things is a real drift risk. It is recorded here and in the risk table,
+and unifying them is deliberately NOT in this slice — that is a change to the
+build flow, which this slice otherwise does not touch.
+
+### Decision 13 — which files carrying `/ctoc:menu` are in this slice
+
+Nothing is hidden. Complete inventory of files containing the literal string
+`/ctoc:menu`, and the disposition of each.
 
 | File | In this slice | Why |
 |---|---|---|
@@ -268,7 +421,7 @@ string `/ctoc:menu`, and the disposition of each.
 | `CLAUDE.md` | Yes | The project instruction surface. |
 | `docs/AGENT_ARCHITECTURE.md` | Yes | Documents the model rules using the command name. |
 | `.ctoc/templates/operating-lessons.md` | Yes | Shipped into every user project on initialization. |
-| `src/lib/streaming-gate.js` | Yes | Already in scope for the matrix work. |
+| `src/lib/streaming-gate.js` | Yes | Already in scope for the matrix and cadence work. |
 | `src/lib/menu-screens.js` | No | Source comment only. Not reachable by a human, and this file is not otherwise edited here. |
 | `src/lib/streaming-render.js` | No | Source comment only. |
 | `src/lib/cache.js`, `src/lib/reachability.js`, `src/lib/task-reconcile.js`, `src/areas/agent.js` | No | Source comments only. |
@@ -277,45 +430,47 @@ string `/ctoc:menu`, and the disposition of each.
 | `plans/**` | No | Historical plan records. Rewriting history would be dishonest. |
 
 The line is drawn at: does a human read this string, or does this file break? If
-either is true it is in the slice. Every remaining occurrence is an internal
-comment about a script whose name is unchanged, so it is not wrong — it just
-names the script rather than the command.
+either is true it is in the slice.
 
 ## Implementation Details
 
 ### Architecture Decision
 
-The start screen is a NEW module (`src/lib/start-screen.js`) rather than another
-branch inside `streaming-gate.js`. Reason: `streaming-gate.js` is about gate
-decisions and already carries eleven hundred lines. The start screen is about a
-different question — what do you want to do right now — and depends on the gate
-module only for a single read (`pendingGateDecisions`). A new module keeps that
-dependency one-directional (`start-screen` → `streaming-gate`, never the reverse)
-and keeps the new behaviour independently testable.
+Three new modules, layered so nothing reaches sideways:
 
-The decision matrix renderer is a THIRD module (`src/lib/decision-matrix.js`),
-below both, because two callers need it: the start screen and the streaming gate
-question screen. Placing it inside either would force the other to reach sideways.
+- `src/lib/decision-matrix.js` — pure rendering. Two callers need it (the start
+  screen and the gate question screen), so it sits below both.
+- `src/lib/question-cadence.js` — the cadence rules: is this a real question, what
+  is the per-topic streak, is a check-in due, what did the human last say about
+  this topic. Pure logic plus two small append-only readers/writers.
+- `src/lib/start-screen.js` — the entry screen, above both.
+
+The start screen is NOT another branch inside `streaming-gate.js`: that file is
+about gate decisions and already carries eleven hundred lines, and the start screen
+depends on it for a single read.
 
 ### Dependency Graph
 
 ```
-src/lib/decision-matrix.js   (new, no CTOC dependencies beyond ./tui for stripCtl)
-        ▲                    ▲
-        │                    │
-src/lib/start-screen.js      src/lib/streaming-gate.js   (modified)
-        │                                 ▲
-        │                                 │
-        └──────── reads pendingGateDecisions, loadPlanQuestions
-                                          │
-src/commands/menu.js  ──calls startScreen──┘   (modified: the no-args path)
+src/lib/decision-matrix.js        src/lib/question-cadence.js
+   (./tui only)                      (./safe-fs, ./tui only)
+        ▲          ▲                      ▲          ▲
+        │          │                      │          │
+        │          └──────┬───────────────┘          │
+        │                 │                          │
+src/lib/start-screen.js   │        src/lib/streaming-gate.js  (modified)
+        │                 └────────────────┘         ▲
+        │                                            │
+        └──── reads pendingGateDecisions, loadPlanQuestions
+                                                     │
+src/commands/menu.js  ──calls startScreen────────────┘   (modified: no-args path)
         ▲
         │
 src/commands/start.md  (new spec — the live entry point; menu.md removed)
 ```
 
-No cycles. `decision-matrix.js` depends on nothing in CTOC except `./tui` for the
-control-character sanitizer, so it sits at the bottom.
+No cycles. Both new leaf modules depend on nothing in CTOC except `./tui` and
+`./safe-fs`.
 
 ### Wiring — the live call sites
 
@@ -325,7 +480,8 @@ this same slice.
 | New module | Live call site | Root it is reachable from |
 |---|---|---|
 | `src/lib/decision-matrix.js` | `src/lib/streaming-gate.js` → `richQuestionScreen()`; `src/lib/start-screen.js` → `startScreen()` | The shipped `/ctoc:start` slash command |
-| `src/lib/start-screen.js` | `src/commands/menu.js` → `main()`, the no-arguments branch (currently line ~728, `streamingGate.streamingGateScreen(app.projectPath)`) | The shipped `/ctoc:start` slash command |
+| `src/lib/question-cadence.js` | `src/lib/streaming-gate.js` → `nextUnansweredQuestion()`, `richQuestionScreen()`, `streamAnswer()` | The shipped `/ctoc:start` slash command |
+| `src/lib/start-screen.js` | `src/commands/menu.js` → `main()`, the no-arguments branch (currently line ~728) | The shipped `/ctoc:start` slash command |
 
 No module in this slice is proved only by its own test.
 
@@ -342,75 +498,167 @@ every question carries an open free text option.
 ##### Exports
 
 - `renderMatrix(question)` → returns `string`
-  - Description: renders `question.options` as a fenced Unicode box-drawing table
-    with the four columns `Option`, `Pros`, `Cons`, `Recommendation`. Returns the
-    fenced block including the opening and closing triple backticks and a trailing
-    newline.
+  - Renders `question.options` as a fenced Unicode box-drawing table with the four
+    columns `Option`, `Pros`, `Cons`, `Recommendation`. Returns the fenced block
+    including the opening and closing triple backticks and a trailing newline.
   - Column characters: top edge `┌ ─ ┬ ┐`, row separator `├ ─ ┼ ┤`, bottom edge
     `└ ─ ┴ ┘`, vertical `│` (U+2502). Never the pipe character `|`.
-  - Column widths: computed from content, then each column is capped at the
-    tightened widths `[24, 40, 38, 46]`. This is the standing "roughly five spaces
-    narrower" preference applied to the four-column structure from
-    `.ctoc/ask-me-questions.md`, whose example uses `[28, 47, 45, 55]`.
-  - Cell text longer than its column wraps onto continuation lines within the same
-    cell; a sentence is never broken across cells.
+  - Column widths computed from content, then capped at `[24, 40, 38, 46]` — the
+    standing "roughly five spaces narrower" preference applied to the four-column
+    structure from `.ctoc/ask-me-questions.md`, whose example uses `[28, 47, 45, 55]`.
+  - Cell text longer than its column wraps within the same cell; a sentence is
+    never broken across cells.
   - The Recommendation cell is non-empty for exactly the option whose
-    `recommended === true`, and reads `Recommended — <reason>` where `<reason>` is
-    the option's `description` when present, otherwise the literal
-    `highest-quality option for this decision`. Every other Recommendation cell is
-    empty.
-  - When more than one option carries `recommended === true`, only the FIRST in
-    array order is marked. Documented here because `validatePlanQuestions` does not
-    enforce single-recommendation, so the renderer must not assume it.
-  - All cell text passes through `stripCtl` before rendering. Question and option
-    text is subagent-authored and therefore untrusted for terminal output.
-  - Throws: never. A malformed question returns the empty string.
+    `recommended === true`, reading `Recommended — <reason>` where `<reason>` is the
+    option's `description` when present, otherwise `highest-quality option for this
+    decision`. Every other Recommendation cell is empty. When more than one option
+    is flagged, only the FIRST in array order is marked — `validatePlanQuestions`
+    does not enforce single-recommendation, so the renderer must not assume it.
+  - All cell text passes through `stripCtl`. Option text is subagent-authored and
+    therefore untrusted for terminal output.
+  - Throws: never. A malformed question returns `''`.
 
 - `withSomethingElse(options)` → returns `Array<object>`
-  - Description: returns a copy of `options` with the open free text option
-    appended: `{ key: 'else', label: 'Something else?', description: 'Type your own answer — none of the options above.' }`.
-  - Idempotent: if an option already carries `key === 'else'` or
-    `label === 'Something else?'`, the input is returned unchanged (copied).
+  - Returns a copy of `options` with `{ key: 'else', label: 'Something else?',
+    description: 'Type your own answer — none of the options above.' }` appended.
+  - Idempotent: an input already carrying `key === 'else'` or the label is returned
+    unchanged (copied).
   - Throws: never. A non-array input returns an array containing only the open
     option, so the escape hatch exists even when the question is malformed.
 
-- `SOMETHING_ELSE_KEY` → `'else'` (exported constant so callers route the answer
-  without re-typing the string)
-
+- `SOMETHING_ELSE_KEY` → `'else'`
 - `SOMETHING_ELSE_LABEL` → `'Something else?'`
 
 ##### Dependencies
-
 - `require('./tui')` — for `stripCtl`
 
 ##### Called By
-
-- `src/lib/streaming-gate.js` → `richQuestionScreen()` and `planDecisionScreen()`
+- `src/lib/streaming-gate.js` → `richQuestionScreen()`, `planDecisionScreen()`
 - `src/lib/start-screen.js` → `startScreen()`
+
+##### Error Handling
+- Non-object question, missing `options`, empty `options`: return `''`. The caller
+  renders the question with no matrix rather than crashing. A missing matrix is a
+  degraded screen; a thrown error is a dead entry point.
+- Non-string `pros` / `cons` / `description`: treated as absent, cell empty. Never
+  coerced with `String()`, which would print `[object Object]` at the human.
+
+##### Cross-Platform Notes
+- Pure string construction; no file system, no path handling. `\n` only.
+
+---
+
+#### File: `src/lib/question-cadence.js`
+**Action:** CREATE
+**Purpose:** Decide whether a question is worth asking, track the per-topic streak
+of accepted recommendations, and raise the calibration check-in when it is due.
+**Change Type:** new-module
+
+##### Exports
+
+- `CALIBRATION_THRESHOLD` → `10`
+  - The single declaration of the number. Decision 11.
+
+- `isRealQuestion(question)` → returns `boolean`
+  - False when fewer than two substantive options remain after excluding the
+    injected `'Something else?'` option (matched by `SOMETHING_ELSE_KEY` or label).
+    False for a null / malformed question. Decision 8.
+  - Throws: never.
+
+- `shouldAskIndividually(question, verdict)` → returns `boolean`
+  - The tier policy from Decision 8, parameterised by the topic's latest check-in
+    verdict (`'trusted'` | `'deeper'` | `null`).
+  - `critical` and `important` → always `true`, for every verdict. A fork is never
+    silenced by trust.
+  - `normal` with no recommended option → `true`.
+  - `normal` with a recommended option → `false` when verdict is `'trusted'`
+    (it takes its recommendation); `true` when verdict is `'deeper'`; otherwise
+    `true` unless it is eligible for the batch offer.
+  - Throws: never. An unrecognised tier is treated as `normal`.
+
+- `recordAnswer(root, entry)` → returns `{ ok: boolean, errors?: string[] }`
+  - Appends ONE line to `.ctoc/streaming/answers.jsonl` in the extended shape from
+    Decision 10: `{ ts, ref, questionId, optionKey, topicKey, topicLabel, tier,
+    tookRecommended }`.
+  - This is the ONLY writer of that log after this slice — `streamAnswer` delegates
+    to it, so the line shape has exactly one implementation and cannot drift.
+  - Throws: never. A write failure returns `{ ok: false, errors }` and the caller
+    surfaces it, exactly as `streamAnswer` already surfaces its own write failure.
+
+- `topicStreak(root, topicKey)` → returns `number`
+  - The count of CONSECUTIVE most-recent entries for `topicKey` carrying
+    `tookRecommended === true`, scanning the log from the end backwards and stopping
+    at the first entry that is not. An entry missing the field stops the scan
+    (Decision 10 — unknown resets).
+  - Entries after the topic's most recent calibration check-in only: a check-in
+    resets the count (Decision 11).
+  - Throws: never. An absent or unreadable log returns `0`.
+
+- `checkInDue(root, topicKey)` → returns `boolean`
+  - `topicStreak(root, topicKey) >= CALIBRATION_THRESHOLD`.
+
+- `checkInQuestion(topicLabel)` → returns `{ id, prompt, critical, options }`
+  - The check-in itself, in the streaming Question contract so it renders through
+    exactly the same path as any other question — matrix included, `'Something
+    else?'` included.
+  - `id`: `'calibration-check-in'`.
+  - `prompt`: ``You've taken my recommendation ${CALIBRATION_THRESHOLD} times in a
+    row on “${topicLabel}”. Do you think my recommendations are good and that I
+    understand this — or do you want more questions on “${topicLabel}”?``
+  - The label is the plan TITLE, spelled out. Never a slug, never a code
+    (Decision 12).
+  - Options, each carrying real `pros` / `cons` so the matrix has content:
+    - `{ key: 'trusted', label: 'Your recommendations are good', recommended: false }`
+    - `{ key: 'deeper', label: `I want more questions on ${topicLabel}` }`
+  - Deliberately NO `recommended: true` on either. The system cannot know which is
+    right — that is the entire reason it is asking. Marking one recommended would
+    be the system answering its own calibration question.
+  - Throws: never.
+
+- `recordCalibration(root, topicKey, topicLabel, verdict)` → returns `{ ok, errors? }`
+  - Appends `{ ts, topicKey, topicLabel, verdict }` to
+    `.ctoc/streaming/calibration.jsonl`. `verdict` must be `'trusted'` or
+    `'deeper'`; anything else is refused with `{ ok: false }` and nothing written.
+  - Throws: never.
+
+- `topicVerdict(root, topicKey)` → returns `'trusted' | 'deeper' | null`
+  - The most recent recorded verdict for the topic, or `null` when none.
+  - Throws: never. An absent or corrupt log returns `null`, which is the neutral
+    default — no behaviour change.
+
+##### Dependencies
+- `require('./safe-fs')`, `require('path')`
+- `require('./decision-matrix')` — for `SOMETHING_ELSE_KEY` / `SOMETHING_ELSE_LABEL`
+  in `isRealQuestion`
+
+##### Called By
+- `src/lib/streaming-gate.js` → `nextUnansweredQuestion()` (filters unreal
+  questions), `richQuestionScreen()` (raises the check-in when due), `streamAnswer()`
+  (records the extended line; routes a check-in answer to `recordCalibration`)
 
 ##### Data Flow
 
 ```
-question (from streaming-precompute.loadPlanQuestions)
-  → withSomethingElse(question.options)
-  → renderMatrix({ ...question, options })   → fenced Unicode block (screen `text`)
-  → options mapped to { label, description } → the `ask` question (NO matrix inside)
+answer recorded
+  → recordAnswer(root, {..., tookRecommended, topicKey, topicLabel, tier})
+  → next render:
+      topicVerdict(root, topicKey)         → how much to ask on this topic
+      checkInDue(root, topicKey)           → streak >= 10 since last check-in?
+        yes → checkInQuestion(topicLabel)  → rendered like any other question
+        no  → next unanswered REAL question, filtered by shouldAskIndividually
 ```
 
 ##### Error Handling
-
-- Non-object question, missing `options`, empty `options`: return `''`. The caller
-  then renders the question with no matrix rather than crashing. A missing matrix
-  is a degraded screen; a thrown error is a dead entry point.
-- Non-string `pros` / `cons` / `description`: treated as absent, cell rendered
-  empty. Never coerced with `String()`, which would print `[object Object]` at the
-  human.
+- Every read is fail-soft: an absent, unreadable, or corrupt log yields the neutral
+  value (`0`, `null`, `false`) — never a throw and never a spurious check-in.
+- A malformed JSONL line is SKIPPED for reads that accumulate, and STOPS the scan
+  for `topicStreak` (the conservative direction — Decision 10).
+- Writes return `{ ok: false, errors }`; the caller surfaces the failure rather than
+  claiming the answer was recorded.
 
 ##### Cross-Platform Notes
-
-- Pure string construction; no file system, no path handling.
-- Line endings are `\n` only. The screen output is JSON-encoded by `menu.js`, so
-  the terminal layer handles platform line endings.
+- `path.join` throughout; `safe-fs` for every read and write; `\n` line endings in
+  the JSONL, matching the existing `streamAnswer` writer.
 
 ---
 
@@ -422,190 +670,151 @@ question (from streaming-precompute.loadPlanQuestions)
 ##### Exports
 
 - `waitingQuestionCount(projectPath)` → returns `number`
-  - Description: how many plans currently have fresh precomputed questions with at
-    least one unanswered question. Reads the ALREADY-COMPUTED store only — it
-    never generates, never dispatches, never waits.
-  - Implementation: `streamingGate.pendingGateDecisions(projectPath)`, then for each
+  - How many plans currently have fresh precomputed questions with at least one
+    unanswered question that `isRealQuestion` accepts. Reads the ALREADY-COMPUTED
+    store only — never generates, never dispatches, never waits.
+  - Implementation: `streamingGate.pendingGateDecisions(projectPath)`, then per
     descriptor `streamingPrecompute.loadPlanQuestions(projectPath, d.ref)`; a `null`
-    return (absent, stale, invalid, or unknown plan) contributes zero.
-  - Throws: never. Any failure returns `0`, which renders the no-questions shape —
-    the shape that never blocks.
+    return (absent, stale, invalid, unknown plan) contributes zero. A plan whose
+    only remaining questions fail `isRealQuestion` contributes zero — the count must
+    not promise a question the screen would then refuse to ask.
+  - Throws: never. Any failure returns `0`, rendering the shape that never blocks.
 
 - `startScreen(projectPath)` → returns `{ text, ask, actions }`
-  - Description: the entry screen. Two shapes, chosen by `waitingQuestionCount`.
-  - **Shape A, count is zero.** `text` carries the CTOC heading and a one-line
+  - **Shape A, count is zero.** `text` carries the heading and a one-line
     orientation. `ask.questions` has exactly ONE question, text
-    `'What shall we create today?'`, header `'Start'`, with the options
-    `'Type what you want'` and `'Something else?'`. No "answer questions" option is
-    present, because there is nothing to answer.
-  - **Shape B, count is one or more.** Same heading, plus a line reading
-    `N question(s) waiting for you.` `ask.questions` has exactly ONE question, text
-    `'What shall we create today — or shall we answer the questions waiting for you?'`,
-    header `'Start'`, with the options `'Type what you want'`,
-    `'Answer the questions'` and `'Something else?'`.
-  - Both shapes route through `decisionMatrix.withSomethingElse`, so the open
-    option is present by construction rather than by each branch remembering it.
-  - `actions` maps:
-    - `'Type what you want'` → `'stream'` (the streaming build flow, which owns the
-      free text idea capture and the vision-decomposer dispatch)
-    - `'Answer the questions'` → `''` (empty — the streaming gate screen is the
-      default no-arguments route, so answering is where the next render already
-      lands)
-    - `'Something else?'` → `'claude:start-freeform'`
-  - Every action key is a WORD. No digit appears in `actions`. Numbers stay
-    reserved exclusively for opening a plan.
+    `'What shall we create today?'`, header `'Start'`, options `'Type what you want'`
+    and `'Something else?'`. No answer-questions option — there is nothing to answer.
+  - **Shape B, count is one or more.** Same heading plus `N question(s) waiting for
+    you.` One question, text `'What shall we create today — or shall we answer the
+    questions waiting for you?'`, header `'Start'`, options `'Type what you want'`,
+    `'Answer the questions'`, `'Something else?'`.
+  - Both shapes route through `decisionMatrix.withSomethingElse`, so the open option
+    is present by construction rather than by each branch remembering it.
+  - `actions`: `'Type what you want'` → `'stream'`; `'Answer the questions'` → `''`
+    (the gate screen is the default no-arguments route); `'Something else?'` →
+    `'claude:start-freeform'`.
+  - Every action key is a WORD. No digit appears in `actions`.
   - Throws: never.
 
 ##### Dependencies
-
-- `require('./streaming-gate')` — for `pendingGateDecisions`
-- `require('./streaming-precompute')` — for `loadPlanQuestions`
-- `require('./decision-matrix')` — for `withSomethingElse`
+- `require('./streaming-gate')`, `require('./streaming-precompute')`,
+  `require('./decision-matrix')`, `require('./question-cadence')`
 
 ##### Called By
-
 - `src/commands/menu.js` → `main()`, the no-arguments branch
 
-##### Data Flow
-
-```
-projectPath
-  → pendingGateDecisions(projectPath)              [gate-eligible plans]
-  → loadPlanQuestions(projectPath, ref) per plan   [ALREADY computed; null if not]
-  → count of plans with >= 1 unanswered question
-  → shape A (0) or shape B (>0)
-  → { text, ask, actions }
-```
-
 ##### Error Handling
-
-- A throwing `pendingGateDecisions` or `loadPlanQuestions`: caught, counted as
-  zero, shape A renders. The entry point must open even when the store is broken.
-- The environment, compliance, and stale-plans ride-along questions attach in
-  `menu.js` exactly as they do today. `startScreen` returns a well-formed
-  `ask.questions` array so the existing attach helpers keep working unchanged.
-
-##### Cross-Platform Notes
-
-- All paths come from `streaming-gate` / `streaming-precompute`, which already use
-  `path.join`. This module constructs no path.
+- A throwing dependency: caught, counted as zero, shape A renders. The entry point
+  must open even when the store is broken.
+- The environment / compliance / stale-plans ride-alongs attach in `menu.js` exactly
+  as today; `startScreen` returns a well-formed `ask.questions` array so the
+  existing attach helpers keep working unchanged.
 
 ---
 
 #### File: `src/lib/streaming-gate.js`
 **Action:** MODIFY
-**Purpose:** Stop flattening pros and cons into a description string; render the
-real matrix, add the open option, and drop `'Open the plan'` per Decision 7.
+**Purpose:** Render the real matrix, add the open option, drop `'Open the plan'`,
+and enforce the question cadence.
 **Change Type:** modify-existing
 
 ##### Changes
 
-- **Import** `decisionMatrix` from `./decision-matrix` (add to the import block at
-  the top, alongside the existing `gate-order` require).
+- **Import** `decisionMatrix` from `./decision-matrix` and `cadence` from
+  `./question-cadence`.
+- **Modify** `nextUnansweredQuestion()` (line ~240): skip any question that
+  `cadence.isRealQuestion` rejects, and any that `cadence.shouldAskIndividually`
+  declines for the topic's current verdict. A topic whose every remaining question
+  is skipped returns `null`, which already falls through to the existing simple
+  screen — no new branch needed.
 - **Modify** `richQuestionScreen()` (line ~546):
-  - After `const parts = precomputedQuestionParts(...)`, build the matrix source
-    from the ORIGINAL question `q` (which still carries `pros` / `cons` /
-    `recommended`), not from `parts.question.options` (which has already been
-    flattened to `{ label, description }`).
+  - **Check-in first.** When `cadence.checkInDue(root, d.ref)`, render
+    `cadence.checkInQuestion(planTitle)` INSTEAD of the next question. It passes
+    through the identical matrix and option path, so the check-in is not a special
+    screen — it is a question like any other.
+  - Build the matrix from the ORIGINAL question `q` (which still carries `pros` /
+    `cons` / `recommended`), not from `parts.question.options` (already flattened).
   - Insert `decisionMatrix.renderMatrix({ ...q, options: decisionMatrix.withSomethingElse(q.options) })`
-    into `text`, placed AFTER the topic and counter header line and BEFORE the
-    prompt line at line ~571. Matrix first, then the question sentence — the
-    `.ctoc/ask-me-questions.md` order.
-  - Append the `'Something else?'` option to the `options` array, and map
-    `actions['Something else?'] = \`stream comment ${d.ref}\``, so the open answer
-    is recorded as a free text comment on the plan (the existing, already-wired
-    free text sink that edits no plan and crosses no gate).
-  - **DELETE** the `'Open the plan'` option and the `if (options.length < 4)`
-    block that adds it (lines ~558-560), and delete
-    `actions['Open the plan'] = \`plan ${d.ref}\`` (line ~563). Per Decision 7 this
-    option is removed unconditionally, not merely dropped when the cap binds.
-  - Final option order: the question's own options, then `'Something else?'`,
-    then `'Skip for now'`.
-- **Modify** `planDecisionScreen()` (line ~604): apply the same matrix insertion
-  and the same `'Something else?'` option to the product-question branch at
-  line ~640. That branch calls the same `precomputedQuestionParts`, so it exhibits
-  the identical flattening bug and must be fixed in the same pass. Note this screen
-  IS the opened plan, so it has no `'Open the plan'` option to remove.
-- **Keep** `precomputedOptionDescription()` unchanged and still called. It remains
-  correct for the `ask` layer, where a one-sentence description is exactly what the
-  harness wants. The matrix is an ADDITION to the text layer, not a replacement of
-  the description layer.
-
-##### Dependencies (added)
-
-- `require('./decision-matrix')`
+    into `text` AFTER the header line and BEFORE the prompt (line ~571) — matrix
+    first, then the question, per `.ctoc/ask-me-questions.md`.
+  - Append `'Something else?'`; map `actions['Something else?'] = \`stream comment ${d.ref}\``.
+  - **DELETE** the `'Open the plan'` option, the `if (options.length < 4)` block that
+    adds it (lines ~558-560), and `actions['Open the plan']` (line ~563). Decision 7
+    — removed unconditionally, not merely when the cap binds.
+  - Final option order: the question's own options, then `'Something else?'`, then
+    `'Skip for now'`.
+- **Modify** `planDecisionScreen()` (line ~604): same matrix insertion and same
+  `'Something else?'` on the product-question branch (line ~640) — it calls the same
+  `precomputedQuestionParts` and has the identical flattening bug. This screen IS the
+  opened plan, so it has no `'Open the plan'` option to remove.
+- **Modify** `streamAnswer()` (line ~1015):
+  - Delegate the append to `cadence.recordAnswer`, passing the extended fields.
+    Derive `tookRecommended` by loading the question from the still-fresh questions
+    file and comparing `optionKey` to the recommended option's key; derive `tier`
+    from the question; derive `topicLabel` from `planTitle`. Decision 10.
+  - When `questionId === 'calibration-check-in'`, route to
+    `cadence.recordCalibration` instead, mapping the chosen key to the verdict.
+  - Surface a write failure exactly as today — never claim an answer was recorded
+    when it was not.
+- **Keep** `precomputedOptionDescription()` unchanged and still called. It is correct
+  for the `ask` layer, where a one-sentence description is what the harness wants.
+  The matrix is an ADDITION to the text layer, not a replacement.
 
 ##### Error Handling
-
-- `renderMatrix` returning `''` (malformed question) leaves `text` with the prompt
-  and no matrix. Degraded, never broken.
-- The whole `richQuestionScreen` call is already wrapped in a `try` at
-  `gateScreenAt()` line ~831, falling back to the simple Approve screen. That
-  fallback is preserved.
+- `renderMatrix` returning `''` leaves `text` with the prompt and no matrix.
+  Degraded, never broken.
+- Every cadence read is fail-soft, so a broken log renders the ordinary question
+  rather than a check-in — the conservative direction.
+- The existing `try` around `richQuestionScreen` at `gateScreenAt()` line ~831,
+  falling back to the simple Approve screen, is preserved.
 
 ---
 
 #### File: `src/commands/start.md`
 **Action:** CREATE
 **Purpose:** The `/ctoc:start` slash command specification.
-**Change Type:** new-module
 
-##### Content
+The full current body of `src/commands/menu.md`, with:
 
-The full current body of `src/commands/menu.md`, with these edits:
-
-- Frontmatter `description:` becomes
-  `CTOC — start here. Say what you want built, or answer the questions waiting for you.`
-- Frontmatter keeps `effort: low` and declares **NO** `model:` line. A slash
-  command's `model:` switches the LIVE session, which is what crashed sessions
-  before (see `tests/slash-command-no-model-pin.test.js`).
-- The `(no args)` row of the Navigation Commands table is rewritten to describe
-  the start screen: the open prompt when nothing is waiting, the open prompt plus
-  the answer-questions choice when questions are waiting.
-- A new Rule is appended documenting the matrix requirement: every question this
-  command asks renders the four-column Unicode box-drawing decision matrix in the
-  screen text first, then the question, and every question carries the
-  `'Something else?'` open option. This mirrors `.ctoc/ask-me-questions.md`, which
-  stays the canonical format specification.
-- The same Rule records Decision 7: the question screen does not offer
-  `'Open the plan'`; a plan is opened from the plan list.
-- The closing line becomes: `CTOC ships exactly three slash commands: start, push, update.`
-- Every `node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js"` invocation is
-  UNCHANGED — the script keeps its name (Decision 2).
+- `description:` → `CTOC — start here. Say what you want built, or answer the questions waiting for you.`
+- `effort: low` kept; **NO** `model:` line. A slash command's `model:` switches the
+  LIVE session, which is what crashed sessions before.
+- The `(no args)` row rewritten to describe the start screen's two shapes.
+- A new Rule recording the question-flow contract: the four-column Unicode
+  box-drawing matrix renders in the screen text first, then the question; every
+  question carries `'Something else?'`; only real questions are asked (Decision 8);
+  ONE topic at a time; and the calibration check-in fires after
+  `CALIBRATION_THRESHOLD` accepted recommendations on a topic, naming the topic
+  spelled out. `.ctoc/ask-me-questions.md` stays the canonical format spec.
+- The same Rule records Decision 7: no `'Open the plan'` on the question screen.
+- Closing line → `CTOC ships exactly three slash commands: start, push, update.`
+- Every `node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js"` invocation UNCHANGED
+  (Decision 2).
 
 ---
 
 #### File: `src/commands/menu.md`
 **Action:** DELETE
-**Purpose:** Removing it is what keeps the count at exactly three commands.
 
-The content moves to `src/commands/start.md`. Deleting rather than aliasing is
-Decision 1; the reasoning and the cost are recorded there.
+Content moves to `src/commands/start.md`. Deleting rather than aliasing is
+Decision 1.
 
 ---
 
 #### File: `src/commands/menu.js`
 **Action:** MODIFY
-**Purpose:** Make the start screen the live no-arguments render.
-**Change Type:** modify-existing
 
-##### Changes
-
-- **Modify** the file header comment (line 2-4) to read
-  `Main entry point for the /ctoc:start command` and to note that the script
-  filename is deliberately unchanged (pointing at this plan's Decision 2).
-- **Modify** `main()`, the no-arguments branch (currently line ~727-728):
-  replace `const result = streamingGate.streamingGateScreen(app.projectPath)` with
-  `const result = require('../lib/start-screen').startScreen(app.projectPath)`.
-- **Keep** the environment, compliance, and initialization-note attach calls that
-  follow (lines ~729-740) exactly as they are. They operate on the returned
-  `{ text, ask, actions }` shape, which `startScreen` preserves. A brand-new
-  project has no plans at gates, so it renders shape A and the first-run
-  environment question still rides along — preserved behaviour, verified by
-  `tests/menu-environment.test.js`.
-- **No change** to `route()` in `src/lib/menu-screens.js`. The `stream` route
-  remains the way the answer flow is reached, and the `dashboard` route remains
-  the way the classic overview is reached. Nothing is orphaned.
+- Header comment (lines 2-4) → `Main entry point for the /ctoc:start command`, plus
+  a line noting the filename is deliberately unchanged (Decision 2).
+- `main()`, the no-arguments branch (line ~727-728): replace
+  `streamingGate.streamingGateScreen(app.projectPath)` with
+  `require('../lib/start-screen').startScreen(app.projectPath)`.
+- **Keep** the environment / compliance / initialization-note attach calls (lines
+  ~729-740) exactly as they are. A brand-new project has no plans at gates, so it
+  renders shape A and the first-run environment question still rides along —
+  verified by `tests/menu-environment.test.js`.
+- **No change** to `route()` in `src/lib/menu-screens.js`.
 
 ---
 
@@ -614,226 +823,243 @@ Decision 1; the reasoning and the cost are recorded there.
 
 | File | Change |
 |---|---|
-| `src/hooks/SessionStart.js` | Lines 202 and 392: `/ctoc:menu` → `/ctoc:start`. Line 200's dead `writePlanQuestions` instruction is NOT touched here — see the known upstream gap section; it belongs to 00066. |
-| `src/hooks/PreToolUse.Edit.js` | Lines 321, 322, 344: `/ctoc:menu` → `/ctoc:start` in the human-facing block message. |
-| `src/hooks/PreToolUse.Bash.js` | Line 352: `/ctoc:menu` → `/ctoc:start` in the ledger denial reason. |
+| `src/hooks/SessionStart.js` | Lines 202 and 392: `/ctoc:menu` → `/ctoc:start`. Line 200's dead `writePlanQuestions` instruction is NOT touched — see the upstream gap; it belongs to 00066. |
+| `src/hooks/PreToolUse.Edit.js` | Lines 321, 322, 344 — the human-facing block message. |
+| `src/hooks/PreToolUse.Bash.js` | Line 352 — the ledger denial reason. |
 | `.ctoc/templates/operating-lessons.md` | Line 73: the three-command list becomes `start`, `push`, `update`. |
-| `README.md` | Lines 440, 746, 750-752, 767, 773, 788, 841: command table, the `/ctoc` alias row, the update instructions, and the project-structure line. Keep the phrase `3 slash commands` verbatim — `tests/readme-numbers.test.js` line 257 asserts on it. |
-| `CLAUDE.md` | Every `/ctoc:menu` occurrence, the "Model rules" table, the "Minimal slash commands" statement, and the Project Init Procedure paragraph (which says opening the menu triggers initialization — it is now opening start). |
-| `docs/AGENT_ARCHITECTURE.md` | The front-process versus subagent model-rule section, which names the command. |
+| `README.md` | Lines 440, 746, 750-752, 767, 773, 788, 841. Keep the phrase `3 slash commands` verbatim — `readme-numbers.test.js` line 257 asserts on it. |
+| `CLAUDE.md` | Every occurrence, the Model rules table, the Minimal slash commands statement, and the Project Init Procedure paragraph. |
+| `docs/AGENT_ARCHITECTURE.md` | The front-process versus subagent model-rule section. |
 
 ---
 
 ### Test Plan
 
 #### Tests: `tests/decision-matrix.test.js`
-**Action:** CREATE
-**Framework:** `node:test` (`describe` / `it` / `assert`)
+**Action:** CREATE · **Framework:** `node:test`
 
-1. **Real box-drawing characters, never pipes.** Render a two-option question;
-   assert the output contains `┌`, `┬`, `┐`, `├`, `┼`, `┤`, `└`, `┴`, `┘` and
-   `│`, and assert `output.includes('|') === false`. This is the explicit
-   project rule that a pipe-character pseudo-table is unacceptable.
-2. **The four columns, spelled in full.** Assert the header row contains
-   `Option`, `Pros`, `Cons`, `Recommendation`, and that no abbreviated form
-   appears.
-3. **Vertical alignment.** Split the output into lines, keep only matrix rows,
-   and assert every row has `│` at the identical set of column indices. A matrix
-   whose separators do not line up is not a matrix.
-4. **Exactly one Recommended cell.** Two options both flagged
-   `recommended: true`; assert the rendered output contains the substring
-   `Recommended` exactly once (Decision 1 in `renderMatrix`).
-5. **Pros and cons survive.** An option with `pros: 'Fast to build.'` and
-   `cons: 'Harder to change later.'`; assert both sentences appear in the output.
-   This is the direct regression test for the flattening bug.
-6. **Singular keys render empty, never fabricated.** An option carrying
-   `pro: 'x'` / `con: 'y'` (singular); assert the output contains neither `'x'`
-   nor `'y'`, and does not throw. Pins Decision 6.
-7. **`withSomethingElse` appends the open option.** Two input options; assert the
-   result has three, the last has `key === 'else'` and
-   `label === 'Something else?'`.
-8. **`withSomethingElse` is idempotent.** Call it twice; assert exactly one open
-   option in the result.
-9. **`withSomethingElse` on a non-array.** Input `null`; assert the result is an
-   array of length one containing the open option. The escape hatch exists even
-   when everything else is broken.
-10. **Control characters are stripped.** An option label containing `\x1b[31m`;
-    assert the escape sequence does not reach the output.
-11. **Malformed input returns the empty string.** `renderMatrix(null)`,
-    `renderMatrix({})`, `renderMatrix({ options: [] })` each return `''` and do
-    not throw.
+1. **Real box-drawing characters, never pipes.** Assert the output contains `┌`,
+   `┬`, `┐`, `├`, `┼`, `┤`, `└`, `┴`, `┘`, `│`, and `output.includes('|') === false`.
+2. **The four columns, spelled in full.** `Option`, `Pros`, `Cons`,
+   `Recommendation`; no abbreviated form anywhere.
+3. **Vertical alignment.** Every matrix row has `│` at the identical column indices.
+4. **Exactly one Recommended cell** when two options are both flagged.
+5. **Pros and cons survive.** `pros: 'Fast to build.'` / `cons: 'Harder to change
+   later.'` both appear — the direct regression test for the flattening bug.
+6. **Singular keys render empty, never fabricated.** `pro` / `con` singular produce
+   neither value in the output, and do not throw. Pins Decision 6.
+7. **`withSomethingElse` appends** the open option with `key === 'else'`.
+8. **`withSomethingElse` is idempotent** — exactly one open option after two calls.
+9. **`withSomethingElse(null)`** returns an array of one containing the open option.
+10. **Control characters stripped** — `\x1b[31m` in a label never reaches the output.
+11. **Malformed input** → `''` from `renderMatrix(null)`, `({})`, `({options:[]})`.
+
+#### Tests: `tests/question-cadence.test.js`
+**Action:** CREATE
+
+1. **`isRealQuestion` rejects a one-option question**, including one whose only
+   other option is the injected `'Something else?'`. Decision 8.
+2. **`isRealQuestion` accepts a genuine two-option question.**
+3. **`isRealQuestion(null)`** is `false` and does not throw.
+4. **Tier policy — a fork is never silenced by trust.** With verdict `'trusted'`,
+   `shouldAskIndividually` still returns `true` for `critical` and for `important`.
+   This is the load-bearing assertion of the whole check-in feature.
+5. **Tier policy — trust quiets normal questions.** With verdict `'trusted'`, a
+   `normal` question WITH a recommended option returns `false`; WITHOUT one, `true`.
+6. **Tier policy — `'deeper'` asks more.** A `normal` question with a recommendation
+   returns `true`.
+7. **`topicStreak` counts consecutive accepted recommendations** — nine `true`
+   entries yield 9.
+8. **A non-recommended pick resets it** — eight `true`, one `false`, one `true`
+   yields 1, not 9.
+9. **A legacy line missing `tookRecommended` stops the scan** (Decision 10) — the
+   streak counts only entries after it.
+10. **The streak is PER TOPIC.** Ten accepted on topic A and zero on topic B: A is
+    due for a check-in, B is not. A global counter would fail this.
+11. **`checkInDue` fires at exactly `CALIBRATION_THRESHOLD`** — false at 9, true at
+    10. Asserted against the exported constant, never a literal.
+12. **The check-in resets the streak** — after `recordCalibration`, `topicStreak`
+    returns 0 and `checkInDue` is false. Decision 11.
+13. **`checkInQuestion` names the topic spelled out.** The prompt contains the given
+    title and does NOT contain the plan slug or any `.md` filename. The human's
+    standing rule, asserted.
+14. **`checkInQuestion` marks NO option recommended.** The system does not answer its
+    own calibration question.
+15. **`recordCalibration` refuses an invalid verdict** — `{ ok: false }` and nothing
+    appended to the file.
+16. **`topicVerdict` returns the LATEST verdict** when a topic has two.
+17. **Every reader is fail-soft** — absent log, unreadable log, and a corrupt line
+    each yield `0` / `null` / `false`, never a throw and never a spurious check-in.
+18. **The extended line is backward compatible** — after `recordAnswer`, the
+    existing `answeredQuestionIds` reader still finds the answer by `ref` +
+    `questionId`.
 
 #### Tests: `tests/start-screen.test.js`
 **Action:** CREATE
 
-1. **Shape A — no questions waiting.** Temporary project directory with a plan at
-   a gate and NO questions file. Assert `waitingQuestionCount === 0`; assert the
-   screen's single question text is exactly `'What shall we create today?'`;
-   assert no option is labelled `'Answer the questions'`.
-2. **Shape B — questions waiting.** Same fixture plus a questions file written
-   through the real `streamingPrecompute.writePlanQuestions(root, ref, questions, mtime)`
-   with the plan's current mtime. Assert `waitingQuestionCount === 1`; assert the
-   question text is `'What shall we create today — or shall we answer the questions waiting for you?'`;
-   assert BOTH `'Type what you want'` and `'Answer the questions'` are present.
-3. **Stale questions do not count.** Write a questions file with a `planMtimeMs`
-   older than the plan's current mtime; assert `waitingQuestionCount === 0` and
-   shape A renders. A stale critique must never claim there is something to answer.
-4. **Fully answered questions do not count.** Write questions, then append a
-   matching answer line to `.ctoc/streaming/answers.jsonl` for every question id;
-   assert `waitingQuestionCount === 0`.
-5. **The open option is always present.** Both shapes; assert
-   `'Something else?'` appears in `ask.questions[0].options` in each.
-6. **No digit is ever an action key.** Assert
-   `Object.keys(screen.actions).every(k => !/^\d+$/.test(k))`. Numbers open plans
-   and nothing else.
-7. **Never throws on a broken store.** Point `startScreen` at a directory with no
-   `plans/` and no `.ctoc/`; assert it returns a well-formed
-   `{ text, ask, actions }` and does not throw.
-8. **The ride-along contract holds.** Assert `ask.questions` is an array and
-   `actions` is a plain object, so `attachEnvironmentQuestion` and
-   `attachComplianceQuestion` in `menu.js` can append to them unchanged.
+1. **Shape A — no questions waiting.** `waitingQuestionCount === 0`; question text
+   exactly `'What shall we create today?'`; no `'Answer the questions'` option.
+2. **Shape B — questions waiting.** Questions written through the real
+   `writePlanQuestions` with the plan's current mtime. Count is 1; question text is
+   the extended sentence; BOTH `'Type what you want'` and `'Answer the questions'`
+   present.
+3. **Stale questions do not count** — a `planMtimeMs` older than the plan's current
+   mtime yields count 0 and shape A.
+4. **Fully answered questions do not count.**
+5. **Unreal questions do not count.** A plan whose only question has one option
+   yields count 0 — the count never promises a question the screen would refuse.
+6. **The open option is always present** in both shapes.
+7. **No digit is ever an action key.**
+8. **Never throws on a broken store** — a directory with no `plans/` and no `.ctoc/`
+   still returns a well-formed screen.
+9. **The ride-along contract holds** — `ask.questions` is an array and `actions` a
+   plain object, so the `menu.js` attach helpers work unchanged.
 
 #### Tests: `tests/ctoc-start-flow.test.js`
 **Action:** CREATE
-**Purpose:** The real human flow, end to end, driving the actual entry point.
-This is the test that Operating Lesson 6 demands — behaviour, not structure.
+**Purpose:** The real human flow, end to end, driving the actual entry point as a
+real process. This is what Operating Lesson 6 demands — behaviour, not structure.
 
-1. **No questions → the open prompt appears.** Build a temporary project with a
-   plan at a gate and no questions store. Execute
-   `node src/commands/menu.js` with `cwd` set to the fixture, capture stdout,
-   `JSON.parse` it. Assert the parsed `ask.questions[0].question` is exactly
-   `'What shall we create today?'`. This drives the shipped entry point as a real
-   process, not the module in isolation.
-2. **Questions present → both choices appear, and answering reaches a REAL
-   precomputed question.** Same fixture plus a questions file written through
-   `writePlanQuestions` containing one `critical` question with two options
-   carrying real `pros`, `cons` and one `recommended: true`. Then:
-   - Run `node src/commands/menu.js`; assert both `'Type what you want'` and
-     `'Answer the questions'` are among the option labels.
-   - Follow the `'Answer the questions'` action by running `node src/commands/menu.js`
-     with no arguments (the action maps to the default route); assert the rendered
-     question prompt is the exact prompt string that was written to the store —
-     proving the answer path reaches the real precomputed question and did not
+1. **No questions → the open prompt appears.** Run `node src/commands/menu.js` with
+   `cwd` set to a fixture with a plan at a gate and no questions store; parse stdout;
+   assert `ask.questions[0].question` is exactly `'What shall we create today?'`.
+2. **Questions present → both choices, and answering reaches a REAL precomputed
+   question.** Fixture plus a questions file written through `writePlanQuestions`
+   with one `critical` question, two options carrying real `pros` / `cons`, one
+   `recommended: true`. Then:
+   - Both `'Type what you want'` and `'Answer the questions'` are among the labels.
+   - Following the answer route renders the EXACT prompt string that was written to
+     the store — proving the path reaches the real precomputed question and did not
      regenerate or invent one.
-   - Assert the rendered `text` contains `┌` and `│` and both the `pros` and the
-     `cons` sentence — the matrix reached the human.
-   - Assert `'Something else?'` is among the rendered options.
-   - Assert `'Open the plan'` is NOT among the rendered options (Decision 7).
-3. **Zero wait.** Assert the questions store file's modification time is unchanged
-   after the render, and that the render process wrote nothing under
-   `.ctoc/streaming/questions/`. The foreground reads; it never generates.
-4. **`/ctoc:start` is the only entry spec.** Assert
-   `fs.existsSync('src/commands/start.md')` is true and
-   `fs.existsSync('src/commands/menu.md')` is false.
-5. **Still exactly three slash commands.** Assert the count of `.md` files in
-   `src/commands/` is 3, and that the set of basenames is exactly
+   - `text` contains `┌`, `│`, and both the `pros` and `cons` sentences.
+   - `'Something else?'` is among the options.
+   - `'Open the plan'` is NOT (Decision 7).
+3. **One topic at a time.** `ask.questions` has length exactly 1, and every option
+   routes to the same `ref`. Decision 9.
+4. **Ten accepted recommendations raise the check-in.** Drive ten real answers
+   through the actual `stream answer` route, each taking the recommended option;
+   assert the next render's question is the calibration check-in, that its prompt
+   contains the plan's TITLE spelled out, and that it contains neither the slug nor
+   a `.md` filename.
+5. **Answering the check-in resets it** — the following render is an ordinary
+   question, not the check-in again.
+6. **A critical question still gets asked after `'trusted'`.** Answer the check-in
+   `'trusted'`, then assert a remaining `critical` question is STILL presented
+   individually. Trust must never swallow a fork.
+7. **Zero wait.** The questions store file's mtime is unchanged after a render, and
+   nothing was written under `.ctoc/streaming/questions/`. The foreground reads; it
+   never generates.
+8. **`/ctoc:start` is the only entry spec** — `start.md` exists, `menu.md` does not.
+9. **Still exactly three slash commands** — three `.md` files, basenames exactly
    `{ start, push, update }`.
-6. **No gate is crossed.** After the whole flow, assert no plan file moved
-   between stage directories and that no file under `.ctoc/approvals/` was
-   created or modified.
+10. **No gate is crossed.** No plan file moved between stage directories; no file
+    under `.ctoc/approvals/` created or modified.
 
 #### Tests: `tests/streaming-gate.test.js`
 **Action:** MODIFY
 
-- Add: `richQuestionScreen` output `text` contains the box-drawing matrix and both
-  the `pros` and the `cons` strings of every option.
-- Add: `richQuestionScreen` options include `'Something else?'`, and
-  `actions['Something else?']` is `stream comment <ref>`.
-- Add: `richQuestionScreen` options do NOT include `'Open the plan'`, and
-  `actions` has no `'Open the plan'` key — asserted for BOTH a two-option and a
-  four-option question, so the removal is proved unconditional rather than
-  cap-dependent (Decision 7).
+- Add: `richQuestionScreen` `text` contains the matrix and both the `pros` and
+  `cons` strings of every option.
+- Add: options include `'Something else?'`; `actions['Something else?']` is
+  `stream comment <ref>`.
+- Add: options do NOT include `'Open the plan'` and `actions` has no such key —
+  asserted for BOTH a two-option and a four-option question, proving the removal is
+  unconditional rather than cap-dependent (Decision 7).
 - Add: option order is the question's own options, then `'Something else?'`, then
   `'Skip for now'`.
+- Add: `nextUnansweredQuestion` skips a question `isRealQuestion` rejects.
+- Add: `streamAnswer` writes the extended line, and a check-in answer routes to
+  `recordCalibration` rather than the answers log.
 - Add: `planDecisionScreen`'s product-question branch renders the same matrix.
 - Update: any existing assertion on the flattened description string, to assert the
   description AND the matrix, rather than being loosened. Any existing assertion
   that `'Open the plan'` is offered on the question screen is DELETED, not
-  weakened — it asserts behaviour the human has now removed. Per Operating
-  Lesson 14 this is the narrow legitimate case: the contract it tested was
-  explicitly replaced.
+  weakened — it asserts behaviour the human has now removed. Per Operating Lesson 14
+  this is the narrow legitimate case: the contract it tested was explicitly replaced.
 
 #### Tests: `tests/readme-numbers.test.js`
 **Action:** MODIFY
 
-- Line 22: `MENU_MD` reads `src/commands/start.md`; rename the constant to
-  `START_MD` and update its uses at lines 359, 367, 379, 386, 392, 412.
-- Line 139: the assertion stays `=== 3`; update its title to name `start, push,
-  update`.
-- Line 257: `assert.match(README, /3 slash commands/)` stays as-is — the README
-  keeps that exact phrase.
-- Add: assert `src/commands/menu.md` does NOT exist, so a re-added fourth command
-  is caught here.
-- `src/lib/`: the module count assertion at line 136 rises from 100 to 102
-  (`decision-matrix.js` and `start-screen.js`).
+- Line 22: read `src/commands/start.md`; rename `MENU_MD` → `START_MD` and update
+  its uses at lines 359, 367, 379, 386, 392, 412.
+- Line 139: assertion stays `=== 3`; title names `start, push, update`.
+- Line 257: `assert.match(README, /3 slash commands/)` unchanged.
+- Add: assert `src/commands/menu.md` does NOT exist, so a re-added fourth command is
+  caught here.
+- Line 136: the `src/lib/` module count rises from 100 to **103**
+  (`decision-matrix.js`, `question-cadence.js`, `start-screen.js`).
 
 #### Tests: `tests/slash-command-no-model-pin.test.js`
 **Action:** MODIFY
 
-- Line 49: read `start.md` instead of `menu.md`; update the assertion message.
-- The loop at lines 36-46 is filename-agnostic and needs no change — it already
-  covers every `.md` in the directory, so `start.md` is checked for a `model:` pin
-  automatically.
+- Line 49: read `start.md`; update the assertion message.
+- The loop at lines 36-46 is filename-agnostic — `start.md` is checked for a
+  `model:` pin automatically, no change needed.
 
 #### Tests: `tests/e2e-menu-lifecycle.test.js`
 **Action:** MODIFY
 
-- Update the `/ctoc:menu` references to `/ctoc:start`.
-- Update any assertion that the no-arguments render is the gate screen; it is now
-  the start screen, which reaches the gate screen through the
-  `'Answer the questions'` choice.
+- `/ctoc:menu` → `/ctoc:start`.
+- Any assertion that the no-arguments render is the gate screen: it is now the start
+  screen, which reaches the gate screen through `'Answer the questions'`.
 
 #### Coverage Targets
 
-- New modules `decision-matrix.js` and `start-screen.js`: at or above 80 percent
-  line and branch coverage, every error path exercised.
-- Overall: `npm test` must hold the floor recorded in
-  `.ctoc/coverage-baseline.json`. The floor is a ratchet and is never lowered to
-  make a run pass.
+- `decision-matrix.js`, `question-cadence.js`, `start-screen.js`: at or above 80
+  percent line and branch coverage; every error path exercised.
+- Overall: `npm test` holds the floor in `.ctoc/coverage-baseline.json`. The floor is
+  a ratchet and is never lowered to make a run pass.
 
 ### Security Review
 
-- [x] **Path traversal.** `start-screen.js` constructs no path; every path comes
-      from `streaming-gate` / `streaming-precompute`, whose `sanitizeRef` already
-      collapses separators and traversal into one inert filename segment.
-- [x] **Input validation.** `renderMatrix` and `withSomethingElse` type-check every
-      field they read and treat a non-string as absent rather than coercing it.
-- [x] **Terminal injection.** Question text, option labels, pros, cons and
-      descriptions are all subagent-authored and therefore untrusted. Every one
-      passes through `stripCtl` before reaching the output. This is the same
-      discipline `streaming-gate.js` already applies.
-- [x] **No secrets.** No key, token, credential or path to one appears in any file
-      in this slice.
-- [x] **Safe file operations.** This slice's runtime code WRITES NOTHING. It is a
-      pure read plus a render. Only the tests write, and only into temporary
-      directories they create and remove.
-- [x] **Error messages.** Failures degrade to a shape-A render or an omitted
-      matrix; no stack trace, internal path, or store state reaches the human.
-- [x] **Prototype pollution.** `withSomethingElse` builds a new array with object
-      literals; no merge of untrusted input into an existing object.
-- [x] **Command injection.** No `exec`, no `execSync`, no shell interpolation in
-      any file in this slice.
-- [x] **Human gates.** Nothing here approves, stamps `approved_by`, writes the
-      approval ledger, or moves a plan between stages. Gates 0 through 3 are
-      untouched, and test 6 in `tests/ctoc-start-flow.test.js` asserts it.
-- [x] **Tool-capability boundary unchanged.** This slice widens no agent's
-      `tools:` declaration. The lens critics keep `Read, Grep` (the Rule-of-Two
-      hardening); the upstream producer gap is recorded, not patched here.
+- [x] **Path traversal.** `start-screen.js` constructs no path. `question-cadence.js`
+      writes only to two fixed filenames under `.ctoc/streaming/`, joined with
+      `path.join` — `topicKey` is used as a JSON FIELD, never as a path segment, so
+      an adversarial ref cannot escape.
+- [x] **Input validation.** `renderMatrix`, `withSomethingElse`, `isRealQuestion` and
+      every cadence reader type-check each field and treat a non-string as absent
+      rather than coercing it. `recordCalibration` accepts only the two literal
+      verdicts.
+- [x] **Terminal injection.** Question text, option labels, pros, cons, descriptions
+      and the topic label are subagent- or plan-authored and therefore untrusted.
+      Every one passes `stripCtl` before output — including `topicLabel`, which comes
+      from a plan's `# ` heading and reaches the check-in prompt.
+- [x] **Log injection.** Both JSONL writers serialize with `JSON.stringify`, so an
+      embedded newline is escaped and cannot forge a second entry. This matters: a
+      forged `tookRecommended: true` line would fabricate evidence of trust.
+- [x] **No secrets.** None in any file in this slice.
+- [x] **Safe file operations.** The only runtime writes are the two append-only logs
+      under `.ctoc/streaming/`, which is whitelisted. Rendering writes nothing. Tests
+      write only into temporary directories they create and remove.
+- [x] **Error messages.** Failures degrade to shape A, an omitted matrix, or no
+      check-in; no stack trace, internal path, or store state reaches the human.
+- [x] **Prototype pollution.** `withSomethingElse` builds a new array of object
+      literals; parsed JSONL entries are read field-by-field, never merged into an
+      existing object.
+- [x] **Command injection.** No `exec`, no `execSync`, no shell interpolation.
+- [x] **Human gates.** Nothing approves, stamps `approved_by`, writes the approval
+      ledger, or moves a plan. The calibration log is NOT approval evidence and is
+      never read by any gate. Gates 0-3 untouched; `ctoc-start-flow.test.js` case 10
+      asserts it.
+- [x] **Tool-capability boundary unchanged.** No agent's `tools:` declaration is
+      widened. The lens critics keep `Read, Grep`.
 
 ## Implementation Order
 
 1. `src/lib/decision-matrix.js` — no dependencies on other new files
 2. `tests/decision-matrix.test.js`
-3. `src/lib/start-screen.js` — depends on step 1
-4. `tests/start-screen.test.js`
-5. `src/lib/streaming-gate.js` — depends on step 1
-6. `tests/streaming-gate.test.js`
-7. `src/commands/menu.js` — depends on step 3, the live wiring
-8. `src/commands/start.md` created, `src/commands/menu.md` deleted
-9. `tests/readme-numbers.test.js`, `tests/slash-command-no-model-pin.test.js` — the two hard-break tests
-10. `tests/ctoc-start-flow.test.js` — the human-flow test, needs 7 and 8 in place
-11. `tests/e2e-menu-lifecycle.test.js`
-12. Documentation and hook message surfaces: `src/hooks/SessionStart.js`, `src/hooks/PreToolUse.Edit.js`, `src/hooks/PreToolUse.Bash.js`, `.ctoc/templates/operating-lessons.md`, `README.md`, `CLAUDE.md`, `docs/AGENT_ARCHITECTURE.md`
+3. `src/lib/question-cadence.js` — depends on step 1
+4. `tests/question-cadence.test.js`
+5. `src/lib/start-screen.js` — depends on steps 1 and 3
+6. `tests/start-screen.test.js`
+7. `src/lib/streaming-gate.js` — depends on steps 1 and 3
+8. `tests/streaming-gate.test.js`
+9. `src/commands/menu.js` — depends on step 5, the live wiring
+10. `src/commands/start.md` created, `src/commands/menu.md` deleted
+11. `tests/readme-numbers.test.js`, `tests/slash-command-no-model-pin.test.js` — the two hard-break tests
+12. `tests/ctoc-start-flow.test.js` — the human-flow test, needs 9 and 10 in place
+13. `tests/e2e-menu-lifecycle.test.js`
+14. Documentation and hook message surfaces: `src/hooks/SessionStart.js`, `src/hooks/PreToolUse.Edit.js`, `src/hooks/PreToolUse.Bash.js`, `.ctoc/templates/operating-lessons.md`, `README.md`, `CLAUDE.md`, `docs/AGENT_ARCHITECTURE.md`
 
 Test-driven development inverts the write order within each pair — the test is
 written and seen failing before its module exists. The list above is DEPENDENCY
@@ -843,56 +1069,69 @@ order: what must exist before what can reference it.
 
 | Criterion | Implemented In | Test Case |
 |---|---|---|
-| 1. `/ctoc:start` exists | `src/commands/start.md` | `ctoc-start-flow.test.js` case 4 |
-| 2. Still exactly three commands | `src/commands/menu.md` deleted | `ctoc-start-flow.test.js` case 5; `readme-numbers.test.js` line 139 |
+| 1. `/ctoc:start` exists | `src/commands/start.md` | `ctoc-start-flow.test.js` case 8 |
+| 2. Still exactly three commands | `src/commands/menu.md` deleted | `ctoc-start-flow.test.js` case 9; `readme-numbers.test.js` line 139 |
 | 3. No questions → open prompt only | `start-screen.js:startScreen()` shape A | `start-screen.test.js` case 1; `ctoc-start-flow.test.js` case 1 |
 | 4. Questions → both choices | `start-screen.js:startScreen()` shape B | `start-screen.test.js` case 2; `ctoc-start-flow.test.js` case 2 |
-| 5. Reaches a real precomputed question | `start-screen.js:waitingQuestionCount()` reading `loadPlanQuestions` | `ctoc-start-flow.test.js` case 2 |
+| 5. Reaches a real precomputed question | `start-screen.js:waitingQuestionCount()` | `ctoc-start-flow.test.js` case 2 |
 | 6. Matrix with the four columns | `decision-matrix.js:renderMatrix()` | `decision-matrix.test.js` cases 1-5; `ctoc-start-flow.test.js` case 2 |
-| 7. `'Something else?'` always present | `decision-matrix.js:withSomethingElse()` | `decision-matrix.test.js` cases 7-9; `start-screen.test.js` case 5 |
+| 7. `'Something else?'` always present | `decision-matrix.js:withSomethingElse()` | `decision-matrix.test.js` cases 7-9; `start-screen.test.js` case 6 |
 | 8. No model pin | `src/commands/start.md` frontmatter | `slash-command-no-model-pin.test.js` |
-| 9. Numbers open plans only | `start-screen.js` action keys | `start-screen.test.js` case 6 |
-| 10. Gates untouched | no approval code path in this slice | `ctoc-start-flow.test.js` case 6 |
+| 9. Numbers open plans only | `start-screen.js` action keys | `start-screen.test.js` case 7 |
+| 10. Gates untouched | no approval code path in this slice | `ctoc-start-flow.test.js` case 10 |
 | 11. Full gate green | all | Step 14 VERIFY, `npm test` |
+| 12. Only real questions | `question-cadence.js:isRealQuestion()`, `shouldAskIndividually()` | `question-cadence.test.js` cases 1-6; `start-screen.test.js` case 5 |
+| 13. One topic at a time | `streaming-gate.js:richQuestionScreen()` | `ctoc-start-flow.test.js` case 3 |
+| 14. Check-in after ten, topic spelled out | `question-cadence.js:checkInDue()`, `checkInQuestion()` | `question-cadence.test.js` cases 7-14; `ctoc-start-flow.test.js` case 4 |
+| 15. Check-in resets and changes depth | `question-cadence.js:recordCalibration()`, `topicVerdict()` | `question-cadence.test.js` cases 12, 16; `ctoc-start-flow.test.js` cases 5-6 |
 | Decision 7 — `'Open the plan'` dropped | `streaming-gate.js:richQuestionScreen()` | `streaming-gate.test.js`; `ctoc-start-flow.test.js` case 2 |
 
 ## Risk Mitigations
 
 | Risk | Mitigation | Where |
 |---|---|---|
-| Building this before 00066 ships a start screen whose best path is empty | `depends_on: 00066-x9-gate-critic-writes-its-own-questions`; the producer gap is recorded in full above | Frontmatter; known upstream gap section |
-| Renaming the command file silently breaks a test that reads it by path | Both path-reading tests are named in `files:` and updated in the same slice | `readme-numbers.test.js`, `slash-command-no-model-pin.test.js` |
-| A human types `/ctoc:menu` and gets nothing | The name is taught in the same slice by `SessionStart.js` (every session) and `README.md` | Decision 1 |
-| Box-drawing alignment breaks on wide characters or a narrow terminal | Widths are capped, cells wrap, and the alignment test asserts identical `│` column indices on every row | `decision-matrix.test.js` case 3 |
-| The matrix is rendered but the human never sees pros and cons because the flattening path is still used | The matrix is asserted to contain the literal pros and cons sentences, not merely to exist | `decision-matrix.test.js` case 5; `streaming-gate.test.js` |
-| `'Open the plan'` is removed only when the cap binds, leaving inconsistent screens | Asserted absent on BOTH a two-option and a four-option question | `streaming-gate.test.js` |
-| Losing the plan-opening route entirely | The plan list route is unchanged; opening a plan costs one extra hop, never access | Decision 7 |
-| A producer writes singular `pro` / `con` and the reasoning vanishes with no error | Pinned by a test asserting the singular keys render empty rather than fabricated | `decision-matrix.test.js` case 6; Decision 6 |
-| The start screen appears to have questions when the critique is stale | `loadPlanQuestions` already returns `null` for stale; asserted directly | `start-screen.test.js` case 3 |
-| The environment or compliance first-run prompt is lost in the new screen | The return shape is preserved and the attach helpers are unchanged; asserted | `start-screen.test.js` case 8 |
+| Building this before 00066 ships a start screen whose best path is empty | `depends_on: 00066`; the producer gap recorded in full | Frontmatter; upstream gap section |
+| Renaming the command file silently breaks a test that reads it by path | Both path-reading tests named in `files:` and updated in the same slice | `readme-numbers.test.js`, `slash-command-no-model-pin.test.js` |
+| A human types `/ctoc:menu` and gets nothing | The name is taught in the same slice by `SessionStart.js` and `README.md` | Decision 1 |
+| Box-drawing alignment breaks on wide characters or a narrow terminal | Widths capped, cells wrap, alignment asserted by identical `│` column indices | `decision-matrix.test.js` case 3 |
+| Matrix rendered but pros/cons still invisible because the flattening path is used | The matrix is asserted to contain the literal pros and cons sentences | `decision-matrix.test.js` case 5 |
+| `'Open the plan'` removed only when the cap binds | Asserted absent on BOTH a two-option and a four-option question | `streaming-gate.test.js` |
+| **Trust silences a real fork** — the worst failure this feature could cause | `shouldAskIndividually` returns `true` for `critical`/`important` under EVERY verdict, asserted directly and again end to end | `question-cadence.test.js` case 4; `ctoc-start-flow.test.js` case 6 |
+| A global counter lets easy approvals on one topic silence another | The counter is keyed per topic, asserted with two topics | `question-cadence.test.js` case 10 |
+| The check-in becomes a nag, firing on every answer past ten | The counter resets after a check-in; asserted | Decision 11; `question-cadence.test.js` case 12 |
+| The check-in shows a slug and he cannot decode it | The prompt uses the plan TITLE; asserted to contain the title and NOT the slug or filename | `question-cadence.test.js` case 13 |
+| The system answers its own calibration question | `checkInQuestion` marks no option recommended; asserted | `question-cadence.test.js` case 14 |
+| Legacy answer lines fabricate a streak that was never observed | A line missing `tookRecommended` STOPS the scan — unknown can only delay a check-in, never fire one | Decision 10; `question-cadence.test.js` case 9 |
+| A forged log line fabricates evidence of trust | Both writers use `JSON.stringify`, so an embedded newline cannot forge a second entry | Security review |
+| **Two streak mechanisms drift apart** — `recommendedStreak` at 5 in `streaming-flow.js` versus the persisted counter at 10 | Stated explicitly in Decision 12 with why they measure different things; unifying them is deliberately not in this slice, so the duplication is visible rather than discovered later | Decision 12 |
+| A producer writes singular `pro` / `con` and the reasoning vanishes silently | Pinned by a test asserting singular keys render empty rather than fabricated | Decision 6 |
+| The start screen claims questions when the critique is stale | `loadPlanQuestions` returns `null` for stale; asserted | `start-screen.test.js` case 3 |
+| The environment or compliance first-run prompt is lost | The return shape is preserved and the attach helpers unchanged; asserted | `start-screen.test.js` case 9 |
 
 ## Execution Plan
 
 ### Step 8: TEST
-Write `tests/decision-matrix.test.js`, `tests/start-screen.test.js` and
-`tests/ctoc-start-flow.test.js` FIRST, and run them to see them fail for the right
-reason — module not found, then wrong output. Add the new assertions to
-`tests/streaming-gate.test.js`. A test written and run in the same pass as its
-implementation is a violation; the red must be observed.
+Write `tests/decision-matrix.test.js`, `tests/question-cadence.test.js`,
+`tests/start-screen.test.js` and `tests/ctoc-start-flow.test.js` FIRST, and run them
+to see them fail for the right reason — module not found, then wrong output. Add the
+new assertions to `tests/streaming-gate.test.js`. A test written and run in the same
+pass as its implementation is a violation; the red must be observed.
 
 ### Step 9: PREPARE
 Confirm 00066 has landed, so the store this screen reads is actually being filled.
-Confirm the current entry path by reading `src/commands/menu.js` `main()` and
-`src/lib/menu-screens.js` `route()` fresh from disk — line numbers in this plan are
-indicative and must be re-derived, never trusted. Confirm the current
-`src/lib/` top-level module count so the `readme-numbers.test.js` assertion is
-raised to the true new value. Confirm `.ctoc/coverage-baseline.json` `minPct`.
+Re-derive every line number in this plan from disk — they are indicative, never to be
+trusted. Confirm the current `src/lib/` top-level module count so the
+`readme-numbers.test.js` assertion is raised to the true value. Confirm
+`.ctoc/coverage-baseline.json` `minPct`. Confirm `.ctoc/streaming/` is whitelisted by
+the enforcement hook, so the two append-only logs are writable at runtime.
 
 ### Step 10: IMPLEMENT
 - `src/lib/decision-matrix.js` — create
+- `src/lib/question-cadence.js` — create
 - `src/lib/start-screen.js` — create
-- `src/lib/streaming-gate.js` — matrix insertion, open option, and the
-  `'Open the plan'` removal in `richQuestionScreen` and `planDecisionScreen`
+- `src/lib/streaming-gate.js` — matrix insertion, open option, `'Open the plan'`
+  removal, cadence filtering in `nextUnansweredQuestion`, check-in in
+  `richQuestionScreen`, extended write in `streamAnswer`
 - `src/commands/menu.js` — the no-arguments branch calls `startScreen`
 - `src/commands/start.md` — create; `src/commands/menu.md` — delete
 - `src/hooks/SessionStart.js`, `src/hooks/PreToolUse.Edit.js`,
@@ -903,47 +1142,60 @@ raised to the true new value. Confirm `.ctoc/coverage-baseline.json` `minPct`.
   `tests/e2e-menu-lifecycle.test.js` — updated to the new name
 
 ### Step 11: REVIEW
-Verify: dependencies flow one way (`decision-matrix` ← `start-screen` and
-`streaming-gate`, never the reverse); no cycle; `start-screen` imports nothing
-from `src/hooks/` or `src/commands/`; every new function takes only the parameters
-it uses; `precomputedOptionDescription` is extended-around, not rewritten; no test
-depends on execution order or on another test's temporary directory; no agent's
-`tools:` declaration was touched.
+Verify: dependencies flow one way (`decision-matrix` and `question-cadence` are
+leaves; `start-screen` and `streaming-gate` sit above; never the reverse); no cycle;
+`start-screen` imports nothing from `src/hooks/` or `src/commands/`; `question-cadence`
+imports nothing from `streaming-gate` (which imports IT — the direction must not
+invert); `CALIBRATION_THRESHOLD` appears exactly once as a declaration and nowhere as
+a literal; `precomputedOptionDescription` is extended-around, not rewritten; no test
+depends on execution order or another test's temporary directory; no agent's `tools:`
+declaration was touched.
 
 ### Step 12: OPTIMIZE
-Confirm `waitingQuestionCount` reads each plan's questions at most once per render
-and that `startScreen` does not call it twice. Confirm the matrix is built once per
-question, not once per option. Remove any duplicated width-computation pass.
+Confirm `waitingQuestionCount` reads each plan's questions at most once per render and
+that `startScreen` does not call it twice. Confirm the answers log is scanned ONCE per
+render, not once per topic — it is append-only and grows without bound, so a per-topic
+rescan is a real cost. Confirm `topicStreak` scans from the END backwards and stops at
+the first break rather than parsing the whole file. Confirm the matrix is built once
+per question, not once per option.
 
 ### Step 13: SECURE
-Walk the Security Review checklist above item by item against the written code.
-Specifically re-verify that every subagent-authored string reaching the terminal
-passes `stripCtl`, and that the runtime code in this slice writes no file.
+Walk the Security Review item by item against the written code. Re-verify that every
+subagent- or plan-authored string reaching the terminal passes `stripCtl` —
+`topicLabel` especially, since it comes from a plan heading and lands in the check-in
+prompt. Re-verify both JSONL writers serialize through `JSON.stringify`, so no
+embedded newline can forge a trust entry.
 
 ### Step 14: VERIFY
-Run the FULL gate: `npm test`. Not `node --test tests/*.test.js`, which bypasses
-both the coverage floor and the zero-skipped gate. Required: `# fail 0`, zero
-skipped, zero flaky, coverage at or above `.ctoc/coverage-baseline.json` `minPct`.
-Then manually open `/ctoc:start` in a real session and confirm with your own eyes:
-the open prompt when nothing waits; both choices when something waits; a real
-matrix with visible vertical lines; `'Something else?'` on the question; and no
-`'Open the plan'` option. A green suite is not the measure — a human opening it and
-getting the right screen is.
+Run the FULL gate: `npm test`. Not `node --test tests/*.test.js`, which bypasses both
+the coverage floor and the zero-skipped gate. Required: `# fail 0`, zero skipped, zero
+flaky, coverage at or above `.ctoc/coverage-baseline.json` `minPct`.
+
+Then drive it by hand in a real session and confirm with your own eyes: the open
+prompt when nothing waits; both choices when something waits; a real matrix with
+visible vertical lines; `'Something else?'` on every question; no `'Open the plan'`;
+one question on screen at a time; and — the one that needs a real run — take the
+recommendation ten times on one topic and watch the check-in appear naming that topic
+in words. A green suite is not the measure. A human opening it and getting the right
+screen is.
 
 ### Step 15: DOCUMENT
 Confirm every new function carries a documentation comment with typed parameters,
-return type, and the throws contract. Confirm the seven documentation and
-instruction surfaces name `/ctoc:start` and that no shipped human-facing text
-still says `/ctoc:menu`. Confirm this plan's Decisions section matches what was
-actually built.
+return type, and the throws contract. Confirm the seven documentation and instruction
+surfaces name `/ctoc:start` and that no shipped human-facing text still says
+`/ctoc:menu`. Confirm `src/commands/start.md`'s new Rule states the question-flow
+contract accurately — only real questions, one topic at a time, the check-in
+threshold, and the topic named in words. Confirm this plan's Decisions section matches
+what was actually built.
 
 ### Step 16: FINAL-REVIEW
-Walk the Quality Bar: every acceptance criterion maps to an implementation and a
-test; every file has an exact path and a declared action; the dependency graph has
-no cycle and no orphan; the test plan covers happy path, error paths and edge
-cases; the security checklist has no open item; cross-platform requirements hold;
-every risk maps to a concrete mitigation. Confirm the three-command invariant, the
-no-model-pin invariant, and that no human gate was crossed by this work.
+Walk the Quality Bar: every acceptance criterion maps to an implementation and a test;
+every file has an exact path and a declared action; the dependency graph has no cycle
+and no orphan; the test plan covers happy path, error paths and edge cases; the
+security checklist has no open item; cross-platform requirements hold; every risk maps
+to a concrete mitigation. Confirm the three-command invariant, the no-model-pin
+invariant, that a critical question is still asked after a `'trusted'` verdict, and
+that no human gate was crossed by this work.
 
 
 ---

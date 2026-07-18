@@ -281,7 +281,7 @@ function nextUnansweredQuestion(root, ref) {
  * @param {object} q the Question
  * @param {string} ref the plan it belongs to
  * @param {string} header the question header
- * @returns {{ question: object, actions: object }}
+ * @returns {{ question: object, matrix: string, actions: object }}
  */
 function precomputedQuestionParts(q, ref, header) {
   const ordered = [
@@ -301,6 +301,10 @@ function precomputedQuestionParts(q, ref, header) {
       header,
       options: entries.map((e) => ({ label: e.label, description: e.description })),
     },
+    // The same structured fields, tabulated for the screen TEXT. The flattened
+    // one-sentence description above stays the ask layer's; the matrix is what the
+    // human actually reads while deciding.
+    matrix: precomputedQuestionMatrix(q, ordered),
     actions,
   };
 }
@@ -519,6 +523,185 @@ function isNonEmptyStr(v) {
   return typeof v === 'string' && v.length > 0;
 }
 
+// ── The DECISION MATRIX ────────────────────────────────────────────────────────
+// The precompute layer stores every option's pros, cons and recommendation as
+// SEPARATE structured fields. `precomputedOptionDescription` above flattens them
+// into ONE sentence, which is correct for the option descriptions handed to the
+// question interface — but rendering only that made the critique fleet's reasoning
+// invisible: the human read a wall of run-on text and could not decide. The screen
+// TEXT therefore carries the canonical decision matrix from
+// `.ctoc/ask-me-questions.md`: a real box-drawing table whose columns are exactly
+// Option, Pros, Cons and Recommendation.
+//
+// WIDTH IS A HARD CONSTRAINT. A matrix that wraps in a narrow terminal is worse
+// than no matrix at all, so the TOTAL rendered width — every border character
+// included — never exceeds this ceiling. Long cell text WRAPS inside its cell;
+// nothing is ever dropped or truncated to fit. Tune the whole matrix here.
+const MATRIX_TOTAL_WIDTH = 88;
+const MATRIX_COLUMNS = Object.freeze(['Option', 'Pros', 'Cons', 'Recommendation']);
+// Share of the available content width per column. Weights, not absolute widths,
+// so MATRIX_TOTAL_WIDTH stays the single tuning knob. Option is the NARROWEST: it
+// carries the label and nothing else. Pros and Cons carry the critique's full
+// reasoning and get the most room. Recommendation carries one short clause.
+const MATRIX_COLUMN_WEIGHTS = Object.freeze([0.20, 0.29, 0.29, 0.22]);
+const MATRIX_MIN_COLUMN_WIDTH = 6;
+
+// Characters a long token may be broken AFTER. A file path or a dotted identifier
+// wider than its column has to break somewhere; breaking it at a separator keeps
+// each fragment readable and the whole token reconstructable by eye. Breaking it
+// mid-word — `src/lib/task-reconci` / `le.js` — does neither.
+const MATRIX_TOKEN_BREAK_AFTER = /[/\\\-_.:,;]/;
+// A fragment shorter than this is not worth a line of its own, so a separator that
+// close to the start of a token is ignored and a later break point is used.
+const MATRIX_MIN_FRAGMENT = 4;
+
+/**
+ * Content width of each column, derived from MATRIX_TOTAL_WIDTH. Each row spends
+ * (columns + 1) characters on vertical rules and 2 per column on padding; whatever
+ * remains is the content, split by weight with the rounding remainder given to the
+ * last column so the widths always sum EXACTLY to the available content width.
+ */
+function matrixColumnWidths() {
+  const n = MATRIX_COLUMNS.length;
+  const content = MATRIX_TOTAL_WIDTH - (n + 1) - n * 2;
+  const widths = MATRIX_COLUMN_WEIGHTS.map(
+    (w) => Math.max(MATRIX_MIN_COLUMN_WIDTH, Math.floor(content * w)),
+  );
+  const used = widths.reduce((a, b) => a + b, 0);
+  widths[n - 1] += content - used;
+  return widths;
+}
+
+// Box-drawing block. A cell value carrying any of these characters — or a newline —
+// would FORGE the matrix's own structure, making planted text render as a real row
+// in the pane the human reads while deciding. Every field here is subagent-authored
+// and therefore untrusted, so structure is neutralised before rendering (the same
+// concern the gate critic's quoting rules describe for the composer strings).
+const MATRIX_BOX_DRAWING = /[\u2500-\u257F]/g;
+
+/** Neutralise one untrusted cell value: no control characters, no newlines, no
+ *  box-drawing characters, whitespace collapsed to single spaces. */
+function matrixCellText(value) {
+  if (typeof value !== 'string') return '';
+  return stripCtl(value.replace(/[\r\n\t\v\f]+/g, ' '))
+    .replace(MATRIX_BOX_DRAWING, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Where to break a token that is wider than its column. Prefers the LAST separator
+ * inside the column window, so `plans/vision/ctoc-background-engine-rebuild.md:227`
+ * breaks after a slash or a hyphen rather than through a word. Falls back to the
+ * column width only for a token that has no separator to break at.
+ */
+function tokenBreakPoint(word, width) {
+  for (let i = width - 1; i >= MATRIX_MIN_FRAGMENT - 1; i--) {
+    if (MATRIX_TOKEN_BREAK_AFTER.test(word[i])) return i + 1;
+  }
+  return width;
+}
+
+/** Wrap already-neutralised text to `width` on WORD boundaries, breaking a single
+ *  token only when it is wider than the column. Never drops a character. */
+function wrapMatrixCell(text, width) {
+  const lines = [];
+  let current = '';
+  for (let word of String(text).split(' ').filter(Boolean)) {
+    while (word.length > width) {
+      if (current) { lines.push(current); current = ''; }
+      const cut = tokenBreakPoint(word, width);
+      lines.push(word.slice(0, cut));
+      word = word.slice(cut);
+    }
+    if (!word) continue;
+    if (!current) current = word;
+    else if (current.length + 1 + word.length <= width) current += ` ${word}`;
+    else { lines.push(current); current = word; }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [''];
+}
+
+/**
+ * The SHORT reason for the Recommendation cell.
+ *
+ * The stored question schema has no dedicated reason field — it has `pros`, `cons`,
+ * `description` and a boolean `recommended` — and copying the pros into this cell
+ * makes it a second, truncated copy of the cell beside it. So the reason is DERIVED:
+ * when the critique recorded a confidence level (its own convention for how well
+ * grounded a finding is), that level is the clause, and the cell points at the Pros
+ * column for the argument itself rather than repeating it.
+ */
+function recommendationReason(pros, description) {
+  const confidence = /confidence\s+(high|medium|low)/i.exec(`${pros} ${description}`);
+  if (confidence) {
+    return `confidence ${confidence[1].toLowerCase()}, on the reasoning in the Pros column.`;
+  }
+  return 'the highest-quality option; the reasoning is in the Pros column.';
+}
+
+/** One horizontal edge: left/junction/right characters over the column widths. */
+function matrixEdge(left, junction, right, widths) {
+  return left + widths.map((w) => '─'.repeat(w + 2)).join(junction) + right;
+}
+
+/** One content row, as many physical lines as the tallest wrapped cell needs. */
+function matrixRow(cells, widths) {
+  const wrapped = cells.map((c, i) => wrapMatrixCell(c, widths[i]));
+  const height = Math.max(...wrapped.map((w) => w.length));
+  const lines = [];
+  for (let line = 0; line < height; line++) {
+    lines.push(`│ ${widths.map((w, i) => (wrapped[i][line] || '').padEnd(w)).join(' │ ')} │`);
+  }
+  return lines;
+}
+
+/**
+ * Render ONE precomputed question's options as the canonical decision matrix.
+ *
+ * Layout per option: the Option cell carries the label and, when present, the
+ * option's one-line description beneath it; Pros and Cons carry their own fields
+ * verbatim (neutralised); the Recommendation cell is filled for EXACTLY ONE option —
+ * the recommended one — with a short reason, and is empty for every other row. The
+ * reason is the option's pros, falling back to its description, falling back to a
+ * plain statement, so the cell always says WHY rather than only "Recommended".
+ *
+ * @param {object} q a precomputed Question
+ * @param {Array<object>} ordered its options, recommended-first (same order as the ask)
+ * @returns {string} the matrix, or '' when there is nothing to tabulate
+ */
+function precomputedQuestionMatrix(q, ordered) {
+  if (!Array.isArray(ordered) || ordered.length === 0) return '';
+  const widths = matrixColumnWidths();
+  const lines = [matrixEdge('┌', '┬', '┐', widths)];
+  lines.push(...matrixRow(MATRIX_COLUMNS, widths));
+
+  let recommendationTaken = false;
+  for (const option of ordered) {
+    lines.push(matrixEdge('├', '┼', '┤', widths));
+    const label = matrixCellText(option.label);
+    const description = matrixCellText(option.description);
+    const pros = matrixCellText(option.pros);
+    const cons = matrixCellText(option.cons);
+
+    let recommendation = '';
+    if (option.recommended === true && !recommendationTaken) {
+      recommendationTaken = true;
+      recommendation = `Recommended — ${recommendationReason(pros, description)}`;
+    }
+    // The Option cell is the LABEL ALONE. The `description` field is the critique's
+    // evidence — in real data a paragraph of file-and-line citations — and putting
+    // it here wrapped a narrow column twenty lines down the page and made the whole
+    // matrix unreadable. It is NOT lost: it still rides in the flattened one-sentence
+    // description handed to the question interface, where the human reads it while
+    // choosing an option. The matrix is the scanning surface; it stays scannable.
+    lines.push(...matrixRow([label, pros, cons, recommendation], widths));
+  }
+  lines.push(matrixEdge('└', '┴', '┘', widths));
+  return lines.join('\n');
+}
+
 /**
  * The set of question ids ALREADY answered for `ref`, read from the append-only
  * answers log (`.ctoc/streaming/answers.jsonl`). Last write wins. Fail-soft: an
@@ -587,6 +770,8 @@ function richQuestionScreen(d, index, total, statusLine, root) {
   text += `Topic: ${d.slug}  ·  ${d.gateName} (${d.fromStage} → ${d.toStage})  ·  `
     + `decision ${index + 1} of ${total}  ·  question ${nextIdx + 1} of ${qTotal}\n`;
   text += `${'─'.repeat(40)}\n\n`;
+  // Matrix FIRST, then the question sentence (the ask-me-questions contract).
+  if (parts.matrix) text += `${parts.matrix}\n\n`;
   text += `  ${stripCtl(q.prompt)}\n\n\n`;
 
   return {
@@ -663,6 +848,9 @@ function planDecisionScreen(ref, projectRoot) {
       gate ? `Gate ${gate.gate}` : stripCtl(slug)
     );
     questions.push(parts.question);
+    // Matrix FIRST, then the question sentence — the same contract the streaming
+    // gate screen follows, from the same helper, so both surfaces stay identical.
+    if (parts.matrix) text += `${parts.matrix}\n\n  ${stripCtl(next.question.prompt)}\n\n\n`;
     Object.assign(actions, parts.actions);
     actions['Other'] = `stream comment ${ref}`;
   } else if (gate) {

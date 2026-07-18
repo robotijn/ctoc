@@ -778,3 +778,385 @@ describe('W1 — wiring the predicate did not create a REQUIRE CYCLE', () => {
     assert.equal(decisions[0].reason, 'not-computed', 'the real predicate answered, not a default');
   });
 });
+
+// ── The DECISION MATRIX in the screen text ─────────────────────────────────────
+// The human could not read the question: the option's structured pros, cons and
+// recommendation were flattened into one run-on sentence. The screen text must
+// carry a real box-drawing decision matrix, and it must fit a narrow terminal.
+
+const MATRIX_WIDTH_CEILING = 88;
+
+function matrixLines(text) {
+  return String(text).split('\n').filter((l) => /[┌├└│]/.test(l));
+}
+
+// Parse the rendered matrix into rows of four column strings, so an assertion can
+// name the COLUMN a value landed in rather than guessing at line breaks.
+function matrixCells(text) {
+  const rows = [];
+  let current = null;
+  for (const line of String(text).split('\n')) {
+    if (/^[┌├└]/.test(line)) { current = null; continue; }
+    if (!line.startsWith('│')) continue;
+    const cells = line.split('│').slice(1, -1).map((c) => c.trim());
+    if (!current) { current = cells.map((c) => [c]); rows.push(current); }
+    else cells.forEach((c, i) => current[i].push(c));
+  }
+  return rows.map((r) => r.map((lines) => lines.filter(Boolean).join(' ')));
+}
+
+// The same parse, but keeping each cell's physical lines so a wrap point can be
+// inspected. Rows of four cells; each cell an array of its rendered lines.
+function matrixRawRows(text) {
+  const rows = [];
+  let current = null;
+  for (const line of String(text).split('\n')) {
+    if (/^[┌├└]/.test(line)) { current = null; continue; }
+    if (!line.startsWith('│')) continue;
+    const cells = line.split('│').slice(1, -1).map((c) => c.trim());
+    if (!current) { current = cells.map((c) => [c]); rows.push(current); }
+    else cells.forEach((c, i) => current[i].push(c));
+  }
+  return rows;
+}
+
+// Column content widths, read back off the rendered top border.
+function matrixWidths(text) {
+  const top = String(text).split('\n').find((l) => l.startsWith('┌'));
+  return top.slice(1, -1).split('┬').map((seg) => seg.length - 2);
+}
+
+// THE WRAP RULE: a line may end mid-token ONLY when the token is wider than the
+// column and holds no separator to break at. Any other mid-token break —
+// `src/lib/task-reconci` / `le.js` — is unreadable and un-copyable.
+//
+// Distinguishing a line break at a SPACE from a break inside a TOKEN: the wrapper
+// never leaves a word behind that would still have fitted, so if the next line's
+// first fragment would have fitted on the previous line, the break was a token split.
+function assertNoMidTokenBreaks(text) {
+  const widths = matrixWidths(text);
+  for (const row of matrixRawRows(text)) {
+    row.forEach((cell, column) => {
+      const width = widths[column];
+      for (let i = 0; i < cell.length - 1; i++) {
+        if (!/[A-Za-z0-9]$/.test(cell[i]) || !/^[A-Za-z0-9]/.test(cell[i + 1])) continue;
+        const tail = (cell[i].match(/[^\s]+$/) || [''])[0];
+        const head = (cell[i + 1].match(/^[^\s]+/) || [''])[0];
+        const wouldHaveFitted = cell[i].length + 1 + head.length <= width;
+        if (!wouldHaveFitted) continue; // an ordinary word wrap at a space
+        assert.ok(!/[/\\\-_.:]/.test(tail + head),
+          'a token was broken mid-word although it contains a separator to break at:\n'
+          + `  "${tail}" | "${head}"`);
+      }
+    });
+  }
+}
+
+describe('decision matrix — the structured critique is VISIBLE in the screen text', () => {
+  it('renders pros, cons and the recommendation in SEPARATE cells of a box-drawing matrix', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'matrix', validFunctionalBody('matrix'));
+    precompute.writePlanQuestions(root, 'functional/matrix.md', [{
+      id: 'db',
+      prompt: 'Which database engine should the project use?',
+      critical: true,
+      options: [
+        { key: 'pg', label: 'Postgres', recommended: true,
+          description: 'A managed relational database engine.',
+          pros: 'Row level security is built in and the engine is mature.',
+          cons: 'More operational work to run in production.' },
+        { key: 'sqlite', label: 'SQLite',
+          description: 'An embedded relational database engine.',
+          pros: 'Zero configuration and a single file on disk.',
+          cons: 'No concurrent writers under load.' },
+      ],
+    }], planMtimeMs(root, 'functional', 'matrix'));
+
+    const screen = streamingGate.streamingGateScreen(root);
+    const text = screen.text;
+
+    // A real box-drawing matrix with the four canonical column names.
+    assert.match(text, /┌.*┬.*┐/, 'a top edge with ┌ ┬ ┐');
+    assert.match(text, /├.*┼.*┤/, 'a row separator with ├ ┼ ┤');
+    assert.match(text, /└.*┴.*┘/, 'a bottom edge with └ ┴ ┘');
+    assert.match(text, /│ Option .*│ Pros .*│ Cons .*│ Recommendation/,
+      'the header row names all four columns in full');
+
+    // The structured fields land in DIFFERENT COLUMNS, not one run-on sentence.
+    const rows = matrixCells(text);
+    assert.deepEqual(rows[0], ['Option', 'Pros', 'Cons', 'Recommendation'], 'header row');
+    const postgres = rows.find((r) => r[0].startsWith('Postgres'));
+    const sqlite = rows.find((r) => r[0].startsWith('SQLite'));
+    assert.ok(postgres && sqlite, 'each option has its own row');
+
+    assert.match(postgres[1], /Row level security is built in and the engine is mature\./,
+      'the pros land in the Pros column, whole');
+    assert.match(postgres[2], /More operational work to run in production\./,
+      'the cons land in the Cons column, whole');
+    assert.ok(!/Row level security/.test(postgres[2]), 'pros do not bleed into the Cons column');
+    assert.ok(!/Pros:/.test(text), 'the matrix column header replaces the inline "Pros:" label');
+
+    // Exactly ONE Recommendation cell is filled, and it carries a reason.
+    const filled = rows.slice(1).filter((r) => r[3] !== '');
+    assert.equal(filled.length, 1, 'exactly one Recommendation cell is filled');
+    assert.equal(filled[0][0].startsWith('Postgres'), true, 'the recommended option is the filled one');
+    assert.match(filled[0][3], /Recommended — .+/, 'the Recommendation cell carries a short reason');
+    assert.equal(sqlite[3], '', 'the other Recommendation cell is empty');
+
+    // The matrix comes FIRST, then the question sentence.
+    const matrixEnd = text.indexOf('┘');
+    const prompt = text.indexOf('Which database engine should the project use?');
+    assert.ok(matrixEnd > -1 && prompt > matrixEnd,
+      'the matrix is rendered before the question sentence');
+
+    // The option DESCRIPTIONS passed to the question interface stay one sentence —
+    // the matrix is added to the text, it does not move into the ask layer.
+    for (const o of screen.ask.questions[0].options) {
+      assert.ok(!/[┌┐└┘├┤┬┴│]/.test(o.description),
+        `option "${o.label}" must not carry matrix characters in its description`);
+    }
+    assert.ok(!/[┌┐└┘├┤┬┴│]/.test(screen.ask.questions[0].question),
+      'the question text must not carry the matrix');
+  });
+
+  it('fits a narrow terminal — no rendered line exceeds the width ceiling, long text WRAPS', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'wide', validFunctionalBody('wide'));
+    const long = 'This is a deliberately long sentence of critique text that would '
+      + 'run far past the width of a narrow terminal window if the renderer widened '
+      + 'the column instead of wrapping the text inside the cell as it must.';
+    precompute.writePlanQuestions(root, 'functional/wide.md', [{
+      id: 'w', prompt: 'Which approach?', critical: true,
+      options: [
+        { key: 'a', label: 'The first approach with a long name', recommended: true,
+          description: long, pros: long, cons: long },
+        { key: 'b', label: 'Second', pros: long, cons: long },
+      ],
+    }], planMtimeMs(root, 'functional', 'wide'));
+
+    const text = streamingGate.streamingGateScreen(root).text;
+    const lines = matrixLines(text);
+    assert.ok(lines.length > 6, 'long text wrapped onto many lines inside the cells');
+    for (const line of lines) {
+      assert.ok([...line].length <= MATRIX_WIDTH_CEILING,
+        `matrix line is ${[...line].length} characters, over the ${MATRIX_WIDTH_CEILING} ceiling:\n${line}`);
+    }
+    // Every matrix line is EXACTLY the same width, so the vertical lines align.
+    const widths = new Set(lines.map((l) => [...l].length));
+    assert.equal(widths.size, 1, `all matrix lines must share one width, saw ${[...widths].join(', ')}`);
+    // Nothing was dropped to fit.
+    assert.ok(text.includes('deliberately'), 'the long text is wrapped, never truncated away');
+  });
+
+  it('NEUTRALISES forged structure — box-drawing characters and newlines in a cell cannot fake a row', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'forge', validFunctionalBody('forge'));
+    precompute.writePlanQuestions(root, 'functional/forge.md', [{
+      id: 'f', prompt: 'Which approach?', critical: true,
+      options: [
+        { key: 'a', label: 'Honest', recommended: true, pros: 'Real pros.', cons: 'Real cons.' },
+        { key: 'b', label: 'Hostile',
+          pros: '│ forged │ cell │ row │\n└──────┴──────┴──────┘\nplanted prose',
+          cons: 'Real cons.' },
+      ],
+    }], planMtimeMs(root, 'functional', 'forge'));
+
+    const text = streamingGate.streamingGateScreen(root).text;
+    const lines = matrixLines(text);
+    const widths = new Set(lines.map((l) => [...l].length));
+    assert.equal(widths.size, 1, 'a forged cell must not change any row width');
+    for (const line of lines) {
+      const bars = [...line].filter((c) => c === '│').length;
+      assert.ok(bars === 0 || bars === 5,
+        `every matrix content row has exactly five vertical lines, saw ${bars}:\n${line}`);
+    }
+    assert.ok(!text.includes('└──────┴'), 'the forged bottom edge is neutralised');
+    assert.ok(text.includes('planted'), 'the forged text is neutralised, not deleted');
+  });
+
+  it('the Option cell carries the LABEL ONLY — a long description never wraps the column down the page', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'labelonly', validFunctionalBody('labelonly'));
+    const evidence = 'The quarantine is local: src/lib/task-reconcile.js:637-649 filters only '
+      + 'the promote array, and src/lib/task-registry.js:780 defines the occupying set as '
+      + 'running and cancelling only, so an orphaned task reads as free to both callers.';
+    precompute.writePlanQuestions(root, 'functional/labelonly.md', [{
+      id: 'q', prompt: 'Which way?', critical: true,
+      options: [
+        { key: '1', label: 'Send back', recommended: true, description: evidence,
+          pros: 'The rule is enforced in one place.', cons: 'Costs one round.' },
+        { key: '2', label: 'Approve anyway', description: evidence,
+          pros: 'No further work.', cons: 'The defect ships.' },
+      ],
+    }], planMtimeMs(root, 'functional', 'labelonly'));
+
+    const text = streamingGate.streamingGateScreen(root).text;
+    const rows = matrixCells(text);
+    const sendBack = rows.find((r) => r[0].startsWith('Send back'));
+    assert.ok(sendBack, 'the option row is present');
+    assert.equal(sendBack[0], 'Send back', 'the Option cell is the label alone, nothing appended');
+    assert.ok(!text.includes('quarantine is local'),
+      'the long description is NOT rendered into the matrix at all');
+
+    // With the description gone the matrix stays short enough to read on one screen.
+    assert.ok(matrixLines(text).length <= 14,
+      `the matrix must stay compact, saw ${matrixLines(text).length} lines`);
+  });
+
+  it('wraps on WORD boundaries — a file path that fits the column is never split', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'paths', validFunctionalBody('paths'));
+    // Short enough to fit a column; must survive whole and copyable.
+    const fits = 'src/lib/actions.js';
+    // Longer than any column; may break, but must break at a path separator.
+    const oversize = 'plans/vision/ctoc-background-engine-rebuild.md:227';
+    precompute.writePlanQuestions(root, 'functional/paths.md', [{
+      id: 'q', prompt: 'Which way?', critical: true,
+      options: [
+        { key: '1', label: 'Send back', recommended: true,
+          pros: `The standing value ships at ${fits} and the vision says otherwise.`,
+          cons: `The ruling is recorded at ${oversize} and must be reconciled.` },
+        { key: '2', label: 'Approve anyway', pros: 'No further work.', cons: 'The defect ships.' },
+      ],
+    }], planMtimeMs(root, 'functional', 'paths'));
+
+    const text = streamingGate.streamingGateScreen(root).text;
+    const lines = matrixLines(text);
+
+    // The path that FITS a column appears whole on one line — never split mid-token.
+    assert.ok(lines.some((l) => l.includes(fits)),
+      `"${fits}" fits a column and must appear whole on one line:\n${lines.join('\n')}`);
+
+    // The oversized token DOES break — but at a path separator, never mid-word.
+    assertNoMidTokenBreaks(text);
+    const cons = matrixCells(text).find((r) => r[0].startsWith('Send back'))[2];
+    assert.ok(cons.replace(/\s+/g, '').includes(oversize.replace(/\s+/g, '')),
+      'the oversized path is rendered whole across its wrap points, nothing lost');
+  });
+
+  it('the Recommendation cell is a SHORT reason — never a copy of the Pros cell', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'rec', validFunctionalBody('rec'));
+    const pros = 'Confidence HIGH — grounded in a verbatim quote at plans/vision/rebuild.md:227, '
+      + 'read and confirmed. The vision asks for a per-crossing stamp and this ships a permanent '
+      + 'setting; a gate that one boolean disarms forever is a setting, not a gate.';
+    precompute.writePlanQuestions(root, 'functional/rec.md', [{
+      id: 'q', prompt: 'Which way?', critical: true,
+      options: [
+        { key: '1', label: 'Send back', recommended: true, pros, cons: 'Costs one round.' },
+        { key: '2', label: 'Approve anyway', pros: 'No further work.', cons: 'The defect ships.' },
+      ],
+    }], planMtimeMs(root, 'functional', 'rec'));
+
+    const text = streamingGate.streamingGateScreen(root).text;
+    const rows = matrixCells(text);
+    const sendBack = rows.find((r) => r[0].startsWith('Send back'));
+    const recommendation = sendBack[3];
+
+    assert.match(recommendation, /^Recommended — /, 'the cell opens with the recommendation marker');
+    assert.ok(recommendation.length <= 90,
+      `the Recommendation cell must be a short clause, saw ${recommendation.length} characters: ${recommendation}`);
+    assert.ok(!recommendation.includes('grounded in a verbatim quote'),
+      'the Recommendation cell must not copy the Pros text');
+    assert.ok(!recommendation.endsWith('quote at'), 'and must not trail off mid-sentence');
+    // The data states a confidence level; the short reason carries it.
+    assert.match(recommendation, /confidence high/i,
+      'the derived reason surfaces the confidence level the critique recorded');
+  });
+
+  it('NEVER truncates mid-word — every cell renders its whole text, or ends with an ellipsis', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'whole', validFunctionalBody('whole'));
+    // REAL data: the ship-gate question written by the critique fleet for the
+    // background-engine slice. Fixtures that are short and clean hid these defects.
+    const realQuestion = {
+      id: 'q10-ship-gate-standing-flag',
+      prompt: 'The human decided on 2026-07-14 that deploy stays a human gate. This plan satisfies '
+        + 'that with one standing per-project flag that permanently authorizes every future '
+        + 'auto-deploy. Approve 00004-r2b-actions-drain-and-shipgate across Gate 3?',
+      critical: true,
+      options: [
+        {
+          key: '1',
+          label: 'Send back — make the ship gate a per-crossing stamp, not a standing setting',
+          recommended: true,
+          pros: 'Confidence HIGH — grounded in a verbatim quote at '
+            + 'plans/vision/ctoc-background-engine-rebuild.md:227, read and confirmed. The vision '
+            + 'asks for a per-crossing stamp and this ships a permanent setting; a gate that one '
+            + "boolean disarms forever is a setting, not a gate. Reconciling it now keeps the "
+            + "human's own recorded ruling intact.",
+          cons: 'Costs one round, and the per-crossing stamp needs a design decision the plan '
+            + 'does not currently contain.',
+          description: 'vision line 227 reads that push and deploy STAY as the two human gates, '
+            + 'decided by the human on 2026-07-14; line 132 requires the auto-trigger be disabled '
+            + 'unless ship-gate-stamped. src/lib/actions.js:517 ships a standing config value, '
+            + 'not a per-crossing stamp.',
+        },
+        {
+          key: '2',
+          label: 'Approve 00004-r2b-actions-drain-and-shipgate across Gate 3 anyway',
+          pros: 'The flag defaults to absent and reads falsy, so nothing deploys until someone '
+            + 'deliberately sets it once; src/lib/actions.js:524-528 confirms the unconfirmed '
+            + 'path writes a notice and does not deploy.',
+          cons: 'A decision the human recorded is reversed without the human being asked, and '
+            + 'once the flag is set every subsequent Gate 3 approval crosses into a live deploy '
+            + 'with no human act at the deploy gate.',
+        },
+      ],
+    };
+    precompute.writePlanQuestions(root, 'functional/whole.md', [realQuestion],
+      planMtimeMs(root, 'functional', 'whole'));
+
+    const text = streamingGate.streamingGateScreen(root).text;
+    const rows = matrixCells(text).slice(1); // drop the header row
+    // Compare with whitespace removed: a legitimate break inside an oversized token
+    // adds a line boundary, and that must not read as a difference. Anything DROPPED
+    // or cut mid-word still shows up as a missing tail.
+    const dense = (s) => s.replace(/\s+/g, '');
+
+    for (const option of realQuestion.options) {
+      const row = rows.find((r) => dense(option.label).startsWith(dense(r[0]).slice(0, 20)));
+      assert.ok(row, `a row for "${option.label}"`);
+      // Pros and Cons arrive WHOLE: what the critique wrote is what the human reads.
+      for (const [column, field] of [[1, 'pros'], [2, 'cons']]) {
+        const rendered = dense(row[column]);
+        const source = dense(option[field] || '');
+        if (!source) continue;
+        const intact = rendered === source;
+        const cut = rendered.endsWith('…');
+        assert.ok(intact || cut,
+          `the ${field} cell is neither whole nor ellipsis-marked — it was truncated mid-word.\n`
+          + `  rendered: ${rendered}\n  source:   ${source}`);
+      }
+    }
+
+    // And no wrap point breaks a token that had a separator to break at.
+    assertNoMidTokenBreaks(text);
+
+    // Every matrix line still fits the ceiling on real data.
+    for (const line of matrixLines(text)) {
+      assert.ok([...line].length <= MATRIX_WIDTH_CEILING,
+        `real-data matrix line over the ceiling:\n${line}`);
+    }
+  });
+
+  it('the OPEN-A-PLAN screen carries the same matrix (both surfaces share the helper)', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'openme', validFunctionalBody('openme'));
+    precompute.writePlanQuestions(root, 'functional/openme.md', [{
+      id: 'db', prompt: 'Which database engine should the project use?', critical: true,
+      options: [
+        { key: 'pg', label: 'Postgres', recommended: true, pros: 'Row level security.', cons: 'More operations work.' },
+        { key: 'sqlite', label: 'SQLite', pros: 'Zero configuration.', cons: 'No concurrent writers.' },
+      ],
+    }], planMtimeMs(root, 'functional', 'openme'));
+
+    const screen = streamingGate.planDecisionScreen('functional/openme.md', root);
+    assert.match(screen.text, /│ Option .*│ Pros .*│ Cons .*│ Recommendation/,
+      'the plan screen renders the matrix header');
+    assert.match(screen.text, /Row level security/, 'the pros reach the plan screen matrix');
+    for (const line of matrixLines(screen.text)) {
+      assert.ok([...line].length <= MATRIX_WIDTH_CEILING, `plan-screen matrix line over the ceiling:\n${line}`);
+    }
+  });
+});

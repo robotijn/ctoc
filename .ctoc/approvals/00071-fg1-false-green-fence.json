@@ -1,0 +1,8 @@
+{
+  "content_sha256": "dfff450fc5e50a6feeb3bc75b98c8b9e8ab6fe381113a272ef357898249b86f3",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-18T13:23:02.238Z",
+  "approved_by": "human",
+  "plan_basename": "00071-fg1-false-green-fence"
+}

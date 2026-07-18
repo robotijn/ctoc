@@ -207,7 +207,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 419 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 420 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -216,6 +216,26 @@ node src/scripts/release.js          # Sync VERSION to all JSON files
 All tests must show `# fail 0`. If any test fails, fix before committing.
 
 **The gate FAILS CLOSED when it cannot read its own instrument.** `test-gate.js` strips ANSI before parsing and returns `null` — never `0` — when a counter is unreadable, so an unparseable run is a loud failure instead of a silent green: a parser whose no-match default is the success value cannot tell "everything passed" from "I could not read my input" (it once reported `fail 0` over 8 real failures under `FORCE_COLOR`).
+
+**The false-green fence — a check that reports a verdict on input it never received.**
+That defect class shipped five times: a parser whose no-match default was the SUCCESS
+value `0`; a verdict parsed off a copy of the output truncated to 4000 characters, when
+the runner prints its verdict LAST; `process.exit` discarding ~1.4MB of pending piped
+writes (invisible interactively, because terminal writes are synchronous — only an
+automated caller ever sees it); an `execSync` overflowing its default 1MB `maxBuffer`,
+throwing, and recording a PASSING suite as a failure. Every one passed review and a
+green suite, because the instrument was blind and the blindness itself was reported as a
+value. `src/lib/false-green-scan.js` scans `src/` for the five signatures
+(`parse-default`, `truncate-then-parse`, `exit-with-pending-writes`,
+`unbounded-capture`, `silent-catch`); `tests/false-green-fence.test.js` is the ratchet
+and `iron-loop-enforcer`'s `false-green-fence` check surfaces the same truth on demand
+in thorough mode. `.ctoc/false-green-baseline.json` holds TWO deliberately separate
+structures: `findings` is pre-existing DEBT that may only ever SHRINK (no per-entry
+justification — requiring one for each of 220 sites would mean the fence never lands),
+and `whitelist` is a PERMANENT exemption that starts EMPTY and requires a written
+justification per entry. Conflating them is what kills a fence. The fixed exemplars are
+the specification: `src/scripts/test-gate.js` (parsers return `null`, never `0`) and
+`src/lib/request-exit.js` (`process.exitCode` + return, so Node drains before exiting).
 
 **Coverage floor — the shipped truth.** Step 14 VERIFY enforces the coverage floor
 recorded in `.ctoc/coverage-baseline.json`, which is **99** today (real src line
@@ -274,13 +294,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (menu, push, update)
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use, subagent stop)
-    lib/                 103 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 104 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                123 agent definitions across 24 categories
   skills/                426 skill files (100 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill; + 326 reference)
-  tests/                 419 test files
+  tests/                 420 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
