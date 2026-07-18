@@ -163,9 +163,9 @@ It is OPT-IN (inert with no batch — safe to ship enabled), FORK-AWARE, BOUNDED
 FAIL-OPEN (any error → allow), and ESCAPABLE (`CTOC_SKIP_CONTINUATION=1`). The two
 legitimate stops are the ONLY stops: work complete, or a real fork surfaced as a question.
 
-## Streaming questions — opening the menu generates them in the background (never-wait)
+## Streaming questions — the SESSION dispatches subagents on start (never a second Claude)
 
-Opening `/ctoc:menu` KICKS background question generation for any plan at a gate that still needs its decision questions: `streaming-gate.maybeKickProduction` spawns `src/scripts/produce-questions.js` DETACHED and returns in milliseconds (the human never waits for a `claude -p` call), so next open the questions are there.
+CTOC is a plugin inside the Claude command-line interface: plain code cannot dispatch a CTOC subagent, and it must never spawn a second Claude (no `claude -p`, no online API calls). Generation is SESSION-DRIVEN. On start, `src/hooks/SessionStart.js` computes `streaming-precompute.plansNeedingQuestions(root)` and, when it is non-empty, appends a directive to the injected context telling the SESSION MODEL to dispatch up to 5 subagents (the stage producers `product-owner`/`vision-advisor`/`implementation-planner` plus the adversarial critics) to find open issues and generate questions, each writing through `streaming-precompute.writePlanQuestions(root, ref, questions, planMtimeMs)`. When nothing is pending the directive is empty — no session-start noise. `/ctoc:menu` only READS that store (instant, fail-soft); the human never waits for a critique.
 
 ---
 
@@ -207,7 +207,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 417 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 416 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -274,13 +274,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (menu, push, update)
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use, subagent stop)
-    lib/                 102 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 101 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                123 agent definitions across 24 categories
   skills/                426 skill files (100 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill; + 326 reference)
-  tests/                 417 test files
+  tests/                 416 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

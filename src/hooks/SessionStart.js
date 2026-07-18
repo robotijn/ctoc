@@ -136,9 +136,74 @@ async function main() {
     selfCheckSummary = `Self-check skipped: ${err.message}`;
   }
 
-  // 8. Output context for Claude (to stdout for hook consumption)
+  // 8. Output context for Claude (to stdout for hook consumption). When plans are
+  //    sitting at a gate without their decision questions, append the session-driven
+  //    dispatch directive so the SESSION MODEL itself dispatches the producers — the
+  //    plugin never spawns a second Claude (fail-open: any error → no directive).
   const context = generateContext(stack, state, version, updateInfo, selfCheckSummary);
-  console.log(context);
+  const directive = questionDispatchDirective(projectPath);
+  console.log(directive ? context + directive : context);
+}
+
+/**
+ * The SESSION-DRIVEN question-dispatch directive (X7).
+ *
+ * The ruling: "there is no model calling, it is a plugin in the Claude command-line
+ * interface, not using online API calls" and "session driven — when starting CTOC,
+ * CTOC starts at least one subagent immediately to find open issues and generate
+ * questions, preferably up to 5." Plain code cannot dispatch a CTOC subagent; only the
+ * MODEL can. So SessionStart INJECTS an instruction and the session model acts on it —
+ * it never spawns a second Claude (the deleted detached-spawn producer did exactly that).
+ *
+ * Requiring `streaming-precompute` here also keeps that module reachable from a hook
+ * root: `plansNeedingQuestions` is the list of plans at a gate whose decision
+ * questions are missing or stale. When it is EMPTY the directive is '' — no
+ * session-start noise. When it is NON-EMPTY the directive names the concurrency cap
+ * (up to 5), the stage producers, the adversarial critics, the real write path
+ * (`streaming-precompute.writePlanQuestions`) with its schema, and every plan ref that
+ * needs questions.
+ *
+ * FAIL-OPEN: any error (a bad root, a broken require) yields '' — the directive can
+ * never break session start.
+ *
+ * @param {string} projectPath - absolute path to the project root
+ * @returns {string} the directive to append to the injected context, or '' when
+ *   nothing is pending.
+ */
+function questionDispatchDirective(projectPath) {
+  if (typeof projectPath !== 'string' || projectPath.length === 0) return '';
+  let needing = [];
+  try {
+    const { plansNeedingQuestions } = require('../lib/streaming-precompute');
+    needing = plansNeedingQuestions(projectPath);
+  } catch {
+    return '';
+  }
+  if (!Array.isArray(needing) || needing.length === 0) return '';
+  const refs = needing
+    .map((d) => d && d.ref)
+    .filter((r) => typeof r === 'string' && r.length > 0);
+  if (refs.length === 0) return '';
+
+  const n = refs.length;
+  return `
+## Streaming questions — open forks awaiting the human (${n} plan${n === 1 ? '' : '(s)'})
+
+Before other work, dispatch UP TO 5 CTOC subagents IN THE BACKGROUND to find open
+issues and generate their questions — at least one, at most 5 at a time, refilling
+as they complete:
+  • producers, per plan stage — product-owner (functional), vision-advisor (vision),
+    implementation-planner (implementation) — generate a plan's decision forks;
+  • the adversarial critics — premortem-critic, devils-advocate-critic, red-team-critic
+    — surface forks nobody has asked yet.
+Each subagent writes its questions to the streaming store via
+src/lib/streaming-precompute.js → writePlanQuestions(root, ref, questions, planMtimeMs),
+questions = [{ id, prompt, critical?, important?, options:[{key,label,pros?,cons?}] }].
+The human answers them in /ctoc:menu; a plan with every fork answered that passes
+validation crosses its pre-build gate by itself.
+
+Plans needing questions: ${refs.join(', ')}
+`;
 }
 
 /**
@@ -345,4 +410,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, generateContext, formatDatabasesLine, formatFrameworksLine, shouldInjectLessons, maybeInjectLessons };
+module.exports = { main, generateContext, questionDispatchDirective, formatDatabasesLine, formatFrameworksLine, shouldInjectLessons, maybeInjectLessons };
