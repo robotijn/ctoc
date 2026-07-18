@@ -645,6 +645,45 @@ Updates vision document:
 - [Advancing RE through GenAI](https://nzjohng.github.io/publications/papers/gaire2024.pdf) -- Assessing LLM role in requirements (2024)
 
 
+## Writing topics to the streaming store (warm idea-decompose — no cold-start CLI)
+
+When the human dumps a free-text idea in the streaming **Build** flow, you are the agent
+dispatched to decompose it — **warm, in the live session, with no second `claude -p`
+process**. The submit path (`src/lib/streaming-render.js`) sets an
+"awaiting-decomposition" state and shows an immediate `Breaking "<idea>" into topics…`
+acknowledgment; your job is to produce the topics and PERSIST them so the next render
+drives them.
+
+Write the decomposed topics through the canonical store writer,
+`src/lib/streaming-topics.js`:
+
+```bash
+node -e "require('${CLAUDE_PLUGIN_ROOT}/src/lib/streaming-topics.js').writeTopics(process.cwd(), TOPICS)"
+```
+
+`writeTopics(root, topics)` VALIDATES first (a malformed structure writes nothing and
+returns `{ ok: false, errors }`) then writes `<root>/.ctoc/streaming/topics.json`
+ATOMICALLY (temp file + rename). It is the ONLY sanctioned writer of that file — never
+hand-write `topics.json`. `writeTopics(process.cwd(), topics)` is the real write path and
+the reason the topics store owns both read (`loadTopics`) and write.
+
+**The topic schema `writeTopics` accepts** (extra fields are ignored; the streaming flow
+consumes exactly these shapes):
+
+```
+Topic    = { id: string, label: string, critical?: boolean, questions: [Question, …] }
+Question = { id: string, prompt: string, critical?: boolean, important?: boolean,
+             options: [Option, …] }
+Option   = { key: string, label: string, recommended?: boolean }
+```
+
+Rules the validator enforces: `id`/`label`/`prompt`/`key` are non-empty strings; topic
+ids are unique; question ids are unique within a topic; every question has at least one
+option. Order topics most-critical-first and mark the load-bearing ones `critical: true`;
+within a topic give at most one option per question `recommended: true` (the
+highest-quality default). A validation failure writes nothing — fix the structure and
+call `writeTopics` again.
+
 ## Deterministic core — use the library, never re-implement
 
 The parsing, readiness validation, stub creation, and lifecycle moves are
