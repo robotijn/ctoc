@@ -12,12 +12,44 @@
  *
  * It classifies a project (`detectAppShape`) and, for anything with a
  * human-facing runtime, LAUNCHES it and drives one real action (`driveApp`):
+ *   - declared-entry-point : the project DECLARED its entry point in settings —
+ *                    run that one command and assert its response. Checked FIRST,
+ *                    ahead of every heuristic below.
  *   - web / server : start the dev server, poll the port until it answers or a
  *                    time budget expires, assert a real HTTP response on '/',
  *                    then tear the process down reliably.
  *   - cli          : run the entry with `--help`, assert exit 0 with output.
  *   - library      : no human-facing runtime → applicable:false (NOT a failure).
  *   - unknown      : nothing to launch → applicable:false.
+ *
+ * "NO APP TO LAUNCH" IS NOT "NO ENTRY POINT". The four shapes above can only
+ * recognise an entry point they know how to GUESS at (a `bin` field, a `dev`/
+ * `start` script). A project whose human entry point is a one-shot command — a
+ * command-line dashboard a human opens every day — was invisible to all of them
+ * and reported `applicable: false`, so the ONE check that exists to prove a human
+ * can reach what was built opted itself out on a project that has a live entry
+ * point. Guessing harder is the wrong repair: it produces a classifier that is
+ * confidently wrong on the next project shape. Instead the project DECLARES its
+ * entry point and the check drives what it was told:
+ *
+ *     // .ctoc/settings.json
+ *     { "general": { "entry_point": {
+ *         "command": "node src/commands/menu.js",  // required, no shell operators
+ *         "expect": "CTOC v",                      // optional literal substring
+ *         "timeout_ms": 30000                      // optional, bounded default
+ *     } } }
+ *
+ * A declared entry point that does not answer is a FAILURE with a loud reason —
+ * NEVER `applicable: false`, which would be the false-green shape this repository
+ * fences (a verdict reported on input never received). A TIMEOUT is a failure too.
+ * There are no retries: a retry turns a flaky check into a slow check that lies.
+ *
+ * NON-GOALS, written down so this is never "improved" into a flaky check: no
+ * browser automation, no screenshot comparison, no network calls, no multi-step
+ * interaction, no warm-up run (a warm-up is a retry wearing a different name). One
+ * command, one response, one substring. The determinism story is that a declared
+ * command RENDERS AND EXITS — there is no port, no readiness race and no teardown
+ * of a long-running server, which is where the web/server path's flakiness lives.
  *
  * `driveApp` is asynchronous (a server is long-running and must be polled). A
  * synchronous caller — Step 14's `runVerify`, which existing tests call without
@@ -36,6 +68,7 @@ const http = require('http');
 const net = require('net');
 const path = require('path');
 const safeFs = require('./safe-fs');
+const { readRawSettings } = require('./settings');
 const { FrameworkDetector } = require('./framework-detector');
 const { setupPlaywright } = require('./playwright-scaffolder');
 const capabilityRegistry = require('./capability-registry');
@@ -59,6 +92,98 @@ const POLL_INTERVAL_MS = 250;
 
 /** Marker framing the JSON verdict emitted by the `--drive` child process. */
 const RESULT_MARKER = '__APP_RUNNER_RESULT__';
+
+/**
+ * Bounded default budget for a DECLARED entry point (ms).
+ *
+ * Deliberately far tighter than DEFAULT_TIME_BUDGET_MS: that 60s budget exists to
+ * absorb a cold framework compile before a server binds a port. A declared entry
+ * point is a one-shot command that renders and exits, so 30s is generous, and a
+ * command that needs longer says so with `timeout_ms`.
+ */
+const DEFAULT_ENTRY_POINT_TIMEOUT_MS = 30000;
+
+/**
+ * How many bytes of a declared entry point's output are RETAINED.
+ *
+ * Only the byte COUNT and the matched flag reach the evidence — never the output
+ * itself, because a command's stdout may contain secrets and the Gate-3 evidence
+ * artifact is written to disk. The retention bound below exists purely to keep the
+ * driver's own memory flat on a chatty command; the substring match runs on the
+ * STREAM (see `driveDeclaredEntryPoint`), never on this bounded copy. Matching a
+ * truncated copy of a run's output is a named false-green signature here.
+ */
+const ENTRY_POINT_RETAINED_BYTES = 8 * 1024;
+
+/** The settings key a project uses to declare its entry point. */
+const ENTRY_POINT_KEY = 'general.entry_point';
+
+/** Sentence appended to every not-applicable reason, naming the way to enable the check. */
+const NO_DECLARATION_SUFFIX =
+  `No entry point was declared either: set \`${ENTRY_POINT_KEY}.command\` in ` +
+  '.ctoc/settings.json (with an optional `expect` substring) to have the last mile ' +
+  'run this project\'s real entry point instead of reporting nothing to launch.';
+
+/**
+ * Read a project's DECLARED entry point.
+ *
+ * Reads the RAW settings file rather than `loadSettings`, for the same reason
+ * `getEnvironment` does: `loadSettings` merges only keys present in
+ * SETTINGS_SCHEMA, and a nested object is not expressible as a schema setting
+ * (every schema entry is a flat scalar rendered by the settings UI). The existing
+ * `general.environment_prompt_dismissed` key is the precedent — a non-schema key
+ * inside `general`, read raw.
+ *
+ * A MALFORMED declaration is NOT silently degraded to "no entry point": a project
+ * that tried to declare one and got it wrong is a different state from a project
+ * that never declared one, and the reader returns a reason that says which.
+ *
+ * @param {string} projectPath - Project root.
+ * @returns {{declaration: ({command: string, expect: (string|null), timeoutMs: number}|null),
+ *   reason: (string|null)}} The validated declaration, or null with a reason when
+ *   malformed, or null with a null reason when simply absent.
+ */
+function readDeclaredEntryPoint(projectPath) {
+  const raw = readRawSettings(projectPath);
+  const general = raw && typeof raw.general === 'object' && raw.general !== null ? raw.general : {};
+  const decl = Object.prototype.hasOwnProperty.call(general, 'entry_point')
+    ? general.entry_point
+    : undefined;
+
+  if (decl === undefined || decl === null) return { declaration: null, reason: null };
+
+  const bad = (detail) => ({
+    declaration: null,
+    reason: `A malformed \`${ENTRY_POINT_KEY}\` declaration was found in .ctoc/settings.json: ${detail}. ` +
+      'Nothing was launched. Fix the declaration so the last mile can drive this project\'s entry point.'
+  });
+
+  if (typeof decl !== 'object' || Array.isArray(decl)) {
+    return bad(`the declaration must be an object, got ${Array.isArray(decl) ? 'an array' : typeof decl}`);
+  }
+  if (typeof decl.command !== 'string' || decl.command.trim() === '') {
+    return bad('`command` is required and must be a non-empty string');
+  }
+  if (decl.expect !== undefined && decl.expect !== null
+    && (typeof decl.expect !== 'string' || decl.expect === '')) {
+    return bad('`expect` must be a non-empty string when present (it is a literal substring, never a pattern)');
+  }
+  if (decl.timeout_ms !== undefined && decl.timeout_ms !== null
+    && !(Number.isFinite(decl.timeout_ms) && decl.timeout_ms > 0)) {
+    return bad('`timeout_ms` must be a finite number greater than zero when present');
+  }
+
+  return {
+    declaration: {
+      command: decl.command.trim(),
+      expect: typeof decl.expect === 'string' ? decl.expect : null,
+      timeoutMs: Number.isFinite(decl.timeout_ms) && decl.timeout_ms > 0
+        ? decl.timeout_ms
+        : DEFAULT_ENTRY_POINT_TIMEOUT_MS
+    },
+    reason: null
+  };
+}
 
 /**
  * Load and parse a project's package.json.
@@ -257,8 +382,53 @@ function nativeNotApplicableResult(target, started) {
         `Detected a ${target.language} ${target.taxonomy || target.projectType} project via the ` +
         `capability registry. Its honest run last mile is build+test (build: ${target.lastMile.build || 'n/a'}; ` +
         `test: ${target.lastMile.test || 'n/a'}; run: ${s.command}); executing it is CR6. ` +
-        'Not launched here.'
+        `Not launched here. ${NO_DECLARATION_SUFFIX}`
     },
+    durationMs: typeof started === 'number' ? Date.now() - started : 0,
+    errors: []
+  };
+}
+
+/**
+ * The honest not-applicable reason for a project with no launchable shape.
+ *
+ * It names BOTH halves of what was looked for — no runtime the classifier could
+ * launch, AND no declared entry point. A reason that says only what was not found
+ * teaches nobody how to fix it; this one names the settings key that turns the
+ * check on, which is the difference between an opt-out and a dead end.
+ *
+ * @param {'library'|'unknown'} shape - The detected shape.
+ * @returns {string} The reason string.
+ */
+function noRuntimeReason(shape) {
+  const first = shape === 'library'
+    ? 'A library has no human-facing runtime; nothing to launch.'
+    : 'Project shape could not be determined; nothing to launch.';
+  return `${first} ${NO_DECLARATION_SUFFIX}`;
+}
+
+/**
+ * Build the not-applicable result for a MALFORMED declaration.
+ *
+ * This is the ONE not-applicable that can follow an `entry_point` key, and it is
+ * honest: nothing was attempted, because the declaration could not be understood.
+ * It is deliberately distinguishable from `noRuntimeReason` — a project that tried
+ * to declare an entry point and got it wrong is a different state from one that
+ * never declared one, and a reader must be able to tell which they are looking at.
+ * It contributes no error, exactly like every other not-applicable; the gate still
+ * fails loudly if nothing else ran, because `countSubstantiveChecks` never counts a
+ * check that did not run.
+ *
+ * @param {string} reason - The reason produced by `readDeclaredEntryPoint`.
+ * @param {number} [started] - Optional start timestamp for durationMs.
+ * @returns {Object} An app-run result with applicable:false.
+ */
+function malformedDeclarationResult(reason, started) {
+  return {
+    applicable: false,
+    launched: false,
+    responded: false,
+    evidence: { shape: 'declared-entry-point-malformed', reason },
     durationMs: typeof started === 'number' ? Date.now() - started : 0,
     errors: []
   };
@@ -469,6 +639,142 @@ async function teardown(child) {
     }, 400);
     const hardTimer = setTimeout(done, 1500);
   });
+}
+
+/**
+ * Drive a project's DECLARED entry point: run the one command it named, and decide
+ * on exit code plus (optionally) a literal substring in its output.
+ *
+ * THE HONESTY RULES, in precedence order:
+ *  1. The result is ALWAYS `applicable: true`. The project declared this entry
+ *     point; whatever happens next is a verdict, never a skip. A timeout is a
+ *     FAILURE — reporting "not applicable" for something that was attempted and did
+ *     not answer is the exact false-green shape this repository fences.
+ *  2. A non-zero exit and a missing marker are DIFFERENT diagnoses and never
+ *     collapse into one message. A command that printed the marker and then exited
+ *     3 is blamed for the exit, not for the marker.
+ *  3. The match runs on the STREAM. `carry` holds the last `expect.length - 1`
+ *     characters across chunk boundaries, so a marker split across two reads — or
+ *     arriving after megabytes of preceding output — is still found. The retained
+ *     buffer bound applies to MEMORY, never to what is searched.
+ *  4. The output never reaches the evidence. Only `outputBytes` and `matched` are
+ *     recorded: a command's stdout may contain secrets and the Gate-3 evidence
+ *     artifact is written to disk.
+ *  5. ONE run. No retries, no warm-up, no polling.
+ *
+ * @param {string} projectPath - Project root.
+ * @param {{command: string, expect: (string|null), timeoutMs: number}} decl - Validated declaration.
+ * @returns {Promise<Object>} The standard app-run result.
+ */
+async function driveDeclaredEntryPoint(projectPath, decl) {
+  const started = Date.now();
+  const result = baseResult('declared-entry-point');
+  result.evidence.command = decl.command;
+  result.evidence.expect = decl.expect;
+  result.evidence.timeoutMs = decl.timeoutMs;
+
+  const spec = resolveScriptCommand(decl.command);
+  if (spec.unsupported) {
+    // Declared but undrivable is still a FAILURE, not a skip: the project stated
+    // this is its entry point, and we could not run what it stated.
+    result.errors.push(
+      `Declared entry point could not be launched. ${spec.reason}`
+    );
+    result.durationMs = Date.now() - started;
+    return result;
+  }
+
+  let child;
+  try {
+    child = spawn(spec.command, spec.args, {
+      cwd: projectPath,
+      shell: spec.shell,
+      env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32'
+    });
+  } catch (e) {
+    result.errors.push(`Declared entry point failed to spawn ("${decl.command}"): ${e.message}`);
+    result.durationMs = Date.now() - started;
+    return result;
+  }
+
+  result.launched = true;
+
+  const needle = decl.expect;
+  const carryLen = needle ? needle.length - 1 : 0;
+  let carry = '';
+  let matched = needle === null; // no marker declared ⇒ exit 0 is the whole verdict
+  let outputBytes = 0;
+  let retainedBytes = 0;
+
+  const consume = (chunk) => {
+    outputBytes += chunk.length;
+    if (matched) return;
+    // The bound is on MEMORY (`carry` is at most needle.length - 1 characters and
+    // `retainedBytes` is only a counter) — the search itself sees every chunk.
+    const text = chunk.toString('utf8');
+    const hay = carry + text;
+    if (hay.includes(needle)) {
+      matched = true;
+      carry = '';
+      return;
+    }
+    carry = carryLen > 0 && hay.length > carryLen ? hay.slice(hay.length - carryLen) : hay;
+    if (retainedBytes < ENTRY_POINT_RETAINED_BYTES) retainedBytes += chunk.length;
+  };
+
+  child.stdout.on('data', consume);
+  child.stderr.on('data', consume);
+
+  const outcome = await new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish({ timedOut: true, code: null, signal: null, spawnError: null }),
+      decl.timeoutMs);
+    child.on('exit', (code, signal) => finish({ timedOut: false, code, signal, spawnError: null }));
+    child.on('error', (err) => finish({ timedOut: false, code: null, signal: null, spawnError: err.message }));
+  });
+
+  // ALWAYS tear down, including the clean-exit path: teardown returns immediately
+  // for an already-dead child and reaps the process group otherwise, so a timed-out
+  // entry point can never be left orphaned behind the verdict.
+  await teardown(child);
+
+  result.evidence.exitCode = outcome.code;
+  result.evidence.matched = matched;
+  result.evidence.outputBytes = outputBytes;
+  result.evidence.timedOut = outcome.timedOut;
+
+  if (outcome.spawnError) {
+    result.errors.push(`Declared entry point failed to run ("${decl.command}"): ${outcome.spawnError}`);
+  } else if (outcome.timedOut) {
+    result.errors.push(
+      `Declared entry point "${decl.command}" did not respond within ${decl.timeoutMs}ms and was killed. ` +
+      'A one-shot entry point must render and exit; this is a FAILURE, not an inconclusive result.'
+    );
+  } else if (outcome.code !== 0) {
+    const how = outcome.signal ? `was killed by ${outcome.signal}` : `exited with code ${outcome.code}`;
+    result.errors.push(
+      `Declared entry point "${decl.command}" ${how} (expected 0).` +
+      (matched ? ' Its expected output WAS produced, so the failure is the exit status alone.' : '')
+    );
+  } else if (!matched) {
+    result.errors.push(
+      `Declared entry point "${decl.command}" exited 0 but its output never contained the ` +
+      `declared marker ${JSON.stringify(needle)}. The exit status was fine; the response was not.`
+    );
+  } else {
+    result.responded = true;
+  }
+
+  result.durationMs = Date.now() - started;
+  return result;
 }
 
 /**
@@ -719,6 +1025,13 @@ async function driveServer(projectPath, opts, result) {
  */
 async function driveApp(projectPath, opts = {}) {
   const started = Date.now();
+
+  // THE DECLARATION IS CONSULTED FIRST — an explicit statement by a project about
+  // its own entry point outranks every heuristic about it.
+  const declared = readDeclaredEntryPoint(projectPath);
+  if (declared.declaration) return driveDeclaredEntryPoint(projectPath, declared.declaration);
+  if (declared.reason) return malformedDeclarationResult(declared.reason, started);
+
   const shape = detectAppShape(projectPath);
 
   if (shape === 'library' || shape === 'unknown') {
@@ -730,12 +1043,7 @@ async function driveApp(projectPath, opts = {}) {
       applicable: false,
       launched: false,
       responded: false,
-      evidence: {
-        shape,
-        reason: shape === 'library'
-          ? 'A library has no human-facing runtime; nothing to launch.'
-          : 'Project shape could not be determined; nothing to launch.'
-      },
+      evidence: { shape, reason: noRuntimeReason(shape) },
       durationMs: Date.now() - started,
       errors: []
     };
@@ -764,7 +1072,14 @@ async function driveApp(projectPath, opts = {}) {
  *   evidence: Object, durationMs: number, errors: string[]}} Drive outcome.
  */
 function driveAppSync(projectPath, opts = {}) {
-  const shape = detectAppShape(projectPath);
+  // The declaration is read BEFORE the shape short-circuit: a library-shaped
+  // project that declares an entry point must reach the driver, not be skipped.
+  // Driving it happens in the `--drive` child (the same mechanism the async engine
+  // already uses) so this synchronous caller gets a real verdict.
+  const declared = readDeclaredEntryPoint(projectPath);
+  if (declared.reason) return malformedDeclarationResult(declared.reason);
+
+  const shape = declared.declaration ? 'declared-entry-point' : detectAppShape(projectPath);
 
   if (shape === 'library' || shape === 'unknown') {
     if (shape === 'unknown') {
@@ -775,18 +1090,15 @@ function driveAppSync(projectPath, opts = {}) {
       applicable: false,
       launched: false,
       responded: false,
-      evidence: {
-        shape,
-        reason: shape === 'library'
-          ? 'A library has no human-facing runtime; nothing to launch.'
-          : 'Project shape could not be determined; nothing to launch.'
-      },
+      evidence: { shape, reason: noRuntimeReason(shape) },
       durationMs: 0,
       errors: []
     };
   }
 
-  const budget = opts.timeBudgetMs || DEFAULT_TIME_BUDGET_MS;
+  const budget = declared.declaration
+    ? declared.declaration.timeoutMs
+    : (opts.timeBudgetMs || DEFAULT_TIME_BUDGET_MS);
   const proc = spawnSync(
     process.execPath,
     [__filename, '--drive', projectPath, JSON.stringify(opts || {})],
@@ -891,6 +1203,8 @@ if (require.main === module && process.argv[2] === '--drive') {
 module.exports = {
   detectAppShape,
   detectRunTarget,
+  readDeclaredEntryPoint,
+  driveDeclaredEntryPoint,
   driveApp,
   driveAppSync,
   scaffoldPlaywright,

@@ -1,0 +1,8 @@
+{
+  "content_sha256": "131e7dd718ccbf4b439587146be0f6d9157f2b3a5d8727a5f1cb4e851641446e",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T07:40:42.744Z",
+  "approved_by": "human",
+  "plan_basename": "00079-answers-bind-to-plan-revision"
+}

@@ -27,6 +27,69 @@ const { readVerifyEvidence } = require('./step-13-verify');
 const ESCALATION_STATUSES = ['SKIPPED', 'BLOCKED', 'DEFERRED'];
 
 /**
+ * A status word counts only when the plan DECLARES it as the state of a step —
+ * never when the plan merely MENTIONS it in prose.
+ *
+ * A plain `\b` is NOT sufficient and that is the entire reason this helper
+ * exists: in `zero-skipped` the character before `skipped` is a hyphen, a
+ * NON-word character, so a word boundary exists there and `/\bskipped\b/i`
+ * matches. A plan's own honest prose about the "zero-skipped gate" was therefore
+ * read as an unapproved skipped step and its completion was refused — until the
+ * author reworded the plan to get past the validator. A gate that is defeated by
+ * rewording measures the wording, not the work, and every reword makes the next
+ * plan's prose a little less true.
+ *
+ * Three rules, all necessary; each was derived from prose this repository's own
+ * plans actually contain:
+ *
+ *   BEFORE   excludes a word character, a hyphen and a dot, so `zero-skipped`,
+ *            `no-skipped`, `parseSkipped` and `result.skipped` are prose.
+ *   AFTER    excludes a word character, a hyphen and an opening bracket, so
+ *            `skipped-tests` and the identifier `skipped[]` are prose. A
+ *            PARENTHESIS is deliberately NOT excluded: `SKIPPED (no hot path)`
+ *            is a real declaration and must still be caught.
+ *   QUANTIFIED  suppresses a count or a negation immediately before the word —
+ *            `0 skipped`, `zero skipped`, `no skipped`, `not skipped`. Only the
+ *            literal `0` is treated as a count, never `\d+`: a step number is
+ *            never 0, but `Step 12 SKIPPED` is a legitimate declaration whose
+ *            preceding token IS a number, and a `\d+` rule would silently
+ *            swallow it.
+ *
+ * KNOWN AND DELIBERATE GAP: a NON-ZERO count ("3 skipped") is still read as a
+ * declaration. It is indistinguishable in shape from `Step 12 SKIPPED`, and a
+ * run that really did skip 3 tests is a genuine problem worth surfacing.
+ */
+const STATUS_BOUNDARY_BEFORE = '(?<![\\w\\-.])';
+const STATUS_BOUNDARY_AFTER = '(?![\\w\\-\\[])';
+const STATUS_NOT_QUANTIFIED = '(?<!\\b(?:0|no|non|not|zero)\\s{1,4})';
+
+/**
+ * Build the pattern fragment that matches `word` as a DECLARED status.
+ *
+ * `word` is always a code-controlled literal from this module (an escalation
+ * status, `NOT APPLICABLE`, or the `SKIP(?:PED)?` stem) — never plan input — so
+ * it is embedded directly. Never pass user- or file-derived text here without
+ * `escapeRegExp`.
+ *
+ * The construct is a pair of fixed-width negative assertions plus one bounded
+ * (`\s{1,4}`) negative lookbehind; there is no quantified group that can
+ * backtrack, so it adds no catastrophic-backtracking path.
+ *
+ * @param {string} word - the status word or alternation to bound
+ * @returns {string} a RegExp source fragment
+ */
+function statusWordPattern(word) {
+  return `${STATUS_BOUNDARY_BEFORE}${STATUS_NOT_QUANTIFIED}${word}${STATUS_BOUNDARY_AFTER}`;
+}
+
+// Invariant probes, compiled ONCE at module load rather than per step per plan.
+// Both are non-global, so they hold no `lastIndex` state between `.test()`
+// calls and are safe to share. The `g`-flagged patterns below stay local to
+// their call sites precisely because they DO carry `lastIndex`.
+const DECLARED_SKIPPED_RE = safeRegExp(statusWordPattern('SKIPPED'), 'i');
+const DECLARED_NOT_APPLICABLE_RE = safeRegExp(statusWordPattern('NOT APPLICABLE'), 'i');
+
+/**
  * Validate a plan before it can move to review stage
  *
  * @param {string} planPath - Path to the plan file
@@ -140,9 +203,16 @@ function validateStepsComplete(content, planPath, projectPath) {
       // a done step, so a step with no checkbox is never complete.
       isCompleted = hasAnyBox ? ((hasChecked || hasWord) && !hasUnchecked) : false;
       // Skipped only on an EXPLICIT, un-completed skip marker — not the words
-      // "n/a"/"skipped" appearing inside completed checkbox prose (e.g.
-      // "- [x] 0 skipped, 0 flaky tests" or "(n/a — Node built-ins only)").
-      isSkipped = !isCompleted && (/\bSKIPPED\b/i.test(block) || /\bNOT APPLICABLE\b/i.test(block) || /\[\s*N\/A\s*\]/i.test(block));
+      // "n/a"/"skipped" appearing inside checkbox prose (e.g. "0 skipped, 0
+      // flaky tests", "keep the zero-skipped gate", "(n/a — Node built-ins
+      // only)"). The `!isCompleted` guard alone did NOT save this: an UNFINISHED
+      // step whose prose mentioned the zero-skip gate was marked skipped. The
+      // status must stand alone as a declaration — see statusWordPattern.
+      // The `[ N/A ]` bracket form is already unambiguous and is left as-is.
+      isSkipped = !isCompleted && (
+        DECLARED_SKIPPED_RE.test(block) ||
+        DECLARED_NOT_APPLICABLE_RE.test(block) ||
+        /\[\s*N\/A\s*\]/i.test(block));
     }
 
     result.checklist[`step_${step.num}`] = {
@@ -205,17 +275,24 @@ function validateEscalations(content, metadata) {
   const execMatch = content.match(/^##\s+Execution Plan[\s\S]*$/m);
   const region = execMatch ? execMatch[0].split(/\n##\s+(?!#)/)[0] : content;
 
-  // Look for SKIPPED/BLOCKED without approval
+  // Look for SKIPPED/BLOCKED without approval. The status must be DECLARED, not
+  // merely mentioned: matched as a standalone status marker via
+  // statusWordPattern, never as a substring of `zero-skipped`, `skipped-tests`,
+  // `parseSkipped`, `skipped[]` or a count like `0 skipped, 0 flaky`. Do NOT
+  // "simplify" this to `\b${status}\b` — `\b` matches inside `zero-skipped`
+  // (the hyphen is a non-word character) and reinstates the exact defect that
+  // refused two real completions.
   for (const status of ESCALATION_STATUSES) {
-    const pattern = safeRegExp(`(Step\\s*\\d+[^\\n]*${status})`, 'gi');
+    const pattern = safeRegExp(`(Step\\s*\\d+[^\\n]*${statusWordPattern(status)})`, 'gi');
     const matches = region.match(pattern) || [];
 
     for (const match of matches) {
       const stepMatch = match.match(/Step\s*(\d+)/i);
       const stepNum = stepMatch ? stepMatch[1] : 'unknown';
 
-      // Check if there's an approval/justification nearby
-      const approvalPattern = safeRegExp(`Step\\s*${stepNum}[^\\n]*${status}[^\\n]*(?:APPROVED|JUSTIFIED|REASON:|ESCALATED)`, 'i');
+      // Check if there's an approval/justification nearby. Same boundary, so an
+      // approved genuine skip is still recognised as approved.
+      const approvalPattern = safeRegExp(`Step\\s*${stepNum}[^\\n]*${statusWordPattern(status)}[^\\n]*(?:APPROVED|JUSTIFIED|REASON:|ESCALATED)`, 'i');
       const hasApproval = approvalPattern.test(region);
 
       result.checklist[`escalation_${stepNum}_${status}`] = {
@@ -392,8 +469,19 @@ function validateNoContradictions(content, projectPath) {
     }
   }
 
-  // Pattern 3: "SKIPPED" but implementation exists
-  const skippedStepPattern = /Step\s*(\d+)[^\\n]*SKIP/gi;
+  // Pattern 3: "SKIPPED" but implementation exists.
+  //
+  // Two defects were fixed here together. (a) `SKIP` was matched as a bare stem,
+  // so `skipped-test policy` in prose produced a "Step 8 was skipped" warning.
+  // The stem is DELIBERATELY kept (this site's intent is broader than the three
+  // escalation statuses) but is now bounded, with `PED` optional so both `SKIP`
+  // and `SKIPPED` still match as standalone words. (b) The class was written
+  // `[^\\n]` inside a regex LITERAL, which means "not a backslash and not the
+  // letter n" — the double backslash is correct only inside the STRING passed to
+  // safeRegExp. So the pattern silently spanned newlines (matching a `Step 8`
+  // heading against an unrelated later line) while refusing to cross any letter
+  // `n` on the step's own line. It is now a real "not a newline".
+  const skippedStepPattern = safeRegExp(`Step\\s*(\\d+)[^\\n]*${statusWordPattern('SKIP(?:PED)?')}`, 'gi');
 
   while ((match = skippedStepPattern.exec(scanContent)) !== null) {
     const stepNum = match[1];

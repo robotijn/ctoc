@@ -145,6 +145,39 @@ enforcement:
 
 **Runtime environment** — `general.environment` in `.ctoc/settings.json` (`ask | dev | staging | prod`) selects a CTOC behavior profile via `src/lib/settings.js` (`ENVIRONMENT_PROFILES`). Resolution is `explicit user setting > environment profile > schema default`; `ask` (default) applies no profile and makes the menu prompt the user on first open. Profiles tune enforcement strictness, auto-push, default model, and log verbosity — they NEVER weaken a human gate (no profile may set `requireReviewGate: false` or `enforcementMode: off`; enforced by `tests/environment-mode.test.js`).
 
+**Declared entry point — "no app to launch" is not "no entry point".** The Step 14
+last-mile check (`src/lib/app-runner.js`) can only recognise an entry point it knows
+how to GUESS at: a `bin` field, a `dev`/`start` script. A project whose human entry
+point is a one-shot command — a command-line dashboard someone opens every day — was
+invisible to every shape and reported `applicable: false`, so the one check that
+exists to prove a human can REACH what was built opted itself out on a project that
+has a live entry point. Guessing harder produces a classifier that is confidently
+wrong on the next project shape, so the project DECLARES instead, in
+`.ctoc/settings.json`:
+
+```json
+{ "general": { "entry_point": {
+    "command": "node src/commands/menu.js",
+    "expect": "CTOC v",
+    "timeout_ms": 30000
+} } }
+```
+
+`command` is required and is run WITHOUT a shell (argument array; a command
+containing `&&`, `||`, `|`, `;` or `&` is rejected as undrivable). `expect` is an
+optional LITERAL substring — never a pattern — and when absent a clean exit is the
+whole verdict. `timeout_ms` is optional and bounded (default 30000). The declaration
+outranks shape detection; absent the key, behaviour is exactly what it was, with a
+not-applicable reason that now names the missing declaration as well as the missing
+runtime. **A declared entry point that exits non-zero, omits its marker, or times out
+FAILS verification — never `applicable: false`**, which would be the false-green shape
+this repository fences. There are no retries (a retry turns a flaky check into a slow
+check that lies), and the substring match runs on the output STREAM while only a byte
+count and a matched flag reach the evidence artifact (stdout may carry secrets).
+Non-goals, so this is never "improved" into a flaky check: no browser automation, no
+screenshots, no network calls, no multi-step interaction, no warm-up run. Enforced by
+`tests/last-mile-drives-entry-point.test.js`.
+
 **Plans must declare `files:`** in YAML frontmatter to be coverage-aware. Pre-v7 plans without this declaration fall through to escape-phrase / block (per the X1 decision: warn-only treatment is logged but not yet block-default for legacy plans).
 
 ## Continuation Gate — building CONTINUES (Operating Lesson 15 enforcement)
@@ -207,7 +240,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 420 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 428 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -300,7 +333,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 420 test files
+  tests/                 428 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

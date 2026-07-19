@@ -1,0 +1,8 @@
+{
+  "content_sha256": "620a417495412037adfd359b2afe5be264025bc62a0ce5f4d35241b9d779b301",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T11:58:15.148Z",
+  "approved_by": "human",
+  "plan_basename": "00084-approval-hash-survives-its-own-pipeline"
+}

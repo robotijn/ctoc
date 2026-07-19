@@ -1,0 +1,8 @@
+{
+  "content_sha256": "143efb91e7220f17022c5b2c2ff64e23bc5592a81115032c254a7798e2fc1715",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-18T21:08:04.252Z",
+  "approved_by": "human",
+  "plan_basename": "00075-wedge-reports-get-a-reader"
+}

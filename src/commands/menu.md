@@ -121,7 +121,7 @@ When a background task fires its task-notification:
 
 1. `menu task complete <id> --summary "…" [--gate N] [--next <navroute>]` (the store rejects a `claude:` `--next`), or `menu task fail <id> --summary "…"` on failure — a failure is surfaced in the inbox, never silently lost.
 2. Emit **ONE** compact, pull-based inbox notice — a **high-level, human-phrased status line** (see "Foreground status plane" below). **Do not** change or hijack the user's current screen — completions pull, they never push.
-3. **Promote.** For each task in the response's `promote[]` (the scheduler's `nextRunnable` set), launch `Agent(run_in_background)` + `menu task start <id>`. This is the ONLY sanctioned promotion — never start a queued task the scheduler did not return in `promote[]`.
+3. **Promote.** For each task in the response's `promote[]` (the scheduler's newly-runnable `nextRunnable` set with the concurrent-edit guard applied — that set MINUS the candidates the guard held, never the raw set), launch `Agent(run_in_background)` + `menu task start <id>`. This is the ONLY sanctioned promotion — never start a queued task the scheduler did not return in `promote[]`.
 
 **Foreground status plane — high-level, human-phrased (Tijn, non-negotiable).** The work
 runs in the background; the FOREGROUND is the status plane. At each milestone show the human

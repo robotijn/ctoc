@@ -1,0 +1,8 @@
+{
+  "content_sha256": "e9abfee08575dafb72e70bf1e3cfe87ac50a94d6ff75d221f74894d91b7395b6",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-18T20:44:41.880Z",
+  "approved_by": "human",
+  "plan_basename": "00077-quarantine-on-every-promote-path"
+}

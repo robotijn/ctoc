@@ -47,6 +47,30 @@
  * file's CURRENT mtime. `loadPlanQuestions` returns `null` for a stale file (as it
  * does for absent / unreadable / unparseable / invalid), and the background
  * dispatcher (via `plansNeedingQuestions`) regenerates it.
+ *
+ * ── An ANSWER binds to the revision it was GIVEN FOR ───────────────────────────
+ * The staleness rule above protects the QUESTIONS. Its companion protects the
+ * ANSWERS, and it is the same idea pointed the other way. Question ids are
+ * POSITIONAL (agents/iron-loop/gate-critic.md: finding questions start at `q10` and
+ * increase in emission order), so a regenerated question set REUSES ids for
+ * DIFFERENT questions. Matching a recorded answer on `(ref, questionId)` alone is
+ * therefore evidence of nothing across a revision, and it silently suppressed
+ * questions the human had never been shown — a verdict reported on input that was
+ * never received, the exact shape `src/lib/false-green-scan.js` fences.
+ *
+ * `readAnsweredQuestionIds` is the ONE encoding of "what counts as answered", and
+ * it binds an answer two ways: STAMPED (the entry's own `planMtimeMs` equals the
+ * question set's stamp) or DERIVED (no stamp, but the answer was recorded at or
+ * after the plan's current mtime — if the plan has not changed since the answer,
+ * the answer was given against the current text). The binding is DERIVED from two
+ * facts already on disk; nothing is asserted that was not observed.
+ *
+ * An answer that binds neither way NEVER suppresses its question — the question is
+ * asked again. The known cost, stated plainly: a plan touched for a purely cosmetic
+ * reason (a typo, a reflow) loses its answers even though the meaning never
+ * changed. There is no way to tell a cosmetic edit from a substantive one without
+ * reading meaning, so the rule errs toward re-asking — the correct direction for a
+ * fail-closed rule, and the same direction the questions' own staleness rule takes.
  */
 
 const path = require('path');
@@ -305,7 +329,8 @@ function writePlanQuestions(root, ref, questions, planMtimeMs) {
  * them) is a different instruction from "corrupt" (→ repair) or "the plan is gone"
  * (→ nothing to do). One `null` cannot carry that.
  *
- *   { status: 'ready',        questions, reason }  computed AND fresh. `questions`
+ *   { status: 'ready',        questions, questionsRevisionMs, planMtimeMs, reason }
+ *                                                  computed AND fresh. `questions`
  *                                                  MAY be [] — the honest "the
  *                                                  critique ran and found nothing
  *                                                  to ask". That is a REAL state.
@@ -328,9 +353,19 @@ function writePlanQuestions(root, ref, questions, planMtimeMs) {
  * not exist. This order is unobservable through `loadPlanQuestions`, whose every
  * non-ready branch collapses to the same `null`.
  *
+ * ── The two revision values on 'ready' (they answer different questions) ───────
+ * `questionsRevisionMs` identifies THE EXACT QUESTION SET the human was shown — it
+ * is the stamp stored in the questions file. `planMtimeMs` is the plan file's
+ * CURRENT modification time and answers "has the plan changed since a given
+ * moment?". They are equal in the normal case and diverge only when a plan is
+ * reverted to older text (a stored stamp NEWER than the current mtime, which the
+ * staleness check permits). Both are needed by `readAnsweredQuestionIds`: the first
+ * drives the STAMPED binding, the second the DERIVED one.
+ *
  * @param {string} root project root
  * @param {string} ref plan reference ("stage/file.md")
- * @returns {{status:string, questions?:Array<object>, errors?:string[], reason:string}}
+ * @returns {{status:string, questions?:Array<object>, questionsRevisionMs?:number,
+ *   planMtimeMs?:number, errors?:string[], reason:string}}
  */
 function planQuestionsStatus(root, ref) {
   const shownRef = typeof ref === 'string' ? ref : typeof ref;
@@ -407,7 +442,13 @@ function planQuestionsStatus(root, ref) {
     };
   }
 
-  return { status: 'ready', questions: parsed.questions, reason: `${shownRef} has fresh precomputed questions` };
+  return {
+    status: 'ready',
+    questions: parsed.questions,
+    questionsRevisionMs: storedMtimeMs, // the stamp the question set was generated against
+    planMtimeMs: currentMtimeMs,        // the plan file's CURRENT mtime
+    reason: `${shownRef} has fresh precomputed questions`,
+  };
 }
 
 /**
@@ -489,52 +530,153 @@ function isBlockingQuestion(question) {
 }
 
 /**
- * The set of question ids ALREADY answered for `ref`, read from the append-only
- * answers log (`.ctoc/streaming/answers.jsonl`) that `streaming-gate.streamAnswer`
- * writes — one JSON object per line, `{ts, ref, questionId, optionKey}`. Read back
- * exactly as it is written.
+ * The recorded time of one answers-log entry, in milliseconds since the epoch, or
+ * `null` when it has none that can be parsed.
  *
- * Returns `{ ok, ids }`, distinguishing two states a gate must NOT confuse:
- *   - `ok: true`  — the log was READ. An ABSENT log is this case: it is knowledge
- *                   ("nothing has been answered yet"), the normal starting state.
- *   - `ok: false` — the log could not be read at all. That is IGNORANCE, not
- *                   knowledge, and the caller must treat it as such.
+ * TWO SHAPES exist in the log, deliberately read rather than normalised away:
+ * `{ts, ref, questionId, optionKey}` is what `streaming-gate.streamAnswer` writes,
+ * and `{ref, questionId, answer, at}` is what an ad-hoc agent-driven writer has
+ * appended (no JavaScript in src/ produces it). The second shape is DATA THIS
+ * FUNCTION MUST READ CORRECTLY; it is not the contract, and nothing here is built
+ * around it. An unparseable time yields null, which binds nothing.
+ */
+function entryRecordedAtMs(entry) {
+  for (const field of ['ts', 'at']) {
+    const raw = entry[field];
+    if (typeof raw !== 'string' && typeof raw !== 'number') continue;
+    const ms = typeof raw === 'number' ? raw : Date.parse(raw);
+    if (Number.isFinite(ms)) return ms;
+  }
+  return null;
+}
+
+/**
+ * The set of question ids already answered for `ref` THAT BIND TO THE CURRENT
+ * REVISION of the plan — read from the append-only answers log
+ * (`.ctoc/streaming/answers.jsonl`).
  *
- * In BOTH cases `ids` contains only answers actually proven present. A malformed
- * line is skipped rather than fatal: skipping can only ever REMOVE an answer from
- * the set, never add one, so it can only push the verdict toward "not enough" —
- * fail-closed by construction. Failing hard on one bad line would instead let a
- * single junk append deadlock the gate forever, since the log is never pruned.
+ * THE SINGLE ENCODING of "what counts as an answered question". `streaming-gate`
+ * calls this, never its own copy: two encodings of this rule is how a revision rule
+ * gets added to one of them and not the other, and gets half-applied forever.
  *
- * Only ever called once `planQuestionsStatus` reports `ready`, which proves `root`
- * is a usable non-empty string — so `path.join` here cannot throw.
+ * ── AN ANSWER BINDS TO THE TEXT THE HUMAN WAS READING ─────────────────────────
+ * Question ids are POSITIONAL (agents/iron-loop/gate-critic.md) and are reused
+ * across regenerations, so an id match ACROSS revisions is evidence of nothing. An
+ * entry counts when EITHER:
+ *
+ *   (a) STAMPED — its recorded `planMtimeMs` equals `questionsRevisionMs`. It was
+ *       written against this exact question set. Direct evidence.
+ *
+ *   (b) DERIVED — it carries no usable stamp, but its recorded TIME is at or after
+ *       the plan's current modification time. If the plan has not changed since the
+ *       answer was given, the answer was given against the current text. Derived
+ *       from two facts already on disk, never asserted.
+ *
+ * Anything else — an older unstamped answer, a MISMATCHED stamp, an unparseable
+ * time — does NOT count, and its question is asked again. A present-but-mismatched
+ * stamp is never re-evaluated by the derived rule: an explicit stamp is the
+ * stronger evidence and it says no, and letting the weaker rule override it would
+ * make a stamp worth less than its absence.
+ *
+ * ── IT FAILS CLOSED ────────────────────────────────────────────────────────────
+ * Not knowing which text an answer was about is NOT a pass. The failure mode is
+ * asking a question the human may already have answered — never hiding a question
+ * they never saw.
+ *
+ * `ok:false` means the log could not be read, OR the revision could not be
+ * established — IGNORANCE, which a caller must not read as "nothing was answered".
+ * `ok:true` with an empty set is knowledge (an ABSENT log is this case: nothing has
+ * been answered yet, the normal starting state).
+ *
+ * A malformed line is skipped rather than fatal: skipping can only ever REMOVE an
+ * answer from the set, never add one, so it can only push a verdict toward "not
+ * enough". Failing hard on one bad line would let a single junk append deadlock the
+ * gate forever, since the log is never pruned.
  *
  * @param {string} root project root
  * @param {string} ref plan reference ("stage/file.md")
- * @returns {{ok: boolean, ids: Set<string>}}
+ * @param {{questionsRevisionMs:number, planMtimeMs:number}} [revision] omitted ⇒
+ *   derived internally from `planQuestionsStatus`. `hasEnoughInformation` passes the
+ *   one it already computed, purely to avoid a redundant stat.
+ * @returns {{ok:boolean, ids:Set<string>, bound:{stamped:number, derived:number},
+ *   unbound:number}} `unbound` counts entries for THIS ref that were read but bound
+ *   to no revision, so a caller can say so out loud instead of silently re-asking.
  */
-function readAnsweredQuestionIds(root, ref) {
+function readAnsweredQuestionIds(root, ref, revision) {
   const ids = new Set();
-  const file = path.join(root, '.ctoc', 'streaming', 'answers.jsonl');
+  const closed = { ok: false, ids, bound: { stamped: 0, derived: 0 }, unbound: 0 };
 
+  // 1. RESOLVE THE REVISION FIRST, before the file is read. An unestablished
+  //    revision cannot bind anything, and saying so as `ok:false` rather than
+  //    `ok:true` with an empty set is the fail-closed discipline: the caller must
+  //    be able to tell "nothing was answered" from "I could not tell".
+  let rev = revision;
+  if (rev === undefined) {
+    const st = planQuestionsStatus(root, ref);
+    if (st.status !== 'ready') return closed;
+    rev = { questionsRevisionMs: st.questionsRevisionMs, planMtimeMs: st.planMtimeMs };
+  }
+  if (!rev || typeof rev !== 'object'
+      || !Number.isFinite(rev.questionsRevisionMs)
+      || !Number.isFinite(rev.planMtimeMs)) {
+    return closed;
+  }
+
+  // The two clocks carry different precision: a recorded time comes from an ISO
+  // string (whole milliseconds) while `mtimeMs` carries a sub-millisecond fraction.
+  // Comparing the truncated value against the untruncated one would systematically
+  // reject an answer recorded in the SAME millisecond as the plan write, so the
+  // plan's mtime is floored to align the precisions. This is precision alignment,
+  // not tolerance: the comparison stays a plain numeric at-or-after.
+  const planFloorMs = Math.floor(rev.planMtimeMs);
+
+  const file = path.join(root, '.ctoc', 'streaming', 'answers.jsonl');
   let raw;
   try {
-    if (!safeFs.existsSync(file)) return { ok: true, ids }; // nothing answered YET
+    if (!safeFs.existsSync(file)) return { ok: true, ids, bound: { stamped: 0, derived: 0 }, unbound: 0 };
     raw = safeFs.readFileSync(file, 'utf8');
   } catch {
-    return { ok: false, ids }; // unreadable → we do not KNOW what was answered
+    return closed; // unreadable → we do not KNOW what was answered
   }
+
+  let stamped = 0;
+  let derived = 0;
+  let unbound = 0;
 
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     let entry;
     try { entry = JSON.parse(trimmed); } catch { continue; }
-    if (entry && entry.ref === ref && typeof entry.questionId === 'string') {
+    if (!entry || typeof entry !== 'object') continue;
+    if (entry.ref !== ref || typeof entry.questionId !== 'string') continue;
+
+    const stamp = Number(entry.planMtimeMs);
+    if (Number.isFinite(stamp)) {
+      // (a) STAMPED — strict numeric equality, never loose, never a range. The log
+      //     is append-only and any process may write to it, so this comparison is
+      //     the whole guard.
+      if (stamp === rev.questionsRevisionMs) {
+        ids.add(entry.questionId);
+        stamped++;
+      } else {
+        unbound++;
+      }
+      continue;
+    }
+
+    // (b) DERIVED — no usable stamp. Bind only when the plan has not changed since
+    //     the answer was recorded.
+    const at = entryRecordedAtMs(entry);
+    if (at !== null && at >= planFloorMs) {
       ids.add(entry.questionId);
+      derived++;
+    } else {
+      unbound++;
     }
   }
-  return { ok: true, ids };
+
+  return { ok: true, ids, bound: { stamped, derived }, unbound };
 }
 
 /**
@@ -577,8 +719,11 @@ function readAnsweredQuestionIds(root, ref) {
  * @param {string} root project root
  * @param {string} ref plan reference ("stage/file.md")
  * @returns {{enough: boolean, reason: string, unanswered: Array<object>,
- *   blocking: Array<object>}} `unanswered` is EVERY still-open question (nothing
- *   hidden); `blocking` is the subset that is a fork and therefore fails the gate.
+ *   blocking: Array<object>, unboundAnswers: number}} `unanswered` is EVERY
+ *   still-open question (nothing hidden); `blocking` is the subset that is a fork
+ *   and therefore fails the gate; `unboundAnswers` is how many recorded answers
+ *   could not be tied to this revision of the plan, so a screen can say "3 recorded
+ *   answers are being asked again" instead of silently re-asking.
  */
 function hasEnoughInformation(root, ref) {
   const status = planQuestionsStatus(root, ref);
@@ -586,11 +731,18 @@ function hasEnoughInformation(root, ref) {
   // FAIL CLOSED: every not-ready state. We do not know what this plan needs, and
   // not-knowing is never a pass.
   if (status.status !== 'ready') {
-    return { enough: false, reason: status.status, unanswered: [], blocking: [] };
+    // Nothing was read, so nothing was evaluated against a revision — 0 unbound is
+    // literally true here and never means "everything bound".
+    return { enough: false, reason: status.status, unanswered: [], blocking: [], unboundAnswers: 0 };
   }
 
   const questions = status.questions;
-  const answers = readAnsweredQuestionIds(root, ref);
+  // The revision is passed through from the status this function already computed —
+  // never re-derived, and never obtained anywhere but planQuestionsStatus.
+  const answers = readAnsweredQuestionIds(root, ref, {
+    questionsRevisionMs: status.questionsRevisionMs,
+    planMtimeMs: status.planMtimeMs,
+  });
 
   // An unreadable log yields an EMPTY answered set, so nothing can read as
   // answered — the ignorance can only ever move the verdict toward false.
@@ -603,10 +755,11 @@ function hasEnoughInformation(root, ref) {
       reason: answers.ok ? 'open-forks' : 'answers-unreadable',
       unanswered,
       blocking,
+      unboundAnswers: answers.unbound,
     };
   }
 
-  return { enough: true, reason: 'enough', unanswered, blocking: [] };
+  return { enough: true, reason: 'enough', unanswered, blocking: [], unboundAnswers: answers.unbound };
 }
 
 module.exports = {
@@ -617,6 +770,7 @@ module.exports = {
   writePlanQuestions,
   planQuestionsStatus,
   loadPlanQuestions,
+  readAnsweredQuestionIds,
   hasEnoughInformation,
   isFresh,
   plansNeedingQuestions,

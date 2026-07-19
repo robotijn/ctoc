@@ -1,0 +1,8 @@
+{
+  "content_sha256": "ab60dfececa8a68b6a6b3a30d4a4a6f9bef5ade102378c63a98eb005ba7d4613",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T11:58:15.120Z",
+  "approved_by": "human",
+  "plan_basename": "00082-ratchet-files-are-in-scope-by-rule"
+}
