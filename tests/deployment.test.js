@@ -266,6 +266,36 @@ function testStrategyGitBranch() {
   });
 }
 
+// ADDITION 7 — the FAILURE path's documented shape, which nothing tested.
+//
+// Contract, sourced OUTSIDE the assertion being strengthened:
+// src/lib/deployment.js:221-224 documents "@returns {Promise<object>} Result with
+// name, status, duration, error", and the body returns `duration` on BOTH the
+// success path (:236) and the failure path (:244). Only the success path had a
+// test; the two return objects are constructed separately, so a refactor could
+// drop `duration` from the error branch and nothing would notice.
+//
+// NOTE ON THE NON-CHANGE at testStrategyGitBranch's `result.duration >= 0`:
+// that assertion is deliberately left alone. `duration` is `Date.now() - start`
+// and its field name is its entire specification — nothing outside the
+// implementation says what precision or floor it must have. Asserting a timing
+// threshold would encode a number nobody decided and add this file's only
+// wall-clock dependency, trading a weak test for a flaky one. Recorded as a
+// finding instead: `duration` has no defined contract beyond its name.
+function testStrategyFailurePathShape() {
+  // 'no-such-strategy' makes executeStrategy throw (deployment.js:274), which is
+  // the real failure path — no mock, no injected error.
+  const env = { name: 'staging', strategy: 'no-such-strategy' };
+  const context = { commit: 'abc123', branch: 'main' };
+  return deployToEnvironment(env, context).then(result => {
+    assert.strictEqual(result.name, 'staging', 'Failure result still carries the environment name');
+    assert.strictEqual(result.status, 'failed', 'Failure status');
+    assert.ok(typeof result.error === 'string' && result.error.length > 0, 'Failure result carries a non-empty error message');
+    assert.ok(Number.isFinite(result.duration), 'Failure result carries a finite duration — the documented shape');
+    console.log('# Failure path returns the documented {name,status,duration,error} shape');
+  });
+}
+
 function testStrategyGitTag() {
   const env = { name: 'production', strategy: 'git-tag' };
   const context = { commit: 'def456', branch: 'main' };
@@ -621,6 +651,7 @@ async function runTests() {
   await testPipelineStopsOnFailure();
   await testPipelineManualApproval();
   await testStrategyGitBranch();
+  await testStrategyFailurePathShape();
   await testStrategyGitTag();
   await testStrategyWebhookSuccess();
   await testStrategyWebhookMissingUrl();

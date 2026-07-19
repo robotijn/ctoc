@@ -50,7 +50,42 @@ function writePlan(root, stage, name, body) {
   return p;
 }
 
-/** A plan that declares a file which does not exist → cheap scan emits missing-files. */
+/**
+ * A plan that declares a file which does not exist → cheap scan emits missing-files.
+ *
+ * CHOOSE THE STAGE DELIBERATELY. A missing declared file only means "abandoned" at a
+ * stage where the files were supposed to have been BUILT. Pass `'review'` when the
+ * fixture needs an ACTIONABLE / dead-on-arrival candidate; pass a not-started stage
+ * (`vision`, `canvas`, `functional`, `implementation`) when it needs a benign one.
+ *
+ * TEN FIXTURES RETARGETED implementation → review, 2026-07-19. They passed
+ * `'implementation'` to manufacture a dead-on-arrival candidate, which stopped
+ * working — correctly — when `implementation` joined NOT_STARTED_STAGES.
+ *
+ * WHAT THE CODE IS SUPPOSED TO DO, derived from OUTSIDE these tests, never from what
+ * the code returns:
+ *   1. The NOT_STARTED_STAGES contract in src/lib/stale-detector.js defines the set as
+ *      "stages at which declared files are NOT yet expected to exist — a missing-files
+ *      signal here means the plan is UNBUILT (not started), never abandoned."
+ *   2. CLAUDE.md's pipeline model, "Pre-todo is context-building. Todo+ is execution",
+ *      places the implementation stage BEFORE Gate 2. Such a plan has never entered the
+ *      todo queue and has therefore NEVER BEEN EXECUTED; its declared `files:` are the
+ *      files it INTENDS to create, so they are SUPPOSED to be missing.
+ *   3. Measured on this repository before the fix: 8 of 21 cheap-scan candidates (38%)
+ *      were unbuilt implementation plans reported as abandoned work — the detector's
+ *      loudest output, and noise.
+ *
+ * WHY THE TESTS WERE WRONG RATHER THAN THE CODE: not one of the ten has the stage
+ * polarity as its SUBJECT. Their subjects are dashboard counts, cleanup grouping, and
+ * routing; the stage is scaffolding chosen only to produce an actionable candidate.
+ * They needed SOME files-expected stage and had picked one that is not. `review` is
+ * post-build, so a declared file missing there is a genuine death signal — the one
+ * stage where `missing-files` keeps full teeth.
+ *
+ * WHICH IMPLEMENTATION PASSES/FAILS: they passed while NOT_STARTED_STAGES was
+ * {vision, canvas, functional} and fail once `implementation` joins it. No assertion
+ * was weakened, deleted, or widened — only the fixture's stage moved.
+ */
 function writeStalePlan(root, stage, name) {
   writePlan(root, stage, name,
     `---\ntitle: ${name}\ntype: implementation\nfiles:\n  - src/does-not-exist-${name}.js\n---\n\n# ${name}\n`);
@@ -208,7 +243,7 @@ describe('buildDashboardTable — inbox count wiring (each count names its door)
 
   test('possibly_stale_count_appears_only_for_an_actionable_candidate', () => {
     const root = mkProject();
-    writeStalePlan(root, 'implementation', 'impl-stale'); // missing-files, actionable, not not-started
+    writeStalePlan(root, 'review', 'impl-stale'); // missing-files at a POST-BUILD stage ⇒ actionable
     const out = menu.buildDashboardTable(root);
     assert.match(out, /1 possibly-stale plan/);
   });
@@ -265,7 +300,7 @@ describe('buildDashboardTable — inbox count wiring (each count names its door)
 describe('dashboardPipeline — stale ride-along question', () => {
   test('actionable_stale_adds_a_second_question_routing_to_the_stale_door', () => {
     const root = mkProject();
-    writeStalePlan(root, 'implementation', 's1');
+    writeStalePlan(root, 'review', 's1');
     const r = menu.dashboardPipeline(root);
 
     assert.equal(r.ask.questions.length, 2, 'stale ride-along is a SECOND question');
@@ -488,7 +523,7 @@ describe('inbox verified proposals (git seam stubbed)', () => {
 
   test('dead_on_arrival_proposals_group_and_surface_the_cleanup_entry', () => {
     const root = mkProject();
-    writeStalePlan(root, 'implementation', 'doa1');
+    writeStalePlan(root, 'review', 'doa1');
     withVerify(() => doaEvidence(), () => {
       const r = menu.route(['inbox', 'verify'], root);
       assert.match(r.text, /dead-on-arrival \(1\)/);
@@ -550,7 +585,7 @@ describe('inbox cleanup review + category + confirm + per-plan + override', () =
 
   test('cleanup_review_groups_actionable_proposals_with_their_verb', () => {
     const root = mkProject();
-    writeStalePlan(root, 'implementation', 'doaX');
+    writeStalePlan(root, 'review', 'doaX');
     withVerify(() => evidenceFor['dead-on-arrival'](), () => {
       const r = menu.route(['inbox', 'cleanup'], root);
       assert.match(r.text, /Inbox ▸ Clean up \(1\)/);
@@ -584,7 +619,7 @@ describe('inbox cleanup review + category + confirm + per-plan + override', () =
 
   test('category_pick_lists_present_actionable_categories_with_confirm_routes', () => {
     const root = mkProject();
-    writeStalePlan(root, 'implementation', 'doaY');
+    writeStalePlan(root, 'review', 'doaY');
     withVerify(() => evidenceFor['dead-on-arrival'](), () => {
       const r = menu.route(['inbox', 'cleanup', 'category'], root);
       assert.match(r.text, /Approve a category/);
@@ -594,7 +629,7 @@ describe('inbox cleanup review + category + confirm + per-plan + override', () =
 
   test('category_confirm_names_the_batch_and_maps_to_the_exec_string', () => {
     const root = mkProject();
-    writeStalePlan(root, 'implementation', 'doaZ');
+    writeStalePlan(root, 'review', 'doaZ');
     withVerify(() => evidenceFor['dead-on-arrival'](), () => {
       const r = menu.route(['inbox', 'cleanup', 'confirm', 'dead-on-arrival'], root);
       assert.match(r.text, /revert 1 dead-on-arrival plan\(s\)/);
@@ -612,7 +647,7 @@ describe('inbox cleanup review + category + confirm + per-plan + override', () =
 
   test('per_plan_review_without_slug_lists_actionable_plans', () => {
     const root = mkProject();
-    writeStalePlan(root, 'implementation', 'pickme');
+    writeStalePlan(root, 'review', 'pickme');
     withVerify(() => evidenceFor['dead-on-arrival'](), () => {
       const r = menu.route(['inbox', 'cleanup', 'plan'], root);
       assert.match(r.text, /Review individually/);
@@ -622,7 +657,7 @@ describe('inbox cleanup review + category + confirm + per-plan + override', () =
 
   test('per_plan_review_with_a_slug_offers_approve_override_skip_with_the_exec_action', () => {
     const root = mkProject();
-    writeStalePlan(root, 'implementation', 'onep');
+    writeStalePlan(root, 'review', 'onep');
     withVerify(() => evidenceFor['dead-on-arrival'](), () => {
       const r = menu.route(['inbox', 'cleanup', 'plan', 'onep'], root);
       assert.equal(r.actions.Approve, 'claude:cleanup-exec plan onep revert');
@@ -633,7 +668,7 @@ describe('inbox cleanup review + category + confirm + per-plan + override', () =
 
   test('per_plan_review_with_an_unknown_slug_falls_back_to_review', () => {
     const root = mkProject();
-    writeStalePlan(root, 'implementation', 'realp');
+    writeStalePlan(root, 'review', 'realp');
     withVerify(() => evidenceFor['dead-on-arrival'](), () => {
       const r = menu.route(['inbox', 'cleanup', 'plan', 'ghost'], root);
       assert.match(r.text, /Inbox ▸ Clean up \(1\)/); // review default, not a per-plan screen
@@ -643,7 +678,7 @@ describe('inbox cleanup review + category + confirm + per-plan + override', () =
 
   test('override_for_a_non_rejected_doa_offers_archive_but_not_delete', () => {
     const root = mkProject();
-    writeStalePlan(root, 'implementation', 'doaov');
+    writeStalePlan(root, 'review', 'doaov');
     withVerify(() => evidenceFor['dead-on-arrival'](), () => {
       const r = menu.route(['inbox', 'cleanup', 'override', 'doaov'], root);
       assert.equal(r.actions['Archive to done instead'], 'claude:cleanup-exec plan doaov archive-to-done');

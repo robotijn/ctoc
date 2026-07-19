@@ -85,6 +85,68 @@ describe('databases: loadDatabases() — data-driven, fail-open', () => {
     }
   });
 
+  // ADDITION 9 — a placeholder is definitionally not content.
+  //
+  // The honest limit, stated rather than papered over: there is NO defined
+  // contract anywhere in this repository for what security.injection or
+  // security.connection must SAY. Verified — capability-registry.js validates
+  // neither field, tests/capability-data-correctness.test.js asserts on neither,
+  // and no template or plan defines their content. So NO content specification is
+  // invented here. Asserting a minimum length, a keyword or a structure would
+  // encode an opinion as a shipped requirement and would go green, which is worse
+  // than the non-emptiness check it replaced because it would LOOK like proof.
+  //
+  // What CAN be asserted without inventing anything: TODO / TBD / FIXME / XXX and
+  // an empty-after-trim string are authoring artefacts, not a description of
+  // injection posture. Today `injection: "TODO"` satisfies
+  // `typeof … === 'string' && length > 0`.
+  //
+  // WHY `XXX` IS MATCHED WHOLE-FIELD ONLY, NEVER BY SUBSTRING — do not "simplify"
+  // this back into a `.includes('XXX')`: `XXX` is the universal convention for
+  // redacting a credential in a connection string (`postgres://user:XXX@host/db`).
+  // In a field literally named security.connection a redacted example connection
+  // string is legitimate content, and a substring rule would reject it. A
+  // tightening that rejects legitimate content is not tighter, it is broken. The
+  // false-positive case below proves that rejection is absent rather than assumed.
+  // TODO / TBD / FIXME keep a word-boundary match — they are unambiguous in prose.
+  const WORD_BOUNDED_PLACEHOLDER = /\b(TODO|TBD|FIXME)\b/i;
+  const WHOLE_FIELD_PLACEHOLDER = /^[\s\p{P}]*(TODO|TBD|FIXME|XXX)[\s\p{P}]*$/iu;
+
+  function placeholderReason(value) {
+    if (typeof value !== 'string' || value.trim().length === 0) return 'empty or not a string';
+    if (WHOLE_FIELD_PLACEHOLDER.test(value)) return `the whole field is a placeholder token: ${JSON.stringify(value)}`;
+    if (WORD_BOUNDED_PLACEHOLDER.test(value)) return `contains an authoring placeholder: ${JSON.stringify(value)}`;
+    return null;
+  }
+
+  it('no shipped security field is a placeholder (TODO/TBD/FIXME/XXX or blank)', () => {
+    const { databases } = registry.loadDatabases();
+    for (const name of THE_TEN) {
+      const db = databases[name];
+      for (const field of ['injection', 'connection']) {
+        const reason = placeholderReason(db.security[field]);
+        assert.equal(reason, null, `${name}: security.${field} must be content, not a placeholder — ${reason}`);
+      }
+    }
+  });
+
+  it('a REDACTED connection string is legitimate content, not a placeholder', () => {
+    // The false-positive case. `XXX` here is a redaction marker inside real
+    // documentation — it must pass. The value is a synthetic, non-routable
+    // example with no real credential in it.
+    assert.equal(placeholderReason('tls-required; e.g. postgres://user:XXX@db.example.invalid/app'), null,
+      'a redacted example connection string must NOT be rejected');
+    assert.equal(placeholderReason('parameterized-queries only; never concatenate input'), null,
+      'ordinary prose must not be rejected');
+
+    // …and the rule still bites where it should.
+    assert.notEqual(placeholderReason('TODO'), null, 'a bare TODO is a placeholder');
+    assert.notEqual(placeholderReason('  tbd  '), null, 'a padded TBD is a placeholder');
+    assert.notEqual(placeholderReason('XXX'), null, 'a field that IS XXX is a placeholder');
+    assert.notEqual(placeholderReason('TODO: describe injection posture'), null, 'a prose TODO is a placeholder');
+    assert.notEqual(placeholderReason('   '), null, 'blank is not content');
+  });
+
   it('RLS posture matches the design: supported vs not-applicable per database', () => {
     const { databases } = registry.loadDatabases();
     for (const name of RLS_SUPPORTED) {

@@ -210,15 +210,60 @@ describe('classifyStaleCandidate — not-started gate (missing files ≠ dead be
     assert.match(proposal.evidence[0], /not started/);
   });
 
-  it('implementation-stage missing files ⇒ dead-on-arrival (past the not-started gate)', () => {
-    // Same evidence, different stage. If the not-started gate leaked to cover
-    // implementation, this would wrongly read inconclusive. Pins the polarity split.
+  // ── REVERSAL, 2026-07-19, and it is deliberate ────────────────────────────
+  // This test previously read `implementation-stage missing files ⇒
+  // dead-on-arrival (past the not-started gate)` and its comment said "Pins the
+  // polarity split." THAT PIN WAS WRONG, and an earlier author placed it on
+  // purpose, so the reversal is recorded here rather than performed quietly.
+  //
+  // WHAT THE CODE IS SUPPOSED TO DO, derived from OUTSIDE this test — never from
+  // what the code returns, which would be circular:
+  //   1. The NOT_STARTED_STAGES contract in src/lib/stale-detector.js states the
+  //      set is "stages at which declared files are NOT yet expected to exist — a
+  //      missing-files signal here means the plan is UNBUILT (not started), never
+  //      abandoned."
+  //   2. CLAUDE.md's pipeline model — "Pre-todo is context-building. Todo+ is
+  //      execution" — places the implementation stage BEFORE Gate 2. Such a plan
+  //      has never entered the todo queue and has therefore NEVER BEEN EXECUTED.
+  //      Its declared `files:` are the files it INTENDS to create.
+  //   3. Measured on this repository before the fix: 8 of 21 cheap-scan
+  //      candidates (38%) were unbuilt implementation plans classified
+  //      dead-on-arrival. It was the detector's loudest output and it was noise.
+  // By (1) and (2), an implementation-stage plan satisfies the set's own stated
+  // membership rule. It was simply missing from the set.
+  //
+  // WHY THE TEST WAS WRONG RATHER THAN THE CODE: the test asserted a CONSEQUENCE
+  // of the omission (implementation reaches DOA) as though it were the intent.
+  // Nothing outside the test ever said implementation expects built files; the
+  // header says the opposite. The test pinned the defect in place.
+  //
+  // WHICH IMPLEMENTATION PASSES/FAILS: it passed while NOT_STARTED_STAGES was
+  // {vision, canvas, functional} and fails once `implementation` joins it.
+  //
+  // The test's REAL value — proving the gate does not swallow every stage — is
+  // preserved below by relocating it to `review`, a stage where declared files
+  // genuinely SHOULD exist because the work has been built. The polarity split is
+  // still pinned; it is pinned at the correct boundary.
+  it('review-stage missing files ⇒ dead-on-arrival (past the not-started gate)', () => {
+    // Same evidence, different stage. If the not-started gate leaked to cover a
+    // POST-BUILD stage, this would wrongly read inconclusive. Pins the polarity
+    // split at the real boundary: pre-Gate-2 stages are benign, review is not.
     const proposal = classifyStaleCandidate(
-      { plan: 'p', stage: 'implementation' },
+      { plan: 'p', stage: 'review' },
       evidence({ anyFileMissing: true, declaredFiles: ['src/notyet.js'] })
     );
     assert.equal(proposal.category, 'dead-on-arrival');
     assert.equal(proposal.proposedAction, 'revert');
+  });
+
+  it('implementation-stage missing files ⇒ inconclusive (pre-Gate-2: the files are UNBUILT, not abandoned)', () => {
+    const proposal = classifyStaleCandidate(
+      { plan: 'p', stage: 'implementation' },
+      evidence({ anyFileMissing: true, declaredFiles: ['src/notyet.js'] })
+    );
+    assert.equal(proposal.category, 'inconclusive');
+    assert.equal(proposal.proposedAction, null);
+    assert.match(proposal.evidence[0], /not started/);
   });
 
   it('functional-stage BUT explicitly rejected ⇒ falls THROUGH the gate to delete (rejection keeps its teeth)', () => {

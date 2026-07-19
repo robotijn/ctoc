@@ -19,6 +19,21 @@
  *
  * Group A — src/lib/task-reconcile.js, the terminal-retention sweep.
  * Group B — src/lib/task-registry.js, nextRunnable's kind-aware dependency gate.
+ * Group C — src/lib/task-registry.js, git-exclusivity ON THE PROMOTION PATH.
+ *
+ * WHY GROUP C EXISTS. Rule 3 (git-exclusive) could be deleted from `nextRunnable`'s
+ * side of the ladder and the entire suite stayed green, while deleting any other rule
+ * from that same path went red. The reason is uniform across the suite: every
+ * promotion-path case that carries a git flag makes its candidate `kind: 'sync'`
+ * (scheduler-guarantees B1-B7; task-registry.test.js ST-21(d) and F2;
+ * actions-scheduler.test.js), so Rule 2 (sync-barrier) refuses it first and Rule 3 is
+ * never reached. F2's git invariants are guarded by `if (gitOps.length > 0)` and were
+ * therefore vacuous. Every genuine non-sync git candidate in the suite was asked
+ * through `canRun` — the oracle — instead.
+ *
+ * THE GENERAL LESSON, so the next author checks both: an oracle and the projection
+ * beside it are DIFFERENT CODE PATHS, and each needs its own defenders — a rule
+ * proven correct through `canRun` is not thereby proven live in `nextRunnable`.
  *
  * Pure in-memory registry literals with an injected clock. No disk, no sleeps, no
  * wall-clock dependence, no platform branch.
@@ -285,5 +300,129 @@ describe('Group B — sync settles on terminal through nextRunnable (task-regist
     ]);
     assert.equal(promoted(r).includes('follower'), false,
       'only a sync settles on terminal — a review must never start on a FAILED dependency');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group C — git-exclusivity holds on the PROMOTION path, not just in the oracle
+//
+// CONTRACT SOURCE (outside any test): src/lib/task-registry.js:848-850 —
+//   "Rule 3 — git-exclusive (strengthened, git-vs-git): a gitOp candidate is blocked
+//    by any running editing-OR-git task; an editing candidate is blocked by any
+//    running gitOp. Read-only non-git tasks may run alongside a git task."
+// and :897-899 — nextRunnable's returned set is JOINTLY startable: "starting the
+// whole returned set never violates ≤5 / sync-barrier / git-exclusive / file-conflict".
+//
+// HEADLINE MUTATION (defended by C1, C2, C3, C5) — delete Rule 3 entirely:
+//   src/lib/task-registry.js:851-854, delete
+//     if ((candidate.gitOp && running.some(t => isEditing(t) || t.gitOp)) ||
+//         (isEditing(candidate) && running.some(t => t.gitOp))) {
+//       return { run: false, reason: 'git-exclusive' };
+//     }
+//   Consequence: nextRunnable returns a commit and an edit as jointly startable. Rule 4
+//   cannot catch it (a git task touches nothing, so there is no overlap), Rule 1 cannot
+//   (two tasks is under the ceiling), Rule 2 cannot (neither is a sync).
+//
+// CLAUSE MUTATIONS:
+//   :851 delete `candidate.gitOp && running.some(t => isEditing(t) || t.gitOp) ||`
+//        — a git candidate stops being blocked by a running editor   (caught by C1)
+//   :852 delete `|| (isEditing(candidate) && running.some(t => t.gitOp))`
+//        — an editing candidate stops being blocked by a running git (caught by C2)
+//   :851 `t => isEditing(t) || t.gitOp` → `t => isEditing(t)`
+//        — git stops excluding git                                    (caught by C3)
+//   :909 `const running = projected.filter(...)` → `const running = result.slice()`
+//        — the ladder consults only tasks accepted THIS pass, not the real running set
+//                                                                     (caught by C5)
+//
+// C4 is the control against over-tightening (refuse everything beside a git task,
+// which would pass C1-C3 and destroy concurrency). C6 pins that the refusal is
+// Rule 3 by name — a case asserting only "not promoted" survives a mutation that
+// broke a different rule, which is the exact failure this whole file corrects.
+//
+// EVERY case below uses a NON-SYNC git candidate. A sync candidate is refused by
+// Rule 2 first and proves nothing about Rule 3.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Group C — git-exclusive holds through nextRunnable (task-registry.js:851-854)', () => {
+  const promoted = (r) => reg.nextRunnable(r).map(t => t.id);
+
+  it('C1: a NON-SYNC git candidate queued behind a queued EDITING candidate is NOT promoted ' +
+     '[mutation: task-registry.js:851 delete the first clause ' +
+     '`candidate.gitOp && running.some(t => isEditing(t) || t.gitOp) ||`]', () => {
+    // The gap this whole group was written for. t1 is accepted and folded into the
+    // projected running set carrying its touches; t2 is then a git candidate facing a
+    // running editor. Rule 1 (2 < 5), Rule 2 (no sync) and Rule 4 (t2 touches nothing)
+    // all pass it — only Rule 3 refuses.
+    const r = mkReg([
+      task({ id: 't1', kind: 'implement', status: 'queued', touches: ['src/a.js'], gitOp: false }),
+      task({ id: 't2', kind: 'review', status: 'queued', touches: [], gitOp: true })
+    ]);
+    assert.deepEqual(promoted(r), ['t1'],
+      'a commit must never be started jointly with an edit — the returned set is ' +
+      'promised to be jointly startable');
+  });
+
+  it('C2: an EDITING candidate queued behind a queued git candidate is NOT promoted ' +
+     '[mutation: task-registry.js:852 delete the second clause ' +
+     '`|| (isEditing(candidate) && running.some(t => t.gitOp))`]', () => {
+    // The reverse direction. Rule 4 explicitly cannot save this one: the git task
+    // touches nothing, so the union of running touches is empty and there is no overlap.
+    const r = mkReg([
+      task({ id: 't1', kind: 'review', status: 'queued', touches: [], gitOp: true }),
+      task({ id: 't2', kind: 'implement', status: 'queued', touches: ['src/a.js'], gitOp: false })
+    ]);
+    assert.deepEqual(promoted(r), ['t1'],
+      'an edit must never be started jointly with a commit, whichever is first in FIFO');
+  });
+
+  it('C3: git does not run beside git ' +
+     '[mutation: task-registry.js:851 `t => isEditing(t) || t.gitOp` → `t => isEditing(t)`]', () => {
+    // Neither task edits anything, so isEditing is false on both sides: the ONLY thing
+    // refusing t2 is the `|| t.gitOp` disjunct.
+    const r = mkReg([
+      task({ id: 't1', kind: 'review', status: 'queued', touches: [], gitOp: true }),
+      task({ id: 't2', kind: 'quality', status: 'queued', touches: [], gitOp: true })
+    ]);
+    assert.deepEqual(promoted(r), ['t1'], 'two git operations must not be started jointly');
+  });
+
+  it('C4 (control): a read-only NON-git task DOES run beside a git task ' +
+     '[control against over-tightening Rule 3 into "refuse every candidate beside a git task", ' +
+     'which would pass C1-C3 while destroying concurrency]', () => {
+    const r = mkReg([
+      task({ id: 't1', kind: 'review', status: 'queued', touches: [], gitOp: true }),
+      task({ id: 't2', kind: 'review', status: 'queued', touches: [], gitOp: false })
+    ]);
+    assert.deepEqual(promoted(r), ['t1', 't2'],
+      'the rule\'s own comment: read-only non-git tasks may run alongside a git task');
+  });
+
+  it('C5: the rule holds against a REALLY running git task, not only a projected one ' +
+     '[mutation: task-registry.js:909 `const running = projected.filter(t => t.id !== cand.id)` ' +
+     '→ `const running = result.slice()` — consult only this pass\'s acceptances]', () => {
+    // t1 is already running, so it is seeded into `projected` at :905 and is never a
+    // candidate. A mutation that built the ladder's running set from `result` alone
+    // would see an empty set and promote the editor straight into a live commit.
+    const r = mkReg([
+      task({ id: 't1', kind: 'review', status: 'running', touches: [], gitOp: true, started: ago(MIN) }),
+      task({ id: 't2', kind: 'implement', status: 'queued', touches: ['src/a.js'], gitOp: false })
+    ]);
+    assert.deepEqual(promoted(r), [],
+      'nothing may be promoted into a live git operation');
+  });
+
+  it('C6: the refusal is git-exclusive BY NAME, through the oracle, for C1\'s shapes ' +
+     '[pins that C1-C3 fail on Rule 3 and not on Rule 1 or Rule 4 firing by accident]', () => {
+    // NOTE (honest scope, and a correction to the plan): the oracle reads the REAL
+    // running set via runningTasks(), so it cannot be asked C1's registry verbatim —
+    // with both tasks queued the running set is empty and canRun correctly answers
+    // `ok`. The shapes are C1's; t1 is marked running so the oracle sees the same
+    // opposition nextRunnable manufactures by folding t1 into `projected` at :912.
+    const r = mkReg([
+      task({ id: 't1', kind: 'implement', status: 'running', touches: ['src/a.js'], gitOp: false, started: ago(MIN) })
+    ]);
+    const cand = task({ id: 't2', kind: 'review', status: 'queued', touches: [], gitOp: true });
+    assert.deepEqual(reg.canRun(cand, r), { run: false, reason: 'git-exclusive' },
+      'not max-concurrent, not sync-barrier, not file-conflict — Rule 3');
   });
 });

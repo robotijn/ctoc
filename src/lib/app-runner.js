@@ -72,6 +72,7 @@ const { readRawSettings } = require('./settings');
 const { FrameworkDetector } = require('./framework-detector');
 const { setupPlaywright } = require('./playwright-scaffolder');
 const capabilityRegistry = require('./capability-registry');
+const { requestExit } = require('./request-exit');
 
 /**
  * Default wall-clock budget for launching and driving an app (ms).
@@ -1171,6 +1172,18 @@ async function scaffoldPlaywright(projectPath, opts = {}) {
 // When invoked as `node app-runner.js --drive <projectPath> <optsJson>`, run the
 // async engine and print the JSON verdict framed by RESULT_MARKER, then exit 0.
 // This is how driveAppSync gets a real verdict from a synchronous context.
+//
+// THE EXIT IS REQUESTED, NEVER TAKEN. This child's stdout is a PIPE (`spawnSync`
+// in `driveAppSync`), so its writes are asynchronous and `process.exit` would
+// discard whatever is still buffered — and the verdict is the LAST thing printed,
+// so the verdict is precisely what gets lost. Measured: a verdict whose command
+// field alone was 120018 bytes arrived as exactly 65536 bytes — one pipe capacity
+// — cut mid-string, and the parent fell through to "Could not parse app-runner
+// driver verdict". That is a flaky FALSE RED (the parent fails closed rather than
+// passing on nothing), and it worsens as the evidence payload grows, which is to
+// say exactly as this check becomes more useful. `requestExit` states the status
+// and returns; Node drains stdout and exits with it. The exemplar and the full
+// account of this defect class live in `src/lib/request-exit.js`.
 if (require.main === module && process.argv[2] === '--drive') {
   const projectPath = process.argv[3];
   let opts = {};
@@ -1182,7 +1195,7 @@ if (require.main === module && process.argv[2] === '--drive') {
   driveApp(projectPath, opts)
     .then((result) => {
       process.stdout.write(RESULT_MARKER + JSON.stringify(result));
-      process.exit(0);
+      requestExit(0);
     })
     .catch((e) => {
       process.stdout.write(
@@ -1196,7 +1209,10 @@ if (require.main === module && process.argv[2] === '--drive') {
           errors: [`app-runner driver exception: ${e.message}`]
         })
       );
-      process.exit(0);
+      // Exit 0 even here: the FAILURE travels inside the verdict, and a non-zero
+      // status would make the parent blame the driver instead of reading the
+      // diagnosis it was handed.
+      requestExit(0);
     });
 }
 

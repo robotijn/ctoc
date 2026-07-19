@@ -63,6 +63,30 @@ function testSettingsTabs() {
 function testSettingsSchema() {
   assert.ok(typeof SETTINGS_SCHEMA === 'object', 'SETTINGS_SCHEMA is an object');
 
+  // ADDITION 10 — make this function non-vacuous on an empty schema.
+  //
+  // `typeof {} === 'object'` passes, and the Object.entries loop below never
+  // executes on `{}` — so on an empty schema this whole function asserted NOTHING
+  // about the schema. That is vacuity in the strict sense, not mere weakness.
+  //
+  // Contract, sourced OUTSIDE this assertion: testSettingsTabs in this same file
+  // already requires SETTINGS_TABS to contain the ids general, agents, workflow,
+  // learning, git and privacy. The settings screen renders each tab against its
+  // schema category, so the schema must carry a category for every tab the file
+  // already requires. CLAUDE.md independently documents general.environment as a
+  // live setting resolved by src/lib/settings.js.
+  //
+  // What newly FAILS: an empty or truncated schema — a bad merge, a config
+  // regression, a refactor dropping a category — which today passes while leaving
+  // settings tabs rendering nothing.
+  for (const tab of SETTINGS_TABS) {
+    assert.ok(SETTINGS_SCHEMA[tab.id], `SETTINGS_SCHEMA must carry a category for tab '${tab.id}'`);
+  }
+  assert.ok(
+    SETTINGS_SCHEMA.general.settings.some(s => s.key === 'environment'),
+    'general must carry the documented `environment` setting'
+  );
+
   // Check each category has required structure
   for (const [category, schema] of Object.entries(SETTINGS_SCHEMA)) {
     assert.ok(schema.label, `Category ${category} has label`);

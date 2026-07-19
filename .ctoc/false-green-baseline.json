@@ -1,5 +1,5 @@
 {
-  "maxFindings": 213,
+  "maxFindings": 211,
   "note": "DEBT, not blessing. These are pre-existing false-green sites — checks that can report a verdict on input they never received — tolerated so the fence could land. This list may only ever SHRINK. Never raise maxFindings to make a run pass; fix a site and lower it instead.",
   "whitelistNote": "SEPARATE from the debt list above. `whitelist` is a PERMANENT exemption for a construct that is genuinely correct, and every entry requires a written justification. It starts EMPTY. Adding to it is a reviewable act; adding to `findings` is forbidden.",
   "findings": [
@@ -71,8 +71,6 @@
     "src/lib/app-runner.js:unbounded-capture:proc",
     "src/lib/app-runner.js:unbounded-capture:driveAppSync",
     "src/lib/app-runner.js:silent-catch:driveAppSync",
-    "src/lib/app-runner.js:exit-with-pending-writes:<module>",
-    "src/lib/app-runner.js:exit-with-pending-writes:<module>#2",
     "src/lib/approval-ledger.js:silent-catch:persistEntry",
     "src/lib/approval-ledger.js:silent-catch:removeEntry",
     "src/lib/audit-chain.js:silent-catch:reclaimIfStale",

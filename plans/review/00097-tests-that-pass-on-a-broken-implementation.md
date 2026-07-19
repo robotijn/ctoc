@@ -2,6 +2,10 @@
 approved_by: human
 approved_at: 2026-07-19T16:48:06.244Z
 gate_crossed: implementation → todo
+kickback_counts:
+  by_step:
+    '14': 1
+  total: 1
 ---
 
 ---
@@ -516,6 +520,159 @@ must restore on every exit path including a failed assertion.
 ### Step 15: DOCUMENT — a comment above each addition naming the contract source by file and line, so the next reader can check the derivation rather than trusting it. **Addition 9's comment must state why `XXX` is whole-field only, naming the redacted-connection-string case, so a future tidy-up does not "simplify" it back into a substring match.** A comment at each existing `else` branch that Additions 1-3 render unreachable, stating that it is retained deliberately because this slice deletes nothing. No `src/` documentation changes.
 ### Step 16: FINAL-REVIEW — report the five paths, the Step 8 per-addition rejection evidence verbatim, the Addition 9 false-positive case result, the Step 9 inventory of live `security.connection` values, the three corrections to the audit's description, both recorded findings (`duration` has no contract; the two capability security fields have no quality bar), the honest weakness note on Additions 5 and 6 if no seam was found, an explicit restatement that the 61 markdown-corpus files are untouched, and every decision taken under ambiguity.
 
+## Execution Record
+
+### Steps
+- [x] **Step 8: TEST** — all ten additions written first, run GREEN against correct code, then each named broken implementation applied and its RED recorded verbatim (below).
+- [x] **Step 9: PREPARE** — every cited contract re-read from disk; three plan premises found wrong and corrected (below).
+- [x] **Step 10: IMPLEMENT** — five files, strictly additive: `git diff --stat` = 365 insertions, **0 deletions**.
+- [x] **Step 11: REVIEW** — `git diff -U0 | grep '^-[^-]'` returns nothing: no assertion altered, no range widened, no case deleted, no branch removed.
+- [x] **Step 12: OPTIMIZE** — one snapshot / one restore per describe via `before`/`after`; no sleep, poll or wall-clock threshold added.
+- [x] **Step 13: SECURE** — tracked-file writes snapshot-and-restore on every exit path; verified clean after the run. No secret, credential or absolute home path asserted or printed. Addition 8 asserts on a recorded command string, never executes one.
+- [x] **Step 14: VERIFY** — numbers below. Coverage floor 99 untouched.
+- [x] **Step 15: DOCUMENT** — each addition carries a comment naming its contract source by file and line; the three now-unreachable `else` branches carry a retention note; Addition 9 carries the `XXX`-whole-field-only reasoning.
+- [x] **Step 16: FINAL-REVIEW** — complete.
+
+### Step 8 — per-addition RED evidence (verbatim)
+
+Probes were run in an **isolated copy** of the repository, not on the shared working
+tree, because four sibling executors were building concurrently and a scratch edit to
+`src/lib/version.js` would have produced spurious failures in their runs.
+
+| Break | Addition | Verbatim result |
+|---|---|---|
+| 1 — `syncToMarketplace` path gets an extra `ctoc-plugin/` segment (the shipped bug, transplanted) | 1 | `✖ marketplace.json actually carries the current version at BOTH locations` · `AssertionError: sync must SUCCEED against this repo's real tracked marketplace.json / actual: false, expected: true` · `fail 2` |
+| 2 — `syncToPluginJson` restored to its original `ctoc-plugin/` path bug | 2 | `✖ plugin.json on disk actually carries the current version` · `AssertionError: sync must SUCCEED against this repo's real tracked plugin.json / actual: false, expected: true` · `fail 2` |
+| 3 — README version-line token no longer matches (format drift) | 3 | `✖ the tracked README still matches the version token — drift goes red, not silent` · `AssertionError: sync must SUCCEED against this repo's real tracked README` · `fail 3` |
+| 4a — `syncAll` hardcodes `plugin: false` (the shipped bug's exact signature) | 4 | `✖ every syncAll boolean is true here, and equals its function's own success` · `AssertionError: plugin sync must have actually succeeded / actual: false, expected: true` · `fail 1` |
+| 4c — readme sync genuinely broken **and** `syncAll` hardcodes `readme: true` | 4 | `AssertionError: readme flag must report syncToReadme / actual: true, expected: false` · `fail 3` |
+| 5 — `checkForUpdatesSync` always reports an update available | 5 | `✖ cache ahead of current → update available; equal or behind → not` · `fail 2` |
+| 6 — `checkForUpdates` (async) always reports an update available | 6 | `✖ cache ahead of current → update available; equal → not; cached flag honest` · `AssertionError: the same version is NOT an update / actual: true, expected: false` · `fail 1` |
+| 7 — failure path drops `duration` from its return object | 7 | `Test failed: AssertionError: Failure result carries a finite duration — the documented shape` |
+| 8 — `syncPlans` runs `git rev-parse HEAD` in the correct cwd | 8 | `AssertionError: First call must be the plans git status, got: git rev-parse HEAD` |
+| 9 — a database ships `injection: TODO` | 9 | `✖ no shipped security field is a placeholder (TODO/TBD/FIXME/XXX or blank)` · `AssertionError: mysql: security.injection must be content, not a placeholder — the whole field is a placeholder token: "TODO"` |
+| 10 — `SETTINGS_SCHEMA` loses the `privacy` category | 10 | `AssertionError: SETTINGS_SCHEMA must carry a category for tab 'privacy'` |
+
+**Addition 9 false-positive case, required GREEN:** `✔ a REDACTED connection string is
+legitimate content, not a placeholder` — green in every run, including the run where
+Break 9 was red. The rejection of legitimate content is proven absent, not assumed.
+
+**Two probes that did NOT go red, reported rather than hidden:**
+
+- **Break 1b — deleting the `plugins[0].version = version` write: stayed GREEN (`fail 0`).**
+  The plan claimed Addition 1 would catch this. It does not, because the repository's
+  own `marketplace.json` is already in sync, so an implementation that never writes
+  still leaves the asserted end state on disk. A perturb-then-sync variant was written,
+  proven red (`AssertionError: plugins[0].version must be synced / actual: '0.0.1',
+  expected: '6.12.94'`), and then **deliberately removed** — see decision 13.
+- **Break 4b — hardcoding `readme: true` alone: stayed GREEN (`fail 0`).** Undetectable
+  in isolation because the real call also succeeds, so `true === true`. It is caught in
+  combination with a failing sibling (Break 4c above), which is the case that matters.
+  Recorded in the test's own comment so nobody overstates it.
+
+### Step 9 — the plan's premises, checked; three are wrong
+
+1. **The two capability security fields are NOT free prose.** The plan's whole rationale
+   for narrowing the `XXX` match — that a redacted connection string is "the single most
+   likely piece of legitimate content" in `security.connection` — is false on disk. The
+   live inventory of all ten shipped databases is a **closed vocabulary of hyphenated
+   tokens**: `injection` ∈ {`parameterized-queries`, `nosql-operator-injection`,
+   `command-injection`}; `connection` ∈ {`tls-required`, `file-local`}. Not one value is
+   a connection string. **The narrowing is kept anyway** — it is strictly safer, and user
+   overrides under `.ctoc/capabilities/databases/` are author-written free text where a
+   redacted string genuinely could appear. The plan's *conclusion* survives; its
+   *reasoning* did not. No placeholder exists in the shipped data today, so Addition 9
+   lands green rather than exposing existing content.
+2. **A seam DOES exist for Additions 5 and 6, so they are NOT left conditional.** The
+   plan told Step 9 to look for one and to accept a vacuous offline invariant if none was
+   found. `tests/version.test.js` already reconstructs the module's real input boundary —
+   the on-disk update cache at `~/.ctoc/.update-cache.json` — with `backupCache` /
+   `writeCache` / `restoreCache` helpers, and `src/lib/version.js` reads that cache before
+   any fetch. Both additions therefore drive the cache directly and assert the invariant
+   **unconditionally, in both directions** (ahead → update, equal → no update, behind →
+   no update), never touching the network. This pair is **not** weaker than the other
+   four; the plan's honest-weakness note is superseded.
+3. **`syncToMarketplace` and `syncToPluginJson` have no `root` seam, and that caps what
+   Additions 1 and 2 can prove.** `syncToReadme(root = getPluginRoot())` takes one, which
+   is precisely why it is fully testable against a fixture. Its two siblings do not, so
+   there is no way to prove the *write* without either perturbing a tracked file (rejected,
+   decision 13) or mocking the filesystem (which is the sibling regression test's job, and
+   whose stub the plan itself shows to be too permissive). Adding that parameter is the
+   real fix and is a `src/` change **outside this slice's declared files** — reported, not
+   made.
+
+The plan's own three corrections to the audit were re-verified on disk and all three hold:
+`sync.test.js:297` is followed by a command-pinning assertion so there is nothing to fix
+there; `version.test.js:404/:443/:466` are a key-presence shape, not the both-branches
+shape; and `capability-databases.test.js:78` sits inside an otherwise strong test.
+
+### Step 14 — verbatim numbers
+
+Plan's named file set (the five changed files plus `version-coverage`,
+`deployment-coverage`, `deployment-execute`, `sync-coverage`, `sync-injection`,
+`capability-registry`, `capability-data-correctness`, and additionally
+`version-syncplugin-path-fix` and `version-license-invariant`):
+
+```
+ℹ tests 279
+ℹ suites 72
+ℹ pass 279
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+```
+
+Full gated run, `npm test`:
+
+```
+ℹ tests 10198
+ℹ suites 1751
+ℹ pass 10182
+ℹ fail 16
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+[CTOC test-gate] coverage 99.07% (threshold 99%), skipped 0, failed 16
+```
+
+**All 16 failures are FOREIGN and attributed.** Every one traces to
+`src/lib/stale-detector.js`, which a concurrent sibling executor was mid-write on:
+`tests/stale-classifier.test.js` (3), `tests/stale-detector-cheap.test.js` (2),
+`tests/stale-detector-coverage.test.js` (1), and `tests/menu-screens-coverage.test.js`
+(10 — every one a stale-plan assertion: `/1 possibly-stale plan/`,
+`/dead-on-arrival \(1\)/`, `/Inbox ▸ Clean up \(1\)/`, "stale ride-along is a SECOND
+question"). None is a declared file of this slice and none was touched. A first pass
+also showed transient failures in `tests/lint.test.js` and `tests/doc-counts.test.js`;
+both pass in isolation (`✔ ESLint reports zero errors across the codebase`) and were
+sibling-write artefacts.
+
+**This slice's own five files, run together: `tests 107 · pass 107 · fail 0 · skipped 0`.**
+
+Fences all green (`false-green-fence`, `reachability`, `export-reachability`,
+`skip-visibility`: `tests 59 · pass 59 · fail 0`). **No ratchet was tripped and none was
+moved**: coverage 99.07% sits above the floor of 99, which is left exactly as it was. No
+whitelist entry was added anywhere. Lint on all five changed files at
+`--max-warnings 0`: clean. `VERSION`, `README.md`, `.claude-plugin/marketplace.json` and
+`.claude-plugin/plugin.json` re-read after the run and confirmed unmodified
+(`git status --porcelain` on those four paths: empty). No git operations.
+
+### Findings recorded for the human to schedule
+
+1. **`duration` has no defined contract beyond its name** (`deployment.js` computes
+   `Date.now() - start`). If elapsed-time accuracy matters to any consumer, that contract
+   needs deciding and then testing. The `duration >= 0` assertion is untouched.
+2. **The two capability security fields have no quality bar.** They are shipped,
+   human-facing security guidance validated by nothing but non-emptiness and now a
+   placeholder ban. Someone should decide what they must contain.
+3. **`syncToMarketplace` and `syncToPluginJson` should take a `root` parameter** like
+   `syncToReadme` does. Without it their write behaviour cannot be proven without either
+   a flaky perturbation or a mock. Out of this slice's declared files.
+
+**The 61 markdown-corpus files are UNTOUCHED** — `cu2-*`, `cu3-*`, `cu4a-*`, `cu4b-*`,
+`cu4c-*` and `skill-*`. This slice did not address them and must not be read as having
+done so.
+
 ## Decisions Taken Under Ambiguity
 
 1. **Every change is an addition; nothing is modified or deleted.** The danger in
@@ -576,3 +733,40 @@ must restore on every exit path including a failed assertion.
     false-positive case is now required at Step 8 and pinned at Step 11, and Step 15
     requires the reasoning in a code comment so a future simplification does not
     reintroduce the substring match.
+11. **Additions 5 and 6 are made UNCONDITIONAL, overriding decision 5.** The plan
+    permitted a conditional, offline-vacuous invariant if Step 9 found no seam.
+    Step 9 found one — the on-disk update cache, already driven by helpers in this
+    very file — so the weaker option was not taken. Asserting in both directions
+    off a controlled cache is strictly better than asserting conditionally against
+    whatever the network returns, and it removes the network from the test path
+    entirely. Decision 5's honest-weakness note no longer applies to this pair.
+12. **The `XXX` whole-field narrowing is KEPT even though its stated justification
+    is false on disk.** The shipped fields are closed-vocabulary tokens, not prose,
+    so no redacted connection string exists to protect. The narrowing is retained
+    because it is strictly the safer rule and user overrides are free text where
+    such a value could legitimately appear. Recorded rather than quietly dropped,
+    because a rule kept for a different reason than the one written down is exactly
+    the kind of drift that later looks like an unexplained restriction.
+13. **The perturb-then-sync variant of Additions 1 and 2 was written, PROVEN RED,
+    and then deliberately REMOVED — a weaker test was chosen over a flaky one.**
+    Perturbing `marketplace.json` / `plugin.json` to a stale `0.0.1` before syncing
+    is the only way to prove the function actually writes, and it worked
+    (`AssertionError: plugins[0].version must be synced`). It was removed because
+    `tests/version-license-invariant.test.js` reads the REAL repository root and
+    asserts "every version source must equal the VERSION file"; node's test runner
+    executes files concurrently, so the perturbation window would make that sibling
+    flake. A test that intermittently reddens an unrelated file is worse than a test
+    that proves less. The limitation is written into the test's own comment and
+    reported as finding 3 rather than being papered over.
+14. **Step 8's broken-implementation probes were run in an isolated copy of the
+    repository, not on the shared working tree.** Four sibling executors were
+    building concurrently; scratch-editing `src/lib/version.js`, `sync.js`,
+    `deployment.js` and `settings.js` in place would have injected spurious
+    failures into their runs. The copy resolves `getPluginRoot()` to itself, so the
+    probes exercised the same real-file code paths.
+15. **Two additions' claimed rejections did not materialise and are reported as
+    such rather than being engineered into a pass.** Break 1b (Addition 1) and
+    Break 4b (Addition 4) stayed green. Neither addition was deleted, because each
+    demonstrably rejects its *primary* named implementation (Breaks 1, 2, 4a, 4c);
+    what was removed instead was the overstatement, from both the plan's claims and
+    the tests' comments.

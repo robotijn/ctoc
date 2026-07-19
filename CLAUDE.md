@@ -244,7 +244,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 435 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 436 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -273,6 +273,55 @@ and `whitelist` is a PERMANENT exemption that starts EMPTY and requires a writte
 justification per entry. Conflating them is what kills a fence. The fixed exemplars are
 the specification: `src/scripts/test-gate.js` (parsers return `null`, never `0`) and
 `src/lib/request-exit.js` (`process.exitCode` + return, so Node drains before exiting).
+
+**The stale scan says when it could not look — and `unreadCount === 0` is the only
+thing that licenses reading a zero.** `scanCheapCandidates` in `src/lib/stale-detector.js`
+runs on the menu hot path (`src/lib/inbox.js`, `src/lib/menu-screens.js`) and skips an
+input at four points: an unreadable stage directory (which drops an ENTIRE stage — up to
+a third of the backlog), a failed `lstat`, a plan above the 1 MiB `MAX_PLAN_BYTES` gate,
+and a failed read. Each skip is correct — a plan that vanishes mid-scan must never crash
+the menu — but the result had nowhere to put them, so `{ candidates: [], count: 0 }` from
+a scan that read NOTHING was byte-identical to the same result from a complete scan of a
+clean backlog. An unreadable `plans/review/` rendered as "no stale plans": the sixth
+instance of the false-green class, on the hot path. The result now carries
+`unread: [{ path, stage, reason }]` and `unreadCount`. **`unreadCount === 0` means the
+walk completed and ONLY THEN does `count === 0` mean the backlog is clean;
+`unreadCount > 0` means the result is PARTIAL.** `reason` is a CLOSED enum —
+`stage-unreadable` · `stat-failed` · `oversized` · `read-failed` — never a raw error
+string, because the value is rendered on a dashboard and a filesystem error carries
+absolute paths and user names; `path` is repository-relative for the same reason. A
+`stage-unreadable` entry stands for a WHOLE stage, since the scan cannot know how many
+plans it failed to read and inventing a count would be the very defect being fixed.
+**TWO SKIPS ARE DELIBERATELY NOT FAULTS, and must not be "fixed" into faults.** A
+non-regular file (a directory or a SYMLINK) is a security exclusion — a symlink could
+point outside root, so the scan refuses to follow it — not a failure to look; reporting
+it would make every repository containing a symlinked plan permanently "partial" and
+devalue the signal into noise. An ABSENT stage directory is not a fault either: there are
+no plans there to fail to read, so reporting it would be a FALSE partial, the mirror
+image of the defect. The enum stays closed at four for this reason.
+**NOT YET DISPLAYED, and that is not finished.** `unreadCount` is produced and tested; no
+consumer renders it, so until `inbox.js` and `menu-screens.js` are wired the menu still
+shows a partial scan as a clean one. The data says otherwise; the screen does not. An
+undisplayed honest signal beats a displayed dishonest one — it is not a substitute for
+one. Enforced by `tests/stale-scan-says-when-it-could-not-look.test.js`, whose
+permission-dependent cases skip LOUDLY with a printed reason on Windows and as root,
+because a permissions test that silently no-ops is itself a check reporting a verdict it
+never earned.
+
+**A pre-Gate-2 plan's missing files are not abandonment.** `NOT_STARTED_STAGES` in
+`src/lib/stale-detector.js` is the allowlist of stages where declared files are NOT yet
+expected to exist, and it did not contain `implementation` — a stage that IS scanned
+(`GATE_SOURCE_STAGES`) but sits BEFORE Gate 2, has never entered the todo queue, and has
+therefore never been executed. Its declared `files:` are the files it INTENDS to create,
+so they are supposed to be missing. That one set membership made every unbuilt
+implementation plan classify as `dead-on-arrival`: measured on this repository, 8 of 21
+candidates (38%) were unbuilt plans reported as abandoned work, and it was the detector's
+loudest output. It is a correction of SCOPE, not a deletion — `missing-files` keeps full
+teeth at `review`, and the not-started gate still exempts `explicitlyRejected`, so
+positive death evidence reaches dead-on-arrival at every stage. The cheap pass stays a
+broad generator (stage polarity lives downstream in `classifyStaleCandidate`, locked by
+the SP5 regression T3b); `implementation` now behaves exactly as `functional` already
+did — one rule for pre-build stages, not two.
 
 **The dead-code fence — the count is DEBT, not a regression.** A module is done when
 a human can REACH it, not when its test passes (a test IS a caller).
@@ -379,7 +428,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 435 test files
+  tests/                 436 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
