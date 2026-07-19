@@ -2,6 +2,10 @@
 approved_by: human
 approved_at: 2026-07-19T18:15:13.949Z
 gate_crossed: implementation → todo
+kickback_counts:
+  by_step:
+    '14': 1
+  total: 1
 ---
 
 ---
@@ -359,3 +363,43 @@ The concurrently-edited `src/lib/reachability.js` is not involved in this slice.
    than this slice's subject warrants; case 4 makes their drift a test failure,
    which buys the safety without the risk. If the human wants them merged, that is a
    separate slice with its own gate.
+9. **EXECUTOR — the large verdict is produced by a declared command containing a
+   shell operator.** A verdict only exceeds a pipe buffer if some unbounded field
+   carries the weight, and every evidence field is bounded (byte counts, a 500-char
+   command-line output slice) EXCEPT the declared command itself, which is echoed
+   into `evidence.command` and again into the diagnosis. A command containing `&&`
+   is rejected as undrivable BEFORE anything is spawned, so a 120018-byte command
+   inflates the verdict to roughly 240KB through real code with no process ever
+   receiving a long argument — no operating-system argument-length limit, no
+   platform difference, no test double.
+10. **EXECUTOR — case 10 (the catch branch) was GREEN at Step 8, and the plan
+   predicted red.** The plan is wrong on this detail. The catch branch's payload is
+   a fixed sentence plus `e.message`, and Node truncates an inspected value in an
+   argument-type error to 25 characters, so that payload cannot be made to exceed a
+   pipe buffer through any real input. The case is kept — it pins the branch, its
+   verdict delivery and its exit status — but it was never red and is reported as
+   such rather than dressed up.
+11. **EXECUTOR — case 11 (fail-closed) is forced with an invalid `NODE_OPTIONS`
+   rather than a corrupted stream.** The parse site is internal to `driveAppSync`
+   and its input comes from a child this module spawns itself, so there is no seam
+   to inject corrupt output through without a test double. Setting an unknown Node
+   flag for the duration of one call makes the real child fail to start, so the
+   parent genuinely sees no parseable verdict — the same state a truncated one
+   produced. The environment variable is restored in a `finally`.
+12. **EXECUTOR — case 9's size guard measures the DECLARATION, not the response.**
+   The first draft asserted the RECEIVED payload exceeded 64KB, which is incoherent:
+   the received payload is the thing under test, so a truncated read would have
+   excused itself by looking small. It now measures the declared command, whose
+   length is known before the child runs.
+13. **EXECUTOR — `maxFindings` lowered 213 → 211, measured live.** `scanFalseGreen`
+   reports 211 findings after the fix, and both
+   `src/lib/app-runner.js:exit-with-pending-writes:<module>` entries are gone from
+   the live scan. The number in this plan was not trusted. The `whitelist` structure
+   was not touched and no entry was added to it.
+14. **EXECUTOR — the entry point was NOT declared, confirming the plan.** Left off
+   deliberately; ladder case 8 records the undeclared state so throwing the switch
+   turns exactly one case red and names itself.
+15. **EXECUTOR — the plan's central finding is CONFIRMED against disk.** The third
+   reported opt-out reason ("build and test project, launching is out of scope")
+   does not occur anywhere in `src/`. Both ladders read the declaration first, above
+   all three producers.

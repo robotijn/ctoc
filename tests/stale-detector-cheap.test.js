@@ -460,10 +460,35 @@ describe('count invariant on a mixed fixture', () => {
 });
 
 describe('structural graceful degradation', () => {
-  it('plans/ absent ⇒ { candidates: [], count: 0 }', () => {
+  // WIDENED 2026-07-19 to the full CheapScanResult contract. These two whole-result
+  // deepEqual assertions were the ONLY thing making the `unread` channel
+  // non-additive, so the record of why is worth more than the edit.
+  //
+  // WHAT THE CODE IS SUPPOSED TO DO, from OUTSIDE the test: the CheapScanResult
+  // typedef in src/lib/stale-detector.js now specifies four properties —
+  // `candidates`, `count`, `unread`, `unreadCount` — and the module header states
+  // the contract that `unreadCount === 0` is the ONLY thing licensing a reader to
+  // treat `count === 0` as "the backlog is clean". A scan that read nothing used
+  // to return a result byte-identical to a clean one; that is the false-green
+  // class CLAUDE.md fences, and it shipped on the menu hot path.
+  //
+  // WHY THE TEST WAS WRONG RATHER THAN THE CODE: a whole-object deepEqual pins the
+  // ABSENCE of every field not listed, so it forbids any future field — including
+  // the honesty channel — without ever having taken a position on honesty. It
+  // over-asserted: its subject is graceful degradation, not result arity.
+  //
+  // WHICH IMPLEMENTATION PASSES/FAILS: passes on the two-key result, fails the
+  // moment `unread`/`unreadCount` exist.
+  //
+  // The assertion is TIGHTENED, not loosened: it now additionally requires
+  // unreadCount === 0, i.e. that the scan COMPLETED its walk rather than merely
+  // failing to find anything — a strictly stronger claim than before.
+  it('plans/ absent ⇒ { candidates: [], count: 0, unread: [], unreadCount: 0 }', () => {
     const sb = makeSandbox();
     const res = scanCheapCandidates(sb);
-    assert.deepEqual(res, { candidates: [], count: 0 });
+    assert.deepEqual(res, { candidates: [], count: 0, unread: [], unreadCount: 0 });
+    // No plans/ directory is "there was nothing to read", NOT "I could not read".
+    assert.equal(res.unreadCount, 0, 'an absent plans/ is not an unread fault');
   });
 
   it('one stage dir absent ⇒ no throw, other stages scanned', () => {
@@ -483,7 +508,12 @@ describe('structural graceful degradation', () => {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, '.gitkeep'), '');
     const res = scanCheapCandidates(sb);
-    assert.deepEqual(res, { candidates: [], count: 0 });
+    // Widened to the full CheapScanResult contract — see the justification on
+    // 'plans/ absent' above. TIGHTENED here too: a .gitkeep is FILTERED, never
+    // skipped, so the walk completed and unreadCount must be 0. Were .gitkeep ever
+    // to become an unread entry, this now catches it.
+    assert.deepEqual(res, { candidates: [], count: 0, unread: [], unreadCount: 0 });
+    assert.equal(res.unreadCount, 0, '.gitkeep is filtered out, not an input the scan failed to read');
   });
 
   it('files: [] and absent files: ⇒ no missing-files signal', () => {

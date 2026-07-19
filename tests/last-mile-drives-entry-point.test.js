@@ -469,3 +469,342 @@ describe('readDeclaredEntryPoint', () => {
     assert.strictEqual(decl.reason, null);
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// THE SETTLED FINDING, PINNED.
+//
+// The worry was that the three opt-out reasons a reader sees in evidence
+// artifacts ("no human-facing runtime", "shape could not be determined", and the
+// capability-registry build-and-test reason) might be THREE code paths, so that
+// making the check drive a DECLARED entry point would have closed only one of
+// them. It is not three paths. There are three PRODUCERS of an opt-out result —
+// `malformedDeclarationResult`, `nativeNotApplicableResult`, and the inline
+// library/unknown result via `noRuntimeReason` — and all three sit BELOW one
+// decision point: the declaration is read first. That single decision point is
+// written TWICE, once in the asynchronous `driveApp` and once in the synchronous
+// `driveAppSync`, which is the real hazard: two ladders can drift apart silently.
+// Ladder case 4 is what makes that drift a test failure instead of a surprise.
+//
+// Until now this was true by reading the file and by nothing else.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** A fixture the capability registry classifies as a native run target. */
+function registryPkg(dir) {
+  write(dir, 'Cargo.toml', '[package]\nname = "fixture"\nversion = "0.1.0"\n');
+  write(dir, path.join('src', 'main.rs'), 'fn main() {}\n');
+}
+
+/** The entry script every ladder fixture declares — one command, renders and exits. */
+function entryScript(dir) {
+  write(dir, 'entry.js', 'process.stdout.write("READY-MARKER\\n");');
+}
+
+describe('the opt-out ladder is ONE ladder, and the declaration sits above all of it', () => {
+  it('ladder 1: the declaration outranks a LIBRARY shape', async () => {
+    const dir = makeProject('ctoc-ladder-lib-');
+    libraryPkg(dir);
+    entryScript(dir);
+    declare(dir, { command: 'node entry.js', expect: 'READY-MARKER' });
+
+    const res = await driveApp(dir);
+    assert.strictEqual(res.applicable, true, 'a library that DECLARES an entry point is not an opt-out');
+    assert.strictEqual(res.evidence.shape, 'declared-entry-point');
+    assert.strictEqual(res.responded, true);
+  });
+
+  it('ladder 2: the declaration outranks a capability-registry-detected target', async () => {
+    const dir = makeProject('ctoc-ladder-reg-');
+    registryPkg(dir);
+    entryScript(dir);
+    declare(dir, { command: 'node entry.js', expect: 'READY-MARKER' });
+
+    // Sanity: without the declaration this fixture IS a registry target — so the
+    // case proves the declaration outranks a live producer, not a dead branch.
+    assert.ok(appRunner.detectRunTarget(dir), 'fixture must be registry-detectable for this case to mean anything');
+
+    const res = await driveApp(dir);
+    assert.strictEqual(res.applicable, true, 'a registry-detected project that DECLARES is not an opt-out');
+    assert.strictEqual(res.evidence.shape, 'declared-entry-point');
+    assert.notStrictEqual(res.evidence.shape, 'native');
+  });
+
+  it('ladder 3: the declaration outranks an UNKNOWN shape', async () => {
+    const dir = makeProject('ctoc-ladder-unk-');
+    entryScript(dir); // no package.json, no registry marker — nothing to classify
+    declare(dir, { command: 'node entry.js', expect: 'READY-MARKER' });
+
+    assert.strictEqual(appRunner.detectAppShape(dir), 'unknown');
+    const res = await driveApp(dir);
+    assert.strictEqual(res.applicable, true, 'an unshaped project that DECLARES is not an opt-out');
+    assert.strictEqual(res.evidence.shape, 'declared-entry-point');
+  });
+
+  it('ladder 4: the async and synchronous ladders agree on every fixture', async () => {
+    const declaredLib = makeProject('ctoc-ladder-agree-lib-');
+    libraryPkg(declaredLib); entryScript(declaredLib);
+    declare(declaredLib, { command: 'node entry.js', expect: 'READY-MARKER' });
+
+    const declaredReg = makeProject('ctoc-ladder-agree-reg-');
+    registryPkg(declaredReg); entryScript(declaredReg);
+    declare(declaredReg, { command: 'node entry.js', expect: 'READY-MARKER' });
+
+    const declaredUnknown = makeProject('ctoc-ladder-agree-unk-');
+    entryScript(declaredUnknown);
+    declare(declaredUnknown, { command: 'node entry.js', expect: 'READY-MARKER' });
+
+    const undeclared = makeProject('ctoc-ladder-agree-none-');
+    libraryPkg(undeclared);
+    declare(undeclared, undefined);
+
+    for (const dir of [declaredLib, declaredReg, declaredUnknown, undeclared]) {
+      const asyncRes = await driveApp(dir);
+      const syncRes = driveAppSync(dir);
+      assert.strictEqual(syncRes.applicable, asyncRes.applicable,
+        `the two ladders disagree on applicable for ${path.basename(dir)}`);
+      // The producer identity — a drift in WHICH producer answered is the failure
+      // this case exists to catch, not merely a different boolean.
+      assert.strictEqual(syncRes.evidence.shape, asyncRes.evidence.shape,
+        `the two ladders disagree on the producer for ${path.basename(dir)}`);
+    }
+  });
+
+  it('ladder 5: each of the three opt-out producers is identifiable', async () => {
+    const malformedDir = makeProject('ctoc-ladder-mal-');
+    libraryPkg(malformedDir);
+    declare(malformedDir, {}); // declared and unreadable
+
+    const registryDir = makeProject('ctoc-ladder-nat-');
+    registryPkg(registryDir);
+
+    const libDir = makeProject('ctoc-ladder-none-');
+    libraryPkg(libDir);
+    declare(libDir, undefined);
+
+    const malformed = await driveApp(malformedDir);
+    const registry = await driveApp(registryDir);
+    const library = await driveApp(libDir);
+
+    for (const res of [malformed, registry, library]) {
+      assert.strictEqual(res.applicable, false);
+      assert.deepStrictEqual(res.errors, [], 'an opt-out contributes no error');
+    }
+
+    const shapes = [malformed.evidence.shape, registry.evidence.shape, library.evidence.shape];
+    assert.strictEqual(new Set(shapes).size, 3,
+      `the three producers must be distinguishable; got shapes ${JSON.stringify(shapes)}`);
+
+    // Each reason teaches the reader how to turn the check on: the two heuristic
+    // producers name the settings key; the malformed one names the specific defect.
+    assert.ok(/entry_point/.test(registry.evidence.reason), 'the registry reason must name the settings key');
+    assert.ok(/entry_point/.test(library.evidence.reason), 'the library reason must name the settings key');
+    assert.ok(/`command` is required/.test(malformed.evidence.reason),
+      `the malformed reason must name the specific defect; got: ${malformed.evidence.reason}`);
+  });
+
+  it('ladder 6: a malformed declaration is NEVER degraded to "none declared"', async () => {
+    const dir = makeProject('ctoc-ladder-mal2-');
+    libraryPkg(dir);
+    declare(dir, {}); // entry_point present, empty
+
+    for (const res of [await driveApp(dir), driveAppSync(dir)]) {
+      assert.strictEqual(res.evidence.shape, 'declared-entry-point-malformed');
+      assert.ok(!/no human-facing runtime|shape could not be determined/.test(res.evidence.reason),
+        'a project that TRIED to declare is a different state from one that never did');
+    }
+  });
+
+  it('ladder 7: the entry-point block documented in CLAUDE.md is still valid', () => {
+    const claudeMd = path.join(__dirname, '..', 'CLAUDE.md');
+    const doc = fs.readFileSync(claudeMd, 'utf8');
+
+    // Find the fenced JSON block that declares an entry point. If it cannot be
+    // found or cannot be parsed, this case FAILS LOUDLY naming what it looked for
+    // — a documentation check that silently passes on a document it could not read
+    // is the very false-green shape this file exists to fence.
+    const fences = [...doc.matchAll(/```json\n([\s\S]*?)```/g)].map((m) => m[1]);
+    const candidates = fences.filter((f) => f.includes('entry_point'));
+    assert.strictEqual(candidates.length, 1,
+      `expected exactly ONE fenced \`\`\`json block containing "entry_point" in ${claudeMd}; ` +
+      `found ${candidates.length} among ${fences.length} json fences. The documented declaration ` +
+      'must be locatable, or this case is asserting nothing.');
+
+    let parsed;
+    try {
+      // The documented block is shown with trailing-comment annotations elsewhere in
+      // the file; this one is plain JSON and must parse as-is.
+      parsed = JSON.parse(candidates[0]);
+    } catch (e) {
+      assert.fail(`the documented entry_point block in ${claudeMd} is not parseable JSON: ${e.message}\n` +
+        `block was:\n${candidates[0]}`);
+    }
+
+    assert.ok(parsed.general && parsed.general.entry_point,
+      'the documented block must sit under general.entry_point, the key the reader actually sets');
+
+    // The real reader is the judge — not a second copy of its rules written here.
+    const dir = makeProject('ctoc-ladder-doc-');
+    libraryPkg(dir);
+    write(dir, path.join('.ctoc', 'settings.json'), JSON.stringify(parsed, null, 2));
+    const decl = appRunner.readDeclaredEntryPoint(dir);
+    assert.strictEqual(decl.reason, null,
+      `the documented block was rejected by the real reader: ${decl.reason}`);
+    assert.ok(decl.declaration, 'the documented block must produce a usable declaration');
+    assert.strictEqual(decl.declaration.command, parsed.general.entry_point.command);
+  });
+
+  it('ladder 8: this repository is honestly UNDECLARED today', () => {
+    // Deliberate, recorded state — NOT an endorsement. This slice does not throw
+    // the switch: declaring an entry point here makes every Step 14 verification
+    // launch a real process, which is a decision with timing and gate consequences
+    // that belongs to the human in a quiet moment. Recording it as an assertion is
+    // what makes throwing that switch VISIBLE: this one case turns red and names
+    // itself, instead of the last mile's behaviour changing silently.
+    const repoRoot = path.join(__dirname, '..');
+    const decl = appRunner.readDeclaredEntryPoint(repoRoot);
+    assert.strictEqual(decl.declaration, null,
+      'this repository now DECLARES an entry point — that is a deliberate change; ' +
+      'update this case (and expect Step 14 to launch the menu on every verification).');
+    assert.strictEqual(decl.reason, null, 'undeclared is not malformed');
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// THE VERDICT MUST SURVIVE ITS OWN PIPE.
+//
+// `driveAppSync` runs the asynchronous engine inside a `--drive` child and reads
+// the verdict off that child's stdout. The child wrote the verdict and then called
+// `process.exit(0)` — the exit-with-pending-writes signature this repository
+// fences by name. A write to a PIPE is asynchronous, so `process.exit` discards
+// whatever is still buffered; the verdict is printed LAST and is therefore exactly
+// what is lost. The parent then finds no parseable marker and fails closed.
+//
+// Being precise about the failure mode, because overstating it would be the same
+// dishonesty: this is a flaky false RED, not a false green. The gate FAILS on a
+// verdict that was computed correctly and then thrown away. It gets worse as the
+// evidence payload grows — that is, exactly as the check becomes more useful.
+// ═════════════════════════════════════════════════════════════════════════════
+describe('the --drive child does not throw away the verdict it just printed', () => {
+  const APP_RUNNER = path.join(__dirname, '..', 'src', 'lib', 'app-runner.js');
+  const { spawnSync } = require('node:child_process');
+
+  /**
+   * A fixture whose verdict is comfortably larger than a pipe's 64KB capacity.
+   * The size comes from real code: a declared command containing a shell operator
+   * is rejected as undrivable BEFORE anything is spawned, and both the evidence
+   * and the diagnosis echo the command in full. No process ever receives the long
+   * argument, so no operating-system argument-length limit is involved.
+   */
+  function hugeVerdictProject() {
+    const dir = makeProject('ctoc-pipe-huge-');
+    libraryPkg(dir);
+    const longCommand = `node ${'x'.repeat(120000)} && echo done`;
+    declare(dir, { command: longCommand });
+    return { dir, longCommand };
+  }
+
+  it('pipe 9: a verdict larger than the pipe buffer is delivered WHOLE', () => {
+    const { dir, longCommand } = hugeVerdictProject();
+    // Measured on the DECLARATION, not on what came back: the received payload is
+    // the very thing under test, so sizing the case by it would let a truncated
+    // read excuse itself.
+    assert.ok(longCommand.length > 65536,
+      `this case only means something if the verdict exceeds a pipe buffer; the declared ` +
+      `command alone is ${longCommand.length} bytes`);
+
+    const proc = spawnSync(process.execPath, [APP_RUNNER, '--drive', dir, '{}'],
+      { encoding: 'utf8', shell: false, maxBuffer: 64 * 1024 * 1024 });
+    const out = proc.stdout || '';
+    const marker = out.lastIndexOf('__APP_RUNNER_RESULT__');
+    assert.ok(marker >= 0, `the child printed no verdict marker at all; stdout was ${out.length} bytes`);
+
+    const payload = out.slice(marker + '__APP_RUNNER_RESULT__'.length).trim();
+
+    let verdict;
+    try {
+      verdict = JSON.parse(payload);
+    } catch (e) {
+      assert.fail(
+        'the verdict was computed and then DISCARDED by process.exit: received only ' +
+        `${out.length} bytes, ending ${JSON.stringify(out.slice(-40))}, for a verdict whose ` +
+        `command field alone is ${longCommand.length} bytes. Parse error: ${e.message}`);
+    }
+    assert.strictEqual(verdict.evidence.command, longCommand,
+      'the verdict must arrive intact, not merely parseable');
+  });
+
+  it('pipe 9b: the synchronous caller parses that same large verdict', () => {
+    const { dir, longCommand } = hugeVerdictProject();
+
+    const res = driveAppSync(dir);
+
+    assert.ok(!res.errors.some((e) => /Could not parse app-runner driver verdict/.test(e)),
+      `the parent lost the verdict: ${res.errors.join(' | ').slice(0, 240)}`);
+    assert.strictEqual(res.applicable, true, 'a declared entry point is always a verdict, never a skip');
+    assert.strictEqual(res.evidence.command, longCommand);
+    assert.ok(res.errors.some((e) => /shell operator/.test(e)),
+      'the real diagnosis must survive the trip, not just the envelope');
+  });
+
+  it('pipe 10: the failure branch delivers its verdict too, and exits 0', () => {
+    // `{"port":"x"}` makes the asynchronous engine reject inside the child, which
+    // is the `catch` handler — the second `process.exit(0)` site. Real input, no
+    // test double: the child parses this options payload from its own argv.
+    const dir = makeProject('ctoc-pipe-catch-');
+    write(dir, 'package.json', JSON.stringify({
+      name: 'fixture', version: '1.0.0', scripts: { dev: 'node server.js' }
+    }));
+    write(dir, 'server.js', 'setTimeout(() => {}, 50);');
+
+    const proc = spawnSync(process.execPath, [APP_RUNNER, '--drive', dir, JSON.stringify({ port: 'x' })],
+      { encoding: 'utf8', shell: false, maxBuffer: 64 * 1024 * 1024 });
+
+    assert.strictEqual(proc.status, 0, 'the failure branch still exits 0 — the verdict carries the failure');
+    const out = proc.stdout || '';
+    const marker = out.lastIndexOf('__APP_RUNNER_RESULT__');
+    assert.ok(marker >= 0, `the catch branch printed no verdict; stderr: ${(proc.stderr || '').slice(0, 200)}`);
+    const verdict = JSON.parse(out.slice(marker + '__APP_RUNNER_RESULT__'.length).trim());
+    assert.strictEqual(verdict.applicable, true);
+    assert.strictEqual(verdict.launched, false);
+    assert.ok(verdict.errors.some((e) => /app-runner driver exception/.test(e)),
+      `the catch branch must deliver its diagnosis; got ${JSON.stringify(verdict.errors)}`);
+  });
+
+  it('pipe 11: an unreadable verdict is still an ERROR, never a pass', () => {
+    // The point is to stop LOSING the verdict, not to start trusting one that
+    // could not be read. Forced with real inputs: an invalid NODE_OPTIONS makes
+    // the child process fail before it can print anything, so the parent sees no
+    // marker at all — the same state a truncated verdict produces.
+    const dir = makeProject('ctoc-pipe-failclosed-');
+    libraryPkg(dir);
+    entryScript(dir);
+    declare(dir, { command: 'node entry.js', expect: 'READY-MARKER' });
+
+    const previous = process.env.NODE_OPTIONS;
+    let res;
+    try {
+      process.env.NODE_OPTIONS = '--ctoc-not-a-real-node-flag';
+      res = driveAppSync(dir);
+    } finally {
+      if (previous === undefined) delete process.env.NODE_OPTIONS;
+      else process.env.NODE_OPTIONS = previous;
+    }
+
+    assert.strictEqual(res.launched, false, 'nothing was proven to have launched');
+    assert.strictEqual(res.responded, false);
+    assert.ok(res.errors.length > 0, 'an unreadable verdict must fail closed, loudly');
+  });
+
+  it('pipe 12: the success branch still exits 0', () => {
+    const dir = makeProject('ctoc-pipe-exit0-');
+    libraryPkg(dir);
+    entryScript(dir);
+    declare(dir, { command: 'node entry.js', expect: 'READY-MARKER' });
+
+    const proc = spawnSync(process.execPath, [APP_RUNNER, '--drive', dir, '{}'],
+      { encoding: 'utf8', shell: false });
+    assert.strictEqual(proc.status, 0, `the child must exit 0; stderr: ${(proc.stderr || '').slice(0, 200)}`);
+    const out = proc.stdout || '';
+    const verdict = JSON.parse(out.slice(out.lastIndexOf('__APP_RUNNER_RESULT__') + '__APP_RUNNER_RESULT__'.length).trim());
+    assert.strictEqual(verdict.responded, true);
+  });
+});

@@ -288,6 +288,17 @@ describe('setVersion', () => {
 // =============================================================================
 
 describe('syncToMarketplace', () => {
+  const marketplaceFile = path.join(path.dirname(__dirname), '.claude-plugin', 'marketplace.json');
+  let savedMarketplace = null;
+
+  before(() => {
+    savedMarketplace = fs.existsSync(marketplaceFile) ? fs.readFileSync(marketplaceFile) : null;
+  });
+
+  after(() => {
+    if (savedMarketplace !== null) fs.writeFileSync(marketplaceFile, savedMarketplace);
+  });
+
   test('updates marketplace.json with version', () => {
     const result = version.syncToMarketplace();
     // Check if it worked or file doesn't exist
@@ -296,8 +307,52 @@ describe('syncToMarketplace', () => {
     if (result.success) {
       assert.ok(result.version, 'Has version property when successful');
     } else {
+      // RETAINED DELIBERATELY, now unreachable. The assertion added below pins
+      // result.success === true, so this branch can no longer be taken. It is
+      // kept rather than deleted because this change is strictly additive.
       assert.ok(result.error, 'Has error property when unsuccessful');
     }
+  });
+
+  // ADDITION 1 — the assertions the shape above cannot make.
+  //
+  // Contract, sourced OUTSIDE this test:
+  //   - src/lib/version.js:116-118 ("Sync VERSION to marketplace.json / Updates
+  //     both metadata.version and plugins[0].version") and its body, which writes
+  //     BOTH locations.
+  //   - tests/version-syncplugin-path-fix.test.js:6-7 records as established fact
+  //     that syncToMarketplace targets <root>/.claude-plugin/marketplace.json —
+  //     the expected path, stated outside this file.
+  //   - CLAUDE.md names VERSION the single source of truth and marketplace.json a
+  //     tracked file present in every checkout, so "not found" is never a valid
+  //     outcome in this repository.
+  //
+  // What newly FAILS: the exact bug that shipped in syncToPluginJson — a wrong
+  // path segment makes existsSync false and the function returns
+  // {success:false, error:'marketplace.json not found'} forever. Verified red at
+  // Step 8 by transplanting that bug here.
+  //
+  // HONEST LIMIT, do not overstate this test. Because the repository's own
+  // marketplace.json is ALREADY in sync, an implementation that stops writing
+  // plugins[0].version still passes — verified at Step 8 by deleting that write
+  // and watching this stay green. Proving the WRITE requires perturbing the file
+  // first, and that was tried and REJECTED: tests/version-license-invariant.test.js
+  // reads the real root and asserts every version source equals VERSION, so a
+  // perturbation window makes it flake under parallel file execution.
+  // The real fix is a `root` parameter on syncToMarketplace/syncToPluginJson —
+  // syncToReadme already has one, which is exactly why it is fully testable
+  // against a fixture. That is a src/ change outside this slice's declared files.
+  test('marketplace.json actually carries the current version at BOTH locations', () => {
+    const expected = version.getVersion();
+    const result = version.syncToMarketplace();
+
+    assert.strictEqual(result.success, true, 'sync must SUCCEED against this repo\'s real tracked marketplace.json');
+    assert.strictEqual(result.version, expected, 'reported version must be the VERSION file version');
+
+    // Read back from disk — the claim is about the file, not the return value.
+    const onDisk = JSON.parse(fs.readFileSync(marketplaceFile, 'utf8'));
+    assert.strictEqual(onDisk.metadata.version, expected, 'metadata.version must be synced');
+    assert.strictEqual(onDisk.plugins[0].version, expected, 'plugins[0].version must be synced');
   });
 });
 
@@ -306,6 +361,17 @@ describe('syncToMarketplace', () => {
 // =============================================================================
 
 describe('syncToPluginJson', () => {
+  const pluginFile = path.join(path.dirname(__dirname), '.claude-plugin', 'plugin.json');
+  let savedPlugin = null;
+
+  before(() => {
+    savedPlugin = fs.existsSync(pluginFile) ? fs.readFileSync(pluginFile) : null;
+  });
+
+  after(() => {
+    if (savedPlugin !== null) fs.writeFileSync(pluginFile, savedPlugin);
+  });
+
   test('updates plugin.json with version', () => {
     const result = version.syncToPluginJson();
     assert.ok(typeof result === 'object', 'Returns an object');
@@ -313,8 +379,33 @@ describe('syncToPluginJson', () => {
     if (result.success) {
       assert.ok(result.version, 'Has version property when successful');
     } else {
+      // RETAINED DELIBERATELY, now unreachable — see the note in syncToMarketplace.
       assert.ok(result.error, 'Has error property when unsuccessful');
     }
+  });
+
+  // ADDITION 2 — against the REAL tracked file, not a mocked filesystem.
+  //
+  // Contract, sourced OUTSIDE this test: tests/version-syncplugin-path-fix.test.js
+  // in full — it states the target path (<root>/.claude-plugin/plugin.json), that
+  // the function "must SUCCEED", and that the written JSON carries the version.
+  //
+  // Honest note on value: that regression test already covers this function well,
+  // but through a mocked safe-fs boundary whose existsSync stub returns true for
+  // any path NOT containing 'ctoc-plugin' — so a DIFFERENT wrong path still passes
+  // it. Against the real files below, no wrong path passes — verified red at
+  // Step 8 by restoring the original ctoc-plugin/ path bug. Same honest limit as
+  // the marketplace addition above: this pins the path and the end state on disk,
+  // not the write itself, because there is no root seam on this function.
+  test('plugin.json on disk actually carries the current version', () => {
+    const expected = version.getVersion();
+    const result = version.syncToPluginJson();
+
+    assert.strictEqual(result.success, true, 'sync must SUCCEED against this repo\'s real tracked plugin.json');
+    assert.strictEqual(result.version, expected, 'reported version must be the VERSION file version');
+
+    const onDisk = JSON.parse(fs.readFileSync(pluginFile, 'utf8'));
+    assert.strictEqual(onDisk.version, expected, 'plugin.json version must be synced');
   });
 });
 
@@ -323,6 +414,17 @@ describe('syncToPluginJson', () => {
 // =============================================================================
 
 describe('syncToReadme', () => {
+  const readmeFile = path.join(path.dirname(__dirname), 'README.md');
+  let savedReadme = null;
+
+  before(() => {
+    savedReadme = fs.existsSync(readmeFile) ? fs.readFileSync(readmeFile) : null;
+  });
+
+  after(() => {
+    if (savedReadme !== null) fs.writeFileSync(readmeFile, savedReadme);
+  });
+
   test('updates README.md with version', () => {
     const result = version.syncToReadme();
     assert.ok(typeof result === 'object', 'Returns an object');
@@ -330,8 +432,30 @@ describe('syncToReadme', () => {
     if (result.success) {
       assert.ok(result.version, 'Has version property when successful');
     } else {
+      // RETAINED DELIBERATELY, now unreachable — see the note in syncToMarketplace.
       assert.ok(result.error, 'Has error property when unsuccessful');
     }
+  });
+
+  // ADDITION 3 — the success path against the REAL tracked README.
+  //
+  // Contract, sourced OUTSIDE this test: src/lib/version.js:166-182 documents the
+  // FAIL LOUD semantics verbatim — "if the version line token is absent (e.g. the
+  // README format drifted so no **X.Y.Z** appears at a line start) … returns
+  // { success: false, matched: false } instead of a phantom success — so a future
+  // format drift surfaces loudly rather than silently disabling the sync."
+  //
+  // The fixture block below already covers BOTH outcomes against a synthetic
+  // README. The one thing it cannot cover is that THIS repository's own tracked
+  // README still matches — which is exactly the drift the fail-loud contract
+  // exists to catch. Honest framing: this is the least valuable of the three.
+  test('the tracked README still matches the version token — drift goes red, not silent', () => {
+    const expected = version.getVersion();
+    const result = version.syncToReadme();
+
+    assert.strictEqual(result.success, true, 'sync must SUCCEED against this repo\'s real tracked README');
+    assert.strictEqual(result.matched, true, 'the version line token must still be present (fail-loud contract)');
+    assert.strictEqual(result.version, expected, 'reported version must be the VERSION file version');
   });
 });
 
@@ -409,6 +533,37 @@ describe('syncAll', () => {
     assert.strictEqual(typeof result.plugin, 'boolean');
     assert.strictEqual(typeof result.readme, 'boolean');
   });
+
+  // ADDITION 4 — the three booleans are CLAIMS, and this pins what they claim.
+  //
+  // Contract, sourced OUTSIDE this test:
+  //   - tests/version-syncplugin-path-fix.test.js:12-13 records the consequence
+  //     that defines this function's job: "syncAll().plugin never actually synced
+  //     the version" while the suite stayed green.
+  //   - src/lib/version.js:211-212 documents the return shape, and syncAll's body
+  //     defines each boolean as the corresponding function's `success`.
+  //   - CLAUDE.md's release procedure depends on these ("node src/scripts/release.js
+  //     — Sync VERSION to all JSON files").
+  //
+  // What newly FAILS: {marketplace:false, plugin:false, readme:false} — the exact
+  // state during the shipped bug — which the key-presence test above accepts.
+  // The second assertion catches a syncAll that LIES — hardcoding a flag true or
+  // dropping a sibling's failure on the floor. Honest limit, measured at Step 8:
+  // hardcoding `readme: true` alone is NOT detectable here, because the real call
+  // also succeeds, so true === true. It goes red only in combination with a
+  // genuinely failing sibling, which is the case that matters and which was
+  // driven and recorded red at Step 8.
+  test('every syncAll boolean is true here, and equals its function\'s own success', () => {
+    const result = version.syncAll();
+
+    assert.strictEqual(result.marketplace, true, 'marketplace sync must have actually succeeded');
+    assert.strictEqual(result.plugin, true, 'plugin sync must have actually succeeded');
+    assert.strictEqual(result.readme, true, 'readme sync must have actually succeeded');
+
+    assert.strictEqual(result.marketplace, version.syncToMarketplace().success, 'marketplace flag must report syncToMarketplace');
+    assert.strictEqual(result.plugin, version.syncToPluginJson().success, 'plugin flag must report syncToPluginJson');
+    assert.strictEqual(result.readme, version.syncToReadme().success, 'readme flag must report syncToReadme');
+  });
 });
 
 // =============================================================================
@@ -454,6 +609,53 @@ describe('checkForUpdatesSync', () => {
     // Result should be valid regardless of cache state
     assert.strictEqual(typeof result.updateAvailable, 'boolean');
   });
+
+  // ADDITION 5 — updateAvailable is a DERIVED claim; derive it and check.
+  //
+  // Contract, sourced OUTSIDE this test: the field name plus src/lib/version.js's
+  // own ordering primitive compareVersions (separately tested in this file). An
+  // update is available exactly when the latest published version is GREATER than
+  // the current one; currentVersion must be this repository's version.
+  //
+  // The plan left open whether a seam exists that makes this unconditional.
+  // It does: the on-disk update cache (UPDATE_CACHE_FILE) is the module's real
+  // input boundary, and this file already drives it via writeCache/removeCache.
+  // So the invariant is asserted UNCONDITIONALLY in BOTH directions rather than
+  // conditionally against whatever the network happened to return.
+  //
+  // What newly FAILS: an implementation reporting updateAvailable:true when the
+  // latest version equals or trails the current one — a false update prompt shown
+  // to every user, which the assertions above cannot see.
+  describe('updateAvailable is derived from the version ordering', () => {
+    before(backupCache);
+    after(restoreCache);
+
+    test('cache ahead of current → update available; equal or behind → not', () => {
+      const current = version.getVersion();
+      const [maj, min, pat] = current.split('.').map(Number);
+      const ahead = `${maj + 1}.0.0`;
+      const behind = `${Math.max(0, maj - 1)}.${min}.${pat}`;
+
+      for (const latest of [ahead, current, behind]) {
+        writeCache({ latestVersion: latest, checkedAt: Date.now() });
+        const result = version.checkForUpdatesSync();
+
+        assert.strictEqual(result.currentVersion, current, 'currentVersion must be this repo\'s version');
+        assert.strictEqual(result.latestVersion, latest, 'latestVersion must be the cached value');
+        assert.strictEqual(
+          result.updateAvailable,
+          version.compareVersions(latest, current) === 1,
+          `updateAvailable must equal (latest > current) for latest=${latest}`
+        );
+      }
+
+      // And the ordering above is not vacuous: the three cases differ.
+      writeCache({ latestVersion: ahead, checkedAt: Date.now() });
+      assert.strictEqual(version.checkForUpdatesSync().updateAvailable, true, 'a newer published version IS an update');
+      writeCache({ latestVersion: current, checkedAt: Date.now() });
+      assert.strictEqual(version.checkForUpdatesSync().updateAvailable, false, 'the same version is NOT an update');
+    });
+  });
 });
 
 // =============================================================================
@@ -470,6 +672,39 @@ describe('checkForUpdates', () => {
     assert.strictEqual(typeof result.updateAvailable, 'boolean');
     assert.ok(result.currentVersion, 'Current version should not be empty');
     assert.ok('cached' in result, 'Has cached property');
+  });
+
+  // ADDITION 6 — same derived invariant on the async path, same real seam.
+  //
+  // Contract: identical to Addition 5, plus src/lib/version.js:313-316 which
+  // documents `cached` as "true when the answer came from the on-disk update
+  // cache rather than a live fetch". Driving the cache pins that flag too, and
+  // keeps this test off the network entirely.
+  describe('await checkForUpdates derives updateAvailable from the ordering', () => {
+    before(backupCache);
+    after(restoreCache);
+
+    test('cache ahead of current → update available; equal → not; cached flag honest', async () => {
+      const current = version.getVersion();
+      const [maj] = current.split('.').map(Number);
+      const ahead = `${maj + 1}.0.0`;
+
+      writeCache({ latestVersion: ahead, checkedAt: Date.now() });
+      let result = await version.checkForUpdates();
+      assert.strictEqual(result.currentVersion, current, 'currentVersion must be this repo\'s version');
+      assert.strictEqual(result.latestVersion, ahead, 'latestVersion must be the cached value');
+      assert.strictEqual(result.updateAvailable, true, 'a newer published version IS an update');
+      assert.strictEqual(result.cached, true, 'answer came from the cache, so cached must be true');
+
+      writeCache({ latestVersion: current, checkedAt: Date.now() });
+      result = await version.checkForUpdates();
+      assert.strictEqual(result.updateAvailable, false, 'the same version is NOT an update');
+      assert.strictEqual(
+        result.updateAvailable,
+        version.compareVersions(result.latestVersion, result.currentVersion) === 1,
+        'updateAvailable must equal (latest > current)'
+      );
+    });
   });
 });
 

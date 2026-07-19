@@ -42,6 +42,36 @@
  * This split is intentional and correct; the cheap pass is NOT the place to gate
  * on stage.
  *
+ * THE SCAN SAYS WHEN IT COULD NOT LOOK. `scanCheapCandidates` drops a plan (or a
+ * whole stage) at four points, each of them a defensible skip — a file that
+ * vanishes mid-scan must never crash the menu. The DEFECT was that the return
+ * value had nowhere to put them: `{ candidates: [], count: 0 }` from a scan that
+ * read NOTHING was byte-identical to the same result from a scan that read every
+ * plan and found the backlog clean, and `inbox.js` hands `.candidates` straight
+ * to the dashboard nag count. An unreadable `plans/review/` therefore rendered as
+ * "no stale plans" — a verdict reported on input never received, which is the
+ * false-green defect class this repository fences.
+ *
+ * THE CONTRACT, and it is the only thing that licenses reading a zero:
+ *   - `unreadCount === 0` means "I read every plan in every stage that exists".
+ *     ONLY THEN does `count === 0` mean the backlog is clean.
+ *   - `unreadCount > 0` means THIS RESULT IS PARTIAL. `count` is the number of
+ *     candidates found among the plans I COULD read, and says nothing about the
+ *     rest.
+ * The skips remain skips (never throws) — the defect was never that the scan
+ * continued, only that it continued silently. It continues, and says so. This
+ * carries to the hot path the discipline the cold path already had:
+ * `verifyStaleCandidate` returns `gitAvailable: false` and `classifyStaleCandidate`
+ * maps it to `inconclusive`, distinguishing "I could not look" from "I looked and
+ * found nothing".
+ *
+ * NOT WIRED TO THE DASHBOARD YET, AND THAT IS NAMED RATHER THAN GLOSSED. This
+ * module produces `unreadCount`; no consumer renders it. Until a follow-up
+ * surfaces it in `inbox.js` / `menu-screens.js`, the menu still renders a PARTIAL
+ * scan as a clean one. The data now says otherwise; the display does not yet. An
+ * undisplayed honest signal beats a displayed dishonest one, but it is not
+ * finished.
+ *
  * @typedef {('functional'|'implementation'|'review')} GateSourceStage
  *
  * @typedef {('missing-files'|'advisory:age')} StaleSignal
@@ -56,11 +86,41 @@
  * @property {boolean}         actionable true iff signals contains missing-files;
  *                                          advisory:age alone ⇒ false.
  *
+ * @typedef {('stage-unreadable'|'stat-failed'|'oversized'|'read-failed')} UnreadReason
+ *   Why an input could not be read. A CLOSED enum, deliberately: this value is
+ *   rendered on a dashboard and a raw filesystem error string carries absolute
+ *   paths and user names. Diagnostic detail belongs in a log, not in a return
+ *   value bound for a screen.
+ *   - `stage-unreadable` — `readdir` on a stage directory failed. THIS ONE ENTRY
+ *     STANDS FOR THE WHOLE STAGE, not for one plan: the scan cannot know how many
+ *     plans it failed to read, and inventing a count would itself be a number
+ *     reported on input never received.
+ *   - `stat-failed`      — `lstat` on one plan failed (it vanished between
+ *                          readdir and stat, or its directory denies search).
+ *   - `oversized`        — one plan exceeds MAX_PLAN_BYTES and is size-gated out
+ *                          BEFORE the read. Still skipped, now skipped AUDIBLY.
+ *   - `read-failed`      — `readFile` on one plan failed.
+ *
+ * @typedef {Object} UnreadInput
+ * @property {string}       path   Repository-RELATIVE, POSIX-separated, never
+ *                                   absolute. `plans/<stage>` for a whole stage,
+ *                                   `plans/<stage>/<file>.md` for one plan.
+ * @property {string}       stage  The gate-source stage it was found in.
+ * @property {UnreadReason} reason Closed enum; never a raw error message.
+ *
  * @typedef {Object} CheapScanResult
  * @property {StaleCandidate[]} candidates Plans (in gate-source stages) that
  *                                          emitted ≥ 1 signal. Zero-signal plans
  *                                          are omitted entirely.
- * @property {number}          count       === candidates.length.
+ * @property {number}          count       === candidates.length. Read honestly:
+ *                                          candidates found AMONG THE PLANS THIS
+ *                                          SCAN COULD READ. Only meaningful as
+ *                                          "the backlog is clean" when
+ *                                          unreadCount === 0.
+ * @property {UnreadInput[]}   unread      Inputs this scan could not read. Empty
+ *                                          iff the walk completed in full.
+ * @property {number}          unreadCount === unread.length. 0 ⇒ complete walk;
+ *                                          > 0 ⇒ THIS RESULT IS PARTIAL.
  */
 
 const safeFs = require('./safe-fs');
@@ -91,13 +151,36 @@ const GATE_SOURCE_STAGES = Object.freeze(['functional', 'implementation', 'revie
  * Stages at which declared files are NOT yet expected to exist — a missing-files
  * signal here means the plan is UNBUILT (not started), never abandoned. DOA is
  * gated OUT of these stages. Any stage NOT in this set is treated as
- * "files should exist" so DOA keeps its teeth for implementation/todo/in-progress/
- * review AND for any unknown/malformed stage (fail-toward-keeping-teeth, since
+ * "files should exist" so DOA keeps its teeth for todo/in-progress/review AND for
+ * any unknown/malformed stage (fail-toward-keeping-teeth, since
  * `Set.has(undefined) === false`). The polarity is deliberately an allowlist of
  * BENIGN stages, not of files-expected stages.
+ *
+ * `implementation` BELONGS HERE, and its absence was the single mis-set membership
+ * that produced the loudest false signal in the whole detector. An
+ * implementation-stage plan sits BEFORE Gate 2 — it has never entered the todo
+ * queue and has therefore NEVER BEEN EXECUTED. Its declared `files:` are the files
+ * it INTENDS to create, so they are supposed to be missing. Yet `implementation`
+ * is in GATE_SOURCE_STAGES and so was scanned, and every unbuilt implementation
+ * plan with a CREATE target emitted `missing-files` and was classified
+ * dead-on-arrival. Measured on this repository before the fix: 8 of 21 candidates
+ * (38%) were unbuilt implementation plans reported as abandoned work.
+ *
+ * SCOPE CORRECTION, NOT DELETION. `missing-files` keeps its full teeth at REVIEW,
+ * where a declared file that does not exist is a genuine signal. And the
+ * not-started gate in `classifyStaleCandidate` exempts `explicitlyRejected`, so
+ * POSITIVE death evidence still reaches DOA at every stage — a killed plan is
+ * still dead, wherever it sits.
+ *
+ * The cheap pass's `actionable` field is deliberately NOT changed by this: the
+ * module's broad-generator design puts stage polarity downstream in
+ * `classifyStaleCandidate`, and the SP5 regression T3b locks "cheap scan is
+ * actionable for a missing file at any gate-source stage". `implementation` now
+ * behaves EXACTLY as `functional` already did — one rule for pre-build stages,
+ * not two.
  * @type {ReadonlySet<string>}
  */
-const NOT_STARTED_STAGES = Object.freeze(new Set(['vision', 'canvas', 'functional']));
+const NOT_STARTED_STAGES = Object.freeze(new Set(['vision', 'canvas', 'functional', 'implementation']));
 
 /**
  * Concatenate the bodies of EVERY consecutive leading `---…---` frontmatter
@@ -783,6 +866,9 @@ function dismissStale(root, candidates) {
  * Per-file IO faults (a plan file that vanishes or becomes unreadable mid-scan)
  * are skipped — the offending plan is omitted and the scan continues; the
  * function never throws on a structural or IO irregularity. Only misuse throws.
+ * EVERY SUCH SKIP IS REPORTED in `unread`, so the caller can tell "I read
+ * everything and found nothing" (`unreadCount === 0`) from "I could not look"
+ * (`unreadCount > 0`, the result is PARTIAL). See the module header contract.
  *
  * @param {string} root Project root (directory containing `plans/`).
  * @param {{ nowMs?: number }} [options] nowMs defaults to Date.now(); inject a
@@ -801,9 +887,32 @@ function scanCheapCandidates(root, { nowMs = Date.now() } = {}) {
 
   /** @type {StaleCandidate[]} */
   const candidates = [];
+  /**
+   * Inputs this scan could not read. Every entry is built from information the
+   * FAILING call already had — no extra syscall is made to describe a failure.
+   * Bounded by the number of plans on disk; no unbounded accumulation.
+   * @type {UnreadInput[]}
+   */
+  const unread = [];
+  /**
+   * Record an unreadable input. `rel` is assembled from the frozen stage name and
+   * a readdir-supplied filename and joined with POSIX separators, so the returned
+   * path is repository-relative on every platform and never leaks the absolute
+   * root (which carries a user name).
+   * @param {string} stage
+   * @param {UnreadReason} reason
+   * @param {string} [file] filename within the stage; omit for a whole-stage entry.
+   */
+  const markUnread = (stage, reason, file) => {
+    const rel = file ? 'plans/' + stage + '/' + file : 'plans/' + stage;
+    unread.push({ path: rel, stage, reason });
+  };
+
   const plansDir = path.join(root, 'plans');
   if (!safeFs.existsSync(plansDir)) {
-    return { candidates, count: 0 };
+    // No plans/ directory is "there was nothing to read", NOT "I could not read".
+    // The full shape is still returned so no caller sees a half-shaped result.
+    return { candidates, count: 0, unread, unreadCount: 0 };
   }
 
   // R3: load the durable dismissal store ONCE per scan (O(1), fail-open ⇒ {}).
@@ -815,13 +924,19 @@ function scanCheapCandidates(root, { nowMs = Date.now() } = {}) {
 
   for (const stage of GATE_SOURCE_STAGES) {
     const stageDir = path.join(plansDir, stage);
+    // An ABSENT stage has no plans to fail to read. Reporting it would be a false
+    // partial — the mirror image of the defect being fixed.
     if (!safeFs.existsSync(stageDir)) continue;
 
     let entries;
     try {
       entries = safeFs.readdirSync(stageDir);
     } catch {
-      continue; // stage dir unreadable — skip the whole stage, keep going
+      // The SEVERE skip: one unreadable directory removes a whole stage — up to a
+      // third of the backlog — from the scan. It is now audible. ONE entry stands
+      // for the entire stage; the scan cannot know how many plans were in it.
+      markUnread(stage, 'stage-unreadable');
+      continue; // skip the whole stage, keep going
     }
     entries = entries
       .filter((f) => f.endsWith('.md') && f !== '.gitkeep')
@@ -853,16 +968,28 @@ function scanCheapCandidates(root, { nowMs = Date.now() } = {}) {
       try {
         st = safeFs.lstatSync(filePath);
       } catch {
-        continue; // file vanished between readdir and stat — skip
+        markUnread(stage, 'stat-failed', file);
+        continue; // file vanished between readdir and stat — skip, audibly
       }
-      if (!st.isFile()) continue; // directory or symlink — skip (reads stay under root)
-      if (st.size > MAX_PLAN_BYTES) continue; // oversized — skip before read
+      // NOT an unread fault: a directory or symlink is not a plan this scan was
+      // ever going to read. The exclusion is a deliberate security boundary (a
+      // symlink could point outside root), not a failure to look — reporting it
+      // as unread would make every repo with a symlinked plan permanently
+      // "partial" and devalue the signal to noise.
+      if (!st.isFile()) continue;
+      if (st.size > MAX_PLAN_BYTES) {
+        // The size gate is PRESERVED exactly: audible must not mean read. The
+        // file is still never pulled into memory on the hot path.
+        markUnread(stage, 'oversized', file);
+        continue; // oversized — skip before read
+      }
 
       let content;
       try {
         content = safeFs.readFileSync(filePath, 'utf8');
       } catch {
-        continue; // file vanished or became unreadable mid-scan — skip
+        markUnread(stage, 'read-failed', file);
+        continue; // file vanished or became unreadable mid-scan — skip, audibly
       }
 
       const mtimeMs = st.mtimeMs;
@@ -894,7 +1021,10 @@ function scanCheapCandidates(root, { nowMs = Date.now() } = {}) {
     }
   }
 
-  return { candidates, count: candidates.length };
+  // The ONLY return that can report unreadCount 0 is this one, reached solely by
+  // completing the walk over every stage that exists. That is the single
+  // assertion the whole honesty contract rests on.
+  return { candidates, count: candidates.length, unread, unreadCount: unread.length };
 }
 
 module.exports = {

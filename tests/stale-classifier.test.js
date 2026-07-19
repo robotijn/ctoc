@@ -147,10 +147,27 @@ describe('classifier — approved-but-stranded', () => {
 
 describe('classifier — dead-on-arrival default revert', () => {
   it('files gone, no slug commits, no approval, not explicitlyRejected ⇒ revert', () => {
-    // SD1: DOA is stage-gated. baseCandidate defaults to 'functional' (now a
-    // not-started stage), so this fixture is relocated to 'implementation' — a
-    // stage where declared files SHOULD exist, so missing files ⇒ DOA still fires.
-    const cand = baseCandidate('p-dead', 'implementation');
+    // SD1: DOA is stage-gated. baseCandidate defaults to 'functional' (a
+    // not-started stage), so this fixture must sit at a stage where declared
+    // files genuinely SHOULD exist for missing-files ⇒ DOA to fire.
+    //
+    // RELOCATED AGAIN 2026-07-19: implementation → review. SD1 moved this fixture
+    // to 'implementation' on the belief that it was a files-expected stage. It is
+    // not. Per the NOT_STARTED_STAGES contract in src/lib/stale-detector.js
+    // ("stages at which declared files are NOT yet expected to exist") and
+    // CLAUDE.md's pipeline model ("Pre-todo is context-building. Todo+ is
+    // execution"), an implementation-stage plan sits BEFORE Gate 2 and has never
+    // been executed, so its declared files are SUPPOSED to be missing. Measured:
+    // 8 of 21 cheap-scan candidates on this repository (38%) were unbuilt
+    // implementation plans wrongly classified dead-on-arrival.
+    //
+    // THE TEST WAS WRONG, NOT THE CODE: this test's subject is "DOA defaults to
+    // revert", and the stage is incidental scaffolding for it. It only needs SOME
+    // files-expected stage. It passed while NOT_STARTED_STAGES was
+    // {vision, canvas, functional} and fails once `implementation` joins it.
+    // `review` is the correct host: post-build, so a missing declared file there
+    // is a genuine death signal. The assertion below is unchanged and untouched.
+    const cand = baseCandidate('p-dead', 'review');
     const evidence = {
       gitAvailable: true,
       error: null,
@@ -232,11 +249,34 @@ describe('classifier — functional not-started is not DOA (SD1)', () => {
     assert.match(p.evidence.join(' '), /not started/i, 'evidence explains the benign not-started state');
   });
 
-  it('PAIRED: SAME evidence at implementation stage ⇒ dead-on-arrival/revert (gate discriminates on stage only)', () => {
+  // RETARGETED 2026-07-19: implementation → review. The PAIRING is the point of
+  // this test — same evidence, different stage, different verdict, proving the
+  // gate discriminates on stage ALONE — and that pairing is fully preserved. Only
+  // the counterpart stage changed, because `implementation` was never a valid
+  // counterpart: per the NOT_STARTED_STAGES contract in src/lib/stale-detector.js
+  // and CLAUDE.md's "Pre-todo is context-building. Todo+ is execution", an
+  // implementation-stage plan is PRE-Gate-2 and has never been executed, so it
+  // belongs on the SAME side of the pairing as functional, not the opposite side.
+  // Pairing functional against implementation compared two not-started stages and
+  // called the difference a discrimination. `review` is post-build and is the real
+  // opposite pole. This passed while NOT_STARTED_STAGES was {vision, canvas,
+  // functional}; it fails once `implementation` joins. The "detector not blinded"
+  // guarantee is unweakened — it is now asserted where it is actually true.
+  it('PAIRED: SAME evidence at review stage ⇒ dead-on-arrival/revert (gate discriminates on stage only)', () => {
+    const cand = baseCandidate('p-fresh', 'review');
+    const p = classifyStaleCandidate(cand, missingFilesEvidence());
+    assert.equal(p.category, 'dead-on-arrival', 'review stage ⇒ DOA — detector not blinded');
+    assert.equal(p.proposedAction, 'revert');
+  });
+
+  // The stage that moved sides, asserted explicitly so the reversal cannot be
+  // undone by accident: implementation is pre-build, so it pairs WITH functional.
+  it('PAIRED: SAME evidence at implementation stage ⇒ inconclusive/null (pre-Gate-2, like functional)', () => {
     const cand = baseCandidate('p-fresh', 'implementation');
     const p = classifyStaleCandidate(cand, missingFilesEvidence());
-    assert.equal(p.category, 'dead-on-arrival', 'implementation stage ⇒ DOA — detector not blinded');
-    assert.equal(p.proposedAction, 'revert');
+    assert.equal(p.category, 'inconclusive', 'implementation is PRE-BUILD — its files are unbuilt, not abandoned');
+    assert.equal(p.proposedAction, null);
+    assert.match(p.evidence.join(' '), /not started/i);
   });
 
   it('vision + canvas stages are also not-started (allowlist) ⇒ inconclusive, null', () => {
@@ -522,11 +562,23 @@ describe('menu — inboxVerifyProposals render', () => {
   // file (the entry is navigation, not execution).
   it('route([inbox,verify]) with an actionable DOA ⇒ Clean up ▸ + Back; read-only; no digit', () => {
     const sb = makeSandbox();
-    // SD1: DOA is stage-gated. p-render is written at 'implementation' (a
-    // files-expected stage) so its missing declared file still ⇒ dead-on-arrival
-    // and surfaces the 'Clean up ▸' entry. A functional-stage plan would now be
-    // not-started/inconclusive and would render NO cleanup entry.
-    writeStalePlan(sb, 'implementation', 'p-render'); // DOA: missing declared file
+    // SD1: DOA is stage-gated. p-render must sit at a files-expected stage so its
+    // missing declared file still ⇒ dead-on-arrival and surfaces the 'Clean up ▸'
+    // entry. A not-started-stage plan is inconclusive and renders NO cleanup entry.
+    //
+    // RELOCATED 2026-07-19: implementation → review. This test's subject is the
+    // RENDER — "an actionable DOA surfaces Clean up ▸, read-only, no digit" — and
+    // the stage is scaffolding chosen only to manufacture a DOA. `implementation`
+    // no longer manufactures one, and correctly so: the NOT_STARTED_STAGES
+    // contract in src/lib/stale-detector.js says the set holds "stages at which
+    // declared files are NOT yet expected to exist", and CLAUDE.md's pipeline
+    // model puts implementation BEFORE Gate 2, never executed, so its declared
+    // files are supposed to be missing. `review` is post-build and produces a
+    // genuine DOA. THE TEST WAS WRONG, NOT THE CODE: it needed any files-expected
+    // stage and had picked one that is not. It passed while NOT_STARTED_STAGES was
+    // {vision, canvas, functional}; it fails once `implementation` joins. Every
+    // assertion below — the read-only guard included — is unchanged.
+    writeStalePlan(sb, 'review', 'p-render'); // DOA: missing declared file
     const spy = spyChildProcess({ execFileSync: () => '1700000000' });
     // Read-only render guard: any plan-file write/rename/rm flips this.
     const origWrite = fs.writeFileSync;

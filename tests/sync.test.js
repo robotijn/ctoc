@@ -384,6 +384,19 @@ describe('Sync Manager Tests', () => {
       // Verify cwd was passed correctly
       assert.ok(execSyncCalls.length > 0, 'Should have exec calls');
       assert.strictEqual(execSyncCalls[0].opts.cwd, '/custom/project/path', 'Should use correct cwd');
+      // ADDITION 8 — pin the COMMAND, not only its working directory.
+      //
+      // Contract, sourced OUTSIDE this test: src/lib/sync.js:97 — syncPlans opens
+      // with `git(['status', '--porcelain', 'plans/'], { cwd: projectPath })`, and
+      // the sibling test at :298 establishes the same expectation for this
+      // module's git invocations by pinning 'git status'.
+      //
+      // Without this line an implementation running an ARBITRARY command in the
+      // right directory passes a test whose name claims it verified plan syncing.
+      assert.ok(
+        execSyncCalls[0].cmd.includes('git status --porcelain'),
+        `First call must be the plans git status, got: ${execSyncCalls[0].cmd}`
+      );
 
       console.log('# syncPlans uses correct project path');
     } finally {

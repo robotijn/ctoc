@@ -1,5 +1,23 @@
 ---
 approved_by: human
+approved_at: 2026-07-19T21:06:47.292Z
+gate_crossed: implementation → todo
+---
+
+---
+approved_by: human
+approved_at: 2026-07-19T20:59:28.582Z
+gate_crossed: implementation → todo
+---
+
+---
+approved_by: human
+approved_at: 2026-07-19T20:45:49.894Z
+gate_crossed: implementation → todo
+---
+
+---
+approved_by: human
 approved_at: 2026-07-19T18:29:04.194Z
 gate_crossed: implementation → todo
 ---
@@ -15,6 +33,11 @@ iron_loop: true
 files:
   - "src/lib/stale-detector.js"
   - "tests/stale-scan-says-when-it-could-not-look.test.js"
+  - "CLAUDE.md"
+  - "tests/menu-screens-coverage.test.js"
+  - "tests/stale-classifier.test.js"
+  - "tests/stale-detector-cheap.test.js"
+  - "tests/stale-detector-coverage.test.js"
 ---
 
 # The stale scan cannot say it could not look
@@ -305,3 +328,106 @@ creates no new module and therefore no new dead code.
 10. **The permission-dependent test cases skip loudly or not at all.** A silent no-op on a
     platform that cannot revoke read would make this slice's own test suite an instance of
     the defect it fixes.
+
+## Decisions Taken Under Ambiguity — added by the executor, 2026-07-19
+
+11. **The cheap pass's `actionable` field was NOT changed; the plan's item 3 and case 7 are
+    materially wrong as written.** The plan asked for `actionable: false` at not-started
+    stages, but `tests/stale-detection-regression.test.js` T3b is an existing locked SP5
+    invariant asserting *"cheap scan is actionable for a missing file at any gate-source
+    stage"* for a **functional** plan — and the plan's own case 9 demands functional not
+    regress. Satisfying both literally would give two pre-build stages two different cheap
+    polarities, contradicting the module header's deliberate broad-generator design. THE
+    CODE WON: `implementation` joins `NOT_STARTED_STAGES` and the polarity is applied
+    downstream in `classifyStaleCandidate`, exactly where the module says it lives.
+    `implementation` now behaves identically to `functional`. The human's stated defect —
+    "that single set membership" — is fixed at the surfaces that carry it (the classifier
+    and `inbox.countActionableStale`). No existing test was weakened.
+12. **The `unread` channel is NOT purely additive, contrary to the plan's claim.** Two
+    existing tests `deepStrictEqual` the WHOLE result object against
+    `{ candidates: [], count: 0 }`. Adding any key breaks them. See the scope stop below.
+13. **A non-regular file (directory or symlink) is NOT an unread fault.** It is a
+    deliberate security exclusion — a symlink could point outside root — not a failure to
+    look. Reporting it would make any repository with a symlinked plan permanently
+    "partial" and devalue the signal to noise. The plan's four-point table did not cover
+    this fifth `continue`; it stays silent, and the reason enum stays closed at four.
+14. **An ABSENT stage directory is not an unread fault either.** There are no plans to fail
+    to read, so reporting it would be a false partial — the mirror image of the defect.
+15. **`inbox.countActionableStale` filters by STAGE, not by `actionable`.** So adding
+    `implementation` to `NOT_STARTED_STAGES` removes implementation candidates from the nag
+    count entirely, including age-only ones — broader than the plan's description. This
+    cannot be narrowed without editing `inbox.js`, which is out of scope. It matches how
+    `functional` is already treated, so it introduces no new inconsistency.
+
+## SCOPE STOP, RAISED AND RESOLVED — 2026-07-19
+
+The executor first halted here: 16 failures sat in four test files outside the declared
+`files:`, every one of them PINNING the behaviour this plan corrects. The scope was then
+extended through the approval path (marker `2026-07-19T20:59:28Z`, which postdates the
+enlarged `files:` list — verified by the executor before acting) and the corrections were
+made. All four are recorded below with the three-part justification each demands, because
+correcting a test that pins a defect is the most dangerous edit in this repository.
+
+**None of the four turned out to be still-correct.** Every one asserted a consequence of
+the omission as though it were the intent.
+
+### 16. `tests/stale-detector-coverage.test.js:213` — A DELIBERATE PIN, REVERSED
+
+The strongest case, and the reversal is stated rather than performed quietly. The test read
+`implementation-stage missing files ⇒ dead-on-arrival (past the not-started gate)` and its
+comment said **"Pins the polarity split."** An earlier author placed that on purpose.
+
+- **Supposed behaviour, from OUTSIDE the test:** the `NOT_STARTED_STAGES` contract in
+  `src/lib/stale-detector.js` defines the set as "stages at which declared files are NOT
+  yet expected to exist — a missing-files signal here means the plan is UNBUILT (not
+  started), never abandoned"; `CLAUDE.md`'s "Pre-todo is context-building. Todo+ is
+  execution" places implementation BEFORE Gate 2, never executed. Measured: 8 of 21
+  candidates (38%) were unbuilt plans reported as abandoned work.
+- **Why the TEST was wrong:** it asserted a CONSEQUENCE of the omission (implementation
+  reaches DOA) as the intent. Nothing outside the test ever said implementation expects
+  built files — the header says the opposite.
+- **Which implementation passes/fails:** passed while `NOT_STARTED_STAGES` was
+  `{vision, canvas, functional}`; fails once `implementation` joins.
+- The test's real value — that the gate does not swallow every stage — is PRESERVED by
+  relocating it to `review`. The split is still pinned, at the correct boundary. The
+  comment was rewritten to record what is now true and why it changed; a second test was
+  added asserting implementation ⇒ inconclusive so the reversal cannot be undone by accident.
+
+### 17. `tests/stale-classifier.test.js` — three sites
+
+`baseCandidate('p-dead', 'implementation')` (subject: "DOA defaults to revert"), the PAIRED
+stage-discrimination test, and the `inboxVerifyProposals` render fixture. In all three the
+stage is SCAFFOLDING, not the subject; each needed some files-expected stage and had picked
+one that is not. Retargeted to `review`; every assertion unchanged. Note the history: SD1
+had already relocated the first fixture once, functional → implementation, for exactly this
+reason — the same move is now made again for the same reason, to the stage that is actually
+post-build. The PAIRED test had been comparing two NOT-STARTED stages and calling the
+difference a discrimination; a twin assertion for implementation was added.
+
+### 18. `tests/stale-detector-cheap.test.js` — two whole-result assertions
+
+`assert.deepEqual(res, { candidates: [], count: 0 })`. A whole-object deepEqual pins the
+ABSENCE of every unlisted field, so it forbade the honesty channel without ever taking a
+position on honesty — it over-asserted; its subject is graceful degradation, not result
+arity. Widened to the full four-key `CheapScanResult`, and **TIGHTENED**: both now
+additionally require `unreadCount === 0`, i.e. that the walk COMPLETED, which is a strictly
+stronger claim than "nothing was found".
+
+### 19. `tests/menu-screens-coverage.test.js` — ten fixtures
+
+`writeStalePlan(root, 'implementation', …)` was the universal recipe for an actionable
+candidate (its comment: "missing-files, actionable, **not not-started**"). Not one of the
+ten has stage polarity as its subject — they test dashboard counts, cleanup grouping, and
+routing. Retargeted to `review`; no assertion weakened, deleted, or widened. The full
+three-part justification is recorded at the `writeStalePlan` helper, where a reviewer meets
+it, and the helper now documents how to choose the stage deliberately.
+
+## Final state
+
+`npm test` — **coverage 99.05% (floor 99, unchanged), skipped 0, failed 0, PASS.** Zero
+foreign failures from the four concurrent executors. Decisions 13 and 14 (a symlink or
+directory is a security exclusion, not an unread fault; an absent stage directory is not
+one either) are recorded in the module source AND in `CLAUDE.md`, so a future reader cannot
+"fix" them into faults and make every repository with a symlinked plan permanently partial.
+The plan's deliberate incompleteness is honoured: `unreadCount` is produced and tested but
+rendered nowhere, and that is stated in both the module header and `CLAUDE.md`.
