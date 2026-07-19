@@ -18,11 +18,13 @@ const os = require('os');
 const projectRoot = path.join(__dirname, '..');
 const {
   checkAllInvariants,
+  checkGateDestinationsApproved,
   formatReport,
   formatCompact,
   CANONICAL_STEPS,
   TIER_1_AGENTS,
   REQUIRED_HOOKS,
+  CHECKS,
 } = require('../src/lib/iron-loop-enforcer');
 
 describe('iron-loop-enforcer — live repo state', () => {
@@ -370,5 +372,151 @@ describe('iron-loop-enforcer — constants', () => {
     assert.ok(REQUIRED_HOOKS.includes('src/hooks/SessionStart.js'));
     assert.ok(REQUIRED_HOOKS.includes('src/hooks/PreToolUse.Edit.js'));
     assert.ok(REQUIRED_HOOKS.includes('src/hooks/human-gate-check.js'));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+//  The verdict-envelope contract (plan 00101)
+//
+//  The defect: every check returned `null` for "clean" and an object for
+//  "violation", so a caller that wrote `result.severity` CRASHED ON SUCCESS.
+//  The contract below pins the envelope so a clean answer can never again be
+//  falsy, and so a check that answers nothing is recorded as an ERROR rather
+//  than silently read as clean.
+// ─────────────────────────────────────────────────────────────────────
+
+describe('iron-loop-enforcer — the verdict envelope', () => {
+  let tmpRoot;
+
+  function makeBareRoot() {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-verdict-'));
+    fs.mkdirSync(path.join(tmpRoot, '.ctoc'), { recursive: true });
+    for (const s of ['implementation', 'todo', 'done']) {
+      fs.mkdirSync(path.join(tmpRoot, 'plans', s), { recursive: true });
+    }
+    return tmpRoot;
+  }
+
+  afterEach(() => {
+    if (tmpRoot) {
+      try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch { /* best-effort */ }
+      tmpRoot = null;
+    }
+  });
+
+  /** Run one injected probe check through the real consumer, then restore CHECKS. */
+  function runProbe(fn) {
+    CHECKS.push({ id: 'contract-probe', scope: 'contract-probe', mode: 'fast', fn });
+    try {
+      return checkAllInvariants({ root: projectRoot, mode: 'fast', scopes: ['contract-probe'] });
+    } finally {
+      const i = CHECKS.findIndex(c => c.id === 'contract-probe');
+      if (i !== -1) CHECKS.splice(i, 1);
+    }
+  }
+
+  // Case 1 — iterates the registry, so a check added later is covered without
+  // editing this case.
+  it('(1) EVERY check returns a readable verdict object with a boolean `clean`', () => {
+    const root = makeBareRoot();
+    for (const check of CHECKS) {
+      const r = check.fn(root);
+      assert.equal(typeof r, 'object', `${check.id} returned ${typeof r}, not an object`);
+      assert.notEqual(r, null, `${check.id} returned null — a clean answer must never be falsy`);
+      assert.equal(typeof r.clean, 'boolean', `${check.id} has no boolean .clean (got ${JSON.stringify(r && r.clean)})`);
+    }
+  });
+
+  // Case 2 — the exact crash the human hit, reproduced as an assertion.
+  it('(2) a CLEAN verdict is truthy and readable — reading .severity does not throw', () => {
+    const root = makeBareRoot();   // no plans anywhere ⇒ no gate-destination offender
+    const r = checkGateDestinationsApproved(root);
+    assert.notEqual(r, null, 'a clean check must not answer null');
+    assert.equal(r.clean, true, 'a clean check reports clean: true');
+    assert.doesNotThrow(() => { void r.severity; void r.message; },
+      'a caller reading the verdict fields on a clean run must not throw');
+    assert.equal(r.severity, undefined, 'a clean verdict carries no severity');
+  });
+
+  // Case 3 — the violating verdict is unchanged apart from the envelope.
+  it('(3) a VIOLATING verdict still carries its severity, message and details', () => {
+    const root = makeBareRoot();
+    fs.writeFileSync(path.join(root, 'plans', 'todo', 'unapproved.md'),
+      '---\ntitle: "unapproved"\ntype: feature\nfiles: ["src/x.js"]\n---\n\n# body');
+    const r = checkGateDestinationsApproved(root);
+    assert.equal(r.clean, false, 'a violation reports clean: false');
+    assert.equal(r.severity, 'block');
+    assert.match(r.message, /gate destinations/);
+    assert.ok(r.details.offenders.some(o => o.plan.endsWith('unapproved.md')));
+  });
+
+  // Case 4 — the case that keeps this slice from becoming the defect it fixes.
+  it('(4) a check returning UNDEFINED is recorded as an ERROR, never as a pass', () => {
+    const result = runProbe(() => undefined);
+    const f = result.findings.find(x => x.id === 'contract-probe');
+    assert.ok(f, 'an unreadable verdict must produce a finding, not silence');
+    assert.equal(f.severity, 'error');
+    assert.match(f.message, /contract-probe|verdict/i);
+    assert.equal(result.summary.error, 1, 'the run is NOT clean');
+  });
+
+  it('(5) a check returning NULL is recorded as an ERROR, never as a pass', () => {
+    const result = runProbe(() => null);
+    const f = result.findings.find(x => x.id === 'contract-probe');
+    assert.ok(f, 'a null verdict must produce a finding — null is exactly the old falsy-clean bug');
+    assert.equal(f.severity, 'error');
+    assert.equal(result.summary.error, 1, 'the run is NOT clean');
+  });
+
+  it('(6) a THROWING check still records an error (behaviour unchanged)', () => {
+    const result = runProbe(() => { throw new Error('boom'); });
+    const f = result.findings.find(x => x.id === 'contract-probe');
+    assert.ok(f, 'a throwing check must be recorded');
+    assert.equal(f.severity, 'error');
+    assert.match(f.message, /Check threw: boom/);
+  });
+
+  // Case 7 — the summary counts do not move. checkPlanCounts is clean AND
+  // informational: its info finding must keep appearing in the report.
+  it('(7) the summary counts are unchanged — plan-counts still reports exactly one info', () => {
+    for (const mode of ['fast', 'thorough']) {
+      const r = checkAllInvariants({ root: projectRoot, mode });
+      assert.equal(r.summary.critical, 0, `${mode}: critical must stay 0`);
+      assert.equal(r.summary.block, 0, `${mode}: block must stay 0`);
+      assert.equal(r.summary.error, 0, `${mode}: error must stay 0`);
+      assert.equal(r.summary.info, 1, `${mode}: exactly one info finding (plan-counts)`);
+      const counts = r.findings.find(x => x.id === 'plan-counts');
+      assert.ok(counts, `${mode}: the informational plan-counts finding must still be reported`);
+      assert.equal(counts.severity, 'info');
+      assert.match(counts.message, /^Plans: vision=/);
+      assert.equal(counts.clean, undefined, 'the envelope flag must not leak into a finding');
+    }
+  });
+
+  // Case 8 — the report text for a fixed finding set is byte-identical to the
+  // text measured before the envelope change.
+  it('(8) formatReport and formatCompact are byte-identical for a fixed finding set', () => {
+    const fixed = {
+      mode: 'fast',
+      findings: [
+        { scope: 'iron-loop', id: 'plans-files-declaration', severity: 'warn', message: '12 active plans missing files: declaration (not coverage-aware)' },
+        { scope: 'info', id: 'plan-counts', severity: 'info', message: 'Plans: vision=3 · canvas=0 · functional=1' },
+      ],
+      summary: { critical: 0, block: 0, warn: 1, info: 1, error: 0, total: 2 },
+    };
+    assert.equal(formatReport(fixed), [
+      '# CTOC Self-Check Report (fast mode)',
+      '',
+      'Summary: 0 critical · 0 block · 1 warn · 1 info',
+      '',
+      '## WARN (1)',
+      '- [iron-loop/plans-files-declaration] 12 active plans missing files: declaration (not coverage-aware)',
+      '',
+      '## INFO (1)',
+      '- [info/plan-counts] Plans: vision=3 · canvas=0 · functional=1',
+      '',
+      'OK: no critical or blocking issues.',
+    ].join('\n'));
+    assert.equal(formatCompact(fixed), 'Self-check: OK (1 warn)');
   });
 });

@@ -298,3 +298,138 @@ No sibling in this batch declares any of this slice's four files.
 7. **The repository-wide census is recommended, not performed.** It is a real piece
    of work with its own scope, and scheduling belongs to the human. Bundling it here
    would make an envelope change into an open-ended audit.
+
+### Taken during execution
+
+8. **`finding(payload)` takes the check's own object literal, not three positional
+   arguments.** The plan proposed `finding(severity, message, details)`. Converting
+   twenty multi-line object literals — several with a message built from string
+   concatenation across three lines and a `details` object built from a slice — into
+   positional arguments would have re-typed every message, and a re-typed message is
+   exactly the thing this slice promised not to change. Taking the literal moves the
+   `return {` boundary only, so every severity, message and detail passes through
+   byte-identically, and `clean: false` is still written in exactly ONE place. Proven
+   by the diff: no message or severity line differs except by the wrapper.
+
+9. **The consumer records a verdict that is clean but carries a message.** The plan
+   said `checkAllInvariants` filters on `result.clean === false`. That filter alone
+   would have DROPPED `checkPlanCounts`, which the plan simultaneously requires to be
+   `clean: true` AND to keep reporting its `info` finding — the two instructions
+   contradict each other. Resolved as: record when
+   `verdict.clean === false || typeof verdict.message === 'string'`. A clean verdict
+   with nothing to say (`CLEAN()`) has no message and is silent; a clean verdict that
+   carries a reportable payload is reported. The `info` count did not move.
+
+10. **`clean` is stripped before the finding is pushed.** `const { clean, ...payload }`
+    keeps the findings-array element shape byte-identical, so `formatReport`,
+    `formatCompact` and every existing consumer of `result.findings` see exactly what
+    they saw before. Pinned by contract case 7 (`counts.clean === undefined`).
+
+11. **The unreadable-verdict message names the check by its `id` FIELD, not by
+    interpolating it into the message text.** Every other finding is rendered
+    `[scope/id] message` by `formatReport`, so the id is already named the way a
+    reader expects; putting it in the text too would have made the one error finding
+    read differently from all nineteen others. The returned value is never included —
+    a future check could put arbitrary content there.
+
+## Execution Record (Steps 8–16)
+
+- [x] **Step 8 TEST** — eight contract cases written and RUN BEFORE any `src/` edit.
+      Verbatim red: `fail 5`, `skipped 0`. Cases 1, 2, 3, 4, 5 red; cases 6, 7, 8
+      green on the unchanged code, exactly as the plan predicted. Case 2's red was
+      `AssertionError: actual: null, expected: null, operator: 'notStrictEqual'` —
+      the human's crash reproduced as an assertion. Cases 4 and 5 failed with "an
+      unreadable verdict must produce a finding, not silence", proving the consumer
+      read an absent verdict as clean.
+- [x] **Step 9 PREPARE** — `src/lib/iron-loop-enforcer.js` read in full; every call
+      site of every exported symbol enumerated across `src/` and `tests/`. Three
+      discrepancies against the plan recorded below.
+- [x] **Step 10 IMPLEMENT** — the `CLEAN()` / `finding()` helpers, all twenty checks
+      on the envelope, the consumer's filter and its unreadable-verdict error path,
+      the eight contract cases, and the four measured call-site assertions.
+- [x] **Step 11 REVIEW** — the diff was read line by line. Every severity, message
+      and details value is byte-identical; only the `return {` / `}` boundary moved.
+      No bare `return null` remains in the file. The unreadable-verdict path is
+      reachable and covered by cases 4 and 5. No assertion anywhere was weakened.
+- [x] **Step 12 OPTIMIZE** — every `CLEAN()` sits at a function tail or an early
+      guard; none is inside a loop over plans, agents, skills or files. Twenty small
+      allocations per run against twenty checks that read the disk.
+- [x] **Step 13 SECURE** — no message gained a path, a plan body or file contents.
+      The unreadable-verdict finding carries the check id and a fixed sentence; the
+      check's returned value is never interpolated.
+- [x] **Step 14 VERIFY** — six named files green; full `npm test` green; both
+      self-check reports byte-identical to the Step 8 baseline; lint clean at
+      `--max-warnings 0`. Numbers recorded below.
+- [x] **Step 15 DOCUMENT** — the rule is stated in a block comment above the helpers:
+      a check reports a verdict, a clean verdict is an object you can read, the
+      original crash is named, and the unrecognised-return-is-an-error rule and its
+      reason are stated in the same comment.
+- [x] **Step 16 FINAL-REVIEW** — all steps complete; the six non-goals restated in
+      the report; the repository-wide census recommended, not performed.
+
+### Discrepancies between this plan and the code
+
+1. **`CHECKS` IS exported** (`module.exports`, last entry) — the plan asserted "the
+   exposure is one function wide, not twenty". The registry is public API, so any
+   consumer that iterates `CHECKS` and calls `check.fn(root)` reached all twenty
+   falsy-clean returns across the module boundary, not just the one exported check.
+   Nothing in this repository does so today, but the trap was wider than measured.
+   This is a further argument for the uniform envelope the plan already chose, and
+   contract case 1 now drives the whole exported registry.
+2. **`tests/iron-loop-enforcer.test.js:185` is a prose comment, not an assertion.**
+   The plan's cost table listed it as "measured at Step 9". Measured: that file
+   contained ZERO `=== null` assertions against a check; every existing case reads
+   `result.findings`, which is falsy-aware and correct. No existing assertion in that
+   file needed changing — only the new contract group was added.
+3. **`tests/iron-loop-enforcer-coverage.test.js` is a fifth consumer the plan did not
+   list**, and it did NOT need declaring: all 30 of its cases read
+   `checkAllInvariants(...).findings`, never a check's return value. Verified green
+   unchanged. No scope growth was required.
+4. Confirmed as the plan stated: `src/lib/actions.js:445` is a comment, not a call.
+
+### Step 14 numbers, verbatim
+
+```
+ℹ tests 10153
+ℹ suites 1744
+ℹ pass 10153
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18249.185542
+[CTOC test-gate] coverage 99.03% (threshold 99%), skipped 0, failed 0
+[CTOC test-gate] PASS
+```
+
+The coverage floor stayed at 99 — not lowered, not raised. No ratchet was tripped:
+the reachability, dead-export and false-green fences all ran inside `npm test` and
+passed with no baseline edit and no whitelist entry.
+
+Self-check reports, before and after, both modes, byte-identical:
+
+```
+Summary: 0 critical · 0 block · 1 warn · 1 info
+## WARN (1)
+- [iron-loop/plans-files-declaration] 12 active plans missing files: declaration (not coverage-aware)
+## INFO (1)
+- [info/plan-counts] Plans: vision=3 · canvas=0 · functional=1 · implementation=8 · todo=12 · in-progress=0 · review=48 · done=234
+OK: no critical or blocking issues.
+```
+
+### Reported, not fixed — a second instance of the same defect family
+
+`completeExecution(planPath, projectPath)` and `completeTaskPlan(projectPath, planSlug)`
+in `src/lib/actions.js` are siblings that take their arguments in OPPOSITE orders.
+Calling one with the other's argument order produces a refusal message that reads like
+a verdict about the plan rather than like a misuse of the surface — the same family as
+this slice's defect: a surface whose misuse is indistinguishable from a result.
+`src/lib/actions.js` is not in this plan's declared `files:`, so it was NOT touched.
+
+### Recommendation for the human to schedule
+
+A repository-wide census of falsy-success returns — a function whose "nothing wrong"
+answer is `null`, `undefined`, `false`, `0` or `''` while its "something wrong" answer
+is an object. This module is now clean; nothing prevents the shape elsewhere, and the
+`completeExecution` / `completeTaskPlan` argument-order trap above suggests the family
+is not confined to return values. Scheduling belongs to the human.

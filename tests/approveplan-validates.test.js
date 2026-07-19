@@ -196,7 +196,7 @@ describe('approvePlan — an un-keyable (non [a-z0-9-]) slug is REFUSED, never c
     // No ledger entry was minted, AND the enforcer reports NO offender — the exact
     // "genuinely-approved plan reverted as a violation" failure is closed.
     assert.ok(!fs.existsSync(ledgerFile(root, 'my_plan')), 'no ledger entry for an un-keyable crossing');
-    assert.equal(checkGateDestinationsApproved(root), null, 'no gate-destination offender — nothing squatting done/');
+    assert.equal(checkGateDestinationsApproved(root).clean, true, 'no gate-destination offender — nothing squatting done/');
   });
 
   it('the keyable control STILL crosses review→done and writes its ledger entry (no regression)', () => {
@@ -213,6 +213,6 @@ describe('approvePlan — an un-keyable (non [a-z0-9-]) slug is REFUSED, never c
     const entry = JSON.parse(fs.readFileSync(ledgerFile(root, 'keyable-plan'), 'utf8'));
     assert.equal(entry.approved_by, 'human');
     assert.equal(entry.stage_to, 'done');
-    assert.equal(checkGateDestinationsApproved(root), null, 'a properly-ledgered done/ resident is clean');
+    assert.equal(checkGateDestinationsApproved(root).clean, true, 'a properly-ledgered done/ resident is clean');
   });
 });

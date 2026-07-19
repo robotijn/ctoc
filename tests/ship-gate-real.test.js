@@ -429,6 +429,7 @@ test('ship-gate: enforcer reports a forged approval marker with no ledger entry'
 
     const finding = enforcer.checkGateDestinationsApproved(dir);
     assert.ok(finding, 'a plan with a forged marker and NO ledger entry must be reported');
+    assert.strictEqual(finding.clean, false, 'the verdict must say so explicitly, not by being truthy');
     assert.strictEqual(finding.severity, 'block');
     assert.ok(JSON.stringify(finding.details).includes('forged.md'));
   } finally { rm(dir); }
@@ -452,7 +453,7 @@ test('ship-gate: enforcer accepts a plan the LEDGER approves', () => {
       approved_by: 'human'
     }, dir);
 
-    assert.strictEqual(enforcer.checkGateDestinationsApproved(dir), null,
+    assert.strictEqual(enforcer.checkGateDestinationsApproved(dir).clean, true,
       'a ledger-backed plan is clean — the enforcer and the hook must agree');
   } finally { rm(dir); }
 });
