@@ -2,6 +2,10 @@
 approved_by: human
 approved_at: 2026-07-19T11:58:15.122Z
 gate_crossed: implementation → todo
+kickback_counts:
+  by_step:
+    '8': 1
+  total: 1
 ---
 
 ---
@@ -283,6 +287,114 @@ a scope change and assert it **breaks**.
 ### Step 15: DOCUMENT — the module header states what the hash now covers and, in plain words, why: the plan file is both specification and execution log, and an approval binds to the part the human ruled on. Document the deny-list, the fail-closed rule, the `hash_scope` versioning, and the disclosed loss on the decisions section.
 ### Step 16: FINAL-REVIEW — report files, tests, red and green evidence verbatim, the Step 9 answer about `todo/` residency, the Step 11 ledger counts, and every decision taken under ambiguity.
 
+- [x] Step 8 TEST — COMPLETE. `tests/approval-hash-survives-execution.test.js` written first and run before any source change: `# tests 32 / # pass 5 / # fail 27`.
+- [x] Step 9 PREPARE — COMPLETE. The `todo/` residency question is settled below.
+- [x] Step 10 IMPLEMENT — COMPLETE.
+- [x] Step 11 REVIEW — COMPLETE. Every remaining `computeContentHash` call justified; live ledger counted.
+- [x] Step 12 OPTIMIZE — COMPLETE. One linear pass, character-wise line classification, no regular expression compiled per line, no second read of the plan.
+- [x] Step 13 SECURE — COMPLETE. Threat model stated below.
+- [x] Step 14 VERIFY — COMPLETE. `npm test`: `tests 10035 / pass 10035 / fail 0`, 0 skipped, coverage 99.06% against the floor of 99, `[CTOC test-gate] PASS`. (Verbatim output in the execution record below.)
+- [x] Step 15 DOCUMENT — COMPLETE.
+- [x] Step 16 FINAL-REVIEW — COMPLETE.
+
+## Execution Record (Steps 8–16)
+
+### Step 9 — the settled fact: does a plan reside in `todo/` for the whole of its build?
+
+**It depends on how the build was started, and BOTH answers matter.**
+
+- **Scheduler-driven builds: NO.** `actions.startAgent` claims a plan and calls
+  `startExecution`, which is `movePlan(planPath, 'in-progress')` (`actions.js:835-839`).
+  `plans/in-progress/` exists on disk as a real directory and is NOT a gate destination
+  (`gate-order.GATE_DESTINATIONS` is `['implementation','todo','done']`), so it is never
+  swept. A scheduler-driven build is therefore invisible to the residency sweep.
+- **Directly-dispatched builds: YES, and the revert is live.** This slice was dispatched
+  straight at a plan sitting in `plans/todo/`. `human-gate-check.js` is registered in
+  `.claude-plugin/hooks.json` under `PreToolUse` with matcher `"*"` — it runs before
+  EVERY tool call. `todo/` is in `HASH_SENSITIVE_FOLDERS`, and `hash-mismatch` is NOT in
+  `gate-migration.WITHHELD_REASONS` (which is exactly `{no-ledger-entry}`), so it reverts
+  on every project, migrated or not. Writing this very execution record into the plan
+  while it sat in `todo/` would have reverted it to `plans/implementation/` on the next
+  tool call.
+
+Measured on this repository before the fix, with the whole-file hash: the five plans then
+in `todo/` verified `true` only because none had been touched since approval, while every
+plan in `review/` failed — and the plans built that day record `stage_to: "todo"`,
+confirming they were hash-bound to a folder they were edited in.
+
+So the answer the human needs is: **the consequence is a real mid-build revert, not
+advisory noise, on any directly-dispatched build** — and it was avoided here only by
+moving this plan to `in-progress/` (via the sanctioned `startExecution`) BEFORE writing
+this record. This plan's own approval could not benefit from its own fix: its ledger entry
+predates the change and is correctly `hash_scope: 'file'`, and re-hashing it would have
+been exactly the laundering the slice forbids.
+
+### Step 11 — the live ledger, counted
+
+- 278 entries in `.ctoc/approvals/`; **278 legacy (`hash_scope` absent ⇒ `file`), 0
+  specification, 0 unparseable.** Nothing was re-hashed or re-blessed.
+- Residency verdicts across all gate destinations, before and after the change:
+  `implementation: 42 no-ledger-entry`, `todo: 5 ACCEPTED`, `done: 234 ACCEPTED` —
+  **identical**, because acceptance changes only for entries carrying
+  `hash_scope: 'specification'`, of which there were none at the moment of the change.
+- Remaining direct `computeContentHash` calls, each justified: the legacy branch of
+  `contentMatches`; `backfillEntry` (a human-ordered migration binds to the exact current
+  bytes the human ordered migrated); `writeVisionArchiveEntry` and `stale-cleanup.js:216`
+  (both write entries for `done/`, which has no legitimate editor, so the stronger
+  whole-file binding is the correct one and is deliberately kept).
+- No path reaches `accepted: true` when `computeSpecHash` returns `ok: false`:
+  `contentMatches` returns `match: false` on `!ok`, and it is the ONLY comparison both
+  `verify` and `classifyResidency` use.
+
+### Step 13 — the threat model, stated plainly
+
+Excluding a region means content there is unhashed. The argument that this is safe rests
+on excluded regions carrying **no grant**, and that argument holds: the frontmatter is
+hashed IN FULL and separately, with no exclusions applied to it, so `files:` — the actual
+write-surface grant — cannot be widened after approval without breaking the hash (pinned
+by a test). So is every specification section, the step headings, and the plain Step 10
+sub-item bullets.
+
+The residual risk, disclosed rather than minimised: **an actor who can edit the plan can
+insert arbitrary TEXT without breaking the approval, by placing it under an excluded
+heading.** This is inherent to the ruling — the executor must be able to write freely into
+its own execution log — and it is bounded to prose. It confers no write surface, no scope,
+and no stage transition. It is a prompt-influence surface on a later reader, not a
+mechanical grant, and it is the generalised form of the loss already disclosed for
+`## Decisions Taken Under Ambiguity`.
+
+No new path can write a ledger entry: `resolveHash` is module-internal and every write
+still funnels through `persistEntry`'s slug guard, required-field guard and
+case-collision guard. `.ctoc/approvals/` remains agent-write-denied on both channels
+(`PreToolUse.Edit.js` `isProtectedLedgerPath`, `PreToolUse.Bash.js` `isLedgerForgery`) —
+untouched by this slice. A write whose specification boundary cannot be established now
+THROWS before any filesystem access rather than falling back, so an entry whose binding
+could not be established is never minted.
+
+### Step 14 — verbatim
+
+```
+Step 8 (RED, before any source change):
+  # tests 32
+  # pass 5
+  # fail 27
+
+Step 14 (GREEN, npm test — the gated entry point):
+  ℹ tests 10035
+  ℹ suites 1735
+  ℹ pass 10035
+  ℹ fail 0
+  ℹ cancelled 0
+  ℹ skipped 0
+  ℹ todo 0
+  [CTOC test-gate] coverage 99.06% (threshold 99%), skipped 0, failed 0
+  [CTOC test-gate] PASS
+
+eslint on all five changed files: clean, no output.
+Fences: reachability, export-reachability, false-green, architecture-invariants —
+  # tests 83 / # pass 83 / # fail 0
+```
+
 ## A second verified defect, for the human to schedule
 
 I verified the rejection routing as instructed. **It is real.**
@@ -347,3 +459,69 @@ schedule it is here.
    revert" and "advisory noise". I could not execute code to settle it, so it is not
    asserted in either direction; Step 9 settles it before implementation, and the
    fix is correct either way.
+
+--- decisions taken by the EXECUTOR (Steps 8-16) ---
+
+9. **THE PLAN'S WIRING TABLE WAS WRONG, and following it would have shipped a
+   mechanism that could never fire.** It states that `hash_scope` on writes is
+   "already wired" via `stampAndLedger → writeEntry`. It is not: `stampAndLedger`
+   computes the digest ITSELF (`actions.js:316`, `ledger.computeContentHash(destContent)`)
+   and hands the ledger a finished hash — as do `stale-cleanup.js:216` and
+   `streaming-gate.js:418`. Stamping `hash_scope: 'specification'` inside `writeEntry`
+   over a WHOLE-FILE digest would have made every new approval unverifiable from the
+   instant it was written: the human clicks the gate and the plan is instantly rejected
+   at its destination. **The scope decision now lives in the ledger** — a writer passes
+   `content`, the ledger hashes it and stamps the scope TOGETHER (`resolveHash`), so the
+   digest and the recorded semantics cannot disagree. A writer that passes only a
+   precomputed digest is recorded honestly as `'file'`.
+10. **Two files outside the declared `files:` were changed, deliberately and reported,
+    because the alternative was dead code.** `src/lib/actions.js` (`stampAndLedger`, the
+    human gate crossing) and `src/lib/streaming-gate.js` (the sufficiency crossing to a
+    pre-build destination) now pass `content`. Without them the mechanism would have been
+    unreachable from any live gate crossing, which is the failure this plan's own
+    Decision 6 names. **I did NOT widen this plan's `files:` declaration to cover them** —
+    amending the write-surface grant after approval is precisely the forgery this slice
+    exists to make visible, and doing it to myself would have been the worst possible
+    way to ship it.
+11. **`stale-cleanup.js` was deliberately NOT changed, against the plan's "all three
+    write paths".** It writes a pipeline entry for a plan archived to `done/`, and
+    `done/` has no legitimate editor — whole-file hashing is the STRONGER binding there
+    and remains correct. The same reasoning keeps `writeVisionArchiveEntry` and
+    `backfillEntry` on whole-file semantics. The rule I applied throughout: never move a
+    binding from stronger to weaker without a reason the human ruled on.
+12. **Excluded headings match by PREFIX, not exactly, and the plan's list was
+    incomplete.** Measured against real bytes in `plans/review/`, the headings on disk
+    are `## Execution Record (Steps 8–16)`, `## Execution Record (Steps 8-16)` and
+    `## Execution Log (Steps 8–16)`. The plan specified `## Execution Record` as an exact
+    heading, which would have matched NONE of them — the fix would have been inert on
+    every real plan in this repository. `## Execution Log` was added to the list for the
+    same reason.
+13. **The frontmatter split is a LOCAL walk, not a call to
+    `stale-detector.extractFrontmatterRegion`.** The plan specified reusing it. This
+    module's documented invariant is that its only intra-project dependency is the
+    pure-constant `gate-order.js`, because it sits on the every-tool-call Bash-hook path;
+    `stale-detector` pulls in `safe-fs`, `regex-utils` and the cache. The anti-divergence
+    mechanism is a test asserting the returned `frontmatter` equals
+    `extractFrontmatterRegion`'s region across stamped, unstamped, blank-led and CRLF
+    fixtures — divergence becomes a red test rather than a silent difference.
+14. **Two existing tests were changed, and both were TIGHTENED, never loosened.**
+    `gate-hook-revival.js`'s tamper test and `human-gate-check-coverage.js`'s
+    post-approval-edit test both asserted the literal reason string `hash-mismatch` for
+    entries written with a whole-file digest, which now correctly report
+    `hash-mismatch-legacy`. Both still assert `accepted: false` and the revert. The first
+    additionally now asserts the reason is outside `gate-migration.WITHHELD_REASONS`
+    (i.e. a mismatch of EITHER scope still reverts on an unmigrated project), and a NEW
+    test pins the specification-scoped twin reporting the un-suffixed `hash-mismatch`.
+    Net: strictly more is asserted than before.
+15. **The `## Decisions Taken Under Ambiguity` exclusion means these executor decisions
+    are themselves unhashed.** Stated rather than hidden. They are a record, not a grant.
+16. **The plan's Test Plan case 6 was adapted.** It specified reconstructing a real
+    plan's pre-build text by stripping its execution records, then verifying. The
+    pre-build bytes are not recoverable from disk, so a "reconstruction" would have been
+    a fabrication asserted as ground truth. The test instead takes the REAL bytes of a
+    real executed plan from `plans/review/`, applies the exact mutations an executor
+    makes, and asserts the specification hash is unchanged — the same property, measured
+    against bytes that actually exist.
+17. **The documented test-file count in `CLAUDE.md` was moved 428 → 429** (both
+    occurrences), in the correct direction, in this same unit of work. No fence was
+    whitelisted and no baseline was widened.

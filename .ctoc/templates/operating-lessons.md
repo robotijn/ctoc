@@ -68,7 +68,10 @@
 implementation→todo, Gate 3 review→done). Key step labels: **8:TEST** (TDD), **10:IMPLEMENT**
 (one step, files as sub-items), **14:VERIFY** (quality gate: lint, typecheck, all
 tests, coverage at or above the enforced floor — `.ctoc/coverage-baseline.json`
-`minPct`, **40** today, ratchet-up only; 80 is the new-code target at review — 0
+`minPct`, **99** today — that file is the single source of truth for the number,
+ratchet-up only, and an unreadable baseline REFUSES rather than defaulting; 80 is
+the aspirational default for a project with no baseline at all, and the new-code
+target at review — 0
 skipped, 0 flaky, run via `npm test`). CTOC ships exactly **3 slash commands** —
 `/ctoc:menu`, `/ctoc:push`, `/ctoc:update` — and is **always installed from the
 marketplace**, never from a local path.

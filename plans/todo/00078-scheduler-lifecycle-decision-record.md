@@ -1,5 +1,11 @@
 ---
 approved_by: human
+approved_at: 2026-07-19T16:47:51.485Z
+gate_crossed: implementation → todo
+---
+
+---
+approved_by: human
 approved_at: 2026-07-19T07:40:42.663Z
 gate_crossed: implementation → todo
 ---
@@ -17,6 +23,15 @@ files:
 ---
 
 # The decision record and the final report get written
+
+> **REPAIR NOTE — an adversarial pre-mortem found this plan contradicts itself on
+> git, and that its strongest guard is missing from the one section that most needs
+> it.** Step 9 requires `git log` commands; Step 14 said "No git operations"; and the
+> files-changed section has no other source. Meanwhile the plan carries an excellent
+> guard against fabricating red evidence and **no equivalent guard for the
+> files-changed section** — which is precisely where a plausible reconstruction gets
+> written. Both are fixed below, along with the working-tree hazard. See decisions
+> 7-9.
 
 `plans/review/00003-r2a-scheduler-lifecycle-honesty.md` is sitting at Gate 3 with
 two of its own commitments unmet.
@@ -55,6 +70,70 @@ corrects two false claims in the same plan file, and on
 4 below records where the quarantine finally lives — a fact that is not settled
 until that slice lands. Writing this record first would document an intention
 rather than a diff.
+
+---
+
+## Git: what is permitted and what is forbidden — the contradiction resolved
+
+The plan previously required `git log --oneline` at Step 9 and `git log --follow` /
+`git show` for the files-changed section, while Step 14 stated flatly **"No git
+operations."** The files-changed section has no other source, and the plan forbids
+paraphrasing — so as written the plan was unsatisfiable, and the cheapest way out
+of an unsatisfiable instruction is to write a plausible reconstruction.
+
+**Resolved by distinguishing the two things the phrase was conflating:**
+
+| Category | Examples | Permitted here? |
+|---|---|---|
+| **READ-ONLY history queries** | `git log`, `git show`, `git diff <commit>..<commit>`, `git rev-parse` | **YES** — these are inspection. They mutate nothing and are the only honest source for a files-changed section |
+| **MUTATING operations** | `commit`, `push`, `add`, `checkout`, `restore`, `reset`, `stash`, `rebase`, `merge`, `am`, `clean` | **NO — absolutely forbidden**, and this is what Step 14's line meant |
+
+Step 14's line now reads "**no MUTATING git operations**" and enumerates them, so
+the permission is unambiguous in both directions.
+
+### The working tree is NOT a safe source — a live build is editing it
+
+The original text offered, as a fallback for the files-changed section: *"or the
+working tree if it has not been committed."* **That fallback is withdrawn.**
+
+A concurrent build may be editing `src/` and `tests/` while this slice runs. A
+working-tree read (`git status`, `git diff` with no revision range, or reading the
+files directly) would therefore capture **another agent's in-flight edits** and
+attribute them to this plan's landing — writing a files-changed section that is
+confidently, invisibly wrong.
+
+**Rules, in order:**
+
+1. Query **committed history only**, pinned to explicit revisions
+   (`git show <sha>`, `git diff <sha>^..<sha>`). Never a bare `git diff`, never
+   `git status`, never `git stash`.
+2. **Never run a mutating git command**, including any that touches the index. A
+   `git checkout` or `git restore` here would clobber the concurrent build's work.
+3. If the landing commit **cannot be identified**, the section is reported as
+   unavailable — see the guard below. It is never reconstructed from the working
+   tree.
+
+## The files-changed section gets the SAME guard as the red evidence
+
+The plan's decision 2 is an excellent guard: red evidence that was never recorded is
+reported as unavailable, in those words, and never reconstructed. **The
+files-changed section had no equivalent guard, and it is the section where a
+plausible reconstruction is most likely to be written** — a list of four file names
+with a sentence each is exactly the shape a model can produce fluently from the plan
+alone, and it would read as evidence while being derived from nothing.
+
+**The guard, stated in the same terms as decision 2:**
+
+> **If the landing commit cannot be identified, or the history query fails or is
+> unavailable for any reason, the files-changed section says so in those words and
+> stops.** It does not list files inferred from the plan's own `files:` declaration,
+> from the in-code comments, or from what the change "must have" touched. A
+> reconstructed files-changed section is fabrication in the same way a reconstructed
+> red transcript is, and it is harder to spot because it will be approximately right.
+>
+> Partial availability is reported as partial: name the files the history query
+> actually reports, and state plainly which of the plan's four declared files could
+> not be confirmed. **Do not fill the gap.**
 
 ## Implementation Details
 
@@ -165,16 +244,18 @@ execution plan and before the decision record, with four subsections:
 - **Files changed.** The four files this plan declared (`src/lib/task-registry.js`,
   `src/lib/task-reconcile.js`, `tests/task-registry.test.js`,
   `tests/task-reconcile.test.js`), each with what actually changed in it,
-  reconstructed from the diff on disk (`git log --follow` / `git show` for the
-  landing commit, or the working tree if it has not been committed).
+  **reconstructed ONLY from committed history pinned to the landing commit**
+  (`git show <sha>` / `git diff <sha>^..<sha>`). **Never from the working tree** — a
+  concurrent build may be editing it. **If the landing commit cannot be identified
+  or the query fails, this subsection reports the section as unavailable in those
+  words and lists nothing.** See the guard above.
 - **Tests.** The test cases that exist for each of the five implementation items,
   named by their `it(...)` titles as they appear in the two test files today, plus
   an explicit list of any item from the plan's own Test Plan (lines 69-80) for
   which **no** test can be found. An item with no test is reported as missing, not
   quietly omitted.
-- **Red evidence.** See decision 2 below — this is the one item that may have to
-  be reported as unavailable, and if so it is reported as unavailable in those
-  words.
+- **Red evidence.** See decision 2 below — this is reported as unavailable, in
+  those words.
 - **Decisions.** A pointer to the decision record written by Change 1, not a
   duplicate of it.
 
@@ -205,15 +286,15 @@ gated suite to prove nothing in the repository regressed.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — no automated test is written; the reason is recorded in the Test Plan above and must be repeated verbatim in the Step 16 report. Instead, record the RED state as evidence: capture the current text of lines 82-95 of `plans/review/00003-r2a-scheduler-lifecycle-honesty.md` (the execution plan, the placeholder, and the absence of any report section) so the before-state is on the record.
-### Step 9: PREPARE — read from disk, in full: `src/lib/task-registry.js:120-200` and `:760-930`; `src/lib/task-reconcile.js:80-135` and `:280-510`; `plans/review/00003-r2a-scheduler-lifecycle-honesty.md`; `plans/review/00004-r2b-actions-drain-and-shipgate.md`; `plans/review/00013-r3b-scheduler-enforced-not-advisory.md` (its decision record is the format to match). Then run `git log --oneline -- src/lib/task-registry.js src/lib/task-reconcile.js` and identify the landing commit for this plan's five items. Do not write a single decision from this plan's paraphrase — write each from the file.
+### Step 9: PREPARE — read from disk, in full: `src/lib/task-registry.js:120-200` and `:760-930`; `src/lib/task-reconcile.js:80-135` and `:280-510`; `plans/review/00003-r2a-scheduler-lifecycle-honesty.md`; `plans/review/00004-r2b-actions-drain-and-shipgate.md`; `plans/review/00013-r3b-scheduler-enforced-not-advisory.md` (its decision record is the format to match). Then run the **READ-ONLY** query `git log --oneline -- src/lib/task-registry.js src/lib/task-reconcile.js` and identify the landing commit for this plan's five items. **If the landing commit cannot be identified, record that fact and carry it into the Step 16 files-changed subsection as "unavailable" — do NOT fall back to the working tree, which a concurrent build may be editing.** Do not write a single decision from this plan's paraphrase — write each from the file.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
-  - `plans/review/00003-r2a-scheduler-lifecycle-honesty.md` — Change 1 (six decisions replacing `(Executor fills in.)`) and Change 2 (the `## Step 16 FINAL-REVIEW report` section with its four subsections).
-### Step 11: REVIEW — for every line-number citation written into the plan, open the file and confirm the cited lines say what the decision claims. Correct any citation that has drifted. Confirm the two facts in decision 5 by running them: `grep -rn "enqueueWaveSync" src/` must show no JavaScript call site, and `src/lib/task-registry.js:845` must still contain Rule 2's refusal. If either is false, the decision text must say so — a precondition that is already expired is the most important thing this record could contain.
+  - `plans/review/00003-r2a-scheduler-lifecycle-honesty.md` — Change 1 (six decisions replacing `(Executor fills in.)`) and Change 2 (the `## Step 16 FINAL-REVIEW report` section with its four subsections, files-changed sourced only from committed history or reported unavailable).
+### Step 11: REVIEW — for every line-number citation written into the plan, open the file and confirm the cited lines say what the decision claims. Correct any citation that has drifted. Confirm the two facts in decision 5 by running them: `grep -rn "enqueueWaveSync" src/` must show no JavaScript call site, and `src/lib/task-registry.js:845` must still contain Rule 2's refusal. If either is false, the decision text must say so — a precondition that is already expired is the most important thing this record could contain. **Confirm the files-changed subsection cites a commit sha for every file it lists, or reports the section as unavailable. A file listed without a sha is a reconstruction and must be removed.**
 ### Step 12: OPTIMIZE — remove every sentence that restates another. The decision record is read at a gate by a human under time pressure; length is not thoroughness. No decision may be padded to match the length of another.
-### Step 13: SECURE — this slice writes only inside `plans/`. It must not copy any secret, token, absolute home-directory path, or environment value into the plan text; source citations are repository-relative paths and line numbers only. It stamps no `approved_by` marker and moves no file — confirm both by diff.
-### Step 14: VERIFY — `node src/hooks/validate-plan-steps.js` and the plan validator over the edited file, then the full gated run `npm test`. Both must be clean; this slice changes no source, so any failure is pre-existing and must be reported as such rather than absorbed. No git operations.
+### Step 13: SECURE — this slice writes only inside `plans/`. It must not copy any secret, token, absolute home-directory path, or environment value into the plan text; source citations are repository-relative paths and line numbers only. It stamps no `approved_by` marker and moves no file — confirm both by reading the file, not by a git command.
+### Step 14: VERIFY — `node src/hooks/validate-plan-steps.js` and the plan validator over the edited file, then the full gated run `npm test`. Both must be clean; this slice changes no source, so any failure is pre-existing and must be reported as such rather than absorbed. **No MUTATING git operations** — specifically no `commit`, `push`, `add`, `checkout`, `restore`, `reset`, `stash`, `rebase`, `merge` or `clean`. Read-only history queries (`git log`, `git show`, `git diff <sha>^..<sha>`) ARE permitted and are the sanctioned source for the files-changed subsection. **A concurrent build may be editing `src/` and `tests/`: never run a command that touches the index or the working tree.**
 ### Step 15: DOCUMENT — the artifact IS documentation; the work of this step is to confirm the two added sections use the heading text the rest of the repository uses (`## Decisions Taken Under Ambiguity`, numbered decisions) so the gate critique and any future reader find them where they expect them.
-### Step 16: FINAL-REVIEW — report the one file changed, the absence of tests with its stated reason, the before-state captured at Step 8, the outcome of the two Step 11 fact checks, and every decision taken under ambiguity below.
+### Step 16: FINAL-REVIEW — report the one file changed, the absence of tests with its stated reason, the before-state captured at Step 8, the outcome of the two Step 11 fact checks, whether the files-changed subsection was sourced from a commit or reported unavailable, and every decision taken under ambiguity below.
 
 ## Decisions Taken Under Ambiguity
 
@@ -250,3 +331,25 @@ gated suite to prove nothing in the repository regressed.
    claims, the executor corrects the decision text and records the drift in the
    Step 16 report, rather than silently adjusting the line number to whatever now
    matches.
+7. **THE GIT CONTRADICTION IS RESOLVED BY CATEGORY, not by dropping one side.**
+   Step 9 required `git log` and the files-changed subsection required `git show`,
+   while Step 14 said "No git operations" — and the files-changed section has no
+   other source, so the plan was unsatisfiable. An unsatisfiable instruction is
+   dangerous precisely because the cheapest way out of it is a plausible
+   reconstruction. Read-only history queries are now explicitly PERMITTED and
+   mutating operations explicitly ENUMERATED and forbidden, so the permission is
+   unambiguous in both directions.
+8. **The files-changed subsection gets the SAME unavailable-is-unavailable guard as
+   the red evidence, because it is the likelier fabrication site.** Decision 2
+   protected the red transcript; nothing protected a four-file list with a sentence
+   each — the shape a model produces most fluently from the plan alone, and which
+   would read as evidence while deriving from nothing. It is now sourced only from a
+   commit-pinned history query, must cite a sha per file, and is reported as
+   unavailable in those words otherwise. Step 11 checks the shas.
+9. **The working-tree fallback is WITHDRAWN because a concurrent build is live.**
+   The original text permitted reading "the working tree if it has not been
+   committed." With another agent editing `src/` and `tests/`, that would capture
+   its in-flight edits and attribute them to this plan's landing — confidently and
+   invisibly wrong. Only commit-pinned queries are permitted, and no command that
+   touches the index or working tree may be run at all, since a `checkout` or
+   `restore` here would clobber the concurrent build's work.

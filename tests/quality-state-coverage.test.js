@@ -36,13 +36,9 @@ const os = require('os');
 // cwd at load time is the real ctoc git repo — used for the getGitHead success path.
 const REPO_ROOT = process.cwd();
 
-// EACCES-based negative tests require a non-root POSIX user; document the skip.
-const CANNOT_FORCE_EACCES =
-  process.platform === 'win32'
-    ? 'chmod-based EACCES is not enforceable on win32'
-    : typeof process.getuid === 'function' && process.getuid() === 0
-      ? 'root bypasses directory write permission; EACCES will not fire'
-      : false;
+// The EACCES probe that used to live here (`CANNOT_FORCE_EACCES`) is gone: the one
+// test that consumed it now induces the unlink failure through a module seam, so it
+// runs on every platform instead of skipping on win32 and as root.
 
 function freshModule() {
   const modPath = require.resolve('../src/lib/quality-state');
@@ -184,14 +180,32 @@ describe('quality-state.js — dark branches', () => {
 
   // ── releaseLock: unlink failure is swallowed with a warning (lines 163-165) ─
 
-  test('releaseLock_warns_and_does_not_throw_when_unlink_fails', { skip: CANNOT_FORCE_EACCES }, () => {
-    // Arrange — our own lock, then make the containing dir read-only so the
-    // unlink inside releaseLock fails with EACCES (real fs boundary, no mock).
+  // Contract source: src/lib/quality-state.js:278-280 — releaseLock's catch turns
+  // an unlink failure into a warning so a lock-release failure never propagates
+  // into a caller. The ASSERTIONS below are byte-identical to the version that
+  // shipped with a chmod fixture; only the way the failure is INDUCED changed.
+  //
+  // Why the fixture changed: the chmod fixture needed a non-root POSIX user, so it
+  // carried `{ skip: CANNOT_FORCE_EACCES }` — which skips on win32 and in any
+  // container running as root. A skip is a gate failure under the zero-skipped
+  // rule, and this one was invisible on the machines where it did NOT fire. Plan
+  // 00080 Decision 5 already ruled that a permission-based test must be replaced by
+  // a seam; tests/task-reconcile-coverage.test.js:153-161 is the mechanism. The
+  // test now runs on every platform instead of some.
+  test('releaseLock_warns_and_does_not_throw_when_unlink_fails', () => {
+    // Arrange — our own lock, then make safe-fs's unlinkSync fail, which is the
+    // exact call releaseLock makes at src/lib/quality-state.js:275.
     qs.ensureStateDir();
-    const dir = qs.getStateDir();
     const lockPath = qs.getLockFilePath();
     qs.atomicWrite(lockPath, { pid: process.pid, startedAt: 'x', hostname: 'h' });
-    fs.chmodSync(dir, 0o555);
+
+    const safeFs = require('../src/lib/safe-fs');
+    const originalUnlinkSync = safeFs.unlinkSync;
+    safeFs.unlinkSync = () => {
+      const err = new Error(`EACCES: permission denied, unlink '${lockPath}'`);
+      err.code = 'EACCES';
+      throw err;
+    };
 
     // Act + Assert — the catch swallows the error; caller never sees a throw.
     let out;
@@ -200,7 +214,7 @@ describe('quality-state.js — dark branches', () => {
         assert.doesNotThrow(() => qs.releaseLock(), 'releaseLock must not propagate the unlink error');
       });
     } finally {
-      fs.chmodSync(dir, 0o755);
+      safeFs.unlinkSync = originalUnlinkSync;
     }
 
     assert.ok(fs.existsSync(lockPath), 'lock still present — unlink genuinely failed');

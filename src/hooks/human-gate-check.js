@@ -140,8 +140,25 @@ const VIOLATIONS_FILE = path.join(LOG_DIR, 'gate-violations.json');
 // the former local literal.
 const { GATE_SOURCE: HUMAN_GATES, GATE_DESTINATIONS, STAGE_ORDER } = require('../lib/gate-order');
 
-// Terminal gate-destination folders where no legitimate agent editing occurs, so
-// acceptance additionally requires a live-content hash match (invalidate-on-edit).
+// Gate-destination folders where acceptance additionally requires a live-content
+// hash match (invalidate-on-edit).
+//
+// THE OLD COMMENT HERE WAS FALSE, and the falsehood was load-bearing. It read
+// "terminal gate-destination folders where NO LEGITIMATE AGENT EDITING OCCURS".
+// That is simply untrue of `todo/`: a planner amends a queued plan, and an executor
+// dispatched directly at a todo/ plan writes its step records, evidence and final
+// report into that plan while it still resides there. Under whole-file hashing every
+// one of those legitimate edits produced `hash-mismatch` — a reason classified as a
+// LIVE ATTACK SIGNATURE, which reverts on every project, migrated or not. So ordinary
+// building armed a mid-build revert of a plan out of the destination the human had
+// just approved it into.
+//
+// What makes hash-sensitivity here TENABLE is that the comparison now runs against
+// the SPECIFICATION (`approval-ledger.computeSpecHash`) for entries written with
+// that scope: the executor's execution log is excluded, and everything that grants
+// anything — the frontmatter and its `files:`, the scope prose, the specification,
+// the step headings — stays hashed. `done/` genuinely has no legitimate editor, and
+// entries written for it keep the stronger whole-file binding.
 const HASH_SENSITIVE_FOLDERS = new Set(['todo', 'done']);
 
 // PRE-BUILD gate destinations (X6): the gate destinations reached BEFORE any code is
@@ -226,8 +243,12 @@ function readPlan(filePath) {
  * @returns {{accepted: boolean, reason: (string|null), kind: ('human'|'backfilled'|'pipeline'|'sufficiency'|'unknown'|null)}}
  *   accepted (with the entry's real kind), or a reason: `ledger-unkeyable` |
  *   `ledger-corrupt` | `no-ledger-entry` | `wrong-edge` | `hash-mismatch` |
- *   `unreadable` | `unknown-provenance` | `pipeline-no-evidence` | `pipeline-not-allowed` |
- *   `sufficiency-no-evidence` | `sufficiency-not-allowed`
+ *   `hash-mismatch-legacy` | `unreadable` | `unknown-provenance` | `pipeline-no-evidence` |
+ *   `pipeline-not-allowed` | `sufficiency-no-evidence` | `sufficiency-not-allowed`
+ *   (`hash-mismatch` is a mismatch under SPECIFICATION semantics — the specification
+ *   really did change after approval; `hash-mismatch-legacy` is a mismatch under a
+ *   pre-specification `hash_scope: 'file'` entry, where the difference may be nothing
+ *   but the execution log of the build the approval authorised. BOTH reject.)
  */
 function classifyResidency(filePath, folderName, projectPath = process.cwd(), content = null) {
   const ledger = require('../lib/approval-ledger');
@@ -245,8 +266,25 @@ function classifyResidency(filePath, folderName, projectPath = process.cwd(), co
   if (HASH_SENSITIVE_FOLDERS.has(folderName)) {
     const text = content != null ? content : readPlan(filePath);
     if (text == null) return { accepted: false, reason: 'unreadable', kind };
-    if (entry.content_sha256 !== ledger.computeContentHash(text)) {
-      return { accepted: false, reason: 'hash-mismatch', kind };
+    // THE SINGLE ENCODING of "does this content match this entry". This used to be an
+    // inline `computeContentHash` comparison — a SECOND encoding of the approval
+    // predicate alongside `ledger.verify`, and two encodings of an approval predicate
+    // can diverge, which is a forgery surface. Both now call `ledger.contentMatches`,
+    // which branches on the entry's recorded `hash_scope` and FAILS CLOSED when a
+    // specification boundary cannot be established at all.
+    const cmp = ledger.contentMatches(entry, text);
+    if (!cmp.match) {
+      // BOTH kinds still REJECT — no gate is weakened. The split exists so the human
+      // and the enforcer can finally tell "this entry predates specification hashing,
+      // so the mismatch may be nothing but the build that was authorised" from "the
+      // specification actually changed after the approval". Without it the fence cries
+      // wolf on every legacy entry and the real signal stays buried, which is the harm
+      // this distinction removes — indistinguishability, never strictness.
+      return {
+        accepted: false,
+        reason: cmp.scope === 'file' ? 'hash-mismatch-legacy' : 'hash-mismatch',
+        kind,
+      };
     }
   }
 

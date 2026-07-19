@@ -1,8 +1,9 @@
 {
-  "content_sha256": "3b91158eb7db7e8c51574a6a00a5f9879b706eb856b76bb9a0e4951f1322b5bd",
+  "content_sha256": "9215c47aebd6f67f230857598a02756bb44082d0b7fa7fc2f1b6a3b47a06004c",
+  "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-19T11:58:15.176Z",
+  "approved_at": "2026-07-19T16:47:51.603Z",
   "approved_by": "human",
   "plan_basename": "00085-rejection-sends-a-plan-back-one-stage"
 }

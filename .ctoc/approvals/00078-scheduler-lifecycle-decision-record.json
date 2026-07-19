@@ -1,8 +1,9 @@
 {
-  "content_sha256": "62c0abba383cae96f3426702303f002d107821cd7001c319be6e564c48bbaf9e",
+  "content_sha256": "1aac07e1f5b820fc083912d185a64843b6e41ef22171e4b87cbca4f5bcb280a4",
+  "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-19T07:40:42.715Z",
+  "approved_at": "2026-07-19T16:47:51.536Z",
   "approved_by": "human",
   "plan_basename": "00078-scheduler-lifecycle-decision-record"
 }

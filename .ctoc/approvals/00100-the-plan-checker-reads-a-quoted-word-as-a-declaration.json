@@ -1,0 +1,9 @@
+{
+  "content_sha256": "f33d72513dc6df4231ccd62fd2b2b8d7ed82534699446a888d9c963ce26e55e0",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T18:15:13.890Z",
+  "approved_by": "human",
+  "plan_basename": "00100-the-plan-checker-reads-a-quoted-word-as-a-declaration"
+}

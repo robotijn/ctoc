@@ -1,6 +1,13 @@
-[
-  "src/scripts/run-self-check.js",
-  "src/scripts/build-coverage-map.js",
-  "src/scripts/evidence-pack.js",
-  "src/lib/continuation.js"
-]
+{
+  "note": "DECLARED EXECUTION ROOTS — the reviewable escape hatch of the dead-code fence. An entry belongs here ONLY when a REAL mechanism executes the file and the analyzer cannot see that mechanism. Each entry carries a one-line reason naming that mechanism. This is NOT a place to make the unreachable count look better: a file that is merely documented, merely exported, or merely deliberately unwired belongs in .ctoc/reachability-baseline.json as DEBT.",
+  "roots": [
+    "src/scripts/run-self-check.js",
+    "src/scripts/build-coverage-map.js",
+    "src/scripts/evidence-pack.js",
+    "src/lib/continuation.js",
+    "src/hooks/post-commit.js"
+  ],
+  "reasons": {
+    "src/hooks/post-commit.js": "Executed BY GIT. src/lib/hooks-installer.js:631 resolves <pluginRoot>/src/hooks/post-commit.js and installPostCommitHook writes a .git/hooks/post-commit script whose body runs `node \"<that path>\" 2>/dev/null &`. Git runs it after every commit — real execution, not a citation."
+  }
+}

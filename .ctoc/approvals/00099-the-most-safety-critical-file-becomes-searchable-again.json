@@ -1,0 +1,9 @@
+{
+  "content_sha256": "b1c26839afd3676a635159acbd9aad4dd550ffce02b780ae62f0a1dcf71a8283",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T18:15:13.860Z",
+  "approved_by": "human",
+  "plan_basename": "00099-the-most-safety-critical-file-becomes-searchable-again"
+}

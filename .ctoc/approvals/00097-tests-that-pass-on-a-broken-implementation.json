@@ -1,0 +1,9 @@
+{
+  "content_sha256": "3b60023285edd805824d475db5e722e245abec68b90183e576472c6f67a02b68",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T16:48:06.303Z",
+  "approved_by": "human",
+  "plan_basename": "00097-tests-that-pass-on-a-broken-implementation"
+}

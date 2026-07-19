@@ -1,0 +1,9 @@
+{
+  "content_sha256": "3f160f027f975541983c9118de9bc63bbb11cd82c20929972cc40c9ea0f544f2",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T16:47:51.632Z",
+  "approved_by": "human",
+  "plan_basename": "00088-the-reachability-fence-stops-counting-prose-as-a-caller"
+}

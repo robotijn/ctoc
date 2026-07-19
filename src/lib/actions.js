@@ -313,7 +313,6 @@ function stampAndLedger(planPath, from, to, root, deps = {}, override = null) {
   const slug = ledger.slugFromPlanPath(planPath);
   const originalContent = safeFs.readFileSync(planPath, 'utf8');
   const destContent = addApprovalMarker(originalContent, from, to, override);
-  const contentHash = ledger.computeContentHash(destContent);
 
   // The slug is guaranteed ledger-keyable here: the ONLY live caller, `approvePlan`,
   // REFUSES an un-keyable slug (a basename outside `[a-z0-9-]`) BEFORE it ever reaches
@@ -332,7 +331,17 @@ function stampAndLedger(planPath, from, to, root, deps = {}, override = null) {
     atomicWriteFileSync(newPath, destContent);
     // Step 3: commit the approval in the ledger (the source of approval truth).
     writeEntry(slug, {
-      content_sha256: contentHash,
+      // Bind the approval to the SPECIFICATION of the exact bytes that land at the
+      // destination, not to the whole file. The plan file is ALSO the execution log —
+      // the executor writes its step records, evidence and final report into this same
+      // file during Steps 8–16 — so a whole-file binding invalidated the human's
+      // approval on every ordinary build, BY CONSTRUCTION, and armed a mid-build revert
+      // out of the gate destination the human had just approved. The ledger hashes and
+      // stamps the scope together (`approval-ledger.resolveHash`), so the digest and the
+      // recorded semantics can never disagree. Everything that GRANTS anything — the
+      // frontmatter and its `files:`, the scope prose, the specification, the step
+      // headings — stays hashed, so a post-approval scope change still breaks this.
+      content: destContent,
       stage_from: from,
       stage_to: to,
       approved_by: 'human',

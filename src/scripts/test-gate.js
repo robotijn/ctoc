@@ -207,25 +207,119 @@ function resolveTestFiles(projectRoot) {
     .map((f) => path.join(testsDir, f));
 }
 
+// The baseline path as the human knows it — repository-relative. Every refusal
+// message below names THIS, never the absolute path: an absolute path leaks a home
+// directory into logs and evidence artifacts for no diagnostic gain.
+const BASELINE_RELATIVE = path.join('.ctoc', 'coverage-baseline.json');
+
 /**
- * Resolve the coverage threshold for a project: the committed RATCHET baseline
- * (`.ctoc/coverage-baseline.json`, key `minPct`) when present and sane, else the
- * aspirational default (80). The baseline is the same honest mechanism as the
- * typecheck baseline: it records today's measured floor for a codebase that
- * predates instrumentation, and it may only ever be RAISED (never lowered) as
- * coverage improves — new code is still held to the 80% figure at review.
- * @param {string} projectRoot
- * @returns {number} the threshold percentage to enforce.
+ * Describe an unusable `minPct` for an error message WITHOUT echoing file contents.
+ * Only the single offending scalar is rendered, type-named and length-capped: a
+ * baseline is not a secret store, but a reader that pipes unparsed file bytes into
+ * its own output is how one becomes one.
+ * @param {*} value
+ * @returns {string} a short, safe description.
  */
-function resolveThreshold(projectRoot) {
+function describeMinPct(value) {
+  if (value === undefined) return 'no "minPct" key at all';
+  const rendered = typeof value === 'object' && value !== null
+    ? (Array.isArray(value) ? 'an array' : 'an object')
+    : String(JSON.stringify(value)).slice(0, 32);
+  return `${typeof value} ${rendered}`;
+}
+
+// The absent-baseline announcement is the REPORT's job, so main() supplies the sink
+// and a bare library call is silent. Defaulting this to stdout was wrong and the full
+// run proved it: tests/coverage-gate.test.js calls resolveThreshold on a baseline-less
+// temp dir, and its announcement leaked into the suite output the gate re-prints —
+// producing a report that said "enforcing the DEFAULT floor of 80%" directly above
+// "threshold 99%". A false alarm inside the report this function exists to make
+// honest is the same defect class wearing the opposite coat, so ownership of the
+// announcement sits with the one caller that is actually reporting to a human.
+// tests/coverage-ratchet-direction.test.js case 12 drives the real command line and
+// asserts the announcement is genuinely emitted there.
+function defaultNotice() { /* silent by default; main() passes the reporting sink */ }
+
+/**
+ * Resolve the coverage threshold for a project from the committed RATCHET baseline
+ * (`.ctoc/coverage-baseline.json`, key `minPct`). The baseline is the same honest
+ * mechanism as the typecheck baseline: it records today's measured floor for a
+ * codebase that predates instrumentation, and it may only ever be RAISED (never
+ * lowered) as coverage improves — new code is still held to the 80% figure at review.
+ * `tests/coverage-ratchet-direction.test.js` enforces that direction.
+ *
+ * ABSENT AND UNREADABLE ARE DIFFERENT FACTS, and reporting them as the same number
+ * was this function's defect. Measured on disk before the fix, a missing file, a
+ * corrupt file, a `minPct` of `"99"` rather than `99`, and a `minPct` outside
+ * (0, 100] ALL returned 80 — a nineteen-point drop from the real floor of 99 — and
+ * the gate then printed "threshold 80%" and PASSED. One character changing type in a
+ * JSON file silently weakened the gate, and the diff looked correct to a reader.
+ *
+ *   - ABSENT   → a legitimate state (a project that predates instrumentation). Keep
+ *                the documented default, but ANNOUNCE it. Silence is the failure.
+ *   - PRESENT but unreadable, unparseable, wrong-typed, or out of range → THROW.
+ *                A corrupt floor is a broken instrument, not permission to enforce a
+ *                weaker one. Never return a number that was not read.
+ *
+ * This mirrors the discipline already in this file: `parseFail`, `parseSkipped` and
+ * `parseCoveragePct` return `null` and never the success value, so "I could not read
+ * my input" can never be mistaken for "everything passed."
+ *
+ * @param {string} projectRoot
+ * @param {{notice?: function(string): void}} [opts] `notice` receives the
+ *   absent-baseline announcement; defaults to the gate's stdout report.
+ * @returns {number} the threshold percentage to enforce.
+ * @throws {Error} when a baseline exists but cannot be trusted.
+ */
+function resolveThreshold(projectRoot, opts) {
+  const notice = (opts && typeof opts.notice === 'function') ? opts.notice : defaultNotice;
+  const file = path.join(projectRoot, '.ctoc', 'coverage-baseline.json');
+
+  let raw;
   try {
-    const raw = safeFs.readFileSync(path.join(projectRoot, '.ctoc', 'coverage-baseline.json'), 'utf8');
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.minPct === 'number' && parsed.minPct > 0 && parsed.minPct <= 100) {
-      return parsed.minPct;
+    raw = safeFs.readFileSync(file, 'utf8');
+  } catch (err) {
+    if (err && err.code === 'ENOENT') {
+      notice(
+        `[CTOC test-gate] no coverage baseline at ${BASELINE_RELATIVE} — enforcing the ` +
+        `DEFAULT floor of ${DEFAULT_THRESHOLD}%. This is a default, not a measured floor: ` +
+        'record the measured value in that file to enforce the real one.\n'
+      );
+      return DEFAULT_THRESHOLD;
     }
-  } catch { /* no baseline file → aspirational default */ }
-  return DEFAULT_THRESHOLD;
+    throw new Error(
+      `${BASELINE_RELATIVE} exists but could not be read (${(err && err.code) || 'unknown error'}). ` +
+      'A floor that cannot be read is not a floor — refusing to enforce a guessed threshold.'
+    );
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      `${BASELINE_RELATIVE} is not valid JSON. A floor that cannot be parsed is not a floor — ` +
+      'refusing to substitute a default for a broken instrument. Fix the file.'
+    );
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(
+      `${BASELINE_RELATIVE} is not a JSON object, so it carries no "minPct" floor. ` +
+      'Refusing to enforce a guessed threshold.'
+    );
+  }
+
+  const { minPct } = parsed;
+  if (typeof minPct !== 'number' || !Number.isFinite(minPct) || minPct <= 0 || minPct > 100) {
+    throw new Error(
+      `${BASELINE_RELATIVE} has an unusable "minPct": expected a finite number in (0, 100], ` +
+      `got ${describeMinPct(minPct)}. Refusing to enforce a guessed threshold — silently ` +
+      `falling back to ${DEFAULT_THRESHOLD}% is how a one-character type change weakens the gate.`
+    );
+  }
+
+  return minPct;
 }
 
 /** CLI entry point: run the suite under coverage, evaluate, print, exit. */
@@ -235,6 +329,17 @@ function main() {
 
   if (files.length === 0) {
     process.stderr.write('[CTOC test-gate] no test files found under tests/ — refusing to report green on an empty run.\n');
+    return requestExit(1);
+  }
+
+  // Resolve the floor BEFORE running the suite. A broken instrument is caught in
+  // milliseconds instead of after a multi-minute run, and — more importantly — the
+  // gate can never reach a verdict it would have had to guess a threshold for.
+  let threshold;
+  try {
+    threshold = resolveThreshold(projectRoot, { notice: (m) => process.stdout.write(m) });
+  } catch (err) {
+    process.stderr.write(`[CTOC test-gate] FAIL: ${err.message}\n`);
     return requestExit(1);
   }
 
@@ -273,7 +378,6 @@ function main() {
     skipped: parseSkipped(output),
     coveragePct: parseCoveragePct(output),
   };
-  const threshold = resolveThreshold(projectRoot);
   const verdict = evaluateSummary(summary, { threshold });
 
   // Report an unreadable counter AS unreadable. Printing "failed 0" for a count the

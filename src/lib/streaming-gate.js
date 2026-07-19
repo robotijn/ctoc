@@ -415,7 +415,13 @@ function crossBySufficiency(root, planPath, ref, fromStage, toStage) {
       `${result.unbound > 0 ? `; ${result.unbound} recorded answer(s) did not bind to this revision` : ''}`;
 
     ledger.writeSufficiencyEntry(slug, {
-      content_sha256: ledger.computeContentHash(content),
+      // SPECIFICATION scope, for the same reason as the human gate crossing in
+      // `actions.stampAndLedger`: a sufficiency entry advances a plan to a PRE-BUILD
+      // destination (implementation, todo), so that plan is about to be BUILT — and the
+      // executor writes its execution log into the plan file itself. A whole-file
+      // binding would go stale on the very build this entry authorises. The ledger
+      // derives the digest and the scope stamp together.
+      content,
       stage_from: fromStage,
       stage_to: toStage,
       evidence,

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "7c1c03f5e4f39b71ef385694836a9bb613730ef1198241a543e959a738aa7ac7",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T18:15:13.949Z",
+  "approved_by": "human",
+  "plan_basename": "00102-git-exclusivity-is-undefended-where-work-actually-starts"
+}

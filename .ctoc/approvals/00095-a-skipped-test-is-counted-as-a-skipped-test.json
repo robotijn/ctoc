@@ -1,0 +1,9 @@
+{
+  "content_sha256": "35e37e2b53568c7d26d8622221d7da05e21f338fcd47d65a3ad06cdba2f41807",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T15:29:41.423Z",
+  "approved_by": "human",
+  "plan_basename": "00095-a-skipped-test-is-counted-as-a-skipped-test"
+}

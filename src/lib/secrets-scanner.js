@@ -380,6 +380,46 @@ const SECRET_DENSE_UNSCANNED_EXTENSIONS = ['.tf', '.tfvars', '.tfstate', '.sql']
 const SECRET_DENSE_UNSCANNED_FILENAMES = ['.npmrc', '.netrc', '.pgpass'];
 
 /**
+ * Error codes that mean the child process NEVER RAN TO COMPLETION. Its silence
+ * therefore carries no information at all — it is a failure, never a finding.
+ * @type {Set<string>}
+ */
+const SPAWN_FAILURE_CODES = new Set([
+  'ENOENT', 'EACCES', 'EPERM', 'ETIMEDOUT', 'ENOMEM', 'EMFILE'
+]);
+
+/**
+ * Recover a child process's stdout from EITHER a clean return or the exception
+ * `execFileSync` throws on a non-zero exit.
+ *
+ * A scanner that exits non-zero BECAUSE IT FOUND SOMETHING is the single most
+ * important run this class ever performs, and it is the one run where the output
+ * arrives attached to an exception instead of a return value. Discarding it
+ * turns a repository with a verified leaked credential into a clean scan — which
+ * is exactly the defect this helper exists to make impossible.
+ *
+ * @param {Error & {stdout?: string|Buffer, status?: number|null, code?: string, signal?: string}} err
+ * @returns {{ stdout: string, status: number|null, spawnFailure: boolean }}
+ *   `spawnFailure` is true when the process never ran to completion (a spawn
+ *   error, or a kill by signal) — a genuine failure, never a finding. A killed
+ *   process is included deliberately: a timeout truncates the output, and a
+ *   truncated scan is not a clean scan.
+ */
+function outputFromError(err) {
+  const rawStdout = err && err.stdout;
+  const stdout = Buffer.isBuffer(rawStdout)
+    ? rawStdout.toString('utf8')
+    : (typeof rawStdout === 'string' ? rawStdout : '');
+
+  const status = (err && Number.isFinite(err.status)) ? err.status : null;
+  const spawnFailure = status === null
+    || Boolean(err && err.signal)
+    || Boolean(err && SPAWN_FAILURE_CODES.has(err.code));
+
+  return { stdout, status, spawnFailure };
+}
+
+/**
  * Secrets Scanner class
  */
 class SecretsScanner {
@@ -1116,17 +1156,27 @@ class SecretsScanner {
   }
 
   /**
-   * Run TruffleHog scanner
+   * Run TruffleHog scanner.
+   *
+   * A non-zero exit is the SUCCESS path here: TruffleHog exits non-zero
+   * precisely because it found verified secrets, and `execFileSync` throws on a
+   * non-zero exit, so the findings arrive attached to an exception. They are
+   * parsed exactly as a clean return would be. Only a process that never ran to
+   * completion is treated as a failure, and that failure is RECORDED on
+   * `this.errors` rather than returned as an empty (clean-looking) array.
+   *
    * @returns {Promise<Array>} TruffleHog findings
    */
   async runTruffleHog() {
     const findings = [];
+    let raw = '';
+    let skippedLines = 0;
 
     try {
       // execFileSync (argv form, no shell) — a projectRoot containing shell
       // metacharacters ($(...), ;, backticks) is passed as a single literal
       // argument and can never be interpreted as a command.
-      const result = execFileSync(
+      raw = execFileSync(
         'trufflehog',
         ['filesystem', '--json', '--only-verified', this.projectRoot],
         {
@@ -1135,45 +1185,83 @@ class SecretsScanner {
           timeout: 300000
         }
       );
-
-      // TruffleHog outputs NDJSON
-      const lines = result.trim().split('\n');
-      for (const line of lines) {
-        try {
-          const data = JSON.parse(line);
-          findings.push({
-            type: data.DetectorName || 'UNKNOWN',
-            name: data.DetectorName || 'Unknown Secret',
-            severity: 'CRITICAL', // TruffleHog only reports verified secrets
-            file: data.SourceMetadata?.Data?.Filesystem?.file || 'unknown',
-            line: data.SourceMetadata?.Data?.Filesystem?.line || 0,
-            match: this.redactSecret(data.Raw || ''),
-            description: `Verified ${data.DetectorName} secret`,
-            verified: true,
-            tool: 'trufflehog'
-          });
-        } catch (e) {
-          // Skip non-JSON lines
-        }
-      }
     } catch (e) {
-      // TruffleHog may exit with non-zero if findings exist
+      // NOT swallowed. TruffleHog exits NON-ZERO precisely when it has verified
+      // findings, so this is the success path for the run that matters most —
+      // the output is attached to the exception and is parsed below exactly as a
+      // clean return would be. Only a process that never completed is a failure.
+      const recovered = outputFromError(e);
+      raw = recovered.stdout;
+      if (recovered.spawnFailure) {
+        this.errors.push({
+          tool: 'trufflehog',
+          kind: 'error',
+          error: `trufflehog did not complete (${e.code || e.signal || 'unknown'}) — the external secret scan DID NOT RUN`
+        });
+        return findings;
+      }
+    }
+
+    // TruffleHog outputs NDJSON, reached from BOTH paths above.
+    const lines = String(raw).trim().split('\n');
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const data = JSON.parse(line);
+        findings.push({
+          type: data.DetectorName || 'UNKNOWN',
+          name: data.DetectorName || 'Unknown Secret',
+          severity: 'CRITICAL', // TruffleHog only reports verified secrets
+          file: data.SourceMetadata?.Data?.Filesystem?.file || 'unknown',
+          line: data.SourceMetadata?.Data?.Filesystem?.line || 0,
+          match: this.redactSecret(data.Raw || ''),
+          description: `Verified ${data.DetectorName} secret`,
+          verified: true,
+          tool: 'trufflehog'
+        });
+      } catch (e) {
+        // A non-JSON line is COUNTED, not vanished. TruffleHog interleaves
+        // human-readable progress output with its NDJSON, so skipping is
+        // correct — but skipping every line without counting is how a changed
+        // output format degrades into a silent zero-finding scan.
+        skippedLines++;
+      }
+    }
+
+    // Only ALL-noise-and-no-findings is the signature of a changed output
+    // format. Progress lines beside real findings are normal and stay quiet;
+    // alarming on every noise line would bury the genuine errors.
+    if (skippedLines > 0 && findings.length === 0) {
+      this.errors.push({
+        tool: 'trufflehog',
+        kind: 'error',
+        error: `trufflehog produced ${skippedLines} unparseable output line(s) and ZERO parseable findings — treat this scan as NOT PERFORMED, not as clean`
+      });
     }
 
     return findings;
   }
 
   /**
-   * Run detect-secrets scanner
+   * Run detect-secrets scanner.
+   *
+   * detect-secrets exits non-zero for a real usage error as well as for a
+   * report, and its output is a single JSON document rather than NDJSON — so
+   * the discriminator is whether the recovered stdout PARSES. A non-zero exit
+   * with a parseable report is a report; anything else is a failure that is
+   * recorded, never returned as a clean empty scan.
+   *
    * @returns {Promise<Array>} detect-secrets findings
    */
   async runDetectSecrets() {
     const findings = [];
+    let raw = '';
+    let status = null;
 
     try {
       // execFileSync (argv form, no shell) — projectRoot is passed as a single
       // literal argument, so shell metacharacters in the path cannot inject.
-      const result = execFileSync(
+      raw = execFileSync(
         'detect-secrets',
         ['scan', this.projectRoot, '--all-files'],
         {
@@ -1182,25 +1270,49 @@ class SecretsScanner {
           timeout: 300000
         }
       );
-
-      const data = JSON.parse(result);
-      for (const [file, secrets] of Object.entries(data.results || {})) {
-        for (const secret of secrets) {
-          findings.push({
-            type: secret.type || 'GENERIC_SECRET',
-            name: secret.type || 'Detected Secret',
-            severity: 'MEDIUM',
-            file: file,
-            line: secret.line_number || 0,
-            match: '***DETECTED***',
-            description: `Detected by detect-secrets: ${secret.type}`,
-            verified: false,
-            tool: 'detect-secrets'
-          });
-        }
-      }
+      status = 0;
     } catch (e) {
-      // detect-secrets may fail
+      const recovered = outputFromError(e);
+      raw = recovered.stdout;
+      status = recovered.status;
+      if (recovered.spawnFailure) {
+        this.errors.push({
+          tool: 'detect-secrets',
+          kind: 'error',
+          error: `detect-secrets did not complete (${e.code || e.signal || 'unknown'}) — the external secret scan DID NOT RUN`
+        });
+        return findings;
+      }
+    }
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (parseErr) {
+      // The recovered stream is SECRET MATERIAL by definition, so the message
+      // carries only the tool name and the exit status — never the output.
+      this.errors.push({
+        tool: 'detect-secrets',
+        kind: 'error',
+        error: `detect-secrets exited ${status === null ? 'abnormally' : status} and produced no parseable report — the external secret scan DID NOT RUN`
+      });
+      return findings;
+    }
+
+    for (const [file, secrets] of Object.entries((data && data.results) || {})) {
+      for (const secret of secrets) {
+        findings.push({
+          type: secret.type || 'GENERIC_SECRET',
+          name: secret.type || 'Detected Secret',
+          severity: 'MEDIUM',
+          file: file,
+          line: secret.line_number || 0,
+          match: '***DETECTED***',
+          description: `Detected by detect-secrets: ${secret.type}`,
+          verified: false,
+          tool: 'detect-secrets'
+        });
+      }
     }
 
     return findings;

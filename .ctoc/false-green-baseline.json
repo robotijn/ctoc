@@ -1,5 +1,5 @@
 {
-  "maxFindings": 217,
+  "maxFindings": 213,
   "note": "DEBT, not blessing. These are pre-existing false-green sites — checks that can report a verdict on input they never received — tolerated so the fence could land. This list may only ever SHRINK. Never raise maxFindings to make a run pass; fix a site and lower it instead.",
   "whitelistNote": "SEPARATE from the debt list above. `whitelist` is a PERMANENT exemption for a construct that is genuinely correct, and every entry requires a written justification. It starts EMPTY. Adding to it is a reviewable act; adding to `findings` is forbidden.",
   "findings": [
@@ -162,9 +162,6 @@
     "src/lib/reachability.js:silent-catch:declaredExportRoots",
     "src/lib/sast-runner.js:unbounded-capture:result",
     "src/lib/sca-runner.js:silent-catch:_detectRequirementFiles",
-    "src/lib/secrets-scanner.js:silent-catch:runTruffleHog",
-    "src/lib/secrets-scanner.js:silent-catch:runTruffleHog#2",
-    "src/lib/secrets-scanner.js:silent-catch:runDetectSecrets",
     "src/lib/stack-detector.js:silent-catch:detectLanguages",
     "src/lib/stack-detector.js:silent-catch:readPackageDeps",
     "src/lib/stack-detector.js:silent-catch:readPackageDeps#2",
@@ -218,8 +215,7 @@
     "src/scripts/run-evals.js:exit-with-pending-writes:main",
     "src/scripts/run-evals.js:exit-with-pending-writes:main#2",
     "src/scripts/run-evals.js:exit-with-pending-writes:<module>",
-    "src/scripts/run-self-check.js:exit-with-pending-writes:<module>",
-    "src/scripts/test-gate.js:silent-catch:resolveThreshold"
+    "src/scripts/run-self-check.js:exit-with-pending-writes:<module>"
   ],
   "whitelist": {},
   "seededAt": "2026-07-18",

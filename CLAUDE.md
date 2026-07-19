@@ -240,7 +240,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 428 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 433 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -270,6 +270,34 @@ justification per entry. Conflating them is what kills a fence. The fixed exempl
 the specification: `src/scripts/test-gate.js` (parsers return `null`, never `0`) and
 `src/lib/request-exit.js` (`process.exitCode` + return, so Node drains before exiting).
 
+**The dead-code fence — the count is DEBT, not a regression.** A module is done when
+a human can REACH it, not when its test passes (a test IS a caller).
+`src/lib/reachability.js` computes that, `tests/reachability.test.js` ratchets it, and
+`.ctoc/reachability-baseline.json` records **26 unreachable files** today. That number
+rose from 0 on 2026-07-19 and **not one file died**: the fence had been crediting two
+things that are not calls. Any quoted string ending in `.js` became a call edge matched
+by BASENAME — so `iron-loop-enforcer.js`'s `REQUIRED_LIBS` array, a list of paths handed
+to `existsSync`, manufactured eight edges and kept `quality-gate.js`, `v8-dispatcher.js`
+and `product-loop.js` "live" on the strength of a presence check — and any `src/**.js`
+path MENTIONED in any markdown became an execution ROOT, bare prose included, which made
+roughly a third of the library a root because an agent definition described it in a
+sentence. Comments were scanned too, so a `require` inside a comment was an edge. **A
+citation is not an invocation** — the sibling EXPORT fence twenty lines away in the same
+module had always said so, and the two now agree: a path is an edge only when something
+SPAWNS it, and a root only when a shipped instruction RUNS it (`node <path>` /
+`require('<path>')`). The baseline holds the same TWO separate structures as the
+false-green baseline — `unreachable` is DEBT that may only SHRINK (exits are wire or
+delete), `whitelist` is a PERMANENT exemption mapping file → written justification in ONE
+object, and it is EMPTY. A file genuinely executed by an invisible mechanism goes to
+`.ctoc/reachability-roots.json` as a declared ROOT with a reason naming that mechanism
+(today: `src/hooks/post-commit.js`, run by git via the hook `hooks-installer.js`
+installs) — a stronger, more reviewable claim than an exemption. **The analyzer FAILS
+LOUD:** every read path used to degrade silently toward "unreachable" (an unreadable
+hooks manifest became `''`, killing every hook root at once), so one unreadable file
+could have nominated live code for deletion. Unreadable now throws and names the path;
+ABSENT keeps its own meaning, and `analyze()` returns `readErrors` so a seeding run can
+prove it read everything it judged (`seedReadErrors: 0`).
+
 **Coverage floor — the shipped truth.** Step 14 VERIFY enforces the coverage floor
 recorded in `.ctoc/coverage-baseline.json`, which is **99** today (real src line
 coverage measured 99.37%, SCOPED to `src/**`). The gate scopes coverage with
@@ -280,6 +308,20 @@ run transitively loads — that broken number, not real coverage, is why the old
 gate; `node --test tests/*.test.js` BYPASSES both. The floor is a ratchet — RAISE it as
 coverage improves, never lower it to make a run pass. The VERSION file is the single
 source of truth for version numbers. Do NOT use `run-all.js` (it doesn't exist).
+
+**The ratchet's DIRECTION is now a check, and an unreadable floor REFUSES.** Both
+halves were prose before. `tests/coverage-ratchet-direction.test.js` states the floor a
+second time in `HISTORICAL_FLOOR`, so lowering `minPct` requires editing two places,
+one of them a test whose name and failure message both say not to. And
+`resolveThreshold` used to return the default 80 on ANY read failure: file absent,
+file corrupt, `minPct` given as the string `"99"` rather than the number `99`, or a
+value outside (0, 100] — a nineteen-point drop from the real floor, after which the
+gate printed "threshold 80%" and PASSED. **ABSENT and UNREADABLE are different facts.**
+A project with no baseline legitimately has no measured floor: it keeps the 80% default
+but the gate now ANNOUNCES that it is defaulting. A baseline that EXISTS but cannot be
+read, parsed, or trusted is a broken instrument, and the gate exits non-zero before it
+runs the suite rather than enforcing a weaker floor it never read. Same discipline as
+the parsers above it in that file: never return a number you did not read.
 
 ---
 
@@ -333,7 +375,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 428 test files
+  tests/                 433 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
@@ -589,7 +631,10 @@ CTOC improves itself. When implementing features:
 implementation→todo, Gate 3 review→done). Key step labels: **8:TEST** (TDD), **10:IMPLEMENT**
 (one step, files as sub-items), **14:VERIFY** (quality gate: lint, typecheck, all
 tests, coverage at or above the enforced floor — `.ctoc/coverage-baseline.json`
-`minPct`, **40** today, ratchet-up only; 80 is the new-code target at review — 0
+`minPct`, **99** today — that file is the single source of truth for the number,
+ratchet-up only, and an unreadable baseline REFUSES rather than defaulting; 80 is
+the aspirational default for a project with no baseline at all, and the new-code
+target at review — 0
 skipped, 0 flaky, run via `npm test`). CTOC ships exactly **3 slash commands** —
 `/ctoc:menu`, `/ctoc:push`, `/ctoc:update` — and is **always installed from the
 marketplace**, never from a local path.

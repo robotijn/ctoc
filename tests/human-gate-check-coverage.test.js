@@ -240,7 +240,31 @@ test('classifyResidency_flagsHashMismatch_whenTodoPlanEditedAfterApproval', () =
   // Act
   const verdict = gate.classifyResidency(filePath, 'todo', projectDir, live);
 
-  // Assert — invalidate-on-edit holds for todo/, not just done/.
+  // Assert — invalidate-on-edit holds for todo/, not just done/. The entry was written
+  // with a precomputed WHOLE-FILE digest, so it carries `hash_scope: 'file'` and the
+  // mismatch is reported under legacy semantics. Rejection is what this test pins, and
+  // it is unchanged.
+  assert.equal(verdict.accepted, false);
+  assert.equal(verdict.reason, 'hash-mismatch-legacy');
+});
+
+test('classifyResidency_flagsHashMismatch_whenSpecificationChangedAfterApproval', () => {
+  // The SPECIFICATION-scoped twin of the test above: an entry bound to the plan's
+  // specification still invalidates on a real specification change in todo/, and reports
+  // the un-suffixed `hash-mismatch` so a real post-approval change is distinguishable
+  // from a legacy entry that merely predates specification hashing.
+  const projectDir = makeProject();
+  const { filePath, content } = writePlan(projectDir, 'todo', 'respecified-todo');
+  ledger.writeEntry('respecified-todo', {
+    content,
+    stage_from: 'implementation',
+    stage_to: 'todo',
+  }, projectDir);
+  fs.writeFileSync(filePath, content.replace(/^title:.*$/m, 'title: something else entirely'));
+  const live = fs.readFileSync(filePath, 'utf8');
+
+  const verdict = gate.classifyResidency(filePath, 'todo', projectDir, live);
+
   assert.equal(verdict.accepted, false);
   assert.equal(verdict.reason, 'hash-mismatch');
 });

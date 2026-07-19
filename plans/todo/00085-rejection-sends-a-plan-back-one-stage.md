@@ -1,5 +1,11 @@
 ---
 approved_by: human
+approved_at: 2026-07-19T16:47:51.572Z
+gate_crossed: implementation → todo
+---
+
+---
+approved_by: human
 approved_at: 2026-07-19T11:58:15.149Z
 gate_crossed: implementation → todo
 ---
@@ -15,9 +21,24 @@ iron_loop: true
 files:
   - "src/lib/actions.js"
   - "tests/reject-plan-stage-aware.test.js"
+  - "CLAUDE.md"
 ---
 
 # Rejection sends a plan back one stage, not four
+
+> **REPAIR NOTE — an adversarial pre-mortem alleged this fix is LESS SAFE than the
+> bug it fixes. I re-derived the claim from the code and it does NOT hold.** The
+> target stays `in-progress`. The full arithmetic is in "The safety challenge,
+> re-derived" below, together with the two things the challenge got right (a
+> genuinely weak test case, and a write-priority property nobody had recorded).
+> Two other findings DID land: the ledger-withdrawal contradiction (decision 10) and
+> an unresolved fact now resolved (decision 11).
+>
+> **A third correction came from a MECHANISM, not a reviewer.** This plan CREATES
+> `tests/reject-plan-stage-aware.test.js`, which moves the documented test-file
+> count that `tests/doc-counts.test.js` verifies against disk — and the plan did not
+> declare `CLAUDE.md`, so the executor could not have fixed the count it was about
+> to break. `CLAUDE.md` is now declared. See decision 14.
 
 ## What I re-verified, and where the code disagrees with the brief
 
@@ -128,20 +149,89 @@ So the per-gate table is a **special case** of one-stage-back evaluated at gate
 destinations. One rule, no second encoding, and the answer at `review` — send the
 build back to being built — is the one a human means by rejecting at Gate 3.
 
-**Why it cannot be used to skip a gate.** Forward moves are gate-checked by
-`crossesHumanGate`, which is span-based and catches multi-hop skips
-(`:41-52`). A plan moved one stage back must re-cross every gate edge it
-re-approaches on the way forward. And one-stage-back from `review` lands on
-`in-progress`, which is **not** a gate destination, so it needs no ledger entry to
-reside there — the move is residency-neutral. Landing a rejected plan on `todo` or
-`implementation` instead would drop it onto ledger-governed ground, which is
-exactly how D4 becomes exploitable.
-
 **Guard-rail the implementation must carry:** the computed target must be rejected
 if it is not strictly one index lower, and the function must refuse rather than
 guess when the current stage is not in `STAGE_ORDER` (a plan in `vision/` or
 `canvas/`). Fail closed — refuse the rejection with a clear error rather than move
 a plan to a stage nobody chose.
+
+---
+
+## The safety challenge, re-derived — and why `in-progress` STANDS
+
+An adversarial review asserted that this fix "trades a loud wrong behaviour for a
+quiet unsafe one," on the grounds that a plan rejected to `in-progress` "returns to
+the finish line via an ordinary task completion, having re-crossed nothing." The
+stated bar was: **a rejected plan must not be able to reach the finish line without
+a human decision.**
+
+That bar is the right bar. The claim that `in-progress` fails it does not survive
+the arithmetic. Re-derived from `src/lib/gate-order.js` rather than from either
+plan's prose:
+
+```
+STAGE_ORDER      = ['functional'(0),'implementation'(1),'todo'(2),'in-progress'(3),'review'(4),'done'(5)]
+GATE_EDGE_ORDERS = [[0,1], [1,2], [4,5]]
+crossesHumanGate(from,to) := order[from] < order[to]
+                             AND ∃[g0,g1] : order[from] <= g0 AND order[to] >= g1
+```
+
+| Move | Evaluation | Crosses a gate? |
+|---|---|---|
+| `in-progress`(3) → `review`(4) | `[0,1]`: 3≤0 ✗ · `[1,2]`: 3≤1 ✗ · `[4,5]`: 3≤4 ✓ but 4≥5 ✗ | **NO** |
+| `review`(4) → `done`(5) | `[4,5]`: 4≤4 ✓ and 5≥5 ✓ | **YES — Gate 3** |
+| `in-progress`(3) → `done`(5) *(direct)* | `[4,5]`: 3≤4 ✓ and 5≥5 ✓ | **YES — Gate 3** |
+
+**The challenge is correct on its first row and wrong on its conclusion.**
+`in-progress → review` is indeed gate-free. But `review` is **not the finish line** —
+`done` is, and *every* path from `in-progress` to `done` crosses Gate 3. The
+span-based rule catches the multi-hop skip specifically so a plan cannot route around
+a gate by jumping over it. **There is no gate-free path from the rejection target to
+the finish line.**
+
+**And the Gate 3 it must re-cross is a fresh decision, because this slice removes
+both things that could have carried the old one:**
+
+| Mechanism | After this slice | Consequence at Gate 3 |
+|---|---|---|
+| approval marker in the plan body (D3) | **stripped** | nothing in the file claims a crossing |
+| ledger entry (D4) | **removed** | `classifyResidency` → `res.status === 'absent'` → `{accepted:false, reason:'no-ledger-entry'}` — fail closed |
+| `done/` hash sensitivity | unchanged | `done` is in `HASH_SENSITIVE_FOLDERS`; residency additionally requires a live content-hash match |
+| `validateReviewToDone` | unchanged | requires fresh, passing VERIFY evidence |
+| the Gate 3 human decision itself | unchanged | **is** `approvePlan` writing the edge-specific entry with `stage_to: 'done'` (`plan-validator.js:650, 697`) |
+
+A rejected plan therefore arrives back at `review` carrying **no approval marker and
+no ledger entry**, and must earn a brand-new Gate 3 human decision to reach `done`.
+That satisfies the stated bar exactly. **The target stays `in-progress`, and it is
+not a least-bad pick — it is the one that keeps the plan off ledger-governed ground
+while leaving the only gate that matters fully armed.**
+
+### What the challenge got RIGHT, and is fixed here
+
+**1. Test case 6 was vacuous on the headline path — a real defect.** It asserted
+`crossesHumanGate(target, originalStage)` "whenever the original stage was reached
+through a gate." For the headline case the original stage is `review`, which is
+*not* reached through a gate (`in-progress → review` crosses none), so the
+precondition is false and **the assertion never fires on the only path that runs**.
+A test that is vacuous precisely where the risk lives is not protection. It asserted
+the wrong property, too: "must re-cross the stage you came from" is weaker than, and
+not implied by, the property that actually matters.
+
+**Case 6 is replaced** with the real safety property, asserted directly and
+non-vacuously — see the Test Plan.
+
+**2. The write-priority property was undocumented.** `src/lib/plan-coverage.js:32`
+reads `STAGE_PRIORITY = ['in-progress', 'todo', 'implementation']`, so a plan at
+`in-progress` holds the **highest** write-permission priority in the repository. A
+rejected plan therefore lands on the top of the coverage stack.
+
+Recorded, and assessed as **correct rather than hazardous**: `STAGE_PRIORITY` governs
+which plan's `files:` globs win when two plans claim the same path — it is a
+*scoping* rule, not an *approval* rule, and it grants no gate crossing whatsoever. A
+plan sent back to be rebuilt is exactly the plan that should own its declared files
+while it is being rebuilt; that is what `in-progress` means. It is now asserted by
+case 21 so the property is pinned rather than incidental, and named here so the next
+reader does not have to rediscover it.
 
 ## The ledger: remove the entry
 
@@ -170,6 +260,33 @@ counter, `rejection_reason`, `tag: rejected`) and the move is logged by the norm
 action path. A `superseded` entry kind that preserves the history is a reasonable
 future improvement; **it is not proposed as work here** and is mentioned only so
 the trade-off is legible.
+
+### The withdrawal must ABORT the rejection on failure — contradiction resolved
+
+The original text said the withdrawal is **"best-effort by that function's existing
+contract"** *and* that **"a failure to remove must be surfaced, never swallowed
+silently."** Those two sentences contradict each other, and the contradiction
+resolves the wrong way by default: both existing call sites swallow —
+
+- `src/lib/actions.js:387` — `if (!isCollision) { try { removeEntry(slug, root); } catch { /* best-effort */ } }`
+- `src/lib/streaming-gate.js:435` — `try { ledger.removeEntry(slug, root); } catch { /* best-effort */ }`
+
+— so "the existing contract" resolves to *the swallow*, and an executor matching
+house style would reproduce it. **The failure it would hide is precisely the one
+that leaves a stale approval record behind: the D4 bypass this slice exists to
+close.**
+
+**Resolved, and the "best-effort" phrasing is withdrawn.** The required behaviour:
+
+> **A failed ledger withdrawal ABORTS the rejection before the move.** The plan stays
+> where it is, with its record intact, and the error is surfaced to the caller.
+> Rejected-but-unmoved is the safe failure state; moved-with-a-surviving-entry is the
+> bypass. This call site does **not** inherit the best-effort convention of the other
+> two, and the code comment must say so explicitly — including why, so a future
+> tidy-up that "makes the three consistent" does not silently reopen D4.
+
+The two existing swallowing sites are **out of scope** and are not touched here; they
+are noted so the difference is deliberate and visible rather than looking like drift.
 
 ## The content rewrite: what is load-bearing
 
@@ -209,9 +326,8 @@ leaving the marker keeps a claim in the file that the ledger no longer backs.
 3. **Strip the approval marker** from the frontmatter region as part of the same
    rewrite.
 4. **Withdraw the ledger entry** via `approval-ledger.removeEntry(slug, root)`,
-   keyed by `slugFromPlanPath`. Best-effort by that function's existing contract;
-   a failure to remove must be surfaced, never swallowed silently, because a
-   surviving entry is the D4 gate-skip.
+   keyed by `slugFromPlanPath`. **A failure ABORTS the rejection before the move** —
+   see the resolution above. Not best-effort, and the comment says why.
 5. **Safe feedback encoding.** Truncate first, then escape, and strip newlines and
    control characters before interpolating into YAML.
 6. **Ordering, so a partial failure cannot strand the plan:** write the content,
@@ -219,6 +335,18 @@ leaving the marker keeps a claim in the file that the ledger no longer backs.
    rejected-but-unmoved plan with no ledger entry — visible and safe. A move before
    the ledger removal could leave an approved-looking plan at a new stage, which is
    the unsafe ordering.
+
+### File: `CLAUDE.md`
+**Action:** MODIFY — the documented test-file count only
+**Purpose:** This plan CREATES a test file, which moves a count the suite verifies.
+
+`tests/doc-counts.test.js` compares `CLAUDE.md`'s documented test-file count against
+a live disk count, in **two** places (the test-command line "Run all N test files"
+and the project-structure line "tests/  N test files"). Adding
+`tests/reject-plan-stage-aware.test.js` moves both.
+
+**Read the live count from disk and update both statements.** Do not trust any number
+written in this plan or in `CLAUDE.md` today. Change nothing else in the file.
 
 ---
 
@@ -249,7 +377,8 @@ a gate could be skipped. A one-constant fix satisfies at most one of each pair.
 | 3 | reject from `implementation` | lands in `functional` (Gate 1's documented target) |
 | 4 | reject from `done` | lands in `review` (Gate 3's documented target) |
 | 5 | **no rejection crosses more than one stage** | for every stage in `STAGE_ORDER`, the target index is exactly `index - 1`; a table-driven case, so a constant cannot satisfy it |
-| 6 | **no rejection lands a plan where it could skip a gate forward** | for every rejection target, assert `crossesHumanGate(target, originalStage)` is TRUE whenever the original stage was reached through a gate — the plan must re-cross to get back |
+| 6 | **REPLACED — the finish line is unreachable from any rejection target without a gate** | for EVERY stage in `STAGE_ORDER`, compute `target = STAGE_ORDER[i-1]` and assert `crossesHumanGate(target, 'done') === true`. Non-vacuous for every target including `in-progress`, and it asserts the property that actually matters. The old case 6 was conditional on "the original stage was reached through a gate", which is FALSE for `review` — so it never fired on the only path that runs |
+| 6b | **the gate-free leg is pinned as a known, bounded fact** | `crossesHumanGate('in-progress','review') === false` AND `crossesHumanGate('in-progress','done') === true` — asserted together, so the leg that is gate-free is documented as such and the span rule that closes it is proven in the same case |
 | 7 | **a rejection target is never a gate destination the plan has not earned** | for each target, either it is not in `GATE_DESTINATIONS`, or the plan has a valid ledger entry for it; asserted against the real `gate-order` values |
 | 8 | reject from `functional` refuses | no move, a clear error, the file unchanged on disk |
 | 9 | reject from an unknown stage refuses | fail closed, no move |
@@ -263,23 +392,25 @@ a gate could be skipped. A one-constant fix satisfies at most one of each pair.
 | 17 | feedback with a newline does not corrupt the frontmatter | `parseMetadata` still parses; `rejection_reason` is single-line |
 | 18 | feedback with a quote at the truncation boundary | no dangling escape; frontmatter parses |
 | 19 | a control character in feedback is stripped | no escape sequence reaches the file |
-| 20 | ordering under failure | with the move forced to throw, the plan is not left with a surviving ledger entry |
+| 20 | **a FAILED ledger withdrawal ABORTS the rejection** | with `removeEntry` forced to throw: the plan is NOT moved, it stays at its original stage, its content is unchanged or safely rewritten-in-place, and the error reaches the caller. The swallow must be absent — a passing test here with a silent catch is the D4 bypass reopened |
+| 21 | **the rejected plan's write priority is the documented one** | a plan rejected to `in-progress` wins the coverage-stack contest against a `todo` plan declaring the same path — pins `plan-coverage.js:32`'s `STAGE_PRIORITY` as deliberate, not incidental |
 
 Cross-platform: `fs.promises`, `path.join`, `os.tmpdir()`; teardown with
 `fs.promises.rm(root, { recursive: true, force: true })`.
 
 ## Execution Plan (Steps 8-16)
 
-### Step 8: TEST — write the file in full, run ONLY it, record red verbatim. Cases 1, 5, 6, 10, 11, 13, 14, 15, 17 and 18 MUST be red. Cases 2, 3 and 4 will be red for a different reason than case 1 (today every stage yields `functional`), and case 5's table form is what makes a single-constant fix insufficient — confirm in the report that changing the literal `'functional'` to any other single literal still fails case 5.
-### Step 9: PREPARE — read from disk in full: `src/lib/actions.js` `rejectPlan`, `movePlan`, `addApprovalMarker` and `stampAndLedger`; `src/lib/gate-order.js`; `src/tabs/review.js`'s reject action; and the frontmatter-region derivation used elsewhere (`stale-detector.extractFrontmatterRegion`). Settle two facts and record both: whether a `plans/in-progress/` directory exists or `movePlan` creates it (the project documents in-progress as a frontmatter state, so if the directory is not a valid move target this plan's Gate 3 answer must be revisited before implementing — STOP and report rather than inventing a target), and whether `movePlan` performs its own gate check that would refuse a backward move.
+### Step 8: TEST — write the file in full, run ONLY it, record red verbatim. Cases 1, 5, 6, 6b, 10, 11, 13, 14, 15, 17, 18 and 20 MUST be red. Cases 2, 3 and 4 will be red for a different reason than case 1 (today every stage yields `functional`), and case 5's table form is what makes a single-constant fix insufficient — confirm in the report that changing the literal `'functional'` to any other single literal still fails case 5. Case 6 must be verified NON-VACUOUS: assert it fires for every stage, including `in-progress`, rather than passing on a false precondition.
+### Step 9: PREPARE — read from disk in full: `src/lib/actions.js` `rejectPlan`, `movePlan`, `addApprovalMarker` and `stampAndLedger`; `src/lib/gate-order.js`; `src/tabs/review.js`'s reject action; `src/lib/plan-coverage.js:20-40` (the `STAGE_PRIORITY` property case 21 pins); the frontmatter-region derivation used elsewhere (`stale-detector.extractFrontmatterRegion`); and both existing `removeEntry` call sites (`actions.js:387`, `streaming-gate.js:435`) so the deliberate divergence from their best-effort convention is written with them in view. Confirm whether `movePlan` performs its own gate check that would refuse a backward move. **NOTE: `src/lib/approval-ledger.js` contains a NUL byte, so ripgrep classifies it as binary and a content search returns NOTHING silently — read it with `Read`, never with a grep, or you will conclude functions do not exist when they do.**
 ### Step 10: IMPLEMENT — one step, files as sub-items.
-  - `src/lib/actions.js` — items 1-6 (stage-aware one-back target with the refuse-on-unknown guard; frontmatter-preserving rewrite; approval-marker strip; ledger withdrawal; safe feedback encoding; the write→withdraw→move ordering).
-### Step 11: REVIEW — confirm no path computes a target more than one index back, and no path uses `sourceOf`. Grep for any other unconditional `movePlan(..., '<literal>')` in the file and justify each. Confirm the rewrite leaves byte zero as `-`, and that a rejected plan round-trips through `parseMetadata` with its `files:` intact.
+  - `src/lib/actions.js` — items 1-6 (stage-aware one-back target with the refuse-on-unknown guard; frontmatter-preserving rewrite; approval-marker strip; **abort-on-failure** ledger withdrawal; safe feedback encoding; the write→withdraw→move ordering).
+  - `CLAUDE.md` — both documented test-file counts, read live from disk (Step 15).
+### Step 11: REVIEW — confirm no path computes a target more than one index back, and no path uses `sourceOf`. Grep for any other unconditional `movePlan(..., '<literal>')` in the file and justify each. Confirm the rewrite leaves byte zero as `-`, and that a rejected plan round-trips through `parseMetadata` with its `files:` intact. **Confirm the ledger withdrawal has NO silent catch and that its comment states why it diverges from the two best-effort sites.**
 ### Step 12: OPTIMIZE — one read, one write, one move; no re-read of the plan after the rewrite.
-### Step 13: SECURE — the feedback string is human input written into YAML and into the plan body: truncate, strip control characters and newlines, then escape, in that order. Confirm the ledger withdrawal cannot be induced to remove a *different* plan's entry (the slug comes from `slugFromPlanPath`, which carries the traversal guard). Confirm no path can leave a plan resident at a gate destination with a stale entry.
-### Step 14: VERIFY — `node --test tests/reject-plan-stage-aware.test.js tests/actions*.test.js tests/gate*.test.js tests/human-gate*.test.js` green, then the full gated run `npm test`. Lint both files. No git operations.
-### Step 15: DOCUMENT — the function's doc comment states the one-stage-back rule, states explicitly that `sourceOf` is the wrong function here and why, and records that rejection withdraws the ledger entry. Note the audit trade-off of removal.
-### Step 16: FINAL-REVIEW — report files, tests, red and green evidence verbatim, the two Step 9 findings, and every decision taken under ambiguity.
+### Step 13: SECURE — the feedback string is human input written into YAML and into the plan body: truncate, strip control characters and newlines, then escape, in that order. Confirm the ledger withdrawal cannot be induced to remove a *different* plan's entry (the slug comes from `slugFromPlanPath`, which carries the traversal guard). Confirm no path can leave a plan resident at a gate destination with a stale entry. **Re-run the safety derivation in the plan text above against the live `gate-order.js` and confirm every row of the table still holds; if any row has changed, the code wins and this slice STOPS for a human ruling on the target.**
+### Step 14: VERIFY — `node --test tests/reject-plan-stage-aware.test.js tests/actions*.test.js tests/gate*.test.js tests/human-gate*.test.js tests/plan-coverage*.test.js tests/doc-counts.test.js` green, then the full gated run `npm test`. Lint both JavaScript files. No git operations.
+### Step 15: DOCUMENT — the function's doc comment states the one-stage-back rule, states explicitly that `sourceOf` is the wrong function here and why, records that rejection withdraws the ledger entry and that a failed withdrawal aborts the rejection, and records the `in-progress` write-priority property. Note the audit trade-off of removal. **Then update `CLAUDE.md`'s documented test-file count in BOTH places (the "Run all N test files" line and the "tests/  N test files" project-structure line), reading the live count from disk first.** Adding this slice's test file moves that count, and `tests/doc-counts.test.js` compares it against disk.
+### Step 16: FINAL-REVIEW — report files, tests, red and green evidence verbatim, the Step 9 findings, the Step 13 re-derivation result, the before/after documented test-file count, and every decision taken under ambiguity.
 
 ## Decisions Taken Under Ambiguity
 
@@ -313,12 +444,62 @@ Cross-platform: `fs.promises`, `path.join`, `os.tmpdir()`; teardown with
 7. **Write, then withdraw the ledger entry, then move.** A crash between steps
    leaves a rejected plan with no approval record, which is safe. The reverse
    ordering could leave an approved-looking plan at a new stage.
-8. **One fact is named as unresolved rather than assumed.** Whether `in-progress`
-   is a valid move target is decided by `movePlan` and the plans directory layout,
-   and the project documents in-progress as a frontmatter state rather than a
-   directory. Step 9 settles it and STOPS if it is not a valid target, instead of
-   inventing a different Gate 3 answer mid-build.
-9. **Case 5 is table-driven on purpose.** The brief asked for pairing so that a
+8. **Case 5 is table-driven on purpose.** The brief asked for pairing so that a
    constant swap cannot pass; a per-stage table plus the forward-skip assertion
    (case 6) means any fix that is not genuinely stage-aware fails at least one
    case in every pair.
+9. **THE SAFETY CHALLENGE IS REJECTED ON THE ARITHMETIC, and the derivation is
+   written into the plan.** An adversarial review held that `in-progress` lets a
+   rejected plan "reach the finish line having re-crossed nothing." Re-derived from
+   `gate-order.js`: `in-progress → review` is indeed gate-free, but `review` is not
+   the finish line — `crossesHumanGate('review','done')` and
+   `crossesHumanGate('in-progress','done')` are both TRUE, so **every** path from
+   the target to `done` crosses Gate 3. Combined with D3 (marker stripped) and D4
+   (entry removed), a rejected plan must earn a **fresh** Gate 3 decision:
+   `classifyResidency` returns `no-ledger-entry` and fails closed. The stated bar —
+   no finish line without a human decision — is met. The target stands. Where a
+   critique and the code disagree, the code wins; that rule cuts both ways, and it
+   cut this way here.
+10. **The ledger-withdrawal contradiction is resolved TOWARD ABORT, and the
+    "best-effort" phrasing is withdrawn.** The plan previously said both
+    "best-effort by that function's existing contract" and "never swallowed
+    silently" in one item. Both existing call sites (`actions.js:387`,
+    `streaming-gate.js:435`) swallow, so "the existing contract" resolved to the
+    swallow and an executor matching house style would have reproduced it —
+    hiding exactly the failure that leaves the stale record D4 exploits. A failed
+    withdrawal now aborts the rejection before the move; rejected-but-unmoved is the
+    safe failure state. The divergence from the other two sites is deliberate, is
+    stated in the code comment, and case 20 pins it.
+11. **An unresolved fact is now RESOLVED: `in-progress` IS a valid move target.**
+    The previous decision 8 deferred this to Step 9 with an instruction to stop if
+    it turned out false. Verified directly: `src/lib/actions.js` builds
+    `path.join(plansDir, 'in-progress', ...)` at `:1061` and `startPlan` calls
+    `movePlan(planPath, 'in-progress', root)` at `:847`. The directory is a real,
+    live move target used by the running scheduler. The Step 9 stop-condition is
+    therefore removed as satisfied rather than left dangling.
+12. **Test case 6 is REPLACED, not tightened, because it was vacuous where it
+    mattered.** It asserted `crossesHumanGate(target, originalStage)` conditioned on
+    "the original stage was reached through a gate" — false for `review`, so it
+    never fired on the headline path. It also asserted the wrong property. The
+    replacement asserts `crossesHumanGate(target, 'done')` for every stage, which is
+    non-vacuous everywhere and is the property the safety bar actually names. Case
+    6b additionally pins the gate-free leg as a known bounded fact so it can never
+    be discovered again as if it were a surprise.
+13. **The `in-progress` write-priority property is recorded and pinned rather than
+    treated as a hazard.** `plan-coverage.js:32` puts `in-progress` first in
+    `STAGE_PRIORITY`, so a rejected plan holds top write priority. That is a
+    *scoping* rule, not an approval rule, and it grants no crossing; a plan being
+    rebuilt should own its declared files. Case 21 pins it so the behaviour is
+    deliberate and visible.
+14. **`CLAUDE.md` IS NOW DECLARED — this plan was found by a MECHANISM, not a
+    reviewer.** The check specified in
+    `plans/todo/00082-ratchet-files-are-in-scope-by-rule.md` fires when a plan
+    CREATES an artifact whose count `tests/doc-counts.test.js` verifies against
+    disk, and the plan does not declare `CLAUDE.md`. This plan creates
+    `tests/reject-plan-stage-aware.test.js` and declared only two files, so at
+    Step 14 `doc-counts` would have gone red on a count this plan itself moved,
+    in a file the executor was not permitted to edit — the precise deadlock the
+    ratchet slice exists to remove, sitting in the approved queue. It is the
+    mechanism's first catch and its non-vacuity evidence (`00082`'s test case 10
+    fails today because of this plan). Scope is unchanged; one declaration and one
+    documentation edit are added.

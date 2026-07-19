@@ -1,0 +1,9 @@
+{
+  "content_sha256": "8cf53dd238340ace6e6f0da341f7e72faf8270133b9e37ba632ea1f637dc8254",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T15:29:41.453Z",
+  "approved_by": "human",
+  "plan_basename": "00096-two-scheduler-guarantees-that-no-test-defends"
+}
