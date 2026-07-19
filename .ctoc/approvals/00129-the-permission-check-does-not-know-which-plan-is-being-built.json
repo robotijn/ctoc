@@ -1,0 +1,9 @@
+{
+  "content_sha256": "388fa3e0ae38c90ce04959e2a5cd5576033f8eabc766c29d2a012f3759591600",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T21:31:41.245Z",
+  "approved_by": "human",
+  "plan_basename": "00129-the-permission-check-does-not-know-which-plan-is-being-built"
+}

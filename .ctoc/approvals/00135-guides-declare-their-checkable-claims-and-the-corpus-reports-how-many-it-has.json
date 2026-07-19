@@ -1,0 +1,9 @@
+{
+  "content_sha256": "b249dcdc51807acce0c36b55a391792daa4f66a72d9be8d6f9c53d0048a8a6a5",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T21:33:26.631Z",
+  "approved_by": "human",
+  "plan_basename": "00135-guides-declare-their-checkable-claims-and-the-corpus-reports-how-many-it-has"
+}

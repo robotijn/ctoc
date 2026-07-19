@@ -533,11 +533,20 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
     // One-time scaffold (CLAUDE.md, .ctoc/settings, .ctoc/state, .gitignore)
     // that runs BEFORE any cache exists — nothing to invalidate.
     ['init-project.js', 'one-time project scaffold before any cache exists; writes CLAUDE.md/.ctoc/settings/.gitignore, no plan/vision/inbox file'],
-    // Edits a plan file IN PLACE (appends "## Execution Plan"/"## Deferred
-    // Questions" to an existing plan). Never creates/deletes/moves a plan file,
-    // so the plan-stage counts are invariant — an in-place body edit changes
-    // content, not the count.
-    ['iron-loop.js', 'edits an existing plan body in place (appends step sections); never creates/deletes/moves a plan file, so counts are invariant'],
+    // (iron-loop.js is no longer whitelisted, and the removal is a FENCE FINDING,
+    // not collateral damage from the edit that exposed it. The broad detector ever
+    // only flagged that file on a SINGLE count-relevant token, and the token was the
+    // word "plans" in a COMMENT — `// Early exit for practical purposes - accept
+    // good enough plans` — on the critic's early-accept branch. A word in a comment
+    // was never evidence of a write target, so the exemption was dead weight from
+    // the day it was written; it simply could not be seen while the comment existed.
+    // Deleting that branch (the self-grading critic, 2026-07-19) did not create this
+    // — it let the whitelist-honesty test finally report the truth. The module's
+    // stated justification remains factually true (it appends "## Execution Plan"/
+    // "## Deferred Questions" to an EXISTING plan and never creates, deletes or
+    // moves a plan file, so the counts are invariant), but a true justification for
+    // an exemption nothing needs is still dead weight, and dead weight on a
+    // whitelist is what masks a real writer later. Removing it TIGHTENS the fence.)
     // Records kickback counters by rewriting the plan's own frontmatter back to
     // the SAME planPath (recordKickback: readFileSync → writeFileSync(planPath)).
     // Never creates/deletes/moves a plan file, so the plan-stage counts are

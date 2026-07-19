@@ -2,18 +2,23 @@
  * Iron Loop — hard coverage tests (failure-first, edge-case).
  *
  * These tests drive the REAL exported functions of src/lib/iron-loop.js against
- * real temp-dir plan fixtures. They deliberately avoid the "simulated" pattern in
- * tests/iron-loop.test.js (which re-implements the logic inline and never calls the
- * module — false green). Every test here calls the actual module and asserts on the
- * value it returns or the file it writes.
+ * real temp-dir plan fixtures. Every test here calls the actual module and asserts
+ * on the value it returns or the file it writes.
  *
- * Coverage targets: hasIronLoopSteps missing-file guard, integrate (throw + section
- * extraction, both truthy and empty branches), generateExecutionPlan (item + else
- * branches), extractCheckboxItems / extractActionItems, critique (no-plan branch,
- * every feedback branch, throw), all five score* helpers via critique (wrong label,
- * missing step, duplicate IMPLEMENT, checkbox floor, vague clarity, edge/security
- * pattern accumulation, duplicate-line efficiency), refineLoop (throw, append,
- * all-perfect, avg>=4, max-rounds), appendDeferredQuestions (empty guard + append).
+ * Coverage targets: integrate (throw + section extraction, both truthy and empty
+ * branches), generateExecutionPlan (item + else branches), extractCheckboxItems /
+ * extractActionItems, critique (throw, absent section, canonical plan, mislabeled
+ * versus absent step, duplicate IMPLEMENT), refineLoop (throw, append, the single
+ * not-evaluated status, structural findings, ignored maxRounds),
+ * appendDeferredQuestions (empty guard + append + provenance line).
+ *
+ * DELETED WITH THEIR CODE (the one sanctioned reason to delete a test): the
+ * hasIronLoopSteps / validateForTodo cases, and every case asserting a numeric
+ * dimension score. validateForTodo had zero callers and checked a marker this
+ * module never writes; the five score* helpers graded the boilerplate template that
+ * this same module had just appended to the plan. The companion file
+ * tests/iron-loop-reports-no-evaluation.test.js pins the honest verdict that
+ * replaced them.
  */
 
 'use strict';
@@ -25,8 +30,6 @@ const path = require('node:path');
 const os = require('node:os');
 
 const {
-  hasIronLoopSteps,
-  validateForTodo,
   integrate,
   critique,
   refineLoop,
@@ -86,27 +89,6 @@ const PERFECT_EXEC_PLAN = `# Plan
 ### Step 16: FINAL-REVIEW
 - [ ] Confirm ready for human review
 `;
-
-// ---------------------------------------------------------------------------
-// hasIronLoopSteps — missing-file guard (lines 22-23)
-// ---------------------------------------------------------------------------
-
-test('hasIronLoopSteps returns false when the plan file does not exist', () => {
-  // Arrange / Act
-  const result = hasIronLoopSteps(missingPath());
-
-  // Assert — the existsSync guard short-circuits before any read
-  assert.equal(result, false);
-});
-
-test('validateForTodo is invalid when the plan file does not exist', () => {
-  // Act
-  const result = validateForTodo(missingPath());
-
-  // Assert
-  assert.equal(result.valid, false);
-  assert.match(result.error, /missing Iron Loop steps/i);
-});
 
 // ---------------------------------------------------------------------------
 // integrate — throw + section extraction
@@ -216,58 +198,66 @@ test('extractActionItems captures only Create/Add/Modify/Update/Implement/Write 
 });
 
 // ---------------------------------------------------------------------------
-// critique — no-plan branch + throw
+// critique — throw + the honest not-evaluated report
+//
+// HISTORY: every case below that asserted a NUMERIC dimension score was deleted
+// with the code that produced it. The five score* helpers computed their numbers by
+// grepping the boilerplate template that generateExecutionPlan had just appended to
+// the same file, so the cases pinned self-grading, not quality. Where a real,
+// checkable behaviour survives (which step labels are present, which are wrong, how
+// many IMPLEMENT steps exist) the case is REPLACED by a tighter assertion on the
+// structural report — never loosened to make red go green.
 // ---------------------------------------------------------------------------
 
 test('critique throws when the plan file is missing', () => {
   assert.throws(() => critique(missingPath()), /Plan file not found/);
 });
 
-test('critique returns all-ones and a completeness finding when no execution plan section exists', () => {
+test('critique reports the absent execution section as a fact, inventing no scores', () => {
   const { file, dir } = makePlan('# Plan\n\nNo execution plan section at all.\n');
   try {
     // Act
     const result = critique(file);
 
-    // Assert
-    assert.deepEqual(result.scores, {
-      completeness: 1, clarity: 1, edgeCases: 1, efficiency: 1, security: 1
-    });
-    assert.equal(result.feedback.length, 1);
-    assert.equal(result.feedback[0].dimension, 'completeness');
-    assert.match(result.feedback[0].suggestion, /integrate\(\) first/);
+    // Assert — the old code returned all-ones here: a numeric verdict on a section
+    // it never read. Absence is now reported as absence.
+    assert.equal(result.structural.hasExecutionPlan, false);
+    assert.equal(result.scores, null);
+    assert.equal(result.evaluated, false);
+    assert.equal(result.stub, true);
+    assert.deepEqual(result.feedback, []);
+    // With no section, every canonical step is honestly missing.
+    assert.deepEqual(result.structural.missingSteps, [8, 9, 10, 11, 12, 13, 14, 15, 16]);
+    assert.deepEqual(result.structural.mislabeledSteps, []);
+    assert.equal(result.structural.implementStepCount, 0);
   } finally {
     rimraf(dir);
   }
 });
 
-// ---------------------------------------------------------------------------
-// critique — perfect plan (all 5, no feedback)
-// ---------------------------------------------------------------------------
-
-test('critique scores a canonical plan 5 on every dimension with no feedback', () => {
+test('critique reports no missing and no mislabeled step for a canonical plan', () => {
   const { file, dir } = makePlan(PERFECT_EXEC_PLAN);
   try {
     // Act
-    const { scores, feedback } = critique(file);
+    const result = critique(file);
 
-    // Assert
-    assert.deepEqual(scores, {
-      completeness: 5, clarity: 5, edgeCases: 5, efficiency: 5, security: 5
-    });
-    assert.equal(feedback.length, 0);
+    // Assert — a GOOD plan gets exactly the same honest verdict as a bad one,
+    // because nothing evaluated either.
+    assert.equal(result.structural.hasExecutionPlan, true);
+    assert.deepEqual(result.structural.missingSteps, []);
+    assert.deepEqual(result.structural.mislabeledSteps, []);
+    assert.equal(result.structural.implementStepCount, 1);
+    assert.equal(result.scores, null);
+    assert.equal(result.evaluated, false);
+    assert.match(result.warning, /NOT EVALUATED/);
   } finally {
     rimraf(dir);
   }
 });
 
-// ---------------------------------------------------------------------------
-// critique — a plan that fails EVERY dimension (all five feedback branches)
-// ---------------------------------------------------------------------------
-
-test('critique emits feedback on all five dimensions for a broken execution plan', () => {
-  // wrong label (completeness 0), vague "do task" (clarity down),
-  // no edge patterns (edge 3), duplicate lines (efficiency down), no security patterns (sec 3)
+test('critique separates a MISLABELED step from an ABSENT one', () => {
+  // Step 8 exists under the wrong label (BUILD); every other step is simply absent.
+  // Collapsing both into one number is what the old completeness score did.
   const bad = `# Plan
 
 ## Execution Plan (Steps 8-16)
@@ -279,40 +269,19 @@ test('critique emits feedback on all five dimensions for a broken execution plan
   const { file, dir } = makePlan(bad);
   try {
     // Act
-    const { scores, feedback } = critique(file);
+    const result = critique(file);
 
-    // Assert — wrong label forces completeness to the blocking 0
-    assert.equal(scores.completeness, 0);
-    const dims = feedback.map(f => f.dimension).sort();
-    assert.deepEqual(dims, ['clarity', 'completeness', 'edgeCases', 'efficiency', 'security']);
+    // Assert
+    assert.deepEqual(result.structural.mislabeledSteps, [8]);
+    assert.deepEqual(result.structural.missingSteps, [9, 10, 11, 12, 13, 14, 15, 16]);
+    assert.equal(result.structural.implementStepCount, 0);
+    assert.deepEqual(result.feedback, [], 'the hardcoded issue literals are gone');
   } finally {
     rimraf(dir);
   }
 });
 
-// ---------------------------------------------------------------------------
-// scoreCompleteness branches (via critique)
-// ---------------------------------------------------------------------------
-
-test('completeness collapses to 1 when most steps are simply absent (no wrong label)', () => {
-  // Only Step 8 present and correct; steps 9-16 missing entirely -> no label error,
-  // heavy deduction, and <9 checkboxes clamps at the floor of 1.
-  const plan = `## Execution Plan (Steps 8-16)
-
-### Step 8: TEST
-- [ ] Write tests
-`;
-  const { file, dir } = makePlan(plan);
-  try {
-    const { scores } = critique(file);
-    assert.equal(scores.completeness, 1);
-  } finally {
-    rimraf(dir);
-  }
-});
-
-test('completeness is penalised when a duplicate IMPLEMENT step appears', () => {
-  // All canonical labels correct + an extra IMPLEMENT -> implementMatches.length > 1 -> -2.
+test('critique counts a duplicated IMPLEMENT step (Step 10 is ONE step, files as sub-items)', () => {
   const plan = `## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
@@ -338,175 +307,24 @@ test('completeness is penalised when a duplicate IMPLEMENT step appears', () => 
 `;
   const { file, dir } = makePlan(plan);
   try {
-    const { scores } = critique(file);
-    // 5 (all labels present) - 2 (duplicate IMPLEMENT) = 3
-    assert.equal(scores.completeness, 3);
-  } finally {
-    rimraf(dir);
-  }
-});
-
-test('completeness drops by one when fewer than nine checkboxes accompany correct labels', () => {
-  // All 9 canonical labels present and correct but only 3 checkboxes total.
-  const plan = `## Execution Plan (Steps 8-16)
-
-### Step 8: TEST
-### Step 9: PREPARE
-### Step 10: IMPLEMENT
-- [ ] one
-### Step 11: REVIEW
-### Step 12: OPTIMIZE
-- [ ] two
-### Step 13: SECURE
-### Step 14: VERIFY
-### Step 15: DOCUMENT
-- [ ] three
-### Step 16: FINAL-REVIEW
-`;
-  const { file, dir } = makePlan(plan);
-  try {
-    const { scores } = critique(file);
-    // labels all correct -> 5; checkboxCount (3) < 9 -> max(1, 5-1) = 4
-    assert.equal(scores.completeness, 4);
+    const result = critique(file);
+    assert.equal(result.structural.implementStepCount, 2);
+    assert.deepEqual(result.structural.missingSteps, []);
+    assert.deepEqual(result.structural.mislabeledSteps, []);
   } finally {
     rimraf(dir);
   }
 });
 
 // ---------------------------------------------------------------------------
-// scoreClarity — every vague pattern drives the score to the floor
-// ---------------------------------------------------------------------------
-
-test('clarity is floored at 1 when all vague phrasings are present', () => {
-  const plan = `## Execution Plan (Steps 8-16)
-
-### Step 8: TEST
-- [ ] implement the feature quickly
-- [ ] do the task now
-- [ ] handle the things later
-- [ ] fix the issues found
-- [ ] update the stuff around it
-`;
-  const { file, dir } = makePlan(plan);
-  try {
-    const { scores } = critique(file);
-    // 5 vague patterns each -1 -> below 1 -> Math.max(1, ...) = 1
-    assert.equal(scores.clarity, 1);
-  } finally {
-    rimraf(dir);
-  }
-});
-
-// ---------------------------------------------------------------------------
-// scoreEdgeCases — accumulation cap and floor
-// ---------------------------------------------------------------------------
-
-test('edgeCases saturates at 5 when many edge patterns are present', () => {
-  const plan = `## Execution Plan (Steps 8-16)
-
-### Step 8: TEST
-- [ ] error handling
-- [ ] timeout guard
-- [ ] missing file case
-- [ ] invalid input case
-- [ ] empty state case
-- [ ] edge case coverage
-- [ ] validation added
-`;
-  const { file, dir } = makePlan(plan);
-  try {
-    const { scores } = critique(file);
-    assert.equal(scores.edgeCases, 5);
-  } finally {
-    rimraf(dir);
-  }
-});
-
-test('edgeCases stays at the neutral 3 when no edge patterns match', () => {
-  const plan = `## Execution Plan (Steps 8-16)
-
-### Step 8: TEST
-- [ ] build the module quietly
-`;
-  const { file, dir } = makePlan(plan);
-  try {
-    const { scores } = critique(file);
-    assert.equal(scores.edgeCases, 3);
-  } finally {
-    rimraf(dir);
-  }
-});
-
-// ---------------------------------------------------------------------------
-// scoreEfficiency — duplicate checkbox lines deduct
-// ---------------------------------------------------------------------------
-
-test('efficiency deducts for repeated identical checkbox actions', () => {
-  const plan = `## Execution Plan (Steps 8-16)
-
-### Step 8: TEST
-- [ ] run the same action
-- [ ] run the same action
-- [ ] run the same action
-`;
-  const { file, dir } = makePlan(plan);
-  try {
-    const { scores } = critique(file);
-    // 3 identical lines -> two duplicates -> 5 - 2 = 3
-    assert.equal(scores.efficiency, 3);
-  } finally {
-    rimraf(dir);
-  }
-});
-
-// ---------------------------------------------------------------------------
-// scoreSecurity — accumulation cap and floor
-// ---------------------------------------------------------------------------
-
-test('security saturates at 5 when many security patterns are present', () => {
-  const plan = `## Execution Plan (Steps 8-16)
-
-### Step 8: TEST
-- [ ] validate input
-- [ ] sanitize output
-- [ ] block path traversal
-- [ ] no secret in code
-- [ ] safe file operations
-- [ ] general security review
-`;
-  const { file, dir } = makePlan(plan);
-  try {
-    const { scores } = critique(file);
-    assert.equal(scores.security, 5);
-  } finally {
-    rimraf(dir);
-  }
-});
-
-test('security stays at the neutral 3 when no security patterns match', () => {
-  const plan = `## Execution Plan (Steps 8-16)
-
-### Step 8: TEST
-- [ ] render the output nicely
-`;
-  const { file, dir } = makePlan(plan);
-  try {
-    const { scores } = critique(file);
-    assert.equal(scores.security, 3);
-  } finally {
-    rimraf(dir);
-  }
-});
-
-// ---------------------------------------------------------------------------
-// refineLoop — throw + append + terminal statuses
+// refineLoop — throw + append + the single terminal status
 // ---------------------------------------------------------------------------
 
 test('refineLoop throws when the plan file is missing', () => {
   assert.throws(() => refineLoop(missingPath()), /Plan file not found/);
 });
 
-test('refineLoop appends a generated execution plan when none exists and returns a score', () => {
+test('refineLoop appends a generated execution plan when none exists and reports not-evaluated', () => {
   // Real integrate path: no exec plan section present -> it must be appended + written.
   const content = `# Plan
 
@@ -523,9 +341,10 @@ test('refineLoop appends a generated execution plan when none exists and returns
     // Act
     const result = refineLoop(file, 3);
 
-    // Assert — a score-passed terminal status and the plan now carries the section
-    assert.equal(result.status, 'score-passed');
-    assert.ok(result.rounds >= 1);
+    // Assert — the append is the one piece of real work; the verdict is honest.
+    assert.equal(result.status, 'not-evaluated');
+    assert.equal(result.rounds, 1);
+    assert.equal(result.scores, null);
     const onDisk = fs.readFileSync(file, 'utf8');
     assert.ok(onDisk.includes('## Execution Plan (Steps 8-16)'), 'section must be appended to disk');
   } finally {
@@ -533,124 +352,68 @@ test('refineLoop appends a generated execution plan when none exists and returns
   }
 });
 
-test('refineLoop returns score-passed on the first round when the seeded plan is perfect', () => {
-  // Pre-seed a perfect plan -> no append -> critique yields all 5 -> allPerfect branch.
+test('refineLoop returns not-evaluated for a canonical plan — a good plan is not graded either', () => {
+  // Pre-seed a perfect plan -> no append -> still not evaluated. There is no
+  // "all scores 5" branch to take, because there are no scores.
   const { file, dir } = makePlan(PERFECT_EXEC_PLAN);
   try {
     // Act
     const result = refineLoop(file, 5);
 
     // Assert
-    assert.equal(result.status, 'score-passed');
+    assert.equal(result.status, 'not-evaluated');
     assert.equal(result.rounds, 1);
-    assert.deepEqual(result.scores, {
-      completeness: 5, clarity: 5, edgeCases: 5, efficiency: 5, security: 5
-    });
-    assert.equal(result.note, undefined, 'perfect plan takes the all-perfect branch, not the avg branch');
+    assert.equal(result.scores, null);
+    assert.equal(result.evaluated, false);
+    assert.equal(result.stub, true);
+    assert.equal(result.note, undefined, 'there is no "score >= 4" note, because there is no score');
   } finally {
     rimraf(dir);
   }
 });
 
-test('refineLoop takes the average>=4 branch and carries the not-an-approval note', () => {
-  // Perfect except one vague clarity line -> clarity 4, avg 4.8 -> avg>=4 branch with note.
-  const plan = PERFECT_EXEC_PLAN.replace(
-    '- [ ] Build the parser module',
-    '- [ ] implement the feature according to spec'
-  );
-  const { file, dir } = makePlan(plan);
-  try {
-    // Act
-    const result = refineLoop(file, 5);
-
-    // Assert
-    assert.equal(result.status, 'score-passed');
-    assert.equal(result.scores.clarity, 4);
-    assert.match(result.note, /SCORE, not an approval/);
-  } finally {
-    rimraf(dir);
-  }
-});
-
-test('refineLoop accepts a plan whose average is exactly 4 (pins the >= 4 boundary)', () => {
-  // Engineered so every dimension scores exactly 4 -> average 4.0.
-  //   completeness 4: all 9 labels correct, single IMPLEMENT, 5 checkboxes (<9 -> -1)
-  //   clarity 4:      exactly one vague phrase ("implement the feature")
-  //   edgeCases 4:    two edge hits (timeout, validation) -> round(3 + 1.0) = 4
-  //   efficiency 4:   exactly one duplicated checkbox line -> 5 - 1
-  //   security 4:     two security hits (validate input, sanitize) -> round(3 + 1.0) = 4
-  // A `> 4` mutant would drop through to max-rounds; a `>= 4` keeps score-passed.
-  const plan = `## Execution Plan (Steps 8-16)
-
-### Step 8: TEST
-- [ ] implement the feature with timeout handling
-### Step 9: PREPARE
-- [ ] validate input and sanitize the payload
-### Step 10: IMPLEMENT
-- [ ] add validation checks
-### Step 11: REVIEW
-- [ ] repeat this exact step
-### Step 12: OPTIMIZE
-- [ ] repeat this exact step
-### Step 13: SECURE
-### Step 14: VERIFY
-### Step 15: DOCUMENT
-### Step 16: FINAL-REVIEW
-`;
-  const { file, dir } = makePlan(plan);
-  try {
-    // Act
-    const result = refineLoop(file, 3);
-
-    // Assert — the boundary case is admitted, and every score is exactly 4
-    assert.equal(result.status, 'score-passed');
-    assert.deepEqual(result.scores, {
-      completeness: 4, clarity: 4, edgeCases: 4, efficiency: 4, security: 4
-    });
-    assert.match(result.note, /SCORE, not an approval/);
-  } finally {
-    rimraf(dir);
-  }
-});
-
-test('refineLoop exhausts maxRounds and returns deferred questions for a low-scoring plan', () => {
-  // Seeded plan with a wrong label -> completeness 0, avg < 4 every round -> max-rounds.
+test('refineLoop surfaces structural findings in its deferred question, as integers only', () => {
+  // A plan with one mislabeled step and the rest absent: those are real, checkable
+  // facts about the file and are worth putting in front of the human at Gate 2.
   const plan = `## Execution Plan (Steps 8-16)
 
 ### Step 8: BUILD
 - [ ] do the task
-- [ ] do the task
 `;
   const { file, dir } = makePlan(plan);
   try {
-    // Act — small maxRounds keeps the test fast while still exercising the loop
+    // Act
     const result = refineLoop(file, 2);
 
     // Assert
-    assert.equal(result.status, 'max-rounds');
-    assert.equal(result.rounds, 2);
-    assert.ok(Array.isArray(result.deferredQuestions));
-    assert.ok(result.deferredQuestions.length > 0);
-    assert.ok('dimension' in result.deferredQuestions[0]);
-    assert.ok('feedback' in result.deferredQuestions[0]);
+    assert.equal(result.status, 'not-evaluated');
+    assert.equal(result.deferredQuestions.length, 1);
+    const q = result.deferredQuestions[0];
+    assert.equal(q.dimension, 'evaluation');
+    assert.match(q.feedback, /NOT EVALUATED/);
+    assert.match(q.feedback, /no Step 9, 10, 11, 12, 13, 14, 15, 16 found/);
+    assert.match(q.feedback, /Step 8 present under a non-canonical label/);
+    // Only integers are interpolated — never a line of plan content.
+    assert.equal(q.feedback.includes('do the task'), false);
   } finally {
     rimraf(dir);
   }
 });
 
-test('refineLoop with maxRounds 0 skips the loop and returns null scores with no questions', () => {
-  // Edge: the loop body never runs, so lastCritique stays null and the max-rounds
-  // return must fall back to scores:null / deferredQuestions:[] without throwing.
+test('refineLoop ignores maxRounds honestly: 0 does not skip the work and rounds is always 1', () => {
+  // The old code treated maxRounds as a real loop bound, so 0 skipped the body
+  // entirely and returned a null-score "max-rounds" verdict. There is no loop now;
+  // the parameter is accepted for signature compatibility and documented as ignored.
   const { file, dir } = makePlan(PERFECT_EXEC_PLAN);
   try {
     // Act
     const result = refineLoop(file, 0);
 
     // Assert
-    assert.equal(result.status, 'max-rounds');
-    assert.equal(result.rounds, 0);
+    assert.equal(result.status, 'not-evaluated');
+    assert.equal(result.rounds, 1);
     assert.equal(result.scores, null);
-    assert.deepEqual(result.deferredQuestions, []);
+    assert.equal(result.deferredQuestions.length, 1);
   } finally {
     rimraf(dir);
   }
@@ -676,7 +439,7 @@ test('appendDeferredQuestions leaves the plan untouched when the list is empty',
   }
 });
 
-test('appendDeferredQuestions writes a Deferred Questions section with every entry', () => {
+test('appendDeferredQuestions writes a Deferred Questions section that names its own provenance', () => {
   const { file, dir } = makePlan('# Plan\n\nbody\n');
   try {
     // Act
@@ -690,6 +453,9 @@ test('appendDeferredQuestions writes a Deferred Questions section with every ent
     assert.ok(onDisk.includes('## Deferred Questions'));
     assert.ok(onDisk.includes('**clarity**: Step 10 remains vague'));
     assert.ok(onDisk.includes('**security**: No input validation listed'));
+    // The provenance line is the repair: an entry here used to read as a finding
+    // someone derived from the plan.
+    assert.match(onDisk, /performs NO\nquality evaluation/);
   } finally {
     rimraf(dir);
   }

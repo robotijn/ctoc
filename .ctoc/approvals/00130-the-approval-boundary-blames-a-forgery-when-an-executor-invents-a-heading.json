@@ -1,0 +1,9 @@
+{
+  "content_sha256": "4c520eacf1d9b760c4c5fb7d97e8bd9ddf843d18190fa295dd44b0a832583181",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T21:23:46.382Z",
+  "approved_by": "human",
+  "plan_basename": "00130-the-approval-boundary-blames-a-forgery-when-an-executor-invents-a-heading"
+}

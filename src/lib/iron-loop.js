@@ -7,102 +7,14 @@ const safeFs = require('./safe-fs');
 const { safeRegExp } = require('./regex-utils');
 
 /**
- * Marker for Iron Loop execution steps section.
+ * The one sentence this module is entitled to say about plan quality.
+ *
+ * Nothing here evaluates a plan. Saying so out loud, in the verdict and in the plan
+ * file, is the whole deliverable of this module's honesty repair.
  * @type {string}
  */
-const IRON_LOOP_MARKER = '## Execution Steps (Iron Loop 8-16)';
-
-/**
- * Check if plan has Iron Loop steps.
- * @param {string} planPath - Path to the plan file
- * @returns {boolean} True if plan contains Iron Loop steps marker
- */
-function hasIronLoopSteps(planPath) {
-  if (!safeFs.existsSync(planPath)) {
-    return false;
-  }
-  const content = safeFs.readFileSync(planPath, 'utf8');
-  return content.includes(IRON_LOOP_MARKER);
-}
-
-/**
- * Validate plan can move to todo.
- * @param {string} planPath - Path to the plan file
- * @returns {{valid: boolean, error?: string}} Validation result
- */
-function validateForTodo(planPath) {
-  if (!hasIronLoopSteps(planPath)) {
-    return {
-      valid: false,
-      error: 'Plan missing Iron Loop steps 8-16. Generate them first.'
-    };
-  }
-  return { valid: true };
-}
-
-/**
- * Generate Iron Loop steps template.
- * @param {string} planContent - The plan content (unused but available for context)
- * @returns {string} Markdown string with steps 8-16 template
- */
-function generateIronLoopTemplate(planContent) {
-  return `
-
----
-
-${IRON_LOOP_MARKER}
-
-### Step 8: TEST (TDD Red)
-- [ ] Write failing tests for new functionality
-- [ ] Test expected behavior
-- [ ] Test error conditions
-- [ ] Verify tests fail for the right reasons
-
-### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
-
-### Step 10: IMPLEMENT
-- [ ] Implement ALL code changes to pass tests
-- [ ] Add error handling
-- [ ] Wire up integrations
-- [ ] Follow existing code patterns
-
-### Step 11: REVIEW
-- [ ] Self-review all changes
-- [ ] Check integration points
-- [ ] Verify error handling completeness
-
-### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
-
-### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] No secrets in code
-- [ ] Safe file operations
-
-### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
-
-### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add code comments where non-obvious
-- [ ] Update CHANGELOG if needed
-
-### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
-`;
-}
+const NO_EVALUATION_WARNING =
+  'NOT EVALUATED — no automated critique was performed on this plan.';
 
 /**
  * Generate execution steps (8-16) for a plan.
@@ -259,10 +171,30 @@ function extractActionItems(text) {
 }
 
 /**
- * Score execution plan on 5 dimensions.
+ * Report on a plan's execution section — WITHOUT scoring it.
+ *
+ * This function does NOT evaluate plan quality and does not pretend to. The five
+ * 1-to-5 dimension scores it used to return were computed by grepping the
+ * boilerplate template that `generateExecutionPlan` had just appended to the same
+ * file, so `security: 5` meant "the template contains the word sanitize", not "this
+ * plan is secure" — and every plan received the same five numbers. The clarity score
+ * was even DOCKED a point because the template's own fallback line ("Implement the
+ * feature according to requirements") matched the critic's own vague-language
+ * pattern: the critic penalised the plan for a sentence the critic wrote. A verdict
+ * computed from input the function itself produced is a verdict on nothing.
+ *
+ * What IS returned is the structural fact the caller can act on: which canonical
+ * Step 8-16 labels are present, which are present with the wrong label, and whether
+ * more than one IMPLEMENT step exists. Those are checkable properties of the file.
+ * Quality is not assessed; `evaluated` is false and `stub` is true, mirroring
+ * src/lib/comparator-agent.js — an unwired judge marks its own return a stub and
+ * carries a warning to its runner rather than faking a result.
  *
  * @param {string} planPath - Path to the plan file
- * @returns {Object} Critique result with scores and feedback
+ * @returns {{evaluated: false, stub: true, scores: null, feedback: Array,
+ *   structural: {hasExecutionPlan: boolean, missingSteps: number[],
+ *     mislabeledSteps: number[], implementStepCount: number},
+ *   warning: string}} An honest not-evaluated report
  */
 function critique(planPath) {
   if (!safeFs.existsSync(planPath)) {
@@ -271,341 +203,177 @@ function critique(planPath) {
 
   const content = safeFs.readFileSync(planPath, 'utf8');
 
-  // Check for execution plan section
+  // Check for execution plan section. When it is absent the structural analysis
+  // runs over an empty section, which honestly reports every step as missing — the
+  // old code returned all-ones here, a numeric verdict on input it never read.
   const hasExecutionPlan = content.includes('## Execution Plan (Steps 8-16)');
-  if (!hasExecutionPlan) {
-    return {
-      scores: {
-        completeness: 1,
-        clarity: 1,
-        edgeCases: 1,
-        efficiency: 1,
-        security: 1
-      },
-      feedback: [
-        {
-          dimension: 'completeness',
-          issue: 'No execution plan found',
-          suggestion: 'Run integrate() first to generate Steps 8-16'
-        }
-      ]
-    };
-  }
-
-  // Extract execution plan section
-  const execMatch = content.match(/## Execution Plan \(Steps 8-16\)([\s\S]*?)(?=\n## [^E]|$)/);
+  const execMatch = hasExecutionPlan
+    ? content.match(/## Execution Plan \(Steps 8-16\)([\s\S]*?)(?=\n## [^E]|$)/)
+    : null;
   const execPlan = execMatch ? execMatch[1] : '';
 
-  // Score each dimension
-  const scores = {
-    completeness: scoreCompleteness(execPlan),
-    clarity: scoreClarity(execPlan),
-    edgeCases: scoreEdgeCases(execPlan),
-    efficiency: scoreEfficiency(execPlan),
-    security: scoreSecurity(execPlan)
+  return {
+    evaluated: false,
+    stub: true,
+    scores: null,
+    feedback: [],
+    structural: { hasExecutionPlan, ...analyzeStepStructure(execPlan) },
+    warning: NO_EVALUATION_WARNING
   };
-
-  // Generate feedback for scores < 5
-  const feedback = [];
-  if (scores.completeness < 5) {
-    feedback.push({
-      dimension: 'completeness',
-      issue: 'Missing steps or actions',
-      suggestion: 'Ensure all steps 8-16 have specific actions'
-    });
-  }
-  if (scores.clarity < 5) {
-    feedback.push({
-      dimension: 'clarity',
-      issue: 'Some actions are vague',
-      suggestion: 'Each action should be unambiguous and single-responsibility'
-    });
-  }
-  if (scores.edgeCases < 5) {
-    feedback.push({
-      dimension: 'edgeCases',
-      issue: 'Error handling not covered',
-      suggestion: 'Add handling for timeouts, missing files, invalid input'
-    });
-  }
-  if (scores.efficiency < 5) {
-    feedback.push({
-      dimension: 'efficiency',
-      issue: 'Potential redundant steps',
-      suggestion: 'Check for duplicate actions, consider parallelization'
-    });
-  }
-  if (scores.security < 5) {
-    feedback.push({
-      dimension: 'security',
-      issue: 'Security checks incomplete',
-      suggestion: 'Add input validation, path sanitization, secrets check'
-    });
-  }
-
-  return { scores, feedback };
 }
 
 /**
- * Score completeness (1-5): All steps have actions, all requirements covered.
- * Score 0 if step labels are wrong (BLOCKING).
+ * Canonical Iron Loop step labels. A step present under any other label is
+ * MISLABELED — a checkable fact about the file, never a quality judgement.
+ * @type {Object<number, string>}
  */
-function scoreCompleteness(execPlan) {
-  // Canonical step labels - must match exactly
-  const canonicalLabels = {
-    8: 'TEST',
-    9: 'PREPARE',
-    10: 'IMPLEMENT',
-    11: 'REVIEW',
-    12: 'OPTIMIZE',
-    13: 'SECURE',
-    14: 'VERIFY',
-    15: 'DOCUMENT',
-    16: 'FINAL-REVIEW'
-  };
+const CANONICAL_STEP_LABELS = {
+  8: 'TEST',
+  9: 'PREPARE',
+  10: 'IMPLEMENT',
+  11: 'REVIEW',
+  12: 'OPTIMIZE',
+  13: 'SECURE',
+  14: 'VERIFY',
+  15: 'DOCUMENT',
+  16: 'FINAL-REVIEW'
+};
 
-  let score = 5;
-  let hasLabelError = false;
+/**
+ * Report the structural facts of an execution section.
+ *
+ * This is the label-matching logic that used to live inside `scoreCompleteness`,
+ * kept because it was the one honest thing that function did — and returned as
+ * lists of step numbers rather than collapsed into a number nobody can audit.
+ *
+ * @param {string} execPlan - The extracted Steps 8-16 section (may be empty)
+ * @returns {{missingSteps: number[], mislabeledSteps: number[],
+ *   implementStepCount: number}} Facts about the section, no judgement
+ */
+function analyzeStepStructure(execPlan) {
+  const missingSteps = [];
+  const mislabeledSteps = [];
 
-  for (const [num, label] of Object.entries(canonicalLabels)) {
+  for (const [num, label] of Object.entries(CANONICAL_STEP_LABELS)) {
+    const stepNumber = Number(num);
     const escapedLabel = label.replace('-', '[-\\s]');
-    const labelPattern = safeRegExp(`Step\\s*${num}[:\\s]+${escapedLabel}`, 'i');
+    // The trailing \b is load-bearing. Without it `REVIEW` matched `REVIEWING` as a
+    // prefix, so a mislabeled step was reported as canonical — an instrument
+    // reporting a label it never actually checked. Inherited from the deleted
+    // scoreCompleteness and fixed here rather than carried forward.
+    const labelPattern = safeRegExp(`Step\\s*${num}[:\\s]+${escapedLabel}\\b`, 'i');
     const stepPresent = safeRegExp(`Step\\s*${num}[:\\s]`, 'i');
 
     if (!labelPattern.test(execPlan)) {
       if (stepPresent.test(execPlan)) {
-        // Step exists but has wrong label
-        hasLabelError = true;
+        mislabeledSteps.push(stepNumber);
+      } else {
+        missingSteps.push(stepNumber);
       }
-      score -= 1;
     }
   }
 
-  // Wrong labels = score 0 (BLOCKING)
-  if (hasLabelError) {
-    return 0;
-  }
+  // \b again: `IMPLEMENTATION` is not an IMPLEMENT step.
+  const implementMatches = execPlan.match(/Step\s*\d+[:\s]+IMPLEMENT\b/gi) || [];
 
-  // Check for checkboxes in each step
-  const checkboxCount = (execPlan.match(/- \[ \]/g) || []).length;
-  if (checkboxCount < 9) {
-    score = Math.max(1, score - 1);
-  }
-
-  // Check for multiple IMPLEMENT steps
-  const implementMatches = execPlan.match(/Step\s*\d+[:\s]+IMPLEMENT/gi) || [];
-  if (implementMatches.length > 1) {
-    score = Math.max(1, score - 2);
-  }
-
-  return Math.max(0, score);
+  return { missingSteps, mislabeledSteps, implementStepCount: implementMatches.length };
 }
 
 /**
- * Score clarity (1-5): Each action is unambiguous, single responsibility.
- */
-function scoreClarity(execPlan) {
-  const vaguePatterns = [
-    /implement.*feature/i,
-    /do.*task/i,
-    /handle.*things/i,
-    /fix.*issues/i,
-    /update.*stuff/i
-  ];
-
-  let score = 5;
-  for (const pattern of vaguePatterns) {
-    if (pattern.test(execPlan)) {
-      score -= 1;
-    }
-  }
-
-  return Math.max(1, score);
-}
-
-/**
- * Score edge cases (1-5): Error handling, timeouts, empty states covered.
- */
-function scoreEdgeCases(execPlan) {
-  let score = 3; // Start at middle
-
-  const goodPatterns = [
-    /error.*handling/i,
-    /timeout/i,
-    /missing.*file/i,
-    /invalid.*input/i,
-    /empty.*state/i,
-    /edge.*case/i,
-    /validation/i
-  ];
-
-  for (const pattern of goodPatterns) {
-    if (pattern.test(execPlan)) {
-      score += 0.5;
-    }
-  }
-
-  return Math.min(5, Math.max(1, Math.round(score)));
-}
-
-/**
- * Score efficiency (1-5): No redundant steps, parallelizable where possible.
- */
-function scoreEfficiency(execPlan) {
-  let score = 5;
-
-  // Check for redundant patterns
-  const lines = execPlan.split('\n').filter(l => l.includes('- [ ]'));
-  const actions = lines.map(l => l.toLowerCase().replace(/- \[ \]\s*/g, '').trim());
-
-  // Check for duplicates
-  const seen = new Set();
-  for (const action of actions) {
-    if (seen.has(action)) {
-      score -= 1;
-    }
-    seen.add(action);
-  }
-
-  return Math.max(1, score);
-}
-
-/**
- * Score security (1-5): Input validation, no secrets, safe file ops.
- */
-function scoreSecurity(execPlan) {
-  let score = 3; // Start at middle
-
-  const securityPatterns = [
-    /validate.*input/i,
-    /sanitize/i,
-    /path.*traversal/i,
-    /no.*secret/i,
-    /safe.*file/i,
-    /security/i
-  ];
-
-  for (const pattern of securityPatterns) {
-    if (pattern.test(execPlan)) {
-      score += 0.5;
-    }
-  }
-
-  return Math.min(5, Math.max(1, Math.round(score)));
-}
-
-/**
- * Run the Integrator + Critic refinement loop.
+ * Append the Steps 8-16 execution section to a plan, and report — honestly — that
+ * NO quality evaluation was performed.
  *
- * APPROVES NOTHING (R3-C). Its terminal statuses are `score-passed` (the critic's
- * own scores cleared the bar) and `max-rounds` (they did not, here are the deferred
- * questions). Neither is an approval: approvals are human, are recorded in the
- * approval ledger, and are checked at the gates. A self-scored "approved" status is
- * a machine grading its own homework and stamping it.
+ * There is no loop. There never was one that could do anything: the content was read
+ * once, the append was guarded by a presence check, and nothing changed between
+ * rounds, so ten rounds scored identical bytes identically. `maxRounds` is accepted
+ * for signature compatibility and is IGNORED; `rounds` is always 1 and `evaluated`
+ * is always false.
+ *
+ * APPROVES NOTHING, and now GRADES nothing either. The single terminal status is
+ * `not-evaluated`. The former `score-passed` and `max-rounds` statuses are gone: no
+ * consumer may keep reading a status that asserted a grade this module never earned.
+ * Approvals remain human, recorded in the approval ledger and checked at the gates.
  *
  * @param {string} planPath - Path to the plan file
- * @param {number} maxRounds - Maximum refinement rounds (default: 10)
- * @returns {Object} Result with status ('score-passed' | 'max-rounds'), rounds, and
- *   optionally deferredQuestions
+ * @param {number} [maxRounds] - Accepted and IGNORED (no iteration is performed)
+ * @returns {{status: 'not-evaluated', evaluated: false, stub: true, rounds: 1,
+ *   scores: null, structural: Object, warning: string,
+ *   deferredQuestions: Array<{dimension: string, feedback: string}>}} Honest verdict
  */
 function refineLoop(planPath, maxRounds = 10) {
   if (!safeFs.existsSync(planPath)) {
     throw new Error(`Plan file not found: ${planPath}`);
   }
 
-  let content = safeFs.readFileSync(planPath, 'utf8');
-  let rounds = 0;
-  let lastCritique = null;
+  const content = safeFs.readFileSync(planPath, 'utf8');
 
-  while (rounds < maxRounds) {
-    rounds++;
-
-    // Generate or refine execution steps
-    const executionPlan = integrate(planPath);
-
-    // Append to plan if not already present
-    if (!content.includes('## Execution Plan (Steps 8-16)')) {
-      content += executionPlan;
-      safeFs.writeFileSync(planPath, content);
-    }
-
-    // Critique the plan
-    lastCritique = critique(planPath);
-    const { scores } = lastCritique;
-
-    // Check if all scores are 5.
-    // R3-C: the status is `score-passed`, NEVER `approved`. This loop scores a plan
-    // with its own critic; calling that result an "approval" is Goodhart's law with
-    // a gate attached — the machine grading itself and then labelling the grade a
-    // human decision. Only a human approves (the four gates), and only the ledger
-    // records it. The single consumer (applyIronLoop) ignores this status anyway;
-    // the label must not imply an approval nobody gave.
-    const allPerfect = Object.values(scores).every(s => s === 5);
-    if (allPerfect) {
-      return {
-        status: 'score-passed',
-        rounds,
-        scores
-      };
-    }
-
-    // If not perfect, we'd normally refine based on feedback
-    // For now, we accept after first round with the scores we have
-    // In a full implementation, this would spawn an agent to refine
-
-    // Early exit for practical purposes - accept good enough plans
-    const avgScore = Object.values(scores).reduce((a, b) => a + b, 0) / 5;
-    if (avgScore >= 4) {
-      return {
-        status: 'score-passed',
-        rounds,
-        scores,
-        note: 'Critic score >= 4 average. This is a SCORE, not an approval — a human still holds the gate.'
-      };
-    }
+  // The one piece of real work: append the execution section when it is absent.
+  // Guarded, so running twice leaves exactly one section.
+  if (!content.includes('## Execution Plan (Steps 8-16)')) {
+    safeFs.writeFileSync(planPath, content + integrate(planPath));
   }
 
-  // Max rounds reached
+  const report = critique(planPath);
+
+  let feedback = NO_EVALUATION_WARNING +
+    ' The refinement loop appended the Steps 8-16 template and assessed nothing.' +
+    ' (The scores this step used to report were computed from that same template,' +
+    ' not from the plan.) A human or a real critic must review this plan before it' +
+    ' is built.';
+
+  // Structural findings ARE real findings about the file, so they are surfaced —
+  // as integers only, never interpolated file content.
+  const { missingSteps, mislabeledSteps } = report.structural;
+  if (missingSteps.length > 0) {
+    feedback += ` Structural fact: no Step ${missingSteps.join(', ')} found.`;
+  }
+  if (mislabeledSteps.length > 0) {
+    feedback += ` Structural fact: Step ${mislabeledSteps.join(', ')} present under a non-canonical label.`;
+  }
+
   return {
-    status: 'max-rounds',
-    rounds,
-    scores: lastCritique?.scores || null,
-    deferredQuestions: lastCritique?.feedback.map(f => ({
-      dimension: f.dimension,
-      feedback: f.issue
-    })) || []
+    status: 'not-evaluated',
+    evaluated: false,
+    stub: true,
+    rounds: 1,
+    scores: null,
+    structural: report.structural,
+    warning: NO_EVALUATION_WARNING,
+    deferredQuestions: [{ dimension: 'evaluation', feedback }]
   };
 }
 
 /**
- * Append deferred questions to plan metadata.
+ * Append deferred questions to the plan file, naming where they came from.
+ *
+ * The provenance line is the point: an entry under this heading used to read as a
+ * question someone derived from the plan, when it was a fixed literal emitted for
+ * any score below 5. Every entry written here now originates from the honest
+ * not-evaluated verdict above.
  *
  * @param {string} planPath - Path to the plan file
- * @param {Array} deferredQuestions - Questions to defer
+ * @param {Array<{dimension: string, feedback: string}>} deferredQuestions - Questions to defer
  */
 function appendDeferredQuestions(planPath, deferredQuestions) {
   if (!deferredQuestions || deferredQuestions.length === 0) return;
 
-  let content = safeFs.readFileSync(planPath, 'utf8');
+  const content = safeFs.readFileSync(planPath, 'utf8');
 
   const questionsSection = `
 
 ## Deferred Questions
 
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
 ${deferredQuestions.map(q => `- **${q.dimension}**: ${q.feedback}`).join('\n')}
 `;
 
-  content += questionsSection;
-  safeFs.writeFileSync(planPath, content);
+  safeFs.writeFileSync(planPath, content + questionsSection);
 }
 
 module.exports = {
-  // Plan from iron-loop-auto-integration.md
-  hasIronLoopSteps,
-  validateForTodo,
-  generateIronLoopTemplate,
-  IRON_LOOP_MARKER,
-  // Existing functions
   integrate,
   critique,
   refineLoop,

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "750db65cbf1aaa4ac1121367652ef77e34aad1c6d439540c745d91efea8c039d",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T21:31:41.192Z",
+  "approved_by": "human",
+  "plan_basename": "00127-the-human-approving-a-plan-is-never-shown-the-files-it-grants"
+}

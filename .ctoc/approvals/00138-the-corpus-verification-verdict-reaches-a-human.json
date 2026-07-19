@@ -1,0 +1,9 @@
+{
+  "content_sha256": "3102640ffc1a00e71f2efc37745ba3fed7136be439583763c3bec0de334a1b24",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T21:33:26.710Z",
+  "approved_by": "human",
+  "plan_basename": "00138-the-corpus-verification-verdict-reaches-a-human"
+}
