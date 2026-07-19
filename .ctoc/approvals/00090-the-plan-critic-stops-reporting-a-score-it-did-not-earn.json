@@ -1,0 +1,9 @@
+{
+  "content_sha256": "98682df9fa2f1654e3a95c44d99630164f0620184809e3e7966df4d01971b8e0",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T16:47:51.665Z",
+  "approved_by": "human",
+  "plan_basename": "00090-the-plan-critic-stops-reporting-a-score-it-did-not-earn"
+}

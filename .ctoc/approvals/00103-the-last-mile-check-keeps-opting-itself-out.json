@@ -1,0 +1,9 @@
+{
+  "content_sha256": "a22bf216d7a429e93807dc9b736556c2406e6e308b5066bc19cf5d4a5d77cc47",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T18:15:13.975Z",
+  "approved_by": "human",
+  "plan_basename": "00103-the-last-mile-check-keeps-opting-itself-out"
+}

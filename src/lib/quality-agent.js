@@ -870,6 +870,35 @@ async function runSecurityScan(_tools, opts = {}) {
       }
     }
 
+    // EXTERNAL VERIFICATION. The external scanners run ONLY when installed
+    // (isToolAvailable), so this is a no-op on a machine without them. It is
+    // wired HERE because a repaired scanner no human can reach is not a repair:
+    // quality-agent is the only consumer of SecretsScanner, and it called run()
+    // — the path that never invokes trufflehog or detect-secrets at all.
+    //
+    // Consequence, stated plainly: a VERIFIED TruffleHog finding carries
+    // severity CRITICAL and this function fails the gate on any CRITICAL. On a
+    // machine with TruffleHog installed, a verified leaked credential will now
+    // block a push that previously passed. That is the point of the repair.
+    for (const tool of ['trufflehog', 'detect-secrets']) {
+      if (!scanner.isToolAvailable(tool)) {
+        const msg = `secrets: ${tool} not installed (external verification NOT performed)`;
+        skipped.push(msg);
+        console.log(`   ${msg}`);
+        continue;
+      }
+      try {
+        const external = tool === 'trufflehog'
+          ? await scanner.runTruffleHog()
+          : await scanner.runDetectSecrets();
+        scanner.findings.push(...external);
+      } catch (toolErr) {
+        const msg = `secrets: ${tool} failed (external verification NOT performed) — ${toolErr.message}`;
+        skipped.push(msg);
+        console.log(`   ${msg}`);
+      }
+    }
+
     const secretFindings = scanner.deduplicateFindings();
     for (const f of secretFindings) {
       bump(f.severity);
@@ -886,12 +915,19 @@ async function runSecurityScan(_tools, opts = {}) {
     // severity bump); the summary just stops erasing that N files went unscanned.
     // scanner.errors entries are {file|path|tool, error}; the location is relativized
     // to projectRoot for a legible, host-independent message.
+    // A TOOL error (an external scanner that did not complete) is NOT a skipped
+    // file, and labelling it as one would misreport which thing went unscanned —
+    // so the two shapes are worded separately. Both are visible; neither blocks.
     for (const e of (scanner.errors || [])) {
-      const where = e.file || e.path || e.tool || 'unknown';
-      const loc = (e.file || e.path)
-        ? path.relative(projectRoot, where) || where
-        : where;
-      const msg = `secrets scan skipped file (NOT scanned): ${loc} — ${e.error}`;
+      const isFileError = Boolean(e.file || e.path);
+      let msg;
+      if (isFileError) {
+        const where = e.file || e.path;
+        const loc = path.relative(projectRoot, where) || where;
+        msg = `secrets scan skipped file (NOT scanned): ${loc} — ${e.error}`;
+      } else {
+        msg = `secrets: ${e.tool || 'unknown tool'} — ${e.error}`;
+      }
       skipped.push(msg);
       console.log(`   ${msg}`);
     }

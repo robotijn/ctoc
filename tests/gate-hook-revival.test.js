@@ -320,8 +320,17 @@ test('Z1: a TAMPERED plan is reverted even on an UNMIGRATED project (provenance 
   const { filePath, content } = writePlan('done', 'tampered-plan', { title: 'Ledgered then edited' });
   humanApprove('tampered-plan', content, 'review', 'done');
   fs.appendFileSync(filePath, '\nsmuggled line after approval\n');
-  assert.equal(gate.checkFolder('done', projectDir)[0].reason, 'hash-mismatch',
-    'precondition: the tamper classifies as hash-mismatch, not no-ledger-entry');
+  // The entry above was written with a WHOLE-FILE digest (`hash_scope: 'file'`), so the
+  // tamper classifies as `hash-mismatch-legacy` — the legacy-semantics twin of
+  // `hash-mismatch`. What this test is about is unchanged and is asserted below: BOTH
+  // mismatch reasons mean "provenance exists and is WRONG", both are outside
+  // gate-migration's withheld set (which is exactly `no-ledger-entry`), and both revert
+  // on an unmigrated project.
+  const reason = gate.checkFolder('done', projectDir)[0].reason;
+  assert.equal(reason, 'hash-mismatch-legacy',
+    'precondition: the tamper classifies as a hash mismatch, not no-ledger-entry');
+  assert.equal(gateMigration.WITHHELD_REASONS.has(reason), false,
+    'a hash mismatch of EITHER scope is a live attack signature and is never withheld');
   assert.equal(gateMigration.isMigrated(projectDir), false, 'precondition: unmigrated');
 
   const res = runSweep(projectDir);

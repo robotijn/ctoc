@@ -1,0 +1,9 @@
+{
+  "content_sha256": "df966a3653001e33577dc3d84ad09afb1b5d343ac21338c52956dbdc6e06951f",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T16:43:31.735Z",
+  "approved_by": "human",
+  "plan_basename": "00098-the-coverage-floor-stops-silently-dropping-to-80"
+}

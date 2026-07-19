@@ -20,6 +20,23 @@ const {
 // Create temp directory for isolated tests
 const tempDir = path.join(os.tmpdir(), 'stack-detector-test-' + Date.now());
 
+// Symlink creation needs a privilege that Windows withholds by default and that some
+// filesystems do not offer. Probed ONCE here so the one test that genuinely requires
+// it can be gated at REGISTRATION rather than abandoning its body at runtime — a
+// body-level skip in this hand-rolled runner reports as a pass and is invisible to
+// the zero-skipped gate (see tests/skip-visibility.test.js).
+const SYMLINK_SUPPORTED = (() => {
+  const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'symlink-probe-'));
+  try {
+    fs.symlinkSync(probeDir, path.join(probeDir, 'link'), 'dir');
+    return true;
+  } catch {
+    return false;
+  } finally {
+    fs.rmSync(probeDir, { recursive: true, force: true });
+  }
+})();
+
 function setupTempDir() {
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
@@ -563,40 +580,63 @@ function testDetectStackDefaultsToCurrentDir() {
 // Real Project Tests (ctoc-build)
 // ============================================
 
-function testRealProjectCtocBuild() {
-  const ctocBuildPath = '/home/tijn/ctoc-build';
+// These two tests were gated on `fs.existsSync('/home/tijn/ctoc-build')` — a path on
+// one person's former machine that exists on no contributor's machine, no container
+// and no continuous-integration runner. Their bodies had therefore NEVER executed:
+// inert text that looked like coverage while the hand-rolled runner reported a pass,
+// invisible to the zero-skipped gate because a `console.log` + `return` is not a skip
+// node can count.
+//
+// They are REBUILT, not deleted — the contract they described is genuine. Contract
+// source, outside these tests: `detectStack(projectPath)` returns
+// `{ project, languages, frameworks }`, echoing the path it was given and reporting
+// what it detected. That is established by the dozens of fixture-driven cases in the
+// rest of this file and by src/lib/stack-detector.js itself, which
+// src/lib/init-project.js calls to generate a project's CLAUDE.md.
+//
+// The replacements are strictly STRONGER than the originals: the originals asserted
+// only that two arrays were arrays; these assert the actual detections.
 
-  if (!fs.existsSync(ctocBuildPath)) {
-    console.log('# Real project test - SKIPPED (ctoc-build not found)');
-    return;
-  }
+function testRealProjectDetectsAConstructedProject() {
+  setupTempDir();
+  createTempFile('package.json', JSON.stringify({
+    name: 'constructed', dependencies: { react: '^18.0.0' }
+  }));
+  createTempFile('tsconfig.json', '{}');
 
-  const stack = detectStack(ctocBuildPath);
+  const stack = detectStack(tempDir);
 
   assert.ok(Array.isArray(stack.languages), 'Languages is array');
   assert.ok(Array.isArray(stack.frameworks), 'Frameworks is array');
-  assert.strictEqual(stack.project, ctocBuildPath, 'Project path matches');
+  assert.strictEqual(stack.project, tempDir, 'Project path matches');
+  // Strictly stronger than the original: the DETECTIONS are asserted, not just the
+  // container types. A detectStack that returned the right shape with empty arrays
+  // passed before and fails here.
+  assert.ok(stack.languages.includes('typescript'),
+    `tsconfig.json must yield typescript, got: ${JSON.stringify(stack.languages)}`);
+  assert.ok(stack.frameworks.includes('react'),
+    `a react dependency must yield react, got: ${JSON.stringify(stack.frameworks)}`);
 
-  console.log('# detectStack - real project ctoc-build');
+  cleanupTempDir();
+  console.log('# detectStack - constructed project detects its language and framework');
 }
 
-function testRealProjectCtocPublic() {
-  const ctocPublicPath = '/home/tijn/ctoc-build/ctoc-public';
+function testRealProjectDetectsAProjectWithoutPackageJson() {
+  setupTempDir();
+  // No package.json — this is the case the deleted ctoc-public test described in its
+  // own comment at the site: a directory that should NOT be reported as JavaScript.
+  createTempFile('README.md', '# no package manifest here\n');
 
-  if (!fs.existsSync(ctocPublicPath)) {
-    console.log('# Real project test - SKIPPED (ctoc-public not found)');
-    return;
-  }
-
-  const stack = detectStack(ctocPublicPath);
+  const stack = detectStack(tempDir);
 
   assert.ok(Array.isArray(stack.languages), 'Languages is array');
   assert.ok(Array.isArray(stack.frameworks), 'Frameworks is array');
-  assert.strictEqual(stack.project, ctocPublicPath, 'Project path matches');
+  assert.strictEqual(stack.project, tempDir, 'Project path matches');
+  assert.ok(!stack.languages.includes('javascript'),
+    `no package.json must NOT yield javascript, got: ${JSON.stringify(stack.languages)}`);
 
-  // ctoc-public doesn't have package.json, so it shouldn't detect JS
-  // But if it does in the future, that's fine too
-  console.log('# detectStack - real project ctoc-public');
+  cleanupTempDir();
+  console.log('# detectStack - a project without package.json is not reported as javascript');
 }
 
 // ============================================
@@ -1030,12 +1070,13 @@ function testWorkspaceSymlinkOutsideRootNotRead() {
   } catch (e) {
     symlinkOk = false; // Windows without privilege, or unsupported FS.
   }
-  if (!symlinkOk) {
-    fs.rmSync(outsideDir, { recursive: true, force: true });
-    cleanupTempDir();
-    console.log('# F1(symlink) - SKIPPED (symlink creation not permitted here)');
-    return;
-  }
+  // The capability-absent branch that used to sit here printed
+  // '# F1(symlink) - SKIPPED' and returned without asserting, which the hand-rolled
+  // runner reported as a PASS. It is gone: this function is now REGISTRATION-gated on
+  // SYMLINK_SUPPORTED at its call site, so on a platform without the privilege it is
+  // never invoked rather than invoked-and-abandoned, and the containment property is
+  // still covered everywhere by testWorkspaceTraversalOutsideRootNotRead below.
+  assert.ok(symlinkOk, 'registration gate must not invoke this test without symlink support');
 
   const stack = detectStack(tempDir);
   // Clean the outside dir before asserting so a failure never leaks it.
@@ -1046,6 +1087,45 @@ function testWorkspaceSymlinkOutsideRootNotRead() {
 
   cleanupTempDir();
   console.log('# F1(symlink) - symlinked workspace whose real path escapes root is not read');
+}
+
+// Containment, asserted WITHOUT needing the symlink privilege — so this half of the
+// property is tested on every platform including Windows without developer mode.
+// A workspace entry that escapes the root through `..` traversal must not be read.
+// Verified empirically before it was written: detectStack on a root whose workspaces
+// declare '../outside' reports frameworks [] while still reporting typescript, i.e.
+// the escaping entry is excluded rather than the whole scan failing.
+function testWorkspaceTraversalOutsideRootNotRead() {
+  setupTempDir();
+  const outsideDir = path.join(tempDir, '..', 'traversal-escape-target');
+  fs.mkdirSync(outsideDir, { recursive: true });
+  fs.writeFileSync(path.join(outsideDir, 'package.json'), JSON.stringify({
+    name: 'evil', dependencies: { react: '^18.0.0' }
+  }));
+
+  createTempFile('package.json', JSON.stringify({
+    name: 'root', private: true, workspaces: ['../traversal-escape-target']
+  }));
+  createTempFile('tsconfig.json', '{}');
+
+  let stack;
+  try {
+    stack = detectStack(tempDir);
+  } finally {
+    // Clean the outside dir on EVERY exit path, including a throw, so no fixture
+    // ever leaks outside the temp root.
+    fs.rmSync(outsideDir, { recursive: true, force: true });
+  }
+
+  assert.ok(!stack.frameworks.includes('react'),
+    'react from a workspace escaping the root via .. is NOT read (containment)');
+  // Control: the scan still ran and detected the root's own stack, so the assertion
+  // above cannot pass merely because detectStack failed outright.
+  assert.ok(stack.languages.includes('typescript'),
+    'the root itself is still scanned (containment excludes the entry, not the scan)');
+
+  cleanupTempDir();
+  console.log('# F1(traversal) - workspace escaping root via .. is not read');
 }
 
 function testWorkspaceRealNestedInsideStillRead() {
@@ -1235,8 +1315,8 @@ testDetectStackDefaultsToCurrentDir();
 
 // Real project tests
 console.log('\n## Real Projects\n');
-testRealProjectCtocBuild();
-testRealProjectCtocPublic();
+testRealProjectDetectsAConstructedProject();
+testRealProjectDetectsAProjectWithoutPackageJson();
 
 // Edge cases
 console.log('\n## Edge Cases\n');
@@ -1290,7 +1370,14 @@ testWorkspaceRecursiveGlob();
 
 // F1(symlink-defect) — symlink escape of workspace containment
 console.log('\n## F1(symlink-defect) - workspace symlink containment\n');
-testWorkspaceSymlinkOutsideRootNotRead();
+// REGISTRATION gate, not a body skip: on a platform that cannot create a symlink the
+// test is never invoked, so it contributes nothing to run or skip either way. The
+// containment property it pins is covered on every platform by the traversal test.
+// Pattern source: tests/plan-index-embedding.test.js:9-21.
+if (SYMLINK_SUPPORTED) {
+  testWorkspaceSymlinkOutsideRootNotRead();
+}
+testWorkspaceTraversalOutsideRootNotRead();
 testWorkspaceRealNestedInsideStillRead();
 
 // F2(comment-defect) — `#` comment must not terminate a multiline array

@@ -632,15 +632,52 @@ function checkDeadExportFence(root) {
  * proves nothing. The ratchet lives in tests/reachability.test.js; this check
  * surfaces the same truth through the self-check so a human can ask for it
  * on demand. Thorough mode only (walks the whole src tree).
+ *
+ * BASELINE-AWARE, mirroring checkDeadExportFence exactly. This check used to block
+ * on ANY unreachable file, which was tenable only while the file fence reported a
+ * false zero (it credited a bare markdown MENTION as an execution root and any
+ * `.js` string literal as a call edge). With the fence telling the truth there is
+ * real committed DEBT, so what blocks is a NEW dead file — anything not in
+ * `.ctoc/reachability-baseline.json`. A malformed baseline excuses NOTHING: every
+ * unreachable file blocks, because a baseline that cannot be read must never read
+ * as "all clear".
+ *
+ * @param {string} root - Project root
+ * @returns {{severity: string, message: string}|null}
  */
 function checkReachabilityFence(root) {
   const { analyze } = require('./reachability');
+  const path = require('path');
+  const safeFs = require('./safe-fs');
+
   const result = analyze(root);
   if (result.total === 0) return null; // not a CTOC source tree — nothing to check
-  if (result.unreachable.length === 0) return null;
+
+  const baselineFile = path.join(root, '.ctoc', 'reachability-baseline.json');
+  /** @type {Set<string>} */
+  const baselined = new Set();
+  if (safeFs.existsSync(baselineFile)) {
+    // A baseline that EXISTS but cannot be read is a broken instrument, and the
+    // check must SAY SO rather than swallow it: proceeding with an empty set would
+    // still block, but on a message blaming the source files for a defect in the
+    // baseline. Absent is a different fact and keeps its own meaning below.
+    try {
+      const parsed = JSON.parse(safeFs.readFileSync(baselineFile, 'utf8'));
+      const list = Array.isArray(parsed) ? parsed : (parsed && parsed.unreachable) || [];
+      for (const rel of list) if (typeof rel === 'string') baselined.add(rel);
+    } catch (err) {
+      return {
+        severity: 'block',
+        message: `.ctoc/reachability-baseline.json exists but could not be read (${err && err.message}) — the dead-code ratchet cannot be evaluated, and an unreadable baseline must never read as "all clear"; repair the file`
+      };
+    }
+  }
+
+  const fresh = result.unreachable.filter((rel) => !baselined.has(rel));
+  if (fresh.length === 0) return null;
   return {
     severity: 'block',
-    message: `${result.unreachable.length} source file(s) unreachable from every live root (dead on arrival): ${result.unreachable.join(', ')} — wire each to a live root or delete it; a module is not done when its test passes, it is done when a human can reach it`
+    message: `${fresh.length} NEW source file(s) unreachable from every live root (dead on arrival): ${fresh.slice(0, 10).join(', ')}${fresh.length > 10 ? ` (+${fresh.length - 10} more)` : ''} — wire each to a live root or delete it; a module is not done when its test passes, it is done when a human can reach it`
   };
 }
 

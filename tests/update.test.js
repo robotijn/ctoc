@@ -26,34 +26,58 @@ function assert(condition, message) {
 
 console.log('# Update Command Tests');
 
-// Test: Cache directory detection (skip if running from source, not cache)
-test('Detects git repository in cache', () => {
-  // Skip if cache doesn't exist or we're running from source directory
-  if (!fs.existsSync(CACHE_DIR)) {
-    console.log('#   (cache not present, skipping)');
-    return;
-  }
+// This file uses a hand-rolled runner, so node sees the WHOLE file as one test. A
+// branch that printed a skip and abandoned its body therefore reported as a PASS and
+// was invisible to the zero-skipped gate. Three such branches lived below. Each is
+// now either a real assertion or a REGISTRATION gate — the test is never registered
+// rather than registered-and-abandoned. See tests/skip-visibility.test.js.
 
-  // The cache is NOT a git repo - it's a clean copy of the plugin files
-  // Git repo is in marketplaces dir, cache is the installed version
-  console.log('#   (cache is clean copy, not git repo - expected behavior)');
-});
+// Contract source: the invariant is stated in this file's own prior comment and
+// corroborated by CLAUDE.md's "Marketplace Only" section, which distinguishes the
+// CACHE directory (a clean copy of the installed plugin files) from the MARKETPLACES
+// directory (the git clone) and tells a user to delete both to fix a stale install.
+//
+// The previous version of this test asserted NOTHING in either branch: absent cache
+// logged and returned, present cache logged '(cache is clean copy, not git repo -
+// expected behavior)' and returned. It PRINTED the invariant instead of checking it.
+// Now it checks it. Registration is gated on the cache existing, because on a machine
+// with no plugin cache the invariant is vacuous rather than skipped.
+if (fs.existsSync(CACHE_DIR)) {
+  test('Cache is a clean copy, not a git repository', () => {
+    assert(
+      !fs.existsSync(path.join(CACHE_DIR, '.git')),
+      `Plugin cache must not be a git repository (the git clone belongs in the ` +
+        `marketplaces dir). Found a .git inside ${CACHE_DIR}`
+    );
+  });
+}
 
-// Test: VERSION file exists in source
+// Contract source: CLAUDE.md — "The VERSION file is the single source of truth for
+// version numbers." src/lib/version.js reads it, src/scripts/release.js syncs from
+// it, and tests/doc-counts.test.js and tests/release-metadata-sync.test.js depend on
+// it existing. The previous `else` branch logged '(VERSION file not present,
+// skipping)' and PASSED — encoding "a missing source-of-truth file is acceptable",
+// which contradicts that contract. The semver assertion below is unchanged; only the
+// escape hatch around it is gone.
 test('VERSION file exists in source', () => {
-  // Check VERSION file in current directory (source)
   const versionFile = path.join(__dirname, '..', 'VERSION');
-  if (fs.existsSync(versionFile)) {
-    const version = fs.readFileSync(versionFile, 'utf8').trim();
-    assert(/^\d+\.\d+\.\d+$/.test(version), `VERSION should be semver format, got: ${version}`);
-  } else {
-    console.log('#   (VERSION file not present, skipping)');
-  }
+  assert(fs.existsSync(versionFile), `VERSION must exist at ${versionFile}`);
+  const version = fs.readFileSync(versionFile, 'utf8').trim();
+  assert(/^\d+\.\d+\.\d+$/.test(version), `VERSION should be semver format, got: ${version}`);
 });
 
-// Test: Git remote is correct
-test('Git remote points to GitHub', () => {
-  if (fs.existsSync(CACHE_DIR) && fs.existsSync(path.join(CACHE_DIR, '.git'))) {
+// Contract source: CLAUDE.md "Marketplace Only" — CTOC is always installed from
+// https://github.com/robotijn/ctoc, never a local path.
+//
+// Honest accounting: this change buys NO new failure. By the invariant pinned
+// directly above, a correct install has no .git under CACHE_DIR, so this body is
+// unreachable in practice; and the marketplace rule it gestures at is already
+// genuinely asserted by 'No local development paths in update script' below. The
+// change is a repair of an INVISIBLE SKIP, not a strengthening — the `else` branch
+// logged '(not a git repo, skipping)' and passed. The execSync call and its assertion
+// are copied verbatim; only the gating moved from the body to the registration.
+if (fs.existsSync(CACHE_DIR) && fs.existsSync(path.join(CACHE_DIR, '.git'))) {
+  test('Git remote points to GitHub', () => {
     try {
       const remote = execSync('git remote get-url origin', {
         cwd: CACHE_DIR,
@@ -66,10 +90,8 @@ test('Git remote points to GitHub', () => {
     } catch (err) {
       throw new Error(`Failed to get git remote: ${err.message}`);
     }
-  } else {
-    console.log('#   (not a git repo, skipping)');
-  }
-});
+  });
+}
 
 // Test: Update script exists
 test('Update script is executable', () => {

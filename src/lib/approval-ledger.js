@@ -12,11 +12,29 @@
  *
  *   - no ledger entry            ⇒ NOT approved (a self-authored marker alone
  *                                   never counts);
- *   - live content hash differs  ⇒ NOT approved (any post-approval edit,
- *                                   including a re-stamped marker, invalidates
- *                                   the entry);
+ *   - live content hash differs  ⇒ NOT approved (a post-approval change to the
+ *                                   hashed region, including a re-stamped marker,
+ *                                   invalidates the entry — see WHAT THE HASH
+ *                                   COVERS below);
  *   - `stage_to` differs         ⇒ NOT approved (an entry recorded for one gate
  *                                   edge cannot be replayed to justify another).
+ *
+ * WHAT THE HASH COVERS, AND WHY IT IS NOT THE WHOLE FILE. A plan file is TWO
+ * documents in one: the SPECIFICATION the human ruled on at a gate, and the
+ * EXECUTION LOG the executor writes into that same file during Steps 8–16. Binding
+ * an approval to the whole file therefore invalidated it on every ordinary build,
+ * BY CONSTRUCTION — and because `hash-mismatch` is treated as a live attack
+ * signature, ordinary building armed a revert of a plan out of the very destination
+ * the human had just approved it into. An entry recording
+ * `hash_scope: 'specification'` binds to the specification only
+ * ({@link computeSpecHash}: the frontmatter in full, plus the body minus the
+ * executor's named execution sections and its `- [x]` completion records). An entry
+ * with no `hash_scope` — every entry written before this existed — keeps WHOLE-FILE
+ * semantics and is verified under {@link computeContentHash}, exactly as written.
+ * Nothing is ever re-hashed: re-hashing a legacy entry against current content would
+ * launder every post-approval amendment into an approved state, which is precisely
+ * the forgery the ledger exists to expose. Entries age into the specification scope
+ * only as plans are genuinely re-approved.
  *
  * WHERE THE DENY ACTUALLY LIVES (R3-A — the previous version of this header made
  * a promise the code did not keep, so read this one literally):
@@ -173,11 +191,304 @@ function slugFromPlanPath(planPath) {
  * as written to disk. Hashing the whole file means ANY later edit (including a
  * re-stamped approval marker) changes the hash and invalidates the entry.
  *
+ * KEPT, UNCHANGED, AND STILL EXPORTED. This is the `hash_scope: 'file'` semantics
+ * that every entry written before the specification scope existed was written
+ * with. Legacy entries are verified under the semantics they were written with,
+ * and NOTHING is retroactively re-hashed — re-hashing would launder every
+ * post-approval amendment into an approved state, which is the exact forgery the
+ * specification scope exists to make visible. It is also the RIGHT scope for
+ * `done/`, where no legitimate editor exists (see {@link computeSpecHash}).
+ *
  * @param {string} content - the plan's full file content
  * @returns {string} the lowercase hex SHA-256 digest
  */
 function computeContentHash(content) {
   return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+/* ---------------------------------------------------------------------------
+ * SPECIFICATION HASHING — the approval binds to what the human ruled on.
+ *
+ * THE DEFECT THIS CLOSES. A plan file is TWO documents in one: the SPECIFICATION
+ * the human approved at a gate, and the EXECUTION LOG the executor writes into
+ * that same file during Steps 8–16 (step completion records, an execution-record
+ * section, decisions taken while building). Binding an approval to a hash of the
+ * WHOLE file therefore invalidated that approval on every ordinary build, BY
+ * CONSTRUCTION — not as an edge case. Measured on this repository before the fix:
+ * every slice executed that day recorded `stage_to: "todo"` and failed `verify`
+ * against its own current text. Because `hash-mismatch` is classified as a live
+ * attack signature (it reverts on every project, migrated or not), an executor
+ * building a plan that physically resides in `todo/` armed a MID-BUILD REVERT of
+ * its own plan out of the gate destination the human had just approved it into.
+ *
+ * THE BOUNDARY IS A DENY-LIST, NEVER AN ALLOW-LIST. The hashed region is the whole
+ * file MINUS explicitly excluded regions. An allow-list would silently exempt any
+ * specification section nobody remembered to list — it fails OPEN, and quietly. A
+ * deny-list hashes anything new by default, so a forgotten or newly invented
+ * section is PROTECTED rather than exempted. Every runtime drift therefore degrades
+ * toward NOISE (a false mismatch, which is recoverable by re-approval) and never
+ * toward SILENCE (a forged approval, which is not recoverable at all):
+ *
+ *   | drift                                        | effect            | direction |
+ *   |----------------------------------------------|-------------------|-----------|
+ *   | executor invents an unlisted section         | hashed → mismatch | noisy     |
+ *   | executor writes a record without a checkbox  | hashed → mismatch | noisy     |
+ *   | executor edits a specification section       | mismatch          | CAUGHT    |
+ *   | planner amends scope after approval          | mismatch          | CAUGHT    |
+ *   | a heading is ADDED to EXECUTION_SECTIONS     | silently exempt   | a reviewed source change |
+ *
+ * The only silent-exemption route is a deliberate edit to a frozen constant in a
+ * reviewed source file. Nothing an executor can do at runtime is silent.
+ *
+ * IT FAILS CLOSED. When the boundary cannot be established at all — no frontmatter
+ * delimiters, an unterminated block, empty content — `computeSpecHash` returns
+ * `ok: false` and EVERY caller must treat that as a FAILED verification. Not being
+ * able to establish a binding is not a pass; a plan is never trusted INTO an
+ * approval.
+ *
+ * THE DISCLOSED LOSS, stated rather than buried. `## Decisions Taken Under
+ * Ambiguity` is excluded because the executor is REQUIRED to append to it, so
+ * hashing it would reproduce the defect. The cost is real: an executor could
+ * rewrite the planner's recorded decisions without breaking the approval. The
+ * bound that makes it acceptable is that the section is a RECORD, not a GRANT — it
+ * confers no write surface and no scope. Every grant-bearing part stays hashed: the
+ * frontmatter (including `files:`, the actual write-surface grant), the scope prose,
+ * the implementation specification, the test plan, and the step headings. The fix
+ * that recovers the loss — splitting the planner's decisions from the executor's
+ * into two sections — is a template and agent-contract change, and is the human's
+ * to schedule.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Headings whose sections are EXCLUDED from the specification hash, normalised
+ * (marker stripped, trimmed, lowercased). Matched by PREFIX, because the real
+ * headings on disk carry suffixes: `## Execution Record (Steps 8–16)`,
+ * `## Execution Record (Steps 8-16)`, `## Execution Log (Steps 8–16)`. An exact
+ * match would have recognised NONE of them, and the fix would have been inert on
+ * every real plan in this repository.
+ *
+ * Every entry here is a section written BY THE EXECUTOR, AFTER the approval.
+ * Adding an entry is the one and only way to exempt content silently, which is
+ * why this list is frozen, exported, and reviewed as source.
+ *
+ * @type {ReadonlyArray<string>}
+ */
+const EXECUTION_SECTIONS = Object.freeze([
+  'execution record',
+  'execution log',
+  'step 16 final-review report',
+  'decisions taken during execution',
+  'verification evidence',
+  'decisions taken under ambiguity',
+]);
+
+/**
+ * Is a normalised heading title the start of an excluded execution section?
+ * Prefix match — see {@link EXECUTION_SECTIONS}.
+ *
+ * @param {string} title - heading text, already trimmed and lowercased
+ * @returns {boolean}
+ */
+function isExecutionHeading(title) {
+  for (const name of EXECUTION_SECTIONS) {
+    if (title.startsWith(name)) return true;
+  }
+  return false;
+}
+
+/**
+ * Heading level of a trimmed line (`###` → 3), or 0 when the line is not an ATX
+ * heading. A heading requires at least one `#` followed by whitespace, so a bare
+ * `#` or a `#tag` is not a heading. Character-wise, so no regular expression is
+ * compiled per line.
+ *
+ * @param {string} trimmed - the line, already trimmed
+ * @returns {number} the heading level, or 0
+ */
+function headingLevel(trimmed) {
+  let level = 0;
+  while (level < trimmed.length && trimmed.charCodeAt(level) === 35 /* '#' */) level++;
+  if (level === 0 || level >= trimmed.length) return 0;
+  const next = trimmed.charCodeAt(level);
+  return (next === 32 /* space */ || next === 9 /* tab */) ? level : 0;
+}
+
+/**
+ * Is this line the executor's completion-record marker — `- [x]`, `- [X]` or
+ * `- [ ]` at the start of the trimmed line?
+ *
+ * This convention is NOT invented here: `plan-validator.validateStepsComplete`
+ * already treats `- [x]` as THE completion signal, so it is already load-bearing
+ * in this codebase. Reusing it adds no second encoding of "this line is an
+ * execution record". Plain bullets — the Step 10 `  - src/lib/x.js — …` sub-items,
+ * which ARE specification — are untouched and stay hashed.
+ *
+ * Character-wise, so no regular expression is compiled per line.
+ *
+ * @param {string} trimmed - the line, already trimmed
+ * @returns {boolean}
+ */
+function isCheckboxLine(trimmed) {
+  if (trimmed.length < 5) return false;
+  if (trimmed.charCodeAt(0) !== 45 /* '-' */) return false;
+  if (trimmed.charCodeAt(1) !== 32 /* ' ' */) return false;
+  if (trimmed.charCodeAt(2) !== 91 /* '[' */) return false;
+  if (trimmed.charCodeAt(4) !== 93 /* ']' */) return false;
+  const mark = trimmed.charCodeAt(3);
+  return mark === 120 /* x */ || mark === 88 /* X */ || mark === 32 /* space */;
+}
+
+/**
+ * SHA-256 (hex) of a plan's SPECIFICATION — the frontmatter plus the body with the
+ * executor's execution log removed. See the block comment above for the boundary,
+ * the deny-list argument, the fail-closed rule and the disclosed loss.
+ *
+ * ONE LINEAR PASS over the lines: the frontmatter walk and the body filter run in
+ * the same traversal, and neither compiles a regular expression per line.
+ *
+ * THE FRONTMATTER SPLIT IS LOCAL, DELIBERATELY. `stale-detector.extractFrontmatterRegion`
+ * is the codebase's canonical derivation and this walk mirrors it exactly
+ * (consecutive leading `---…---` blocks, CRLF-safe, unterminated block stops the
+ * walk). It is NOT required here because this module's documented invariant is that
+ * its ONLY intra-project dependency is the pure-constant `gate-order.js` — it sits on
+ * the every-tool-call Bash-hook path, and `stale-detector` pulls in `safe-fs`,
+ * `regex-utils` and the cache. The anti-divergence mechanism is a test that asserts
+ * the returned `frontmatter` equals `extractFrontmatterRegion`'s region across
+ * stamped, unstamped, blank-led and CRLF fixtures.
+ *
+ * @param {string} content - the plan's full file content
+ * @returns {{hash: (string|null), ok: boolean, reason: (string|null), frontmatter: (string|null)}}
+ *   `ok: false` with a `reason` when the boundary cannot be established — which
+ *   EVERY caller must treat as a FAILED verification, never as a pass.
+ */
+function computeSpecHash(content) {
+  if (typeof content !== 'string' || content === '') {
+    return { hash: null, ok: false, reason: 'empty-content', frontmatter: null };
+  }
+  // CRLF-safe split, so a Windows checkout of the same plan hashes identically.
+  // Line endings are not part of the specification, and normalising them protects
+  // nothing less: every hashed line is compared verbatim after the split.
+  const lines = content.split(/\r?\n/);
+  const blocks = [];
+  let i = 0;
+  while (i < lines.length && lines[i].trim() === '') i++;
+  while (i < lines.length && lines[i].trim() === '---') {
+    let j = i + 1;
+    const block = [];
+    let closed = false;
+    while (j < lines.length) {
+      if (lines[j].trim() === '---') { closed = true; break; }
+      block.push(lines[j]);
+      j++;
+    }
+    // An unterminated block means the boundary is not locatable: stop the walk and
+    // let the emptiness test below fail CLOSED.
+    if (!closed) break;
+    blocks.push(block.join('\n'));
+    i = j + 1;
+    while (i < lines.length && lines[i].trim() === '') i++;
+  }
+  if (blocks.length === 0) {
+    return { hash: null, ok: false, reason: 'no-frontmatter-delimiters', frontmatter: null };
+  }
+  const frontmatter = blocks.join('\n');
+
+  const kept = [];
+  let excluding = false;
+  let excludeLevel = 0;
+  for (; i < lines.length; i++) {
+    const raw = lines[i];
+    const trimmed = raw.trim();
+    const level = headingLevel(trimmed);
+    if (level > 0) {
+      // An excluded section runs to the next heading of the SAME OR HIGHER level;
+      // a deeper heading inside it (e.g. `### Step 14 numbers`) stays excluded.
+      if (excluding && level <= excludeLevel) excluding = false;
+      if (!excluding && isExecutionHeading(trimmed.slice(level).trim().toLowerCase())) {
+        excluding = true;
+        excludeLevel = level;
+        continue;
+      }
+    }
+    if (excluding) continue;
+    if (isCheckboxLine(trimmed)) continue;
+    kept.push(raw);
+  }
+
+  // Length-prefixed domain separation between the two derived regions, so no
+  // shuffling of bytes across the frontmatter/body boundary can produce the same
+  // digest from a different split.
+  const h = crypto.createHash('sha256');
+  h.update(`${frontmatter.length} `, 'utf8');
+  h.update(frontmatter, 'utf8');
+  h.update(' ', 'utf8');
+  h.update(kept.join('\n'), 'utf8');
+  return { hash: h.digest('hex'), ok: true, reason: null, frontmatter };
+}
+
+/**
+ * THE SINGLE ENCODING of "does this content match this entry", branching on the
+ * entry's recorded `hash_scope` and failing CLOSED.
+ *
+ * There used to be TWO encodings — `verify` here and an inline comparison in
+ * `human-gate-check.classifyResidency` — which could diverge, and a divergence in
+ * an approval predicate is a forgery surface. Both now call this.
+ *
+ * VERSIONED SEMANTICS, NO MIGRATION. An entry with no `hash_scope` means `'file'`:
+ * legacy whole-file semantics, verified exactly as it was written. Existing entries
+ * are NEVER re-hashed — re-hashing against current content would launder every
+ * post-approval amendment into an approved state. Entries age into the
+ * specification scope only as plans are genuinely re-approved. This mirrors the
+ * task registry's `generation` field (absent ⇒ 0), an established pattern here.
+ *
+ * @param {object|null} entry - a parsed ledger entry
+ * @param {string} content - the plan's current full file content
+ * @returns {{match: boolean, scope: ('specification'|'file'), reason: (string|null)}}
+ *   `scope` is the semantics the comparison was made UNDER, so a caller can report
+ *   a legacy mismatch distinctly from a real specification change. Both still reject.
+ */
+function contentMatches(entry, content) {
+  const scope = entry && entry.hash_scope === 'specification' ? 'specification' : 'file';
+  if (scope === 'specification') {
+    const res = computeSpecHash(content);
+    // FAIL CLOSED: an unlocatable boundary is not a match. Never trust a plan INTO
+    // an approval.
+    if (!res.ok) return { match: false, scope, reason: res.reason };
+    return { match: entry.content_sha256 === res.hash, scope, reason: null };
+  }
+  return { match: entry.content_sha256 === computeContentHash(content), scope, reason: null };
+}
+
+/**
+ * Resolve the `content_sha256` + `hash_scope` pair a write path should record.
+ *
+ * A caller that supplies `content` gets SPECIFICATION semantics, hashed here so the
+ * scope stamp and the digest can never disagree — the failure mode that would arise
+ * from stamping a scope over a hash computed elsewhere. A caller that supplies only
+ * a precomputed `content_sha256` keeps whole-file semantics and is recorded HONESTLY
+ * as `'file'`, because that is what its digest actually covers.
+ *
+ * A caller supplying `content` whose boundary cannot be established gets a THROW,
+ * not a fallback: minting an entry whose binding could not be established is exactly
+ * the unearned approval this module exists to prevent.
+ *
+ * @param {{content?: string, content_sha256?: string}} src
+ * @returns {{content_sha256: (string|undefined), hash_scope: ('specification'|'file')}}
+ * @throws {Error} when `content` is supplied but its specification boundary is
+ *   unlocatable
+ */
+function resolveHash(src) {
+  if (typeof src.content === 'string' && src.content !== '') {
+    const res = computeSpecHash(src.content);
+    if (!res.ok) {
+      throw new Error(
+        `approval-ledger: refusing to write an entry — the plan's specification boundary ` +
+        `could not be established (${res.reason}). An unlocatable binding is not an approval.`,
+      );
+    }
+    return { content_sha256: res.hash, hash_scope: 'specification' };
+  }
+  return { content_sha256: src.content_sha256, hash_scope: 'file' };
 }
 
 /**
@@ -187,7 +498,15 @@ function computeContentHash(content) {
  * write) — the type only describes the accepted shape, not the contract.
  *
  * @typedef {object} LedgerEntryInput
- * @property {string} [content_sha256]
+ * @property {string} [content] - the plan's full content. When supplied, the ledger
+ *   hashes the SPECIFICATION itself and records `hash_scope: 'specification'`; the
+ *   digest and the scope stamp are therefore derived together and cannot disagree.
+ *   Preferred over a precomputed `content_sha256` on every gate edge a plan is later
+ *   BUILT in (`implementation`, `todo`) — see {@link computeSpecHash}.
+ * @property {string} [content_sha256] - a precomputed WHOLE-FILE digest. Recorded
+ *   honestly as `hash_scope: 'file'`; correct for `done/`, where no legitimate
+ *   editor exists and the stronger binding is the right one.
+ * @property {('specification'|'file')} [hash_scope]
  * @property {string} [stage_from]
  * @property {string} [stage_to]
  * @property {string} [approved_at]
@@ -218,8 +537,10 @@ function computeContentHash(content) {
  */
 function writeEntry(slug, entry, projectPath) {
   const src = /** @type {LedgerEntryInput} */ (entry || {});
+  const { content_sha256, hash_scope } = resolveHash(src);
   const record = {
-    content_sha256: src.content_sha256,
+    content_sha256,
+    hash_scope,
     stage_from: src.stage_from,
     stage_to: src.stage_to,
     approved_at: src.approved_at || new Date().toISOString(),
@@ -255,8 +576,10 @@ function writePipelineEntry(slug, entry, projectPath) {
   if (typeof src.evidence !== 'string' || src.evidence.trim() === '') {
     throw new Error('approval-ledger: pipeline entry requires non-empty "evidence"');
   }
+  const { content_sha256, hash_scope } = resolveHash(src);
   const record = {
-    content_sha256: src.content_sha256,
+    content_sha256,
+    hash_scope,
     stage_from: src.stage_from,
     stage_to: src.stage_to,
     approved_at: src.approved_at || new Date().toISOString(),
@@ -315,8 +638,10 @@ function writeSufficiencyEntry(slug, entry, projectPath) {
   if (typeof src.evidence !== 'string' || src.evidence.trim() === '') {
     throw new Error('approval-ledger: sufficiency entry requires non-empty "evidence"');
   }
+  const { content_sha256, hash_scope } = resolveHash(src);
   const record = {
-    content_sha256: src.content_sha256,
+    content_sha256,
+    hash_scope,
     stage_from: src.stage_from,
     stage_to: src.stage_to,
     approved_at: src.approved_at || new Date().toISOString(),
@@ -589,9 +914,10 @@ function readEntry(slug, projectPath) {
 
 /**
  * The single predicate encoding C4. Returns `true` iff an entry exists AND its
- * `stage_to` equals `currentStage` AND its `content_sha256` equals the hash of
- * the live `content`. Any of the three legs failing — no entry, wrong edge, or
- * a post-approval edit — yields `false`.
+ * `stage_to` equals `currentStage` AND its content matches under the semantics the
+ * entry was WRITTEN with ({@link contentMatches}). Any of the three legs failing —
+ * no entry, wrong edge, or a post-approval change to the hashed region — yields
+ * `false`, as does a specification boundary that cannot be established at all.
  *
  * @param {string} slug - the plan slug
  * @param {string} content - the plan's current full file content
@@ -603,7 +929,7 @@ function verify(slug, content, currentStage, projectPath) {
   const entry = readEntry(slug, projectPath);
   if (!entry) return false;
   if (entry.stage_to !== currentStage) return false;
-  return entry.content_sha256 === computeContentHash(content);
+  return contentMatches(entry, content).match;
 }
 
 /**
@@ -631,6 +957,9 @@ module.exports = {
   ledgerPath,
   slugFromPlanPath,
   computeContentHash,
+  computeSpecHash,
+  contentMatches,
+  EXECUTION_SECTIONS,
   writeEntry,
   writePipelineEntry,
   writeSufficiencyEntry,

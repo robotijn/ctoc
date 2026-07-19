@@ -47,14 +47,38 @@
  *   4. roots declared in .ctoc/reachability-roots.json (escape hatch for genuinely
  *      new entry points; adding one is a deliberate, reviewable act).
  *
- *   5. INSTRUCTION-SURFACE roots: any src/ file explicitly named in shipped
- *      executable instructions — src/commands/*.md, agents' markdown, skills'
- *      SKILL.md, or a CI workflow. In CTOC's architecture the session model
- *      executes what those surfaces instruct (node -e requires, spawned
- *      scripts), so a file named there is genuinely reachable by a human's
- *      session. A file named NOWHERE — no code edge, no instruction — is dead.
+ *   5. INSTRUCTION-SURFACE roots: any src/ file a shipped executable instruction
+ *      INVOKES — `node <path>` or `require('<path>')` inside src/commands/*.md,
+ *      agents' markdown, skills' SKILL.md, or a CI workflow. In CTOC's
+ *      architecture the session model executes what those surfaces instruct, so a
+ *      file they RUN is genuinely reachable by a human's session. A file merely
+ *      NAMED in prose is a CITATION, NOT A ROOT. A file invoked NOWHERE — no code
+ *      edge, no instruction that runs it — is dead.
  *
  * A TEST IS NEVER A ROOT. That is the whole point.
+ *
+ * A CITATION IS NOT AN INVOCATION — IN BOTH FENCES. The export fence has always
+ * said so; the file fence used to contradict it twenty lines away. Until
+ * 2026-07-19 `edgesFrom` credited ANY quoted string ending in `.js` as a call
+ * edge, matched by BASENAME — so `existsSync`'s presence-check array
+ * (`iron-loop-enforcer.js`'s REQUIRED_LIBS) manufactured eight call edges to files
+ * nothing executes — and `liveRoots` promoted ANY `src/**.js` path MENTIONED in
+ * any markdown to an execution root, prose included. Two rules, one module,
+ * opposite verdicts: a reader who landed on the wrong function concluded the
+ * exact opposite of the truth, and the baseline reported zero unreachable files
+ * against roughly two dozen real ones.
+ *
+ * THE READ PATHS FAIL LOUD (2026-07-19). Every one of them used to degrade
+ * SILENTLY toward "unreachable": an unreadable source file returned an empty edge
+ * set, an unreadable hooks manifest became the empty string so EVERY registered
+ * hook lost root status at once, and an unreadable instruction surface was
+ * skipped. The prose-root rule masked all three. Removing the mask without fixing
+ * them would let ONE unreadable file declare every hook — and its whole transitive
+ * tree — dead, into a baseline whose only sanctioned exits are wire or delete: a
+ * fence whose failure mode is "everything is dead" nominating live code for
+ * deletion. Unreadable is now FATAL and named; ABSENT keeps its own handling,
+ * because absent and unreadable are DIFFERENT FACTS. `analyze` returns
+ * `readErrors` so a seeding run can prove it read everything it judged.
  *
  * Cross-platform: path.join / posix normalization only; no shell.
  */
@@ -115,22 +139,138 @@ function resolveRequire(fromFile, spec) {
 }
 
 /**
+ * A repository-relative label for a path, for error messages. Never an absolute
+ * path (which would leak a home directory into a build log); falls back to the
+ * last two segments when the file lies outside the project root.
+ *
+ * @param {string|null} projectRoot
+ * @param {string} file - absolute path
+ * @returns {string}
+ */
+function relLabel(projectRoot, file) {
+  if (projectRoot) {
+    const r = path.relative(projectRoot, file).split(path.sep).join('/');
+    if (r.length > 0 && !r.startsWith('..')) return r;
+  }
+  return file.split(path.sep).slice(-2).join('/');
+}
+
+/**
+ * Read a file the analyzer has already committed to judging. A file it cannot
+ * read is a BROKEN INSTRUMENT, never evidence of absence — returning "" or an
+ * empty edge set here is a verdict on input that was never received, and it
+ * always points the same way: toward "dead".
+ *
+ * @param {string} file - absolute path
+ * @param {string|null} projectRoot - for the error label only
+ * @param {string} what - human noun for the message
+ * @returns {string}
+ * @throws {Error} naming the repository-relative path
+ */
+function readOrThrow(file, projectRoot, what) {
+  try {
+    return safeFs.readFileSync(file, 'utf8');
+  } catch (err) {
+    const e = /** @type {NodeJS.ErrnoException} */ (err);
+    throw new Error(
+      `reachability: cannot read ${what} ${relLabel(projectRoot, file)} (${e.code || e.message}). ` +
+      'An unreadable input is a broken instrument, not evidence that nothing is there — ' +
+      'every silent degradation here points at "unreachable", and the baseline it feeds ' +
+      'can only be paid off by wiring or deleting. Fix the read.'
+    );
+  }
+}
+
+/** The process-spawning calls whose ARGUMENTS genuinely execute a script.
+ * Disjoint classes plus a literal `(` sentinel → linear, ReDoS-safe. */
+const SPAWN_CALL_RE = /\b(?:spawnSync|spawn|execFileSync|execFile|execSync|exec|fork)\s*\(/g;
+/** A quoted literal inside an argument list. Bounded, no nesting, linear. */
+const ARG_LITERAL_RE = /['"`]([^'"`\n]{0,512})['"`]/g;
+/** A command string that RUNS a src file: `node …/src/x.js`. `node:` (the builtin
+ * module scheme) is excluded, and the gap between `node` and the path is bounded
+ * to the length of a realistic flag list plus a `${CLAUDE_PLUGIN_ROOT}` prefix. */
+const NODE_RUNS_SRC_RE = /\bnode(?![:\w])[^\n]{0,80}?(src\/[A-Za-z0-9_\-/.]+\.js)/g;
+/** How far a spawn call's argument list is scanned before giving up. */
+const ARG_SCAN_LIMIT = 2000;
+
+/**
+ * The text of one call's argument list, from just after its `(` to the matching
+ * `)`. Quote-aware (so a `)` inside a string does not close the list) and bounded
+ * — a spawn's arguments are the ONLY place a path literal is genuinely executed,
+ * and a fixed character window instead would credit whatever happened to sit a few
+ * lines below the call.
+ *
+ * @param {string} content - comment-stripped source
+ * @param {number} openIdx - index of the character AFTER the opening paren
+ * @returns {string}
+ */
+function argumentText(content, openIdx) {
+  let depth = 1;
+  let quote = '';
+  const end = Math.min(content.length, openIdx + ARG_SCAN_LIMIT);
+  let i = openIdx;
+  for (; i < end; i++) {
+    const c = content[i];
+    if (quote) {
+      if (c === '\\') { i++; continue; }
+      if (c === quote) quote = '';
+      continue;
+    }
+    if (c === "'" || c === '"' || c === '`') { quote = c; continue; }
+    if (c === '(' || c === '[' || c === '{') depth++;
+    else if (c === ')' || c === ']' || c === '}') { depth--; if (depth === 0) break; }
+  }
+  return content.slice(openIdx, i);
+}
+
+/**
+ * Resolve a PATH literal to a real src file. Two conditions, both required, and
+ * together they are what stops a presence-check array from manufacturing edges:
+ *
+ *   • it must contain a path SEPARATOR — a bare basename (`'menu.js'`) names no
+ *     path, and basename matching is precisely how one string used to fan out to
+ *     every file that shares it;
+ *   • it must resolve UNAMBIGUOUSLY to one real file under src/ — either relative
+ *     to the referring file, or as a unique project-relative suffix (covering
+ *     `${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js`). Two candidates → no edge; a
+ *     guess is worse than a gap in a list that can only be paid off by deletion.
+ *
+ * @param {string} fromFile - absolute path of the referring file
+ * @param {string[]} allFiles - absolute paths of every src file
+ * @param {string} spec - the literal's text
+ * @returns {string|null}
+ */
+function resolvePathLiteral(fromFile, allFiles, spec) {
+  const norm = String(spec).replace(/\\/g, '/').replace(/^\.\//, '');
+  if (!norm.endsWith('.js') || !norm.includes('/')) return null;
+  const abs = path.resolve(path.dirname(fromFile), norm);
+  const hits = [];
+  for (const candidate of allFiles) {
+    if (candidate === abs) return candidate;
+    if (candidate.split(path.sep).join('/').endsWith(`/${norm}`)) hits.push(candidate);
+  }
+  return hits.length === 1 ? hits[0] : null;
+}
+
+/**
  * Extract every outbound edge from one file: static `require('./x')`, the
- * codebase's lazy `req('./x')` alias, and path literals naming another src file
- * (a hook or command spawned by path, e.g. `node ".../src/commands/menu.js"`).
+ * codebase's lazy `req('./x')` alias, and path literals another file genuinely
+ * EXECUTES — a script passed to a spawning call, or named in a `node …` command
+ * string. A path literal that is merely STORED, listed, or checked for existence
+ * is a citation, not an invocation, and is not an edge.
+ *
+ * Comments are stripped first: a `require` written inside a comment is not a
+ * call. A fence a comment can disarm is not a fence.
  *
  * @param {string} file - absolute path
  * @param {string[]} allFiles - absolute paths of every src file (for path-literal matching)
+ * @param {string|null} [projectRoot] - project root, for error labels only
  * @returns {Set<string>} absolute paths this file reaches directly
+ * @throws {Error} if the file cannot be read (never a silent empty edge set)
  */
-function edgesFrom(file, allFiles) {
+function edgesFrom(file, allFiles, projectRoot = null) {
   const out = new Set();
-  let content;
-  try {
-    content = safeFs.readFileSync(file, 'utf8');
-  } catch {
-    return out;
-  }
+  const content = stripComments(readOrThrow(file, projectRoot, 'source file'));
 
   // require('./x') and the lazy req('./x') alias used across the codebase.
   const requirePattern = /(?:require|req)\(\s*['"]([^'"]+)['"]\s*\)/g;
@@ -140,16 +280,23 @@ function edgesFrom(file, allFiles) {
     if (target) out.add(target);
   }
 
-  // Path literals naming another src file — how hooks.json and the update/menu
-  // scripts reference siblings they SPAWN rather than require.
-  const literalPattern = /['"]([^'"]*\.js)['"]/g;
-  const selfBase = path.basename(file);
-  while ((match = literalPattern.exec(content)) !== null) {
-    const base = path.basename(match[1]);
-    if (base === selfBase) continue;
-    for (const candidate of allFiles) {
-      if (path.basename(candidate) === base) out.add(candidate);
+  // A path literal inside a SPAWNING call's argument list — the script really runs.
+  SPAWN_CALL_RE.lastIndex = 0;
+  while ((match = SPAWN_CALL_RE.exec(content)) !== null) {
+    const args = argumentText(content, match.index + match[0].length);
+    ARG_LITERAL_RE.lastIndex = 0;
+    let lit;
+    while ((lit = ARG_LITERAL_RE.exec(args)) !== null) {
+      const target = resolvePathLiteral(file, allFiles, lit[1]);
+      if (target && target !== file) out.add(target);
     }
+  }
+
+  // A command string that runs a src file by path: `node ".../src/commands/menu.js"`.
+  NODE_RUNS_SRC_RE.lastIndex = 0;
+  while ((match = NODE_RUNS_SRC_RE.exec(content)) !== null) {
+    const target = resolvePathLiteral(file, allFiles, match[1]);
+    if (target && target !== file) out.add(target);
   }
 
   return out;
@@ -184,22 +331,42 @@ function collectSurfaceFiles(projectRoot) {
   return surfaces;
 }
 
+/** A shipped instruction that RUNS a src file: `node …/src/x.js`. Same bounded,
+ * `node:`-excluding shape as the code-side rule. */
+const SURFACE_NODE_RUNS_RE = /\bnode(?![:\w])[^\n]{0,80}?(src\/[A-Za-z0-9_\-/.]+\.js)/g;
+/** A shipped instruction that REQUIRES a src file — the session's inline
+ * `node -e "require('./src/lib/x.js')"` recipe form. Quote-delimited, linear. */
+const SURFACE_REQUIRES_RE = /\brequire\s*\(\s*['"][^'"\n]{0,64}?(src\/[A-Za-z0-9_\-/.]+\.js)['"]\s*\)/g;
+
 /**
  * Resolve the live roots for a project.
  *
  * @param {string} projectRoot - absolute project root
  * @param {string[]} allFiles - absolute paths of every src file
+ * @param {{ tolerate?: boolean, readErrors?: string[] }} [options] - when
+ *   `tolerate` is set, an unreadable input is recorded in `readErrors` instead of
+ *   throwing. A run with a non-empty `readErrors` may NEVER seed a baseline.
  * @returns {{ roots: string[], declared: string[] }} absolute root paths, and the
  *   subset that came from the declared-roots escape hatch.
  */
-function liveRoots(projectRoot, allFiles) {
+function liveRoots(projectRoot, allFiles, options = {}) {
   const roots = new Set();
+  const tolerate = options.tolerate === true;
+  const readErrors = options.readErrors || [];
 
   // 1. Hooks registered in the plugin manifest — the real runtime entry points.
+  //    An ABSENT manifest means "no hooks" and is legitimate. An UNREADABLE one is
+  //    a broken instrument: reading it as "" made `raw.includes(...)` false for
+  //    EVERY hook, silently killing every runtime entry point at once.
   const manifest = path.join(projectRoot, HOOKS_MANIFEST);
   if (safeFs.existsSync(manifest)) {
     let raw = '';
-    try { raw = safeFs.readFileSync(manifest, 'utf8'); } catch { raw = ''; }
+    try {
+      raw = readOrThrow(manifest, projectRoot, 'the hooks manifest');
+    } catch (err) {
+      if (!tolerate) throw err;
+      readErrors.push(relLabel(projectRoot, manifest));
+    }
     for (const file of allFiles) {
       // A hook is live iff the manifest names its file. Matching on the basename
       // within a src/hooks path keeps this robust to ${CLAUDE_PLUGIN_ROOT} prefixes.
@@ -225,14 +392,25 @@ function liveRoots(projectRoot, allFiles) {
   }));
   for (const surface of surfaces) {
     let text = '';
-    try { text = safeFs.readFileSync(surface, 'utf8'); } catch { continue; }
-    // Match explicit src/... .js path mentions — a shipped instruction naming
-    // the file. Basename-only mentions do NOT count (too weak to be a root).
-    const mention = /src\/[A-Za-z0-9_\-/.]+\.js/g;
-    let m;
-    while ((m = mention.exec(text)) !== null) {
-      const hit = byRel.get(m[0]);
-      if (hit) roots.add(hit);
+    try {
+      text = readOrThrow(surface, projectRoot, 'instruction surface');
+    } catch (err) {
+      if (!tolerate) throw err;
+      readErrors.push(relLabel(projectRoot, surface));
+      continue;
+    }
+    // A path is a root only when the surface RUNS it — `node <path>` or
+    // `require('<path>')`. A path merely NAMED in prose, backticks included, is a
+    // CITATION, not an invocation: this is `surfaceCalledNames`' rule, transposed
+    // from names to paths. Crediting bare mentions made roughly a third of the
+    // library a root on the strength of descriptive sentences in agent markdown.
+    for (const re of [SURFACE_NODE_RUNS_RE, SURFACE_REQUIRES_RE]) {
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        const hit = byRel.get(m[1]);
+        if (hit) roots.add(hit);
+      }
     }
   }
 
@@ -260,17 +438,37 @@ function liveRoots(projectRoot, allFiles) {
 /**
  * Compute reachability over src/.
  *
+ * UNREADABLE INPUT IS FATAL. By default any file the analyzer cannot read throws,
+ * naming the path: every silent degradation in here points at "unreachable", and
+ * the baseline this feeds can only be paid off by wiring or deleting, so a verdict
+ * computed over unread input would nominate live code for deletion. Pass
+ * `{ tolerateReadErrors: true }` to collect the failures into `readErrors` instead
+ * — a run with a non-empty `readErrors` MAY NOT seed a baseline.
+ *
  * @param {string} projectRoot - absolute project root
- * @returns {{ total: number, reachable: string[], unreachable: string[], roots: string[] }}
- *   `reachable`/`unreachable`/`roots` are project-relative POSIX paths, sorted.
+ * @param {{ tolerateReadErrors?: boolean }} [options]
+ * @returns {{ total: number, reachable: string[], unreachable: string[],
+ *   roots: string[], readErrors: string[] }} `reachable`/`unreachable`/`roots`
+ *   are project-relative POSIX paths, sorted; `readErrors` names every input the
+ *   analyzer could not read (always empty unless tolerating).
  */
-function analyze(projectRoot) {
+function analyze(projectRoot, options = {}) {
   const srcDir = path.join(projectRoot, 'src');
   const allFiles = collectJsFiles(srcDir);
-  const { roots } = liveRoots(projectRoot, allFiles);
+  const tolerate = options.tolerateReadErrors === true;
+  const readErrors = [];
+  const { roots } = liveRoots(projectRoot, allFiles, { tolerate, readErrors });
 
   const graph = new Map();
-  for (const file of allFiles) graph.set(file, edgesFrom(file, allFiles));
+  for (const file of allFiles) {
+    try {
+      graph.set(file, edgesFrom(file, allFiles, projectRoot));
+    } catch (err) {
+      if (!tolerate) throw err;
+      readErrors.push(relLabel(projectRoot, file));
+      graph.set(file, new Set());
+    }
+  }
 
   const reached = new Set(roots);
   const queue = [...roots];
@@ -292,7 +490,8 @@ function analyze(projectRoot) {
     total: allFiles.length,
     reachable,
     unreachable,
-    roots: roots.map(rel).sort()
+    roots: roots.map(rel).sort(),
+    readErrors
   };
 }
 
@@ -568,8 +767,11 @@ function analyzeExports(projectRoot) {
   const tokensByFile = new Map();      // abs → Set<string>
   const internalUseByFile = new Map(); // abs → Set<string> (exports called inside their own file)
   for (const file of liveFiles) {
-    let content = '';
-    try { content = safeFs.readFileSync(file, 'utf8'); } catch { content = ''; }
+    // Fail loud, same reason as the file fence: `analyze` just read this exact
+    // file successfully, so a failure here is a broken instrument. Reading it as
+    // "" would report ZERO exports for the module — an under-report the ratchet
+    // would then absorb as progress.
+    const content = readOrThrow(file, projectRoot, 'live module');
     const names = exportedNames(content);
     exportsByFile.set(file, names);
     const code = stripComments(content);

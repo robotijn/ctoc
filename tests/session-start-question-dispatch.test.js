@@ -119,10 +119,25 @@ describe('X7 — the claude -p producer machinery is deleted', () => {
   });
 });
 
-describe('X7 — the dead-code fence stays at zero and writePlanQuestions stays live', () => {
-  it('case 5 — 0 unreachable files after the deletion', () => {
-    const { unreachable } = reachability.analyze(ROOT);
-    assert.deepEqual(unreachable, [], 'every src file is still reachable from a live root');
+describe('X7 — the dead-code fence stays green and writePlanQuestions stays live', () => {
+  it('case 5 — the deletion stranded nothing: the streaming files are reachable and the fence matches its baseline', () => {
+    // This case used to assert `unreachable === []`. That literal zero was never
+    // true: it was an artifact of the file fence crediting a BARE PROSE MENTION in
+    // markdown as an execution root. The fence now credits only invocations, so
+    // the honest global number lives in ONE place — the committed baseline that
+    // tests/reachability.test.js ratchets — and this case asserts what it is
+    // actually about: the files THIS slice touched are still reachable.
+    const { unreachable, reachable } = reachability.analyze(ROOT);
+    const baseline = JSON.parse(
+      fs.readFileSync(path.join(ROOT, '.ctoc', 'reachability-baseline.json'), 'utf8')
+    );
+    for (const rel of ['src/lib/streaming-gate.js', 'src/lib/streaming-precompute.js', 'src/hooks/SessionStart.js']) {
+      assert.ok(reachable.includes(rel), `${rel} must stay reachable from a live root`);
+    }
+    assert.deepEqual(
+      unreachable.filter((f) => !baseline.unreachable.includes(f)), [],
+      'the deletion must not strand any file outside the committed dead-code baseline'
+    );
   });
 
   it('case 5b — writePlanQuestions is a LIVE export (kept live by the instruction surface, no new JS caller)', () => {

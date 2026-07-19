@@ -266,7 +266,7 @@ describe('getVersion', () => {
 // setVersion Tests (using real file system)
 // =============================================================================
 
-describe('setVersion', { skip: false }, () => {
+describe('setVersion', () => {
   test('writes version to VERSION file', () => {
     // Read current version first
     const originalVersion = version.getVersion();
@@ -412,26 +412,26 @@ describe('syncAll', () => {
 });
 
 // =============================================================================
-// release Tests
+// release Tests — see the LIVE `release` suite near the bottom of this file.
+//
+// A second `release` suite used to sit here carrying
+// `{ skip: 'Skipped to avoid modifying VERSION file' }`. It was deleted, not
+// re-gated, because it was a DEAD DUPLICATE: every one of its four assertions is
+// superseded by a strictly stronger one in the live suite, which additionally
+// captures and restores the exact bytes of VERSION, marketplace.json and README
+// in before/after hooks rather than restoring only VERSION in a `finally`.
+//
+//   ok(result.oldVersion)                  → strictEqual(result.oldVersion, original)
+//   ok(result.newVersion)                  → strictEqual(result.newVersion, bump(original, 'patch'))
+//   ok(result.synced)                      → typeof object + marketplace/plugin/readme keys
+//   compareVersions(new, old) === 1        → identical assertion, retained
+//
+// Keeping it would have meant registration-gating a redundant suite behind an
+// environment variable — dead code with a switch on it. The suite-level `skip:`
+// was itself invisible: on node v24.14.1 a skipped SUITE contributes 0 to
+// `ℹ skipped` and its inner tests vanish from `ℹ tests` entirely, which is the
+// blind spot tests/skip-visibility.test.js now fences.
 // =============================================================================
-
-describe('release', { skip: 'Skipped to avoid modifying VERSION file' }, () => {
-  test('bumps version and syncs all files', () => {
-    const originalVersion = version.getVersion();
-    try {
-      const result = version.release('patch');
-      assert.ok(result.oldVersion, 'Has old version');
-      assert.ok(result.newVersion, 'Has new version');
-      assert.ok(result.synced, 'Has synced status');
-      assert.strictEqual(version.compareVersions(result.newVersion, result.oldVersion), 1,
-        'New version should be greater than old version');
-    } finally {
-      // Restore original version
-      version.setVersion(originalVersion);
-      version.syncAll();
-    }
-  });
-});
 
 // =============================================================================
 // checkForUpdatesSync Tests
