@@ -54,6 +54,14 @@ let enforcementLog = null;
 try { enforcementLog = require('../lib/enforcement-log'); } catch { enforcementLog = null; }
 let escapePhrases = null;
 try { escapePhrases = require('../lib/escape-phrases'); } catch { escapePhrases = null; }
+// Loaded fail-soft like the four above, BUT WITH THE OPPOSITE CONSEQUENCE, written
+// here so nobody reads the shared shape as "this one is optional too": if this module
+// fails to load, the protected-path guards fall back to ARITHMETIC ALONE and the
+// symbolic-link path into `.ctoc/approvals/` is open again. That is a real degradation
+// — recorded, not silent. Crashing the hook instead would be worse: the file's outer
+// catch fails OPEN, so a load-time throw would allow EVERY edit.
+let realPathConfinement = null;
+try { realPathConfinement = require('../lib/real-path-confinement'); } catch { realPathConfinement = null; }
 
 const WHITELIST = [
   '.gitignore',
@@ -169,7 +177,19 @@ function isUnderProtectedDir(norm, dir) {
  * @returns {boolean} true iff the normalized path is the ledger dir or under it
  */
 function isProtectedLedgerPath(filePath) {
-  return isUnderProtectedDir(normalizeForProtection(filePath), LEDGER_DIR);
+  // TWO INDEPENDENT CHECKS, EITHER OF WHICH DENIES. The arithmetic check is KEPT,
+  // not replaced: it costs nothing, it catches the spelling-level evasions the
+  // existing tests pin (case variants, a `..` that resolves back inside), and it
+  // works when the filesystem does not. The real-path check catches what names
+  // cannot express — an in-repository symbolic link whose REAL destination is the
+  // ledger, which pure arithmetic reports as an ordinary `src/…` path.
+  //
+  // FAILING DIRECTION: `resolvesUnder` returns TRUE to deny, and returns TRUE on
+  // every fault. It never throws — a throw would reach enforce()'s fail-OPEN catch
+  // and become an ALLOW of a ledger write.
+  return isUnderProtectedDir(normalizeForProtection(filePath), LEDGER_DIR)
+    || (realPathConfinement !== null
+      && realPathConfinement.resolvesUnder(filePath, LEDGER_DIR, process.cwd()));
 }
 
 /**
@@ -182,7 +202,12 @@ function isProtectedLedgerPath(filePath) {
  * @returns {boolean} true iff the normalized path is the verify dir or under it
  */
 function isProtectedVerifyPath(filePath) {
-  return isUnderProtectedDir(normalizeForProtection(filePath), VERIFY_EVIDENCE_DIR);
+  // Same additive pair, same inversion, as `isProtectedLedgerPath` above: the
+  // arithmetic check stays, and `resolvesUnder` returns TRUE to deny (including on
+  // every fault) so a link into `.ctoc/state/verify/` cannot forge Gate-3 evidence.
+  return isUnderProtectedDir(normalizeForProtection(filePath), VERIFY_EVIDENCE_DIR)
+    || (realPathConfinement !== null
+      && realPathConfinement.resolvesUnder(filePath, VERIFY_EVIDENCE_DIR, process.cwd()));
 }
 
 function readStdinJson() {

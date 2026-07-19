@@ -57,6 +57,7 @@
 const safeFs = require('./safe-fs');
 const { parseFrontmatter } = require('./frontmatter');
 const approvalResidency = require('./approval-residency');
+const realPathConfinement = require('./real-path-confinement');
 const path = require('path');
 
 // SCANNED STAGES, IN PRIORITY ORDER. `implementation` is deliberately ABSENT: it is
@@ -403,6 +404,26 @@ function scanForCoverage(targetFile, root) {
     path.isAbsolute(relRaw) ||
     path.isAbsolute(relTarget)
   ) {
+    return { ok: true, match: null, denial: null };
+  }
+
+  // REAL-PATH CONFINEMENT. The block above is pure ARITHMETIC and cannot see a
+  // symbolic link: with `link → /outside` in the tree, `/repo/link/x.js` yields the
+  // clean relative path `link/x.js`, passes every test above, and writes outside the
+  // repository. Ask the filesystem where the target REALLY leads.
+  //
+  // FAILING DIRECTION: `escapes === true` DENIES, and every fault inside
+  // `escapesRoot` returns `true` — it never throws, because a throw reaches
+  // `PreToolUse.Edit.js`'s fail-OPEN catch and becomes an ALLOW.
+  //
+  // PLACEMENT IS LOAD-BEARING. AFTER the arithmetic, so an obviously-escaping target
+  // costs zero syscalls; BEFORE the stage loop, so the resolution is paid ONCE per
+  // call rather than once per plan or once per glob.
+  //
+  // The verdict is `{ ok: true, match: null }` — not FAILED — matching exactly how
+  // the arithmetic escape above is reported: an out-of-tree target is not a scan
+  // fault, it is a target no plan may ever cover. No new message shape is introduced.
+  if (realPathConfinement.escapesRoot(targetFile, root).escapes) {
     return { ok: true, match: null, denial: null };
   }
 
