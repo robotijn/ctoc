@@ -498,3 +498,171 @@ file and the exact change, and ask — per the sibling slice's Decision 18.
    a link on the Bash channel are all marked MEASURE or PROBE. The ledger finding is
    marked as derived from reading and **required to be confirmed or refuted at Step 8**,
    with refutation reported plainly rather than defended.
+
+## Execution Record
+
+All steps 8–16 executed. Files changed:
+
+- `src/lib/real-path-confinement.js` — CREATED (the one real-path predicate)
+- `src/lib/plan-coverage.js` — one `escapesRoot` check, after the arithmetic, before the stage loop
+- `src/hooks/PreToolUse.Edit.js` — fail-soft require + both protected-path guards gain the additive `resolvesUnder` check
+- `tests/a-link-cannot-leave-the-repository.test.js` — CREATED, 16 cases
+- OUT OF DECLARED SCOPE, moved as count RATCHETS only: `CLAUDE.md` (436→437 test files ×2, 105→106 lib modules) and `tests/readme-numbers.test.js` (the live-disk equality 105→106). See Decision 13.
+
+### Step 8: TEST — TDD RED, recorded verbatim BEFORE any src/ change
+
+`node --test tests/a-link-cannot-leave-the-repository.test.js`:
+`tests 14 · suites 2 · pass 6 · fail 8 · cancelled 0 · skipped 0 · todo 0`
+
+RED (the defect): case 1, case 2, case 6, case 11, case 13.
+RED (planning's own ledger finding — **CONFIRMED, not refuted**): case 7, case 8, case 9.
+GREEN already, and still green after the fix: case 3, case 4, case 5, case 10, case 12, case 14.
+
+Case 1 actual: `{ plan: 'todo/p-link', stage: 'todo', glob: 'link/**' }` where `null` was required —
+an approved plan covered a file whose real location was a different temp directory entirely.
+Case 7/8/9 actual: `false !== true` — `isProtectedLedgerPath` / `isProtectedVerifyPath` reported
+a write whose real destination was the approval ledger as an ordinary, unprotected source path.
+Case 11 (link loop): it did NOT hang and did NOT throw — it returned a MATCH (`glob: 'a/**'`),
+which is the worst of the three outcomes: a silent ALLOW through an ELOOP path.
+Case 13 (realpath fault): the fault did not reach the hook's fail-open catch; it simply never
+happened, because nothing on either path called `realpathSync` at all.
+
+### Step 9: PREPARE — measured, not assumed
+
+Symbolic links in this repository, excluding `node_modules/` and `.git/`: **NONE**. `src/`,
+`tests/`, `plans/`, `agents/`, `skills/`, `.ctoc/` and `docs/` contain zero links, so nothing
+load-bearing had to be reported to the human before Step 10.
+
+`src/lib/plan-coverage.js` and `src/hooks/PreToolUse.Edit.js` were both clean in git at start —
+the concurrent executor had not touched either.
+
+Timing BEFORE (200 iterations after 20 warm-up, real repository):
+existing covered target **1.130 ms/call** · non-existent target (the Write ancestor-walk path)
+**0.926 ms/call** · uncovered target **1.050 ms/call**.
+
+DISCREPANCY, code wins: the plan expected `safe-fs`'s `validatePath` to REFUSE an absolute path
+outside the project. It does not — it validates only "non-empty string, no NUL byte", so
+`validatePath('/etc/passwd')` is ACCEPTED and `realpathSync('/etc/passwd')` returns
+`/private/etc/passwd`. There is no out-of-project refusal to handle. What validatePath DOES throw
+on is an empty or NUL-byte path (a TypeError, no `code`), which the resolver maps to DENY via its
+non-ENOENT branch. Pinned by the NUL-byte assertions in the predicate tests.
+
+### Step 12: OPTIMIZE — timing AFTER, against Step 9
+
+existing covered target **1.192 ms/call** (was 1.130) · non-existent target **0.953 ms/call**
+(was 0.926) · uncovered target **0.974 ms/call**. Cost of the fix is ≈**0.03–0.06 ms/call**,
+roughly 170× under the 10 ms budget.
+
+An ARITHMETICALLY escaping target (`../outside.js`) costs **0.001 ms/call** — zero syscalls,
+confirming the placement after the arithmetic block. The two hook guards cost **0.024 ms** and
+**0.025 ms** per call.
+
+### Step 13: SECURE — probe verdicts, reported and NOT fixed
+
+**The Bash channel: an agent CAN create the link.** `PreToolUse.Bash.js` was driven with real
+payloads. `WRITE_PATTERNS` does not contain `ln` at all, and the ledger guard matches PATH TEXT:
+
+| command | verdict |
+|---|---|
+| `ln -s .. src/anywhere` | **ALLOWED** |
+| `ln -s /etc src/anywhere` | **ALLOWED** |
+| `ln -s ../.. src/up` | **ALLOWED** |
+| `ln -s ../../../ plans/out` | **ALLOWED** |
+| `ln -s .ctoc/approvals src/anywhere` | BLOCKED (exit 2) |
+
+Only the command that literally spells `.ctoc/approvals` is stopped. An attacker never needs to:
+`ln -s .. src/anywhere` is allowed and reaches the ledger at
+`src/anywhere/<repo>/.ctoc/approvals/`. So before this fix the full chain was executable
+end-to-end by an agent with no human anywhere in it. NOT FIXED here — `PreToolUse.Bash.js` is
+not declared by this plan.
+
+**`isWhitelisted` DOES reach further through a link — confirmed, not assumed.** With
+`plans/out → <outside>` and `.ctoc/out → <outside>`, `isWhitelisted` returns `true` for
+`plans/out/evil.md` and for `.ctoc/out/anything.json`, i.e. the whitelist grants a write to an
+arbitrary location outside the repository. The ledger and verify-evidence directories are now
+protected against this (both guards run BEFORE the whitelist and both resolve real paths), but
+the general out-of-tree whitelist escape remains open. NOT FIXED here — the plan explicitly
+scopes the whitelist out.
+
+Fault paths all DENY by RETURNING: missing path (ancestor walk), `ELOOP` → `loop`,
+`EACCES`/`EPERM` → `denied`, `ENOTDIR` → `resolve-failed`, unresolvable root, a `validatePath`
+TypeError. Verified by assertion, including `assert.doesNotThrow` — a throw would reach
+`enforce()`'s fail-OPEN catch and become an ALLOW.
+
+The deny path leaks nothing: `plan-coverage` discards the reason entirely and returns
+`{ ok: true, match: null }`, the same shape as today's arithmetic out-of-tree denial;
+`resolvesUnder` returns a bare boolean. No absolute paths, no file contents, no stack traces, no
+errno objects cross the boundary.
+
+## Verification Evidence
+
+Targeted run (16 files the plan names, plus the reachability fences): `tests 407 · pass 403 ·
+fail 4 · skipped 0` — the 4 were the two documented-count ratchets tripped by adding two files,
+nothing else. After moving both ratchets: all green.
+
+Full gated run, `npm test`, verbatim:
+
+```
+ℹ tests 10213
+ℹ suites 1760
+ℹ pass 10213
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+[CTOC test-gate] coverage 99.06% (threshold 99%), skipped 0, failed 0
+[CTOC test-gate] PASS
+```
+
+The floor stayed at 99 — not lowered, not raised. `real-path-confinement.js` measured 94.20% line
+coverage on its first pass; two predicate-level tests were added for the input-guard branches
+rather than lowering anything. The three remaining uncovered lines (the post-`MAX_ANCESTOR_WALK`
+return and the two outermost catches) are documented-unreachable in the test file's header, not
+faked.
+
+`npx eslint --max-warnings 0` clean on every changed JavaScript file. `npx tsc --noEmit -p .`
+clean — `resolveExisting` returns a UNIFORM `{ok, real, reason}` shape rather than a discriminated
+union, because `checkJs` would not narrow the union across the `!ok` guard (TS2339).
+
+**The pipeline still runs.** All **74** declared globs across every plan in `todo/` and
+`in-progress/` still resolve to an approved covering plan through `findCoveringPlan`. A root
+resolution done wrong would have denied all 74; none were denied.
+
+## Step 16 Final-Review Report
+
+The reported defect and planning's derived ledger finding are BOTH confirmed and both closed on
+the editing channel. What this does NOT fix, restated: the Bash channel is unchanged (and the
+probe shows an agent really can create the link); hard links are an open residual that real-path
+resolution cannot see; `isWhitelisted` remains pure arithmetic and demonstrably reaches outside
+the tree through a link; declaration width is unbounded and the human is not shown what they are
+granting; and no link in this repository was removed, there being none.
+
+## Decisions Taken Under Ambiguity
+
+10. **`resolveExisting` and `isWithin` are NOT exported**, against the plan's export list. They
+    have no caller outside this module, and `tests/export-reachability.test.js` fails an export
+    whose only caller would be a test. Exporting the two public predicates (`escapesRoot`,
+    `resolvesUnder`) is what the two live call sites need; the plan's own wiring table already
+    records the other two as reached only "the same" way, i.e. internally.
+11. **`ENOTDIR` DENIES rather than walking up**, per the plan's table. An ancestor that is a file
+    means the target is not a path at all; treating it as "missing" and walking past it would
+    silently accept a path shape the filesystem has already rejected.
+12. **`resolvesUnder` returns `false`, not `true`, for a target that is not a path at all**
+    (absent, non-string, empty). That is not a resolver fault — there is nothing to protect — and
+    both call sites already guard `targetFile &&`. Returning `true` there would report a null
+    target as ledger-protected and change unrelated existing verdicts. Every OTHER fault returns
+    `true`, and the distinction is written at the definition.
+13. **Two count ratchets outside the declared file list were moved, not stopped on.** Adding one
+    library module and one test file tripped `tests/doc-counts.test.js` (against `CLAUDE.md`'s
+    documented counts) and `tests/readme-numbers.test.js`'s live-disk equality on `src/lib`. Both
+    are pure count ratchets whose comment says in as many words "raised because the disk changed",
+    and the executor brief puts ratchets in scope by rule, measured live. Nothing was weakened:
+    no assertion loosened, no case deleted, no exemption added. Recorded here because the files
+    are outside this plan's `files:` declaration.
+14. **`resolveExisting` returns a uniform shape rather than the plan's discriminated union.**
+    `tsc --checkJs` would not narrow `{ok:true,real} | {ok:false,reason}` across the `!ok` guard.
+    Behaviour is identical; only the type shape changed.
+15. **Case 4 was strengthened beyond the plan.** The plan reproduces the `/tmp → /private/tmp`
+    shape by relying on macOS's own tmpdir link, which would make the case vacuous on Linux. The
+    test instead creates an explicit link pointing AT the fixture root and passes that as the
+    root, so the trap is exercised deterministically on every platform.

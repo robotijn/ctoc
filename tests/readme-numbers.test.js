@@ -132,13 +132,17 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
-  it('src/lib/: 105 JS modules at top level (approval-residency.js — the ONE encoding of approved residency)', () => {
+  it('src/lib/: 106 JS modules at top level (real-path-confinement.js — the ONE encoding of where a path really leads)', () => {
     // 104 → 105: `src/lib/approval-residency.js` was extracted out of
     // `src/hooks/human-gate-check.js` so `src/lib/plan-coverage.js` could consult the
     // SAME approval predicate — a library may not require a hook, and a second
     // predicate would be two encodings of an approval, which is a forgery surface.
+    // 105 → 106: `src/lib/real-path-confinement.js`. Root confinement and the
+    // protected-directory guards were pure path ARITHMETIC, which cannot see a
+    // symbolic link; both now share one real-path predicate, for the same
+    // two-encodings-diverge reason.
     // This is the live disk count, raised because the disk changed.
-    assert.equal(countTopLevelJs("src/lib"), 105);
+    assert.equal(countTopLevelJs("src/lib"), 106);
   });
 
   it('src/commands/: 3 slash command specs — menu, push, update (v6.9.32)', () => {
