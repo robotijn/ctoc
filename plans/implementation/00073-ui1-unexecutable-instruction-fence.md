@@ -1,9 +1,9 @@
 ---
 iron_loop: true
-title: "A ratcheting fence against an instruction that can never execute — something documented, registered, or ordered where nothing on the other end can act on it"
+title: "A ratcheting fence against a documented vocabulary word nothing accepts, and a setting nothing reads"
 type: implementation
 parent_plan: none
-depends_on: none
+depends_on: 00098-agents-told-to-run-code-they-cannot-run
 priority: critical
 files:
   - src/lib/unexecutable-instruction-scan.js
@@ -12,26 +12,62 @@ files:
   - .ctoc/unexecutable-instruction-baseline.json
 ---
 
-# The unexecutable-instruction fence
+# The unexecutable-instruction fence — the two remaining detections
 
-## ⚠️ BUILD CONFLICT — SERIALIZE THIS WITH THE FALSE-GREEN FENCE
+## SCOPE NARROWED — SETTLED BY THE HUMAN, DO NOT RE-OPEN
 
-`plans/in-progress/00071-fg1-false-green-fence.md` is **in-progress right now** and
-declares `src/lib/iron-loop-enforcer.js` in its own `files:` list. It will append a
-check to the `CHECKS` registry at roughly line 565. **This plan appends a check to the
-same array.** Two executors editing that array concurrently will produce a lost update
-or a merge conflict in the one file that both fences depend on for liveness.
+This plan originally specified **three** detections. **The human ruled on 2026-07-19 that
+its middle detection moves out, and the ruling is his** — not the planner's and not the
+coordinator's. It is recorded here as settled so nobody rediscovers the conflict and
+re-litigates it.
 
-**The human must serialize the two builds.** Recommended order: let the false-green
-fence land first (it is already in-progress and already gate-approved), then start this
-one. The rest of this plan's files are disjoint from that plan's, so no other conflict
-exists.
+**What moved.** The detection of *an order to an agent to run code its own `tools:` grant
+gives it no way to run* is now owned entirely by the plan titled **"Five agents are ordered
+to run code they have no way to run — the orders are corrected and a fence stops the next
+one"** (`plans/implementation/00098-agents-told-to-run-code-they-cannot-run.md`). That plan
+found five live instances, corrects all five agent bodies, and builds the detection with
+three signatures rather than this plan's one — including two signatures this plan's design
+would have missed entirely.
+
+**Why it moved.** That detection was the only one of the three with a live, unfixed root
+cause; it carries by far the highest false-positive risk and deserved its own slice of
+attention; and Operating Lesson 16 says a fix and the fence that prevents its recurrence
+belong in the same unit of work.
+
+**THE BOUNDARY RULE — this sentence appears in both plans, and it is the boundary. It is
+this plan's own decision 2, and it is why the detection moved rather than being
+duplicated:**
+
+> **One fence per invariant, or the two drift and the human trusts neither.**
+
+Concretely, and permanently:
+
+| Invariant | Owner | The other plan must never grow a checker for it |
+|---|---|---|
+| an order to an agent to run code its `tools:` grant cannot execute | **the five-agents plan** | **this plan must not add this detection back** |
+| a document naming a task kind the accepted vocabulary rejects | **this plan** | that plan must not add it |
+| a configuration key written or documented that nothing reads | **this plan** | that plan must not add it |
+
+**What this plan now builds:** detections (a) and (c) only, **added to the scanner the
+five-agents plan ships**. It creates no new module, no new baseline file, no new test file
+and no new `CHECKS` entry — those four artifacts already exist by the time this plan runs.
+Its `files:` list is unchanged for exactly that reason: the same four paths, extended
+rather than created.
+
+**Ordering:** `depends_on` the five-agents plan. Its two remaining detections extend a
+module that does not exist until that plan lands. **If
+`src/lib/unexecutable-instruction-scan.js` is absent at Step 9, STOP and report — do not
+create it here.**
+
+The earlier build conflict with the false-green fence over `src/lib/iron-loop-enforcer.js`
+has **cleared**: that fence has landed (`.ctoc/false-green-baseline.json` is live and
+`CLAUDE.md` documents it). It is no longer a reason to serialize anything.
 
 ## Problem — a defect class that fails in total silence
 
 In plain words: **something is documented, registered, or instructed, and nothing on
 the other end can act on it.** It never throws at the point of authorship, it never
-shows up as a failing assertion, and the pipeline reports success. All three confirmed
+shows up as a failing assertion, and the pipeline reports success. All the confirmed
 instances were found **by accident**, never by a check — which is the whole argument
 for a mechanical fence.
 
@@ -40,12 +76,11 @@ is an instrument reporting a verdict on input it never received. This class is a
 instruction with no receiver at all. They need different detectors, which is why this
 is its own plan and not a section of that one.
 
-### The three confirmed instances (verified against disk, 2026-07-18)
+### The confirmed instances in this plan's remaining scope (verified against disk, 2026-07-18)
 
 | # | Site | What is instructed | What is on the other end | State |
 |---|---|---|---|---|
-| 1 | `src/commands/menu.md:232` documented the recipe "Record a task per ref (`menu task add`, kind `precompute`…)" | a task of kind `precompute` | `KINDS` in `src/lib/task-registry.js` did not contain `precompute`; `addTask` threw on every call | **FIXED today** — `precompute` now sits in `KINDS` at `task-registry.js:136-139` with the post-mortem in its docblock |
-| 2 | `src/hooks/SessionStart.js:199-201` | producer and critic agents must call the JavaScript function `streaming-precompute.writePlanQuestions(root, ref, questions, planMtimeMs)` | none of the named agents can invoke a function: `agents/iron-loop/premortem-critic.md`, `devils-advocate-critic.md` and `red-team-critic.md` are `tools: Read, Grep`; `agents/planning/product-owner.md` is `Read, Write, WebSearch`; `vision-advisor.md` is `Read, AskUserQuestion, Write`; `implementation-planner.md` is `Read, Glob, Grep, Write`. **Not one holds Bash.** | **STILL LIVE** |
+| 1 | `src/commands/menu.md:232` documented the recipe "Record a task per ref (`menu task add`, kind `precompute`…)" | a task of kind `precompute` | `KINDS` in `src/lib/task-registry.js` did not contain `precompute`; `addTask` threw on every call | **FIXED** — `precompute` now sits in `KINDS` at `task-registry.js:136-139` with the post-mortem in its docblock |
 | 3 | `src/lib/init-project.js:509-510` writes `enforcement:\n  mode: strict` into every new project's `settings.yaml`, and `CLAUDE.md` documents it as live per-project tuning | an enforcement-strictness setting | nothing in `src/` reads it. `src/hooks/PreToolUse.Task.js:27` says so outright: *"`enforcement.mode` from `.ctoc/settings.yaml` today — no hook does"*. The similarly-named `workflow.enforcementMode` at `src/lib/settings.js:59` is a **different key on a different surface** (`settings.json`) | **STILL LIVE** (plan 00069 wires it; the fence must catch the general case regardless) |
 
 Instance 1's blast radius is the argument for urgency: every `menu task add precompute`
@@ -53,29 +88,15 @@ call threw, so the record-first step failed, so **no critic was ever dispatched,
 questions file was ever written**, and the streaming screen silently fell back to a
 bare prompt for all 64 pending plans. Nothing was red. Nobody was told.
 
-### A fourth instance, found while writing this plan
-
-The detection signature designed below was run by hand over the agent corpus before
-committing to it. It immediately surfaced a fourth, previously unrecorded instance of
-the same class:
-
-- `agents/planning/product-owner.md:336` — *"Call `markComplete(stubPath, …)` from
-  `src/lib/background.js`"*, in an agent whose grant is `Read, Write, WebSearch`.
-  Five sibling instructions in the same file (`markNeedsInput` at lines 51, 52, 53,
-  75, 119, 506).
-- `agents/planning/vision-decomposer.md` — eight instructions to call
-  `getCanvasForVision`, `parseCanvas`, `decomposeVision`, `mergeStubs`, `removeStub`,
-  `createStub`, `initProductOwnerAgent`, `completeVision`, in an agent granted
-  `Read, Write, AskUserQuestion`.
-
-That the signature found a real, unknown instance on its first hand-run is the
-strongest evidence available that detection (b) is buildable rather than noise.
+**Instance 2 — agents instructed to call JavaScript functions they cannot execute — has
+MOVED to the five-agents plan** and is not this plan's work. It is deliberately left out of
+the table above, rather than listed as "moved", so that nobody builds against it here by
+reflex. The numbering gap between 1 and 3 is the only trace, and it is intentional.
 
 ## What this builds
 
-A **test that fails, inside `npm test`** — not a linter hint, not a documentation note
-— backed by one scanner module wired into the live self-check registry so the scanner
-itself is reachable and is not flagged by the dead-code and dead-export fences.
+Two additional detections in the **existing** scanner — a **test that fails, inside
+`npm test`**, not a linter hint and not a documentation note.
 
 It follows this repository's established fence pattern exactly: `tests/reachability.test.js`
 for the ratchet, `tests/menu-task-wiring.test.js` for bidirectional vocabulary parity,
@@ -85,7 +106,8 @@ prescriptive failure message.
 ### Debt versus exemption — the distinction that makes this landable
 
 Conflating these is what has killed fences in this repository before, so they are two
-separate structures in the baseline file with two different meanings.
+separate structures in the baseline file with two different meanings. **The five-agents
+plan already ships this structure; this plan adds entries to it and never redefines it.**
 
 | | Meaning | Justification | Direction | Starts at |
 |---|---|---|---|---|
@@ -95,9 +117,9 @@ separate structures in the baseline file with two different meanings.
 A finding in DEBT is a bug awaiting a fix. A finding in EXEMPTION is a false positive
 awaiting nothing. Anything in neither list **fails the build**.
 
-## The three detections
+## The two detections
 
-Three genuinely different mechanics, one scanner, one exported function.
+Two genuinely different mechanics, added to the one scanner.
 
 ### (a) Recipe verb versus accepted vocabulary
 
@@ -130,61 +152,6 @@ can name and code can reject): `STATUSES` and `TERMINAL` in `task-registry.js`, 
 key parity is **not duplicated** — the scanner records it as already-fenced and skips it,
 so there is exactly one fence per invariant.
 
-### (b) Instruction verb versus agent tool grant
-
-The highest false-positive risk in this plan, and the reason the discriminators are
-stated explicitly rather than left to the implementer.
-
-**Grant side.** Parse the **first** YAML frontmatter block of each `agents/**/*.md` and
-read its `tools:` list. *Load-bearing parsing detail:* `agents/planning/implementation-planner.md`
-has a **second** `tools:` line at line 160, inside an embedded "agent definition pattern"
-example. Reading the last match, or matching anywhere in the file, reads an example as
-the grant. Only the first frontmatter block counts.
-
-**Instruction side — the two signatures I accept.**
-
-| Signature | Shape | Requires |
-|---|---|---|
-| **b1 — function call** | an imperative or second-person `call` / `invoke` verb immediately followed by a backticked call token `` `name(` `` or `` `mod.name(` `` | `Bash` (a function is invoked by shelling out to `node -e`), **unless** the callee's bare name matches a granted tool name |
-| **b2 — shell command** | a line beginning with an imperative `Run ` / `Execute ` followed by a backticked token that is not a call token | `Bash` |
-
-**The discriminator between instruction and description**, which is the crux:
-
-- **Instruction (flagged)** — the sentence has no third-person subject before the verb.
-  `Call \`markComplete(…)\``; `you call \`applyFallback(…)\``; `2. Call \`parseCanvas(path)\``;
-  `- **Merge:** Call \`mergeStubs(…)\``. The addressee is this agent.
-- **Description (not flagged)** — a third-person subject precedes the verb. Detected by
-  testing whether the ≤ 60 characters preceding the verb end in a noun-phrase subject or
-  a modal: `The decomposer will call \`validateVisionReadiness(…)\``
-  (`vision-advisor.md:455`); `the dispatcher calls X`; `CTO Chief runs the stack-chooser`.
-  Also excluded: the third-person verb inflections `calls` / `runs` / `invokes`, which
-  are description by grammar.
-- **Satisfied-by-tool (not flagged)** — the callee name is itself a granted tool.
-  `vision-advisor.md:26` says `Call \`Read('.ctoc/learnings/vision.md')\`` and
-  `vision-advisor.md:110` says `Call \`Write(visionPath, updatedContent)\`` — that agent
-  holds `Read` and `Write`, so both are perfectly executable. Without this rule the
-  detector would produce a flood of false positives against exactly the agents that are
-  correct.
-- **Fenced code excluded entirely.** Content inside ``` fences is example, output
-  template, or transcript — never an instruction to this agent.
-
-**Signatures I reject as too noisy, and why** (stated as required, and this is the
-honest part of the design):
-
-| Rejected signature | Why |
-|---|---|
-| bare "write the report" / "write X to Y" as a Write-grant check | English "write" is overwhelmingly used for the agent's *output prose*, not a file write. Unresolvable without semantics. |
-| bare "search for X" as a WebSearch-grant check | "search the codebase" is satisfied by Grep; "search for a pattern" is satisfied by Glob. The verb does not name the tool. Hand-run over `agents/quality/**` returned zero true positives. |
-| any backticked shell-looking token anywhere in a line | agent prose is dense with example commands. Restricted to a line-initial imperative (b2) precisely to avoid this. |
-| "read X" as a Read-grant check | every agent in the corpus holds `Read`; the check can never fire. Zero value, non-zero noise. |
-
-**Measured volume.** A hand-run of the b1 signature over all 123 agent definitions
-returned **23 matches**, of which the clear majority are true positives and the
-remainder are cleanly separated by the two exclusion rules above. This is a
-hand-auditable set, not a flood. If, at Step 8, the seeded scan exceeds **60** b-findings,
-that is evidence the signature drifted noisy: stop, and report to the human rather than
-whitelisting the residue away.
-
 ### (c) Config key written or documented versus read
 
 **Read `docs/CONFIG_SOURCES.md` before touching this — the two surfaces have two
@@ -205,9 +172,19 @@ and wrongly certify the yaml key as read. The scanner therefore keys every findi
 
 **Read side.** A key counts as read when its leaf name, or its dotted path, appears in
 `src/**` **outside** the writer that emits it and outside a comment. Deliberately
-generous: this detector must **under**-report, exactly like the export fence
-(`src/lib/reachability.js:333-335` states that bias as the correct one for a gate that
-fails a build). A fence that cries wolf gets whitelisted into uselessness.
+generous: this detector must **under**-report, exactly like the export fence. The bias is
+stated in the header comment governing the export-level analysis at
+`src/lib/reachability.js:333-335`. A fence that cries wolf gets whitelisted into
+uselessness.
+
+**A trap the five-agents plan documented and this plan inherits:** `src/lib/reachability.js`
+contains **both** the exemplar and the counter-example for "a citation is not an
+invocation". `exportedNames` (declared `:499`) calls `stripComments` as its first statement
+(`:500`) and is the model to follow. `edgesFrom` (declared `:126`) does the opposite twenty
+lines earlier — at `:145` any string literal ending in `.js` becomes a call edge, and at
+`:231` any `src/…` path merely mentioned in any markdown becomes a reachability root, with
+no comment stripping and no call syntax required. Follow `exportedNames`. A reader who
+opens the file and lands on the wrong function concludes the opposite of the truth.
 
 **Expected seed for the yaml surface**, from the live `generateSettings()` at
 `init-project.js:504-535`: `enforcement.mode`, `quality.coverage_threshold`,
@@ -222,16 +199,17 @@ the detector's own non-vacuity control.
 ### Dependency graph
 
 ```
-src/lib/unexecutable-instruction-scan.js
+src/lib/unexecutable-instruction-scan.js        ← EXTENDED here, not created
    ├── requires  src/lib/safe-fs.js          (audited fs choke point — no raw fs)
-   ├── requires  src/lib/task-registry.js    (KINDS / STATUSES / TERMINAL)
-   └── reads     src/commands/*.md, agents/**/*.md, src/lib/init-project.js,
-                 src/lib/settings.js, src/**  (as data)
+   ├── requires  src/lib/task-registry.js    (KINDS / STATUSES / TERMINAL)   ← ADDED
+   └── reads     src/commands/*.md, src/lib/init-project.js,
+                 src/lib/settings.js, src/**  (as data)                       ← ADDED
 
 src/lib/iron-loop-enforcer.js
-   └── requires  src/lib/unexecutable-instruction-scan.js   ← THE LIVE CALL SITE
+   └── requires  src/lib/unexecutable-instruction-scan.js   ← the live call site,
+                                                              ALREADY WIRED upstream
 
-tests/unexecutable-instruction-fence.test.js
+tests/unexecutable-instruction-fence.test.js    ← EXTENDED here, not created
    ├── requires  src/lib/unexecutable-instruction-scan.js
    └── reads     .ctoc/unexecutable-instruction-baseline.json
 ```
@@ -239,68 +217,43 @@ tests/unexecutable-instruction-fence.test.js
 No cycle: the scanner requires `task-registry`, which requires only `safe-fs` and
 `plan-coverage`. The enforcer already requires `reachability` the same way.
 
-### Wiring — the live call sites (non-negotiable, and in THIS slice)
+### Wiring — already live, and this plan must not duplicate it
 
-| New module | Live call site | Root it is reachable from |
+| Module | Live call site | Root it is reachable from |
 |---|---|---|
-| `src/lib/unexecutable-instruction-scan.js` | `src/lib/iron-loop-enforcer.js` → `CHECKS` entry `{ id: 'unexecutable-instruction-fence', scope: 'architecture', mode: 'thorough', fn: checkUnexecutableInstructionFence }`, appended to the array at ~line 585, with `checkUnexecutableInstructionFence(root)` defined beside `checkDeadExportFence` at ~line 601 | `iron-loop-enforcer.checkAllInvariants` is reached from the shipped `src/commands/menu.js` self-check route |
+| `src/lib/unexecutable-instruction-scan.js` | the `CHECKS` entry `{ id: 'unexecutable-instruction-fence', … }` in `src/lib/iron-loop-enforcer.js`, **shipped by the five-agents plan** | `iron-loop-enforcer.checkAllInvariants`, reached from the shipped `src/commands/menu.js` self-check route |
 
-The call site ships in this slice's Step 10. It is not a follow-up. Without it the
-scanner is dead on arrival and the reachability fence at `tests/reachability.test.js`
-will say so.
+This plan adds detections to a scanner that is **already reachable**. It must **not** add a
+second `CHECKS` entry — one fence, one entry. If a second entry appears, the human sees two
+verdicts for one invariant family and trusts neither.
 
 ### File: `src/lib/unexecutable-instruction-scan.js`
 
-**Action:** CREATE
-**Purpose:** Find every instruction that nothing on the other end can act on.
-**Exports:** exactly one function (any second export would be flagged by the
-dead-export fence, since only `scan` has a live call site).
+**Action:** MODIFY — extend the existing `scan(root)`.
+**Exports:** unchanged. Still exactly one name, `scan`. Any second export would be flagged
+by the dead-export fence.
 
-```js
-/**
- * @typedef {Object} Finding
- * @property {'recipe-kind'|'recipe-kind-reverse'|'instruction-tool'|'config-key'} detection
- * @property {string} key     stable baseline key — NEVER contains a line number
- * @property {string} file    repo-relative path, path.posix-normalized
- * @property {number} line    1-based, for the human-readable message ONLY
- * @property {string} message one sentence naming what cannot execute and why
- * @property {string} fix     the prescribed fix, naming the file and the safe shape
- */
+The `Finding.detection` union widens from `'instruction-tool'` to
+`'instruction-tool'|'recipe-kind'|'recipe-kind-reverse'|'config-key'`, and `scanned` gains
+`commandDocs` and `settingsKeys` counters beside the existing `agents` and `withGrant` —
+because a scan that read zero command documents must fail the fence, never pass it silently.
 
-/**
- * Scan a project for instructions that can never execute.
- *
- * @param {string} root - absolute project root
- * @returns {{findings: Finding[], counts: {recipeKind:number, recipeKindReverse:number,
- *   instructionTool:number, configKey:number}, scanned: {commandDocs:number,
- *   agents:number, settingsKeys:number}}}
- *   `scanned` exists for the non-vacuity assertions: a scan that read zero agents
- *   must fail the fence, never pass it silently.
- * @throws {TypeError} root is not a non-empty string
- */
-function scan(root) { /* … */ }
-
-module.exports = { scan };
-```
-
-**Internal helpers** (module-private, not exported):
+**Additional module-private helpers** (none exported), beside the five the five-agents plan
+already ships:
 
 | Helper | Signature | Behaviour |
 |---|---|---|
-| `stripFences` | `(md: string) => string` | replace ``` fenced blocks with blank lines of equal count, so line numbers survive |
-| `frontmatterTools` | `(md: string) => string[]` | tools from the **first** `---` block only; `[]` when absent |
 | `recipeKinds` | `(md: string) => Array<{kind, line}>` | both the inline and the displaced shapes; skips single-uppercase-letter metavariables |
-| `instructionCalls` | `(md: string, tools: Set<string>) => Array<{callee, line, signature}>` | b1 + b2, after `stripFences`, after the description and satisfied-by-tool exclusions |
 | `writtenSettingsKeys` | `(root: string) => Array<{surface, path, line, file}>` | yaml keys from `generateSettings()`'s emitted literal; json keys from the `settings.js` schema |
 | `keyIsRead` | `(root, surface, dottedPath) => boolean` | leaf-or-dotted occurrence in `src/**`, excluding the emitting writer and comment lines |
 
 **Baseline key shapes** — stable identifiers, **no line numbers** (a line number in a
-key makes the baseline churn on every unrelated edit and turns the fence into noise):
+key makes the baseline churn on every unrelated edit and turns the fence into noise), in
+the same namespace the five-agents plan established:
 
 ```
 recipe-kind          src/commands/menu.md::recipe-kind::precompute
 recipe-kind-reverse  src/lib/task-registry.js::recipe-kind-reverse::sync
-instruction-tool     agents/planning/product-owner.md::instruction-tool::markComplete
 config-key           settings.yaml::config-key::enforcement.mode
 ```
 
@@ -311,10 +264,6 @@ the safe shape. Vague messages are how a fence gets ignored:
   `src/lib/task-registry.js` rejects — every such call throws and the recipe silently
   never runs. Either add `X` to `KINDS` (with a docblock note saying why) or correct the
   recipe to name an accepted kind."*
-- `instruction-tool` → *"`<agent>.md` tells this agent to call `X(…)`, but its
-  `tools:` grant is `<list>` — it cannot invoke a function. Either grant `Bash` and have
-  it shell out via `node -e`, or rewrite the instruction as an artifact the agent CAN
-  produce with its granted tools (e.g. Write a file that a wired code path consumes)."*
 - `config-key` → *"`<writer>` writes `<surface>` key `<path>` but no code in `src/`
   reads it — a visible setting wired to nothing is a placebo. Either wire a reader (and
   note it in `docs/CONFIG_SOURCES.md`) or stop writing the key."*
@@ -325,114 +274,105 @@ keys to a macOS one. All filesystem access through `src/lib/safe-fs.js`. No `exe
 
 ### File: `src/lib/iron-loop-enforcer.js`
 
-**Action:** MODIFY — **conflicts with plan 00071, see the banner at the top.**
+**Action:** MODIFY — **minimally**.
 
-- **Add** `checkUnexecutableInstructionFence(root)` beside `checkDeadExportFence`
-  (~line 601). Lazy-`require` the scanner inside the function body, matching the
-  established shape of `checkReachabilityFence` and `checkDeadExportFence`.
-- **Add** one `CHECKS` entry (~line 585), `mode: 'thorough'` (the scan walks the agent
-  corpus, so it must not run on the fast path).
-- Returns `null` when `scanned.agents === 0` (not a CTOC source tree) and `null` when
-  every finding is baselined; otherwise `{severity: 'block', message}` naming the first
-  ten fresh findings, mirroring `checkDeadExportFence` exactly.
-- A malformed baseline excuses **nothing** — every finding blocks. Same posture as
-  `checkDeadExportFence`'s `catch` at line 617.
+The `CHECKS` entry and `checkUnexecutableInstructionFence(root)` already exist. This plan
+touches this file **only** if the new detections require the message to name a detection
+kind. Do **not** add a second check, do **not** change the entry's `id`, and do **not**
+change its `mode: 'thorough'`. The `null`-return guard for a non-CTOC tree widens from
+`scanned.agents === 0` to also tolerate `scanned.commandDocs === 0`, and a malformed
+baseline must continue to excuse **nothing**.
 
 ### File: `.ctoc/unexecutable-instruction-baseline.json`
 
-**Action:** CREATE — seeded from a **real scan at Step 8**, never hand-guessed.
+**Action:** MODIFY — add the new detections' seeded debt from a **real scan at Step 8**,
+never hand-guessed. The file, its `comment`, its `debt`/`exemptions` split and its
+`maxDebt` ratchet already exist. `maxDebt` **rises** by exactly the count of newly seeded
+findings and by nothing else — and that is the one and only circumstance in which this
+number may rise: a **new detection revealing pre-existing debt**. It may never rise to
+accommodate a newly introduced defect.
 
-```json
-{
-  "maxDebt": 0,
-  "debt": [],
-  "exemptions": []
-}
-```
-
-`debt` is an array of baseline-key strings. `exemptions` is an array of
-`{ "key": "…", "reason": "…" }` and **ships empty**. `maxDebt` is the seeded debt count.
+`exemptions` stays **empty**.
 
 ### Test plan: `tests/unexecutable-instruction-fence.test.js`
 
-**Action:** CREATE. Framework `node:test` with `assert/strict`, matching every sibling
-fence in `tests/`.
+**Action:** MODIFY — append cases. Framework `node:test` with `assert/strict`, matching
+every sibling fence in `tests/`. The existing 19 cases must all still pass unchanged; if
+any of them has to be weakened to accommodate a new detection, **STOP and report** — the
+code changes, not the test.
 
 | # | Test | Drives |
 |---|---|---|
-| 1 | **Non-vacuity** — `scanned.agents >= 100`, `scanned.commandDocs >= 1`, `scanned.settingsKeys >= 5`. A scan that read nothing must fail, never pass silently (the false-green trap this fence must not fall into itself). | the analyzer |
-| 2 | **(a) REAL INSTANCE, historical** — a fixture reproducing `menu.md:232` verbatim (``Record a task per ref (`menu task add`, kind `precompute`…)``) scanned against a `KINDS` set lacking `precompute` yields exactly one `recipe-kind` finding keyed `…::recipe-kind::precompute`. Asserts the **displaced** shape is caught — a naive `menu task add (\w+)` regex would miss the real bug. | instance 1 |
-| 3 | **(a) forward parity is clean today** — the live repo produces zero fresh `recipe-kind` findings, because `precompute` was added to `KINDS`. | the fix holds |
-| 4 | **(b) REAL INSTANCE, live** — the live scan contains `agents/planning/product-owner.md::instruction-tool::markComplete`, and that key is present in `debt`. | instance 2's mechanic, on the fourth instance found by this signature |
-| 5 | **(b) description is NOT flagged** — `agents/planning/vision-advisor.md:455` ("The decomposer will call `validateVisionReadiness(…)`") produces no finding. | the discriminator |
-| 6 | **(b) satisfied-by-tool is NOT flagged** — `vision-advisor.md:26` `Call \`Read(…)\`` and `:110` `Call \`Write(…)\`` produce no findings, since that agent holds `Read` and `Write`. | the second discriminator |
-| 7 | **(b) frontmatter parsing** — `implementation-planner.md` resolves to `Read, Glob, Grep, Write` from its **first** block, never the example `tools:` at line 160. | the parsing trap |
-| 8 | **(c) REAL INSTANCE, live** — the live scan contains `settings.yaml::config-key::enforcement.mode`, and that key is in `debt`. | instance 3 |
-| 9 | **(c) surface separation** — `workflow.enforcementMode` on the json surface does **not** satisfy `enforcement.mode` on the yaml surface. | the `CONFIG_SOURCES.md` split |
-| 10 | **(c) non-vacuity control** — `regulatory_regime.active_profiles` is **not** flagged, because `regulatory-regime.js` `loadActiveProfiles` reads it. Proves the reader-detection is not stuck returning false. | the detector |
-| 11 | **NO NEW ENTRY** — every live finding is in `debt` or `exemptions`; anything else fails with the per-finding prescriptive `fix` text. | the ratchet |
-| 12 | **RATCHET ONLY TIGHTENS** — `findings.length <= maxDebt`. | the ratchet |
-| 13 | **CLAIM YOUR PROGRESS** — `findings.length === maxDebt` exactly; a drop fails with *"you fixed N — now LOWER maxDebt to X and remove the fixed keys."* Mirrors `tests/reachability.test.js:87-98`. | the ratchet |
-| 14 | **BASELINE IS HONEST** — no `debt` key names a file that no longer exists; no key contains a line number (asserted by pattern). | the baseline |
-| 15 | **EXEMPTIONS ARE JUSTIFIED** — every exemption has a `reason` of ≥ 20 characters; `exemptions` ships empty. | debt/exemption separation |
-| 16 | **WIRED** — `src/lib/iron-loop-enforcer.js` contains the `unexecutable-instruction-fence` `CHECKS` entry, and `checkAllInvariants({mode:'thorough'})` runs it without throwing. | the live call site |
+| 20 | **Non-vacuity, extended** — `scanned.commandDocs >= 1` and `scanned.settingsKeys >= 5`. A scan that read nothing must fail, never pass silently (the false-green trap this fence must not fall into itself). | the analyzer |
+| 21 | **(a) REAL INSTANCE, historical** — a fixture reproducing `menu.md:232` verbatim (``Record a task per ref (`menu task add`, kind `precompute`…)``) scanned against a `KINDS` set lacking `precompute` yields exactly one `recipe-kind` finding keyed `…::recipe-kind::precompute`. Asserts the **displaced** shape is caught — a naive `menu task add (\w+)` regex would miss the real bug. | instance 1 |
+| 22 | **(a) forward parity is clean today** — the live repo produces zero fresh `recipe-kind` findings, because `precompute` was added to `KINDS`. | the fix holds |
+| 23 | **(c) REAL INSTANCE, live** — the live scan contains `settings.yaml::config-key::enforcement.mode`, and that key is in `debt`. | instance 3 |
+| 24 | **(c) surface separation** — `workflow.enforcementMode` on the json surface does **not** satisfy `enforcement.mode` on the yaml surface. | the `CONFIG_SOURCES.md` split |
+| 25 | **(c) non-vacuity control** — `regulatory_regime.active_profiles` is **not** flagged, because `regulatory-regime.js` `loadActiveProfiles` reads it. Proves the reader-detection is not stuck returning false. | the detector |
+| 26 | **ONE FENCE, ONE ENTRY** — `src/lib/iron-loop-enforcer.js` contains **exactly one** `CHECKS` entry whose `id` is `unexecutable-instruction-fence`, and no second entry for any detection in this family. | the boundary rule |
+| 27 | **THE MOVED DETECTION IS NOT DUPLICATED** — this plan's added code introduces no second implementation of the agent-tool-grant detection; `scan` still exposes exactly one code path producing `detection === 'instruction-tool'`. | the boundary rule |
 
-Coverage target ≥ 80% on the new module, error paths included (`scan(null)` throws
-`TypeError`; a missing `agents/` directory yields `scanned.agents === 0` rather than a
-throw).
+Coverage target ≥ 80% on the added code, error paths included (a missing
+`src/commands/` directory yields `scanned.commandDocs === 0` rather than a throw).
 
 ## Security Review
 
 - **Path traversal** — every read path is built with `path.join(root, …)` from a
   caller-supplied root; no path segment comes from scanned file *content*.
-- **Regex denial of service** — the instruction signatures use bounded character
-  classes and a bounded look-back window (≤ 60 chars), never a nested quantifier over
-  unbounded input. Each scanned line is length-capped at 2000 characters before
-  matching.
+- **Regex denial of service** — the added patterns use bounded character classes and a
+  bounded 200-character window for the displaced recipe shape, never a nested quantifier
+  over unbounded input. Each scanned line is length-capped at 2000 characters before
+  matching, matching the existing scanner.
 - **No secrets** — the scanner reads config **key paths**, never values; no finding
-  message may contain a settings value. Asserted in test 8's message check.
+  message may contain a settings value. Asserted in test 23's message check.
 - **Prototype pollution** — findings are built from named fields, never spread from
   parsed content; the baseline is read into a `Set` of strings, never merged into an
   object.
 - **Command injection** — no `exec`, no `execSync`, no shell. The scan is pure reads.
 - **Error messages** — repo-relative paths only, never absolute ones that would leak a
   developer's home directory into a build log.
-- **Fail direction** — the scanner **under**-reports by design (matching
-  `src/lib/reachability.js:333-335`); a malformed baseline excuses nothing.
+- **Fail direction** — the scanner **under**-reports by design; a malformed baseline
+  excuses nothing.
 
 ## Execution Plan
 
 ### Step 8: TEST
-Write `tests/unexecutable-instruction-fence.test.js` with all 16 cases above. Run it,
-**see it fail red** — the module does not exist yet. Then run the scanner prototype once
-to **seed** `.ctoc/unexecutable-instruction-baseline.json` from a real scan; record the
-seeded counts per detection in this plan. If the `instruction-tool` count exceeds 60,
-**stop and report to the human** — that is evidence the signature drifted noisy, and
-whitelisting the residue away would be the exact failure this plan exists to prevent.
+Append tests 20–27 to `tests/unexecutable-instruction-fence.test.js`. Run it, **see the new
+cases fail red** — the detections do not exist yet — and confirm the existing 19 still pass.
+Then run the extended scanner once to **seed** the new detections' debt into
+`.ctoc/unexecutable-instruction-baseline.json` from a real scan; record the seeded counts
+per detection in this plan and the resulting `maxDebt` rise.
 
 ### Step 9: PREPARE
-Confirm plan 00071 has landed and `src/lib/iron-loop-enforcer.js` is free (see the
-conflict banner). Read `docs/CONFIG_SOURCES.md`, `src/lib/task-registry.js` `KINDS`,
-and `tests/menu-task-wiring.test.js` before writing the parity code.
+**First, confirm the five-agents plan has landed:**
+`src/lib/unexecutable-instruction-scan.js` must exist and export `scan`, and
+`src/lib/iron-loop-enforcer.js` must already contain the `unexecutable-instruction-fence`
+`CHECKS` entry. **If either is absent, STOP and report — do not create them here.** Then
+read `docs/CONFIG_SOURCES.md`, `src/lib/task-registry.js` `KINDS`, and
+`tests/menu-task-wiring.test.js` before writing the parity code.
 
 ### Step 10: IMPLEMENT
-- `src/lib/unexecutable-instruction-scan.js` — `scan(root)` plus the six private helpers.
-- `src/lib/iron-loop-enforcer.js` — `checkUnexecutableInstructionFence` + the `CHECKS` entry.
-- `.ctoc/unexecutable-instruction-baseline.json` — the seeded debt from Step 8.
+- `src/lib/unexecutable-instruction-scan.js` — the three added private helpers, the widened
+  `detection` union, and the two added `scanned` counters.
+- `src/lib/iron-loop-enforcer.js` — only if the message needs to name a detection kind.
+- `.ctoc/unexecutable-instruction-baseline.json` — the seeded debt from Step 8 and the
+  `maxDebt` rise.
 
 ### Step 11: REVIEW
 Verify the dependency direction (lib never imports hooks or commands), that exactly one
-name is exported, that no baseline key carries a line number, and that every failure
-message prescribes a fix naming a file and a safe shape.
+name is still exported, that no baseline key carries a line number, that every failure
+message prescribes a fix naming a file and a safe shape, and — the boundary rule — that
+there is still exactly **one** `CHECKS` entry and exactly **one** code path producing an
+`instruction-tool` finding.
 
 ### Step 12: OPTIMIZE
-One pass per file; `stripFences` and the line split computed once per file, not per
-signature. The whole scan must stay under one second over the 123-agent corpus — it runs
-in `thorough` mode inside the self-check.
+One pass per file; the line split computed once per file, not per detection. The whole
+scan must stay under one second over the corpus — it runs in `thorough` mode inside the
+self-check.
 
 ### Step 13: SECURE
-Walk the Security Review list above item by item. Confirm the length caps and the
-bounded look-back are present in the shipped regexes.
+Walk the Security Review list above item by item. Confirm the length caps and the bounded
+200-character window are present in the shipped regexes.
 
 ### Step 14: VERIFY
 Run the **full gate**: `npm test`. Requires lint clean, typecheck clean, all tests
@@ -441,16 +381,16 @@ passing, **coverage at or above the enforced floor of 99** in
 **not** sufficient — it bypasses both the coverage floor and the zero-skipped gate.
 
 ### Step 15: DOCUMENT
-JSDoc on `scan` and every private helper, including the two rejected-signature
-rationales so a future maintainer does not "helpfully" add them back. A short comment
-block at the top of the baseline's consuming test stating the debt/exemption
-distinction.
+JSDoc on every added private helper, including the two rejected-signature rationales so a
+future maintainer does not "helpfully" add them back, and a note in the scanner's header
+recording that the agent-tool-grant detection is owned by the five-agents plan **and only
+there**, per the boundary rule.
 
 ### Step 16: FINAL-REVIEW
-Confirm: all three detections each have a test driving a real instance from the list;
-the scanner is wired into `CHECKS` in this same slice; `exemptions` is empty; the
-ratchet fails loudly in both directions; the plan's acceptance criteria all map to a
-passing test.
+Confirm: both remaining detections have a test driving a real instance from the list; no
+second `CHECKS` entry and no second scanner were created; `exemptions` is still empty; the
+ratchet fails loudly in both directions; and the boundary rule is restated in the scanner's
+own documentation so the next reader inherits it.
 
 ## Decisions Taken Under Ambiguity
 
@@ -460,21 +400,26 @@ passing test.
    Forward parity — the direction of the real instance — stays hard.
 2. **The `claude:` action-key parity is not re-implemented.** `tests/menu-task-wiring.test.js:636-664`
    already fences it bidirectionally. The scanner records it as already-fenced and skips
-   it: one fence per invariant, or the two drift and the human trusts neither.
-3. **Detection (b) is scoped to two signatures.** Four candidate signatures were rejected
-   as too noisy (table in the (b) section). This is a deliberate under-report: a fence
-   that cries wolf gets whitelisted into uselessness, and the export fence's own docblock
-   argues that bias is correct for a gate that fails a build.
-4. **Config readers are detected by name occurrence in `src/**`, not by data-flow.** A
+   it: **one fence per invariant, or the two drift and the human trusts neither.** This is
+   the rule the human applied on 2026-07-19 when he moved the agent-tool-grant detection
+   out of this plan — it was already this plan's own decision, and it now governs the
+   boundary *between* the two plans as well as the boundary inside this one.
+3. **Config readers are detected by name occurrence in `src/**`, not by data-flow.** A
    real reachability analysis of a config read is out of proportion here. Name matching
    under-reports (a key mentioned anywhere counts as read), which is the safe direction.
-5. **Both settings surfaces are scanned, keyed by surface.** Scanning only the yaml
+4. **Both settings surfaces are scanned, keyed by surface.** Scanning only the yaml
    surface would have missed the general case the human asked for; merging the two
    surfaces would have falsely certified `enforcement.mode` as read via
    `workflow.enforcementMode`.
-6. **`scan` is the only export.** The dead-export fence would flag any second export,
-   since only `scan` gains a live call site in this slice.
-7. **Plan 00069 (wiring enforcement mode) will make test 13 fail on purpose.** When that
+5. **`scan` remains the only export.** The dead-export fence would flag any second export.
+6. **Plan 00069 (wiring enforcement mode) will make the ratchet fail on purpose.** When that
    plan lands, `enforcement.mode` stops being a finding, the live count drops below
    `maxDebt`, and the "claim your progress" test fails with an instruction to lower the
    baseline. That is the ratchet working as designed, not a conflict.
+7. **After the narrowing this plan creates nothing and extends everything** — four modified
+   files, no new ones. The alternative, its own scanner and baseline and test file and
+   `CHECKS` entry alongside the five-agents plan's, is precisely what decision 2 forbids.
+8. **The three rejected instruction signatures from this plan's original detection (b) went
+   with it.** They are recorded in the five-agents plan, which owns that detection. Nothing
+   about them is repeated here, because a rejected-signature rationale sitting in a plan
+   that no longer owns the signature is how a deleted detection grows back.
