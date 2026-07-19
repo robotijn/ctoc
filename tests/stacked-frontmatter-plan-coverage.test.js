@@ -53,6 +53,22 @@ function writePlan(root, stage, slug, content) {
   fs.writeFileSync(p, content);
   return p;
 }
+/**
+ * Mint the REAL ledger approval for a fixture plan. Coverage now requires a
+ * genuine, agent-unforgeable approval and not merely a stage folder — a plan file
+ * is something an agent can author, so residency alone confers no write access.
+ * Only the two `findCoveringPlan` cases below need it; every `readPlanFiles`
+ * assertion in this file is about PARSING and is untouched by approval.
+ */
+function approve(root, planPath, stageTo = 'todo') {
+  const ledger = require('../src/lib/approval-ledger');
+  return ledger.writeEntry(ledger.slugFromPlanPath(planPath), {
+    content: fs.readFileSync(planPath, 'utf8'),
+    stage_from: 'implementation',
+    stage_to: stageTo,
+    approved_by: 'human',
+  }, root);
+}
 after(() => {
   while (sandboxes.length) fs.rmSync(sandboxes.pop(), { recursive: true, force: true });
 });
@@ -98,7 +114,7 @@ describe('plan-coverage sees `files:` through a prepended approval marker', () =
 
   it('RED: the enforcement oracle covers a stamped plan\'s declared file', () => {
     const root = mkSandbox();
-    writePlan(root, 'todo', 'stacked-cover', MARKER + '\n' + OWN);
+    approve(root, writePlan(root, 'todo', 'stacked-cover', MARKER + '\n' + OWN));
 
     const hit = findCoveringPlan('src/lib/task-registry.js', root);
     assert.ok(hit, 'a gate-stamped plan must still cover the file it declares');
@@ -135,6 +151,7 @@ describe('plan-coverage sees `files:` through a prepended approval marker', () =
   it('REGRESSION: a normal single-block plan is unaffected', () => {
     const root = mkSandbox();
     const p = writePlan(root, 'todo', 'single', OWN);
+    approve(root, p);
     assert.deepEqual(readPlanFiles(p), [
       'src/lib/task-registry.js',
       'src/lib/task-reconcile.js',

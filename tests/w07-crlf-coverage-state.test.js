@@ -87,7 +87,17 @@ test('findCoveringPlan: declared file resolves as COVERED under CRLF via the hoo
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'w07-cov-'));
   try {
     // Only the CRLF plan is present, so a match proves CRLF coverage resolves.
-    mkPlan(root, 'crlf-only', CRLF_PLAN);
+    // It carries a REAL ledger approval because coverage now requires one: a plan
+    // file is something an agent can author, so residency grants nothing by itself.
+    // The property under test is unchanged — CRLF must not resolve to empty coverage.
+    const crlfPath = mkPlan(root, 'crlf-only', CRLF_PLAN);
+    const ledger = require('../src/lib/approval-ledger');
+    ledger.writeEntry(ledger.slugFromPlanPath(crlfPath), {
+      content: fs.readFileSync(crlfPath, 'utf8'),
+      stage_from: 'implementation',
+      stage_to: 'todo',
+      approved_by: 'human',
+    }, root);
 
     const covered = findCoveringPlan('src/foo.js', root);
     assert.ok(covered, 'declared file must be COVERED (not treated as uncovered) under CRLF');

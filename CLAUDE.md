@@ -131,7 +131,11 @@ When Claude is inside a CTOC project, the **PreToolUse enforcement hook** (`src/
 
 1. **Whitelist** — `.gitignore`, `.ctoc/*`, `.local/*`, `plans/*.md`, `VERSION` always pass.
 2. **Non-CTOC project** — silent pass; the hook treats this project as out of scope.
-3. **Plan-covered target** — allow. The hook checks each active plan's `files:` declaration (in stages `in-progress`, `todo`, `implementation`) and matches the target via minimatch-style globs. Stage priority: in-progress > todo > implementation. Within a stage, most-specific glob wins.
+3. **Plan-covered target** — allow, **only if a human APPROVED that plan**. The hook checks each active plan's `files:` declaration (in stages `in-progress`, `todo`) and matches the target via minimatch-style globs. Stage priority: in-progress > todo. Within a stage, most-specific glob wins — among the plans that are approved.
+
+   **Only approved plans grant write access.** This decision is a PERMISSION, and it used to be derived from a document the requesting agent was free to write: `plans/**.md` is edit-whitelisted, and the scan included `implementation/`, which is PRE-approval (Gate 2 is the `implementation → todo` edge). An agent could therefore author a seven-line plan declaring `files: ["src/hooks/human-gate-check.js"]` and grant itself permission to edit the hook enforcing the four human gates; with `files: ["**"]` it granted the whole repository. Both were reproduced. Two halves close it and either alone leaves it open: `implementation` is out of the scan, AND every candidate is verified against the agent-write-denied approval ledger via `src/lib/approval-residency.js` (`isApprovedForCoverage`) — otherwise the identical probe written one directory over, into `plans/todo/`, still worked. A plan resident in `in-progress/` is classified against the **`todo` edge**, because `in-progress` is not a gate destination and no ledger entry ever records it; the Gate 2 approval is what admits a plan to the build phase and it holds throughout. `approval-residency.js` is the ONE encoding of approved residency, shared with `src/hooks/human-gate-check.js` — a second predicate would be a divergence, and a divergence in an approval predicate is a forgery surface.
+
+   **Coverage fails CLOSED, and fail-closed means return `null`, never throw.** `PreToolUse.Edit.js` wraps enforcement in a catch that fails OPEN, so a throw out of `plan-coverage.js` becomes an ALLOW — a permission check whose failure mode is "permission granted". An unlistable stage directory used to do exactly that. Enforced by `tests/unapproved-plan-grants-nothing.test.js`. A denial that was caused by an unapproved or invalidated plan NAMES that plan and the reason, because a lockout the human cannot read is what gets reverted.
 4. **Escape phrase in recent user messages** — allow. See `src/lib/escape-phrases.js` for the canonical list (`hotfix`, `trivial fix`, `urgent`, `skip planning`, `skip iron loop`, `quick fix`, `trivial change`). Case-insensitive, word-bounded.
 5. **Otherwise — BLOCK** with a helpful message redirecting to `/ctoc:menu`.
 
@@ -240,7 +244,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 433 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 435 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -369,13 +373,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (menu, push, update)
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use, subagent stop)
-    lib/                 104 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 105 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 433 test files
+  tests/                 435 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

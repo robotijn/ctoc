@@ -70,8 +70,20 @@ function cleanup(dir) {
   if (dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ } }
 }
 
-/** Write a plan with a `files:` coverage block into `stage`. */
-function writePlan(dir, stage, name, files) {
+/**
+ * Write a plan with a `files:` coverage block into `stage`, AND — by default —
+ * mint the REAL ledger approval that makes it grant coverage.
+ *
+ * Only an APPROVED plan grants write access. This file is the evasion suite, so the
+ * distinction is the point: authoring a plan file is something an agent can do, and
+ * it must buy nothing. The positive control ("an in-progress plan covering src/**
+ * must ALLOW src/lib/x.js") is about a plan a HUMAN approved, so the fixture mints
+ * that approval instead of assuming the stage folder implies it. Minted with the
+ * real ledger over the fixture's actual bytes; `stage_to` mapped as production maps
+ * it (`in-progress` carries its Gate 2 `todo` entry, since no entry ever records
+ * `in-progress`). Pass `{ approved: false }` for a deliberately unapproved plan.
+ */
+function writePlan(dir, stage, name, files, opts = {}) {
   const filesYaml = files.map((f) => `  - "${f}"`).join('\n');
   const content = `---
 title: "${name}"
@@ -81,7 +93,18 @@ ${filesYaml}
 ---
 # ${name}
 `;
-  fs.writeFileSync(path.join(dir, 'plans', stage, `${name}.md`), content);
+  const planPath = path.join(dir, 'plans', stage, `${name}.md`);
+  fs.writeFileSync(planPath, content);
+  if (opts.approved !== false) {
+    const ledger = require('../src/lib/approval-ledger');
+    ledger.writeEntry(ledger.slugFromPlanPath(planPath), {
+      content,
+      stage_from: 'implementation',
+      stage_to: stage === 'in-progress' ? 'todo' : stage,
+      approved_by: 'human',
+    }, dir);
+  }
+  return planPath;
 }
 
 /**

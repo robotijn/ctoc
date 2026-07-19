@@ -61,7 +61,18 @@ describe('plan-coverage', () => {
   beforeEach(() => { root = tempProject(); });
   afterEach(() => { cleanup(root); });
 
-  function writePlan(stage, name, files) {
+  const ledger = require('../src/lib/approval-ledger');
+
+  /**
+   * Write a plan AND — by default — mint the real ledger approval that makes it
+   * grant coverage. Only an APPROVED plan grants write access: a plan file is
+   * something an agent can author, so residency alone confers nothing. The entry
+   * is minted with the real ledger over the fixture's actual bytes, and
+   * `stage_to` is mapped as production maps it (a plan building in `in-progress/`
+   * carries the Gate 2 `todo` entry, because no entry ever records `in-progress`).
+   * Pass `{ approved: false }` for a negative case.
+   */
+  function writePlan(stage, name, files, opts = {}) {
     const filesYaml = files.map(f => `  - "${f}"`).join('\n');
     const content = `---
 title: "${name}"
@@ -71,7 +82,17 @@ ${filesYaml}
 ---
 # ${name}
 `;
-    fs.writeFileSync(path.join(root, 'plans', stage, `${name}.md`), content);
+    const planPath = path.join(root, 'plans', stage, `${name}.md`);
+    fs.writeFileSync(planPath, content);
+    if (opts.approved !== false) {
+      ledger.writeEntry(ledger.slugFromPlanPath(planPath), {
+        content,
+        stage_from: 'implementation',
+        stage_to: stage === 'in-progress' ? 'todo' : stage,
+        approved_by: 'human',
+      }, root);
+    }
+    return planPath;
   }
 
   it('returns the plan that covers a target file (exact match)', () => {

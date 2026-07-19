@@ -1,0 +1,9 @@
+{
+  "content_sha256": "8cd15b6d9721d805dd12cc021e6f287c08e401335cf3e0c120ca74470133ca00",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T18:29:04.192Z",
+  "approved_by": "human",
+  "plan_basename": "00120-two-plans-can-be-given-the-same-number"
+}

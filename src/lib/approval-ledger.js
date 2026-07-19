@@ -418,10 +418,23 @@ function computeSpecHash(content) {
   // Length-prefixed domain separation between the two derived regions, so no
   // shuffling of bytes across the frontmatter/body boundary can produce the same
   // digest from a different split.
+  //
+  // THE SEPARATOR IS WRITTEN AS THE `\x00` ESCAPE, NEVER AS AN EMBEDDED CONTROL
+  // CHARACTER — do not "simplify" it back to a raw byte. A single raw NUL flips this
+  // file to BINARY for every content-search tool. A single-FILE search at least
+  // prints a `binary file matches` notice; a PROJECT-WIDE search drops the file
+  // SILENTLY — no notice, no match, indistinguishable from a genuine miss. That made
+  // the single source of approval truth in this product invisible to every reader,
+  // reviewer and agent that searches the codebase (a search for `require(` across
+  // `src/**` returned 139 files and omitted this one, though it requires `crypto`).
+  // The escape and the literal byte produce an IDENTICAL string, so the digest is
+  // unchanged — pinned against a golden constant in
+  // `tests/source-stays-searchable.test.js`, because a moved digest would silently
+  // invalidate every existing approval record in the repository.
   const h = crypto.createHash('sha256');
-  h.update(`${frontmatter.length} `, 'utf8');
+  h.update(`${frontmatter.length}\x00`, 'utf8');
   h.update(frontmatter, 'utf8');
-  h.update(' ', 'utf8');
+  h.update('\x00', 'utf8');
   h.update(kept.join('\n'), 'utf8');
   return { hash: h.digest('hex'), ok: true, reason: null, frontmatter };
 }

@@ -58,6 +58,12 @@ const ESCALATION_STATUSES = ['SKIPPED', 'BLOCKED', 'DEFERRED'];
  * KNOWN AND DELIBERATE GAP: a NON-ZERO count ("3 skipped") is still read as a
  * declaration. It is indistinguishable in shape from `Step 12 SKIPPED`, and a
  * run that really did skip 3 tests is a genuine problem worth surfacing.
+ *
+ * These three rules are NOT the whole fix, and the second half is `maskQuotedSpans`
+ * below. The boundary rules handle the COMPOUND and QUANTIFIED forms; they cannot
+ * help a BARE standalone word, and a plan whose subject IS the skip counter has to
+ * be able to QUOTE that counter's label. Two different problems, both necessary,
+ * neither replacing the other.
  */
 const STATUS_BOUNDARY_BEFORE = '(?<![\\w\\-.])';
 const STATUS_BOUNDARY_AFTER = '(?![\\w\\-\\[])';
@@ -88,6 +94,91 @@ function statusWordPattern(word) {
 // their call sites precisely because they DO carry `lastIndex`.
 const DECLARED_SKIPPED_RE = safeRegExp(statusWordPattern('SKIPPED'), 'i');
 const DECLARED_NOT_APPLICABLE_RE = safeRegExp(statusWordPattern('NOT APPLICABLE'), 'i');
+
+/**
+ * Spans whose contents are a MENTION, never a claim. Compiled once at module
+ * load; every one is linear (bounded delimiter runs, no nested quantifier, the
+ * content class excludes its own delimiter so there is no backtracking path).
+ *
+ * Fences may span lines — a fenced example of a step declaration is still an
+ * example. Inline code and quotations are deliberately SINGLE-LINE: a stray
+ * backtick or quote must not open a span that swallows the rest of the document
+ * and silently switches the checker off (see D-3 below and its test).
+ */
+const MASKED_SPAN_PATTERNS = [
+  safeRegExp('```[\\s\\S]*?```', 'g'),
+  safeRegExp('~~~[\\s\\S]*?~~~', 'g'),
+  safeRegExp('(`{1,3})[^`\\n]*?\\1', 'g'),
+  safeRegExp('"[^"\\n]*"', 'g'),
+  safeRegExp('“[^”\\n]*”', 'g')
+];
+
+/** Every character except a line break; used to blank a span in place. */
+const NON_NEWLINE_RE = /[^\n\r]/g;
+
+/**
+ * Blank out the contents of coded and quoted spans, preserving LENGTH exactly.
+ *
+ * A status word inside inline code or a quotation is a MENTION, not a claim, and
+ * scanning it produced blocking errors on plans that were merely honest about the
+ * quality gate. Three real builds were refused for a step line quoting the
+ * counter label the test runner prints — the offending text was inside backticks —
+ * and each author reworded their own plan to get through. A gate that is defeated
+ * by rewording measures the wording, not the work.
+ *
+ * This is the same discipline `validateNoContradictions` already ships (it strips
+ * fenced blocks before scanning, for exactly this reason), extended to the two
+ * other scanners in this file that match a status word, and widened from fences to
+ * inline code and quotations because that is what the corpus actually contains.
+ *
+ * Three properties are load-bearing, each pinned by a test:
+ *
+ *   LENGTH IS PRESERVED. Three consumers report a step number parsed out of the
+ *     same line. A mask that shortened the text would move the offsets and name
+ *     the WRONG step — a checker that names the wrong step is worse than one that
+ *     names none. Line breaks are preserved too, so a masked span can never join
+ *     two lines and let a `[^\n]`-scoped pattern match across them.
+ *   ONLY BALANCED PAIRS COUNT. An unmatched backtick or quote masks NOTHING.
+ *     Treating a lone delimiter as opening a span to end of region is exactly how
+ *     a checker gets quietly turned off.
+ *   SINGLE QUOTES ARE NOT MASKED. An apostrophe in ordinary prose ("the
+ *     executor's step") opens a span that never closes; masking to the end of the
+ *     paragraph would blind the checker wholesale. Double and typographic quotes
+ *     are unambiguous; the apostrophe is not.
+ *
+ * The filler is a SPACE, chosen so masking can only ever remove a match, never
+ * create one: a blanked span leaves ordinary word separation behind. It is not a
+ * letter, a digit, a backtick or a quote, so it cannot re-form a status word or a
+ * new span delimiter.
+ *
+ * REJECTED ALTERNATIVE, recorded so it is not re-proposed: "require the status to
+ * be DECLARED — anchored as a trailing marker, or a colon form, or bold." It reads
+ * well and it is wrong. It frees
+ * `plans/review/00012-r3a-ledger-forgery-closed.md:129`, a GENUINE unapproved
+ * declaration in this repository's own corpus written mid-line as bare prose
+ * ("Items 4 … and 7-deploy-ready … SKIPPED — both actions.js, re-scoped …"), which
+ * is none of those three shapes. That fix would have converted a blocking error
+ * into SILENCE — a false green created while fixing a false red, which is the
+ * worse of the two failures. Masking discriminates on the evidence the corpus
+ * actually carries: every false positive found sits inside code or a quotation,
+ * and every genuine declaration is bare.
+ *
+ * NOT a markdown parser, and deliberately so. It recognises the four span shapes
+ * this repository's plans actually use; anything it does not recognise stays
+ * visible to the scanners, which fails toward CATCHING a declaration rather than
+ * toward silence.
+ *
+ * @param {string} text - plan text (or a region of it)
+ * @returns {string} the same text, same length, with masked spans blanked
+ */
+function maskQuotedSpans(text) {
+  if (typeof text !== 'string' || text.length === 0) return '';
+  let out = text;
+  for (const pattern of MASKED_SPAN_PATTERNS) {
+    out = out.replace(pattern, (span) => span.replace(NON_NEWLINE_RE, ' '));
+  }
+  return out;
+}
 
 /**
  * Validate a plan before it can move to review stage
@@ -209,10 +300,17 @@ function validateStepsComplete(content, planPath, projectPath) {
       // step whose prose mentioned the zero-skip gate was marked skipped. The
       // status must stand alone as a declaration — see statusWordPattern.
       // The `[ N/A ]` bracket form is already unambiguous and is left as-is.
+      //
+      // All three probes read the SAME masked text: a status word inside inline
+      // code or a quotation is a mention, not a declaration (maskQuotedSpans).
+      // Masking one probe and not another would be a new inconsistency, not a fix
+      // — the per-step probe and the region scan in validateEscalations must
+      // classify the same line the same way.
+      const maskedBlock = maskQuotedSpans(block);
       isSkipped = !isCompleted && (
-        DECLARED_SKIPPED_RE.test(block) ||
-        DECLARED_NOT_APPLICABLE_RE.test(block) ||
-        /\[\s*N\/A\s*\]/i.test(block));
+        DECLARED_SKIPPED_RE.test(maskedBlock) ||
+        DECLARED_NOT_APPLICABLE_RE.test(maskedBlock) ||
+        /\[\s*N\/A\s*\]/i.test(maskedBlock));
     }
 
     result.checklist[`step_${step.num}`] = {
@@ -273,7 +371,19 @@ function validateEscalations(content, metadata) {
   // a "0 skipped" line) as an unapproved skip (v6.9.86). Fall back to the whole
   // body only when there is no execution section (legacy plans).
   const execMatch = content.match(/^##\s+Execution Plan[\s\S]*$/m);
-  const region = execMatch ? execMatch[0].split(/\n##\s+(?!#)/)[0] : content;
+  const rawRegion = execMatch ? execMatch[0].split(/\n##\s+(?!#)/)[0] : content;
+
+  // Mask coded and quoted spans before ANY matching below. A status word inside
+  // backticks or a quotation is a MENTION — a plan quoting the runner's counter
+  // label, or quoting the very kickback message this check produces, is not
+  // declaring a skipped step. Length is preserved, so the step number reported
+  // out of a match still names the step the author wrote.
+  //
+  // The approval probe below reads THIS SAME masked text, deliberately. Masking
+  // the declaration scan but not the approval scan would create a forgery
+  // surface: write the skip bare, write the approval inside backticks, and the
+  // gate clears. Both halves see identical text or neither does.
+  const region = maskQuotedSpans(rawRegion);
 
   // Look for SKIPPED/BLOCKED without approval. The status must be DECLARED, not
   // merely mentioned: matched as a standalone status marker via
@@ -481,9 +591,19 @@ function validateNoContradictions(content, projectPath) {
   // safeRegExp. So the pattern silently spanned newlines (matching a `Step 8`
   // heading against an unrelated later line) while refusing to cross any letter
   // `n` on the step's own line. It is now a real "not a newline".
+  //
+  // (c) The status scan reads MASKED text, not `scanContent`. `maskQuotedSpans`
+  // is a superset of the fence strip above (it also blanks inline code and
+  // quotations) and preserves length, so this scan no longer fires on a step line
+  // that merely QUOTES the runner's skip counter. It is applied ONLY here and not
+  // to `scanContent` itself: patterns 1 and 2 above deliberately match a filename
+  // written inside backticks (`created \`guard-files.js\``), and masking their
+  // input would blind two working checks while fixing a third. Same helper, three
+  // call sites, each fed the text its own pattern needs.
+  const statusScanContent = maskQuotedSpans(content);
   const skippedStepPattern = safeRegExp(`Step\\s*(\\d+)[^\\n]*${statusWordPattern('SKIP(?:PED)?')}`, 'gi');
 
-  while ((match = skippedStepPattern.exec(scanContent)) !== null) {
+  while ((match = skippedStepPattern.exec(statusScanContent)) !== null) {
     const stepNum = match[1];
 
     // Check if there are actually files for this step

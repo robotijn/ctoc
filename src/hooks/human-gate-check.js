@@ -138,40 +138,18 @@ const VIOLATIONS_FILE = path.join(LOG_DIR, 'gate-violations.json');
 // hook path. The keys are the three gate destinations `implementation, todo, done`,
 // in that order (Object.keys drives the folder sweep in `main()`), byte-identical to
 // the former local literal.
-const { GATE_SOURCE: HUMAN_GATES, GATE_DESTINATIONS, STAGE_ORDER } = require('../lib/gate-order');
+const { GATE_SOURCE: HUMAN_GATES } = require('../lib/gate-order');
 
-// Gate-destination folders where acceptance additionally requires a live-content
-// hash match (invalidate-on-edit).
-//
-// THE OLD COMMENT HERE WAS FALSE, and the falsehood was load-bearing. It read
-// "terminal gate-destination folders where NO LEGITIMATE AGENT EDITING OCCURS".
-// That is simply untrue of `todo/`: a planner amends a queued plan, and an executor
-// dispatched directly at a todo/ plan writes its step records, evidence and final
-// report into that plan while it still resides there. Under whole-file hashing every
-// one of those legitimate edits produced `hash-mismatch` — a reason classified as a
-// LIVE ATTACK SIGNATURE, which reverts on every project, migrated or not. So ordinary
-// building armed a mid-build revert of a plan out of the destination the human had
-// just approved it into.
-//
-// What makes hash-sensitivity here TENABLE is that the comparison now runs against
-// the SPECIFICATION (`approval-ledger.computeSpecHash`) for entries written with
-// that scope: the executor's execution log is excluded, and everything that grants
-// anything — the frontmatter and its `files:`, the scope prose, the specification,
-// the step headings — stays hashed. `done/` genuinely has no legitimate editor, and
-// entries written for it keep the stronger whole-file binding.
-const HASH_SENSITIVE_FOLDERS = new Set(['todo', 'done']);
-
-// PRE-BUILD gate destinations (X6): the gate destinations reached BEFORE any code is
-// built — derived from the ONE gate-edge encoding, never hardcoded. A destination is
-// pre-build iff it sits earlier in the stage order than the build phase (which begins
-// at `in-progress`): implementation(1) and todo(2) qualify; done(5) does NOT. A
-// SUFFICIENCY entry — "the plan has enough information to be built" — is accepted only
-// here. `done/` is Gate 3 ("was this built correctly?"), answered by review and the 14
-// quality dimensions, NEVER by an answered-question log (X6 Decision 1).
-const BUILD_PHASE_START = STAGE_ORDER.indexOf('in-progress');
-const PRE_BUILD_GATES = new Set(
-  GATE_DESTINATIONS.filter((dest) => STAGE_ORDER.indexOf(dest) < BUILD_PHASE_START),
-);
+// THE ONE ENCODING OF APPROVED RESIDENCY, now in `lib/` (see
+// `src/lib/approval-residency.js` for the full argument). It was MOVED, not copied:
+// `src/lib/plan-coverage.js` — the oracle that decides whether an edit is permitted
+// at all — must consult the same predicate, and a library may not require a hook.
+// Writing a second predicate there would be two encodings of an approval predicate,
+// which this codebase names a forgery surface. This hook's behaviour is unchanged;
+// `classifyResidency` and `hasLedgerApproval` are re-exported below under their
+// existing names so every existing call site keeps working.
+const approvalResidency = require('../lib/approval-residency');
+const { classifyResidency, hasLedgerApproval, readPlan } = approvalResidency;
 
 function plansDir(projectPath) {
   return path.join(projectPath, 'plans');
@@ -191,151 +169,6 @@ function logViolation(entry) {
   // Lossless O_APPEND via the shared durable-log; the "keep last 100" cap is
   // preserved by the primitive's rotation (a rare atomic temp+rename boundary op).
   durableLog.appendEntry(VIOLATIONS_FILE, entry, { maxEntries: 100 });
-}
-
-/**
- * Read a plan's full file content, or `null` if it cannot be read. Fail-soft so
- * a transient read error is treated as "not approved / not exempt" (a violation)
- * rather than throwing out of the sweep.
- *
- * @param {string} filePath - absolute path to the plan file
- * @returns {string|null}
- */
-function readPlan(filePath) {
-  try {
-    return safeFs.readFileSync(filePath, 'utf8');
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Classify a resident plan against the agent-write-denied ledger, per-plan fault-
- * isolated (R2-F). NEVER throws: an un-keyable slug or a corrupt entry returns a
- * NON-accepted result with the matching reason rather than propagating out and
- * killing the sweep. Folder-sensitive, and kind-sensitive:
- *   - `todo` / `done` (tamper-sensitive): the entry's `content_sha256` must match
- *     the live content (invalidate-on-edit);
- *   - `implementation` (active editing expected): acceptance binds to entry
- *     existence for this gate edge, NOT a frozen hash;
- *   - `done` accepts a human OR a pipeline (`advanced_by: 'pipeline'` + evidence)
- *     entry; every pre-done gate stays human-only.
- * Never trusts the plan-body `approved_by: human` marker.
- *
- * HONEST KIND (R3-A item 5). Every verdict — accepted or not — carries the entry's
- * REAL `kind` (`human` | `backfilled` | `pipeline` | `sufficiency` | `unknown` | `null`). A backfilled
- * entry is still ACCEPTED (the human ordered the migration): acceptance is not
- * weakened. But it is reported as `'backfilled'`, never laundered into `'human'`, so a
- * later audit can always separate a migrated record from a live human approval.
- *
- * FAILS CLOSED ON UNRECOGNISED PROVENANCE (X5). `'pipeline'` used to be the ONLY
- * guarded kind, and every other kind fell through to `accepted: true` — which, paired
- * with `entryKind`'s old `return 'human'` default, meant an entry with an unrecognised
- * `advanced_by` was accepted at EVERY gate including `todo/` with no evidence. An
- * `'unknown'` kind is now rejected (`unknown-provenance`) BEFORE the pipeline branch,
- * on every path. A new provenance earns acceptance only by being added to
- * `approval-ledger.entryKind` AND given an explicit guard here.
- *
- * @param {string} filePath - absolute path to the plan file
- * @param {string} folderName - the gate-destination folder the plan resides in
- * @param {string} [projectPath] - project root (defaults to cwd)
- * @param {string|null} [content] - pre-read file content, to avoid a re-read
- * @returns {{accepted: boolean, reason: (string|null), kind: ('human'|'backfilled'|'pipeline'|'sufficiency'|'unknown'|null)}}
- *   accepted (with the entry's real kind), or a reason: `ledger-unkeyable` |
- *   `ledger-corrupt` | `no-ledger-entry` | `wrong-edge` | `hash-mismatch` |
- *   `hash-mismatch-legacy` | `unreadable` | `unknown-provenance` | `pipeline-no-evidence` |
- *   `pipeline-not-allowed` | `sufficiency-no-evidence` | `sufficiency-not-allowed`
- *   (`hash-mismatch` is a mismatch under SPECIFICATION semantics — the specification
- *   really did change after approval; `hash-mismatch-legacy` is a mismatch under a
- *   pre-specification `hash_scope: 'file'` entry, where the difference may be nothing
- *   but the execution log of the build the approval authorised. BOTH reject.)
- */
-function classifyResidency(filePath, folderName, projectPath = process.cwd(), content = null) {
-  const ledger = require('../lib/approval-ledger');
-  const slug = ledger.slugFromPlanPath(filePath);
-  const res = ledger.readEntryResult(slug, projectPath);
-
-  if (res.status === 'unkeyable') return { accepted: false, reason: 'ledger-unkeyable', kind: null };
-  if (res.status === 'corrupt') return { accepted: false, reason: 'ledger-corrupt', kind: null };
-  if (res.status === 'absent') return { accepted: false, reason: 'no-ledger-entry', kind: null };
-
-  const entry = res.entry;
-  const kind = ledger.entryKind(entry);
-  if (entry.stage_to !== folderName) return { accepted: false, reason: 'wrong-edge', kind };
-
-  if (HASH_SENSITIVE_FOLDERS.has(folderName)) {
-    const text = content != null ? content : readPlan(filePath);
-    if (text == null) return { accepted: false, reason: 'unreadable', kind };
-    // THE SINGLE ENCODING of "does this content match this entry". This used to be an
-    // inline `computeContentHash` comparison — a SECOND encoding of the approval
-    // predicate alongside `ledger.verify`, and two encodings of an approval predicate
-    // can diverge, which is a forgery surface. Both now call `ledger.contentMatches`,
-    // which branches on the entry's recorded `hash_scope` and FAILS CLOSED when a
-    // specification boundary cannot be established at all.
-    const cmp = ledger.contentMatches(entry, text);
-    if (!cmp.match) {
-      // BOTH kinds still REJECT — no gate is weakened. The split exists so the human
-      // and the enforcer can finally tell "this entry predates specification hashing,
-      // so the mismatch may be nothing but the build that was authorised" from "the
-      // specification actually changed after the approval". Without it the fence cries
-      // wolf on every legacy entry and the real signal stays buried, which is the harm
-      // this distinction removes — indistinguishability, never strictness.
-      return {
-        accepted: false,
-        reason: cmp.scope === 'file' ? 'hash-mismatch-legacy' : 'hash-mismatch',
-        kind,
-      };
-    }
-  }
-
-  // FAIL CLOSED ON UNRECOGNISED PROVENANCE (X5). This must come BEFORE the pipeline
-  // branch, so no unrecognised provenance can reach `accepted: true` on ANY path.
-  // Until X5 `'pipeline'` was the ONLY guarded kind and the function ended in a bare
-  // `return { accepted: true }` — so an entry stamped `advanced_by: 'sufficiency-gate'`
-  // classified as `'human'` (the old classifier's fallthrough), skipped the guard
-  // below, and was ACCEPTED at every gate including `todo/`, with no evidence. It was
-  // not mislabelled; it was waved through. That is the mechanism behind the 26 forged
-  // approvals removed from this repo. A kind this hook does not RECOGNISE is never
-  // accepted: adding a new provenance means adding its guard here, deliberately.
-  if (kind === 'unknown') return { accepted: false, reason: 'unknown-provenance', kind };
-
-  if (kind === 'pipeline') {
-    // Pipeline provenance is accepted ONLY at the terminal `done/` gate, and only
-    // with evidence; every pre-done gate (todo) stays human-only. A decomposed
-    // vision archived to done/ arrives on exactly this path (evidence:
-    // 'vision-decomposed') — there is no longer any `type: vision` exemption.
-    if (folderName !== 'done') return { accepted: false, reason: 'pipeline-not-allowed', kind };
-    if (typeof entry.evidence !== 'string' || entry.evidence.trim() === '') {
-      return { accepted: false, reason: 'pipeline-no-evidence', kind };
-    }
-  }
-
-  if (kind === 'sufficiency') {
-    // SUFFICIENCY provenance (X6) — "the plan had enough information to be built
-    // without guessing" — crosses the PRE-BUILD gates (implementation, todo) ONLY,
-    // and only with evidence. It is REJECTED at `done/`: Gate 3 asks whether the work
-    // was built correctly, which a sufficiency verdict cannot answer. Mirrors the
-    // pipeline guard exactly, with the allowed set inverted (pre-build, not done).
-    if (!PRE_BUILD_GATES.has(folderName)) return { accepted: false, reason: 'sufficiency-not-allowed', kind };
-    if (typeof entry.evidence !== 'string' || entry.evidence.trim() === '') {
-      return { accepted: false, reason: 'sufficiency-no-evidence', kind };
-    }
-  }
-  return { accepted: true, reason: null, kind };
-}
-
-/**
- * Boolean facade over {@link classifyResidency}, preserving the historical
- * `hasLedgerApproval` contract for any external caller.
- *
- * @param {string} filePath
- * @param {string} folderName
- * @param {string} [projectPath]
- * @param {string|null} [content]
- * @returns {boolean}
- */
-function hasLedgerApproval(filePath, folderName, projectPath = process.cwd(), content = null) {
-  return classifyResidency(filePath, folderName, projectPath, content).accepted;
 }
 
 /**

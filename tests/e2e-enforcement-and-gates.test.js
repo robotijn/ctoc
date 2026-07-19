@@ -144,8 +144,22 @@ function runBashHook(projectDir, command) {
   return res;
 }
 
-/** Write a plan with a `files:` frontmatter block (block-list coverage). */
-function writeCoveringPlan(projectDir, stage, name, files) {
+/**
+ * Write a plan with a `files:` frontmatter block (block-list coverage), AND — by
+ * default — mint the REAL ledger approval that makes it grant coverage.
+ *
+ * Only an APPROVED plan grants write access. Plan files are edit-whitelisted, so an
+ * agent can author one; residency in a stage folder proves nothing and used to be
+ * treated as proof. "A covering plan should ALLOW" means a plan a human approved, so
+ * the fixture mints the approval it always implied. Minted with the real ledger over
+ * the fixture's actual bytes; `stage_to` mapped as production maps it (`in-progress`
+ * carries its Gate 2 `todo` entry, since no entry ever records `in-progress`).
+ * Pass `{ approved: false }` for a deliberately unapproved plan.
+ *
+ * Distinct from `writeStagePlan` below, which is about GATE RESIDENCY (the
+ * `approved_by: human` marker in a gate-destination folder) and is unchanged.
+ */
+function writeCoveringPlan(projectDir, stage, name, files, opts = {}) {
   const filesYaml = files.map((f) => `  - "${f}"`).join('\n');
   const content = `---
 title: "${name}"
@@ -155,7 +169,18 @@ ${filesYaml}
 ---
 # ${name}
 `;
-  fs.writeFileSync(path.join(projectDir, 'plans', stage, `${name}.md`), content);
+  const planPath = path.join(projectDir, 'plans', stage, `${name}.md`);
+  fs.writeFileSync(planPath, content);
+  if (opts.approved !== false) {
+    const ledger = require('../src/lib/approval-ledger');
+    ledger.writeEntry(ledger.slugFromPlanPath(planPath), {
+      content,
+      stage_from: 'implementation',
+      stage_to: stage === 'in-progress' ? 'todo' : stage,
+      approved_by: 'human',
+    }, projectDir);
+  }
+  return planPath;
 }
 
 /** Write a plan into a stage, optionally with the human-approval marker. */

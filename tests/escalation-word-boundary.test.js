@@ -376,3 +376,418 @@ describe('status words match as standalone status markers, never as prose substr
       `these plans are refused for prose they merely mention:\n  ${offenders.join('\n  ')}`);
   });
 });
+
+/**
+ * A status word inside INLINE CODE or a QUOTATION is a mention, not a claim.
+ *
+ * The boundary rules above handle the COMPOUND and QUANTIFIED forms
+ * (`zero-skipped`, `skipped[]`, `0 skipped`). They cannot help a BARE standalone
+ * word, and a plan whose subject IS the skip counter has to be able to quote that
+ * counter's label. Three real builds were refused for exactly that — the offending
+ * text was inside backticks, quoting a label printed by the test runner — and each
+ * author reworded their own plan to get through. A gate defeated by rewording
+ * measures the wording, not the work.
+ *
+ * The discriminator is measured, not assumed: every false positive found in this
+ * repository's corpus sits inside inline code or a quotation, and every genuine
+ * declaration is bare prose — including a MID-LINE one
+ * (plans/review/00012-r3a-ledger-forgery-closed.md:129) that a "require a trailing
+ * marker / colon / bold" rule would have freed. Freeing that one would convert a
+ * blocking error into silence: a false green created while fixing a false red.
+ *
+ * Both directions are asserted here and neither may be weakened:
+ *   - a quoted or coded mention must NOT be read as a declaration;
+ *   - a bare declaration must STILL be caught, and an approval written inside
+ *     backticks must NOT clear it (masking must not launder an approval).
+ */
+describe('a status word inside code or quotes is a mention, never a declaration', () => {
+  let testDir;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-mask-'));
+    for (const stage of ['implementation', 'todo', 'in-progress', 'review', 'done']) {
+      fs.mkdirSync(path.join(testDir, 'plans', stage), { recursive: true });
+    }
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  function write(name, content) {
+    const p = path.join(testDir, `${name}.md`);
+    fs.writeFileSync(p, content);
+    return p;
+  }
+
+  // ------------------------------------------- direction 1: quoted is not claimed
+
+  test('case 1 — the reported defect verbatim: the runner counter label inside backticks', () => {
+    // The exact prose that was refused: a step line quoting the counter label the
+    // test runner prints. Reworded to "skip-count line" at the time to get through.
+    const p = write('counter-label', planFile({
+      14: { heading: '### Step 14: VERIFY — record the verbatim `ℹ skipped N` line from the gated run.' }
+    }));
+
+    const result = validator.validateForReview(p, testDir);
+
+    assert.deepEqual(escalationErrors(result), [],
+      `a counter label inside backticks is not a declared skip: ${JSON.stringify(result.errors)}`);
+    assert.equal(result.valid, true, `plan must validate: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('case 1b — a backticked list of runner counters (the corpus false positive)', () => {
+    const p = write('counter-list', planFile({
+      14: { heading: '### Step 14: VERIFY — record `tests`, `suites`, `pass`, `fail`, `skipped`, `todo` verbatim.' }
+    }));
+    const result = validator.validateForReview(p, testDir);
+    assert.deepEqual(escalationErrors(result), [],
+      `backticked counter names are not declarations: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('case 2 — a kickback message quoted in double quotes', () => {
+    const p = write('quoted-kickback', planFile({
+      9: { heading: '### Step 9: PREPARE — the kickback said "Step 9 marked as SKIPPED" and it was wrong.' }
+    }));
+
+    const result = validator.validateForReview(p, testDir);
+
+    assert.deepEqual(escalationErrors(result), [],
+      `a quoted error message is not a declaration: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('case 3 — a fenced example containing a step line with a bare status word', () => {
+    const p = write('fenced-example', planFile({
+      12: {
+        body: [
+          '- [x] documented the shape the checker must still catch:',
+          '',
+          '```',
+          'Step 12: OPTIMIZE — SKIPPED',
+          '```'
+        ].join('\n')
+      }
+    }));
+
+    const result = validator.validateForReview(p, testDir);
+
+    assert.deepEqual(escalationErrors(result), [],
+      `a fenced example is not a declaration: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('case 3b — a tilde-fenced example is masked the same way', () => {
+    const p = write('tilde-fenced', planFile({
+      12: {
+        body: ['- [x] example below:', '', '~~~', 'Step 12: OPTIMIZE — BLOCKED', '~~~'].join('\n')
+      }
+    }));
+    const result = validator.validateForReview(p, testDir);
+    assert.deepEqual(escalationErrors(result), [],
+      `a tilde-fenced example is not a declaration: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('case 4 — typographic quotes mask the same as straight ones', () => {
+    const p = write('typographic', planFile({
+      9: { heading: '### Step 9: PREPARE — the kickback said “Step 9 marked as SKIPPED” and it was wrong.' }
+    }));
+    const result = validator.validateForReview(p, testDir);
+    assert.deepEqual(escalationErrors(result), [],
+      `a typographically quoted message is not a declaration: ${JSON.stringify(result.errors)}`);
+  });
+
+  // ------------------------------------------ direction 2: the gate still holds
+
+  test('case 5 — a trailing-marker declaration is still caught', () => {
+    const p = write('trailing-decl', planFile({
+      12: { heading: '### Step 12: OPTIMIZE — SKIPPED' }
+    }));
+    const result = validator.validateForReview(p, testDir);
+    assert.equal(result.valid, false, 'an unapproved trailing declaration must still fail');
+    assert.ok(result.errors.some((e) => /Step 12 marked as SKIPPED without escalation approval/i.test(e)),
+      `expected an escalation error naming step 12, got ${JSON.stringify(result.errors)}`);
+  });
+
+  test('case 6 — the MID-LINE declaration is still caught (the shape the rejected fix would free)', () => {
+    // The shape of plans/review/00012-r3a-ledger-forgery-closed.md:129 — a real,
+    // unapproved declaration written mid-line, with backticked identifiers around
+    // it. No trailing marker, no colon form, no bold. This is the counter-example
+    // that rejected the "require a declared form" proposal.
+    const p = write('midline-decl', planFile({
+      10: {
+        heading: '### Step 10: IMPLEMENT — items 1,2,3 done. Items 4 (`plan_basename` into `stampAndLedger`) SKIPPED — both actions.js, re-scoped to the concurrent slice.'
+      }
+    }));
+
+    const result = validator.validateForReview(p, testDir);
+
+    assert.equal(result.valid, false,
+      'a bare mid-line declaration must still be caught even with backticks elsewhere on the line');
+    assert.ok(result.errors.some((e) => /Step 10 marked as SKIPPED without escalation approval/i.test(e)),
+      `expected an escalation error naming step 10, got ${JSON.stringify(result.errors)}`);
+  });
+
+  test('case 7 — an approved declaration still clears', () => {
+    const p = write('approved-decl', planFile({
+      12: { heading: '### Step 12: OPTIMIZE — SKIPPED REASON: nothing on a hot path in this slice' }
+    }));
+    const result = validator.validateForReview(p, testDir);
+    assert.deepEqual(escalationErrors(result), [],
+      `an approved skip must raise no escalation error: ${JSON.stringify(result.errors)}`);
+    assert.equal(result.checklist.escalations.escalation_12_SKIPPED.approved, true,
+      'the approval must be recorded on the checklist entry');
+  });
+
+  test('case 8 — an approval written inside backticks does NOT clear a bare declaration', () => {
+    // Masking the declaration scan but not the approval scan would create a
+    // forgery surface: quote the approval, keep the real skip. Both scans must
+    // read the SAME masked text.
+    const p = write('laundered-approval', planFile({
+      12: { heading: '### Step 12: OPTIMIZE — SKIPPED — `APPROVED: nothing on a hot path`' }
+    }));
+
+    const result = validator.validateForReview(p, testDir);
+
+    assert.equal(result.valid, false,
+      'an approval inside code must not clear a real declaration');
+    assert.ok(result.errors.some((e) => /Step 12 marked as SKIPPED without escalation approval/i.test(e)),
+      `expected the skip to remain unapproved, got ${JSON.stringify(result.errors)}`);
+    assert.equal(result.checklist.escalations.escalation_12_SKIPPED.approved, false);
+  });
+
+  test('case 8b — an approval inside double quotes does NOT clear a bare declaration', () => {
+    const p = write('laundered-approval-quotes', planFile({
+      12: { heading: '### Step 12: OPTIMIZE — SKIPPED — the reviewer asked "was this APPROVED?"' }
+    }));
+    const result = validator.validateForReview(p, testDir);
+    assert.equal(result.valid, false, 'a quoted question is not an approval');
+    assert.ok(result.errors.some((e) => /Step 12 marked as SKIPPED/i.test(e)));
+  });
+
+  test('case 9 — an unmatched backtick masks nothing', () => {
+    const p = write('unmatched-backtick', planFile({
+      12: { heading: '### Step 12: OPTIMIZE — see `the note below and SKIPPED anyway' }
+    }));
+    const result = validator.validateForReview(p, testDir);
+    assert.equal(result.valid, false,
+      'a lone backtick must not open a span that turns the checker off');
+    assert.ok(result.errors.some((e) => /Step 12 marked as SKIPPED/i.test(e)));
+  });
+
+  test('case 9b — an unmatched double quote masks nothing', () => {
+    const p = write('unmatched-quote', planFile({
+      12: { heading: '### Step 12: OPTIMIZE — the reviewer said "look here and SKIPPED anyway' }
+    }));
+    const result = validator.validateForReview(p, testDir);
+    assert.equal(result.valid, false, 'a lone double quote must not blind the checker');
+  });
+
+  test('case 10 — an apostrophe masks nothing', () => {
+    const p = write('apostrophe', planFile({
+      12: { heading: "### Step 12: OPTIMIZE — the executor's own step was SKIPPED" }
+    }));
+    const result = validator.validateForReview(p, testDir);
+    assert.equal(result.valid, false,
+      'single quotes are deliberately not masked; an apostrophe must not blind the checker');
+    assert.ok(result.errors.some((e) => /Step 12 marked as SKIPPED/i.test(e)));
+  });
+
+  // ------------------------------------------------- offsets, agreement, corpus
+
+  test('case 11 — step numbers still report correctly across a masked line', () => {
+    // A masked line and a genuine line in one region. The error must name the
+    // GENUINE step; a mask that changed offsets would misreport which step.
+    const p = write('offsets', planFile({
+      9: { heading: '### Step 9: PREPARE — record the verbatim `ℹ skipped N` line.' },
+      12: { heading: '### Step 12: OPTIMIZE — SKIPPED' }
+    }));
+
+    const result = validator.validateForReview(p, testDir);
+
+    const errs = escalationErrors(result);
+    assert.equal(errs.length, 1, `exactly one escalation error expected, got ${JSON.stringify(errs)}`);
+    assert.ok(/Step 12 marked as SKIPPED/i.test(errs[0]),
+      `the error must name step 12, got ${errs[0]}`);
+    assert.equal(
+      Object.keys(result.checklist.escalations).some((k) => k.startsWith('escalation_9_')),
+      false,
+      'no escalation entry may be recorded for the masked step 9 line'
+    );
+  });
+
+  test('case 12 — the per-step probe and the region scan agree on the same line', () => {
+    // One masked line inside an UNFINISHED step: the per-step probe must not mark
+    // it skipped and the region scan must not raise an escalation. One masked and
+    // one not is a new inconsistency, not a fix.
+    const p = write('detectors-agree', planFile({
+      12: { body: '- [ ] record the verbatim `ℹ skipped N` line from the gated run' }
+    }));
+
+    const result = validator.validateForReview(p, testDir);
+
+    assert.equal(result.checklist.steps.step_12.completed, false, 'fixture must be incomplete');
+    assert.equal(result.checklist.steps.step_12.skipped, false,
+      'the per-step probe must not read a backticked counter label as a skip');
+    assert.deepEqual(escalationErrors(result), [],
+      `the region scan must agree with the per-step probe: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('case 12b — both detectors still agree on a genuine declaration', () => {
+    const p = write('detectors-agree-real', planFile({
+      12: { heading: '### Step 12: OPTIMIZE — SKIPPED', body: '- [ ] not done' }
+    }));
+    const result = validator.validateForReview(p, testDir);
+    assert.equal(result.checklist.steps.step_12.skipped, true,
+      'a genuine declaration must still register on the per-step probe');
+    assert.ok(escalationErrors(result).length > 0,
+      'and must still raise an escalation error on the region scan');
+  });
+
+  test('case 12c — the contradiction scan masks quoted spans too', () => {
+    const proseInCode = '# Plan\n\nStep 8: TEST — record the `ℹ skipped N` line.\n';
+    const masked = validator.validateNoContradictions(proseInCode, REPO_ROOT);
+    assert.equal(
+      masked.warnings.some((w) => /Step 8 \(TEST\) marked as skipped/i.test(w)),
+      false,
+      `a backticked counter label must not warn, got ${JSON.stringify(masked.warnings)}`
+    );
+
+    const realSkip = '# Plan\n\nStep 8: TEST — the `runner` was never run, SKIPPED\n';
+    const caught = validator.validateNoContradictions(realSkip, REPO_ROOT);
+    assert.ok(
+      caught.warnings.some((w) => /Step 8 \(TEST\) marked as skipped but test files exist/i.test(w)),
+      'a bare declaration on a line that also contains backticks must still warn'
+    );
+  });
+
+  test('case 13 — the corpus measurement: no plan is refused for a coded or quoted mention', () => {
+    // Fails LOUDLY on input it cannot read. A corpus check that silently reads
+    // nothing and reports "no plans refused" is the false-green defect class this
+    // repository fences: it would report a verdict on input it never received.
+    const targets = [];
+
+    // A synthetic GENUINE declaration, so this case can never become vacuous and
+    // can never pass by the gate being switched off wholesale.
+    const syntheticGenuine = path.join(testDir, 'plans', 'review', 'synthetic-genuine-declaration.md');
+    fs.writeFileSync(syntheticGenuine, planFile({
+      10: { heading: '### Step 10: IMPLEMENT — items 1,2 done. Item 3 (`writeEntry`) SKIPPED — owned by a concurrent slice.' }
+    }));
+    // A synthetic MASKED mention, so the freeing direction is measured too.
+    const syntheticMasked = path.join(testDir, 'plans', 'review', 'synthetic-masked-mention.md');
+    fs.writeFileSync(syntheticMasked, planFile({
+      14: { heading: '### Step 14: VERIFY — record `tests`, `suites`, `pass`, `fail`, `skipped`, `todo` verbatim.' }
+    }));
+    targets.push({ file: syntheticGenuine, root: testDir, synthetic: 'genuine' });
+    targets.push({ file: syntheticMasked, root: testDir, synthetic: 'masked' });
+
+    for (const stage of ['implementation', 'todo', 'in-progress', 'review', 'done', 'functional', 'vision']) {
+      const dir = path.join(REPO_ROOT, 'plans', stage);
+      if (!fs.existsSync(dir)) continue;
+      let entries;
+      try {
+        entries = fs.readdirSync(dir);
+      } catch (err) {
+        throw new Error(`corpus measurement could not read ${dir}: ${err.message}`);
+      }
+      for (const f of entries.filter((x) => x.endsWith('.md'))) {
+        targets.push({ file: path.join(dir, f), root: REPO_ROOT, synthetic: null });
+      }
+    }
+
+    assert.ok(targets.length > 2,
+      `the corpus measurement read no repository plans (only ${targets.length} synthetic targets) — ` +
+      'it cannot report a verdict on input it never received');
+
+    let readCount = 0;
+    const refusedForMaskedText = [];
+    let genuineStillCaught = 0;
+    let maskedFreed = 0;
+
+    for (const { file, root, synthetic } of targets) {
+      let content;
+      try {
+        content = fs.readFileSync(file, 'utf8');
+      } catch (err) {
+        throw new Error(`corpus measurement could not read ${file}: ${err.message}`);
+      }
+      readCount++;
+
+      const result = validator.validateForReview(file, root);
+      const errs = escalationErrors(result);
+
+      if (synthetic === 'genuine') {
+        assert.ok(errs.length > 0,
+          'the synthetic genuine declaration must still be refused — a fix that frees everything catches nothing');
+        genuineStillCaught++;
+        continue;
+      }
+      if (synthetic === 'masked') {
+        assert.deepEqual(errs, [],
+          `the synthetic masked mention must be freed: ${JSON.stringify(errs)}`);
+        maskedFreed++;
+        continue;
+      }
+
+      for (const err of errs) {
+        const m = err.match(/Step\s*(\d+)\s+marked as\s+(\w+)/i);
+        if (!m) continue;
+        const [, stepNum, status] = m;
+        const lines = content.split(/\r?\n/).filter(
+          (line) => new RegExp(`Step\\s*${stepNum}\\b`, 'i').test(line) &&
+                    new RegExp(status, 'i').test(line)
+        );
+        // The status word must survive removal of every inline-code and quoted
+        // span on its own line — i.e. it must appear as BARE prose somewhere.
+        const bareSomewhere = lines.some((line) => {
+          const stripped = line
+            .replace(/`{1,3}[^`\n]*?`{1,3}/g, ' ')
+            .replace(/"[^"\n]*"/g, ' ')
+            .replace(/“[^”\n]*”/g, ' ');
+          return new RegExp(status, 'i').test(stripped);
+        });
+        if (!bareSomewhere) {
+          refusedForMaskedText.push(`${path.basename(file)}: ${err.trim()}\n    ${lines.join('\n    ')}`);
+        } else {
+          genuineStillCaught++;
+        }
+      }
+    }
+
+    assert.ok(readCount === targets.length && readCount > 2,
+      `corpus measurement read ${readCount} of ${targets.length} plans`);
+    assert.deepEqual(refusedForMaskedText, [],
+      `these plans are refused for a status word that appears only inside code or quotes:\n  ${refusedForMaskedText.join('\n  ')}`);
+    assert.ok(maskedFreed === 1, 'the freeing direction must have been measured');
+    assert.ok(genuineStillCaught >= 1,
+      'at least one genuine declaration must still be caught — otherwise the gate is off');
+  });
+
+  test('case 14 — masking is bounded on pathological input', () => {
+    const longBacktickRun = '`'.repeat(4000);
+    const longQuoteRun = '"'.repeat(4000);
+    const p = write('pathological', planFile({
+      12: { heading: `### Step 12: OPTIMIZE — ${longBacktickRun} ${longQuoteRun} done` }
+    }, `${'`'.repeat(2000)}\n${'"'.repeat(2000)}\n${'x'.repeat(50000)}\n`));
+
+    const started = Date.now();
+    const result = validator.validateForReview(p, testDir);
+    const elapsed = Date.now() - started;
+
+    assert.ok(result != null, 'validation must complete');
+    assert.ok(elapsed < 5000,
+      `masking must not backtrack: validation took ${elapsed}ms on pathological input`);
+  });
+
+  test('the mask preserves length exactly, asserted rather than inspected', () => {
+    // Length preservation is load-bearing: three consumers report a step number
+    // parsed out of the same line. Asserted through the public surface — a mask
+    // that shortened the text would move the reported step number, which case 11
+    // pins, and would also change where line breaks fall, which this pins.
+    const withCode = planFile({
+      12: { heading: '### Step 12: OPTIMIZE — `a` `bb` "ccc" “dddd” and SKIPPED' }
+    });
+    const p = write('length-preserved', withCode);
+    const result = validator.validateForReview(p, testDir);
+    assert.ok(result.errors.some((e) => /Step 12 marked as SKIPPED/i.test(e)),
+      'the declaration after several masked spans must still be caught, on the right step');
+  });
+});

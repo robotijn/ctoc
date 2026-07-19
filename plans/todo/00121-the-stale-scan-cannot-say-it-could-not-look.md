@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-19T18:29:04.194Z
+gate_crossed: implementation → todo
+---
+
+---
 title: "The stale scan cannot say it could not look — four silent skips report an unread backlog as a clean one, and its loudest signal fires on every plan that has not been built yet"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild
@@ -14,8 +20,8 @@ files:
 # The stale scan cannot say it could not look
 
 > **PROVENANCE.** The human found a backlog of 44 plans of which 37 were dead — 34
-> already built, 3 killed by a later plan — and nothing had detected it. He reported
-> it as "rot with no detector" and proposed building one.
+> already built, 3 killed by a later plan — and nothing had detected it. He reported it
+> as "rot with no detector" and proposed building one.
 >
 > **A detector already exists and is live.** `src/lib/stale-detector.js` is 900+ lines,
 > is called on the menu hot path by `src/lib/inbox.js:241` and `:302` and by
@@ -23,14 +29,29 @@ files:
 > classifier. It is not missing. It has two specific defects that made it quiet, and
 > this slice fixes those rather than building a second detector beside the first.
 >
-> **This changes what the work is.** Building a new checker next to a live one would
+> **This changes what the work is.** Building a new checker beside a live one would
 > have produced a second encoding of the same rule — the hazard being removed across
 > this whole batch.
+>
+> **READ THIS AS A LIVE DEFECT, NOT A GAP.** Nothing here is new capability. A detector
+> that runs on the menu hot path is producing a wrong answer today, on every menu open,
+> and has been for as long as the constant has been mis-set. A reader who takes this
+> for a missing feature will not understand why it is urgent.
+
+## Independently verified by the coordinator, 2026-07-19
+
+Stated as measured, not as a claim:
+
+> `GATE_SOURCE_STAGES` at `src/lib/stale-detector.js:88` contains `'implementation'`
+> while `NOT_STARTED_STAGES` at `:100` does not — **that single set membership is the
+> mis-set constant that produced the loudest false signal.**
+
+One line of set membership, on a live hot path, is the whole of defect two below.
 
 ## Defect one — four silent skips, and no channel to report them
 
-`scanCheapCandidates` (`src/lib/stale-detector.js:794`) walks the gate-source stages
-and drops a plan from the scan at four points, each a bare `continue`:
+`scanCheapCandidates` (`src/lib/stale-detector.js:794`) walks the gate-source stages and
+drops a plan from the scan at four points, each a bare `continue`:
 
 | Line | Condition | What is dropped |
 |---|---|---|
@@ -39,8 +60,8 @@ and drops a plan from the scan at four points, each a bare `continue`:
 | `:859` | plan exceeds `MAX_PLAN_BYTES` (1 MiB) | that plan |
 | `:864-866` | `readFileSync` on a plan throws | that plan |
 
-Each individual skip is defensible: a file that vanished mid-scan should not crash
-the menu. **The defect is that the return value has nowhere to put them.**
+Each individual skip is defensible: a file that vanished mid-scan should not crash the
+menu. **The defect is that the return value has nowhere to put them.**
 `CheapScanResult` is `{ candidates, count }` and `count === candidates.length`, so a
 scan that read nothing returns `{ candidates: [], count: 0 }` — **byte-identical to a
 scan that read every plan and found the backlog clean.**
@@ -49,8 +70,8 @@ Follow it to the surface: `inbox.js:241` returns `.candidates` straight to the m
 nag count. **An unreadable `plans/review/` directory therefore renders as "no stale
 plans" on the dashboard.** The human's constraint for this batch names this exact
 outcome — "a staleness checker that reports 'nothing stale' because it could not read
-the plans would be the ninth instance of the defect this year, inside the fix for
-it." It is not a hypothetical. It is line 824, shipped, on the hot path.
+the plans would be the ninth instance of the defect this year, inside the fix for it."
+It is not a hypothetical. It is line 824, shipped, on the hot path.
 
 The `:823` skip is the severe one. One unreadable directory removes a third of the
 backlog from the scan and the count still prints with confidence.
@@ -58,9 +79,9 @@ backlog from the scan and the count still prints with confidence.
 Note what the module already gets right, because the fix should match it rather than
 invent a new convention: `verifyStaleCandidate` returns explicit `gitAvailable: false`
 plus an `error` string when git is unavailable, and `classifyStaleCandidate` maps that
-to `inconclusive` with a null action. **The cold path already distinguishes "I could
-not look" from "I looked and found nothing." The hot path does not.** This slice
-carries the discipline that already exists in the same file across to the scan.
+to `inconclusive` with a null action. **The cold path already distinguishes "I could not
+look" from "I looked and found nothing." The hot path does not.** This slice carries the
+discipline that already exists in the same file across to the scan.
 
 ## Defect two — the loudest signal fires on every plan that has not been built yet
 
@@ -111,35 +132,35 @@ Two further points, both established by reading rather than assumed:
 ```
 
 Every one of the four skip points pushes an entry instead of vanishing. `reason` is a
-fixed enum — `stage-unreadable`, `stat-failed`, `oversized`, `read-failed` — never a
-raw error string in the returned value (see Step 13). For `stage-unreadable`, `path`
-is the stage directory and the entry stands for the whole stage; say so in the
-`reason` documentation so a consumer cannot read one entry as one plan.
+fixed enum — `stage-unreadable`, `stat-failed`, `oversized`, `read-failed` — never a raw
+error string in the returned value (see Step 13). For `stage-unreadable`, `path` is the
+stage directory and the entry stands for the whole stage; say so in the `reason`
+documentation so a consumer cannot read one entry as one plan.
 
 The addition is **purely additive**: `candidates` and `count` keep their exact current
 meaning and shape, so every existing caller and test continues to work unchanged.
 
 **2. The consumers must be able to tell the two states apart.** The scan's contract
-becomes: `unreadCount === 0` means *"I read every plan"*; `unreadCount > 0` means
-*"this result is partial"*. Add that to the module header alongside the existing
-statements, and make `count` documented as "candidates found among the plans I could
-read" — the honest phrasing.
+becomes: `unreadCount === 0` means *"I read every plan"*; `unreadCount > 0` means *"this
+result is partial"*. Add that to the module header alongside the existing statements,
+and make `count` documented as "candidates found among the plans I could read" — the
+honest phrasing.
 
 > **SCOPE NOTE, deliberate.** This slice does **not** edit `inbox.js` or
-> `menu-screens.js`, so the dashboard does not yet display the partial-scan warning.
-> The reason is sizing, and it is a real cost stated plainly: **until a follow-up
-> surfaces `unreadCount`, the menu still renders a partial scan as a clean one.** The
-> data exists and is tested here; the display is not wired here. That is a knowingly
-> incomplete state and it is named rather than glossed. See "What this does NOT fix".
+> `menu-screens.js`, so the dashboard does not yet display the partial-scan warning. The
+> reason is sizing, and it is a real cost stated plainly: **until a follow-up surfaces
+> `unreadCount`, the menu still renders a partial scan as a clean one.** The data exists
+> and is tested here; the display is not wired here. That is a knowingly incomplete state
+> and it is named rather than glossed. See "What this does NOT fix".
 
 **3. `implementation` joins `NOT_STARTED_STAGES`, and the cheap pass consults it for
 `actionable`.**
 
-- The candidate is still **emitted** — the cheap pass stays a broad generator, exactly
-  as the header specifies, so nothing downstream loses input.
+- The candidate is still **emitted** — the cheap pass stays a broad generator, exactly as
+  the header specifies, so nothing downstream loses input.
 - `actionable` becomes false when the only actionable signal is `missing-files` at a
-  not-started stage. The plan appears in the list as advisory; it stops driving the
-  nag count.
+  not-started stage. The plan appears in the list as advisory; it stops driving the nag
+  count.
 - `NOT_STARTED_STAGES` is already exported and `inbox.js:296` already has a fail-safe
   path for an older detector lacking it — read that path and confirm the change is
   compatible with it before editing.
@@ -165,9 +186,9 @@ read" — the honest phrasing.
 
 Cross-platform: `path.join`, `os.tmpdir()`, teardown with
 `fs.promises.rm(root, { recursive: true, force: true })`. Cases 1, 3 and 5 depend on
-revoking read permission; where a platform cannot, **skip with a stated reason printed
-in the output** — a permissions test that silently no-ops is itself a check reporting
-a verdict it never earned, and would be a tenth instance inside the fix for the ninth.
+revoking read permission; where a platform cannot, **skip with a stated reason printed in
+the output** — a permissions test that silently no-ops is itself a check reporting a
+verdict it never earned, and would be a tenth instance inside the fix for the ninth.
 
 ---
 
@@ -178,30 +199,27 @@ a verdict it never earned, and would be a tenth instance inside the fix for the 
 | `scanCheapCandidates` with the `unread` channel | `src/lib/inbox.js:241` and `:302` | `/ctoc:menu` — the dashboard nag count and drill-in list |
 | the `actionable` scoping | same, plus `src/lib/menu-screens.js:1126` / `:1234` via `classifyStaleCandidate` | `/ctoc:menu` |
 
-`stale-detector.js` is **not** in `.ctoc/reachability-baseline.json` — it is already
-live and reachable. This slice changes a module a human already reaches on every menu
-open; it creates no new module and therefore no new dead code.
+`stale-detector.js` is **not** in `.ctoc/reachability-baseline.json` — it is already live
+and reachable. This slice changes a module a human already reaches on every menu open; it
+creates no new module and therefore no new dead code.
 
 ## What this does NOT fix
 
-- **The dashboard does not yet show the partial-scan warning.** `unreadCount` is
-  produced and tested; no consumer renders it. Until a follow-up wires it, a partial
-  scan still *looks* clean to the human even though the data now says otherwise. This
-  is the honest cost of keeping the slice to one module, and it is the first thing to
-  wire next.
+- **The dashboard does not yet show the partial-scan warning.** `unreadCount` is produced
+  and tested; no consumer renders it. Until a follow-up wires it, a partial scan still
+  *looks* clean to the human even though the data now says otherwise. This is the honest
+  cost of keeping the slice to one module, and it is the first thing to wire next.
 - **It does not answer "has this plan's work already landed?"** That is the question
-  behind the 34 already-built plans, and it needs a code-presence probe. See
-  `00122`.
+  behind the 34 already-built plans, and it needs a code-presence probe. See `00122`.
 - **It does not detect supersession by a later plan.** Also `00122`.
-- **It does not fix the contention signal.** "Two plans declare the same file" without
-  a landed-check is the human's second worthless signal; it lives in the plan-index
-  conflict detector and is addressed in `00122`.
-- **It does not make `missing-files` meaningful at the implementation stage.** It
-  makes it quiet there. A pre-Gate-2 plan's missing files carry no information, so
-  there is nothing to extract — the correct action is to stop reporting it, not to
-  reinterpret it.
-- **It does not raise the 1 MiB size gate.** An oversized plan is still skipped; it is
-  now skipped *audibly*.
+- **It does not fix the contention signal.** "Two plans declare the same file" without a
+  landed-check is the human's second worthless signal; it lives in the plan-index conflict
+  detector and is addressed in `00122`.
+- **It does not make `missing-files` meaningful at the implementation stage.** It makes it
+  quiet there. A pre-Gate-2 plan's missing files carry no information, so there is nothing
+  to extract — the correct action is to stop reporting it, not to reinterpret it.
+- **It does not raise the 1 MiB size gate.** An oversized plan is still skipped; it is now
+  skipped *audibly*.
 
 ## Execution Plan (Steps 8-16)
 
@@ -252,40 +270,38 @@ open; it creates no new module and therefore no new dead code.
 
 ## Decisions Taken Under Ambiguity
 
-1. **The existing detector is extended; no second detector is built.** The human's
-   brief anticipated building one. `stale-detector.js` is live on the menu hot path, so
-   a new checker beside it would be a second encoding of one rule and would compete for
-   the same surface. This is the largest decision in the slice and it changes the
-   shape of the work.
-2. **The `unread` channel is additive; `candidates` and `count` keep their exact
-   meaning.** Redefining `count` to include unread plans would silently change every
-   existing consumer's numbers — a quiet behaviour change inside a slice about quiet
-   behaviour changes.
+1. **The existing detector is extended; no second detector is built.** The human's brief
+   anticipated building one. `stale-detector.js` is live on the menu hot path, so a new
+   checker beside it would be a second encoding of one rule and would compete for the same
+   surface. This is the largest decision in the slice and it changes the shape of the work.
+2. **The `unread` channel is additive; `candidates` and `count` keep their exact meaning.**
+   Redefining `count` to include unread plans would silently change every existing
+   consumer's numbers — a quiet behaviour change inside a slice about quiet behaviour
+   changes.
 3. **`reason` is a closed enum, not a raw error string.** The value is rendered on a
-   dashboard; filesystem errors carry absolute paths and user names. The diagnostic
-   detail belongs in a log, not in a return value bound for a screen.
+   dashboard; filesystem errors carry absolute paths and user names. The diagnostic detail
+   belongs in a log, not in a return value bound for a screen.
 4. **The skips remain skips.** They are not converted into throws. A vanished plan file
    must not crash the menu — the defect was never that the scan continued, only that it
    continued silently. Continue, and say so.
 5. **`stage-unreadable` is ONE entry standing for a whole stage, not one per plan.** The
    scan cannot know how many plans it failed to read, and inventing a count would be a
    number reported on input never received — the exact defect being fixed.
-6. **`implementation` joins `NOT_STARTED_STAGES` rather than leaving the gate-source
-   set.** Removing it from the scan would also silence the age signal and any future
-   signal at that stage. The plan is a legitimate candidate; only `missing-files` is
-   uninformative there.
-7. **The candidate is still emitted at not-started stages, only `actionable` changes.**
-   The module's header states the broad-generator split is deliberate and correct; this
-   slice honours that design rather than relitigating it.
-8. **`missing-files` keeps its teeth at review.** The signal is not worthless in
-   general — it is worthless before a plan has been built. Deleting it outright would
-   throw away the one stage where it discriminates.
+6. **`implementation` joins `NOT_STARTED_STAGES` rather than leaving the gate-source set.**
+   Removing it from the scan would also silence the age signal and any future signal at
+   that stage. The plan is a legitimate candidate; only `missing-files` is uninformative
+   there.
+7. **The candidate is still emitted at not-started stages, only `actionable` changes.** The
+   module's header states the broad-generator split is deliberate and correct; this slice
+   honours that design rather than relitigating it.
+8. **`missing-files` keeps its teeth at review.** The signal is not worthless in general —
+   it is worthless before a plan has been built. Deleting it outright would throw away the
+   one stage where it discriminates.
 9. **The dashboard wiring is deliberately deferred, and the resulting incompleteness is
    stated rather than hidden.** Editing `inbox.js` and `menu-screens.js` would take this
-   slice past the one-to-three file rule and into two modules with live menu callers.
-   The cost — the human still sees a clean-looking dashboard on a partial scan — is
-   named in "What this does NOT fix" and in Step 15 rather than being left for someone
-   to discover.
-10. **The permission-dependent test cases skip loudly or not at all.** A silent no-op on
-    a platform that cannot revoke read would make this slice's own test suite an
-    instance of the defect it fixes.
+   slice past the one-to-three file rule and into two modules with live menu callers. The
+   cost — the human still sees a clean-looking dashboard on a partial scan — is named in
+   "What this does NOT fix" and in Step 15 rather than being left for someone to discover.
+10. **The permission-dependent test cases skip loudly or not at all.** A silent no-op on a
+    platform that cannot revoke read would make this slice's own test suite an instance of
+    the defect it fixes.
