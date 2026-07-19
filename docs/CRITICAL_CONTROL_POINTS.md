@@ -66,8 +66,8 @@ The defect is invisible until Gate 3 (or worse, until production).
 
 | Field | Entry |
 |---|---|
-| **Critical limit** | Approach must score ≥ 4 on all five dimensions of `src/lib/iron-loop.js` `critique()` (completeness, clarity, edgeCases, efficiency, security). At least two alternative approaches must be documented and rejected with reasons. |
-| **Monitoring procedure** | Implementation-plan-reviewer (opus) scores the plan. Refinement loop runs against the PLAN section if `effort_level` is `high` or `xhigh` or any `files:` glob matches `.ctoc/config/refinement-triggers.yaml`. |
+| **Critical limit** | The human at Gate 2 accepts the approach. At least two alternative approaches must be documented and rejected with reasons. **No automated score stands behind this limit.** It formerly read "must score ≥ 4 on all five dimensions of `src/lib/iron-loop.js` `critique()`"; that function computed its five numbers by grepping the boilerplate template it had itself just appended to the plan, so every plan scored the same and a plan with no content at all averaged 4.6. Those scores are deleted — `critique()` now returns `evaluated: false`, `scores: null`. |
+| **Monitoring procedure** | The human reads the plan at Gate 2, and the plan file carries the integrator's own `not-evaluated` verdict so the reader knows nothing machine-checked it. Implementation-plan-reviewer (opus) reviews the plan when dispatched. A real automated critic is separate work, not yet built. |
 | **Corrective action when exceeded** | Kickback to Step 5. Author re-investigates alternatives, including stack-chooser if the project is template-based. Maximum three kickbacks before circuit-breaker escalates to user. |
 | **Records kept** | `.ctoc/audit/dispatches/<date>/<dispatch_id>.yaml` for each implementation-planner dispatch. Plan file frontmatter `decisions_taken_under_ambiguity:`. |
 | **Linked controls** | `process_fmea_loop`, `requirements_traceability_matrix`, `fmeda_design` |
@@ -101,9 +101,9 @@ catching it at Step 14 is a full Iron Loop re-run.
 
 | Field | Entry |
 |---|---|
-| **Critical limit** | Plan must survive ten rounds of the Integrator-plus-Critic refinement loop with all critic scores ≥ 4. No `# Decisions Taken Under Ambiguity` section may contain unresolved items at Gate 2. |
-| **Monitoring procedure** | `src/lib/iron-loop.js` `refineLoop()` runs up to ten rounds. Journal at `.ctoc/loops/<plan-slug>/journal.yaml` records every round. Persistent-issue and oscillation detectors in `refinement-loop.js` flag stuck plans. |
-| **Corrective action when exceeded** | If ten rounds fail to converge, the refinement loop emits a `deferredQuestions` letter. User is alerted at Gate 2 to resolve each question. If oscillation is detected, kickback to Step 6 — the design is itself ambiguous. |
+| **Critical limit** | No `# Decisions Taken Under Ambiguity` section may contain unresolved items at Gate 2. **The former limit — "must survive ten rounds of the Integrator-plus-Critic refinement loop with all critic scores ≥ 4" — described a loop that did not exist:** `refineLoop()` read the plan once, appended the Steps 8-16 template under a presence guard, and nothing changed between rounds, so ten rounds would have scored identical bytes identically. |
+| **Monitoring procedure** | `src/lib/iron-loop.js` `refineLoop()` appends the execution section and returns the single status `not-evaluated`, which is written into the plan file so the human at Gate 2 reads that nothing evaluated it. Persistent-issue and oscillation detectors in `refinement-loop.js` flag stuck plans when that loop is driven by agents. |
+| **Corrective action when exceeded** | The `deferredQuestions` entry in the plan states plainly that no critique ran; the user resolves the plan's open questions at Gate 2 by reading it. If oscillation is detected in an agent-driven loop, kickback to Step 6 — the design is itself ambiguous. |
 | **Records kept** | `.ctoc/loops/<plan-slug>/journal.yaml`, `.ctoc/loops/<plan-slug>/letters/*.json`. |
 | **Linked controls** | `requirements_traceability_matrix`, `spec_code_reconciliation`, `irac_compliance_output` |
 

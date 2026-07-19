@@ -457,7 +457,15 @@ Input: Approved Implementation Plan
 
 ### 6-Dimension Rubric
 
-Each dimension scored 1-5. All must reach 5/5 for auto-approval.
+> **This rubric is for a HUMAN or an agent reviewer reading a plan. No JavaScript in
+> this repository computes it.** `src/lib/iron-loop.js` used to return five of these
+> dimensions as 1-to-5 numbers, but it computed them by grepping the boilerplate
+> Steps 8-16 template that the same function had just appended to the plan file — so
+> every plan received the same numbers and a plan whose entire body was "This plan
+> says nothing" averaged 4.6 and passed. Those scores are deleted. The module now
+> reports `not-evaluated` and says so in the plan file.
+
+Each dimension is judged 1-5 by the reviewer.
 
 | Dimension | Score 5/5 Means | Common Failure Modes |
 |-----------|-----------------|---------------------|
@@ -469,6 +477,10 @@ Each dimension scored 1-5. All must reach 5/5 for auto-approval.
 | **Observability** | Logging at key points, metrics for monitoring, error tracing, health checks | Silent failures, no monitoring hooks |
 
 ### Example Critic Response
+
+> **Illustrative only — no code produces this output.** It is the shape a human or
+> an agent reviewer's critique takes when working the rubric above. It is not, and
+> never was, the output of `src/lib/iron-loop.js`.
 
 ```
 Round 3 of 10:
@@ -489,23 +501,37 @@ Round 3 of 10:
 
 ### Deferred Questions
 
-When max rounds (10) is reached and some dimensions still score < 5, unresolved issues become **Deferred Questions** presented at Step 16 (FINAL-REVIEW) with context, options, and pros/cons.
+`appendDeferredQuestions()` writes a **Deferred Questions** section into the plan
+file. Today it carries exactly one entry, and that entry is the module's honest
+report on itself: no automated critique was performed. The section names its own
+provenance so nobody reads it as a finding a critic derived from the plan.
 
 ### Settings
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `integration.max_rounds` | 10 | Maximum refinement rounds |
-| `integration.quality_threshold` | 5 | All dimensions must meet this |
-| `integration.defer_unresolved` | true | Store unresolved as Deferred Questions |
+**None.** This section documented `integration.max_rounds`,
+`integration.quality_threshold` and `integration.defer_unresolved`. Grepped on
+2026-07-19: not one of the three has a single consumer anywhere in `src/`, and none
+is present in the settings schema. `max_rounds` never bounded anything even when the
+loop existed — the plan content was read once and the append was guarded, so ten
+rounds would have scored identical bytes identically. A documented setting with zero
+consumers is the same defect class as a score computed from nothing: a claim the
+system cannot honour.
 
-**The refinement loop approves nothing.** `refineLoop()` returns `score-passed`
-(the critic's own scores cleared the bar) or `max-rounds` (they did not — here are
-the deferred questions). Neither is an approval. Approvals are human, are recorded
-in the approval ledger, and are checked at the four gates. There is no
-"auto-approve after max rounds" — that setting was documented but had zero code
-consumers, which is worse than a wrong default: it described a machine crossing a
-gate that no machine actually crosses.
+**The refinement loop approves nothing, and now grades nothing either.**
+`refineLoop()` returns the single terminal status `not-evaluated`, with
+`evaluated: false`, `stub: true` and `scores: null` — the absence of a verdict, not
+a default number a consumer could mistake for a measurement. It still does the one
+piece of real work it always did: appending the Steps 8-16 execution section when
+the plan lacks one, and reporting checkable structural facts (which canonical step
+labels are missing, which are present under a wrong label, how many IMPLEMENT steps
+exist). Approvals are human, are recorded in the approval ledger, and are checked at
+the four gates. There is no "auto-approve after max rounds" — that setting was
+documented but had zero code consumers, which is worse than a wrong default: it
+described a machine crossing a gate that no machine actually crosses.
+
+**A real critic is separate work the human schedules.** Until it exists, the honest
+report is the deliverable: blindness reported as blindness, following the in-repo
+exemplar `src/lib/comparator-agent.js`.
 
 ### Implementation
 

@@ -587,8 +587,16 @@ function applyIronLoop(planPath) {
   try {
     const result = refineLoop(planPath);
 
-    // If max rounds reached, append deferred questions
-    if (result.status === 'max-rounds' && result.deferredQuestions) {
+    // The refinement loop performs NO quality evaluation (see iron-loop.js). Its
+    // verdict is written into the plan so the human at Gate 2 reads "not evaluated"
+    // instead of inferring that something checked this plan.
+    //
+    // VOLUME CHANGE, INTENDED: the old condition was `status === 'max-rounds'`, a
+    // branch that essentially never fired because the loop early-accepted on round
+    // one. So this section landed in almost no plan. It now lands in every plan that
+    // reaches this function. A verdict that appears on almost no plan is a verdict
+    // nobody reads — the volume is the deliverable, not a side effect.
+    if (result.deferredQuestions && result.deferredQuestions.length > 0) {
       appendDeferredQuestions(planPath, result.deferredQuestions);
     }
 

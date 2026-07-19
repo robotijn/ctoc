@@ -1,0 +1,9 @@
+{
+  "content_sha256": "75963fea3f8f64eec1565bbde1880489a1079b1a85c35ecaf5f76cefbee6b7d5",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T21:31:41.163Z",
+  "approved_by": "human",
+  "plan_basename": "00128-a-link-inside-the-repository-reaches-outside-it-and-the-check-is-pure-arithmetic"
+}

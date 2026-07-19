@@ -1,0 +1,9 @@
+{
+  "content_sha256": "4599e57fccee10a67c568601176865a2850be9a8e234f6cb3d36c58d41e12cc6",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T21:33:26.684Z",
+  "approved_by": "human",
+  "plan_basename": "00137-the-verification-verdict-is-enforced-offline-on-every-build"
+}

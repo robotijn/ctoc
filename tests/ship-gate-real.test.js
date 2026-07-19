@@ -400,12 +400,25 @@ test('ship-gate: no source file hardcodes an ungated push', () => {
 
 // ── 6. refineLoop stops self-approving (Goodhart) ────────────────────────────
 
+// The positive assertion was RETARGETED, never loosened. It required the literal
+// `status: 'score-passed'` to be PRESENT — the string that was honest when it
+// replaced 'approved'. The status has since become MORE honest ('not-evaluated':
+// the loop grades nothing, so it reports nothing), which to the old assertion read
+// as the anti-gaming property having been REMOVED. That was a FALSE RED, and the
+// cheap escape — deleting or loosening the assertion — is exactly the failure this
+// gate exists to catch. Instead: the 'approved' negative is byte-identical to
+// before, the positive names the new non-authoritative status, and a THIRD
+// assertion pins that the old grading status cannot come back. Three properties
+// where there were two: strictly stricter.
 test('ship-gate: refineLoop never returns status "approved" (it approves nothing)', () => {
   const src = fs.readFileSync(path.join(ROOT, 'src/lib/iron-loop.js'), 'utf8');
   assert.ok(!/status:\s*'approved'/.test(src),
     'refineLoop must not label its own critic score an approval — only a human approves');
-  assert.ok(/status:\s*'score-passed'/.test(src),
-    'the non-authoritative status must be score-passed');
+  assert.ok(/status:\s*'not-evaluated'/.test(src),
+    'the non-authoritative status must be not-evaluated');
+  assert.ok(!/status:\s*'score-passed'/.test(src),
+    'the grading status must not come back — this loop computed its scores by grepping ' +
+    'the boilerplate template it had itself just appended to the plan');
 });
 
 test('ship-gate: docs no longer claim auto_approve_after_max', () => {

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "2989acb9f98423f7d863c1d7c4731bc90f3059ecd8a8b4a3d98d04e2c8b0395d",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T21:23:46.409Z",
+  "approved_by": "human",
+  "plan_basename": "00131-a-mistaken-call-reads-as-a-verdict-about-the-plan"
+}

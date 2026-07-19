@@ -443,7 +443,7 @@ ctoc/
 | `src/lib/actions.js` | Plan operations (create, move, approve) |
 | `src/lib/state.js` | Plan state management |
 | `src/lib/quality-gate.js` | Quality enforcement |
-| `src/lib/iron-loop.js` | Step validation and Integrator+Critic |
+| `src/lib/iron-loop.js` | Appends the Steps 8-16 execution section; reports `not-evaluated` (it grades nothing) |
 | `src/lib/init-project.js` | Project initialization |
 | `src/hooks/PreToolUse.Bash.js` | Edit/commit enforcement |
 | `src/hooks/human-gate-check.js` | Human gate violation detection + auto-revert |
@@ -479,6 +479,8 @@ ctoc/
 | 16 | FINAL-REVIEW | iron-loop-critic (opus) | Gate 3: User approves result |
 
 **Step labels are MANDATORY.** The wired `src/lib/plan-validator.js` rejects a plan that is missing a required step (matched by step *number*). Label-*text* correctness (e.g. `TEST`, not `TESTING`) is checked by `src/hooks/validate-plan-steps.js`, which today runs only as a standalone script (`node src/hooks/validate-plan-steps.js`) and is NOT wired as a runtime hook — so a present-but-mislabeled step is not auto-rejected at runtime.
+
+**The Step 7 refinement rounds are AGENT-driven, and no JavaScript scores a plan.** `src/lib/iron-loop.js` appends the Steps 8-16 execution section and returns the single status `not-evaluated` (`evaluated: false`, `stub: true`, `scores: null`) — plus checkable structural facts: which canonical step labels are missing, which are present under a wrong label, how many IMPLEMENT steps exist. It formerly returned five 1-to-5 dimension scores, but computed them by grepping the boilerplate template it had itself just appended to the same plan, so every plan received the same numbers and a plan whose entire body was "This plan says nothing" averaged 4.6 and passed. Those scores are deleted; the honest verdict is written into the plan so the human at Gate 2 reads that nothing machine-checked it. A real automated critic is separate work.
 
 **Step 10 is ONE step** with sub-items for multiple files. Never create multiple IMPLEMENT steps.
 
