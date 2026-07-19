@@ -17,8 +17,8 @@
  *   Hook registration (PreToolUse, SessionStart)
  *   VERSION sync across plugin JSON files
  *
- * Each check is a self-contained function returning { severity, message, details }
- * or null (no finding). Severities:
+ * Each check is a self-contained function returning a VERDICT — see the CLEAN /
+ * finding helpers below. Severities:
  *   critical = breaks the system (CTO Chief missing top-level marker)
  *   block    = unsafe state (gate destination without approved_by)
  *   warn     = drift (stale plan, version out of sync)
@@ -80,6 +80,54 @@ const REQUIRED_LIBS = [
   'src/lib/v8-dispatcher.js',
   'src/lib/product-loop.js',     // v8.4+ Product Loop
 ];
+
+// ─────────────────────────────────────────────────────────────────────
+//  The verdict envelope — a clean answer you can READ
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * THE RULE: a check reports a VERDICT, and a clean verdict is an object you can
+ * read — never a falsy value that crashes the reader who asks it a question.
+ *
+ * The original crash (2026-07-19): every check in this module returned `null` to
+ * mean "clean" and an object to mean "violation". `checkGateDestinationsApproved`
+ * is exported, so a caller outside this module wrote `result.severity` and got a
+ * TypeError ON SUCCESS — a crash that read like a failure when the real answer was
+ * "no violation". The falsy success value is indistinguishable from an absent
+ * answer, which is this repository's central defect class wearing a small coat.
+ *
+ * So: `CLEAN()` for no finding, `finding({ severity, message, details })` for one.
+ * Every check returns `{ clean: true }` or `{ clean: false, severity, message, … }`.
+ * One check — `checkPlanCounts` — is clean AND informational: it reports counts,
+ * not problems, so it returns `{ clean: true, severity: 'info', message, details }`
+ * and the consumer records any verdict that carries a message.
+ *
+ * AND: a check that returns anything WITHOUT a boolean `clean` — `null`,
+ * `undefined`, a bare string — is recorded by `checkAllInvariants` as an
+ * `error`-severity finding naming the check id, exactly as a check that throws is.
+ * It is NOT treated as clean. Treating an unreadable answer as a pass would
+ * replace "a clean answer that crashes its reader" with "a broken check that reads
+ * as clean", which is strictly worse than the defect this envelope fixes.
+ *
+ * A FRESH object per call, never a shared frozen singleton: a singleton is one
+ * careless spread away from a consumer mutating every other check's verdict, and
+ * twenty small allocations per run costs nothing against checks that read the disk.
+ */
+function CLEAN() {
+  return { clean: true };
+}
+
+/**
+ * Wrap a check's own `{ severity, message, details }` payload in the not-clean
+ * envelope. The severity, the message text and the details belong to the check and
+ * pass through untouched — this helper is the ONE place `clean: false` is written,
+ * so no check can invent a third shape.
+ * @param {{severity: 'critical'|'block'|'warn'|'info', message: string, details?: Object}} payload
+ * @returns {{clean: false, severity: string, message: string, details?: Object}}
+ */
+function finding(payload) {
+  return { clean: false, ...payload };
+}
 
 // ─────────────────────────────────────────────────────────────────────
 //  Helpers
@@ -154,16 +202,16 @@ function listPlans(root, stage) {
 function checkCtoChiefTopLevel(root) {
   const p = path.join(root, 'agents/coordinator/cto-chief.md');
   if (!safeFs.existsSync(p)) {
-    return { severity: 'critical', message: 'CTO Chief agent file missing at agents/coordinator/cto-chief.md' };
+    return finding({ severity: 'critical', message: 'CTO Chief agent file missing at agents/coordinator/cto-chief.md' });
   }
   const { fm } = readFM(p);
   if (!/role:\s*top-level-coordinator/.test(fm)) {
-    return { severity: 'critical', message: 'CTO Chief MUST declare role: top-level-coordinator' };
+    return finding({ severity: 'critical', message: 'CTO Chief MUST declare role: top-level-coordinator' });
   }
   if (!/^tier:\s*0$/m.test(fm)) {
-    return { severity: 'warn', message: 'CTO Chief should declare tier: 0' };
+    return finding({ severity: 'warn', message: 'CTO Chief should declare tier: 0' });
   }
-  return null;
+  return CLEAN();
 }
 
 function checkOnlyOneTopLevel(root) {
@@ -176,28 +224,28 @@ function checkOnlyOneTopLevel(root) {
     }
   }
   if (offenders.length > 0) {
-    return {
+    return finding({
       severity: 'critical',
       message: `Multiple agents declare role: top-level-coordinator: ${offenders.join(', ')}`,
       details: { offenders },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 function checkSynthesizerExists(root) {
   const p = path.join(root, 'agents/coordinator/synthesizer.md');
   if (!safeFs.existsSync(p)) {
-    return { severity: 'critical', message: 'Synthesizer (cross-pillar Tier 1) missing at agents/coordinator/synthesizer.md' };
+    return finding({ severity: 'critical', message: 'Synthesizer (cross-pillar Tier 1) missing at agents/coordinator/synthesizer.md' });
   }
   const { fm } = readFM(p);
   if (!/^tier:\s*1$/m.test(fm)) {
-    return { severity: 'block', message: 'Synthesizer must declare tier: 1' };
+    return finding({ severity: 'block', message: 'Synthesizer must declare tier: 1' });
   }
   if (!/reports_to:\s*cto-chief/.test(fm)) {
-    return { severity: 'block', message: 'Synthesizer must declare reports_to: cto-chief' };
+    return finding({ severity: 'block', message: 'Synthesizer must declare reports_to: cto-chief' });
   }
-  return null;
+  return CLEAN();
 }
 
 function checkTier1ReportsTo(root) {
@@ -214,13 +262,13 @@ function checkTier1ReportsTo(root) {
     }
   }
   if (missing.length > 0) {
-    return {
+    return finding({
       severity: 'block',
       message: `${missing.length} Tier 1 agents missing or misconfigured`,
       details: { missing },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 function checkTier2NoSubagent(root) {
@@ -233,13 +281,13 @@ function checkTier2NoSubagent(root) {
     }
   }
   if (offenders.length > 0) {
-    return {
+    return finding({
       severity: 'block',
       message: `${offenders.length} Tier 2 skills missing max_subagents: 0`,
       details: { offenders: offenders.slice(0, 5) },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 // DELETED by plan F3b (v6.12.79): checkTier3Scouts.
@@ -277,13 +325,13 @@ function checkActivePlanStepLabels(root) {
     }
   }
   if (offenders.length > 0) {
-    return {
+    return finding({
       severity: 'block',
       message: `${offenders.length} non-canonical step labels in active plans`,
       details: { offenders: offenders.slice(0, 5) },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 // Extract the leading frontmatter region — the one or more consecutive `---`
@@ -315,8 +363,9 @@ function frontmatterRegion(content) {
  * a temp root.
  *
  * @param {string} root - project root
- * @returns {{severity: string, message: string, details: object}|null} a block-severity
- *   finding, or null when every gate-destination plan is ledger-approved
+ * @returns {{clean: boolean, severity?: string, message?: string, details?: object}} a
+ *   not-clean block-severity verdict, or { clean: true } when every gate-destination
+ *   plan is ledger-approved. NEVER null — a clean answer must be readable.
  */
 function checkGateDestinationsApproved(root) {
   const offenders = [];
@@ -360,14 +409,14 @@ function checkGateDestinationsApproved(root) {
     }
   }
   if (offenders.length > 0) {
-    return {
+    return finding({
       severity: 'block',
       message: `${offenders.length} plans in gate destinations are missing approved_by: human in the approval ledger ` +
                `(a frontmatter marker is not an approval — the runtime hook will revert these)`,
       details: { offenders: offenders.slice(0, 5) },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 function checkStalePlans(root, days = 7) {
@@ -380,13 +429,13 @@ function checkStalePlans(root, days = 7) {
     }
   }
   if (stale.length > 0) {
-    return {
+    return finding({
       severity: 'warn',
       message: `${stale.length} plans stale (in-progress > ${days} days without activity)`,
       details: { stale: stale.slice(0, 5) },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 function checkPlansHaveFilesDeclaration(root) {
@@ -400,13 +449,13 @@ function checkPlansHaveFilesDeclaration(root) {
     }
   }
   if (missing.length > 0) {
-    return {
+    return finding({
       severity: 'warn',
       message: `${missing.length} active plans missing files: declaration (not coverage-aware)`,
       details: { missing: missing.slice(0, 5) },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -416,49 +465,49 @@ function checkPlansHaveFilesDeclaration(root) {
 function checkRequiredHooks(root) {
   const missing = REQUIRED_HOOKS.filter(rel => !safeFs.existsSync(path.join(root, rel)));
   if (missing.length > 0) {
-    return {
+    return finding({
       severity: 'critical',
       message: `${missing.length} required hook file(s) missing — Iron Loop enforcement DEGRADED`,
       details: { missing },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 function checkRequiredLibs(root) {
   const missing = REQUIRED_LIBS.filter(rel => !safeFs.existsSync(path.join(root, rel)));
   if (missing.length > 0) {
-    return {
+    return finding({
       severity: 'critical',
       message: `${missing.length} required lib file(s) missing`,
       details: { missing },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 function checkHooksJsonRegistration(root) {
   const hooksJson = path.join(root, '.claude-plugin/hooks.json');
   if (!safeFs.existsSync(hooksJson)) {
-    return { severity: 'critical', message: '.claude-plugin/hooks.json missing — no hooks registered' };
+    return finding({ severity: 'critical', message: '.claude-plugin/hooks.json missing — no hooks registered' });
   }
   const content = safeFs.readFileSync(hooksJson, 'utf8');
   const required = ['SessionStart', 'PreToolUse', 'PreToolUse.Edit.js', 'human-gate-check.js'];
   const missing = required.filter(s => !content.includes(s));
   if (missing.length > 0) {
-    return {
+    return finding({
       severity: 'critical',
       message: `hooks.json missing registration for: ${missing.join(', ')}`,
       details: { missing },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 function checkVersionSync(root) {
   const versionPath = path.join(root, 'VERSION');
   if (!safeFs.existsSync(versionPath)) {
-    return { severity: 'critical', message: 'VERSION file missing' };
+    return finding({ severity: 'critical', message: 'VERSION file missing' });
   }
   const version = safeFs.readFileSync(versionPath, 'utf8').trim();
   const pluginJson = path.join(root, '.claude-plugin/plugin.json');
@@ -479,13 +528,13 @@ function checkVersionSync(root) {
     } catch { /* ignore: unreadable/invalid marketplace.json is reported by other checks */ }
   }
   if (mismatches.length > 0) {
-    return {
+    return finding({
       severity: 'block',
       message: `VERSION (${version}) out of sync with plugin JSON files. Run: node src/scripts/release.js`,
       details: { mismatches },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -495,31 +544,31 @@ function checkVersionSync(root) {
 function checkSaasTemplates(root) {
   const indexPath = path.join(root, '.ctoc/templates/saas/index.yaml');
   if (!safeFs.existsSync(indexPath)) {
-    return { severity: 'warn', message: 'SaaS template index missing — autonomous SaaS build degraded' };
+    return finding({ severity: 'warn', message: 'SaaS template index missing — autonomous SaaS build degraded' });
   }
   const b2c = path.join(root, '.ctoc/templates/saas/b2c-subscription');
   const required = ['README.md', 'manifest.yaml', 'production-readiness.yaml'];
   const missing = required.filter(f => !safeFs.existsSync(path.join(b2c, f)));
   if (missing.length > 0) {
-    return {
+    return finding({
       severity: 'warn',
       message: `b2c-subscription template incomplete: missing ${missing.join(', ')}`,
       details: { missing },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 function checkBudgetConfigExists(root) {
   const p = path.join(root, '.ctoc', 'config', 'budget.yaml');
   if (!safeFs.existsSync(p)) {
-    return {
+    return finding({
       severity: 'warn',
       message: 'Session-level build budget config missing at .ctoc/config/budget.yaml — autonomous runs are unbounded',
       details: { suggested: 'Copy from .ctoc/config/budget.yaml in the CTOC repo, or run /ctoc:budget to generate.' },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 function checkProductLoop(root) {
@@ -533,13 +582,13 @@ function checkProductLoop(root) {
   ];
   const missing = required.filter(rel => !safeFs.existsSync(path.join(root, rel)));
   if (missing.length > 0) {
-    return {
+    return finding({
       severity: 'warn',
       message: `Product Loop artifacts missing: ${missing.join(', ')}`,
       details: { missing },
-    };
+    });
   }
-  return null;
+  return CLEAN();
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -551,7 +600,12 @@ function checkPlanCounts(root) {
   for (const stage of ['vision', 'canvas', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done']) {
     counts[stage] = listPlans(root, stage).length;
   }
+  // CLEAN and informational: this check reports counts, not problems, so its
+  // verdict is clean by definition — but it still carries a reportable payload,
+  // and the consumer records any verdict that carries a message. The `info` count
+  // in the summary must not move.
   return {
+    clean: true,
     severity: 'info',
     message: `Plans: ${Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(' · ')}`,
     details: counts,
@@ -597,7 +651,7 @@ const CHECKS = [
  * Thorough mode only.
  *
  * @param {string} root - Project root
- * @returns {{severity: string, message: string}|null}
+ * @returns {{clean: boolean, severity?: string, message?: string}} not-clean, or { clean: true }
  */
 function checkDeadExportFence(root) {
   const { analyzeExports } = require('./reachability');
@@ -605,7 +659,7 @@ function checkDeadExportFence(root) {
   const safeFs = require('./safe-fs');
 
   const result = analyzeExports(root);
-  if (!result || result.totalExports === 0) return null; // not a CTOC source tree
+  if (!result || result.totalExports === 0) return CLEAN(); // not a CTOC source tree
 
   const baselineFile = path.join(root, '.ctoc', 'export-reachability-baseline.json');
   /** @type {Set<string>} */
@@ -619,11 +673,11 @@ function checkDeadExportFence(root) {
   }
 
   const fresh = result.dead.filter((name) => !baselined.has(name));
-  if (fresh.length === 0) return null;
-  return {
+  if (fresh.length === 0) return CLEAN();
+  return finding({
     severity: 'block',
     message: `${fresh.length} NEW dead export(s) — defined and exported, called by nothing live: ${fresh.slice(0, 10).join(', ')}${fresh.length > 10 ? ` (+${fresh.length - 10} more)` : ''} — wire each to a live call site or delete it; a test is not a caller`
-  };
+  });
 }
 
 /**
@@ -643,7 +697,7 @@ function checkDeadExportFence(root) {
  * as "all clear".
  *
  * @param {string} root - Project root
- * @returns {{severity: string, message: string}|null}
+ * @returns {{clean: boolean, severity?: string, message?: string}} not-clean, or { clean: true }
  */
 function checkReachabilityFence(root) {
   const { analyze } = require('./reachability');
@@ -651,7 +705,7 @@ function checkReachabilityFence(root) {
   const safeFs = require('./safe-fs');
 
   const result = analyze(root);
-  if (result.total === 0) return null; // not a CTOC source tree — nothing to check
+  if (result.total === 0) return CLEAN(); // not a CTOC source tree — nothing to check
 
   const baselineFile = path.join(root, '.ctoc', 'reachability-baseline.json');
   /** @type {Set<string>} */
@@ -666,19 +720,19 @@ function checkReachabilityFence(root) {
       const list = Array.isArray(parsed) ? parsed : (parsed && parsed.unreachable) || [];
       for (const rel of list) if (typeof rel === 'string') baselined.add(rel);
     } catch (err) {
-      return {
+      return finding({
         severity: 'block',
         message: `.ctoc/reachability-baseline.json exists but could not be read (${err && err.message}) — the dead-code ratchet cannot be evaluated, and an unreadable baseline must never read as "all clear"; repair the file`
-      };
+      });
     }
   }
 
   const fresh = result.unreachable.filter((rel) => !baselined.has(rel));
-  if (fresh.length === 0) return null;
-  return {
+  if (fresh.length === 0) return CLEAN();
+  return finding({
     severity: 'block',
     message: `${fresh.length} NEW source file(s) unreachable from every live root (dead on arrival): ${fresh.slice(0, 10).join(', ')}${fresh.length > 10 ? ` (+${fresh.length - 10} more)` : ''} — wire each to a live root or delete it; a module is not done when its test passes, it is done when a human can reach it`
-  };
+  });
 }
 
 /**
@@ -705,8 +759,8 @@ function checkReachabilityFence(root) {
  * mode only (walks the whole src tree).
  *
  * @param {string} root - Project root
- * @returns {{severity: string, message: string}|null} null when clean or when this is
- *   not a CTOC source tree.
+ * @returns {{clean: boolean, severity?: string, message?: string}} { clean: true } when
+ *   clean or when this is not a CTOC source tree.
  */
 function checkFalseGreenFence(root) {
   const { scanFalseGreen } = require('./false-green-scan');
@@ -714,7 +768,7 @@ function checkFalseGreenFence(root) {
   const safeFs = require('./safe-fs');
 
   const result = scanFalseGreen(root);
-  if (result.filesScanned === 0) return null; // not a CTOC source tree — nothing to check
+  if (result.filesScanned === 0) return CLEAN(); // not a CTOC source tree — nothing to check
 
   const baselineFile = path.join(root, '.ctoc', 'false-green-baseline.json');
   /** @type {Set<string>} */
@@ -728,16 +782,16 @@ function checkFalseGreenFence(root) {
   }
 
   const fresh = result.findings.filter((f) => !excused.has(f.key));
-  if (fresh.length === 0) return null;
+  if (fresh.length === 0) return CLEAN();
 
   const shown = fresh.slice(0, 5).map(
     (f) => `${f.file}:${f.line} [${f.signature}] ${f.evidence} → ${f.fix}`
   );
-  return {
+  return finding({
     severity: 'block',
     message: `${fresh.length} NEW false-green site(s) — a check that can report a verdict on input it never received: ` +
       `${shown.join(' | ')}${fresh.length > 5 ? ` (+${fresh.length - 5} more)` : ''}`
-  };
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -762,8 +816,26 @@ function checkAllInvariants(opts = {}) {
     if (mode === 'fast' && check.mode === 'thorough') continue;
     if (scopes && !scopes.includes(check.scope)) continue;
     try {
-      const finding = check.fn(root);
-      if (finding) findings.push({ id: check.id, scope: check.scope, ...finding });
+      const verdict = check.fn(root);
+      if (!verdict || typeof verdict.clean !== 'boolean') {
+        // An unreadable verdict is an ERROR, never a pass. A check that answers
+        // `null`/`undefined` has told us nothing, and recording nothing as "clean"
+        // is exactly the false-green defect this envelope exists to close. Only the
+        // check id is named — never the returned value, which a future check could
+        // fill with arbitrary content.
+        findings.push({
+          id: check.id, scope: check.scope, severity: 'error',
+          message: `Check returned an unreadable verdict (no boolean \`clean\`) — treated as an ERROR, not a pass`,
+        });
+        continue;
+      }
+      // Record a finding when the verdict is not clean, or when a clean verdict
+      // still carries a reportable message (the informational plan-counts check).
+      // `clean` itself is stripped: the findings element shape is unchanged.
+      if (verdict.clean === false || typeof verdict.message === 'string') {
+        const { clean, ...payload } = verdict;   // `clean` is a rest sibling: dropped, never reported
+        findings.push({ id: check.id, scope: check.scope, ...payload });
+      }
     } catch (err) {
       findings.push({ id: check.id, scope: check.scope, severity: 'error', message: `Check threw: ${err.message}` });
     }
