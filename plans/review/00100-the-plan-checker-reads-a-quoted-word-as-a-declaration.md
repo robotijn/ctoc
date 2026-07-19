@@ -203,6 +203,20 @@ test.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] Twenty new cases added to `tests/escalation-word-boundary.test.js`, run BEFORE
+  touching `src/`. RED evidence: `12 subtests failed` in the new group, while the
+  entire pre-existing group stayed `✔`. The reported-defect cases (1, 1b, 2, 3, 3b,
+  4), the offsets case (11), both detector-agreement cases (12, 12c) and the corpus
+  case (13) were RED. Cases 5, 6, 7, 9, 9b, 10, 12b, 14 and the length case were
+  GREEN before the change and stayed green after — the proof the gate was not
+  loosened.
+- [x] MEASURED, as the plan required recording: case 8 (an approval written inside
+  backticks) was **RED today**. The laundering hole already existed — a real bare
+  declaration was being cleared by an approval inside code. The masking closes it,
+  so this change is strictly TIGHTENING on that path, not only loosening.
+- [x] Before-corpus measurement recorded: 304 plans read, 3 escalation refusals
+  across 2 plans.
+
 Extend `tests/escalation-word-boundary.test.js` with the fourteen cases and run ONLY
 that file before touching `src/`. Cases 1, 2, 3 and 4 must be **RED** — they are the
 reported defect and their red output is the evidence. Cases 5, 6, 7, 9, 10 and 12
@@ -213,6 +227,17 @@ verbatim. Run case 13 against the corpus **before** the change and record the co
 of refused plans; that number is the before half of the measurement this slice owes.
 
 ### Step 9: PREPARE
+- [x] Read from disk, in full: `src/lib/plan-validator.js` (whole file),
+  `tests/escalation-word-boundary.test.js` (whole file), `src/lib/regex-utils.js`,
+  and the vision ancestor `plans/vision/ctoc-background-engine-rebuild.md`.
+- [x] Verified the decisive corpus claim MYSELF rather than trusting the plan:
+  `plans/review/00012-r3a-ledger-forgery-closed.md:129` is a real, unapproved,
+  bare mid-line declaration. The rejected proposal would indeed have freed it.
+- [x] Confirmed on disk which scans are region-scoped: `validateEscalations` and
+  `validateStepsComplete` are region/block-scoped, `validateNoContradictions`
+  pattern 3 sees the whole document. Three call sites, as the plan said.
+- [x] DISCREPANCY RECORDED — the code won over the plan. See decision 9 below.
+
 Read from disk: `src/lib/plan-validator.js:24-100` (the boundary helper and its
 derivation), `:180-240` (the per-step probes), `:264-320` (the region scan),
 `:395-500` (the existing fence strip and pattern 3); the whole of
@@ -224,12 +249,32 @@ decides how many call sites the helper needs. Where the code disagrees with this
 plan, **the code wins** — record the discrepancy.
 
 ### Step 10: IMPLEMENT
+- [x] `src/lib/plan-validator.js` — `maskQuotedSpans` added, patterns compiled once
+  at module load through `safeRegExp`, applied at all three named call sites.
+- [x] `tests/escalation-word-boundary.test.js` — twenty cases added, not one
+  existing assertion touched.
+- [x] Wiring: the helper is reached from the exported `validateForReview` on its
+  first call (via all three validators), which `src/lib/actions.js` drives on the
+  review transition and `src/hooks/human-gate-check.js` drives at the gate. It is
+  private to the module, so no new export and no new file — both reachability
+  fences pass unchanged in the gated run.
+
 One step, files as sub-items.
 - `src/lib/plan-validator.js` — `maskQuotedSpans`, applied at the three named sites,
   patterns compiled once at module load through `safeRegExp`.
 - `tests/escalation-word-boundary.test.js` — the fourteen cases.
 
 ### Step 11: REVIEW
+- [x] Every pre-existing case in the test file passes UNMODIFIED — no assertion
+  weakened, no range widened, no case deleted. Confirmed by `git diff --stat`:
+  the test file is +415 with zero deletions.
+- [x] Length preservation asserted rather than inspected (the offsets case and the
+  length case), not merely reasoned about.
+- [x] Both detectors classify identically, in both directions (cases 12 and 12b).
+- [x] Every site that matches a status word was checked; none left on unmasked
+  text. The two file/script claim patterns are deliberately left on the
+  fence-stripped text — see decision 9.
+
 Confirm every pre-existing case in the test file passes **unmodified** — not one
 assertion weakened, no range widened, no case deleted. Confirm the masking preserves
 length exactly, by assertion rather than by inspection. Confirm the two detectors
@@ -237,11 +282,30 @@ classify identically. Confirm the helper is used at every site that matches a st
 word, and that no site was left on the old text.
 
 ### Step 12: OPTIMIZE
+- [x] All five span patterns compiled once at module load, never inside a loop.
+- [x] No nested quantifier anywhere. The inline-code delimiter run is bounded to
+  `{1,3}` rather than `+` precisely so the backreference cannot drive quadratic
+  backtracking on a long run of backticks, and every content class excludes its
+  own delimiter.
+- [x] One masking pass per scanned region or block, on text already extracted.
+  Added cost on the real corpus is unmeasurable against the 304-plan sweep.
+
 Patterns compiled once at module load, never inside a loop. The masking is one pass
 per scanned region, and the region is already extracted. Confirm the added cost on a
 real plan is negligible and that no pattern has a nested quantifier.
 
 ### Step 13: SECURE
+- [x] Every pattern goes through `safeRegExp`; all five are fixed literals. No
+  plan-derived text is interpolated into any pattern, and the status words remain
+  code-controlled constants.
+- [x] The pathological-input case (a 4000-character unmatched backtick run, a
+  4000-character quote run and a 50000-character body) completes well inside its
+  budget.
+- [x] Error messages still name only a step number and a status — never plan
+  contents. Unchanged.
+- [x] The masking cannot be used to launder an approval: both halves of the
+  escalation check read identical text, pinned by two cases.
+
 Every pattern goes through `safeRegExp`. No plan-derived text is interpolated into a
 pattern — the helper's patterns are fixed literals, and the status words remain
 code-controlled constants. Confirm the bounded-time case passes on a pathological
@@ -249,6 +313,25 @@ input, and that error messages continue to name a step number and a status, neve
 plan contents.
 
 ### Step 14: VERIFY
+- [x] `node --test` on the named file and the five adjacent files: all green.
+- [x] Full gated run `npm test`, verbatim: `tests 10122`, `suites 1743`,
+  `pass 10122`, `fail 0`, `cancelled 0`, `skipped 0`, `todo 0`,
+  `duration_ms 18942.160375`, and
+  `[CTOC test-gate] coverage 99.05% (threshold 99%), skipped 0, failed 0` →
+  `[CTOC test-gate] PASS`. The floor was neither lowered nor raised.
+- [x] Corpus measurement, both halves, over 304 plans:
+  - BEFORE: 3 escalation refusals across 2 plans.
+  - AFTER: 2 escalation refusals across 1 plan.
+  - **Plans freed: 1** — `plans/todo/00097-tests-that-pass-on-a-broken-implementation.md`,
+    refused because it listed the runner's counters inside backticks.
+  - **Genuine declarations still caught: 2** — both on
+    `plans/review/00012-r3a-ledger-forgery-closed.md:129`, bare prose. Non-zero,
+    so the change did not free everything.
+- [x] `eslint --max-warnings 0` clean on both changed files.
+- [x] No ratchet tripped: coverage floor holds at 99, the false-green fence and
+  both reachability fences pass unchanged. No whitelist entry added anywhere.
+- [x] No git operations performed.
+
 Run `node --test` on `tests/escalation-word-boundary.test.js`,
 `tests/plan-validator.test.js`, `tests/plan-validator-coverage.test.js`,
 `tests/gates.test.js`, `tests/approveplan-validates.test.js` and
@@ -262,6 +345,20 @@ everything and **must not ship**. Lint every changed file at `--max-warnings 0`.
 git operations.
 
 ### Step 15: DOCUMENT
+- [x] The block comment above the boundary helper now states that the boundary
+  rules handle the compound and quantified forms while the masking handles the
+  coded and quoted ones — two different problems, both necessary, neither
+  replacing the other.
+- [x] `maskQuotedSpans` carries its own contract: length preservation and why,
+  balanced pairs only and why, single quotes excluded and why, and the filler
+  choice and why it can only remove a match and never create one.
+- [x] The REJECTED ALTERNATIVE is named in the module with its counter-example
+  (the mid-line declaration in this repository's own corpus), so nobody
+  re-proposes it.
+- [x] The masking-only-for-the-status-scan choice is documented at its call site
+  in `validateNoContradictions`, naming the two checks it would otherwise blind.
+- [x] No test file added, so no count to update.
+
 Extend the block comment above the boundary helper: the boundary rules handle
 compound and quantified forms, and the masking handles quoted and coded ones — two
 different problems, both necessary, neither replacing the other. Name the
@@ -269,6 +366,17 @@ counter-example that rejected the trailing-marker proposal, so nobody re-propose
 Update the test-file count only if a file was added (this slice adds none).
 
 ### Step 16: FINAL-REVIEW
+- [x] All prior steps complete; every quality check passed.
+- [x] Two files changed, both declared in `files:`. No scope growth: nothing
+  outside the declared list was touched, so the human's approval still binds
+  exactly what it was given.
+- [x] The six things this slice does NOT fix are restated unchanged below and
+  none of them was quietly altered: the non-zero-count gap stays open; what
+  counts as an approval is unchanged; the step-label checker is untouched; no
+  existing plan was reworded; a genuinely un-executed step is still not passable;
+  the frontmatter metadata path is untouched.
+- [x] Ready for human review at Gate 3.
+
 Report the two paths, the Step 8 verbatim red, the before-and-after corpus
 measurement with both numbers, the verbatim green from Step 14, an explicit
 restatement of the six things this slice does NOT fix, and every decision taken
@@ -318,3 +426,44 @@ No sibling in this batch declares `src/lib/plan-validator.js` or
    the module, indistinguishable in shape from a real declaration, and closing it
    would need the same judgment call that produced this defect. Recorded, not
    changed.
+9. **THE PLAN WAS WRONG AT THE THIRD CALL SITE, AND THE CODE WON.** The plan said
+   to "extend `scanContent` to use the same helper so all three scans share one
+   definition" in `validateContradictions`. Read from disk, `scanContent` is the
+   input to THREE patterns, not one. Patterns 1 and 2 deliberately match a
+   filename or script path written inside backticks — the capture is literally
+   wrapped in an optional `` [`"] `` — and the module's own comment records that
+   bare-basename prose in backticks is the shape it exists to resolve. Masking
+   `scanContent` would have blinded two working checks in order to fix a third:
+   a file claimed as created inside backticks would have stopped being checked at
+   all. That is a silent loosening of an unrelated gate, created while fixing a
+   false positive — the same defect class as the rejected trailing-marker
+   proposal, one call site over. So the helper is applied to a SEPARATE masked
+   copy used only by pattern 3 (the status scan), and `scanContent` keeps its
+   existing fence strip for patterns 1 and 2. One helper, three call sites, each
+   fed the text its own pattern needs.
+10. **Inline code and quotations are masked only within a single line; fences may
+   span lines.** A fenced example of a step declaration is still an example, so
+   fences must cross lines. But a stray backtick or quote that opened a
+   multi-line span would blank the rest of the document and switch the checker
+   off wholesale — the exact failure mode decision 5 rejects for unbalanced
+   delimiters, arriving by another route. Line-scoped spans make an unbalanced
+   delimiter harmless by construction. Line breaks are also preserved inside
+   masked fences, so a mask can never join two lines and let a `[^\n]`-scoped
+   pattern match across them.
+11. **The filler is a space, not a dot or a null.** It must be able to remove a
+   match but never create one. A space leaves ordinary word separation behind. A
+   dot would have been worse than neutral: `STATUS_BOUNDARY_BEFORE` excludes a
+   preceding dot, so a dot filler would SUPPRESS a genuine declaration written
+   immediately after a masked span — a false negative introduced by the fix,
+   which is the failure this slice exists to avoid.
+12. **Case 8 was already failing before the change, and that is a finding, not a
+   test artifact.** An approval written inside backticks was ALREADY clearing a
+   real bare declaration, because the approval probe matched raw text. Masking
+   both halves identically closes that laundering surface. The slice therefore
+   TIGHTENS one path while loosening another; it is not a pure loosening.
+13. **Twenty cases shipped rather than fourteen.** The plan specified fourteen;
+   six shapes had no case of their own and each could hide a broken fix: the
+   backticked counter LIST that is the actual corpus false positive, tilde
+   fences, an unmatched double quote, a quoted approval as distinct from a coded
+   one, the genuine-declaration direction of the detector-agreement pair, and the
+   contradiction scan's own two directions. Adding cases only tightens.

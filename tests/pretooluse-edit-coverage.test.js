@@ -83,15 +83,37 @@ function markCtoc(root) {
   );
 }
 
-/** Write a plan that declares `files:` into plans/<stage>/. */
-function writePlan(root, stage, name, globs) {
+/**
+ * Write a plan that declares `files:` into plans/<stage>/, AND — by default — mint
+ * the REAL ledger approval that makes it grant coverage.
+ *
+ * Only an APPROVED plan grants write access. Plan files are edit-whitelisted, so an
+ * agent can author one; residency in a stage folder proves nothing and used to be
+ * treated as proof. A "plan-covered" edit means covered by an APPROVED plan, so the
+ * fixture must mint the approval it always implied. Minted with the real ledger over
+ * the fixture's actual bytes; `stage_to` mapped as production maps it (`in-progress`
+ * carries its Gate 2 `todo` entry, since no entry ever records `in-progress`).
+ * Pass `{ approved: false }` for a deliberately unapproved plan.
+ */
+function writePlan(root, stage, name, globs, opts = {}) {
   const dir = path.join(root, 'plans', stage);
   fs.mkdirSync(dir, { recursive: true });
   const body =
     '---\nfiles:\n' +
     globs.map((g) => `  - "${g}"`).join('\n') +
     '\n---\n\n# ' + name + '\n';
-  fs.writeFileSync(path.join(dir, `${name}.md`), body, 'utf8');
+  const planPath = path.join(dir, `${name}.md`);
+  fs.writeFileSync(planPath, body, 'utf8');
+  if (opts.approved !== false) {
+    const ledger = require('../src/lib/approval-ledger');
+    ledger.writeEntry(ledger.slugFromPlanPath(planPath), {
+      content: body,
+      stage_from: 'implementation',
+      stage_to: stage === 'in-progress' ? 'todo' : stage,
+      approved_by: 'human',
+    }, root);
+  }
+  return planPath;
 }
 
 /** Write a JSONL transcript file, return its absolute path. */

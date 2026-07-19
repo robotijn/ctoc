@@ -1,0 +1,9 @@
+{
+  "content_sha256": "c5549304ad3fdc5316c849022a54fd815c652902776da4bc06fed67992741249",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T20:16:02.636Z",
+  "approved_by": "human",
+  "plan_basename": "00124-a-plan-nobody-approved-grants-no-write-access"
+}

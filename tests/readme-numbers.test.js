@@ -132,8 +132,13 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
-  it('src/lib/: 104 JS modules at top level (X8 deleted streaming-decompose — the last claude -p spawner)', () => {
-    assert.equal(countTopLevelJs("src/lib"), 104);
+  it('src/lib/: 105 JS modules at top level (approval-residency.js — the ONE encoding of approved residency)', () => {
+    // 104 → 105: `src/lib/approval-residency.js` was extracted out of
+    // `src/hooks/human-gate-check.js` so `src/lib/plan-coverage.js` could consult the
+    // SAME approval predicate — a library may not require a hook, and a second
+    // predicate would be two encodings of an approval, which is a forgery surface.
+    // This is the live disk count, raised because the disk changed.
+    assert.equal(countTopLevelJs("src/lib"), 105);
   });
 
   it('src/commands/: 3 slash command specs — menu, push, update (v6.9.32)', () => {

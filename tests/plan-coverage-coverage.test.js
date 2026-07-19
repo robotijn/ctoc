@@ -41,6 +41,7 @@ const {
   globToRegex,
   touchesOverlap,
 } = require('../src/lib/plan-coverage');
+const ledger = require('../src/lib/approval-ledger');
 
 // ---------------------------------------------------------------------------
 // Fixture helpers — real temp dirs, selective stage creation.
@@ -50,8 +51,12 @@ const {
  * Create a temp project root. `stages` controls WHICH plans/<stage> dirs exist,
  * so a test can omit a stage dir to exercise the "stage dir missing → continue"
  * branch in findCoveringPlan.
+ *
+ * `implementation` is no longer a coverage stage — it is PRE-approval, and a plan
+ * an agent can author must not confer write permission — so it is not in the
+ * default set. Tests that need the directory ask for it explicitly.
  */
-function makeRoot(stages = ['in-progress', 'todo', 'implementation']) {
+function makeRoot(stages = ['in-progress', 'todo']) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-plancov-'));
   for (const s of stages) fs.mkdirSync(path.join(dir, 'plans', s), { recursive: true });
   return dir;
@@ -61,11 +66,35 @@ function rm(dir) {
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort */ }
 }
 
-/** Write a plan with a `files:` block into plans/<stage>/<name>.md. */
-function writePlan(root, stage, name, files) {
+/**
+ * Write a plan with a `files:` block into plans/<stage>/<name>.md, AND — by
+ * default — mint the real ledger approval that makes it grant coverage.
+ *
+ * Coverage now requires a genuine, agent-unforgeable approval, not merely a stage
+ * folder; without the entry every positive case below would be asserting the
+ * DEFECT (that authoring a plan file is enough). The entry is minted with the real
+ * `approval-ledger` over the fixture's actual bytes, so it cannot drift from the
+ * production hash derivation. `{ approved: false }` writes the plan with NO entry,
+ * for the negative cases.
+ *
+ * `stage_to` is mapped exactly as production maps it: a plan building in
+ * `in-progress/` carries the Gate 2 `todo` entry it crossed with, because
+ * `in-progress` is not a gate destination and no entry ever records it.
+ */
+function writePlan(root, stage, name, files, opts = {}) {
   const yaml = files.map(f => `  - "${f}"`).join('\n');
   const content = `---\ntitle: "${name}"\nprogram: ctoc-v7\nfiles:\n${yaml}\n---\n# ${name}\n`;
-  fs.writeFileSync(path.join(root, 'plans', stage, `${name}.md`), content);
+  const planPath = path.join(root, 'plans', stage, `${name}.md`);
+  fs.writeFileSync(planPath, content);
+  if (opts.approved !== false) {
+    ledger.writeEntry(ledger.slugFromPlanPath(planPath), {
+      content,
+      stage_from: 'implementation',
+      stage_to: stage === 'in-progress' ? 'todo' : stage,
+      approved_by: 'human',
+    }, root);
+  }
+  return planPath;
 }
 
 /** Write arbitrary raw content to plans/<stage>/<name.ext>. */
@@ -351,9 +380,10 @@ describe('findCoveringPlan', () => {
     } finally { rm(root); }
   });
 
-  it('in_progress_wins_over_todo_and_implementation', () => {
-    // Stage priority ordering (STAGE_PRIORITY[0]). All three declare the target.
-    const root = makeRoot();
+  it('in_progress_wins_over_todo', () => {
+    // Stage priority ordering (STAGE_PRIORITY[0]). Both declare the target, and an
+    // implementation-stage plan declaring it too must not disturb the answer.
+    const root = makeRoot(['in-progress', 'todo', 'implementation']);
     try {
       writePlan(root, 'implementation', 'impl', ['src/x.js']);
       writePlan(root, 'todo', 'td', ['src/x.js']);
@@ -363,27 +393,44 @@ describe('findCoveringPlan', () => {
     } finally { rm(root); }
   });
 
-  it('todo_wins_over_implementation', () => {
-    // The MIDDLE of the priority ordering — pins that todo precedes implementation,
-    // not merely that in-progress precedes everything. Mutant swapping the last
-    // two STAGE_PRIORITY entries reds this.
+  it('todo_covers_when_no_in_progress_plan_does', () => {
+    // The remainder of the priority ordering: todo is scanned, and covers when
+    // in-progress does not.
     const root = makeRoot();
     try {
-      writePlan(root, 'implementation', 'impl', ['src/y.js']);
       writePlan(root, 'todo', 'td', ['src/y.js']);
 
       assert.equal(findCoveringPlan('src/y.js', root).stage, 'todo');
     } finally { rm(root); }
   });
 
-  it('falls_through_to_implementation_when_it_is_the_only_covering_stage', () => {
-    // Pins that implementation IS considered (not dropped): a lower-priority stage
-    // still covers when no higher stage does.
+  it('an_implementation_stage_plan_is_NEVER_covered_whatever_its_approval_state', () => {
+    // INVERTED — this test used to pin the DEFECT ("Pins that implementation IS
+    // considered"). `implementation` is the PRE-approval stage: Gate 2 is the
+    // `implementation → todo` edge, so a plan sitting there has been approved by
+    // nobody, and plan files are edit-whitelisted. Honouring that stage let an agent
+    // author a plan file and thereby grant itself write access to the code that
+    // enforces the human gates. It is out of the scan, and no approval state puts it
+    // back — asserted BOTH ways so a partial fix cannot pass.
+    const root = makeRoot(['in-progress', 'todo', 'implementation']);
+    try {
+      writePlan(root, 'implementation', 'impl-unapproved', ['src/z.js'], { approved: false });
+      writePlan(root, 'implementation', 'impl-approved', ['src/z2.js']);
+
+      assert.equal(findCoveringPlan('src/z.js', root), null, 'an unapproved implementation plan covers nothing');
+      assert.equal(findCoveringPlan('src/z2.js', root), null, 'nor does one carrying a ledger entry');
+    } finally { rm(root); }
+  });
+
+  it('a_plan_with_no_ledger_approval_covers_nothing_even_in_todo', () => {
+    // The other half of the same rule: residing in a POST-approval folder is not
+    // proof of approval either, because the edit whitelist covers every stage
+    // folder. Dropping the pre-approval stage alone left this hole open.
     const root = makeRoot();
     try {
-      writePlan(root, 'implementation', 'impl', ['src/z.js']);
+      writePlan(root, 'todo', 'squat', ['src/squat.js'], { approved: false });
 
-      assert.equal(findCoveringPlan('src/z.js', root).stage, 'implementation');
+      assert.equal(findCoveringPlan('src/squat.js', root), null);
     } finally { rm(root); }
   });
 

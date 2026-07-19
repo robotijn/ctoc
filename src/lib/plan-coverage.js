@@ -17,19 +17,54 @@
  *   ?   matches single char except /
  *   everything else is literal
  *
- * Stage priority (per I11): in-progress > todo > implementation.
- * Within a stage, the most-specific glob wins.
+ * Stage priority (per I11): in-progress > todo. Within a stage, the most-specific
+ * glob wins — among the plans that are APPROVED (see below).
  *
  * X1: pre-v7 plans (no `files:` declaration AND no `program: ctoc-v7`) are
  * treated warn-only — they never match, so the hook falls through to the
  * escape-phrase check.
+ *
+ * ONLY APPROVED PLANS GRANT WRITE ACCESS.
+ *
+ * This module's answer is a PERMISSION, and it used to be derived from a document
+ * the requesting agent was free to write. `PreToolUse.Edit.js` whitelists
+ * `/^plans\/.*\.md$/`, so an agent could author a seven-line plan file declaring
+ * `files: ["src/hooks/human-gate-check.js"]` and thereby grant ITSELF permission to
+ * edit the hook that enforces the four human gates. With `files: ["**"]` it granted
+ * the entire repository. Both were reproduced on this repository.
+ *
+ * TWO HALVES CLOSE IT, and either alone leaves it open:
+ *   1. `implementation` is gone from the scan. It is PRE-approval — Gate 2 is the
+ *      `implementation → todo` edge — so a plan sitting there has been approved by
+ *      nobody. If you are about to add it back, or add any other stage: a stage
+ *      folder is not a permission, and `approval-residency.COVERAGE_STAGE_EDGE`
+ *      must be told which gate vouches for the stage or it grants nothing.
+ *   2. Every candidate is checked against the AGENT-WRITE-DENIED approval ledger
+ *      (`approval-residency.isApprovedForCoverage`). Without this, the identical
+ *      probe written one directory over — `plans/todo/zz-probe.md` — still worked,
+ *      because the whitelist covers every stage folder. Residing in a post-approval
+ *      folder is not proof of approval.
+ *
+ * IT FAILS CLOSED, AND FAIL-CLOSED MEANS RETURN `null`, NEVER THROW.
+ * `PreToolUse.Edit.js` wraps the whole enforcement decision in a catch that fails
+ * OPEN, so a THROW out of this module becomes an ALLOW — a permission check whose
+ * failure mode is "permission granted". This module must therefore be TOTAL. That
+ * is the opposite of the fail-open default used by this codebase's REPORTING
+ * checks, and it is written here so it is not later "fixed" into consistency with
+ * its neighbours.
  */
 
 const safeFs = require('./safe-fs');
 const { parseFrontmatter } = require('./frontmatter');
+const approvalResidency = require('./approval-residency');
 const path = require('path');
 
-const STAGE_PRIORITY = ['in-progress', 'todo', 'implementation'];
+// SCANNED STAGES, IN PRIORITY ORDER. `implementation` is deliberately ABSENT: it is
+// the PRE-approval stage (Gate 2 is `implementation → todo`), and a plan an agent can
+// author must never confer permission. Adding a stage here grants NOTHING unless
+// `approval-residency.COVERAGE_STAGE_EDGE` also names the gate edge that vouches for
+// it — that map fails closed on purpose.
+const STAGE_PRIORITY = ['in-progress', 'todo'];
 
 /**
  * @typedef {{ k: 'lit', c: string } | { k: 'one' } | { k: 'star' } | { k: 'globstar' }} GlobToken
@@ -202,13 +237,40 @@ function touchesOverlap(aList, bList) {
  * Read a plan's `files:` declaration as an array of globs.
  * Returns [] for plans without a `files:` block.
  *
+ * Behaviour is UNCHANGED for the one-argument call (an unreadable plan yields `[]`,
+ * contributing no globs, which is itself a fail-closed outcome). The OPTIONAL
+ * second argument takes content the caller has ALREADY read, mirroring
+ * `approval-residency.classifyResidency`'s `content` parameter: the scan reads each
+ * plan exactly ONCE and reuses that text for both glob parsing and the approval
+ * hash, so consulting the ledger costs no extra read.
+ *
  * @param {string} planPath
+ * @param {string|null} [content] - pre-read file content, to avoid a re-read
  * @returns {string[]}
  */
-function readPlanFiles(planPath) {
-  let content;
-  try { content = safeFs.readFileSync(planPath, 'utf8'); } catch { return []; }
+function readPlanFiles(planPath, content = null) {
+  let text = content;
+  if (text == null) {
+    try { text = safeFs.readFileSync(planPath, 'utf8'); } catch { return []; }
+  }
+  return parsePlanFiles(text);
+}
 
+/**
+ * Parse a plan's `files:` declaration out of ALREADY-READ content.
+ *
+ * Every caller passes a string read from disk, and the ONE call site inside the
+ * scan wraps this in the same try/catch that guards the read — so a parse fault
+ * skips that plan (it grants nothing, which is the fail-CLOSED direction) instead
+ * of escaping into the hook's fail-open catch. Deliberately no `typeof` guard
+ * returning `[]`: a no-match branch that returns a VERDICT cannot distinguish "this
+ * plan declares no files" from "I could not read my input", which is the false-green
+ * shape this repository fences.
+ *
+ * @param {string} content - the plan file's full text
+ * @returns {string[]}
+ */
+function parsePlanFiles(content) {
   // Read the UNION of every LEADING `---…---` block, not just the first.
   //
   // `addApprovalMarker` (actions.js) PREPENDS a marker block on each human-gate
@@ -300,18 +362,30 @@ function specificity(glob) {
 }
 
 /**
- * Find the plan that covers `targetFile` in the project at `root`.
- * Returns null if no plan covers it.
+ * THE SCAN. Walks the coverage stages in priority order and returns BOTH the
+ * best APPROVED match and, for the block path, the best REJECTED candidate.
  *
- * @param {string} targetFile - Path relative to project root (or absolute; both supported)
- * @param {string} root - Project root
- * @returns {{ plan: string, stage: string, glob: string } | null}
+ * TOTAL BY CONSTRUCTION — every fault returns `{ ok: false }`, which both public
+ * entry points turn into `null` (a DENY). It never throws, because a throw reaches
+ * `PreToolUse.Edit.js`'s fail-OPEN catch and becomes an ALLOW.
+ *
+ * @param {string} targetFile - path relative to project root, or absolute
+ * @param {string} root - project root
+ * @returns {{ok: boolean, match: (object|null), denial: (object|null)}}
  */
-function findCoveringPlan(targetFile, root) {
+function scanForCoverage(targetFile, root) {
+  const FAILED = { ok: false, match: null, denial: null };
   // Normalize target relative to root for matching
-  const absTarget = path.isAbsolute(targetFile) ? targetFile : path.join(root, targetFile);
-  const relRaw = path.relative(root, absTarget);
-  const relTarget = relRaw.replace(/\\/g, '/');
+  let relRaw;
+  let relTarget;
+  try {
+    const absTarget = path.isAbsolute(targetFile) ? targetFile : path.join(root, targetFile);
+    relRaw = path.relative(root, absTarget);
+    relTarget = relRaw.replace(/\\/g, '/');
+  } catch {
+    // A path operation that cannot resolve the target is not permission to write it.
+    return FAILED;
+  }
 
   // ROOT CONFINEMENT (out-of-repo write prevention). The coverage oracle backs
   // the Edit hook's allow-decision, so it must NEVER vouch for a path outside
@@ -329,18 +403,46 @@ function findCoveringPlan(targetFile, root) {
     path.isAbsolute(relRaw) ||
     path.isAbsolute(relTarget)
   ) {
-    return null;
+    return { ok: true, match: null, denial: null };
   }
 
+  let denial = null;
   for (const stage of STAGE_PRIORITY) {
     const stageDir = path.join(root, 'plans', stage);
-    if (!safeFs.existsSync(stageDir)) continue;
-    const files = safeFs.readdirSync(stageDir).filter(f => f.endsWith('.md') && f !== '.gitkeep');
+    let files;
+    try {
+      // A stage directory that does not exist is SKIPPED — a project need not have
+      // every stage, and that is not a fault.
+      if (!safeFs.existsSync(stageDir)) continue;
+      // FAIL CLOSED, NEVER BY THROWING. A directory that EXISTS but cannot be listed
+      // is a fault in the permission check itself. It used to throw straight into
+      // `PreToolUse.Edit.js`'s fail-OPEN catch, which turned an unreadable plans
+      // directory into a blanket ALLOW. It now denies the whole call.
+      files = safeFs.readdirSync(stageDir).filter(f => f.endsWith('.md') && f !== '.gitkeep');
+    } catch {
+      return FAILED;
+    }
 
     let best = null;
     for (const f of files) {
       const planPath = path.join(stageDir, f);
-      const globs = readPlanFiles(planPath);
+      // Read each plan ONCE and reuse the content for glob parsing AND (only if a
+      // glob actually matched) the approval hash.
+      let content;
+      let globs;
+      try {
+        content = safeFs.readFileSync(planPath, 'utf8');
+        globs = readPlanFiles(planPath, content);
+      } catch {
+        // A plan that cannot be read or parsed contributes NO globs, so it grants
+        // nothing — the fail-CLOSED direction. It must not throw out of here: that
+        // reaches the hook's fail-open catch and becomes an ALLOW.
+        continue;
+      }
+      // LAZY APPROVAL. Resolved at most once per plan, and only after one of its
+      // globs matched — so the hash is never computed for a plan that was never a
+      // candidate. `undefined` means "not yet asked".
+      let approval;
       for (const rawGlob of globs) {
         // Normalize the glob ONCE (collapse `.`/`..`/`//` segments) so a non-escaping
         // `..` like `src/mod/../mod/**` both survives the escape check AND matches
@@ -351,21 +453,77 @@ function findCoveringPlan(targetFile, root) {
         // Defense in depth: a plan may not declare out-of-tree coverage.
         if (globEscapesRoot(glob)) continue;
         const re = globToRegex(glob);
-        if (re.test(relTarget)) {
-          const score = specificity(glob);
-          if (!best || score > best.score) {
-            best = { plan: `${stage}/${f.replace(/\.md$/, '')}`, stage, glob, score };
+        if (!re.test(relTarget)) continue;
+
+        if (approval === undefined) {
+          approval = approvalResidency.isApprovedForCoverage(planPath, stage, root, content);
+        }
+        const score = specificity(glob);
+        const ref = `${stage}/${f.replace(/\.md$/, '')}`;
+        if (!approval.approved) {
+          // EXCLUDED BEFORE RANKING, so an APPROVED less-specific glob correctly
+          // beats an UNAPPROVED more-specific one. Kept only to explain the denial.
+          if (!denial || score > denial.score) {
+            denial = { plan: ref, stage, glob, reason: approval.reason, score };
           }
+          continue;
+        }
+        if (!best || score > best.score) {
+          best = { plan: ref, stage, glob, score };
         }
       }
     }
-    if (best) return { plan: best.plan, stage: best.stage, glob: best.glob };
+    if (best) return { ok: true, match: { plan: best.plan, stage: best.stage, glob: best.glob }, denial: null };
   }
-  return null;
+  return { ok: true, match: null, denial };
+}
+
+/**
+ * Find the plan that covers `targetFile` in the project at `root`.
+ * Returns null if no APPROVED plan covers it — including when the scan could not
+ * complete, because a permission check that allows because it could not look is
+ * the whole defect this module exists to prevent.
+ *
+ * @param {string} targetFile - Path relative to project root (or absolute; both supported)
+ * @param {string} root - Project root
+ * @returns {{ plan: string, stage: string, glob: string } | null}
+ */
+function findCoveringPlan(targetFile, root) {
+  const res = scanForCoverage(targetFile, root);
+  return res.ok ? res.match : null;
+}
+
+/**
+ * Explain a denial: the best-matching plan that DECLARED this target but was
+ * REJECTED, and why. For the BLOCK PATH ONLY — it re-runs the scan, so it must
+ * never be called on an allow.
+ *
+ * A lockout the human can read is a correction; one they cannot read is what gets
+ * reverted — and reverting this check reopens a self-granting write surface on gate
+ * enforcement. The result carries a fixed-vocabulary reason and a repository-relative
+ * plan reference only: no file contents, no absolute paths, no stack traces.
+ *
+ * @param {string} targetFile - path relative to project root, or absolute
+ * @param {string} root - project root
+ * @returns {{plan: string, stage: string, glob: string, reason: (string|null)} | null}
+ *   `null` when nothing matched, when a plan DID cover the target, or on any fault.
+ */
+function explainDenial(targetFile, root) {
+  try {
+    const res = scanForCoverage(targetFile, root);
+    if (!res.ok || res.match || !res.denial) return null;
+    const d = res.denial;
+    return { plan: d.plan, stage: d.stage, glob: d.glob, reason: d.reason };
+  } catch {
+    // Explanatory only: a fault here must never change a decision, and must never
+    // throw into the hook's fail-open catch.
+    return null;
+  }
 }
 
 module.exports = {
   findCoveringPlan,
+  explainDenial,
   readPlanFiles,
   globToRegex,
   touchesOverlap,

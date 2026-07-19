@@ -66,8 +66,20 @@ function cleanup(dir) {
   if (dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort */ } }
 }
 
-/** Write a plan declaring `files:` coverage into a stage. */
-function writeCoveringPlan(dir, stage, name, files) {
+/**
+ * Write a plan declaring `files:` coverage into a stage, AND — by default — mint
+ * the REAL ledger approval that makes it grant coverage.
+ *
+ * Only an APPROVED plan grants write access. Plan files are edit-whitelisted, so an
+ * agent can author one; residency in a stage folder proves nothing and used to be
+ * treated as proof. The positive controls here mean "a plan-covered MultiEdit /
+ * NotebookEdit is allowed", and a covered plan is by definition an approved one, so
+ * the fixture mints the approval it always implied. Minted with the real ledger over
+ * the fixture's actual bytes; `stage_to` mapped as production maps it (`in-progress`
+ * carries its Gate 2 `todo` entry, since no entry ever records `in-progress`).
+ * Pass `{ approved: false }` for a deliberately unapproved plan.
+ */
+function writeCoveringPlan(dir, stage, name, files, opts = {}) {
   const filesYaml = files.map((f) => `  - "${f}"`).join('\n');
   const content = `---
 title: "${name}"
@@ -77,7 +89,18 @@ ${filesYaml}
 ---
 # ${name}
 `;
-  fs.writeFileSync(path.join(dir, 'plans', stage, `${name}.md`), content);
+  const planPath = path.join(dir, 'plans', stage, `${name}.md`);
+  fs.writeFileSync(planPath, content);
+  if (opts.approved !== false) {
+    const ledger = require('../src/lib/approval-ledger');
+    ledger.writeEntry(ledger.slugFromPlanPath(planPath), {
+      content,
+      stage_from: 'implementation',
+      stage_to: stage === 'in-progress' ? 'todo' : stage,
+      approved_by: 'human',
+    }, dir);
+  }
+  return planPath;
 }
 
 /**

@@ -316,21 +316,33 @@ describe('Gate-3: enforce() denies writes under .ctoc/state/verify/ (subprocess)
 
   it('REGRESSION: a normal source edit under a covering plan stays ALLOWED (no deny, exit 0)', () => {
     dir = makeProject();
-    // A plan in in-progress declaring coverage of src/feature/**.
-    fs.writeFileSync(
-      path.join(dir, 'plans', 'in-progress', 'cover.md'),
-      [
-        '---',
-        'title: covering plan',
-        'program: ctoc-v7',
-        'files:',
-        '  - "src/feature/**"',
-        '---',
-        '',
-        '# covering plan',
-        '',
-      ].join('\n'),
-    );
+    // A plan in in-progress declaring coverage of src/feature/**, carrying the REAL
+    // Gate 2 approval that makes it grant that coverage. Only an APPROVED plan grants
+    // write access — a plan file is edit-whitelisted, so authoring one proves nothing
+    // — and "a covering plan" here means one a human approved. The `stage_to` is
+    // `todo`, exactly as production records it: `in-progress` is not a gate
+    // destination, so no ledger entry ever names it, and a building plan carries the
+    // Gate 2 entry it crossed with.
+    const coverPlan = path.join(dir, 'plans', 'in-progress', 'cover.md');
+    const coverContent = [
+      '---',
+      'title: covering plan',
+      'program: ctoc-v7',
+      'files:',
+      '  - "src/feature/**"',
+      '---',
+      '',
+      '# covering plan',
+      '',
+    ].join('\n');
+    fs.writeFileSync(coverPlan, coverContent);
+    const ledger = require('../src/lib/approval-ledger');
+    ledger.writeEntry(ledger.slugFromPlanPath(coverPlan), {
+      content: coverContent,
+      stage_from: 'implementation',
+      stage_to: 'todo',
+      approved_by: 'human',
+    }, dir);
     const srcDir = path.join(dir, 'src', 'feature');
     fs.mkdirSync(srcDir, { recursive: true });
     const targetAbs = path.join(srcDir, 'widget.js');

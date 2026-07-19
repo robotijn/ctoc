@@ -307,16 +307,32 @@ function findEscapeInTranscript(transcript) {
  * message stays actionable (it names the target and points at /ctoc:menu) and is
  * a pure function so its content can be asserted in-process without process.exit.
  *
+ * NAMING THE REJECTED PLAN (info.denial). A plan may DECLARE this file and still
+ * grant nothing — because nobody approved it, or because its approval no longer
+ * matches its content. Silently blocking in that case is how a permission fix gets
+ * reverted, and reverting THIS one reopens a self-granting write surface on gate
+ * enforcement. So when `plan-coverage.explainDenial` names a rejected candidate, the
+ * banner says which plan, why, and what the human can do about it. It carries a
+ * fixed-vocabulary reason and a repository-relative plan reference ONLY — never file
+ * contents, an absolute path, or a stack trace — and it changes no allow/deny outcome.
+ *
  * @param {string} reason - short machine reason (shown after "BLOCKED:")
- * @param {object} info - { target_file?, project_root? }
+ * @param {object} info - { target_file?, project_root?, denial? }
  * @returns {string} the multi-line stderr banner, containing no canonical phrase
  */
 function buildBlockMessage(reason, info) {
   const target = (info && info.target_file) || '(unknown)';
   const project = (info && info.project_root) || process.cwd();
+  const denial = info && info.denial;
+  const explanation = denial && denial.plan
+    ? `  Why: the plan "${denial.plan}" declares this file, but it grants nothing `
+      + `(${denial.reason || 'not approved'}).\n`
+      + `       Only an APPROVED plan grants write access. Approve or re-approve it via /ctoc:menu.\n\n`
+    : '';
   return `\n[CTOC v7] Edit BLOCKED: ${reason}\n`
     + `  Target: ${target}\n`
     + `  Project: ${project}\n\n`
+    + explanation
     + `  Resolution:\n`
     + `  - Run /ctoc:menu to create or activate a plan that covers this file, OR\n`
     + `  - If this change is genuinely small, an escape phrase you type yourself will allow it — see /ctoc:menu for the current list.\n\n`;
@@ -438,9 +454,16 @@ async function enforce(stdinJson) {
       });
     }
 
-    // 5. Block
+    // 5. Block. On the BLOCK PATH ONLY, ask coverage WHY: a plan may declare this
+    //    file and still grant nothing (unapproved, or its approval no longer matches
+    //    its content). This re-runs the scan, so it must never run on an allow.
+    //    Fail-soft to `null` — an explanation must never change a decision.
+    let denial = null;
+    if (coverage && targetFile && typeof coverage.explainDenial === 'function') {
+      try { denial = coverage.explainDenial(targetFile, root); } catch { denial = null; }
+    }
     return block('no active plan covers this file and no escape phrase used', {
-      tool, target_file: targetFile, project_root: root,
+      tool, target_file: targetFile, project_root: root, denial,
     });
   } catch (err) {
     // Fail OPEN — never break the user's flow due to a hook bug
