@@ -1,0 +1,8 @@
+{
+  "content_sha256": "aaa8259a06d0e752e95b39eb3cb8fddfe269ae4d296fd91ad3efeb2d097a4960",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T07:27:00.543Z",
+  "approved_by": "human",
+  "plan_basename": "00081-skipped-step-detection-word-boundary"
+}

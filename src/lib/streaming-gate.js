@@ -258,17 +258,28 @@ function nextUnansweredQuestion(root, ref) {
   } catch { /* fail-soft: the human still gets the plain Approve screen */ }
 
   let questions;
+  let answered;
   try {
     // Lazy require avoids a load-time circular dependency (streaming-precompute
     // requires this module at call time for plansNeedingQuestions).
     const precompute = require('./streaming-precompute');
-    questions = precompute.loadPlanQuestions(root, ref);
+    // ONE status call, not two: it yields the questions AND the revision in a
+    // single read (`loadPlanQuestions` would call the same status internally and
+    // then throw the revision away).
+    const st = precompute.planQuestionsStatus(root, ref);
+    if (st.status !== 'ready') return null;
+    questions = st.questions;
+    answered = precompute.readAnsweredQuestionIds(root, ref, {
+      questionsRevisionMs: st.questionsRevisionMs,
+      planMtimeMs: st.planMtimeMs,
+    });
   } catch {
     return null;
   }
   if (!Array.isArray(questions) || questions.length === 0) return null;
-  const answered = answeredQuestionIds(root, ref);
-  const index = questions.findIndex((q) => !answered.has(q.id));
+  // A question whose only answer belongs to an OLDER revision is offered again —
+  // that is the point, not a regression: the human never saw this question.
+  const index = questions.findIndex((q) => !answered.ids.has(q.id));
   if (index === -1) return null;
   return { question: questions[index], index, total: questions.length };
 }
@@ -392,10 +403,16 @@ function crossBySufficiency(root, planPath, ref, fromStage, toStage) {
     const content = safeFs.readFileSync(planPath, 'utf8');
     // Evidence an auditor can reconstruct the decision from: the plan ref, the count
     // of answered questions, and their ids.
-    const answered = [...answeredQuestionIds(root, ref)];
+    // The revision is omitted here (this path holds no status) so the shared
+    // function derives it from planQuestionsStatus itself. The count is therefore
+    // only the answers that BIND to the plan's current text — which is what an
+    // auditor reading this entry would already assume it meant.
+    const result = require('./streaming-precompute').readAnsweredQuestionIds(root, ref);
+    const answered = [...result.ids];
     const evidence =
       `sufficiency: ${ref} — ${answered.length} question(s) answered` +
-      `${answered.length ? ` (${answered.join(', ')})` : ''}; enough (no unanswered fork)`;
+      `${answered.length ? ` (${answered.join(', ')})` : ''}; enough (no unanswered fork)` +
+      `${result.unbound > 0 ? `; ${result.unbound} recorded answer(s) did not bind to this revision` : ''}`;
 
     ledger.writeSufficiencyEntry(slug, {
       content_sha256: ledger.computeContentHash(content),
@@ -745,33 +762,15 @@ function precomputedQuestionMatrix(q, ordered) {
   return lines.join('\n');
 }
 
-/**
- * The set of question ids ALREADY answered for `ref`, read from the append-only
- * answers log (`.ctoc/streaming/answers.jsonl`). Last write wins. Fail-soft: an
- * absent/unreadable/corrupt log yields an empty set, and a malformed JSONL line is
- * skipped rather than fatal.
- * @param {string} root
- * @param {string} ref
- * @returns {Set<string>}
- */
-function answeredQuestionIds(root, ref) {
-  const ids = new Set();
-  try {
-    const file = path.join(root, '.ctoc', 'streaming', 'answers.jsonl');
-    if (!safeFs.existsSync(file)) return ids;
-    const raw = safeFs.readFileSync(file, 'utf8');
-    for (const line of raw.split('\n')) {
-      const t = line.trim();
-      if (!t) continue;
-      let obj;
-      try { obj = JSON.parse(t); } catch { continue; }
-      if (obj && obj.ref === ref && typeof obj.questionId === 'string') {
-        ids.add(obj.questionId);
-      }
-    }
-  } catch { /* fail-soft: no answers */ }
-  return ids;
-}
+// ── "What counts as an answered question" lives in ONE place, deliberately ──────
+// A local `answeredQuestionIds` used to live here: a second, independent read of
+// the answers log that matched on `(ref, questionId)` alone. It was DELETED rather
+// than turned into a wrapper — a wrapper is still a second name for the rule and a
+// second place to add a special case. The encoding is now
+// `streaming-precompute.readAnsweredQuestionIds`, which binds an answer to the plan
+// REVISION it was given for, and both call sites in this file reach it through the
+// established lazy require. This module still WRITES the log (see `streamAnswer`);
+// it no longer interprets it.
 
 /**
  * Build the RICH single-question screen for decision `d` from its PRECOMPUTED
@@ -1253,18 +1252,51 @@ function streamAnswer(ref, questionId, optionKey, projectRoot) {
   if (!qid || !key) {
     return streamingGateScreen(projectRoot, `Ignored an incomplete answer for ${parsed.file}.`);
   }
+  // WHICH REVISION was the human answering? Stamping it is what lets the reader
+  // (streaming-precompute.readAnsweredQuestionIds) know this answer was given about
+  // THIS question set — question ids are positional and are reused across
+  // regenerations, so without the stamp an answer can only be bound by inference.
+  //
+  // Fail-soft, but NEVER silently: an unstampable answer is recorded UNSTAMPED and
+  // the reason is carried into the status text the human reads. Swallowing the
+  // failure without recording it would make "no stamp" indistinguishable from "the
+  // stamp lookup broke" — a verdict reported on input that was never received.
+  let planMtimeMs = null;
+  let stampFailure = null;
+  try {
+    const { planQuestionsStatus } = require('./streaming-precompute');
+    const st = planQuestionsStatus(projectRoot, ref);
+    if (st.status === 'ready' && Number.isFinite(st.questionsRevisionMs)) {
+      planMtimeMs = st.questionsRevisionMs;
+    } else {
+      stampFailure = st.status === 'ready' ? 'the question set carries no usable revision stamp' : st.reason;
+    }
+  } catch (err) {
+    stampFailure = (err && err.message) || String(err);
+  }
+
   let status;
   try {
     const dir = path.join(projectRoot, '.ctoc', 'streaming');
     if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
-    const line = JSON.stringify({
+    const record = {
       ts: new Date().toISOString(),
       ref,
       questionId: qid,
       optionKey: key,
-    }) + '\n';
+    };
+    // Only ever a real, established revision — never a fabricated one.
+    if (planMtimeMs !== null) record.planMtimeMs = planMtimeMs;
+    const line = JSON.stringify(record) + '\n';
     safeFs.appendFileSync(path.join(dir, 'answers.jsonl'), line, 'utf8');
-    status = `Recorded your answer for ${parsed.file}.`;
+    // A failure to establish the revision NEVER loses the answer — but the human is
+    // told, because recording it silently would let them discover later that it did
+    // not count.
+    status = planMtimeMs !== null
+      ? `Recorded your answer for ${parsed.file}.`
+      : `Recorded your answer for ${parsed.file} — it could not be tied to a plan revision`
+        + `${stampFailure ? ` (${stripCtl(String(stampFailure))})` : ''}`
+        + `, so this question may be asked again.`;
   } catch (err) {
     status = `Could not record the answer for ${parsed.file}: ${stripCtl((err && err.message) || String(err))}`;
   }

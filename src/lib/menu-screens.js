@@ -162,6 +162,232 @@ function getVersion(projectPath) {
   }
 }
 
+/** Cap on rendered entries per wedge category; the rest collapse to a count. */
+const WEDGE_RENDER_CAP = 5;
+
+/** Max characters of a recorded fault/summary message rendered on one line. */
+const WEDGE_MESSAGE_CAP = 120;
+
+/** Max characters of a captured reconcile-failure message rendered on one dashboard line. */
+const FAILURE_MESSAGE_CAP = 120;
+
+/**
+ * Render the reconcile pass's TRUSTWORTHINESS — not its findings.
+ *
+ * NOT BRICKING AND NOT SAYING ANYTHING ARE DIFFERENT INSTRUCTIONS. The `catch` around
+ * `taskReconcile.reconcileState` below used to be empty, on the reasoning that a reconcile
+ * failure must never brick the dashboard. That reasoning is correct and it is only half the
+ * job: with the failure discarded, the dashboard rendered the task registry EXACTLY as it
+ * would have if the pass had succeeded — same TASKS block, same counts, no orphan line,
+ * nothing amiss. The human read a screen asserting the background plane was in a known
+ * state when nothing had checked it. That is presenting STALE STATE AS LIVE, and it is
+ * worse than a blank section: a blank section prompts a question, a confident wrong section
+ * does not. This function changes only whether the failure is REPORTED, never whether it is
+ * SURVIVED.
+ *
+ * Three states mean "the task state below is not trustworthy right now", and none of them
+ * had a reader. They differ in WHY, and the difference changes what the human should do, so
+ * each renders its own line:
+ *
+ *   `threw`               the pass DID NOT RUN — likely a code defect; the counts are stale.
+ *   `report.corrupt`      it ran against an EMPTY view — the registry file needs repairing.
+ *   `report.saveFailed`   it ran and decided, but nothing was persisted — usually disk or
+ *                         permissions; the same work is re-decided next open.
+ *
+ * Corrupt and save-failed can both hold, and both render, corrupt first: a bad read explains
+ * a bad write, not the reverse. A thrown pass renders alone — there is no report to inspect.
+ *
+ * WHAT IS REACHABLE, verified against the code rather than assumed. An unparseable
+ * registry file does NOT arrive here: `task-registry.load` fails OPEN to an empty registry,
+ * so no corrupt marker is set and this function correctly stays silent — a false alarm is
+ * the same defect class as a silent failure. `corrupt.reason === 'load-failed'` (the loader
+ * itself threw) and `saveFailed` are the two reachable PARTIAL states, and a throw mid-pass
+ * never delivers a half report, because the report object does not escape the throw.
+ *
+ * Every interpolated value comes from a registry file, which is attacker-influenceable, so
+ * it passes through `stripCtl` AND is length-bounded: a crafted message must not be able to
+ * forge an extra dashboard row.
+ *
+ * Returns '' when the pass ran, parsed and persisted — a healthy project's dashboard is
+ * byte-identical.
+ *
+ * @param {string|null} threw  the caught reconcile error message, or null.
+ * @param {object|null} report  the reconcile report, or null when the pass threw.
+ * @returns {string}  zero or more complete newline-terminated lines, or ''.
+ */
+function renderReconcileHealth(threw, report) {
+  const bounded = (v, fallback) => {
+    const s = stripCtl(String(v == null ? fallback : v));
+    return s.length > FAILURE_MESSAGE_CAP ? `${s.slice(0, FAILURE_MESSAGE_CAP)}…` : s;
+  };
+
+  if (typeof threw === 'string' && threw.length > 0) {
+    return `  ⛔ the background task check DID NOT RUN — the task counts above are unchecked ` +
+      `and may be stale: ${bounded(threw, 'no message recorded')} · view: tasks\n`;
+  }
+
+  if (!report || typeof report !== 'object') return '';
+
+  let out = '';
+
+  const corrupt = report.corrupt;
+  if (corrupt && typeof corrupt === 'object') {
+    const skipped = corrupt.skipped;
+    const extra = (Number.isFinite(skipped) && skipped > 0)
+      ? ` · ${skipped} malformed entr${skipped === 1 ? 'y' : 'ies'} skipped`
+      : '';
+    out += `  ⛔ the task registry could not be read (${bounded(corrupt.reason, 'unknown')}) — ` +
+      `the check ran against an EMPTY view, so the task counts above are a floor, not the truth` +
+      `${extra} · view: tasks\n`;
+  }
+
+  if (report.saveFailed) {
+    out += `  ⛔ the task check ran but could NOT be saved — what you see is not what is stored, ` +
+      `and the same work will be re-decided next open: ` +
+      `${bounded(report.saveFailed, 'no message recorded')} · view: tasks\n`;
+  }
+
+  return out;
+}
+
+/**
+ * Human wording for each `task-registry.unsatisfiableTasks` reason, and whether the wedge
+ * is PERMANENT (no passage of time clears it) or a ONE-OFF (a re-run or a repaired
+ * dependency clears it).
+ *
+ * The distinction is the whole point of the line. A dependency cycle needs a human to
+ * break it; a failed dependency does not. Rendered as one undifferentiated "failed" line —
+ * which is what the dashboard did before this slice — the two are indistinguishable from
+ * the human's seat, and the permanent one waits forever.
+ *
+ * @type {Object<string,{permanent:boolean, text:string}>}
+ */
+const WEDGE_REASONS = Object.freeze({
+  'dep-cycle':   { permanent: true,  text: 'dependency cycle — this can NEVER clear on its own; a human must break the cycle' },
+  'dep-failed':  { permanent: false, text: 'a dependency failed' },
+  'dep-missing': { permanent: false, text: 'a dependency is gone from the registry' }
+});
+
+/**
+ * Render the reconcile pass's five WEDGE REPORTS as dashboard lines.
+ *
+ * These fields — `report.unsatisfiable`, `report.deferred`, `report.stalenessOrphaned`
+ * (written by `task-reconcile.reconcileState`), plus `report.quarantined` and
+ * `report.quarantineFaulted` (written by `task-reconcile.applyQuarantine`, shipped by
+ * plans/review/00076-quarantine-fault-fails-safe.md and
+ * plans/review/00077-quarantine-on-every-promote-path.md) — had NO reader on this screen
+ * before this function existed. The pass computed them on every menu open and threw them
+ * away, so queued work that can NEVER run, work held one pass, an agent orphaned on age
+ * alone that may still be alive, and a safety check that did not run at all were ALL
+ * invisible. `report.quarantined` was the near miss: it IS surfaced on the three
+ * `menu task fail|cancel|complete` results, so a human who never ran one of those
+ * commands saw no held task at all. A computed value with no reader is the same defect
+ * class as a claim with no test: the system looks like it knows something, and no human
+ * ever learns it.
+ *
+ * ORDER IS A CLAIM. The fault leads, because it is the only line that says a CHECK did not
+ * happen; everything below it is a RESULT that check produced. A reader who has not seen
+ * the fault line will read those results as decisions, when they were a blanket
+ * precaution. The held block follows it immediately so the fault's count of held tasks has
+ * its evidence directly beneath it, rather than citing tasks that appear nowhere.
+ *
+ * TOTAL and fail-open: a null/absent/malformed report, or a malformed entry inside a
+ * well-formed report, yields fewer lines — never a throw. An EMPTY report yields the EMPTY
+ * STRING, so a project with no wedges renders a byte-identical dashboard.
+ *
+ * @param {object|null} report  a reconcile report (see ReconcileReport in task-reconcile.js).
+ * @returns {string}  zero or more complete newline-terminated lines, or ''.
+ */
+function renderWedgeReports(report) {
+  if (!report || typeof report !== 'object') return '';
+  const list = (v) => (Array.isArray(v) ? v : []);
+  const clean = (v, fallback) => stripCtl(String(v == null ? fallback : v));
+  const plural = (n) => (n === 1 ? '' : 's');
+  const overflow = (n) => (n > WEDGE_RENDER_CAP ? `      … and ${n - WEDGE_RENDER_CAP} more\n` : '');
+  const depsOf = (e) => list(e && e.deps).map((d) => stripCtl(String(d))).join(', ') || 'none recorded';
+  const bounded = (s) => (s.length > WEDGE_MESSAGE_CAP ? `${s.slice(0, WEDGE_MESSAGE_CAP)}…` : s);
+
+  let out = '';
+
+  // 1. THE FAULT — the safety check that did not run. `report.quarantined` says "these
+  // tasks are waiting" (normal, self-clearing); this says "the check that decides who
+  // waits did not run" (abnormal, recurring, and the wait was a precaution, not a
+  // decision). Without this line a human sees held tasks and reasonably concludes the
+  // system is working as designed. One line, not a list: the field is a single object
+  // describing one incident, and the dropped ids are named in the held block directly
+  // below — repeating them here would imply two separate problems.
+  const fault = report.quarantineFaulted;
+  if (fault && typeof fault === 'object') {
+    const phase = clean(fault.phase, 'unknown');
+    const held = list(fault.dropped).length;
+    const error = bounded(clean(fault.error, 'no message recorded'));
+    out += `  ⛔ the concurrent-edit safety check FAILED to run (${phase}) — ${held} task${plural(held)} ` +
+      `held as a blanket precaution, not by a decision: ${error} · view: tasks\n`;
+  }
+
+  // 2. HELD — the candidates the concurrent-edit guard excluded from promote this pass.
+  // The guard writes two distinct reasons — `staleness-orphan-quarantine` (a real
+  // decision) and `quarantine-fault` (the check could not decide) — and its own summary
+  // text already distinguishes them, so the summary is rendered rather than re-worded.
+  const held = list(report.quarantined);
+  if (held.length > 0) {
+    const n = held.length;
+    out += `  ⊙ ${n} task${plural(n)} held this pass — files reserved by an agent that was never ` +
+      `confirmed dead · view: tasks\n`;
+    for (const e of held.slice(0, WEDGE_RENDER_CAP)) {
+      const why = bounded(clean(e && (e.summary == null ? e.reason : e.summary), 'held'));
+      out += `      ${clean(e && e.id, 'unknown')} — ${why}\n`;
+    }
+    out += overflow(n);
+  }
+
+  // 3. WEDGED — the scheduler already failed these; they can never run as things stand.
+  const wedged = list(report.unsatisfiable);
+  if (wedged.length > 0) {
+    const n = wedged.length;
+    out += `  ⛔ ${n} task${plural(n)} can NEVER run — the scheduler failed ${n === 1 ? 'it' : 'them'} · view: tasks\n`;
+    for (const e of wedged.slice(0, WEDGE_RENDER_CAP)) {
+      const known = WEDGE_REASONS[e && e.reason];
+      const marker = known && known.permanent ? '⛔ PERMANENT — ' : '⚠ ';
+      const reason = known ? known.text : clean(e && e.reason, 'no reason recorded');
+      out += `      ${marker}${clean(e && e.id, 'unknown')} — ${reason} · depends on: ${depsOf(e)}\n`;
+    }
+    out += overflow(n);
+  }
+
+  // 4. DEFERRED — left queued one pass because every dead dependency was orphaned on age
+  // alone and may still finish. Not failed; re-evaluated next pass.
+  const deferred = list(report.deferred);
+  if (deferred.length > 0) {
+    const n = deferred.length;
+    out += `  ⊙ ${n} task${plural(n)} held one pass — every dead dependency was orphaned on age alone ` +
+      `and may still finish · view: tasks\n`;
+    for (const e of deferred.slice(0, WEDGE_RENDER_CAP)) {
+      out += `      ${clean(e && e.id, 'unknown')} — waiting on: ${depsOf(e)}\n`;
+    }
+    out += overflow(n);
+  }
+
+  // 5. ORPHANED ON AGE ALONE — the agent was never confirmed dead. `ageMs` is null when the
+  // start time could not be parsed (task-reconcile records null there deliberately), so it
+  // renders `unknown`, never NaN.
+  const aged = list(report.stalenessOrphaned);
+  if (aged.length > 0) {
+    const n = aged.length;
+    out += `  ⚠ ${n} task${plural(n)} orphaned on age alone — the agent was never confirmed dead ` +
+      `and may still be alive · view: tasks\n`;
+    for (const e of aged.slice(0, WEDGE_RENDER_CAP)) {
+      const mins = Number.isFinite(e && e.ageMs) ? Math.round(e.ageMs / 60000) : 'unknown';
+      const floor = Number.isFinite(e && e.thresholdMs) ? Math.round(e.thresholdMs / 60000) : 'unknown';
+      out += `      ${clean(e && e.id, 'unknown')} (${clean(e && e.kind, 'unknown')}) — ` +
+        `${mins} min old, the floor for this kind is ${floor} min\n`;
+    }
+    out += overflow(n);
+  }
+
+  return out;
+}
+
 /**
  * Build the dashboard table text
  * @param {string} projectPath
@@ -225,24 +451,56 @@ function buildDashboardTable(projectPath, opts = {}) {
   // caller as `opts.liveAgentIds` (menu.js parses it from the `--live-agent-ids <csv>`
   // argv flag the parent session appends on each on-open render). When it is absent
   // (`undefined`/`null` — a true session restart or the TUI child with no Task access),
-  // reconcile falls back to the staleness backstop, exactly as before. Fully fail-open:
-  // ANY reconcile failure falls back to the plain load so the dashboard always renders.
+  // reconcile falls back to the staleness backstop, exactly as before. Fail-open but NOT
+  // SILENT: any reconcile failure still falls back to the plain load so the dashboard
+  // always renders, AND the reason is now kept and rendered by renderReconcileHealth. The
+  // pass is no longer treated as purely best-effort — not bricking and not saying anything
+  // are different instructions.
+  // The pass's report is now kept WHOLE, not reduced to the orphan count: its four wedge
+  // fields (unsatisfiable / deferred / stalenessOrphaned / quarantineFaulted) are rendered
+  // by renderWedgeReports below. They were computed on every open and discarded before.
   let orphanedCount = 0;
+  /** The WHOLE report — not one number. See renderWedgeReports for why. @type {object|null} */
+  let reconcileReport = null;
+  /** The captured failure message — NOT discarded. See renderReconcileHealth. @type {string|null} */
+  let reconcileThrew = null;
   try {
     const { report } = taskReconcile.reconcileState(root, { liveAgentIds: opts.liveAgentIds });
+    reconcileReport = report || null;
     orphanedCount = (report && Array.isArray(report.orphaned)) ? report.orphaned.length : 0;
-  } catch { /* reconcile is best-effort; a failure must never brick the dashboard */ }
+  } catch (err) {
+    // NOT swallowed. A reconcile failure must not BRICK the dashboard — it must also not be
+    // INVISIBLE. Rendering the registry as though the pass succeeded presents stale state as
+    // live, which is the more dangerous of the two failures: a blank section prompts a
+    // question, a confident wrong section does not. The dashboard still renders; only the
+    // reason is kept, and renderReconcileHealth puts it on screen.
+    reconcileThrew = (err && err.message) ? String(err.message) : String(err);
+  }
   let taskReg;
   try { taskReg = taskRegistry.load(root); } catch { taskReg = taskRegistry.emptyRegistry(); }
   let tasksBlock = '';
   try { tasksBlock = taskView.renderTasksSection(taskReg); } catch { tasksBlock = ''; }
   if (tasksBlock) out += tasksBlock + '\n';
+  // TRUSTWORTHINESS BEFORE FINDINGS. A human who reads the counts without knowing the check
+  // never ran, ran against an empty view, or could not persist what it decided has been
+  // actively MISLED, not merely under-informed. So this leads every FINDING: above the
+  // orphan line and above every wedge line, asserted by the tests rather than left to
+  // convention. It sits INSIDE the TASKS section, directly beneath the counts it qualifies —
+  // which is why each line says "the task counts ABOVE"; detaching it to sit above the
+  // section header would leave a bare ⛔ line belonging to nothing.
+  out += renderReconcileHealth(reconcileThrew, reconcileReport);
   // NB4: surface newly-orphaned tasks on the existing TASKS line as a re-run offer.
   // Re-run is routed through the scheduler (canRun/nextRunnable) by the menu driver,
   // never a direct launch (menu.md Two-Plane Protocol). No new screen (D-NB4-5).
   if (orphanedCount > 0) {
     out += `  ⚠ ${orphanedCount} task${orphanedCount === 1 ? '' : 's'} orphaned — offer re-run\n`;
   }
+  // The four wedge reports the reconcile pass computes on EVERY open finally have a READER.
+  // Before this, a task the scheduler had already failed for a permanent dependency cycle
+  // was indistinguishable on screen from an ordinary one-off failure, and a concurrent-edit
+  // guard that never ran looked exactly like one that ran and decided to hold. Returns ''
+  // for a clean project, so a project with no wedges renders byte-identically.
+  out += renderWedgeReports(reconcileReport);
 
   // Inbox (A3 — async-overnight surface; SP2 adds the possibly-stale stream)
   const inbox = getInboxCounts(root);
@@ -1734,19 +1992,34 @@ function taskAdd(root, rest) {
 
 /**
  * NB3: the scheduler's newly-runnable set, projected onto the just-saved in-memory
- * registry, as a compact promote list. This is the ONLY sanctioned promotion source
- * for the COMPLETION turn — Claude dispatches exactly these tasks (never a queued
- * task the scheduler did not return). Each entry carries only what the dispatcher
- * needs (id + the scheduler inputs), never the whole task object.
+ * registry, as a compact promote list — now with the CONCURRENT-EDIT GUARD applied.
+ * This is the ONLY sanctioned promotion source for the COMPLETION turn — Claude
+ * dispatches exactly these tasks (never a queued task the scheduler did not return).
+ * Each entry carries only what the dispatcher needs (id + the scheduler inputs), never
+ * the whole task object.
+ *
+ * Before this, the guard ran ONLY on the dashboard-open path (`reconcileState`), so
+ * `menu task fail|cancel|complete` published a promote list that could hand a file still
+ * reserved by a possibly-live age-only orphan to a conflicting queued task — two agents
+ * on one file, which is the exact outcome the guard exists to prevent. Four routes now
+ * share ONE encoding, `task-reconcile.applyQuarantine`. The scheduler stays pure: the
+ * filter is in the PROJECTION, never in `canRun`/`nextRunnable`.
+ *
+ * A held candidate is RETURNED alongside the promote list, never silently dropped — a
+ * candidate that vanishes with no explanation is the silent behaviour this program keeps
+ * removing.
+ *
  * @param {{tasks:Array<object>}} reg  a post-save in-memory registry value
- * @returns {Array<{id:string, kind:string, plan:(string|null), touches:string[], gitOp:boolean}>}
+ * @returns {{promote:Array<{id:string, kind:string, plan:(string|null), touches:string[], gitOp:boolean}>, quarantined:Array<{id:string,reason:string,summary:string}>}}
  */
 function computePromote(reg) {
-  return taskRegistry.nextRunnable(reg)
+  const guarded = taskReconcile.applyQuarantine(reg, taskRegistry.nextRunnable(reg));
+  const promote = guarded.promote
     // NB3 (LOW, defense in depth): only ids of the canonical `t<n>` shape may ride
     // into a `menu task start <id>` dispatch instruction, and id/plan are stripped of
     // control chars — a crafted registry entry can never inject an ANSI/newline
     // payload into the COMPLETION turn (mirrors the render layer's stripCtl guard).
+    // This runs LAST, after the guard, so the injection defence is unweakened.
     .filter((t) => /^t\d+$/.test(t.id))
     .map((t) => ({
       id: stripCtl(t.id),
@@ -1755,6 +2028,7 @@ function computePromote(reg) {
       touches: t.touches,
       gitOp: t.gitOp
     }));
+  return { promote, quarantined: guarded.quarantined };
 }
 
 /**
@@ -1830,13 +2104,18 @@ function taskTransition(root, rest, kind) {
     // ── fail ─────────────────────────────────────────────────────────────────────
     if (kind === 'fail') {
       taskRegistry.updateTask(reg, id, { status: 'failed', result: { ok: false, summary: p.summary || 'failed' } });
-      return {
+      const { promote, quarantined } = computePromote(reg);
+      const failRes = {
         ok: true,
         taskId: id,
         status: 'failed',
         text: `Task ${id} → failed`,
-        promote: computePromote(reg),
+        promote,
       };
+      // Only when non-empty, so a project with no age-only orphans gets a byte-identical
+      // result object and no existing protocol assertion regresses.
+      if (quarantined.length > 0) failRes.quarantined = quarantined;
+      return failRes;
     }
 
     // ── cancel (item 10: stamp the deadline clock; --force skips the two-phase wait) ─
@@ -1877,7 +2156,9 @@ function taskTransition(root, rest, kind) {
           : `Task ${id} → ${settled.status}`,
     };
     if (forcedCancel) res.forced = true;
-    res.promote = computePromote(reg);
+    const cancelPromote = computePromote(reg);
+    res.promote = cancelPromote.promote;
+    if (cancelPromote.quarantined.length > 0) res.quarantined = cancelPromote.quarantined;
     return res;
   });
 }
@@ -2017,15 +2298,20 @@ function taskComplete(root, rest) {
   }
 
   // NB3: a completion frees a slot → surface the scheduler's newly-runnable set for
-  // the COMPLETION turn to promote (scheduler-consulted every completion, Decision 4).
-  return {
+  // the COMPLETION turn to promote (scheduler-consulted every completion, Decision 4),
+  // with the concurrent-edit guard applied — the same guard, on the same terms, as the
+  // dashboard-open path.
+  const { promote, quarantined } = computePromote(settled);
+  const res = {
     ok: true,
     taskId: id,
     status: 'done',
     text,
     completion,
-    promote: computePromote(settled),
+    promote,
   };
+  if (quarantined.length > 0) res.quarantined = quarantined;
+  return res;
 }
 
 /** `menu task list` — a pure read of the registry for rendering. */

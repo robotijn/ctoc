@@ -1,0 +1,8 @@
+{
+  "content_sha256": "c5c2f898833c1e1fb4b7a8c828ceb79b4d975f554361b9a122537c750055cef5",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-18T20:44:41.855Z",
+  "approved_by": "human",
+  "plan_basename": "00076-quarantine-fault-fails-safe"
+}

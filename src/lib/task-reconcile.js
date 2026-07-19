@@ -52,7 +52,16 @@
  *   • STALENESS-FREED FILES ARE QUARANTINED FOR ONE PASS (R3-B item 8). A task orphaned on
  *     AGE ALONE (no live confirmation) may still be alive, so its `touches` must NOT be
  *     handed to a conflicting queued task in the SAME pass: `reconcileState` excludes such
- *     candidates from `promote` and reports them in `report.quarantined`.
+ *     candidates from `promote` and reports them in `report.quarantined`. The guard is the
+ *     exported pure function `applyQuarantine`, and it serves EVERY promote path — the
+ *     dashboard render here, and `menu task fail|cancel|complete` through
+ *     `menu-screens.computePromote`. One encoding, one behaviour, four routes; the
+ *     SCHEDULER stays pure and never learns why a task reached a status. The guard FAILS
+ *     SAFE: if it throws while building the reserved set or while testing one candidate,
+ *     the fault is recorded in `report.quarantineFaulted` and the candidates it could not
+ *     clear are DROPPED, never promoted — a check that cannot decide must not wave work
+ *     through (only a candidate with an empty `touches` set, which can never conflict,
+ *     survives a fault).
  *   • RETENTION NEVER SEVERS A LIVE EDGE (R3-B item 9). A terminal task still referenced by
  *     a surviving task's `blockedBy` is NOT swept, however old: sweeping it would make the
  *     next pass fail its dependent as `dep-missing` even though the dependency SUCCEEDED.
@@ -158,6 +167,13 @@ const TEMP_PREFIX = 'tasks.json.tmp-';
  * @property {null|{reason?:string, skipped?:number}} corrupt  fail-open marker, else null.
  * @property {string} [saveFailed]  set by reconcileState when the fail-loud save threw.
  * @property {string[]} [tempSwept]  set by reconcileState — swept temp-artifact paths.
+ * @property {null|{phase:string, error:string, dropped:string[]}} [quarantineFaulted]
+ *   set by reconcileState when the concurrent-edit guard THREW. `phase` is 'collect'
+ *   (building the reserved file set) or 'filter' (testing one candidate against it).
+ *   `dropped` are the promote candidates removed BECAUSE the check could not be
+ *   completed — a guard that cannot decide must not let the candidate through. Mirrors
+ *   `saveFailed`: the caller learns the check did not happen. ABSENT (not null) when no
+ *   fault occurred, so a clean project's report shape is unchanged.
  * @property {string[]} [quarantineReleased]  staleness-orphan ids whose file quarantine was
  *   released this pass — because the agent was CONFIRMED dead (live list excludes its id) OR
  *   PRESUMED dead (aged past presumedDeadMultiple × the kind staleness floor). The second
@@ -617,7 +633,73 @@ function reconcileState(root, opts = {}) {
   } catch {
     promote = [];
   }
-  report.quarantined = [];
+  // A scheduler that threw OR returned a non-array decided nothing, so nothing may be
+  // promoted. Normalizing here (rather than letting the quarantine below trip over a
+  // non-array) keeps the shape fault at its own boundary and keeps `reconcileState`
+  // total: every path below can rely on `promote` being an array.
+  if (!Array.isArray(promote)) promote = [];
+  // ONE guard, ONE encoding, EVERY route. The guard used to live inline here, so it ran on
+  // the dashboard-open path only and `menu task fail|cancel|complete` published an
+  // unguarded promote list. It is now `applyQuarantine` below, which menu-screens'
+  // `computePromote` calls too. `reconcileState`'s observable behaviour is unchanged: the
+  // same promote set, the same `report.quarantined` entries, the same `quarantineFaulted`.
+  const guarded = applyQuarantine(reconciled, promote);
+  promote = guarded.promote;
+  report.quarantined = guarded.quarantined;
+  if (guarded.faulted) report.quarantineFaulted = guarded.faulted;
+
+  return { report, promote };
+}
+
+/**
+ * THE CONCURRENT-EDIT GUARD, as a pure function — the ONE encoding of "these promote
+ * candidates would collide with files still reserved by an age-only orphan", applied by
+ * EVERY promote path (the dashboard render via `reconcileState`, and `menu task
+ * fail|cancel|complete` via `menu-screens.computePromote`).
+ *
+ * WHY THIS IS NOT IN THE SCHEDULER. `task-registry`'s scheduler section is pure and reads
+ * only status/kind/touches/gitOp; it must not learn WHY a task reached a status. This
+ * guard reads `result.orphanReason`, a reconcile-pass marker, so it belongs to the
+ * PROJECTION that turns a scheduler answer into a dispatch list — never to `canRun` or
+ * `nextRunnable`. Coupling the concurrency ladder to this marker would make the ladder's
+ * answer depend on lifecycle history, and a change to how an orphan records its reason
+ * would silently change what the scheduler allows to run.
+ *
+ * A task orphaned on AGE ALONE was never confirmed dead: its agent may still be editing
+ * its files. Handing those files to a conflicting queued task puts two agents on one file.
+ * Such a candidate waits; the exclusion is always REPORTED, never silent.
+ *
+ * FAILS SAFE. A throw while building the reserved set drops every file-editing candidate;
+ * a throw while testing one candidate drops that candidate. Only a candidate with an empty
+ * `touches` set — which can never conflict under the scheduler's own Rule 4 fast path —
+ * survives a fault. Never throws, and never mutates the registry or the candidates.
+ *
+ * @param {{tasks:Array<object>}|any} registry  a reconciled registry VALUE
+ * @param {Array<object>} candidates  the scheduler's promote set (nextRunnable output)
+ * @returns {{promote:Array<object>, quarantined:Array<{id:string,reason:string,summary:string}>, faulted:(null|{phase:string,error:string,dropped:string[]})}}
+ */
+function applyQuarantine(registry, candidates) {
+  // A projection helper must never brick a caller. A non-array candidate list decided
+  // nothing, so nothing may be promoted; a non-object registry reserves nothing, so the
+  // candidates pass through exactly as given.
+  if (!Array.isArray(candidates)) return { promote: [], quarantined: [], faulted: null };
+  if (!registry || typeof registry !== 'object') {
+    return { promote: candidates, quarantined: [], faulted: null };
+  }
+
+  let promote = candidates;
+  /** @type {Array<{id:string,reason:string,summary:string}>} */
+  const quarantined = [];
+  /** @type {null|{phase:string, error:string, dropped:string[]}} */
+  let faulted = null;
+
+  // FAIL SAFE, NOT FAIL OPEN. All of this used to sit in ONE try whose catch was an empty
+  // comment: any throw abandoned the guard and returned the UNFILTERED promote list, which
+  // is how two agents end up on one file — and the failure looked exactly like the guard
+  // running and finding nothing. Each phase now records its fault and DROPS what it could
+  // not check.
+  const quarantinedTouches = [];
+  let collectFaulted = null;
   try {
     // PERSISTENT quarantine set (concurrent-edit defect). Reserve the files of EVERY task
     // currently `orphaned` on staleness — this-pass orphans (their `result` marker was set
@@ -626,33 +708,79 @@ function reconcileState(root, opts = {}) {
     // `report.stalenessOrphaned`, is what makes the hold persist across passes: a still-alive
     // age-orphan keeps its files reserved until the across-passes branch flips its marker to
     // `confirmed-dead` (agent confirmed gone), at which point it drops out of this set.
-    const quarantinedTouches = [];
-    for (const t of reconciled.tasks || []) {
+    for (const t of registry.tasks || []) {
       if (t && t.status === 'orphaned' && t.result &&
           t.result.orphanReason === 'staleness' && Array.isArray(t.touches)) {
         quarantinedTouches.push(...t.touches);
       }
     }
-    if (quarantinedTouches.length > 0) {
-      promote = promote.filter((cand) => {
-        const touches = Array.isArray(cand.touches) ? cand.touches : [];
-        if (touches.length > 0 && touchesOverlap(touches, quarantinedTouches)) {
-          report.quarantined.push({
-            id: cand.id,
-            reason: 'staleness-orphan-quarantine',
-            summary: 'held one pass — its files were freed by an AGE-ONLY orphaning ' +
-              '(the previous holder was never confirmed dead and may still be editing them)'
-          });
-          return false;
-        }
-        return true;
-      });
-    }
-  } catch {
-    /* the quarantine is defensive; a fault must never break the render (promote stands) */
+  } catch (err) {
+    collectFaulted = msgOf(err);
   }
 
-  return { report, promote };
+  if (collectFaulted !== null) {
+    // The reserved set is UNKNOWN, so every file-editing candidate is potentially colliding
+    // with a live agent's files. Drop them all; keep only candidates that touch nothing —
+    // an empty touch set can never conflict (the same Rule 4 fast path
+    // task-registry.evaluateConcurrency already takes), so keeping it is a proven fact about
+    // the scheduler, not a guess.
+    const dropped = [];
+    promote = promote.filter((cand) => {
+      const touches = Array.isArray(cand.touches) ? cand.touches : [];
+      if (touches.length === 0) return true;
+      dropped.push(cand.id);
+      quarantined.push({
+        id: cand.id,
+        reason: 'quarantine-fault',
+        summary: 'held — the concurrent-edit guard could not determine which files are ' +
+          'reserved by an age-only orphan, so promoting a file-editing task would risk ' +
+          'two agents on one file'
+      });
+      return false;
+    });
+    faulted = { phase: 'collect', error: collectFaulted, dropped };
+  } else if (quarantinedTouches.length > 0) {
+    // The reserved set is known. Each candidate's overlap test gets its OWN guard, so one
+    // candidate's fault drops THAT candidate and never silently voids the whole guard.
+    const faults = [];
+    const dropped = [];
+    promote = promote.filter((cand) => {
+      const touches = Array.isArray(cand.touches) ? cand.touches : [];
+      if (touches.length === 0) return true;
+      let overlaps;
+      try {
+        overlaps = touchesOverlap(touches, quarantinedTouches);
+      } catch (err) {
+        // FAIL SAFE. An overlap test that threw decided NOTHING; treating "no answer" as
+        // "no conflict" is what let this guard fail open. Drop the candidate and record
+        // why — one pass of delay costs a wave slot, two agents on one file costs the file.
+        faults.push(msgOf(err));
+        dropped.push(cand.id);
+        quarantined.push({
+          id: cand.id,
+          reason: 'quarantine-fault',
+          summary: 'held — the file-overlap test threw, so this candidate could not be ' +
+            'cleared against the files reserved by an age-only orphan'
+        });
+        return false;
+      }
+      if (overlaps) {
+        quarantined.push({
+          id: cand.id,
+          reason: 'staleness-orphan-quarantine',
+          summary: 'held one pass — its files were freed by an AGE-ONLY orphaning ' +
+            '(the previous holder was never confirmed dead and may still be editing them)'
+        });
+        return false;
+      }
+      return true;
+    });
+    if (faults.length > 0) {
+      faulted = { phase: 'filter', error: faults[0], dropped };
+    }
+  }
+
+  return { promote, quarantined, faulted };
 }
 
 /** Extract a message string from an unknown error (never throws). */
@@ -663,6 +791,7 @@ function msgOf(err) {
 module.exports = {
   reconcile,
   reconcileState,
+  applyQuarantine,
   sweepTempArtifacts,
   // constants (exported for callers/tests that want to tune or assert defaults)
   DEFAULT_GRACE_MS,

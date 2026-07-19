@@ -1,0 +1,8 @@
+{
+  "content_sha256": "2c2472e0a1e264b74dbae3c41eabd518754d1079036878c7a70797c27d4d0082",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-19T07:40:42.772Z",
+  "approved_by": "human",
+  "plan_basename": "00080-dashboard-says-when-reconcile-failed"
+}

@@ -1,5 +1,5 @@
 {
-  "maxFindings": 220,
+  "maxFindings": 217,
   "note": "DEBT, not blessing. These are pre-existing false-green sites — checks that can report a verdict on input they never received — tolerated so the fence could land. This list may only ever SHRINK. Never raise maxFindings to make a run pass; fix a site and lower it instead.",
   "whitelistNote": "SEPARATE from the debt list above. `whitelist` is a PERMANENT exemption for a construct that is genuinely correct, and every entry requires a written justification. It starts EMPTY. Adding to it is a reviewable act; adding to `findings` is forbidden.",
   "findings": [
@@ -130,7 +130,6 @@
     "src/lib/iron-loop-enforcer.js:silent-catch:checkDeadExportFence",
     "src/lib/iron-loop-enforcer.js:silent-catch:checkFalseGreenFence",
     "src/lib/legal-hold.js:parse-default:extractListField",
-    "src/lib/menu-screens.js:silent-catch:buildDashboardTable",
     "src/lib/operating-manual.js:silent-catch:atomicWrite",
     "src/lib/operating-manual.js:silent-catch:atomicWrite#2",
     "src/lib/plan-coverage.js:parse-default:readPlanFiles",
@@ -182,7 +181,6 @@
     "src/lib/step-13-verify.js:unbounded-capture:output",
     "src/lib/streaming-gate.js:silent-catch:nextUnansweredQuestion",
     "src/lib/streaming-gate.js:silent-catch:crossBySufficiency",
-    "src/lib/streaming-gate.js:silent-catch:answeredQuestionIds",
     "src/lib/streaming-precompute.js:silent-catch:writePlanQuestions",
     "src/lib/streaming-questions-sweeper.js:silent-catch:logDiscard",
     "src/lib/streaming-questions-sweeper.js:silent-catch:logDiscard#2",
@@ -190,7 +188,6 @@
     "src/lib/sync.js:silent-catch:getLastSyncTimestamp",
     "src/lib/sync.js:silent-catch:saveLastSyncTimestamp",
     "src/lib/task-reconcile.js:silent-catch:sweepTempArtifacts",
-    "src/lib/task-reconcile.js:silent-catch:reconcileState",
     "src/lib/task-registry.js:silent-catch:warnLog",
     "src/lib/task-registry.js:silent-catch:save",
     "src/lib/task-registry.js:silent-catch:clearDrainStop",
