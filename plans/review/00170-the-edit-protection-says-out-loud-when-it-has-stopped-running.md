@@ -697,3 +697,150 @@ file two plans claim.
     whose absence is undetectable was never a boundary; the note belongs in
     `docs/CRITICAL_CONTROL_POINTS.md`, which an active plan declares. The human
     schedules it.
+
+### Added during execution (Steps 8–16)
+
+16. **The plan's Step 12 short-circuit was REJECTED, and this is the one place
+    the plan was found materially wrong on design.** Step 12 instructs the scan
+    to stop counting once the corroboration floor is met. Doing so caps
+    `unrecordedCount` at 2 — but Question 2's own rendered example promises
+    "23 files changed", and Question 2 argues that the count exists "so the
+    claim can be judged rather than believed". Both cannot hold. The count won:
+    "2 files have changed" on a project where thirty-five did understates a true
+    alarm to the only reader who matters. The cost of counting in full is bounded
+    by construction — the witness is plan-DECLARED LITERAL paths (149 on this
+    repository), never a tree walk — and the measured render cost is 3.1 ms.
+    Test case 6 asserts the true count at 3 changed files, which is what caught it.
+17. **The newest entry is the cutoff even when that entry is a hand-fired probe,
+    and the plan did not notice this about its own instrument.** The plan
+    documents entries 21–24 as probes fired by hand today, then defines the
+    cutoff as "the newest timestamp". The probes therefore RESET the cutoff:
+    measured against them, zero declared files are newer; measured against the
+    newest ORGANIC entry (2026-07-17T08:52:39Z), thirty-five are. The design was
+    NOT adjusted, per Step 9's instruction. It is self-consistent — any hook
+    invocation forgives prior history, because a file older than the last decision
+    is indistinguishable from a file whose edit WAS that decision — and it is
+    monotone: the moment new edits land unrecorded, it fires, which it did within
+    the hour. The limitation is real and is recorded here rather than engineered
+    around: a SINGLE hook invocation, from any cause, silently forgives every
+    unrecorded edit that preceded it.
+18. **Glob declarations are excluded from the witness.** A declaration such as
+    `agents/**/*.md` names a SET, not a file to stat, and expanding it means
+    walking the tree — the noisy witness this plan rejects. One of the 150
+    declarations on this repository is a glob; the other 149 are literal. Skipping
+    it can only make the check less sensitive, never more permissive.
+19. **The witness spans `implementation` even though `plan-coverage`'s
+    `STAGE_PRIORITY` deliberately omits it.** That omission exists because a
+    pre-approval plan must never CONFER PERMISSION. Here nothing is granted: a
+    declaration is used only as a witness that a file is one an agent edits
+    through tool calls. A wider witness is strictly more sensitive.
+20. **`plan-coverage` exports no active-plan enumeration, so the stage walk is
+    written here — but the `files:` PARSE is not.** Step 9 required reusing an
+    existing enumeration if one existed. `plan-coverage` exports
+    `readPlanFiles`, `globToRegex`, `touchesOverlap`, `findCoveringPlan` and
+    `explainDenial`; the stage enumeration is private to `scanForCoverage`. The
+    format-bearing half — parsing `files:` out of a plan — is reused through the
+    exported `readPlanFiles`, so the declaration format is still spelled once.
+    Only the trivial "which directories to walk" is restated, and it is
+    deliberately a DIFFERENT list (see 19), so sharing it would have been wrong.
+21. **A blind witness does not veto POSITIVE evidence at or above the floor.**
+    The plan says no combination of unreadable sources may produce `recording`;
+    it does not say they must suppress `not-recording`. When two or more
+    unrecorded files have already been observed, an unreadable plan elsewhere can
+    only have HIDDEN more, never invented these. Below the floor the small count
+    may be an artifact of the blindness, so the verdict degrades to `unknown`
+    (`reason: 'witness-unreadable'`) — which is exactly case 9's fixture.
+22. **`asOf` was added to the result, beyond the plan's listed fields.**
+    `describeProtection` must be pure to be asserted without rendering, yet
+    "Active — checked 4 minutes ago" needs a clock. Passing the injected `now`
+    through the result keeps the description pure and deterministic. Reading
+    `opts` happens INSIDE the guard so a hostile options object degrades to
+    `unknown` instead of crashing the screen — the backstop's live test.
+23. **The moment is rendered in LOCAL time.** "09:12 on 17 Jul" is the clock the
+    human was looking at when the edits happened; rendering it in UTC would make
+    them do arithmetic to judge the claim. Tests assert structure and the absence
+    of `NaN`, never a fixed wall-clock string, so this cannot fail by timezone.
+24. **A defensive guard around `existsSync` was REMOVED rather than left
+    uncovered.** `root` is already known to be an existing directory and the rest
+    of the path is a fixed join, so that branch was unreachable by any input. A
+    guard no input can reach is untestable code pretending to be safety; the
+    outer catch is the real backstop, and it now has a real test.
+25. **The count ratchets in `CLAUDE.md` and `tests/readme-numbers.test.js` were
+    moved, though neither is in this plan's `files:`.** Adding one module and one
+    test file tripped three documented counts (src/lib 106→107, test files
+    439→440 in two places). The brief's standing rule is that ratchet files are
+    in scope by rule and must be moved in the correct direction, measured live —
+    and an active plan, `00082`, is titled exactly that. Only the numbers changed;
+    no whitelist entry was added anywhere. `README.md` line 844 still reads "104
+    JS modules" and was left alone: no test asserts it, it was already stale
+    before this work, and `README.md` is declared by `00089`.
+
+## Execution Record (Steps 8–16)
+
+- **Step 8 TEST — RED, verbatim.** `node --test tests/the-edit-protection-says-whether-it-is-running.test.js`
+  before any source existed: `Cannot find module '../src/lib/enforcement-liveness'`
+  (`MODULE_NOT_FOUND`), `tests 1 / pass 0 / fail 1`. Zero cases passed, so nothing
+  already provided this. Case 18 (the vacuity guard) passes GREEN at the end,
+  asserting that case 1's assertion THROWS against case 2's healthy fixture.
+  Case 3 additionally reads the finished module's source and asserts it contains
+  no uppercase numeric constant other than `GRANULARITY_MS` and
+  `CORROBORATION_FLOOR` — the fence against a duration threshold creeping back.
+- **Step 9 PREPARE — measurements.** (3) declared files newer than the newest
+  entry: **0** against the probe at 2026-07-20T10:03:21Z, **35** against the
+  newest organic entry at 2026-07-17T08:52:39Z — see decision 17. (1) the log
+  holds **24** lines, matching planning. (2) newest entry is a hand-fired probe;
+  newest organic is 2026-07-17, matching planning. (4) `MAX_ENTRIES` is still
+  **1000**, so the log has demonstrably never rotated. `src/areas/system.js` is
+  required at `src/commands/menu.js:255` and is a live mount; it remains declared
+  by no other active plan.
+- **Step 10 IMPLEMENT.** `src/lib/enforcement-liveness.js` (new),
+  `src/areas/system.js` (Logs block only — the two sibling byte lines untouched),
+  `tests/the-edit-protection-says-whether-it-is-running.test.js` (new).
+- **Step 11 REVIEW.** One encoding of the rule; `src/areas/system.js` renders a
+  verdict and computes none. The log format is read only through
+  `enforcementLog.readLog`. No cycle: nothing in the graph reaches back to a
+  brand-new module. `git status` confirms `src/lib/enforcement-log.js` and
+  `src/lib/plan-coverage.js` are UNMODIFIED. No path returns `recording` from a
+  guarded read failure.
+- **Step 12 OPTIMIZE.** Log read once; each distinct declared path `lstat`ed at
+  most once (deduplicated across plans — a dedicated test asserts it). Measured
+  render cost on this repository: **3.1 ms** over 20 renders. Short-circuit
+  rejected, see decision 16.
+- **Step 13 SECURE.** A hostile entry whose `target_file` carries a newline, a
+  terminal escape, `%s` and 10,000 characters reaches the screen in NO form —
+  asserted. Out-of-tree declarations (`../../../../etc/passwd`, `/etc/hosts`) are
+  never stat'ed. Every fault path returns rather than throws: absent `.ctoc/`,
+  log-as-directory, unreadable plan, unlistable stage directory, hostile options
+  object, hostile roots (a file, `''`, `null`, `undefined`, `42`, `{}`, a NUL byte).
+- **Step 14 VERIFY.** `npm test`, verbatim: `tests 10273`, `suites 1762`,
+  `pass 10273`, `fail 0`, `cancelled 0`, `skipped 0`, `todo 0`,
+  `[CTOC test-gate] coverage 99.01% (threshold 99%), skipped 0, failed 0`,
+  `[CTOC test-gate] PASS`. Re-run for stability at the floor: identical counts,
+  coverage 99.03%, PASS. `enforcement-liveness.js` reaches **100.00%** line
+  coverage in the full run. The floor was NOT lowered. ESLint `--max-warnings 0`
+  and `tsc --checkJs` are both clean on all changed files.
+- **Step 14 — the human's own reading**, rendered verbatim from the live System
+  screen on this repository (colour codes stripped):
+
+  ```
+    Edit protection
+      NOT RUNNING — 6 files have changed since CTOC last checked one, at 12:03 on 20 Jul.
+      Edits are not being checked against your plans right now.
+      Restart this session to load it again.
+  ```
+
+  This is a **PASS**: the check working correctly on a project whose protection is
+  dead. The six files include this executor's own edits, which the hook did not
+  record — the instrument catching the live outage as it happened.
+- **Step 15 DOCUMENT.** File header on `enforcement-liveness.js` records the
+  motivating measurement, why there is no duration threshold (naming the
+  idle-versus-busy argument), why `unknown` must never fold into `recording`, and
+  that the module observes only. A comment at the `src/areas/system.js` call site
+  records that the byte count it replaced was accurate and meaningless.
+- **Step 16 FINAL-REVIEW.** Two findings are handed on, not acted on: the ceiling
+  note for `docs/CRITICAL_CONTROL_POINTS.md` (declared by `00089`), and the
+  `PostToolUse` beacon in `00171` that would separate "the hook system is not
+  running" from "the enforcement hook specifically is not recording". This plan
+  still does NOT make the hooks run, does not explain why they are not running,
+  does not warn proactively, is evidence rather than proof, cannot detect a hook
+  that runs but decides wrongly, and does not restore the missing history.
