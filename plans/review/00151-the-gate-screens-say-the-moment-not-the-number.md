@@ -16,6 +16,27 @@ files:
   - "src/lib/gate-words.js"
   - "src/lib/streaming-gate.js"
   - "tests/gate-words.test.js"
+  - "tests/streaming-gate.test.js"
+  - "tests/menu-screens.test.js"
+  - "tests/plan-question-screen.test.js"
+  - "CLAUDE.md"
+  - "tests/readme-numbers.test.js"
+scope_extension:
+  authorized_by: human
+  authorized_at: 2026-07-20
+  reason: >
+    Twelve assertions across three test files pin the OLD contract — they
+    assert the literal gate-number strings this plan exists to delete
+    ("Gate 1", "Approve <slug> across Gate 3?", header "Gate 1"). They are not
+    wrong tests to be softened; they must be inverted to the new contract, or
+    the suite keeps vouching for the wording the owner could not read.
+    CLAUDE.md carries two counts that move because this plan adds one module
+    and one test file. The human ruled on this identical fork earlier the same
+    day for the setup-preview work: extend the build rather than split, so the
+    behaviour and the tests that guard it are corrected together.
+    Extended a second time for tests/readme-numbers.test.js, which pins the
+    top-level module count in its OWN source (not in CLAUDE.md, as the first
+    report mistakenly said); this plan adds one module, so 107 becomes 108.
 ---
 
 # The gate screens say what the moment is, instead of a number
@@ -336,3 +357,205 @@ Cross-platform: `path.join`, `os.tmpdir()`, `fs.promises.rm` teardown.
 8. **The unknown-stage fallbacks are grammatical sentences, not empty strings or
    error text.** A vocabulary module that renders `undefined` at a human is a worse
    failure than the one being fixed.
+9. **`gateScreenAt` is driven through its SHIPPED routes, not directly.** The Test
+   Plan (cases 8 and 13) says "drive the REAL `gateScreenAt`", but that function is
+   not in `module.exports`. Exporting it so a test could call it would prove
+   reachability with a test, and a test is not a caller. Cases 8 and 9 therefore walk
+   all three pending decisions the way a person does: `streamingGateScreen` for the
+   first, then `streamSkip` ("Skip for now") for each next one. Same code path, real
+   entry points.
+10. **The ride-along and lifecycle questions were moved off the slug too.**
+    `planDecisionScreen` printed the slug in three further places the plan did not
+    enumerate — `Anything else for <slug>?`, `What should happen to <slug>?`, and that
+    question's header. They are the same defect as the header line (a filename standing
+    in for a piece of work), they are inside a declared file, and case 13 renders them
+    on the very screen the owner saw. They now use `humanPlanName`.
+11. **Test case 2 inspects STRING LITERALS only.** The rule permits a gate number in
+    comments and identifiers and forbids it in anything renderable, so the case
+    extracts quoted literals from the module source rather than scanning the whole
+    file. As belt and braces, `gate-words.js` contains no digit-after-"gate" anywhere
+    at all, so the case cannot pass by a parsing accident.
+12. **"FAILS validation" became "FAILS its checks".** The approve option's failure
+    description sits beside the re-worded success description; leaving one in pipeline
+    vocabulary and re-wording the other would read as a half-finished edit.
+
+### 13. The twelve inverted assertions — justification, one per changed case
+
+Every one is INVERTED, not softened: each now asserts against `gate-words` (the ONE
+vocabulary encoding, so a copy edit does not break it) plus a NEGATIVE fence that
+fails if a gate number, a raw stage name or a slug ever reaches a human-readable
+string again. **(a)** what the code is supposed to do is sourced from OUTSIDE every
+test — the vocabulary table in this plan, and the owner's own words ("wtf is gate 3
+<< i told you no numbers"); never from what the code now happens to do. **(b)** the
+TEST is wrong rather than the code because the human EXPLICITLY REPLACED the
+contract: several of these assertions carry messages that state the old contract as a
+virtue ("the gate question names the gate", "the gate is named outright"), and naming
+the gate outright is precisely the defect. **(c)** the implementation that passes
+today and fails after is named per row.
+
+| # | file · case | old assertion | fails after |
+|---|---|---|---|
+| 1 | `streaming-gate` · lists plans at all three gates | `gateName === 'Gate 1\|2\|3'` | any descriptor re-growing `gateName`, or a number in `moment`/`chip`/`approveLabel`/`title`/`summary` |
+| 2 | `streaming-gate` · well-formed first decision (header) | `/Gate 1 \(functional → implementation\)/` | a header printing a number OR a raw stage name |
+| 3 | `streaming-gate` · well-formed first decision (question) | `/Approve first-plan across Gate 1\?/`, `header === 'Gate 1'` | a question or chip drifting off the vocabulary, or naming a number |
+| 4 | `streaming-gate` · recommends the affirmative when clean | `opts[0].label === 'Approve'` | the leading option not being the edge's affirmative, or a number in its label or its recommendation text |
+| 5 | `streaming-gate` · recommends Open when failing | `opts.find(o => o.label === 'Approve')` | as above, plus a number in ANY option label or description |
+| 6 | `streaming-gate` · maps replies | `actions['Approve']` | the old bare label being re-aliased, or any action KEY naming a number |
+| 7 | `streaming-gate` · falls back to the simple question | `/Approve plain across Gate 1\?/` | the fallback question drifting, or its action key regressing |
+| 8 | `menu-screens` · a gate plan is asked about its gate | `/Approve my-plan across Gate 1\?/` | question or chip off-vocabulary, or a number in the question |
+| 9 | `menu-screens` · a review plan keeps its options | substrings `Approve`, `Feedback`, `Rework` | a number OR a raw stage in any label; the two reject ACTION strings are pinned byte-identical |
+| 10 | `menu-screens` · the build crossing at a real gate | `/Approve impl-plan across Gate 2\?/` | as row 8, on the other edge |
+| 11 | `menu-screens` · route dispatches correctly | `/Approve test-plan across Gate 1\?/` | as row 8 |
+| 12 | `plan-question-screen` · the gate fallback | `/Approve no-questions across Gate 3\?/` | the question drifting, a number reaching it, or the SLUG reaching it |
+
+One case needed more than a swap. `plan-question-screen` · "the product question is
+NOT a gate-approval prompt" asserted `doesNotMatch(/Approve .* across Gate/)`. That
+pattern can only ever match the OLD wording, so after the re-word it would have
+passed **vacuously** — a fence over a string that no longer exists anywhere. It now
+asserts the real thing (the question is not this edge's gate question) and KEEPS the
+old pattern beside it, so the dead wording cannot come back either.
+
+### 14. A fifth surface DOES exist — reported, not touched
+
+I had flagged this as an open risk. Reading the four `menu-screens.test.js` bodies in
+full closes it: all four drive `route(['plan', …])` → `planDecisionScreen`, already
+fixed here. But the same file's `route function dispatches correctly` case asserts
+`browse.text.includes('[functional]')` — and it PASSES, because `stageBrowse` in
+`src/lib/menu-screens.js` prints the raw stage-directory name at a human. Two more
+sites in that file print a gate number in rendered text: `:964`
+(`approved at Gate 3; deploy is a SEPARATE human ship gate`) and `:2337`
+(`evidence recorded for Gate 3`). `src/lib/ui.js` prints five more (`:47-48`,
+`:119-120`, `:178-180`), as this plan already predicted.
+
+**None of these were touched.** `src/lib/menu-screens.js` and `src/lib/ui.js` are
+outside the declared paths, and this plan's own "What this slice does NOT fix"
+schedules them as the next slice.
+
+**TO THE NEXT EXECUTOR — two things, and the second is the trap.**
+
+1. **The next slice is wider than gate numbers.** Raw stage-directory names reach a
+   human through `stageBrowse` in `src/lib/menu-screens.js`, which renders the stage
+   as a literal bracketed token — a person reads `[functional]` on the screen. That
+   is the same class of internal vocabulary as the number (Decision 5 above), so the
+   slice scoped as "the remaining gate numbers" is under-scoped: it must cover raw
+   stage names too, or the screen keeps leaking after the numbers are gone.
+
+2. **A test currently asserts the raw stage name is PRESENT, and it PASSES today.**
+   `tests/menu-screens.test.js`, case `route function dispatches correctly`:
+   `assert.ok(browse.text.includes('[functional]'))`. That assertion **pins the
+   defect as the contract**. It must be **INVERTED** — rewritten so it fails when a
+   raw stage name reaches the browse text — and NOT merely re-pointed at whatever
+   the new string happens to be. Re-pointing it (swapping `[functional]` for the new
+   wording) would leave the suite vouching for the next wording just as blindly as
+   it vouches for this one. Follow the pattern established in Decision 13: assert
+   against the vocabulary encoding, then add the negative fence
+   (`doesNotMatch(/\b(functional|implementation|todo|review)\b/i)`) so a regression
+   fails on the RULE rather than on a literal.
+
+### 15. The counts were MEASURED, not computed
+
+`ls src/lib/*.js | wc -l` → **108**. `ls tests/*.test.js | wc -l` → **443**. Three
+lines in `CLAUDE.md` updated to match (`:247`, `:425`, `:431`).
+
+`tests/readme-numbers.test.js:149` needed its own edit: it does NOT read `CLAUDE.md`,
+it pins `107` as a literal in its own source, so no documentation edit could satisfy
+it. Re-measured with **that test's own method** (`fs.readdirSync('src/lib').filter(f
+=> f.endsWith('.js')).length`, not a shell `ls`, in case the two ever disagree) →
+**108**, and the per-increment comment convention in that file was continued with a
+`107 → 108` entry naming `gate-words.js` and what it is for.
+
+**A correction I owe the record:** my previous report listed this failing case as one
+that "reads CLAUDE.md". It does not. I had attributed it from its failure message
+without opening the body — the same shortcut that left the `stageBrowse` surface
+unexamined for a round.
+
+### 17. The unknown-stage fallbacks are tested as SCREENS, not as coverage
+
+Four cases (6a-6d) drive all four exports across nine unknown-stage inputs: real
+stages with no gate edge (`todo`, `in-progress`, `done`), a typo, the empty string, a
+missing argument, `null`, a number, and an object.
+
+The reason they exist is not the coverage figure. An unknown stage is the state in
+which a screen is MOST likely to leak an internal identifier, because there is no
+curated phrase to fall back on and the nearest available string is the stage value
+itself. So 6c asserts the specific leak: a fallback must never echo the stage value it
+was handed — `question('in-progress', …)` must not read "…at in-progress?".
+
+6d pins a deliberate ASYMMETRY so nobody later "fixes" it into consistency: the
+unknown MOMENT is empty while the chip, label and question all degrade to real words.
+An unknown edge has no moment to state, and the caller renders no moment line —
+degraded but true. Inventing a sentence there would put a claim about the pipeline on
+screen that nobody can vouch for. The other three sites cannot render nothing, so
+they degrade to neutral words instead.
+
+All four were green on first run — they guard a module written earlier in this same
+task, so they are fences, not test-driven-development red. Rather than bank them,
+each was proved to bite under a targeted mutation of `gate-words.js`: dropping the
+plan name from the fallback question (6a red), echoing the stage back (6c red),
+blanking the chip (6b red), returning an internal token as the chip (6b red),
+inventing a fallback moment (6d red), and blanking the affirmative label (6b red).
+
+### 16. The exemption boundary is terminated by the next same-level heading — a real defect
+
+**What happened.** Writing up the previous round, I added the findings under a new
+`## Findings` heading. `approval-ledger.EXECUTION_SECTIONS` exempts
+`decisions taken under ambiguity` from the specification hash, but an exempt section
+runs only until the next heading of the SAME OR HIGHER level — so my `##` heading
+CLOSED the exempt region, put executor-written prose back inside the hashed
+specification, and invalidated this plan's own approval binding.
+`hasLedgerApproval` went false and `iron-loop-enforcer` blocked with
+`gate-destinations-approved`. Demoting to `###` restored it.
+
+**Why it is a mechanism defect and not just my mistake.** The rule that decides
+whether a plan stays approved is *the heading level of text the executor is
+INSTRUCTED to write*. Nothing states that constraint at the point of writing: the
+plan says "record decisions under `## Decisions Taken Under Ambiguity`", the brief
+repeats it, and neither says "and never open a `##` section afterwards". The failure
+is silent at write time and surfaces later as a gate block whose message names
+`gate-destinations-approved` — a symptom two layers from the cause. Any executor
+following instructions in good faith can invalidate the plan it is executing, and the
+more thorough the write-up, the likelier it is.
+
+**What I think the fix is** (NOT done here — outside this plan's scope). The
+exemption should be positional rather than heading-level-scoped: **everything from
+the first execution-section heading to end-of-file is executor territory**, since by
+construction no specification content follows it. That makes the boundary independent
+of what the executor writes underneath, and it is a one-predicate change in
+`approval-ledger`'s boundary walk. A weaker alternative — treat an unknown `##`
+heading that appears AFTER an execution section as still-exempt — preserves more of
+the current shape but re-opens the question of what a specification edit appended at
+the end looks like. Either way the boundary must stop depending on the executor's
+choice of `#` count. A cheap interim guard: have `approval-ledger` expose the
+boundary it computed so an executor can assert its write landed outside the hash.
+
+### Findings — where the plan and the code disagree
+
+(Kept as a `###` INSIDE this section deliberately. `approval-ledger.EXECUTION_SECTIONS`
+exempts "decisions taken under ambiguity" from the specification hash; a new `##`
+heading would have closed that section and put executor-written text back inside the
+hashed specification, breaking this plan's own approval binding. It did, and this is
+the repair.)
+
+1. **`gateScreenAt` is not exported** (plan, Test Plan cases 8 and 13). Resolved by
+   Decision 9 above; no export was added.
+2. **The line numbers all held.** Every site named in Step 9 was where the plan said
+   it was. `humanPlanName` still exists and still returns the title.
+3. **BLOCKER — the plan's `files:` grant is one file short of its own change, and
+   two short of a green suite.** Deleting `gateName` and re-wording the screens breaks
+   **12 existing assertions in three test files the plan does not declare**, and
+   adding one module plus one test file breaks **1 documented-count assertion** that
+   reads a fourth file:
+
+   | file | failing cases | what they assert |
+   |---|---|---|
+   | `tests/streaming-gate.test.js` | 6 | `gateName === 'Gate 1'`, `Gate 1 (functional → implementation)` in the header, `Approve <slug> across Gate 1?`, `header === 'Gate 1'`, and `actions['Approve']` keyed by the old label |
+   | `tests/menu-screens.test.js` | 4 | the routed screen "names the gate"; `Should have Approve` |
+   | `tests/plan-question-screen.test.js` | 2 | `Approve no-questions across Gate 3?`; `/Approve .* across Gate/` |
+   | `CLAUDE.md` (read by `tests/readme-numbers.test.js` and `tests/doc-counts.test.js`) | 3 | `src/lib/: 107 JS modules` (now 108) and `442 test files` twice (now 443) |
+
+   Every one of these asserts the EXACT STRINGS this plan exists to delete. They are
+   not wrong tests being softened; they pin the old contract and must be re-pointed at
+   the new one (invert, not loosen). **They were NOT touched**, because `files:` is the
+   permission grant and editing it would invalidate the approval this plan acts under.
+   The declared work is complete and green; the suite is red on these 13 cases until
+   the grant is extended.

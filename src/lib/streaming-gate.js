@@ -45,6 +45,7 @@ const { readPlans, getPlansDir } = require('./state');
 const { validateTransition } = require('./plan-validator');
 const { approvePlan, movePlan } = require('./actions');
 const gateOrder = require('./gate-order');
+const gateWords = require('./gate-words');
 
 // PRE-BUILD gate destinations (X6): the gates reached BEFORE any code is built,
 // derived from the ONE gate-edge encoding, never hardcoded. A destination is
@@ -63,13 +64,19 @@ const PRE_BUILD_DESTINATIONS = new Set(
 // ANSI/control sequences or forge screen rows.
 const stripCtl = (s) => String(s).replace(/[\x00-\x1f\x7f-\x9f]/g, '');
 
-// The three approvePlan gate edges, in furthest-along-FIRST order (Gate 3 → 2 → 1).
-// Kept aligned with gate-order.GATE_EDGES; the gate NUMBER is the human-facing name.
+// The three approvePlan gate edges, in furthest-along-FIRST order (review first).
+// Kept aligned with gate-order.GATE_EDGES.
+//
+// THERE IS NO GATE NUMBER HERE, deliberately. This table used to carry one, and the
+// comment above it used to say the number WAS the human-facing name — that sentence
+// was the defect, written down. What a human reads at each of these moments now
+// comes from `gate-words`, which encodes what the moment IS. The field is DELETED
+// rather than renamed: while it exists, somebody renders it.
 const GATE_SOURCE_ORDER = ['review', 'implementation', 'functional'];
 const GATE_META = Object.freeze({
-  functional: { toStage: 'implementation', gate: 1 },
-  implementation: { toStage: 'todo', gate: 2 },
-  review: { toStage: 'done', gate: 3 },
+  functional: { toStage: 'implementation' },
+  implementation: { toStage: 'todo' },
+  review: { toStage: 'done' },
 });
 
 /**
@@ -464,7 +471,8 @@ function crossBySufficiency(root, planPath, ref, fromStage, toStage) {
  *
  * @param {string} projectRoot
  * @returns {Array<{ref:string, slug:string, title:string, summary:string,
- *   fromStage:string, toStage:string, gateName:string, passesValidation:boolean,
+ *   fromStage:string, toStage:string, moment:string, chip:string,
+ *   approveLabel:string, passesValidation:boolean,
  *   critical:boolean, enough:boolean, sufficiencyReason:string,
  *   unansweredQuestionIds:string[], blockingQuestionIds:string[]}>}
  */
@@ -509,7 +517,10 @@ function pendingGateDecisions(projectRoot) {
         summary: title,
         fromStage: stage,
         toStage: meta.toStage,
-        gateName: `Gate ${meta.gate}`,
+        // What the human READS at this moment — never a number, never a stage name.
+        moment: gateWords.moment(stage),
+        chip: gateWords.chip(stage),
+        approveLabel: gateWords.approveLabel(stage),
         passesValidation,
         critical: isCritical(plan.metadata),
         // The ENOUGH-INFORMATION verdict — shown to the human, acted on by nothing.
@@ -798,7 +809,7 @@ function richQuestionScreen(d, index, total, statusLine, root) {
   if (next === null) return null; // none / all answered → simple Approve (final gate crossing)
   const { question: q, index: nextIdx, total: qTotal } = next;
 
-  const parts = precomputedQuestionParts(q, d.ref, d.gateName);
+  const parts = precomputedQuestionParts(q, d.ref, d.chip);
   const actions = Object.assign({}, parts.actions);
 
   // Question options + Skip; add Open the plan only if it fits the harness's
@@ -815,7 +826,10 @@ function richQuestionScreen(d, index, total, statusLine, root) {
 
   let text = '';
   if (statusLine) text += `${stripCtl(statusLine)}\n\n`;
-  text += `Topic: ${humanPlanName(d.title, d.slug)}  ·  ${d.gateName} (${d.fromStage} → ${d.toStage})  ·  `
+  // The moment phrase replaces both the gate number and the (from → to) stage
+  // parenthetical. `decision N of M` stays: a count of things the human must do is a
+  // fact he asked to see and can act on. The rule is about gate numbers, not arithmetic.
+  text += `Topic: ${humanPlanName(d.title, d.slug)}  ·  ${d.moment}  ·  `
     + `decision ${index + 1} of ${total}  ·  question ${nextIdx + 1} of ${qTotal}\n`;
   text += `${'─'.repeat(40)}\n\n`;
   // Matrix FIRST, then the question sentence (the ask-me-questions contract).
@@ -876,9 +890,14 @@ function planDecisionScreen(ref, projectRoot) {
   const title = titleMatch ? stripCtl(titleMatch[1].trim()) : slug;
 
   const gate = GATE_META[stage];
-  const gateLabel = gate ? `  ·  Gate ${gate.gate} (${stage} → ${gate.toStage})` : '';
+  // The plan's HUMAN name, then what the moment IS. Neither the slug (which names a
+  // file, not a piece of work), nor the stage chip, nor a gate number reaches the
+  // header any more — a plan not at a gate simply renders with no moment phrase,
+  // exactly as it previously rendered with no gate label.
+  const name = humanPlanName(title, slug);
+  const momentLabel = gate ? `  ·  ${gateWords.moment(stage)}` : '';
 
-  let text = `Topic: ${stripCtl(slug)}  ·  [${stripCtl(stage)}]${gateLabel}\n`;
+  let text = `Topic: ${name}${momentLabel}\n`;
   text += `${'─'.repeat(40)}\n\n`;
   text += `  ${title}\n\n`;
   text += renderPlanBody(content);
@@ -893,7 +912,7 @@ function planDecisionScreen(ref, projectRoot) {
     const parts = precomputedQuestionParts(
       next.question,
       ref,
-      gate ? `Gate ${gate.gate}` : stripCtl(slug)
+      gate ? gateWords.chip(stage) : name
     );
     questions.push(parts.question);
     // Matrix FIRST, then the question sentence — the same contract the streaming
@@ -911,11 +930,12 @@ function planDecisionScreen(ref, projectRoot) {
     } catch {
       passes = false;
     }
+    const approveLabel = gateWords.approveLabel(stage);
     const approve = {
-      label: 'Approve',
+      label: approveLabel,
       description: passes
-        ? 'Recommended — passes validation. Cross the gate now (records approved_by: human).'
-        : 'This plan FAILS validation — approving is refused here. Check what is failing first.',
+        ? 'Recommended — everything checks out. Your answer is recorded as yours.'
+        : 'This plan FAILS its checks — saying yes is refused here. Check what is failing first.',
     };
     // `validate <ref>` is the ONLY route to the validation detail screen and to the
     // deliberate `claude:approve --override` force-crossing — the human's own
@@ -929,24 +949,27 @@ function planDecisionScreen(ref, projectRoot) {
     };
     const options = passes ? [approve, check] : [check, approve];
     if (stage === 'review') {
-      options.push({ label: 'Feedback → Functional', description: 'Send back to functional for requirements rework' });
-      options.push({ label: 'Rework → Implementation', description: 'Send back to implementation for technical rework' });
-      actions['Feedback → Functional'] = `claude:reject ${stage}/${file} functional`;
-      actions['Rework → Implementation'] = `claude:reject ${stage}/${file} implementation`;
+      // The human chooses between WHAT IS WRONG — the thing, or the way. The stage
+      // identifier survives only in the action string, which no human reads, so the
+      // action strings below are byte-identical to what they always were.
+      for (const sb of gateWords.SEND_BACK) {
+        options.push({ label: sb.label, description: sb.description });
+        actions[sb.label] = `claude:reject ${stage}/${file} ${sb.toStage}`;
+      }
     }
-    actions['Approve'] = `stream approve ${ref}`;
+    actions[approveLabel] = `stream approve ${ref}`;
     actions['Check validation'] = `validate ${stage}/${file}`;
     actions['Other'] = `stream comment ${ref}`;
     questions.push({
-      question: `Approve ${stripCtl(slug)} across Gate ${gate.gate}?`,
-      header: `Gate ${gate.gate}`,
+      question: gateWords.question(stage, name),
+      header: gateWords.chip(stage),
       options,
     });
   } else {
     // 3. Not at a gate and nothing precomputed: the plan-lifecycle decision.
     questions.push({
-      question: `What should happen to ${stripCtl(slug)}?`,
-      header: stripCtl(slug),
+      question: `What should happen to ${name}?`,
+      header: name,
       options: [
         { label: 'Discuss', description: 'EXTREME adversarial critique — nothing held back. The most important step.' },
         { label: 'View/Edit', description: 'Show the plan, then edit it' },
@@ -974,7 +997,7 @@ function planDecisionScreen(ref, projectRoot) {
     for (const o of rest.slice(0, 3)) actions[o.label] = o.action;
     actions['Not now'] = '';
     questions.push({
-      question: `Anything else for ${stripCtl(slug)}?`,
+      question: `Anything else for ${name}?`,
       header: 'This plan',
       options,
     });
@@ -1017,10 +1040,10 @@ function sufficiencyLine(d) {
 /** Build the option list; the RECOMMENDED option is placed FIRST (menu convention). */
 function buildOptions(d) {
   const approve = {
-    label: 'Approve',
+    label: d.approveLabel,
     description: d.passesValidation
-      ? 'Recommended — passes validation. Cross the gate now (records approved_by: human).'
-      : 'This plan FAILS validation — approving is refused. Open it first to fix it.',
+      ? 'Recommended — everything checks out. Your answer is recorded as yours.'
+      : 'This plan FAILS its checks — saying yes is refused. Open it first to fix it.',
   };
   const open = {
     label: 'Open the plan',
@@ -1091,14 +1114,14 @@ function gateScreenAt(decisions, index, statusLine, root) {
 
   let text = '';
   if (statusLine) text += `${stripCtl(statusLine)}\n\n`;
-  text += `Topic: ${humanPlanName(d.title, d.slug)}  ·  ${d.gateName} (${d.fromStage} → ${d.toStage})  ·  decision ${index + 1} of ${total}\n`;
+  text += `Topic: ${humanPlanName(d.title, d.slug)}  ·  ${d.moment}  ·  decision ${index + 1} of ${total}\n`;
   text += `${'─'.repeat(40)}\n\n`;
   text += `  ${d.summary}\n\n`;
   text += sufficiencyLine(d);
   text += '\n\n';
 
   const actions = {
-    'Approve': `stream approve ${d.ref}`,
+    [d.approveLabel]: `stream approve ${d.ref}`,
     'Open the plan': `plan ${d.ref}`,
     'Skip for now': `stream skip ${d.ref}`,
     // AskUserQuestion's built-in "Other" free-text path records a comment.
@@ -1109,8 +1132,8 @@ function gateScreenAt(decisions, index, statusLine, root) {
     text,
     ask: {
       questions: [{
-        question: `Approve ${d.slug} across ${d.gateName}?`,
-        header: d.gateName,
+        question: gateWords.question(d.fromStage, humanPlanName(d.title, d.slug)),
+        header: d.chip,
         options: buildOptions(d),
       }],
     },

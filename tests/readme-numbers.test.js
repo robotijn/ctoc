@@ -132,7 +132,7 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
-  it('src/lib/: 107 JS modules at top level (enforcement-liveness.js — the edit protection says when it has stopped running)', () => {
+  it('src/lib/: 108 JS modules at top level (gate-words.js — the vocabulary that keeps a gate number off a screen)', () => {
     // 104 → 105: `src/lib/approval-residency.js` was extracted out of
     // `src/hooks/human-gate-check.js` so `src/lib/plan-coverage.js` could consult the
     // SAME approval predicate — a library may not require a hook, and a second
@@ -145,8 +145,15 @@ describe('Ground truth — project counts (sanity checks)', () => {
     // lifetime entries under a 1000-entry cap and nobody noticed; a guard that
     // has fallen over and reports nothing is indistinguishable from one that is
     // working. This module makes that silence loud.
+    // 107 → 108: `src/lib/gate-words.js`. Screens printed "Gate 3 (review → done)"
+    // at a human, and a gate number is an internal code out of CTOC's own docs —
+    // the reader would need a numbered map of the pipeline in their head to decode
+    // it. This module is the ONE encoding of what each moment IS in plain words
+    // ("nothing is finished until you say so"), per site type. It is one module and
+    // not four inline phrasings for the reason above: four encodings drift, and a
+    // fence over a phrase living in four places cannot say which is canonical.
     // This is the live disk count, raised because the disk changed.
-    assert.equal(countTopLevelJs("src/lib"), 107);
+    assert.equal(countTopLevelJs("src/lib"), 108);
   });
 
   it('src/commands/: 3 slash command specs — menu, push, update (v6.9.32)', () => {

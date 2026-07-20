@@ -8,6 +8,10 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { test, describe, beforeEach, afterEach } = require('node:test');
+const gateWords = require('../src/lib/gate-words.js');
+
+// Re-pointed 2026-07-20: the plan screen says what the MOMENT is, never its number.
+const NO_GATE_NUMBER = /\bgates?\s*[0-9]/i;
 
 describe('Menu Screens Tests', () => {
   let testDir;
@@ -256,37 +260,60 @@ describe('Menu Screens Tests', () => {
     assert.ok(result.actions['Delete'].startsWith('claude:delete'), 'Delete maps to claude:delete');
   });
 
-  test('a gate plan is asked about its gate, and Approve crosses via the gate-safe path', () => {
+  test('a gate plan is asked what the MOMENT is, and the affirmative crosses via the gate-safe path', () => {
     createPlan('functional', 'my-plan');
 
     const result = menuScreens.route(['plan', 'functional/my-plan.md'], testDir);
 
-    assert.match(result.ask.questions[0].question, /Approve my-plan across Gate 1\?/,
-      'the gate question names the gate, replacing "Approve → implementation"');
+    // INVERTED (2026-07-20): was `/Approve my-plan across Gate 1\?/` with the message
+    // "the gate question names the gate". Naming the gate IS the defect the human
+    // rejected; the question now names the MOMENT and the plan by its title.
+    assert.equal(result.ask.questions[0].question, gateWords.question('functional', 'my-plan'));
+    assert.equal(result.ask.questions[0].header, gateWords.chip('functional'));
+    assert.doesNotMatch(result.ask.questions[0].question, NO_GATE_NUMBER,
+      'a gate number must never reach the question a human reads');
     // TIGHTER than the screen it replaces: Approve used to route through `validate`
     // and a second confirm. It now goes straight to the gate-safe `stream approve`
     // (approvePlan — validates, refuses an invalid transition, stamps approved_by).
-    assert.equal(result.actions['Approve'], 'stream approve functional/my-plan.md');
+    assert.equal(result.actions[gateWords.approveLabel('functional')], 'stream approve functional/my-plan.md');
     // The validation detail screen (and its deliberate override) stays reachable.
     assert.equal(result.actions['Check validation'], 'validate functional/my-plan.md');
   });
 
-  test('a review plan keeps Approve, Feedback → Functional and Rework → Implementation', () => {
+  test('a review plan keeps the affirmative and BOTH send-backs, worded by what is wrong', () => {
     createPlan('review', 'reviewed-plan');
 
     const result = menuScreens.route(['plan', 'review/reviewed-plan.md'], testDir);
     const labels = allLabels(result);
 
-    assert.ok(labels.some(l => l.includes('Approve')), 'Should have Approve');
-    assert.ok(labels.some(l => l.includes('Feedback')), 'Should have Feedback');
-    assert.ok(labels.some(l => l.includes('Rework')), 'Should have Rework');
+    // INVERTED (2026-07-20): these three used to be found by the substrings
+    // 'Approve', 'Feedback' and 'Rework'. "Feedback → Functional" and
+    // "Rework → Implementation" print stage-directory names at a human — the same
+    // class of internal vocabulary as the gate number — so the options now name WHAT
+    // IS WRONG (the thing, or the way), from the ONE vocabulary encoding.
+    assert.ok(labels.includes(gateWords.approveLabel('review')), 'the affirmative option is offered');
+    for (const sb of gateWords.SEND_BACK) {
+      assert.ok(labels.includes(sb.label), `the send-back is offered: ${sb.label}`);
+      assert.ok(result.actions[sb.label].startsWith('claude:reject'), 'a send-back rejects');
+    }
     assert.ok(labels.includes('View/Edit'), 'Should have View/Edit');
     assert.ok(!labels.includes('View'), 'View is merged into View/Edit');
 
-    assert.equal(result.actions['Approve'], 'stream approve review/reviewed-plan.md',
-      'Approve → Done now crosses Gate 3 through the gate-safe approvePlan');
-    assert.ok(result.actions['Feedback → Functional'].startsWith('claude:reject'), 'Feedback should reject');
-    assert.ok(result.actions['Rework → Implementation'].startsWith('claude:reject'), 'Rework should reject');
+    // The FENCE: no label a human reads may name a gate number or a raw stage.
+    for (const l of labels) {
+      assert.doesNotMatch(l, NO_GATE_NUMBER, `an option label names a gate number: ${l}`);
+      assert.doesNotMatch(l, /\b(functional|implementation|todo|review)\b/i,
+        `an option label names a raw stage: ${l}`);
+    }
+
+    assert.equal(result.actions[gateWords.approveLabel('review')], 'stream approve review/reviewed-plan.md',
+      'the affirmative still crosses through the gate-safe approvePlan');
+    // The ACTION values keep the stage identifier — no human reads them.
+    const rejects = Object.values(result.actions).filter(v => String(v).startsWith('claude:reject'));
+    assert.deepStrictEqual(rejects.sort(), [
+      'claude:reject review/reviewed-plan.md functional',
+      'claude:reject review/reviewed-plan.md implementation',
+    ], 'the reject action strings are byte-identical to what they always were');
   });
 
   test('"Create new" survives on the stage list, where creating a plan belongs', () => {
@@ -456,16 +483,22 @@ describe('Menu Screens Tests', () => {
     console.log('# validateScreen canvas no autoApprove');
   });
 
-  test('plan route (implementation) STILL offers the Gate 2 crossing (real gate, no regression)', () => {
+  test('the plan route STILL offers the build crossing at a real gate (no regression)', () => {
     createPlan('implementation', 'impl-plan');
 
     const result = menuScreens.route(['plan', 'implementation/impl-plan.md'], testDir);
     const labels = allLabels(result);
-    assert.ok(labels.includes('Approve'), 'implementation is a real human gate — keeps its Approve');
-    assert.match(result.ask.questions[0].question, /Approve impl-plan across Gate 2\?/,
-      'the gate is named outright, replacing the "Approve → todo" label');
-    assert.strictEqual(result.actions['Approve'], 'stream approve implementation/impl-plan.md',
-      'Approve crosses Gate 2 through the gate-safe approvePlan');
+    // INVERTED (2026-07-20): was the literal 'Approve' label and
+    // `/Approve impl-plan across Gate 2\?/` with the message "the gate is named
+    // outright". Naming the gate outright is exactly what the human rejected.
+    assert.ok(labels.includes(gateWords.approveLabel('implementation')),
+      'this is a real human gate — it keeps its affirmative option');
+    assert.equal(result.ask.questions[0].question, gateWords.question('implementation', 'impl-plan'));
+    assert.doesNotMatch(result.ask.questions[0].question, NO_GATE_NUMBER,
+      'the question must never name a gate number');
+    assert.strictEqual(result.actions[gateWords.approveLabel('implementation')],
+      'stream approve implementation/impl-plan.md',
+      'the affirmative crosses through the gate-safe approvePlan');
     assert.strictEqual(result.actions['Check validation'], 'validate implementation/impl-plan.md',
       'the validation detail screen stays reachable at the real gate');
   });
@@ -600,8 +633,10 @@ describe('Menu Screens Tests', () => {
 
     // plan stage/file -> the plan QUESTION (not an actions menu)
     const plan = menuScreens.route(['plan', 'functional/test-plan.md'], testDir);
-    assert.match(plan.ask.questions[0].question, /Approve test-plan across Gate 1\?/,
-      'the plan route asks the gate decision, not "what would you like to do"');
+    // INVERTED (2026-07-20): was `/Approve test-plan across Gate 1\?/`.
+    assert.equal(plan.ask.questions[0].question, gateWords.question('functional', 'test-plan'),
+      'the plan route asks the real decision, not "what would you like to do"');
+    assert.doesNotMatch(plan.ask.questions[0].question, NO_GATE_NUMBER);
     assert.ok(allLabels(plan).includes('View/Edit'), 'View/Edit is still offered');
 
     // The `more` sub-screen is gone; its Delete lives on the plan screen itself.
