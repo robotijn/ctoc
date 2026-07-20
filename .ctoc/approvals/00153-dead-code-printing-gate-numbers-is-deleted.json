@@ -1,9 +1,9 @@
 {
-  "content_sha256": "bb6535518b10eed2756a99dc6a6a6bcbc16bb822378301bec06824a4162b4543",
+  "content_sha256": "f2077ad7729c82ecd0312d0bcd2a5ba25493b5b59d8302f7db51ed61dc0c587e",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-20T09:18:54.014Z",
+  "approved_at": "2026-07-20T19:27:44.980Z",
   "approved_by": "human",
   "plan_basename": "00153-dead-code-printing-gate-numbers-is-deleted"
 }

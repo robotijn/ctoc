@@ -1,9 +1,34 @@
 /**
- * CTOC UI Library
- * Terminal formatting and display utilities
+ * CTOC UI Library — terminal colours and a terminal writer.
+ *
+ * That is the whole module, and it is deliberately that small. Until 2026-07-20 it
+ * also carried five screen builders — `dashboard`, `progress`, `adminDashboard`,
+ * `blocked` and `getPhase` — which were DELETED as unreachable.
+ *
+ * WHY THEY WENT. Nothing in the product called them. The only live requires of this
+ * module are `src/hooks/PreToolUse.Bash.js` (`writeToTerminal`, `colors`) and
+ * `src/hooks/SessionStart.js` (`writeToTerminal`), both static destructurings, so
+ * there was no dynamic route to them either. Their only callers were their own
+ * tests — and a test IS a caller, which is exactly why a green suite certified them
+ * as healthy for years. A module is not done when its test passes; it is done when
+ * a human can reach it, and no human reached these.
+ *
+ * The content confirmed the verdict independently. `blocked` printed
+ * `THE IRON LOOP IS HOLY. IT CANNOT BE BYPASSED.` for an enforcement path that has
+ * long since moved to `src/hooks/PreToolUse.Edit.js`, which writes its own message.
+ * `adminDashboard` rendered a seven-column board whose columns (`BACKLOG`,
+ * `TECHNICAL`, `READY`) are not the pipeline's stages any more. `dashboard` and
+ * `progress` rendered a TWO-gate model for a pipeline that has four. These were not
+ * dormant utilities; they were a previous version of the product, kept alive by
+ * its tests.
+ *
+ * They were also the last place in `src/` where a gate NUMBER reached a screen —
+ * "Gate 1", "Gate 2" — which is CTOC's own internal code, undecodable by the person
+ * reading it. Re-wording them was the obvious move and it would have been wrong: it
+ * produces five correctly-phrased functions no human can reach, and leaves the
+ * impression the wording problem was solved. `tests/ui.test.js` fences both the
+ * absence of the five exports and the absence of any printable gate number here.
  */
-
-const { STEP_NAMES, STEP_DESCRIPTIONS } = require('./state-manager');
 
 // ANSI colors
 const colors = {
@@ -19,174 +44,12 @@ const colors = {
 };
 
 /**
- * Formats the dashboard display
- */
-function dashboard(state, stack, version) {
-  const c = colors;
-  let output = '\n';
-
-  output += `${c.cyan}════════════════════════════════════════════════════════════════${c.reset}\n`;
-  output += `${c.bold}CTOC${c.reset} - CTO Chief v${version}\n`;
-  output += `${c.cyan}════════════════════════════════════════════════════════════════${c.reset}\n\n`;
-
-  output += `  Project: ${stack.project ? require('path').basename(stack.project) : 'Unknown'}\n`;
-  output += `  Stack:   ${stack.languages.join('/') || 'none'}\n`;
-
-  if (stack.frameworks.length > 0) {
-    output += `  Framework: ${stack.frameworks.join(', ')}\n`;
-  }
-
-  output += '\n';
-
-  if (state && state.feature) {
-    const stepInfo = STEP_NAMES[state.currentStep] || 'Unknown';
-    const phase = getPhase(state.currentStep);
-
-    output += `  Feature: ${c.cyan}${state.feature}${c.reset}\n`;
-    output += `  Step:    ${state.currentStep}/16 - ${stepInfo} (${phase})\n`;
-    output += `  Gate 1:  ${state.gate1_approval ? c.green + '✓ Passed' : c.yellow + '○ Pending'}${c.reset}\n`;
-    output += `  Gate 2:  ${state.gate2_approval ? c.green + '✓ Passed' : c.yellow + '○ Pending'}${c.reset}\n`;
-  } else {
-    output += `  ${c.yellow}No feature being tracked${c.reset}\n`;
-    output += `  Use: /ctoc start <feature-name>\n`;
-  }
-
-  output += '\n';
-  return output;
-}
-
-/**
- * Gets the phase for a step number
- */
-function getPhase(step) {
-  if (step <= 1) return 'Ideation';
-  if (step <= 4) return 'Planning';
-  if (step <= 7) return 'Planning';
-  if (step <= 11) return 'Development';
-  return 'Delivery';
-}
-
-/**
- * Formats progress display
- */
-function progress(state) {
-  const c = colors;
-  let output = '\n';
-
-  output += `${c.cyan}Iron Loop Progress${c.reset}\n\n`;
-
-  if (!state || !state.feature) {
-    output += `  ${c.yellow}No feature being tracked${c.reset}\n`;
-    output += '  Use: /ctoc start <feature-name>\n\n';
-    return output;
-  }
-
-  output += `  Feature: ${c.bold}${state.feature}${c.reset}\n\n`;
-
-  const phases = [
-    { name: 'Ideation (1)', steps: [1] },
-    { name: 'Planning (2-7)', steps: [2, 3, 4, 5, 6, 7] },
-    { name: 'Development (8-11)', steps: [8, 9, 10, 11] },
-    { name: 'Delivery (12-16)', steps: [12, 13, 14, 15, 16] }
-  ];
-
-  for (const phase of phases) {
-    output += `  ${c.bold}${phase.name}${c.reset}\n`;
-
-    for (const stepNum of phase.steps) {
-      const stepName = STEP_NAMES[stepNum];
-      const stepDesc = STEP_DESCRIPTIONS[stepNum];
-      const stepStatus = state.steps[stepNum];
-
-      let status;
-      if (stepStatus?.status === 'completed') {
-        status = `${c.green}✓${c.reset}`;
-      } else if (state.currentStep === stepNum) {
-        status = `${c.yellow}▶${c.reset}`;
-      } else {
-        status = `${c.dim}○${c.reset}`;
-      }
-
-      const numStr = String(stepNum).padStart(2);
-      output += `    ${status} ${numStr}. ${stepName.padEnd(10)} ${c.dim}${stepDesc}${c.reset}\n`;
-    }
-
-    output += '\n';
-  }
-
-  // Gates
-  output += `  ${c.bold}Gates${c.reset}\n`;
-  output += `    Gate 1 (after step 4): ${state.gate1_approval ? c.green + '✓ Passed' : c.yellow + '○ Pending'}${c.reset}\n`;
-  output += `    Gate 2 (after step 7): ${state.gate2_approval ? c.green + '✓ Passed' : c.yellow + '○ Pending'}${c.reset}\n\n`;
-
-  return output;
-}
-
-/**
- * Formats the admin dashboard with kanban
- */
-function adminDashboard(kanbanCounts, gitStatus, version) {
-  const c = kanbanCounts;
-  const total = c.backlog + c.functional + c.technical + c.ready + c.building + c.review + c.done;
-
-  const versionPadded = version.padEnd(7);
-
-  return `
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  CTOC ADMIN                                                       v${versionPadded}  ║
-╠═════════╤══════════╤══════════╤═════════╤═════════╤═════════╤════════════════╣
-║ BACKLOG │FUNCTIONAL│TECHNICAL │  READY  │BUILDING │ REVIEW  │     DONE       ║
-║ (draft) │(steps2-4)│(steps5-7)│         │ (8-15)  │ [HUMAN] │                ║
-╠═════════╪══════════╪══════════╪═════════╪═════════╪═════════╪════════════════╣
-║   (${String(c.backlog).padStart(2)})  │   (${String(c.functional).padStart(2)})   │   (${String(c.technical).padStart(2)})   │  (${String(c.ready).padStart(2)})   │  (${String(c.building).padStart(2)})   │  (${String(c.review).padStart(2)})   │     (${String(c.done).padStart(2)})       ║
-╚═════════╧══════════╧══════════╧═════════╧═════════╧═════════╧════════════════╝
-
-Legend (${total} items): Use /ctoc plan for details
-
-Git: ${gitStatus.modified} modified, ${gitStatus.untracked} untracked
-
-Actions:
-  [N] New feature    [R#] Review item #    [V#] View item #
-  [C] Commit         [P] Push              [Q] Queue status
-`;
-}
-
-/**
- * Formats blocked output
- */
-function blocked(reason, state, tool) {
-  const c = colors;
-  const currentStep = state?.currentStep || 1;
-  const stepName = STEP_NAMES[currentStep] || 'Unknown';
-  const featureName = state?.feature || 'No feature';
-
-  let output = '\n';
-  output += '='.repeat(70) + '\n';
-  output += `${c.red}CTOC IRON LOOP - ${tool} BLOCKED${c.reset}\n`;
-  output += '='.repeat(70) + '\n\n';
-
-  output += `Feature: ${featureName}\n`;
-  output += `Current Step: ${currentStep} (${stepName})\n`;
-  output += `Required Step: 8 (TEST)\n\n`;
-
-  output += `${c.yellow}REASON:${c.reset} ${reason}\n\n`;
-
-  output += `${c.cyan}THE IRON LOOP IS HOLY. IT CANNOT BE BYPASSED.${c.reset}\n\n`;
-
-  output += 'TO PROCEED:\n';
-  output += '  1. Complete ideation + planning steps 1-4 (functional plan)\n';
-  output += '  2. Get user approval at Gate 1\n';
-  output += '  3. Complete planning steps 5-7 (technical plan)\n';
-  output += '  4. Get user approval at Gate 2\n';
-  output += '  5. Then Edit/Write operations are allowed (Step 8+)\n';
-
-  output += '\n' + '='.repeat(70) + '\n';
-
-  return output;
-}
-
-/**
- * Write to terminal (stderr for visibility)
+ * Write to terminal (stderr for visibility).
+ *
+ * stderr, not stdout, is load-bearing: both hook callers emit a decision JSON on
+ * stdout, and a human banner written there would corrupt it.
+ *
+ * @param {string} text
  */
 function writeToTerminal(text) {
   process.stderr.write(text);
@@ -194,10 +57,5 @@ function writeToTerminal(text) {
 
 module.exports = {
   colors,
-  dashboard,
-  progress,
-  adminDashboard,
-  blocked,
-  writeToTerminal,
-  getPhase
+  writeToTerminal
 };
