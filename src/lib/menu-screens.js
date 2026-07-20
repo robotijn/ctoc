@@ -581,7 +581,7 @@ function buildDashboardTable(projectPath, opts = {}) {
         out += `  ⛔ ${escalations} circuit-breaker escalation${escalations === 1 ? '' : 's'} — a plan keeps failing and needs you · view: inbox escalations\n`;
       }
       if (deployReady > 0) {
-        out += `  ⊙ ${deployReady} plan${deployReady === 1 ? '' : 's'} deploy-ready — deploy is a separate ship gate · view: inbox escalations\n`;
+        out += `  ⊙ ${deployReady} plan${deployReady === 1 ? '' : 's'} waiting to be deployed — deploying is a separate decision, and it is still yours · view: inbox escalations\n`;
       }
       if (migrationPending > 0) {
         out += `  ⛔ ${migrationPending} plan${migrationPending === 1 ? '' : 's'} would be reverted — approval ledger not migrated · view: inbox migration\n`;
@@ -893,9 +893,13 @@ function inboxDecisionsScreen(projectPath) {
 }
 
 /**
- * Read the deploy-ready notices written by `actions.recordDeployReadyNotice` at
- * Gate 3 (a plan approved review → done is DEPLOY-READY, but deploy is a SEPARATE
- * human ship gate, so the pipeline records a notice instead of deploying).
+ * Read the deploy-ready notices written by `actions.recordDeployReadyNotice` when a
+ * human calls a plan finished (review → done, Gate 3 in the pipeline's own terms).
+ * Calling work finished does NOT imply shipping it: deploying is a second, separate
+ * human decision, so the pipeline records a notice instead of deploying.
+ *
+ * The number in this comment is fine — comments are exempt. What the human READS is
+ * not: see the rendered line below, which says the moment in plain words.
  *
  * R3-D: that writer claimed "the menu/inbox surface reads this log" and NO reader
  * existed — a claim with no reader is a lie. This is the reader. Fail-open: a
@@ -961,7 +965,8 @@ function inboxEscalationsScreen(projectPath) {
   }
 
   if (deploys.length > 0) {
-    text += `\n  Deploy-ready (${deploys.length}) — approved at Gate 3; deploy is a SEPARATE human ship gate\n`;
+    text += `\n  Waiting to be deployed (${deploys.length}) — you called these finished. `
+      + 'Deploying them is a separate decision, and it is still yours.\n';
     for (const d of deploys.slice(0, INBOX_DOOR_MAX_ROWS)) {
       const plan = stripCtl(String(d.plan || '(unknown plan)'));
       const age = stripCtl(_inboxAge(d.at));
@@ -2333,8 +2338,13 @@ function taskComplete(root, rest) {
 
   let text = `Task ${id} → done`;
   if (completion && completion.ran && completion.newPath) {
-    const verified = completion.verify ? (completion.verify.passed ? 'VERIFY passed' : 'VERIFY FAILED') : 'no verify';
-    text += ` · plan → review (${verified}; evidence recorded for Gate 3)`;
+    // The words a person reads, not the pipeline's own vocabulary: no gate number,
+    // no step name ("VERIFY"), no stage-to-stage arrow. The VERDICT survives intact —
+    // re-wording a status line must never cost the reader the fact it carried.
+    const verified = completion.verify
+      ? (completion.verify.passed ? 'the checks passed' : 'the checks FAILED')
+      : 'no checks were run';
+    text += ` · moved to review (${verified}; the evidence is saved for when you decide it’s finished)`;
   } else if (completion && completion.ran === false) {
     text += ` · ${stripCtl(String(completion.reason))}`;
   }
