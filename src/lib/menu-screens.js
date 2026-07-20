@@ -30,7 +30,10 @@ const { getInboxCounts, listStaleCandidates, listQuestions, listDecisions, listP
 // boundary. inboxVerifyProposals is the SOLE call site of verifyStaleCandidate.
 const staleDetector = require('./stale-detector');
 const { validateTransition } = require('./plan-validator');
-const { findProjectRoot } = require('./project-root');
+// Namespace import as well as the destructured helper: the disclosure line calls
+// describeProjectRoot through the module object so there is one resolution seam.
+const projectRootLib = require('./project-root');
+const { findProjectRoot } = projectRootLib;
 // NB2: the background-task registry (fs choke point via safe-fs) + its pure view.
 const taskRegistry = require('./task-registry');
 const taskView = require('./task-view');
@@ -145,6 +148,44 @@ const HUMAN_GATES = {
  */
 function getProjectPath(projectPath) {
   return projectPath || findProjectRoot();
+}
+
+/**
+ * The dashboard's disclosure line: WHICH project did this open?
+ *
+ * The root walk is a rule, and a rule has edges. The backstop is disclosure — when the
+ * resolved root is not the directory the human is standing in, the header says so. That
+ * is what turns "I opened a fresh repository and was shown a plan I never wrote" from a
+ * mystery into five seconds of reading.
+ *
+ * Two guards:
+ *  - The path is RELATIVE (`../..`), never absolute. An absolute path prints the user's
+ *    directory layout onto a screen that gets pasted into issues and chat.
+ *  - The line renders ONLY when `root` IS the ambient resolution from the working
+ *    directory. A caller that injects an explicit `projectPath` (every test, and the
+ *    task/verify surfaces) is not describing where the human is standing, so claiming
+ *    "you opened a different project" would be false — and a header that names the wrong
+ *    root is a worse defect than the one this exists to disclose.
+ *
+ * @param {string} root - The project root actually being rendered
+ * @returns {string} The disclosure line (newline-terminated), or '' when silent
+ */
+function renderRootDisclosure(root) {
+  try {
+    const where = projectRootLib.describeProjectRoot(process.cwd());
+    if (where.sameAsCwd) return '';
+    if (path.resolve(String(root)) !== where.root) return '';
+    const rel = path.relative(where.cwd, where.root);
+    if (!rel) return '';
+    return `Working in ${stripCtl(rel)}  —  opened from this directory's parent project\n`;
+  } catch (err) {
+    // Absorbed: the working directory could not be read (a deleted cwd) or the relative
+    // path could not be computed. Silence here is not a claim that the root IS the
+    // working directory — it is the absence of a claim, which is the only honest output
+    // when the comparison could not be made. The dashboard still renders.
+    void err;
+    return '';
+  }
 }
 
 /**
@@ -418,6 +459,7 @@ function buildDashboardTable(projectPath, opts = {}) {
 
   let out = '';
   out += `CTOC v${version}\n`;
+  out += renderRootDisclosure(root);
   out += `${'─'.repeat(60)}\n\n`;
 
   // Render 3 sections (A2 / v7) — Business / Implementation / Execution.

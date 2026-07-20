@@ -149,23 +149,47 @@ describe('project-root.js', () => {
     assert.equal(projectRoot.findProjectRoot(nested), tmpRoot);
   });
 
-  test('.ctoc takes priority over a deeper .git when both are present', () => {
-    // .ctoc at the parent, a WEAKER marker (.git) in a child. `.ctoc` is the
-    // authoritative CTOC-root marker (documented priority 1) and must win ACROSS
-    // levels — a nested .git/package.json (a common monorepo subpackage) must NOT
-    // shadow the ancestor .ctoc root (that mis-rooting was the confirmed defect).
+  test('a child .git ENDS the climb — it is its own root, not the ancestor .ctoc', () => {
+    // REVERSED DECISION (owner's ruling, 2026-07-20). This test previously asserted the
+    // OPPOSITE — that an ancestor `.ctoc` wins over a child's own `.git` — and its
+    // comment called the behaviour now installed here "the confirmed defect". That was a
+    // deliberate decision and it has been deliberately reversed by the owner on
+    // evidence. It is NOT an oversight and must not be "restored".
+    //
+    // WHY IT CHANGED. Treating `.git` as a weak marker meant a fresh git repository
+    // created beneath a CTOC project could never BECOME a CTOC project: resolution
+    // climbed past it to the ancestor, setup saw a configuration directory already
+    // present and did nothing while claiming it had initialised, and the human was shown
+    // the ancestor's pipeline and plans.
+    //
+    // THE EVIDENCE THAT DECIDED IT. The owner hit exactly this in a real fresh
+    // repository and was offered an approval decision on a plan he never wrote. It is
+    // reproduced from a fixture as case 14 of
+    // tests/fresh-repository-is-its-own-project.test.js, where a real
+    // `node src/commands/menu.js` in an empty nested repository printed
+    // `"Approve": "stream approve review/discuss-suggestion-with-editor.md"` — the
+    // PARENT project's plan.
+    //
+    // THE COST THE OWNER ACCEPTED: a nested service repository or git submodule inside a
+    // CTOC project no longer inherits the parent's setup and must be initialised itself.
+    // Weighed and accepted — being shown another project's plans is the worse failure.
+    //
+    // The reversal is scoped to `.git`. `.ctoc` remains authoritative over the weak
+    // markers the two-pass design was written about (`package.json`, `CLAUDE.md`), and a
+    // repository root that CARRIES `.ctoc` is still the root, because the boundary
+    // directory is examined before the climb stops.
     fs.mkdirSync(path.join(tmpRoot, '.ctoc'), { recursive: true });
-    // Make the ancestor .ctoc a genuine project root (settings present), not the bare
-    // crypto-home shape — otherwise it correctly no longer qualifies as a CTOC root.
+    // A genuine project root (settings present), not the bare crypto-home shape.
     fs.writeFileSync(path.join(tmpRoot, '.ctoc', 'settings.yaml'), 'enforcement:\n  mode: strict\n');
     const child = path.join(tmpRoot, 'child');
     fs.mkdirSync(path.join(child, '.git'), { recursive: true });
-    // From the child, the ancestor .ctoc wins over the child's own .git.
-    assert.equal(projectRoot.findProjectRoot(child), tmpRoot);
-    // One level deeper: still the .ctoc ancestor.
+    // From the child, its own repository boundary wins over the ancestor .ctoc.
+    assert.equal(projectRoot.findProjectRoot(child), child);
+    // One level deeper: still the child repository — the boundary is inherited downward,
+    // so everything inside the nested repository belongs to the nested repository.
     const deeper = path.join(child, 'inner');
     fs.mkdirSync(deeper, { recursive: true });
-    assert.equal(projectRoot.findProjectRoot(deeper), tmpRoot);
+    assert.equal(projectRoot.findProjectRoot(deeper), child);
   });
 
   test('findProjectRoot falls back to cwd when no markers exist up the tree', () => {
