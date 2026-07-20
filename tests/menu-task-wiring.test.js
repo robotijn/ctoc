@@ -728,7 +728,23 @@ describe('R3-D — inbox escalations door', () => {
       { plan: 'shipme.md', at: '2026-07-14T09:00:00.000Z', status: 'deploy-ready', message: 'awaiting the deploy ship gate' },
     ], null, 2));
     const dash = ms.buildDashboardTable(root);
-    assert.match(dash, /deploy-ready/i, 'the dashboard surfaces the deploy-ready notice');
+
+    // INVERTED (was `assert.match(dash, /deploy-ready/i)`). "deploy-ready" is the
+    // pipeline's own word for the moment; matching on it pinned the internal
+    // vocabulary as the contract. What D3 actually proves is that the notice is
+    // READ and SURFACED — so the assertion is now that a deploy line exists and
+    // carries the human's sentence, and that neither a gate number nor a raw
+    // stage-directory name has come back onto it.
+    const deployLine = dash.split('\n').find((l) => /deploy/i.test(l));
+    assert.ok(deployLine, `the dashboard must surface the notice:\n${dash}`);
+    assert.match(deployLine, /still yours/, `the line must say whose decision deploying is: ${deployLine}`);
+    assert.doesNotMatch(deployLine, /\bgates?\s*[0-9]/i, `a gate NUMBER reached a human: ${deployLine}`);
+    assert.doesNotMatch(deployLine, /ship gate/i, `"ship gate" is jargon a reader cannot decode: ${deployLine}`);
+    assert.doesNotMatch(
+      deployLine, /\b(functional|implementation|todo|in-progress)\b/i,
+      `a raw stage-directory name reached a human: ${deployLine}`
+    );
+
     const screen = ms.route(['inbox', 'escalations'], root);
     assert.match(screen.text, /shipme/, 'the door lists the deploy-ready plan');
   });
@@ -736,7 +752,15 @@ describe('R3-D — inbox escalations door', () => {
   it('D4: a project with NO escalations and NO deploy notices adds ZERO output (no regression)', () => {
     const dash = ms.buildDashboardTable(root);
     assert.ok(!/escalation/i.test(dash), 'no escalation line when there are none');
-    assert.ok(!/deploy-ready/i.test(dash), 'no deploy line when there are none');
+
+    // WAS VACUOUS: `assert.ok(!/deploy-ready/i.test(dash))`. After the re-word the
+    // dashboard says "waiting to be deployed", so "deploy-ready" appears nowhere and
+    // the assertion could never fail — proof-shaped, but proving nothing. The dead
+    // pattern is kept HERE, in a comment, so nobody re-adopts it as a live check.
+    //
+    // The real property: with zero notices, NO deploy line renders at all. Asserted
+    // against the word that is actually on the line today, so it can genuinely fail.
+    assert.ok(!/deploy/i.test(dash), `no deploy line when there are none:\n${dash}`);
     assert.match(dash, /Inbox clear/, 'a fresh project still reads "Inbox clear"');
   });
 

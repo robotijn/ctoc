@@ -238,7 +238,24 @@ describe('buildDashboardTable — inbox count wiring (each count names its door)
     const out = menu.buildDashboardTable(root);
 
     assert.match(out, /1 circuit-breaker escalation .* view: inbox escalations/);
-    assert.match(out, /1 plan deploy-ready .* view: inbox escalations/);
+
+    // INVERTED (was `/1 plan deploy-ready .* view: inbox escalations/`). That
+    // assertion pinned the DEFECT as the contract: "deploy-ready" is the pipeline's
+    // own vocabulary, and the line it guarded also read "deploy is a separate ship
+    // gate". The contract is the rule, not the old string — a screen says what the
+    // MOMENT IS, in plain words, never its number and never a stage-directory name.
+    // The count must still name its door (a count with no door is the original bug),
+    // so BOTH halves are asserted: the door survives, the jargon cannot come back.
+    const deployLine = out.split('\n').find((l) => /deploy/i.test(l));
+    assert.ok(deployLine, `expected a deploy count line on the dashboard:\n${out}`);
+    assert.match(deployLine, /view: inbox escalations/, `the count must still name its door: ${deployLine}`);
+    assert.match(deployLine, /still yours/, `the line must say whose decision deploying is: ${deployLine}`);
+    assert.doesNotMatch(deployLine, /\bgates?\s*[0-9]/i, `a gate NUMBER reached a human: ${deployLine}`);
+    assert.doesNotMatch(deployLine, /ship gate/i, `"ship gate" is jargon a reader cannot decode: ${deployLine}`);
+    assert.doesNotMatch(
+      deployLine, /\b(functional|implementation|todo|in-progress)\b/i,
+      `a raw stage-directory name reached a human: ${deployLine}`
+    );
   });
 
   test('possibly_stale_count_appears_only_for_an_actionable_candidate', () => {
@@ -470,7 +487,18 @@ describe('inbox escalations & deploy-ready door', () => {
     for (let i = 0; i < 21; i++) many.push({ plan: `d${i}`, at: iso(0), message: 'm' });
     writeDeployReady(root, many);
     const r = menu.route(['inbox', 'escalations'], root);
-    assert.match(r.text, /Deploy-ready \(21\)/);
+    // INVERTED (was `/Deploy-ready \(21\)/`). What this case exists to prove is the
+    // SECTION + the CAP, not the heading's exact words; pinning the heading made a
+    // copy edit look like a behaviour change while letting the jargon stand. The
+    // count is asserted on the section line itself, which must carry no gate number
+    // and no stage name.
+    const section = r.text.split('\n').find((l) => /^ {2}\S/.test(l) && /deploy/i.test(l) && /\(21\)/.test(l));
+    assert.ok(section, `expected the deploy-ready section line with its count:\n${r.text}`);
+    assert.doesNotMatch(section, /\bgates?\s*[0-9]/i, `a gate NUMBER reached a human: ${section}`);
+    assert.doesNotMatch(
+      section, /\b(functional|implementation|todo|in-progress)\b/i,
+      `a raw stage-directory name reached a human: ${section}`
+    );
     assert.match(r.text, /… and 1 more/);
   });
 
@@ -478,7 +506,21 @@ describe('inbox escalations & deploy-ready door', () => {
     const root = mkProject();
     writeDeployReady(root, '{}'); // parses, not an array → readDeployReady returns []
     const r = menu.route(['inbox', 'escalations'], root);
-    assert.doesNotMatch(r.text, /Deploy-ready/);
+
+    // WAS VACUOUS: `assert.doesNotMatch(r.text, /Deploy-ready/)`. Once the section
+    // heading was re-worded, "Deploy-ready" existed nowhere in the codebase, so the
+    // assertion could never fail — it looked like proof while proving nothing. That
+    // is the same defect as a search whose output was truncated: a verdict reported
+    // on input never received. The dead pattern is kept HERE, in a comment, so
+    // nobody re-adopts it as a live assertion.
+    //
+    // The real property: a non-array log yields ZERO notices, so the notice SECTION
+    // must not render at all. Asserted positively (the empty-state message is the
+    // one thing that must be there) and negatively against the CURRENT heading,
+    // which does exist and therefore can actually fail.
+    assert.match(r.text, /No circuit-breaker escalations/, `the door must still render its empty state:\n${r.text}`);
+    assert.doesNotMatch(r.text, /Waiting to be deployed/, `a non-array log must render NO deploy section:\n${r.text}`);
+    assert.doesNotMatch(r.text, /^ {2}\S.*\(\d+\).*deploy/im, `no deploy section line may render:\n${r.text}`);
   });
 });
 
