@@ -377,3 +377,207 @@ file and the exact change, and ask.
    this repository are all marked MEASURE. The defect itself is marked derived from
    reading and **required to be confirmed or refuted at Step 8**, with refutation
    reported plainly rather than defended.
+
+## Execution Record
+
+All steps 8–16 executed. Files changed:
+
+- `src/lib/real-path-confinement.js` — the `dangling` branch on the `ENOENT` path; a new
+  internal `resolveBasis` for strict root resolution; the header's missing-path paragraph
+  corrected; `'dangling'` added to the reason vocabulary.
+- `tests/a-dangling-link-is-not-a-path-inside-the-tree.test.js` — CREATED, 14 cases.
+- `CLAUDE.md` — count ratchet only, 437 → 438 test files, in two places, measured live.
+- `tests/readme-numbers.test.js` — NOT changed. Its live-disk equality is on `src/lib`
+  (106 modules, unchanged by this slice), so nothing tripped and nothing was touched.
+
+### Step 8: TEST — TDD RED, recorded verbatim BEFORE any src/ change
+
+`node --test tests/a-dangling-link-is-not-a-path-inside-the-tree.test.js`:
+`tests 14 · suites 1 · pass 6 · fail 8 · cancelled 0 · skipped 0 · todo 0`
+
+RED as planning derived: case 1, case 2, case 3, case 5, case 13, case 14.
+RED and NOT predicted: **case 10** (see the surprise below) and case 12 (a permission
+fault on `lstat` — it could not reach the fail-open catch because nothing on either
+path called `lstat` at all).
+GREEN already, and still green after the fix: case 4, case 6, case 7, case 8, case 9,
+case 11.
+
+Case 2 — the ledger claim — was **CONFIRMED, not refuted**: `resolvesUnder('src/anywhere',
+'.ctoc/approvals', root)` returned `false` for a link pointing at a not-yet-forged
+approval entry, i.e. the write that mints the forged record was reported as an ordinary
+source write. Case 13 actual: `{ plan: 'todo/p-link', stage: 'todo', glob: 'link' }` where
+`null` was required. Case 14 actual: the real spawned hook emitted no deny at all.
+
+**The errno, MEASURED rather than assumed** — darwin 25.5.0, Node v24.14.1:
+`realpathSync` on a dangling link throws `ENOENT` (`syscall: 'stat'`), identical to a
+genuinely absent path; `lstatSync` on the same path SUCCEEDS with
+`isSymbolicLink() === true`, and on a genuinely absent path throws `ENOENT`. So `lstat`
+separates the two facts exactly as the plan required, and the fix fires. The same
+`ENOENT` is returned for a dangling link in the middle of a path (`dlink/x.js`).
+
+### THE SURPRISE — a second silent allow in the same walk, not predicted by the plan
+
+The plan's pathological table states "the root itself unresolvable → `escapes: true` →
+DENY the whole call". **That row was FALSE in the shipped code.** Measured:
+
+```
+escapesRoot('src/x.js', '/tmp/ctoc-absent-99999/nope')  →  {"escapes":false,"reason":null}
+resolvesUnder('x.json', '.ctoc/approvals', <same>)      →  false
+```
+
+Both predicates PERMITTED. The cause is the same ancestor walk: an unresolvable root has
+no nearest existing ancestor worth anchoring to, so the walk SYNTHESISED a fictional root
+out of whatever real directory lay above it, and the target — equally non-existent,
+walking up through the same fiction — compared as INSIDE it. The sibling slice's own
+case 12 passed over this: it asserted `findCoveringPlan` returned `null`, which it did,
+but only because a non-existent directory contains no plans to match. The predicate
+itself never denied. Fixed here by resolving a comparison BASIS strictly, with no walk.
+
+### Step 9: PREPARE — measured, not assumed
+
+Symbolic links in this repository outside `node_modules/` and `.git/`: **ZERO**, so
+dangling links outside those directories are necessarily zero too. The over-refusal in
+Decision 1 therefore costs nothing measurable here, and nothing had to be reported to the
+human before Step 10.
+
+Extra `lstat` calls for a single new-file `Write`, COUNTED by instrumenting `safe-fs`:
+
+| shape | extra lstat |
+|---|---|
+| new file whose parent exists (tail depth 1) | **1** |
+| the same with a `..` segment | 1 |
+| tail depth 5 (`a/b/c/d/new.js`) | 5 |
+| an EXISTING target | **0** |
+
+Bounded exactly by the depth of the missing tail, and zero on the existing-path branch —
+confirming the placement inside the `ENOENT` branch only.
+
+### Step 12: OPTIMIZE — all six timing numbers, measured on the real repository
+
+200 iterations after 20 warm-up, `findCoveringPlan`, before and after, by installing the
+pre-fix module in a controlled window and restoring a byte-identical copy (verified with
+`diff`).
+
+| target | BEFORE | AFTER |
+|---|---|---|
+| existing covered target | 1.114 ms/call | **1.101 ms/call** |
+| non-existent target (the `Write` ancestor-walk path) | 1.026 ms/call | **1.014 ms/call** |
+| uncovered target | 1.077 ms/call | **1.051 ms/call** |
+
+The added cost is inside run-to-run noise — at most a few hundredths of a millisecond,
+roughly 100× under the 10 ms budget, and it falls only on the missing-path branch.
+
+### Step 13: SECURE — the re-attack, by hand, against the built code
+
+| attack | verdict |
+|---|---|
+| dangling link AT the target | `{"escapes":true,"reason":"dangling"}` |
+| dangling link in the MIDDLE of the path | `{"escapes":true,"reason":"dangling"}` |
+| CHAINED — `a → b`, `b → <absent>` | `{"escapes":true,"reason":"dangling"}` |
+| ledger via a link at a not-yet-forged entry | `resolvesUnder` → `true` (DENY) |
+| ledger via a live directory link + a new entry | `true` (DENY) |
+| ledger via a PARENT link + a new entry | `true` (DENY) |
+| genuinely absent new file (the CONTROL) | `{"escapes":false}` — permitted |
+| NUL byte | `{"escapes":true,"reason":"resolve-failed"}` |
+| unresolvable root | `{"escapes":true,"reason":"root-resolve-failed"}` |
+| link LOOP | `{"escapes":true,"reason":"loop"}` |
+| `ENOTDIR` (a file where a directory is expected) | `{"escapes":true}` |
+| permission fault on the `lstat` itself | DENY both directions, `assert.doesNotThrow` |
+
+Every one RETURNED. No throw anywhere: a throw reaches `PreToolUse.Edit.js`'s fail-OPEN
+catch and becomes an ALLOW, which is the defect this module exists to prevent.
+
+The deny path leaks nothing: `plan-coverage` discards the reason and returns
+`{ ok: true, match: null }`, `resolvesUnder` returns a bare boolean. No absolute paths,
+no file contents, no stack traces, no errno objects cross the boundary. The link's
+CONTENTS are never read — detection is `lstat`, never `readlink`.
+
+**PROBED AND REPORTED, NOT FIXED — the check-then-write race is real and demonstrated:**
+
+```
+1. hook resolves      -> {"escapes":false,"reason":null} (permitted)
+   <attacker creates a dangling link at that exact path>
+2. write landed at    -> OUTSIDE the repository
+3. re-resolving NOW   -> {"escapes":true,"reason":"outside-root"} (would deny)
+```
+
+The resolution is a point-in-time answer. No in-process hook can close this; it stands as
+a residual, now backed by evidence rather than by assertion.
+
+## Verification Evidence
+
+Targeted run — the new file plus the 14 suites the plan names, plus both reachability
+fences: `tests 343 · pass 343 · fail 0 · skipped 0`.
+
+Full gated run, `npm test`, verbatim:
+
+```
+ℹ tests 10229
+ℹ suites 1762
+ℹ pass 10229
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+[CTOC test-gate] coverage 99.04% (threshold 99%), skipped 0, failed 0
+[CTOC test-gate] PASS
+```
+
+The floor stayed at **99** — not lowered, not raised. No whitelist entry was added
+anywhere. `real-path-confinement.js` measures 96.15% line coverage; the four uncovered
+regions are the documented-unreachable ones (the post-`MAX_ANCESTOR_WALK` return and the
+three outermost `catch` blocks, which are second, independent bounds whose whole purpose
+is that nothing reaches them). Rather than fake a hit, one genuinely reachable new branch
+was pinned instead: a root that is itself a link LOOP, asserted to return
+`reason: 'root-loop'`.
+
+`npx eslint --max-warnings 0` clean on both changed JavaScript files.
+`npx tsc --noEmit -p .` clean.
+
+**The pipeline still runs.** All **82** declared globs across every plan in `todo/` and
+`in-progress/` still resolve to an approved covering plan through `findCoveringPlan`;
+**zero** were denied. A wrong root resolution would have denied all 82.
+
+## Step 16 Final-Review Report
+
+The defect is confirmed and closed, and planning's ledger claim is confirmed rather than
+refuted: a link pointing at a not-yet-forged approval record was reported as an ordinary
+source path, and the real spawned hook now denies it. One material surprise was found
+beyond the plan — an unresolvable root PERMITTED on both predicates, a second silent
+allow with the same root cause, fixed here.
+
+What this does NOT fix, restated: the Bash channel is untouched and an agent can still
+create the link; `isWhitelisted` remains pure arithmetic and reaches outside the tree
+through a link; hard links stay invisible to real-path resolution; the check-then-write
+race is open and now demonstrated rather than assumed; every other pure-arithmetic path
+check in the codebase is untouched; and an in-tree dangling link is now REFUSED, which is
+a deliberate behaviour change whose reasoning is Decision 1.
+
+## Decisions Taken Under Ambiguity
+
+7. **The plan CONTRADICTED ITSELF on a failing `lstat`, and the contradiction was
+   resolved by splitting on the errno.** The pathological table says "lstat itself fails
+   on the ENOENT branch → `resolve-failed` → DENY"; Decision 3 says a failing `lstat`
+   CONTINUES the walk. Both are right about different faults. `lstat` throwing `ENOENT`
+   means the entry is GENUINELY absent — the ordinary new-file case — and continues the
+   walk, because denying there would deny every `Write`. `lstat` throwing anything else
+   (`EACCES`, `ELOOP`, `ENOTDIR`, a `validatePath` TypeError) is a fault we cannot see
+   through and DENIES with `resolve-failed`. Written at the branch so it is not "tidied"
+   into one behaviour later.
+8. **A comparison BASIS is resolved strictly, by a new internal `resolveBasis`, with no
+   ancestor walk.** This is the fix for the unpredicted surprise above. It is not
+   exported — `tests/export-reachability.test.js` fails an export whose only caller is a
+   test, and its two callers are both in this module.
+9. **The PROTECTED DIRECTORY keeps the walking resolver, unlike the root.** A project
+   that has never minted an approval has no `.ctoc/approvals` directory yet, and
+   requiring one to exist would deny every write in such a project. Its tail is anchored
+   to a root already proved real, and a DANGLING protected path still refuses through the
+   existing `!ok` branch.
+10. **`tests/readme-numbers.test.js` was declared but NOT touched.** Its live-disk
+    equality is on `src/lib` (106 modules), which this slice does not change. Only
+    `CLAUDE.md`'s test-file count moved, 437 → 438, in the two places it appears.
+    Declaring a file is permission to touch it, not an obligation.
+11. **The fixture root is reached through an EXPLICIT link in case 13**, not through the
+    platform's own tmpdir link, so the root-resolution trap is exercised deterministically
+    on Linux and Windows and the case is not vacuous off macOS. This carries forward the
+    sibling slice's Decision 15.
