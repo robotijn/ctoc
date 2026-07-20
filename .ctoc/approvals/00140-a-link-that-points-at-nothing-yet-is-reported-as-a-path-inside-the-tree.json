@@ -1,0 +1,9 @@
+{
+  "content_sha256": "eacb966d28fd8829dec4479bd6e112e48111795ded4d8205dab6affd4f90e1f4",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-20T08:40:32.390Z",
+  "approved_by": "human",
+  "plan_basename": "00140-a-link-that-points-at-nothing-yet-is-reported-as-a-path-inside-the-tree"
+}

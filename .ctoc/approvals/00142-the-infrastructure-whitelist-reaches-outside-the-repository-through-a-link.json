@@ -1,0 +1,9 @@
+{
+  "content_sha256": "c213eea234d9570dbf30cc91d4162d96a0e65203ee663ae412de0e0cda0d5d1a",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-20T08:40:32.442Z",
+  "approved_by": "human",
+  "plan_basename": "00142-the-infrastructure-whitelist-reaches-outside-the-repository-through-a-link"
+}

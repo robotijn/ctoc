@@ -1,0 +1,9 @@
+{
+  "content_sha256": "bbc908c5a0a5a614dd06a5006205493adb12b9488d591a66ddfa74a15169039a",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-20T08:40:32.418Z",
+  "approved_by": "human",
+  "plan_basename": "00141-the-bash-channel-reaches-the-approval-ledger-through-a-link-and-blocking-the-link-command-would-not-stop-it"
+}
