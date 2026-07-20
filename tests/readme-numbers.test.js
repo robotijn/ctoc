@@ -132,7 +132,7 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
-  it('src/lib/: 106 JS modules at top level (real-path-confinement.js — the ONE encoding of where a path really leads)', () => {
+  it('src/lib/: 107 JS modules at top level (enforcement-liveness.js — the edit protection says when it has stopped running)', () => {
     // 104 → 105: `src/lib/approval-residency.js` was extracted out of
     // `src/hooks/human-gate-check.js` so `src/lib/plan-coverage.js` could consult the
     // SAME approval predicate — a library may not require a hook, and a second
@@ -141,8 +141,12 @@ describe('Ground truth — project counts (sanity checks)', () => {
     // protected-directory guards were pure path ARITHMETIC, which cannot see a
     // symbolic link; both now share one real-path predicate, for the same
     // two-encodings-diverge reason.
+    // 106 → 107: `src/lib/enforcement-liveness.js`. The enforcement log held 24
+    // lifetime entries under a 1000-entry cap and nobody noticed; a guard that
+    // has fallen over and reports nothing is indistinguishable from one that is
+    // working. This module makes that silence loud.
     // This is the live disk count, raised because the disk changed.
-    assert.equal(countTopLevelJs("src/lib"), 106);
+    assert.equal(countTopLevelJs("src/lib"), 107);
   });
 
   it('src/commands/: 3 slash command specs — menu, push, update (v6.9.32)', () => {

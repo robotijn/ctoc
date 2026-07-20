@@ -12,16 +12,62 @@
 
 const safeFs = require('../lib/safe-fs');
 const path = require('path');
-const { c, line, renderFooter } = require('../lib/tui');
+const { c, line, renderFooter, stripCtl } = require('../lib/tui');
 const toolsTab = require('../tabs/tools');
 
 function fileSize(filePath) {
   try { return safeFs.statSync(filePath).size; } catch { return 0; }
 }
 
+/**
+ * Render the edit-protection verdict block that REPLACED the enforcement log's
+ * byte count.
+ *
+ * The line this replaced (`Enforcement  4821 bytes  .ctoc/logs/enforcement.json`)
+ * was rendered faithfully and was perfectly ACCURATE — and it answered no
+ * question a human has. It read exactly the same on a project whose protection
+ * had been dead for three days, which is the project it was being rendered on
+ * when this was written. An accurate number that carries no meaning to the
+ * reader is this repository's false-green shape in its other form.
+ *
+ * FAIL-OPEN IN SHAPE, NEVER FAIL-QUIET IN CONTENT. The require is LAZY and
+ * guarded so a broken check cannot take the whole screen down — but the catch
+ * renders the `unknown` text, never the old byte count and never nothing.
+ * Falling back to the byte count on error would restore the exact silence this
+ * removes, at the precise moment it matters most.
+ *
+ * @param {string} root - project root
+ * @returns {string} the rendered block
+ */
+function renderEditProtection(root) {
+  let described;
+  try {
+    const liveness = require('../lib/enforcement-liveness');
+    described = liveness.describeProtection(liveness.protectionLiveness(root));
+  } catch {
+    described = {
+      heading: 'Edit protection',
+      lines: [
+        'Cannot tell — CTOC could not read its own record (.ctoc/logs/enforcement.json).',
+        'Treat protection as OFF until this reads clean.'
+      ],
+      severity: 'alarm'
+    };
+  }
+
+  const tone = described.severity === 'alarm'
+    ? c.red
+    : (described.severity === 'warn' ? c.yellow : c.green);
+
+  let block = `  ${c.bold}${stripCtl(described.heading)}${c.reset}\n`;
+  for (const l of described.lines) {
+    block += `    ${tone}${stripCtl(l)}${c.reset}\n`;
+  }
+  return block + '\n';
+}
+
 function render(app) {
   const root = app.projectPath || process.cwd();
-  const enforcementLog = path.join(root, '.ctoc', 'logs', 'enforcement.json');
   const gateViolations = path.join(root, '.ctoc', 'logs', 'gate-violations.json');
   const cleanupLog = path.join(root, '.ctoc', 'logs', 'cleanup.json');
 
@@ -33,8 +79,9 @@ function render(app) {
   out += `    ${c.cyan}u${c.reset}  Update      — check for CTOC updates\n`;
   out += `    ${c.cyan}s${c.reset}  Settings    — configure CTOC\n\n`;
 
+  out += renderEditProtection(root);
+
   out += `  ${c.bold}Logs${c.reset}\n`;
-  out += `    Enforcement     ${fileSize(enforcementLog).toString().padStart(8)} bytes  ${c.dim}.ctoc/logs/enforcement.json${c.reset}\n`;
   out += `    Gate violations ${fileSize(gateViolations).toString().padStart(8)} bytes  ${c.dim}.ctoc/logs/gate-violations.json${c.reset}\n`;
   out += `    Cleanup         ${fileSize(cleanupLog).toString().padStart(8)} bytes  ${c.dim}.ctoc/logs/cleanup.json${c.reset}\n\n`;
 
