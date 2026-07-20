@@ -1,5 +1,11 @@
 ---
 approved_by: human
+approved_at: 2026-07-20T09:39:54.720Z
+gate_crossed: implementation → todo
+---
+
+---
+approved_by: human
 approved_at: 2026-07-20T08:40:32.419Z
 gate_crossed: implementation → todo
 ---
@@ -119,6 +125,21 @@ message shape and no new failure mode. That is deliberate: introducing a fifth o
 into this hook to say "whitelisted but outside" would be a new thing to get wrong for
 no gain.
 
+### THE DENIAL SLOT — this plan is NOT a writer, deliberately
+
+Three plans in this repair program write into `plan-coverage.scanForCoverage`'s single
+`denial` slot: the shipped unapproved-plan branch, `00126` (`unanchored-declaration`)
+and `00129` (`not-building`). **The canonical ranking rule for that slot is defined in
+`00126` under "THE DENIAL SLOT"** — reason severity first, glob specificity as a
+tiebreak within a reason — and every writer references it rather than restating it.
+
+**This plan adds no reason and writes no denial**, per Decision 1 above and below: a
+whitelist miss is a fall-through to coverage, not a recorded denial. That is stated
+here explicitly so that nobody building this slice adds a fourth writer to a slot whose
+precedence was settled elsewhere. If a future change to this slice ever needs to record
+a denial, it must add its reason to `00126`'s severity table first — never rank it
+locally.
+
 ### Fail CLOSED, and it must be built as return-never-throw
 
 `enforce()` wraps the whole decision in a catch that allows (`PreToolUse.Edit.js:468-472`),
@@ -180,6 +201,12 @@ Nothing else in this file changes. Not the two protected-path guards, not
 escape-phrase check, not the block message, not `enforce()`'s step ordering, not the
 fail-open outer catch.
 
+**Note on a neighbouring change**: `00129` modifies `buildBlockMessage` in this same
+file, adding a reason-keyed remedy table. The two changes do not overlap —
+`isWhitelisted` and `buildBlockMessage` are separate functions, and this slice must not
+touch the message. Plans build sequentially; read live at Step 9 and stop and ask if
+the file has changed shape.
+
 ### File: `tests/the-whitelist-cannot-leave-the-repository.test.js`
 **Action:** CREATE
 **Framework:** `node:test`, real `os.tmpdir()` fixtures, `path.join` throughout,
@@ -234,7 +261,9 @@ Nothing here is reachable only from a test.
    escape is the human's own instrument and this fix does not take it away.
 6. **It does not bound how wide a plan declaration may be, does not show the human what
    they are granting, and does not know which plan is building** — those are separate
-   plans in this program.
+   plans in this program. On the last of those, note that `00129` measured that the
+   building-plan narrowing **cannot be built today**: no witness of a live build is set
+   on the dispatch path in use. Do not assume that gap closes.
 7. **If the confinement module fails to load, this hole is open again.** The require is
    fail-soft by necessity (a load-time throw would reach the fail-open catch and allow
    EVERY edit), so the degradation is real, documented, and not silent.
@@ -287,7 +316,7 @@ recorded.**
 One step, files as sub-items.
 - `src/hooks/PreToolUse.Edit.js` — the `escapesRoot` test at the end of
   `isWhitelisted`, with the failing direction and the fall-through consequence written
-  at the call site.
+  at the call site. **`buildBlockMessage` is NOT touched** — that is `00129`'s.
 - `tests/the-whitelist-cannot-leave-the-repository.test.js` — the fifteen cases.
 - `CLAUDE.md` and `tests/readme-numbers.test.js` — **count ratchets ONLY**, measured
   live, if adding one test file trips them. Nothing else, no assertion loosened.
@@ -300,7 +329,8 @@ this file contains no copy of it. Confirm the two failing directions now present
 file (`escapes: true` denies in `isWhitelisted`; `resolvesUnder: true` denies in the two
 protected-path guards) are documented at all three call sites. Confirm `enforce()`'s step
 ordering is unchanged and that the ledger and verify guards still precede the whitelist.
-Confirm no `require` points from `lib/` into `hooks/`.
+Confirm no `require` points from `lib/` into `hooks/`. Confirm no denial reason was
+added — this slice is not a writer of the shared denial slot.
 
 ### Step 12: OPTIMIZE
 Confirm the non-whitelisted path costs exactly what it cost before — that is the hot
@@ -374,10 +404,15 @@ and different channels: 00141 closes the Bash route to the ledger, this one clos
 editing route out of the tree.
 
 This slice declares `src/hooks/PreToolUse.Edit.js`, which is **also declared by the
-unapproved plans 00069 and 00072 and by 00129**. Plans build **sequentially**, so there
-is no concurrent-edit hazard; the executor reads the file live at Step 9, confirms it
-matches what this plan describes, and **stops and asks** if it has changed. Never take
-content from a plan.
+unapproved plans 00069 and 00072 and by 00129**. `00129` now declares this slice in its
+`depends_on` and therefore builds after it; the two changes are in different functions
+(`isWhitelisted` here, `buildBlockMessage` there) and do not overlap. Plans build
+**sequentially**, so there is no concurrent-edit hazard; the executor reads the file
+live at Step 9, confirms it matches what this plan describes, and **stops and asks** if
+it has changed. Never take content from a plan.
+
+**The shared denial slot**: this slice is not a writer of it. The canonical ranking rule
+lives in `00126`; see "THE DENIAL SLOT" above for why this slice must not add a reason.
 
 If an existing enforcement test breaks, it is **not declared here**: stop, name the file
 and the exact change, and ask.
@@ -407,7 +442,13 @@ and the exact change, and ask.
 7. **The count ratchets are declared in `files:`** rather than moved out of scope later,
    with ratchet-only stated at the declaration so the plan text bounds what the glob
    does not.
-8. **Nothing is asserted that planning could not verify.** The timing, the presence of
+8. **This slice adds NO denial reason and does not write the shared denial slot.** Three
+   plans in this program write that one slot; its precedence is settled once in `00126`.
+   Recording a "whitelisted but outside" denial here would add a fourth writer under no
+   rule, which is the exact defect the shared rule was written to prevent. Consequence
+   of Decision 1, stated separately because it is the thing a builder might add without
+   noticing.
+9. **Nothing is asserted that planning could not verify.** The timing, the presence of
    links under whitelisted prefixes, the loop behaviour and the non-CTOC pass-through
    cost are all marked MEASURE. The defect itself is the sibling executor's recorded
    probe and is **required to be reproduced at Step 8**, with refutation reported

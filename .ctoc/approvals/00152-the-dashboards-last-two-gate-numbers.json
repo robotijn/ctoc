@@ -1,0 +1,9 @@
+{
+  "content_sha256": "8e1c070444052b414e3e93b3ba2ce3fff2cbbeef7d20f6a82170c67509fe8b0b",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-20T09:18:53.985Z",
+  "approved_by": "human",
+  "plan_basename": "00152-the-dashboards-last-two-gate-numbers"
+}

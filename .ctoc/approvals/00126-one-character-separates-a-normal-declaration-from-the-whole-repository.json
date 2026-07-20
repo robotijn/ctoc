@@ -1,9 +1,9 @@
 {
-  "content_sha256": "e58e7f94d5f8338d7297a165b3e65c4d9fc17251c2f08de7eb076c5da512735f",
+  "content_sha256": "c6f8a495ced492b015346905f9fc299eff1e397d215cc9015eacd09445c71d96",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-19T21:31:41.219Z",
+  "approved_at": "2026-07-20T09:39:54.625Z",
   "approved_by": "human",
   "plan_basename": "00126-one-character-separates-a-normal-declaration-from-the-whole-repository"
 }
