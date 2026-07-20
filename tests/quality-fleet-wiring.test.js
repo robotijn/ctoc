@@ -17,7 +17,7 @@
  * the loop never fired).
  */
 
-const { describe, it, before, after } = require('node:test');
+const { describe, it, before, after, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -790,21 +790,39 @@ describe('Finding A (SEVERE) — an AUTO-UNDETERMINED test command is NOT a sile
   });
 });
 
-describe('POST-COMMIT LOOP: initProject wires the background quality hook', () => {
+describe('POST-COMMIT LOOP: the background quality hook is wired ONLY when asked', () => {
   let dir;
-  before(() => {
+  beforeEach(() => {
     dir = mkTmp('ctoc-init-');
     // A real git repo so the installer has a real .git/hooks to write to.
     execFileSync('git', ['init', '-q'], { cwd: dir });
   });
-  after(() => rm(dir));
+  afterEach(() => rm(dir));
 
-  it('installs .git/hooks/post-commit that launches the quality agent', () => {
+  // INVERTED. This suite used to assert that setting up a project installs a
+  // hook into the user's repository that fires on every commit they make. That
+  // is not a wiring detail, it is a consent decision, and it shipped: the owner
+  // found the hook in his own repository afterwards, having never been asked and
+  // having never seen it in the preview. Setup no longer does it.
+  it('setup does NOT install the hook, and says that it did not', () => {
     const result = initProject(dir);
+
+    const hookPath = path.join(dir, '.git', 'hooks', 'post-commit');
+    assert.ok(!fs.existsSync(hookPath),
+      'setup must not install a hook that runs on every commit without being asked');
+    assert.equal(result.success, true, 'declining to install is not a setup failure');
+
+    const notice = result.skipped.find(s => s.includes('post-commit'));
+    assert.ok(notice, 'the human must be told the hook exists and was not installed');
+    assert.match(notice, /NOT installed/);
+  });
+
+  it('an explicit request still installs a hook that launches the quality agent', () => {
+    const result = initProject(dir, { installGitHook: true });
     assert.equal(result.success, true);
 
     const hookPath = path.join(dir, '.git', 'hooks', 'post-commit');
-    assert.ok(fs.existsSync(hookPath), 'initProject must install the post-commit hook');
+    assert.ok(fs.existsSync(hookPath), 'the explicit opt-in must still install the hook');
 
     const body = fs.readFileSync(hookPath, 'utf8');
     assert.match(body, /CTOC/, 'the installed hook must carry the CTOC marker');

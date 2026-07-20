@@ -713,13 +713,14 @@ function verifySetup(root) {
  *
  * @param {string} [projectPath]
  * @returns {{ attempted: boolean, ok: boolean, created: string[],
- *   skipped: string[], missing: string[], reason: (string|null) }}
+ *   skipped: string[], failed: string[], missing: string[], reason: (string|null) }}
  */
 function ensureInitialized(projectPath) {
   const root = projectPath || process.cwd();
   let attempted = false;
   let created = [];
   let skipped = [];
+  let failed = [];
   let reason = null;
 
   if (!safeFs.existsSync(path.join(root, '.ctoc'))) {
@@ -727,17 +728,29 @@ function ensureInitialized(projectPath) {
     try {
       const { initProject } = require('../lib/init-project');
       const report = initProject(root);
-      // The report is KEPT. It records an intention to write; the read-back
+      // The report is KEPT. It records what was actually written; the read-back
       // below records what the world actually holds.
       if (report && Array.isArray(report.created)) created = report.created;
       if (report && Array.isArray(report.skipped)) skipped = report.skipped;
+      // A per-artifact write failure no longer THROWS out of `initProject` — it
+      // is recorded, so setup can continue past one bad write instead of losing
+      // the project its `plans/` directories. That fix moved the failure text
+      // from an exception into `report.failed`, and a field nobody reads is a
+      // failure nobody can see: without this, a run where EVERY write failed
+      // returned `reason: null`, which reads exactly like a run that had nothing
+      // to report. The reason is surfaced here so a human looking at a degraded
+      // menu can read WHY it is degraded.
+      if (report && Array.isArray(report.failed) && report.failed.length > 0) {
+        failed = report.failed;
+        reason = `setup could not write: ${failed.join('; ')}`;
+      }
     } catch (err) {
       reason = err && err.message ? err.message : String(err);
     }
   }
 
   const { ok, missing } = verifySetup(root);
-  return { attempted, ok, created, skipped, missing, reason };
+  return { attempted, ok, created, skipped, failed, missing, reason };
 }
 
 /**
@@ -747,7 +760,7 @@ function ensureInitialized(projectPath) {
  * non-interactive JSON screen) so the two can never drift into telling the same
  * person two different stories.
  *
- * @param {{ attempted: boolean, ok: boolean, missing: string[] }} setup
+ * @param {{ attempted: boolean, ok: boolean, missing: string[], reason?: (string|null) }} setup
  * @returns {string|null}
  */
 function setupMessage(setup) {
@@ -760,7 +773,15 @@ function setupMessage(setup) {
   const lead = setup.attempted
     ? 'CTOC could not finish setting up this project.'
     : 'CTOC is not fully set up for this project.';
-  return `${lead} Missing: ${list}. Nothing here will work properly until that is fixed.`;
+  // WHY it failed, when setup knows. A list of missing artifacts tells a human
+  // WHAT is absent; only the reason tells them what to do about it (a permission
+  // error and a missing template are the same `missing` list and completely
+  // different problems). Absent when setup did not run or failed silently — the
+  // sentence is then exactly what it was before.
+  const why = (setup.attempted && typeof setup.reason === 'string' && setup.reason.length > 0)
+    ? ` Reason: ${setup.reason}.`
+    : '';
+  return `${lead} Missing: ${list}.${why} Nothing here will work properly until that is fixed.`;
 }
 
 /**

@@ -3,7 +3,7 @@ iron_loop: true
 title: "A ratcheting fence against a documented vocabulary word nothing accepts, and a setting nothing reads"
 type: implementation
 parent_plan: none
-depends_on: 00098-agents-told-to-run-code-they-cannot-run
+depends_on: 00110-agents-told-to-run-code-they-cannot-run
 priority: critical
 files:
   - src/lib/unexecutable-instruction-scan.js
@@ -24,7 +24,7 @@ re-litigates it.
 **What moved.** The detection of *an order to an agent to run code its own `tools:` grant
 gives it no way to run* is now owned entirely by the plan titled **"Five agents are ordered
 to run code they have no way to run — the orders are corrected and a fence stops the next
-one"** (`plans/implementation/00098-agents-told-to-run-code-they-cannot-run.md`). That plan
+one"** (`plans/implementation/00110-agents-told-to-run-code-they-cannot-run.md`). That plan
 found five live instances, corrects all five agent bodies, and builds the detection with
 three signatures rather than this plan's one — including two signatures this plan's design
 would have missed entirely.

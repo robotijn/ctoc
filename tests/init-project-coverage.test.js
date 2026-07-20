@@ -41,7 +41,8 @@ const os = require('os');
 const {
   initProject,
   detectLanguages,
-  detectFrameworks
+  detectFrameworks,
+  PLAN_DIRS
 } = require('../src/lib/init-project');
 
 function makeTempDir() {
@@ -324,14 +325,41 @@ describe('init-project dark branches', () => {
   // the fail-open throw path.
   // ---------------------------------------------------------------------------
   describe('post-commit hook installation', () => {
-    it('should_install_post_commit_hook_when_git_dir_present_and_no_hook_yet', () => {
+    it('should_NOT_install_post_commit_hook_by_default_and_should_say_so', () => {
       // Arrange — a bare `.git` directory, no hooks yet.
       fs.mkdirSync(path.join(tempDir, '.git'));
 
-      // Act
+      // Act — DEFAULT options. This is what opening the menu does.
       const result = initProject(tempDir);
 
-      // Assert — reported created AND the executable hook actually lands on disk.
+      // Assert — INVERTED. This test used to require that setup install a hook
+      // that fires on every commit the human ever makes. That is a consent
+      // decision, not a side effect of setup, and it shipped: the owner found
+      // the hook in his own repository afterwards, having never been asked. The
+      // filesystem is the witness, not the report.
+      const hookPath = path.join(tempDir, '.git', 'hooks', 'post-commit');
+      assert.ok(!fs.existsSync(hookPath),
+        'setup must not write into the user\'s .git without being asked');
+      assert.ok(!result.created.some(s => s.includes('post-commit')),
+        'and must not report an install it did not perform');
+
+      // Silence would be its own defect: the human must learn the thing exists,
+      // what it would do, and that it did not happen.
+      const notice = result.skipped.find(s => s.includes('post-commit'));
+      assert.ok(notice, 'the decision must be reported, not omitted');
+      assert.match(notice, /NOT installed/);
+      assert.match(notice, /every commit/);
+    });
+
+    it('should_install_post_commit_hook_when_EXPLICITLY_asked', () => {
+      // Arrange — a bare `.git` directory, no hooks yet.
+      fs.mkdirSync(path.join(tempDir, '.git'));
+
+      // Act — the explicit opt-in a caller passes only after asking the human.
+      const result = initProject(tempDir, { installGitHook: true });
+
+      // Assert — the install path itself is UNCHANGED. This slice changed WHEN
+      // the install runs, never WHAT it does, and this is the guard for that.
       assert.ok(result.created.some(s => s.includes('post-commit')), 'install must be reported');
       const hookPath = path.join(tempDir, '.git', 'hooks', 'post-commit');
       assert.ok(fs.existsSync(hookPath), 'post-commit hook file must be written');
@@ -349,8 +377,12 @@ describe('init-project dark branches', () => {
       const existing = '#!/bin/sh\n# CTOC post-commit hook - triggers background quality agent\nnode ".ctoc/agent/post-commit.js" 2>/dev/null &\n';
       fs.writeFileSync(hookPath, existing);
 
-      // Act
-      const result = initProject(tempDir);
+      // Act — EXPLICIT opt-in, because the idempotency this case exists to prove
+      // lives on the install path, and setup no longer reaches that path on its
+      // own. Under default options the installer is never consulted at all, so
+      // running this fixture without the option would assert nothing about
+      // idempotency and would quietly become a test of a branch it never enters.
+      const result = initProject(tempDir, { installGitHook: true });
 
       // Assert — reported skipped, existing content untouched (idempotency).
       assert.ok(
@@ -360,21 +392,53 @@ describe('init-project dark branches', () => {
       assert.equal(fs.readFileSync(hookPath, 'utf8'), existing);
     });
 
-    it('should_fail_open_and_report_skip_when_hook_install_throws', () => {
+    it('should_NOT_touch_a_foreign_post_commit_hook_under_default_options', () => {
+      // A hook the human wrote themselves. Setup must leave it byte-identical:
+      // under the default it does not consult the installer at all, so the
+      // append path that would add CTOC's block is never reached.
+      const hooksDir = path.join(tempDir, '.git', 'hooks');
+      fs.mkdirSync(hooksDir, { recursive: true });
+      const hookPath = path.join(hooksDir, 'post-commit');
+      const foreign = '#!/bin/sh\necho "the user\'s own hook"\n';
+      fs.writeFileSync(hookPath, foreign);
+
+      initProject(tempDir);
+
+      assert.equal(fs.readFileSync(hookPath, 'utf8'), foreign,
+        'setup must not modify a hook the human wrote');
+    });
+
+    it('should_fail_open_and_RECORD_the_failure_when_hook_install_throws', () => {
       // Arrange — `.git` is a FILE (a worktree-style gitdir link), so building
       // the hooks directory (mkdir .git/hooks) raises ENOTDIR inside the
-      // installer. init must swallow it and record a skip, never throw.
+      // installer. init must record it and continue, never throw.
       fs.writeFileSync(path.join(tempDir, '.git'), 'gitdir: /nonexistent\n');
 
-      // Act
-      const result = initProject(tempDir);
+      // Act — EXPLICIT opt-in. Without it the installer is never invoked, so
+      // nothing throws, and this case would report a verdict on a code path it
+      // never entered: it would pass on the strength of the not-installed
+      // notice, which also contains the string 'post-commit'. That is the
+      // false-green shape this repository fences, so the fixture is driven onto
+      // the real throw path instead.
+      let result;
+      assert.doesNotThrow(() => { result = initProject(tempDir, { installGitHook: true }); },
+        'a hook-install failure must never break project setup');
 
-      // Assert — init still succeeds and the failure is surfaced as a skip.
-      assert.equal(result.success, true);
+      // The failure is NAMEABLE, and it is a failure — not a skip. A skip means
+      // "there was nothing to do"; the human asked for this and it did not
+      // happen.
       assert.ok(
-        result.skipped.some(s => s.includes('post-commit')),
-        'the install failure must be reported as a skip, not thrown'
+        result.failed.some(s => s.includes('post-commit')),
+        'the install failure must be recorded in `failed`, not thrown'
       );
+      assert.equal(result.success, false,
+        'the human asked for the hook and did not get it — that is not a success');
+
+      // And setup continued past it: the rest of the project still exists.
+      for (const dir of PLAN_DIRS) {
+        assert.ok(fs.existsSync(path.join(tempDir, dir)),
+          `${dir} must survive a hook-install failure`);
+      }
     });
   });
 });

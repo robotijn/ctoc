@@ -562,17 +562,137 @@ function generateInitialState() {
 }
 
 /**
- * Initialize a project with CTOC
+ * The artifacts a project MUST hold before setup may call itself successful.
+ *
+ * Deliberately duplicated with the menu's read-back (`verifySetup` in
+ * `src/commands/menu.js`). They are two INDEPENDENT checks of the same claim;
+ * sharing one list would let a single mistake pass both of them. If they ever
+ * disagree, the cross-layer test in `tests/init-tells-the-truth.test.js` fails —
+ * which is the point. Display form (forward slashes) so a message can never
+ * leak the filesystem layout.
+ */
+const REQUIRED_ARTIFACTS = Object.freeze([
+  ...PLAN_DIRS,
+  '.ctoc/settings.yaml',
+  '.ctoc/state/iron-loop.yaml'
+]);
+
+/**
+ * What setup says about the git hook it deliberately does NOT install.
+ *
+ * The human learns three things: the thing exists, what it would do, and that
+ * it did not happen. Reported in a preview and in a real run alike.
+ */
+const HOOK_NOT_INSTALLED_NOTICE =
+  '.git/hooks/post-commit — NOT installed. It would run on every commit you make. '
+  + 'That is your decision, not setup\'s.';
+
+/**
+ * Strip filesystem layout out of an error message before it reaches a report.
+ *
+ * Node's fs errors embed the absolute path they failed on. A report is shown to
+ * a human and may be logged, so the project root and the user's home directory
+ * are replaced with stable placeholders. The MESSAGE survives; the layout does
+ * not, and a stack trace never enters a report at all.
+ *
+ * @param {Error} err
+ * @param {string} projectDir
+ * @returns {string}
+ */
+function reportableError(err, projectDir) {
+  const message = (err && err.message) ? String(err.message) : String(err);
+  let out = message.split(projectDir).join('<project>');
+  // The home-directory scrub is BEST-EFFORT and its failure is not a verdict:
+  // `os.homedir()` throws on a host with no resolvable home. The project scrub
+  // above has already run, so the fall-through is strictly less scrubbing, never
+  // a check that passed without looking. The absorbed failure is NAMED in the
+  // returned text so a reader can see the scrub was partial rather than assume
+  // it was complete.
+  let home = null;
+  try {
+    home = require('os').homedir();
+  } catch (homedirErr) {
+    return `${out} [home-directory scrub skipped: ${homedirErr.message}]`;
+  }
+  if (home) out = out.split(home).join('<home>');
+  return out;
+}
+
+/**
+ * Perform one setup action, or — in a preview — describe it without doing it.
+ *
+ * ONE helper, so the preview branch cannot be got wrong at a fifth site. The
+ * defect this replaces was the shape `if (!dryRun) { write(); } created.push(x)`
+ * repeated six times: the write was skipped in a preview and the ANNOUNCEMENT
+ * was not, so a preview's report was byte-identical to a real run's.
+ *
+ * @param {{dryRun: boolean, created: string[], wouldCreate: string[], failed: string[], projectDir: string}} state
+ * @param {string} label - the artifact, in display form
+ * @param {() => void} write - the actual write, called ONLY on a real run
+ */
+function record(state, label, write) {
+  if (state.dryRun) {
+    state.wouldCreate.push(label);
+    return;
+  }
+  try {
+    write();
+    state.created.push(label);
+  } catch (err) {
+    // A per-artifact failure is RECORDED and setup continues. Before this, the
+    // throw escaped into `ensureInitialized`'s bare catch and cost the project
+    // its remaining artifacts — one bad write took the whole run with it.
+    state.failed.push(`${label} (${reportableError(err, state.projectDir)})`);
+  }
+}
+
+/**
+ * Initialize a project with CTOC.
+ *
+ * TWO RULES this function is required to keep:
+ *
+ *  1. **A preview reports what it WOULD do, under a different key.** A preview
+ *     writes nothing and therefore `created` is empty — the truth. The preview
+ *     list lives in `wouldCreate`, which a caller must ask for by name, and the
+ *     report carries `dryRun: true` so it is structurally distinguishable from
+ *     a real run. `success` is `null` in a preview: a preview has no success,
+ *     and `true` would only repeat the old lie in a new field.
+ *
+ *  2. **Setup never installs anything into a git repository without being
+ *     asked.** The post-commit hook fires on every commit the human ever makes;
+ *     that is a decision the human takes, not a side effect of opening a menu.
+ *     `installGitHook` defaults to `false`, and BOTH modes report that the hook
+ *     exists, what it would do, and that it did not happen.
+ *
+ * FOLLOW-UP, named rather than forgotten: nothing OFFERS the hook yet. Offering
+ * it means rendering an option in `src/commands/menu.js`, which a separate slice
+ * owns — two plans editing one command surface is the contention this pipeline
+ * keeps tripping over. Until that lands, new projects do not get the background
+ * post-commit quality loop. That is a real behaviour change, stated here rather
+ * than buried.
+ *
  * @param {string} projectDir - Project root directory
  * @param {object} [options] - Initialization options
  * @param {boolean} [options.force] - Overwrite existing files
- * @param {boolean} [options.dryRun] - Show what would be created without creating
- * @returns {{ success: boolean, created: string[], skipped: string[], detected: object }}
+ * @param {boolean} [options.dryRun] - Describe what would be created, write nothing
+ * @param {boolean} [options.installGitHook] - Install the post-commit quality hook.
+ *   Defaults to FALSE. Only a caller that has ASKED the human may pass true.
+ * @returns {{ success: (boolean|null), dryRun: boolean, created: string[],
+ *   wouldCreate: string[], skipped: string[], failed: string[], missing: string[],
+ *   detected: object }}
  */
 function initProject(projectDir, options = {}) {
-  const { force = false, dryRun = false } = options;
-  const created = [];
-  const skipped = [];
+  const { force = false, dryRun = false, installGitHook = false } = options;
+  const state = {
+    dryRun,
+    projectDir,
+    created: [],
+    wouldCreate: [],
+    skipped: [],
+    failed: []
+  };
+  const created = state.created;
+  const skipped = state.skipped;
 
   // 1. Detect project stack
   const projectName = detectProjectName(projectDir);
@@ -603,10 +723,7 @@ function initProject(projectDir, options = {}) {
         TOOL_CONFIGURATION: generateToolConfig(languages, frameworks)
       });
 
-      if (!dryRun) {
-        safeFs.writeFileSync(claudeMdPath, content, 'utf8');
-      }
-      created.push('CLAUDE.md');
+      record(state, 'CLAUDE.md', () => safeFs.writeFileSync(claudeMdPath, content, 'utf8'));
     } else {
       skipped.push('CLAUDE.md (template not found)');
     }
@@ -620,7 +737,16 @@ function initProject(projectDir, options = {}) {
   //     existing managed block if one is present. It does NOT append a block to a pre-existing
   //     user CLAUDE.md that has none — that first-injection is owned by SessionStart on next
   //     session open, so init never silently rewrites a user's hand-authored CLAUDE.md.
-  if (!dryRun) {
+  //     In a PREVIEW the block cannot be applied (there is no CLAUDE.md to apply
+  //     it to), so the preview PREDICTS it: a run that would write CLAUDE.md from
+  //     the template would also fill that template's lessons placeholder. Without
+  //     this prediction a preview and a real run would describe different sets of
+  //     actions, which is the defect one layer over.
+  if (dryRun) {
+    if (state.wouldCreate.includes('CLAUDE.md')) {
+      state.wouldCreate.push('CLAUDE.md (operating-lessons block)');
+    }
+  } else {
     try {
       const { ensureLessonsBlock, START_MARKER } = require('./claude-md-lessons');
       const ctocRoot = path.resolve(__dirname, '..', '..');   // same base as templatePath
@@ -632,7 +758,7 @@ function initProject(projectDir, options = {}) {
       }
     } catch (err) {
       // Fail-open: a lessons failure must never break project init.
-      skipped.push('CLAUDE.md operating-lessons block (' + err.message + ')');
+      skipped.push('CLAUDE.md operating-lessons block (' + reportableError(err, projectDir) + ')');
     }
   }
 
@@ -644,7 +770,12 @@ function initProject(projectDir, options = {}) {
   //     block — it never silently rewrites a user's hand-authored CLAUDE.md that has none
   //     (that first-injection is owned by SessionStart). mergeOperatingManual is fail-open
   //     internally; the extra try/catch mirrors 3b for defense-in-depth.
-  if (!dryRun) {
+  //     Predicted in a preview for the same reason as 3b.
+  if (dryRun) {
+    if (state.wouldCreate.includes('CLAUDE.md')) {
+      state.wouldCreate.push('CLAUDE.md (operating-manual block)');
+    }
+  } else {
     try {
       const { mergeOperatingManual, BEGIN_MARKER } = require('./operating-manual');
       const ctocRoot = path.resolve(__dirname, '..', '..');   // same base as templatePath
@@ -657,7 +788,7 @@ function initProject(projectDir, options = {}) {
       }
     } catch (err) {
       // Fail-open: a manual-merge failure must never break project init.
-      skipped.push('CLAUDE.md operating-manual block (' + err.message + ')');
+      skipped.push('CLAUDE.md operating-manual block (' + reportableError(err, projectDir) + ')');
     }
   }
 
@@ -666,10 +797,7 @@ function initProject(projectDir, options = {}) {
   if (!safeFs.existsSync(ironLoopPath) || force) {
     if (safeFs.existsSync(ironLoopTemplatePath)) {
       const content = safeFs.readFileSync(ironLoopTemplatePath, 'utf8');
-      if (!dryRun) {
-        safeFs.writeFileSync(ironLoopPath, content, 'utf8');
-      }
-      created.push('IRON_LOOP.md');
+      record(state, 'IRON_LOOP.md', () => safeFs.writeFileSync(ironLoopPath, content, 'utf8'));
     }
   } else {
     skipped.push('IRON_LOOP.md (already exists)');
@@ -680,10 +808,7 @@ function initProject(projectDir, options = {}) {
   for (const dir of allDirs) {
     const dirPath = path.join(projectDir, dir);
     if (!safeFs.existsSync(dirPath)) {
-      if (!dryRun) {
-        ensureDir(dirPath);
-      }
-      created.push(dir + '/');
+      record(state, dir + '/', () => ensureDir(dirPath));
     }
   }
 
@@ -691,11 +816,10 @@ function initProject(projectDir, options = {}) {
   const settingsPath = path.join(projectDir, '.ctoc', 'settings.yaml');
   if (!safeFs.existsSync(settingsPath) || force) {
     const settingsContent = generateSettings(languages, frameworks);
-    if (!dryRun) {
+    record(state, '.ctoc/settings.yaml', () => {
       ensureDir(path.dirname(settingsPath));
       safeFs.writeFileSync(settingsPath, settingsContent, 'utf8');
-    }
-    created.push('.ctoc/settings.yaml');
+    });
   } else {
     skipped.push('.ctoc/settings.yaml (already exists)');
   }
@@ -704,11 +828,10 @@ function initProject(projectDir, options = {}) {
   const statePath = path.join(projectDir, '.ctoc', 'state', 'iron-loop.yaml');
   if (!safeFs.existsSync(statePath) || force) {
     const stateContent = generateInitialState();
-    if (!dryRun) {
+    record(state, '.ctoc/state/iron-loop.yaml', () => {
       ensureDir(path.dirname(statePath));
       safeFs.writeFileSync(statePath, stateContent, 'utf8');
-    }
-    created.push('.ctoc/state/iron-loop.yaml');
+    });
   } else {
     skipped.push('.ctoc/state/iron-loop.yaml (already exists)');
   }
@@ -718,34 +841,66 @@ function initProject(projectDir, options = {}) {
   if (safeFs.existsSync(gitignorePath)) {
     const gitignore = safeFs.readFileSync(gitignorePath, 'utf8');
     if (!gitignore.includes('.ctoc/logs/') || !gitignore.includes('.ctoc/state/')) {
-      if (!dryRun) {
+      record(state, '.gitignore (updated with CTOC entries)', () => {
         const additions = '\n# CTOC\n.ctoc/logs/\n.ctoc/state/\n';
         safeFs.appendFileSync(gitignorePath, additions, 'utf8');
-      }
-      created.push('.gitignore (updated with CTOC entries)');
+      });
     }
   }
 
-  // 9. Install the background post-commit quality hook.
-  //    Without this, the hook script at src/hooks/post-commit.js is never
-  //    wired into the project's .git/hooks, so the background quality loop
-  //    never fires. Only meaningful inside a git repository; fail-open so a
-  //    hook-install failure never breaks project init.
-  if (!dryRun && safeFs.existsSync(path.join(projectDir, '.git'))) {
-    try {
-      const { installPostCommitHook } = require('./hooks-installer');
-      const res = installPostCommitHook(projectDir);
-      if (res.installed) {
-        created.push('.git/hooks/post-commit (background quality loop)');
-      } else if (res.skipped) {
-        skipped.push(`.git/hooks/post-commit (${res.reason || 'already installed'})`);
+  // 9. The background post-commit quality hook — a CONSENT DECISION, not a
+  //    side effect. It fires on every commit the human ever makes in their own
+  //    repository, so setup does not install it. `installGitHook` defaults to
+  //    false; only a caller that has ASKED may pass true.
+  //
+  //    The block used to sit entirely inside `!dryRun`, which made it the one
+  //    item a preview HID and a real run always did. Now it is reported in BOTH
+  //    modes, so a preview and a real run describe the same set of actions.
+  //    Fail-open: a hook failure is recorded and never breaks project setup.
+  const hasGitRepo = safeFs.existsSync(path.join(projectDir, '.git'));
+  if (hasGitRepo && installGitHook) {
+    if (dryRun) {
+      state.wouldCreate.push('.git/hooks/post-commit (background quality loop)');
+    } else {
+      try {
+        const { installPostCommitHook } = require('./hooks-installer');
+        const res = installPostCommitHook(projectDir);
+        if (res.installed) {
+          created.push('.git/hooks/post-commit (background quality loop)');
+        } else if (res.skipped) {
+          skipped.push(`.git/hooks/post-commit (${res.reason || 'already installed'})`);
+        }
+      } catch (err) {
+        state.failed.push(`.git/hooks/post-commit (${reportableError(err, projectDir)})`);
       }
-    } catch (err) {
-      skipped.push(`.git/hooks/post-commit (${err.message})`);
     }
+  } else if (hasGitRepo) {
+    // Not a failure and not an omission — a decision, reported as one.
+    skipped.push(HOOK_NOT_INSTALLED_NOTICE);
   }
 
-  return { success: true, created, skipped, detected };
+  // 10. The verdict is READ BACK from the world, never asserted.
+  //     `success` was the literal `true`: true when every write succeeded, true
+  //     when every write was skipped, true in a preview that wrote nothing, and
+  //     true when a required artifact failed. A field whose value never depends
+  //     on anything is not a result.
+  const missing = REQUIRED_ARTIFACTS.filter(
+    (rel) => !safeFs.existsSync(path.join(projectDir, ...rel.split('/')))
+  );
+
+  return {
+    // A preview has NO success. `true` would repeat the old lie in a new field;
+    // `false` would read as a failure that did not happen. `null` is the honest
+    // third value, and it forces a caller to think.
+    success: dryRun ? null : (state.failed.length === 0 && missing.length === 0),
+    dryRun,
+    created,
+    wouldCreate: state.wouldCreate,
+    skipped,
+    failed: state.failed,
+    missing,
+    detected
+  };
 }
 
 /**
