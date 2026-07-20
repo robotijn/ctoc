@@ -6,6 +6,16 @@
  * initProject() before rendering. `ensureInitialized` is that hook.
  *
  * See: CLAUDE.md "Project Init Procedure" and src/commands/menu.md rule 7.
+ *
+ * CONTRACT CHANGE (plan 00156, 2026-07-20). `ensureInitialized` no longer returns
+ * a boolean. It returns a VERDICT read back from the filesystem —
+ * `{ attempted, ok, created, skipped, missing, reason }` — because the boolean was
+ * derived from the absence of an exception and nothing else, and the menu rendered
+ * it as "CTOC initialized for this project" on projects that were not initialized.
+ * The assertions below are re-pointed at the verdict; the SUBJECT of each is
+ * unchanged, and each is TIGHTER than the boolean it replaces: the old `true`
+ * could not distinguish "it ran" from "it worked", and the new `attempted && ok`
+ * does.
  */
 
 const { describe, it, beforeEach, afterEach } = require('node:test');
@@ -30,9 +40,11 @@ describe('Menu auto-init — replaces the removed init command (v6.9.32)', () =>
   it('initializes a project that has no .ctoc/ directory', () => {
     assert.ok(!fs.existsSync(path.join(dir, '.ctoc')), 'precondition: not yet initialized');
 
-    const didInit = ensureInitialized(dir);
+    const setup = ensureInitialized(dir);
 
-    assert.equal(didInit, true, 'ensureInitialized reports it initialized the project');
+    assert.equal(setup.attempted, true, 'ensureInitialized ran initialization');
+    assert.equal(setup.ok, true,
+      `and it worked — missing: ${JSON.stringify(setup.missing)}`);
     assert.ok(fs.existsSync(path.join(dir, '.ctoc')), '.ctoc/ directory was created');
     assert.ok(fs.existsSync(path.join(dir, 'plans')), 'plans/ directory was created');
   });
@@ -40,9 +52,14 @@ describe('Menu auto-init — replaces the removed init command (v6.9.32)', () =>
   it('is a no-op when .ctoc/ already exists', () => {
     fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true });
 
-    const didInit = ensureInitialized(dir);
+    const setup = ensureInitialized(dir);
 
-    assert.equal(didInit, false, 'an already-initialized project is left untouched');
+    assert.equal(setup.attempted, false, 'an already-initialized project is left untouched');
+    assert.deepEqual(setup.created, [], 'nothing was written');
+    // The fixture is a BARE `.ctoc/` — the marker without the artifacts. The old
+    // boolean called that "initialized"; the verdict reads the world back and
+    // does not. Asserted here so the marker can never again stand in for proof.
+    assert.equal(setup.ok, false, 'an empty .ctoc/ is a marker, not a set-up project');
   });
 
   it('requiring menu.js does not run the menu (importable without side effects)', () => {

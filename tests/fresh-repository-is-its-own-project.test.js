@@ -89,10 +89,16 @@ test('case 2: the fresh repository is actually initialised, not skipped', () => 
 
     const { ensureInitialized } = require('../src/commands/menu');
     const resolved = findProjectRoot(fresh);
-    const didInit = ensureInitialized(resolved);
+    // SHAPE ONLY (plan 00156, 2026-07-20). `ensureInitialized` now returns a
+    // verdict read back from the filesystem instead of a boolean. THIS SLICE'S
+    // SUBJECT IS UNAFFECTED: root resolution reaching the fresh repository, and
+    // the fresh repository having its own settings file afterwards, are both
+    // asserted exactly as before and both still pass. Only the return shape moved,
+    // and `attempted` is the field that carries the old `true`'s meaning here.
+    const setup = ensureInitialized(resolved);
 
     assert.strictEqual(resolved, fresh, 'precondition: resolution must reach the fresh repository');
-    assert.strictEqual(didInit, true, 'setup must actually run in a repository that has no .ctoc');
+    assert.strictEqual(setup.attempted, true, 'setup must actually run in a repository that has no .ctoc');
     const hasSettings =
       fs.existsSync(path.join(fresh, '.ctoc', 'settings.yaml')) ||
       fs.existsSync(path.join(fresh, '.ctoc', 'settings.json'));

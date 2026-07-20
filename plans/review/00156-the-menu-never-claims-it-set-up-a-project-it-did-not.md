@@ -1,5 +1,11 @@
 ---
 approved_by: human
+approved_at: 2026-07-20T10:48:43.095Z
+gate_crossed: implementation → todo
+---
+
+---
+approved_by: human
 approved_at: 2026-07-20T09:18:53.812Z
 gate_crossed: implementation → todo
 ---
@@ -15,6 +21,10 @@ iron_loop: true
 files:
   - "src/commands/menu.js"
   - "tests/menu-reports-what-init-did.test.js"
+  - "tests/menu-auto-init.test.js"
+  - "tests/menu-coverage.test.js"
+  - "tests/fresh-repository-is-its-own-project.test.js"
+  - "CLAUDE.md"
 ---
 
 # The menu never claims it set up a project it did not
@@ -253,3 +263,192 @@ would have to be skipped on some platform and a skip is a gate failure.
    own correct fixture, which is precisely why none of them caught this. Driving the
    real entry point and then reading the real directory is the only assertion whose
    failure would have matched the owner's experience.
+
+### Taken during execution (Steps 8–14)
+
+8. **The plan's compliance read-back was materially wrong and was replaced.** The
+   plan specifies `loadActiveProfiles(root)` "returns an array". It returns an
+   OBJECT `{ profiles, overrides, declined }`, and it returns
+   `{ profiles: [], … }` for a settings file with no `regulatory_regime:` block —
+   and for NO settings file at all. As specified, the check would have passed on
+   every broken world in this slice's own fixtures. Test case 5 pins that: it
+   asserts the naive reader check passes on the broken file BEFORE asserting the
+   real check fails on it. The implemented read-back is two-part: the reader of
+   record must return a `profiles` array, AND the `active_profiles:` anchor must be
+   TARGETABLE by `writeActiveProfiles` — a line with an INLINE value. That second
+   half is the writer's one precondition and is what actually bit the owner.
+9. **The anchor pattern is duplicated in `menu.js`, not borrowed.**
+   `compliance-regime.js` exports no anchor predicate and
+   `regulatoryRegimeRegion` is module-private. Adding an export there is an
+   UNDECLARED file, forbidden by the scope rule, so the writer's `lineRe` and its
+   block-style guard are mirrored in `complianceAnchorUsable` with the owning
+   module named in the comment. Test 5b pins the block-style half, so a drift in
+   either direction fails a test.
+10. **The read-back runs on BOTH paths — including when initialization is not
+    attempted.** The plan's table says a `!attempted` project is silent. That
+    would have made two of the shapes the brief demands uncatchable: an empty
+    `.ctoc/` directory and an anchorless settings file are both states where
+    `.ctoc/` EXISTS, so no attempt happens and nothing would ever be read back.
+    The bare presence of `.ctoc/` is precisely the un-evidenced marker this slice
+    exists to delete. Cost: about twelve `existsSync` calls and one small file
+    read per menu open, against the plan's Step 12 wish that a set-up project
+    perform no extra read. A healthy project is still SILENT — case 8 pins it —
+    so the human-visible contract in the plan's table is unchanged.
+11. **`!attempted && !ok` gets its own sentence.** "CTOC is not fully set up for
+    this project" rather than "could not finish setting up", because nothing was
+    attempted and claiming an attempt would be the same class of untruth.
+12. **`setupMessage` is a new export, against the plan's "no new export".** Two
+    render sites (the interactive screen and the non-interactive JSON screen) must
+    tell the same person the same story; a single pure function is the anti-drift
+    measure. Its live caller is `main()`, so the export-reachability fence is
+    satisfied by production code, not by its test.
+13. **Test case 7 was redesigned.** The plan's fixture makes the settings write
+    fail through the `safe-fs` seam and then asserts on a SPAWNED process. An
+    in-process monkeypatch does not cross a process boundary, so that fixture
+    would have proved nothing about the child. Replaced with a broken world that
+    does survive the boundary — an empty `.ctoc/` directory — which still fails
+    setup and still must render.
+14. **Two extra cases added beyond the plan's twelve**: an empty `.ctoc/`
+    directory (case 13) and a leak check on the failure message (case 14, Step 13
+    SECURE — no absolute path, no stack frame).
+
+
+## Execution Record
+
+### The finding the next executor should read first — a vacuous read-back
+
+**The plan's own read-back was vacuous, and the detection method was that it was
+the ONE test case green before any implementation existed.**
+
+The plan specified proving the settings file through the profile loader:
+`regulatory-regime.loadActiveProfiles(root)` "returns an array". Read from disk,
+that function returns an OBJECT `{ profiles, overrides, declined }`, and it
+returns `{ profiles: [], … }` in three distinct worlds:
+
+- a healthy settings file with an empty profile list — the intended pass;
+- a settings file with NO `regulatory_regime:` block at all;
+- **no settings file whatsoever** (`if (!existsSync(settingsPath)) return { profiles: [], … }`).
+
+The check as specified therefore passes on every broken world in this slice's own
+fixtures — including the exact one the owner hit. It is a check that agrees with
+whatever happened, which is not a check. It is the same defect class the slice
+exists to kill, reproduced inside the slice's own fix: a verdict rendered from
+input that carries no verdict.
+
+**How it was caught, and the rule to generalise: a test that passes before the
+code is written is not testing the code.** Step 8 was run as true test-driven
+development — all fifteen cases written and run BEFORE a line of implementation.
+Fourteen were red. One was green. A green case against an unimplemented feature
+has exactly two explanations: the behaviour already exists, or the assertion is
+vacuous. Neither is ever acceptable to leave unexamined, and here it was the
+second. Had Step 8 been written alongside the implementation — the common
+shortcut — that case would have been green for the "right" reason and the vacuity
+would have shipped inside the fix for vacuity.
+
+The case is now retained deliberately as case 5's PRECONDITION: it asserts that
+the naive reader check passes on the broken file, immediately before asserting
+that the real check fails on it. The inadequate check is pinned in place as
+evidence, so a future reader cannot re-adopt it.
+
+The replacement is two-part, because the writer's precondition — not the
+reader's — is what actually failed for the owner. `compliance-regime.js`
+`writeActiveProfiles` does a line-targeted replacement of the `active_profiles:`
+anchor (deliberately, so it cannot disturb the `enforcement`/`operations` blocks
+the hooks parse without a YAML library), and it refuses a block-style list rather
+than corrupt it. So the anchor must be PRESENT and INLINE for any compliance
+answer to ever persist. `complianceAnchorUsable` checks the reader of record AND
+that targetability; cases 5 and 5b pin both halves.
+
+### Steps
+
+- [x] Step 8 TEST — 15 cases, run first, RED 14/15. See the finding above for the
+      fifteenth.
+- [x] Step 9 PREPARE — re-read from disk: `menu.js` `ensureInitialized` + `main()`,
+      `init-project.js` (`return { success: true, … }` is hardcoded; `created` and
+      `skipped` still carried), `regulatory-regime.js`, `compliance-regime.js`.
+- [x] Step 10 IMPLEMENT — `src/commands/menu.js`: `complianceAnchorUsable`,
+      `verifySetup`, `ensureInitialized` returning a verdict, `setupMessage`, and
+      the three render sites.
+- [x] Step 11 REVIEW — no path renders a success sentence without `ok === true`.
+- [x] Step 12 OPTIMIZE — twelve existence checks and one small read.
+- [x] Step 13 SECURE — project-relative display paths only; no absolute path and
+      no stack frame reaches the screen (case 14).
+- [x] Step 14 VERIFY — full gated run GREEN, numbers below.
+- [x] Step 15 DOCUMENT — JavaScript doc naming the discarded-report defect and its
+      date; contract-change comments in each repaired test file.
+- [x] Step 16 FINAL-REVIEW — before/after announcements below.
+
+### The four repairs — assertions pinning a replaced contract
+
+The contract that replaced them is derived from OUTSIDE these tests: the plan
+itself, and the running code in `src/commands/menu.js`, where `ensureInitialized`
+now returns `{ attempted, ok, created, skipped, missing, reason }`. In every case
+the test is wrong rather than the code, because the value each asserted —
+`true` — meant "nothing threw" and nothing more, which is precisely the defect
+under repair. **Every repair TIGHTENS.**
+
+| # | site | old assertion | new assertion | which implementation passes before and fails after |
+|---|---|---|---|---|
+| 1 | `menu-auto-init.test.js` "initializes a project" | `didInit === true` | `attempted === true` AND `ok === true` | an implementation that runs initialization and writes nothing passed before (it did not throw) and fails now |
+| 2 | `menu-auto-init.test.js` "no-op when .ctoc exists" | `didInit === false` | `attempted === false`, `created` empty, AND `ok === false` on a bare `.ctoc/` | an implementation treating the bare marker directory as proof of setup passed before and fails now |
+| 3 | `menu-coverage.test.js` "reports true" / "returning false" | `=== true` / `=== false` | `attempted`+`ok`; `attempted === false` plus empty `created` (the init-always mutant stays dead) | same as 1 and 2 |
+| 4 | `menu-coverage.test.js` fail-open | `result === false` | `ok === false`, `attempted === true`, non-empty string `reason` | an implementation collapsing "we tried and failed" into "we did not try" passed before and fails now |
+| 5 | `menu-coverage.test.js:791` | `match(/CTOC initialized for this project/)` | `match(/CTOC is set up for this project\./)` PLUS `settings.yaml` exists on disk | an implementation announcing setup without the artifact passed before and fails now |
+| 6 | `fresh-repository-is-its-own-project.test.js` case 2 | `didInit === true` | `setup.attempted === true` | shape only |
+| 7 | `CLAUDE.md` | documented 440 test files | 441, read live from `ls tests/*.test.js \| wc -l` | mechanical; this slice's own declared test file moved it |
+
+**None turned out to be asserting something still correct.** Two deserve their
+reasoning stated in full:
+
+- `menu-coverage.test.js:791` is a REAL contract assertion, not a mechanical
+  boolean: it pins that `main()` tells the human something about setup on first
+  open. Only the WORDING moved. It was RE-POINTED, never deleted — dropping a
+  contract assertion because its wording changed is how a contract quietly stops
+  being checked — and it was tightened to require that the note and the
+  filesystem AGREE, which is the pairing whose absence let this defect ship.
+- `fresh-repository-is-its-own-project.test.js` belongs to a sibling slice that
+  landed hours ago. **Its subject is unaffected**: root resolution reaching the
+  fresh repository, and that repository owning a settings file afterwards, are
+  asserted exactly as before and both still pass. Only the return SHAPE moved.
+  Stated as such in the test's own comment.
+
+### Verification Evidence — Step 14, verbatim
+
+Full gated run, `npm test`:
+
+    ℹ tests 10288
+    ℹ pass 10288
+    ℹ fail 0
+    ℹ skipped 0
+    [CTOC test-gate] coverage 99.03% (threshold 99%), skipped 0, failed 0
+    [CTOC test-gate] PASS
+
+Own suite: `tests 15, pass 15, fail 0, skipped 0`. Fences (`reachability`,
+`export-reachability`, `false-green-fence`): `tests 54, pass 54, fail 0`. Lint
+clean. The coverage floor was neither raised nor lowered and no whitelist entry
+was added; measured coverage rose to 99.03% against the floor of 99.
+
+Fail-open confirmed directly — with a root under a file, `ensureInitialized`
+returns `{attempted:true, ok:false, …, reason:"ENOTDIR: …"}` and does not throw.
+
+### What the human reads, before and after
+
+BEFORE, on a genuinely fresh directory AND on a directory where setup fails —
+the SAME sentence in both, which is the defect:
+
+    CTOC initialized for this project (automatic — no init command needed).
+
+AFTER, driving the real entry point in a real fresh directory:
+
+    CTOC is set up for this project.
+    (.ctoc/settings.yaml on disk: true)
+
+AFTER, on a directory holding an empty `.ctoc/`:
+
+    CTOC is not fully set up for this project. Missing: .ctoc/settings.yaml,
+    .ctoc/state/iron-loop.yaml, plans/vision, plans/canvas, plans/functional,
+    plans/implementation, plans/todo, plans/in-progress, plans/review,
+    plans/done. Nothing here will work properly until that is fixed.
+    (.ctoc/settings.yaml on disk: false)
+
+A healthy, already-set-up project stays silent.
