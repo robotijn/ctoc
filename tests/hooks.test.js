@@ -855,42 +855,26 @@ describe('Tool Input Parsing', () => {
 // ============================================================================
 
 describe('UI Formatting', () => {
-  const { blocked, colors } = require('../src/lib/ui');
+  const { colors } = require('../src/lib/ui');
 
-  describe('Blocked Message Formatting', () => {
-    it('formats blocked message with state', () => {
-      const state = createMockState({
-        feature: 'test-feature',
-        currentStep: 3
-      });
-
-      const output = blocked('Step 3 < 8 - planning not complete', state, 'EDIT');
-
-      assert.ok(output.includes('BLOCKED'), 'Should include BLOCKED');
-      assert.ok(output.includes('test-feature'), 'Should include feature name');
-      assert.ok(output.includes('3'), 'Should include current step');
-      assert.ok(output.includes('EDIT'), 'Should include tool type');
-    });
-
-    it('formats blocked message without feature', () => {
-      const state = createMockState({ feature: null, currentStep: 1 });
-
-      const output = blocked('No feature context', state, 'WRITE');
-
-      assert.ok(output.includes('No feature'), 'Should show no feature');
-      assert.ok(output.includes('WRITE'), 'Should include tool type');
-    });
-
-    it('includes instructions for proceeding', () => {
-      const state = createMockState({ feature: 'test', currentStep: 2 });
-
-      const output = blocked('test reason', state, 'EDIT');
-
-      assert.ok(output.includes('TO PROCEED'), 'Should include instructions');
-      assert.ok(output.includes('Gate 1'), 'Should mention Gate 1');
-      assert.ok(output.includes('Gate 2'), 'Should mention Gate 2');
-    });
-  });
+  // The `Blocked Message Formatting` cases that stood here were DELETED on
+  // 2026-07-20 along with `src/lib/ui.js#blocked`, which they were the only
+  // non-ui.test.js caller of. Two things justify removing them rather than
+  // re-pointing them:
+  //
+  //   1. `blocked` was never the message a human saw. This describe block is
+  //      titled "used by hooks for blocked messages" and that had stopped being
+  //      true: the enforcement path that actually blocks an edit is
+  //      src/hooks/PreToolUse.Edit.js, which composes its own message and never
+  //      required this module. These cases asserted a formatter no hook called.
+  //   2. One of them asserted the DEFECT — `output.includes('Gate 1')`,
+  //      "Should mention Gate 1". A gate number is CTOC's own internal code and
+  //      must never reach a screen. That assertion is INVERTED, not dropped:
+  //      tests/ui.test.js now fails if any printable gate number returns to
+  //      src/lib/ui.js.
+  //
+  // `colors` is untouched and still has a live caller in
+  // src/hooks/PreToolUse.Bash.js, so its cases stay exactly as they were.
 
   describe('Color Constants', () => {
     it('has expected color codes', () => {

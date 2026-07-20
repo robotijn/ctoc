@@ -107,13 +107,18 @@ describe('State Manager Constants', () => {
     assert.strictEqual(stateManager.STEP_NAMES[15], 'DOCUMENT');
   });
 
-  test('STEP_DESCRIPTIONS contains all 16 steps', () => {
-    assert.strictEqual(Object.keys(stateManager.STEP_DESCRIPTIONS).length, 16);
-    assert.ok(stateManager.STEP_DESCRIPTIONS[1].includes('idea'));
-    assert.ok(stateManager.STEP_DESCRIPTIONS[8].includes('TDD'));
-    assert.ok(stateManager.STEP_DESCRIPTIONS[13].includes('Security'));
-    assert.ok(stateManager.STEP_DESCRIPTIONS[15].includes('documentation'));
-  });
+  // The `STEP_DESCRIPTIONS contains all 16 steps` case that stood here was DELETED on
+  // 2026-07-20 along with the table itself. The table's only live reader was
+  // `progress()` in src/lib/ui.js, removed the same day as unreachable; leaving the
+  // table behind would have added a NEW entry to the dead-export baseline, whose only
+  // sanctioned exits are wire or delete.
+  //
+  // The case was deleted rather than inverted into a "must not exist" fence, and that
+  // is deliberate. STEP_DESCRIPTIONS was not a defect — it was legitimate data that
+  // lost its last reader — so a fence forbidding its return would block a future
+  // author who wires real step prose to a real screen. The guarantee that it cannot
+  // come back DEAD is already held, and held better, by the dead-export ratchet in
+  // tests/export-reachability.test.js.
 
   test('STATE_DIR points to ~/.ctoc/state', () => {
     const expected = path.join(os.homedir(), '.ctoc', 'state');

@@ -31,24 +31,17 @@ const STEP_NAMES = {
   16: 'FINAL-REVIEW'
 };
 
-const STEP_DESCRIPTIONS = {
-  1: 'Explore and shape the idea with the product-owner agent (optional)',
-  2: 'Assess the problem and context',
-  3: 'Align with user goals and business objectives',
-  4: 'Capture requirements and success criteria',
-  5: 'Plan the technical approach',
-  6: 'Design the architecture',
-  7: 'Write detailed specifications',
-  8: 'Write failing tests (TDD Red)',
-  9: 'Prepare environment (install deps, check prerequisites)',
-  10: 'Implement ALL code changes (TDD Green)',
-  11: 'Self-review checkpoint (logic, integration, error handling)',
-  12: 'Performance optimization and simplification',
-  13: 'Security vulnerability check',
-  14: 'Run ALL quality checks (lint, type, tests, coverage)',
-  15: 'Update documentation',
-  16: 'Final review - verify steps 8-15 complete'
-};
+// STEP_DESCRIPTIONS — a sixteen-entry table of one-line step blurbs — was DELETED
+// on 2026-07-20. Its only live reader was `progress()` in src/lib/ui.js, one of five
+// screen builders removed the same day as unreachable, and orphaning it would have
+// added a NEW entry to the dead-export baseline (a ratchet whose only sanctioned
+// exits are wire or delete). STEP_NAMES above is untouched: it has live readers in
+// src/hooks/PreToolUse.Bash.js and src/hooks/SessionStart.js.
+//
+// The step blurbs themselves are not lost — docs/IRON_LOOP.md and CLAUDE.md carry the
+// canonical step table, and they are what a human reads. If a live screen ever needs
+// per-step prose again, it should come from there rather than from a second copy that
+// drifts silently because nothing renders it.
 
 /**
  * Ensures state directory exists
@@ -238,7 +231,6 @@ function formatTimeSince(lastActivity) {
 module.exports = {
   STATE_DIR,
   STEP_NAMES,
-  STEP_DESCRIPTIONS,
   ensureStateDir,
   getStatePath,
   createState,
