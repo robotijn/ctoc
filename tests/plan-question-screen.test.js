@@ -39,6 +39,10 @@ const path = require('node:path');
 
 const streamingGate = require('../src/lib/streaming-gate.js');
 const precompute = require('../src/lib/streaming-precompute.js');
+const gateWords = require('../src/lib/gate-words.js');
+
+// Re-pointed 2026-07-20: a screen says what the MOMENT is, never its number.
+const NO_GATE_NUMBER = /\bgates?\s*[0-9]/i;
 const { route } = require('../src/lib/menu-screens.js');
 
 const STAGES = ['vision', 'canvas', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
@@ -182,11 +186,16 @@ describe('plan <ref> asks the PRODUCT question first', () => {
 
     const r = route(['plan', 'functional/export-rules.md'], root);
 
-    assert.doesNotMatch(
-      r.ask.questions[0].question,
-      /Approve .* across Gate/,
-      'a gate prompt must never pre-empt a waiting product question'
-    );
+    // INVERTED (2026-07-20): was `/Approve .* across Gate/`. That pattern can only
+    // catch the OLD wording, so after the re-wording it would have passed vacuously
+    // — a fence over a string that no longer exists. It now asserts the real thing:
+    // the question is the PRODUCT question, not the gate question for this edge, and
+    // no gate number reaches it either way.
+    assert.notEqual(r.ask.questions[0].question, gateWords.question('functional', 'Export rules'),
+      'a gate prompt must never pre-empt a waiting product question');
+    assert.doesNotMatch(r.ask.questions[0].question, NO_GATE_NUMBER);
+    assert.doesNotMatch(r.ask.questions[0].question, /Approve .* across Gate/,
+      'and the old gate wording must never come back');
     assert.match(r.ask.questions[0].question, /Which format should an export produce\?/);
   });
 });
@@ -202,8 +211,16 @@ describe('plan <ref> falls back to the gate question only when no product questi
 
     const r = route(['plan', 'review/no-questions.md'], root);
 
-    assert.match(r.ask.questions[0].question, /Approve no-questions across Gate 3\?/);
-    assert.equal(r.actions['Approve'], 'stream approve review/no-questions.md');
+    // INVERTED (2026-07-20): was `/Approve no-questions across Gate 3\?/` — the exact
+    // sentence the owner could not decode ("WHAT THE FUKCCCCKKK IS GATE 3"). The
+    // fallback still asks the gate decision; it now asks it in words, naming the plan
+    // by its TITLE rather than by its slug.
+    assert.equal(r.ask.questions[0].question, gateWords.question('review', 'No questions yet'));
+    assert.equal(r.ask.questions[0].header, gateWords.chip('review'));
+    assert.doesNotMatch(r.ask.questions[0].question, NO_GATE_NUMBER);
+    assert.ok(!r.ask.questions[0].question.includes('no-questions'),
+      'the slug names a file, not a piece of work — it must not reach the question');
+    assert.equal(r.actions[gateWords.approveLabel('review')], 'stream approve review/no-questions.md');
   });
 
   // The validation detail screen carries the human's own escape hatch: the
@@ -227,14 +244,18 @@ describe('plan <ref> falls back to the gate question only when no product questi
     assert.match(opts[0].description, /override/, 'the override escape hatch is disclosed');
   });
 
-  it('a passing plan leads with Approve, and still offers the validation detail', () => {
+  it('a passing plan leads with the affirmative, and still offers the validation detail', () => {
     const root = makeSandbox();
     // functional→implementation validates on far less than a full Iron Loop run.
     writePlan(root, 'functional', 'clean-plan', planBody('Clean plan'));
 
     const r = route(['plan', 'functional/clean-plan.md'], root);
     assert.equal(r.actions['Check validation'], 'validate functional/clean-plan.md');
-    assert.equal(r.actions['Approve'], 'stream approve functional/clean-plan.md');
+    // INVERTED (2026-07-20): the action map is keyed by the OPTION LABEL, so
+    // re-wording the affirmative necessarily re-keys it. The command VALUE is
+    // byte-identical — that is the half that must not move.
+    assert.equal(r.actions[gateWords.approveLabel('functional')], 'stream approve functional/clean-plan.md');
+    assert.equal(r.actions['Approve'], undefined, 'the old bare label is gone, not aliased');
   });
 
   it('a non-gate stage asks what should happen to the plan — with decisions, not routes', () => {

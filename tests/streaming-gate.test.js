@@ -21,6 +21,15 @@ const os = require('node:os');
 const path = require('node:path');
 
 const streamingGate = require('../src/lib/streaming-gate.js');
+const gateWords = require('../src/lib/gate-words.js');
+
+// The contract these assertions were RE-POINTED at (2026-07-20): a screen says what
+// the MOMENT is, never its number. Asserting against `gateWords` rather than against
+// a pasted literal means a copy edit to the vocabulary does not break these cases,
+// while a gate number, a raw stage name or a slug reaching a human-readable string
+// still does — that is what NO_GATE_NUMBER and NO_STAGE_WORD below are for.
+const NO_GATE_NUMBER = /\bgates?\s*[0-9]/i;
+const NO_STAGE_WORD = /\b(functional|implementation|todo|review)\b/i;
 const precompute = require('../src/lib/streaming-precompute.js');
 const { route } = require('../src/lib/menu-screens.js');
 
@@ -70,7 +79,7 @@ afterEach(() => {
 });
 
 describe('pendingGateDecisions — ordered, honest passesValidation, pure read', () => {
-  it('lists plans at all three gates with correct fromStage/toStage/gateName', () => {
+  it('lists plans at all three gates carrying the MOMENT phrasing, and no gate number anywhere', () => {
     const root = makeSandbox();
     writePlan(root, 'functional', 'func-pass', validFunctionalBody('func-pass'));
     writePlan(root, 'implementation', 'impl-pass', validImplBody('impl-pass'));
@@ -81,15 +90,36 @@ describe('pendingGateDecisions — ordered, honest passesValidation, pure read',
 
     assert.equal(decisions.length, 3, 'one decision per gate-source plan');
 
+    // The machine-facing edge identifiers are UNCHANGED — they drive the transition.
     assert.deepEqual(
-      { from: bySlug['func-pass'].fromStage, to: bySlug['func-pass'].toStage, gate: bySlug['func-pass'].gateName },
-      { from: 'functional', to: 'implementation', gate: 'Gate 1' });
+      { from: bySlug['func-pass'].fromStage, to: bySlug['func-pass'].toStage },
+      { from: 'functional', to: 'implementation' });
     assert.deepEqual(
-      { from: bySlug['impl-pass'].fromStage, to: bySlug['impl-pass'].toStage, gate: bySlug['impl-pass'].gateName },
-      { from: 'implementation', to: 'todo', gate: 'Gate 2' });
+      { from: bySlug['impl-pass'].fromStage, to: bySlug['impl-pass'].toStage },
+      { from: 'implementation', to: 'todo' });
     assert.deepEqual(
-      { from: bySlug['rev-fail'].fromStage, to: bySlug['rev-fail'].toStage, gate: bySlug['rev-fail'].gateName },
-      { from: 'review', to: 'done', gate: 'Gate 3' });
+      { from: bySlug['rev-fail'].fromStage, to: bySlug['rev-fail'].toStage },
+      { from: 'review', to: 'done' });
+
+    // What the human READS is the moment, sourced from the ONE vocabulary encoding.
+    for (const [slug, stage] of [['func-pass', 'functional'], ['impl-pass', 'implementation'], ['rev-fail', 'review']]) {
+      const d = bySlug[slug];
+      assert.equal(d.moment, gateWords.moment(stage), `${slug} carries its moment phrase`);
+      assert.equal(d.chip, gateWords.chip(stage), `${slug} carries its chip`);
+      assert.equal(d.approveLabel, gateWords.approveLabel(stage), `${slug} carries its affirmative label`);
+    }
+
+    // INVERTED (2026-07-20): this trio used to assert `gateName === 'Gate 1|2|3'`.
+    // The field is DELETED, not renamed — while it exists somebody renders it — so
+    // the case now fails if it ever comes back, or if any human-facing field on a
+    // descriptor names a gate number.
+    for (const d of decisions) {
+      assert.equal(d.gateName, undefined, 'gateName is deleted, not renamed — a field that exists gets rendered');
+      for (const field of ['moment', 'chip', 'approveLabel', 'title', 'summary']) {
+        assert.doesNotMatch(String(d[field]), NO_GATE_NUMBER,
+          `descriptor.${field} must never carry a gate number: ${d[field]}`);
+      }
+    }
 
     // Each carries a plan-view ref of the shape `stage/file.md` (the `plan <ref>`
     // route contract) and a title from the plan.
@@ -169,12 +199,21 @@ describe('streamingGateScreen — a focused single-decision question', () => {
 
     // Topic-labeled header + counter.
     assert.match(screen.text, /Topic: first-plan/);
-    assert.match(screen.text, /Gate 1 \(functional → implementation\)/);
+    // INVERTED (2026-07-20): was `/Gate 1 \(functional → implementation\)/`. The
+    // header now says what the MOMENT is; the number and the stage parenthetical are
+    // both gone, and this case fails if either returns.
+    assert.ok(screen.text.includes(gateWords.moment('functional')),
+      `the header names the moment: ${screen.text.split('\n')[0]}`);
+    assert.doesNotMatch(screen.text, NO_GATE_NUMBER, 'no gate number reaches the header');
+    assert.doesNotMatch(screen.text, NO_STAGE_WORD, 'no raw stage name reaches the header');
     assert.match(screen.text, /decision 1 of 1/);
 
     const q = screen.ask.questions[0];
-    assert.match(q.question, /Approve first-plan across Gate 1\?/);
-    assert.equal(q.header, 'Gate 1');
+    // INVERTED: was `/Approve first-plan across Gate 1\?/` and `header === 'Gate 1'`.
+    assert.equal(q.question, gateWords.question('functional', 'first-plan title'));
+    assert.equal(q.header, gateWords.chip('functional'));
+    assert.doesNotMatch(q.question, NO_GATE_NUMBER);
+    assert.doesNotMatch(q.header, NO_GATE_NUMBER);
   });
 
   it('recommends Approve (first option) ONLY when the plan passes validation', () => {
@@ -184,8 +223,14 @@ describe('streamingGateScreen — a focused single-decision question', () => {
     const screen = streamingGate.streamingGateScreen(root);
     const opts = screen.ask.questions[0].options;
 
-    assert.equal(opts[0].label, 'Approve', 'Approve is the recommended (first) option on a clean plan');
+    // INVERTED (2026-07-20): was the literal label 'Approve'. The affirmative option
+    // now answers the question in the human's own words, from the ONE vocabulary.
+    assert.equal(opts[0].label, gateWords.approveLabel('functional'),
+      'the affirmative option leads on a clean plan, worded as the human would answer');
+    assert.doesNotMatch(opts[0].label, NO_GATE_NUMBER);
     assert.match(opts[0].description, /Recommended/i);
+    assert.doesNotMatch(opts[0].description, NO_GATE_NUMBER,
+      'the recommendation text must not name a gate number either');
     // Open is present but NOT recommended.
     const open = opts.find(o => o.label === 'Open the plan');
     assert.ok(open, 'Open the plan is offered');
@@ -201,17 +246,31 @@ describe('streamingGateScreen — a focused single-decision question', () => {
 
     assert.equal(opts[0].label, 'Open the plan', 'Open is the recommended (first) option when validation fails');
     assert.match(opts[0].description, /Recommended/i);
-    const approve = opts.find(o => o.label === 'Approve');
-    assert.ok(approve, 'Approve is still offered (buried)');
+    // INVERTED (2026-07-20): found by the literal label 'Approve'; now by the
+    // vocabulary's affirmative label for this edge.
+    const approve = opts.find(o => o.label === gateWords.approveLabel('functional'));
+    assert.ok(approve, 'the affirmative option is still offered (buried)');
     assert.doesNotMatch(approve.description, /Recommended/i, 'a failing plan is never recommended for approval');
+    for (const o of opts) {
+      assert.doesNotMatch(o.label, NO_GATE_NUMBER, `option label names a gate number: ${o.label}`);
+      assert.doesNotMatch(o.description, NO_GATE_NUMBER, `option description names a gate number: ${o.description}`);
+    }
   });
 
-  it('maps replies: Approve→stream approve, Open→plan, Skip→stream skip, Other→stream comment', () => {
+  it('maps replies: the affirmative→stream approve, Open→plan, Skip→stream skip, Other→stream comment', () => {
     const root = makeSandbox();
     writePlan(root, 'functional', 'mapme', validFunctionalBody('mapme'));
 
     const screen = streamingGate.streamingGateScreen(root);
-    assert.equal(screen.actions['Approve'], 'stream approve functional/mapme.md');
+    // INVERTED (2026-07-20): the action MAP IS KEYED BY THE OPTION LABEL, so
+    // re-wording the label necessarily re-keys the action. The action VALUE — the
+    // command identifier the router consumes — is byte-identical, which is the half
+    // that must not move.
+    assert.equal(screen.actions[gateWords.approveLabel('functional')], 'stream approve functional/mapme.md');
+    assert.equal(screen.actions['Approve'], undefined, 'the old bare label is gone, not aliased');
+    for (const key of Object.keys(screen.actions)) {
+      assert.doesNotMatch(key, NO_GATE_NUMBER, `an option label names a gate number: ${key}`);
+    }
     assert.equal(screen.actions['Open the plan'], 'plan functional/mapme.md');
     assert.equal(screen.actions['Skip for now'], 'stream skip functional/mapme.md');
     assert.equal(screen.actions['Other'], 'stream comment functional/mapme.md');
@@ -435,8 +494,11 @@ describe('streamingGateScreen — precomputed questions vs simple-Approve fallba
     writePlan(root, 'functional', 'plain', validFunctionalBody('plain'));
 
     const screen = streamingGate.streamingGateScreen(root);
-    assert.match(screen.ask.questions[0].question, /Approve plain across Gate 1\?/);
-    assert.equal(screen.actions['Approve'], 'stream approve functional/plain.md');
+    // INVERTED (2026-07-20): was `/Approve plain across Gate 1\?/`.
+    assert.equal(screen.ask.questions[0].question, gateWords.question('functional', 'plain title'));
+    assert.doesNotMatch(screen.ask.questions[0].question, NO_GATE_NUMBER);
+    // INVERTED: keyed by the re-worded affirmative label; the command value is unchanged.
+    assert.equal(screen.actions[gateWords.approveLabel('functional')], 'stream approve functional/plain.md');
   });
 
   it('answering the LAST fork CROSSES the plan by sufficiency — the human approves nothing (X6)', () => {
