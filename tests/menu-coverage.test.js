@@ -165,19 +165,29 @@ describe('extractLiveAgentIds — present-but-empty flag is NOT authoritative', 
   });
 });
 
+// CONTRACT CHANGE (plan 00156, 2026-07-20). `ensureInitialized` returns a VERDICT
+// read back from the filesystem — `{ attempted, ok, created, skipped, missing,
+// reason }` — not a boolean. The boolean meant "nothing threw" and nothing more,
+// which is why the menu announced initialization on projects it had not
+// initialized. Each assertion below keeps its original subject and gains
+// precision: `true` conflated "it ran" with "it worked", and `false` conflated
+// "we did not try" with "we tried and failed".
 describe('ensureInitialized — auto-init boundary and fail-open catch', () => {
-  it('initializes a project that has no .ctoc/ and reports true', () => {
+  it('initializes a project that has no .ctoc/ and reports it worked', () => {
     const dir = mkTmp('menu-cov-init-');
     assert.ok(!fs.existsSync(path.join(dir, '.ctoc')), 'precondition');
-    const didInit = ensureInitialized(dir);
-    assert.equal(didInit, true);
+    const setup = ensureInitialized(dir);
+    assert.equal(setup.attempted, true);
+    assert.equal(setup.ok, true, `missing: ${JSON.stringify(setup.missing)}`);
     assert.ok(fs.existsSync(path.join(dir, '.ctoc')), '.ctoc/ created');
   });
 
-  it('is a no-op returning false when .ctoc/ already exists (kills init-always mutant)', () => {
+  it('is a no-op (attempted false) when .ctoc/ already exists (kills init-always mutant)', () => {
     const dir = mkTmp('menu-cov-noop-');
     fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true });
-    assert.equal(ensureInitialized(dir), false);
+    const setup = ensureInitialized(dir);
+    assert.equal(setup.attempted, false, 'no second initialization run');
+    assert.deepEqual(setup.created, [], 'and nothing written — the mutant stays dead');
   });
 
   it('FAILS OPEN (false, no throw) when initProject cannot run — root under a file', () => {
@@ -193,7 +203,13 @@ describe('ensureInitialized — auto-init boundary and fail-open catch', () => {
 
     // Assert — the catch swallowed the error; the menu is never blocked by init.
     assert.equal(threw, false, 'ensureInitialized must not propagate the init error');
-    assert.equal(result, false, 'fail-open returns false');
+    // Fail-open, now with the reason preserved instead of collapsed into `false`.
+    // "We tried and it failed" is a different fact from "we did not try", and the
+    // old boolean rendered both as the same value.
+    assert.equal(result.ok, false, 'fail-open reports failure, never success');
+    assert.equal(result.attempted, true, 'the attempt happened and is recorded as such');
+    assert.equal(typeof result.reason, 'string', 'the error message survives');
+    assert.ok(result.reason.length > 0, 'and is not empty');
   });
 });
 
@@ -756,7 +772,8 @@ describe('streaming primary view — render + key routing (the wiring under test
 
     // initProject still runs on first open (auto-init unchanged by the streaming wiring).
     const dir = mkTmp('menu-stream-init-');
-    assert.equal(ensureInitialized(dir), true, 'ensureInitialized initializes a fresh project');
+    const setup = ensureInitialized(dir);
+    assert.equal(setup.ok, true, 'ensureInitialized initializes a fresh project');
     assert.ok(fs.existsSync(path.join(dir, '.ctoc')), '.ctoc created on first open');
   });
 });
@@ -784,12 +801,27 @@ describe('main() — real behavior, cross-process (documented uncredited coverag
     return out;
   }
 
-  it('auto-initializes a project with NO .ctoc and prefixes the init note', () => {
+  it('auto-initializes a project with NO .ctoc and prefixes the setup note', () => {
+    // A REAL contract assertion, not a mechanical boolean: it pins that main()
+    // tells the human something about setup on first open. Only the WORDING
+    // changed (plan 00156) — "CTOC initialized for this project (automatic — no
+    // init command needed)" became "CTOC is set up for this project.", a sentence
+    // now derived from a read-back rather than from the absence of an exception.
+    // Re-pointed rather than deleted: dropping a contract assertion because its
+    // wording moved is how a contract quietly stops being checked.
+    //
+    // It is also TIGHTENED. The note and the filesystem must AGREE — that pairing
+    // is the assertion whose absence let the reported defect ship, and it is the
+    // subject of tests/menu-reports-what-init-did.test.js case 12.
     const dir = project({ withCtoc: false });
     const out = run(dir);
     const parsed = JSON.parse(out);
-    assert.match(parsed.text, /CTOC initialized for this project/, 'init note surfaced');
+    assert.match(parsed.text, /CTOC is set up for this project\./, 'setup note surfaced');
     assert.ok(fs.existsSync(path.join(dir, '.ctoc')), '.ctoc actually created by main()');
+    assert.ok(
+      fs.existsSync(path.join(dir, '.ctoc', 'settings.yaml')),
+      'and the artifact the note implies is genuinely on disk'
+    );
   });
 
   it('routes a sub-command (args mode) to a JSON screen, NOT the dashboard', () => {

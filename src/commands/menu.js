@@ -594,22 +594,173 @@ function handleResize() {
   render();
 }
 
-// Auto-initialize CTOC for this project if it has not been set up yet.
-// Opening the menu is the signal that the user wants CTOC in this project,
-// so initialization happens automatically — there is no separate init
-// command. The marker is a `.ctoc/` directory; initProject() is idempotent
-// and skips any file that already exists. Fails open so the menu never
-// blocks on an initialization problem.
-function ensureInitialized(projectPath) {
-  const root = projectPath || process.cwd();
-  if (safeFs.existsSync(path.join(root, '.ctoc'))) return false;
+// --- Setup read-back --------------------------------------------------------
+//
+// THE RULE: the menu never claims an action it did not take. The claim is
+// derived from a READ-BACK of the world, never from the absence of an exception.
+//
+// The defect this replaces (reported 2026-07-20, from a genuinely fresh
+// repository): `ensureInitialized` returned `true` for exactly one reason —
+// nothing threw — and DISCARDED `initProject`'s full `{ created, skipped }`
+// report. `initProject` itself returns a hardcoded `success: true`. So the
+// sentence "CTOC initialized for this project" was a statement about the
+// absence of an exception, not about any artifact existing. The owner was told
+// his project was set up; `.ctoc/settings.yaml` was not there, and the later
+// compliance write failed because of it.
+
+/** Project-relative artifact paths, in forward-slash form for DISPLAY. */
+const REQUIRED_SETTINGS = '.ctoc/settings.yaml';
+const REQUIRED_STATE = '.ctoc/state/iron-loop.yaml';
+const REQUIRED_STAGE_DIRS = [
+  'plans/vision', 'plans/canvas', 'plans/functional', 'plans/implementation',
+  'plans/todo', 'plans/in-progress', 'plans/review', 'plans/done'
+];
+
+/** Join a display path (forward-slash) onto a root, cross-platform. */
+function underRoot(root, relDisplayPath) {
+  return path.join(root, ...relDisplayPath.split('/'));
+}
+
+/**
+ * Is the compliance anchor in settings.yaml USABLE — not merely present?
+ *
+ * Two conditions, both derived from readers of record rather than from a local
+ * opinion about the file:
+ *
+ *  1. `regulatory-regime.loadActiveProfiles` — the READER of record — must
+ *     return a `profiles` array. A file it cannot read is unusable.
+ *  2. The `active_profiles:` line must be TARGETABLE by
+ *     `compliance-regime.writeActiveProfiles` — the WRITER of record. That
+ *     writer does a line-targeted replacement (deliberately: it must not
+ *     disturb the `enforcement`/`operations` blocks the hooks parse without a
+ *     YAML library), so its ONE precondition is that an `active_profiles:` line
+ *     with an INLINE value already exists. No anchor ⇒ no write, silently.
+ *
+ * Condition 2 is what actually bit the owner, and condition 1 alone CANNOT
+ * catch it: `loadActiveProfiles` happily returns `{ profiles: [] }` for a
+ * settings file with no `regulatory_regime:` block at all, and for no settings
+ * file at all. The anchor pattern below therefore mirrors the writer's own
+ * (`compliance-regime.js`, `lineRe` + the block-style guard) — that module
+ * exports no predicate to borrow, and adding one is outside this slice's
+ * declared files. Owner: `src/lib/compliance-regime.js`.
+ *
+ * @param {string} root
+ * @returns {boolean} true when a compliance answer could actually be persisted
+ */
+function complianceAnchorUsable(root) {
   try {
-    const { initProject } = require('../lib/init-project');
-    initProject(root);
-    return true;
+    const { loadActiveProfiles: readerOfRecord } = require('../lib/regulatory-regime');
+    if (!Array.isArray(readerOfRecord(root).profiles)) return false;
+
+    const content = safeFs.readFileSync(underRoot(root, REQUIRED_SETTINGS), 'utf8');
+    const m = /^([ \t]*)active_profiles:.*$/m.exec(content);
+    if (!m) return false;
+    // Block-style (`active_profiles:` with items on following `- ` lines) is
+    // REFUSED by the writer rather than corrupted, so it is unusable too.
+    const inlineValue = m[0].slice(m[0].indexOf(':') + 1).split('#')[0].trim();
+    return inlineValue !== '';
   } catch {
+    // A throwing reader means the anchor is not usable. That is a `missing`
+    // entry, never a crash — the menu must still render.
     return false;
   }
+}
+
+/**
+ * Read back the artifacts a working project actually needs.
+ *
+ * The required list is FIXED here, never derived from `initProject`'s report:
+ * a check derived from what the run decided to write would pass whenever it
+ * decided to write nothing, which is not a check.
+ *
+ * @param {string} root
+ * @returns {{ ok: boolean, missing: string[] }} `missing` holds project-relative
+ *   display paths only — never absolute paths, so the message cannot leak the
+ *   filesystem layout.
+ */
+function verifySetup(root) {
+  const missing = [];
+  if (!safeFs.existsSync(underRoot(root, REQUIRED_SETTINGS))) {
+    missing.push(REQUIRED_SETTINGS);
+  } else if (!complianceAnchorUsable(root)) {
+    missing.push(`${REQUIRED_SETTINGS} (no usable regulatory_regime.active_profiles anchor)`);
+  }
+  if (!safeFs.existsSync(underRoot(root, REQUIRED_STATE))) missing.push(REQUIRED_STATE);
+  for (const dir of REQUIRED_STAGE_DIRS) {
+    if (!safeFs.existsSync(underRoot(root, dir))) missing.push(dir);
+  }
+  return { ok: missing.length === 0, missing };
+}
+
+/**
+ * Auto-initialize CTOC for this project if it has not been set up yet, and
+ * return a VERDICT about the result that was read back from the filesystem.
+ *
+ * Opening the menu is the signal that the user wants CTOC in this project, so
+ * initialization happens automatically — there is no separate init command.
+ * `initProject()` is idempotent and skips any file that already exists.
+ *
+ * The read-back runs on BOTH paths, not only after an attempt. A `.ctoc/`
+ * directory that exists is not evidence the project is configured — an empty
+ * one, or one holding a settings file whose compliance anchor the writer can
+ * never target, is exactly the state that produced a silent failure weeks
+ * later. It counts as missing NOW.
+ *
+ * Fails open: a setup problem produces a MESSAGE, never a refusal to render.
+ * A caught error is `attempted: true, ok: false` with the message in `reason` —
+ * collapsing "we tried and failed" into "we did not try" is how the original
+ * defect was possible, since both were the value `false`.
+ *
+ * @param {string} [projectPath]
+ * @returns {{ attempted: boolean, ok: boolean, created: string[],
+ *   skipped: string[], missing: string[], reason: (string|null) }}
+ */
+function ensureInitialized(projectPath) {
+  const root = projectPath || process.cwd();
+  let attempted = false;
+  let created = [];
+  let skipped = [];
+  let reason = null;
+
+  if (!safeFs.existsSync(path.join(root, '.ctoc'))) {
+    attempted = true;
+    try {
+      const { initProject } = require('../lib/init-project');
+      const report = initProject(root);
+      // The report is KEPT. It records an intention to write; the read-back
+      // below records what the world actually holds.
+      if (report && Array.isArray(report.created)) created = report.created;
+      if (report && Array.isArray(report.skipped)) skipped = report.skipped;
+    } catch (err) {
+      reason = err && err.message ? err.message : String(err);
+    }
+  }
+
+  const { ok, missing } = verifySetup(root);
+  return { attempted, ok, created, skipped, missing, reason };
+}
+
+/**
+ * Render the one sentence the human reads about setup — or `null` for silence.
+ *
+ * Single source for both render sites (the interactive screen and the
+ * non-interactive JSON screen) so the two can never drift into telling the same
+ * person two different stories.
+ *
+ * @param {{ attempted: boolean, ok: boolean, missing: string[] }} setup
+ * @returns {string|null}
+ */
+function setupMessage(setup) {
+  if (!setup) return null;
+  if (setup.ok) {
+    // Silence is correct for a project that was already set up and is healthy.
+    return setup.attempted ? 'CTOC is set up for this project.' : null;
+  }
+  const list = setup.missing.length > 0 ? setup.missing.join(', ') : 'unknown artifacts';
+  const lead = setup.attempted
+    ? 'CTOC could not finish setting up this project.'
+    : 'CTOC is not fully set up for this project.';
+  return `${lead} Missing: ${list}. Nothing here will work properly until that is fixed.`;
 }
 
 /**
@@ -665,7 +816,8 @@ function extractLiveAgentIds(argv) {
 
 // Main entry point
 function main() {
-  const justInitialized = ensureInitialized(app.projectPath);
+  const setup = ensureInitialized(app.projectPath);
+  const setupNote = setupMessage(setup);
 
   // Check for non-interactive JSON mode (subcommands passed as args)
   // Usage: node menu.js [browse functional | plan stage/file | validate stage/file | menu commands]
@@ -707,7 +859,7 @@ function main() {
     // The interactive session opens on the PRIMARY streaming view — the first thing
     // the human sees after initProject is the streaming topic-Q&A, not the dashboard.
     app.streamView = true;
-    if (justInitialized) app.message = 'CTOC initialized for this project';
+    if (setupNote) app.message = setupNote;
     // PI4-s4 kickback: kick the landing area's related-plans pre-fetch so the panel
     // is populated on first paint (fire-and-forget, fail-open).
     activateCurrentArea();
@@ -736,8 +888,8 @@ function main() {
     if (needsComplianceRegimePrompt(app.projectPath)) {
       attachComplianceQuestion(result, app.projectPath);
     }
-    if (justInitialized) {
-      result.text = 'CTOC initialized for this project (automatic — no init command needed).\n\n' + result.text;
+    if (setupNote) {
+      result.text = setupNote + '\n\n' + result.text;
     }
     console.log(JSON.stringify(result, null, 2));
   }
@@ -752,6 +904,8 @@ module.exports = {
   splitCliArgs,
   extractLiveAgentIds,
   ensureInitialized,
+  verifySetup,
+  setupMessage,
   needsComplianceRegimePrompt,
   attachComplianceQuestion,
   enterSearchMode,
