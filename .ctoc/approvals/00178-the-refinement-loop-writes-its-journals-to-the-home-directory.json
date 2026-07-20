@@ -1,0 +1,9 @@
+{
+  "content_sha256": "7ba3ce2ebd5948bc83ba874b8c26d3afc1528ad221b486f609b2e3c0673febc1",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-20T11:56:02.868Z",
+  "approved_by": "human",
+  "plan_basename": "00178-the-refinement-loop-writes-its-journals-to-the-home-directory"
+}

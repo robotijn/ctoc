@@ -321,11 +321,22 @@ describe('init-project', () => {
       assert.ok(content.includes('enforcement:'));
     });
 
-    it('dry run does not create files', () => {
+    it('dry run does not create files, and does not CLAIM to have created any', () => {
       const result = initProject(tempDir, { dryRun: true });
 
-      assert.ok(result.success);
-      assert.ok(result.created.length > 0);
+      // A preview created nothing, so `created` is empty — that is the truth.
+      // This assertion is INVERTED from what it used to be: it used to require
+      // `created.length > 0` on a run that wrote nothing, which made a preview's
+      // report byte-identical to a real run's. If that defect returns, this
+      // fails.
+      assert.deepStrictEqual(result.created, [],
+        'a preview must not claim writes it did not perform');
+      assert.ok(result.wouldCreate.length > 0,
+        'the preview list lives under its own key, which a caller must ask for by name');
+      assert.strictEqual(result.dryRun, true,
+        'the report is structurally distinguishable from a real run');
+      assert.strictEqual(result.success, null,
+        'a preview has no success to report; `true` would repeat the lie in a new field');
 
       // No plan directories should exist
       for (const dir of PLAN_DIRS) {

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "dbad59aaff8ac7e9853f7912973ad1e44d3e5fc11ccd92b7782b58a0e4667b52",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-20T11:56:02.786Z",
+  "approved_by": "human",
+  "plan_basename": "00175-a-session-that-cannot-identify-a-project-invents-one"
+}

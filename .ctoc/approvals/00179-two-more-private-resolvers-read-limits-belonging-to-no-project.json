@@ -1,0 +1,9 @@
+{
+  "content_sha256": "966b6063c3b10872b49a1b46a9fb197f49c1e7ed2113f19efb2f28cdf8818f12",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-20T11:56:02.894Z",
+  "approved_by": "human",
+  "plan_basename": "00179-two-more-private-resolvers-read-limits-belonging-to-no-project"
+}
