@@ -1,0 +1,9 @@
+{
+  "content_sha256": "a52281ea1f5a799ec6bdc888f51415e319d2ca085bf10c45382cab6d01b69df9",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-20T10:17:33.165Z",
+  "approved_by": "human",
+  "plan_basename": "00170-the-edit-protection-says-out-loud-when-it-has-stopped-running"
+}
