@@ -1,0 +1,9 @@
+{
+  "content_sha256": "5b07fd6f9cea4dff095053ea50d9b5bf777be4ee04b57c3cdb2ac9fc91634cc0",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-20T10:17:33.193Z",
+  "approved_by": "human",
+  "plan_basename": "00171-a-session-records-which-build-of-ctoc-it-is-actually-running"
+}
