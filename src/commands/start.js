@@ -624,39 +624,57 @@ function underRoot(root, relDisplayPath) {
 /**
  * Is the compliance anchor in settings.yaml USABLE — not merely present?
  *
- * Two conditions, both derived from readers of record rather than from a local
- * opinion about the file:
+ * There is ONE reader of record for what a regulatory_regime anchor means:
+ * `regulatory-regime.loadActiveProfiles`. This check DEFERS to it rather than
+ * re-deriving a stricter opinion — an earlier version imported that reader,
+ * named the binding `readerOfRecord`, then IGNORED its verdict and demanded a
+ * literal non-empty inline `active_profiles:` line. That rejected the exact
+ * value CTOC's own writer produces when the human DECLINES a regime
+ * (`declined: true`), so a correctly-configured demo with no regulated data read
+ * as "not set up". Two predicates for one fact, disagreeing. This is the fix:
+ * one predicate, honoring what the reader honors.
  *
- *  1. `regulatory-regime.loadActiveProfiles` — the READER of record — must
- *     return a `profiles` array. A file it cannot read is unusable.
- *  2. The `active_profiles:` line must be TARGETABLE by
- *     `compliance-regime.writeActiveProfiles` — the WRITER of record. That
- *     writer does a line-targeted replacement (deliberately: it must not
- *     disturb the `enforcement`/`operations` blocks the hooks parse without a
- *     YAML library), so its ONE precondition is that an `active_profiles:` line
- *     with an INLINE value already exists. No anchor ⇒ no write, silently.
+ * An anchor is USABLE when the reader can DETERMINE the regime from it:
  *
- * Condition 2 is what actually bit the owner, and condition 1 alone CANNOT
- * catch it: `loadActiveProfiles` happily returns `{ profiles: [] }` for a
- * settings file with no `regulatory_regime:` block at all, and for no settings
- * file at all. The anchor pattern below therefore mirrors the writer's own
- * (`compliance-regime.js`, `lineRe` + the block-style guard) — that module
- * exports no predicate to borrow, and adding one is outside this slice's
- * declared files. Owner: `src/lib/compliance-regime.js`.
+ *  1. The reader must return a `profiles` array. A file it cannot read is
+ *     unusable.
+ *  2. `declined === true` — the durable "None" marker CTOC's own writer stamps
+ *     when the human declines an EU compliance regime — is a COMPLETE, valid
+ *     anchor. The reader treats it as a first-class choice; so does this check.
+ *     This is the fact the earlier stricter predicate ignored.
+ *  3. Otherwise, an `active_profiles:` line with an INLINE value must exist — a
+ *     non-empty inline list (`[gdpr]`) or an explicit empty list (`[]`, meaning
+ *     "none selected"). This is unchanged from before: a bare header or a
+ *     block-style list (items on following `- ` lines) is REFUSED by the writer
+ *     of record (`compliance-regime.writeActiveProfiles` does a line-targeted
+ *     inline replacement and cannot target a block list), so it is unusable — a
+ *     compliance answer could never be persisted onto it. The presence must be
+ *     detected here because the reader collapses "active_profiles: []" and "no
+ *     active_profiles line at all" to the same `profiles: []`.
+ *
+ * The one NOT-usable state, absent an inline anchor, is a block that carries
+ * NEITHER a usable active_profiles line NOR `declined: true`: a genuinely
+ * unconfigured anchor, still correctly flagged.
  *
  * @param {string} root
- * @returns {boolean} true when a compliance answer could actually be persisted
+ * @returns {boolean} true when the reader of record can determine the regime
  */
 function complianceAnchorUsable(root) {
   try {
     const { loadActiveProfiles: readerOfRecord } = require('../lib/regulatory-regime');
-    if (!Array.isArray(readerOfRecord(root).profiles)) return false;
+    const anchor = readerOfRecord(root);
+    if (!Array.isArray(anchor.profiles)) return false;
 
+    // Defer to the reader of record: `declined: true` is a complete regime
+    // choice CTOC wrote and this same reader honors — not an unset anchor.
+    if (anchor.declined === true) return true;
+
+    // Otherwise usable iff an `active_profiles:` line carries an INLINE value.
+    // A bare header / block-style list is refused by the writer (unchanged), and
+    // absent-line AND not-declined is the one unconfigured state.
     const content = safeFs.readFileSync(underRoot(root, REQUIRED_SETTINGS), 'utf8');
     const m = /^([ \t]*)active_profiles:.*$/m.exec(content);
     if (!m) return false;
-    // Block-style (`active_profiles:` with items on following `- ` lines) is
-    // REFUSED by the writer rather than corrupted, so it is unusable too.
     const inlineValue = m[0].slice(m[0].indexOf(':') + 1).split('#')[0].trim();
     return inlineValue !== '';
   } catch {
@@ -683,7 +701,7 @@ function verifySetup(root) {
   if (!safeFs.existsSync(underRoot(root, REQUIRED_SETTINGS))) {
     missing.push(REQUIRED_SETTINGS);
   } else if (!complianceAnchorUsable(root)) {
-    missing.push(`${REQUIRED_SETTINGS} (no usable regulatory_regime.active_profiles anchor)`);
+    missing.push(`${REQUIRED_SETTINGS} (no usable regulatory_regime anchor: neither active_profiles nor declined)`);
   }
   if (!safeFs.existsSync(underRoot(root, REQUIRED_STATE))) missing.push(REQUIRED_STATE);
   for (const dir of REQUIRED_STAGE_DIRS) {
