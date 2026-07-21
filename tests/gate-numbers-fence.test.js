@@ -601,3 +601,126 @@ describe('the enforcer surfaces the fence on demand', () => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────
+//  6. The fence covers its OWN reachable edge branches with real faults
+// ─────────────────────────────────────────────────────────────────────
+//
+// Each case drives a real edge the fence must handle, with an assertion a caller
+// relies on — confinement, unavailable-on-unparseable, degrade-not-crash — never
+// merely "a line executed". Every branch here was proven to bite by mutation (see
+// the plan's Step 8 record); a case that does not bite is the coverage theatre this
+// repository forbids.
+
+// chmod does NOT revoke read on win32 and is bypassed as uid 0 (root). One branch —
+// readFileSync failing on a path the walk already classified as a regular `.js` file
+// — has NO cross-platform inducer: the walk's own isFile() gate means a
+// directory-named-`*.js` is recursed into, not read, so EISDIR never reaches the
+// read (proven by probe). It is driven by chmod and announces a LOUD skip where
+// revocation is unavailable, exactly as the sibling stale-scan slice does for its
+// own read-failed branch — never a silent no-op, which would itself be a check
+// reporting a verdict it never earned.
+const CAN_REVOKE_READ =
+  process.platform !== 'win32' &&
+  typeof process.getuid === 'function' &&
+  process.getuid() !== 0;
+
+const NO_REVOKE_REASON =
+  process.platform === 'win32'
+    ? 'SKIPPED (stated reason): win32 mode bits do not revoke read, so the readFileSync fault cannot be induced.'
+    : 'SKIPPED (stated reason): uid 0 (root) bypasses permission bits, so the readFileSync fault cannot be induced.';
+
+describe('the fence covers its own reachable edge branches with real faults', () => {
+  let dir;
+  before(() => { dir = makeTmp('edge'); });
+  after(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+
+  it('a registry entry that resolves outside the root makes the WHOLE scan unavailable', () => {
+    // SCREEN_MODULES is frozen and internal, so a genuine `../`-escaping entry cannot
+    // be injected without a source change. The identical confinement guard fires when
+    // the project root is the filesystem root: every clean `src/…` entry then resolves
+    // to `/src/…`, which the guard rejects because `root + separator` is `//` and the
+    // absolute path does not start with it. The caller-visible guarantee: a registry
+    // can never make the fence read a file outside the root.
+    const fsRoot = path.parse(REPO_ROOT).root;
+    const res = scanRegistry(fsRoot);
+    assert.equal(res.available, false,
+      'a confinement rejection must make the scan unavailable, not clean');
+    assert.match(res.reason, /resolves outside the project root/,
+      'the reason must name the confinement failure, not some downstream read error');
+    assert.deepEqual(res.findings, []);
+  });
+
+  it('an ESM import/export specifier that looks like a gate number is excluded, not flagged', () => {
+    // `import a from './gate 3 mod'` — the specifier is an identifier wearing quotes.
+    // Its text matches the written pattern, so ONLY the ImportDeclaration/
+    // ExportDeclaration exclusion keeps it from firing. Plain ECMAScript, parsed clean
+    // under ScriptKind.JS. (Distinct from case 7, which covers the require() form.)
+    const findings = findingsOf(fixture(dir, 'esm.js', [
+      "import a from './gate 3 mod';",
+      "export { b } from './gates 2 helper';",
+      'const x = 1;',
+      'export { a, b, x };',
+    ].join('\n')));
+    assert.deepEqual(findings, [],
+      `a module specifier must never be a finding, whatever its text; got ${JSON.stringify(findings)}`);
+  });
+
+  it('a src path that is a regular FILE degrades to "no screens", never crashing the walk', () => {
+    // findUnregisteredScreens walks src/. When that path is a regular file,
+    // readdirSync throws ENOTDIR — a genuine cross-platform I/O fault, no permission
+    // bits, no mock. walkDir only recurses into entries a parent readdir already
+    // classified as directories, so the initial walk of src IS the reachable
+    // readdir-throw point. The walk swallows it and reports no screen module rather
+    // than taking down the sweep.
+    const root = makeTmp('src-is-file');
+    try {
+      fs.writeFileSync(path.join(root, 'src'), 'this is a file, not a directory\n');
+      let res;
+      assert.doesNotThrow(() => { res = findUnregisteredScreens(root); },
+        'an unreadable src path must degrade, not throw');
+      assert.equal(res.available, true, `reason: ${res.reason}`);
+      assert.deepEqual(res.modules, []);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('a module with a syntax error makes findUnregisteredScreens UNAVAILABLE, not clean', () => {
+    // The false-green shape this module exists to refuse: an unparseable module must
+    // yield available:false, never an empty (passing) modules list.
+    const root = makeTmp('syntax');
+    try {
+      fixture(root, 'src/broken.js', 'function ( { ][ \n');
+      const res = findUnregisteredScreens(root);
+      assert.equal(res.available, false,
+        'an unparseable module must never report an empty, passing modules list');
+      assert.match(res.reason, /syntax error/, 'the reason must name the parse failure');
+      assert.deepEqual(res.modules, []);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('an unreadable module file makes findUnregisteredScreens UNAVAILABLE, naming the file', () => {
+    if (!CAN_REVOKE_READ) {
+      console.log(`[gate-numbers-fence] unreadable-module-file — ${NO_REVOKE_REASON}`);
+      return;
+    }
+    const root = makeTmp('unreadable-mod');
+    const secret = path.join(root, 'src', 'secret.js');
+    try {
+      fixture(root, 'src/secret.js', 'const x = 1;\nmodule.exports = { x };\n');
+      fs.chmodSync(secret, 0o000);
+      const res = findUnregisteredScreens(root);
+      assert.equal(res.available, false,
+        'a module whose read fails must be unavailable, never an empty passing list');
+      assert.match(res.reason, /could not read/, 'the reason must say it could not read the file');
+      assert.match(res.reason, /secret\.js/, 'and it must name the file');
+      assert.deepEqual(res.modules, []);
+    } finally {
+      try { fs.chmodSync(secret, 0o644); } catch { /* best effort — dir removal does not need it */ }
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
