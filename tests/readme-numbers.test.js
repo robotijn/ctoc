@@ -132,7 +132,7 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
   });
 
-  it('src/lib/: 108 JS modules at top level (gate-words.js — the vocabulary that keeps a gate number off a screen)', () => {
+  it('src/lib/: 109 JS modules at top level (human-facing-scan.js — the fence that keeps a gate number off a screen)', () => {
     // 104 → 105: `src/lib/approval-residency.js` was extracted out of
     // `src/hooks/human-gate-check.js` so `src/lib/plan-coverage.js` could consult the
     // SAME approval predicate — a library may not require a hook, and a second
@@ -152,8 +152,15 @@ describe('Ground truth — project counts (sanity checks)', () => {
     // ("nothing is finished until you say so"), per site type. It is one module and
     // not four inline phrasings for the reason above: four encodings drift, and a
     // fence over a phrase living in four places cannot say which is canonical.
+    // 108 → 109: `src/lib/human-facing-scan.js`. Screens were STILL printing gate
+    // numbers ("Gate 3", the composed `` `Gate ${n}` `` whose source has no digit) at
+    // a human across the menu-router screens AND the whole src/areas/* TUI family — a
+    // prose rule against it kept silently un-truing. This module is the FENCE: it
+    // PARSES every screen-producing module (a text search cannot see the composed
+    // shape) and fails the build when a gate number reaches a person, and it defends
+    // its own registry against rot by detecting both screen contracts.
     // This is the live disk count, raised because the disk changed.
-    assert.equal(countTopLevelJs("src/lib"), 108);
+    assert.equal(countTopLevelJs("src/lib"), 109);
   });
 
   it('src/commands/: 3 slash command specs — menu, push, update (v6.9.32)', () => {

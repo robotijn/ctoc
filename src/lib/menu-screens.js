@@ -47,6 +47,9 @@ const streamingGate = require('./streaming-gate');
 // approval provenance was never migrated. This is that report's READER — a report
 // path with no reader is the same defect R3-D fixed for deploy-ready.
 const gateMigration = require('./gate-migration');
+// The ONE encoding of human-facing gate wording — say the MOMENT/decision, never the
+// gate number, which is an internal code a person cannot decode.
+const gateWords = require('./gate-words');
 
 // R3-B item 4: the terminal set is IMPORTED from the registry — there is exactly ONE
 // encoding. The former local mirror (`['done','failed','orphaned']`) was STALE in both
@@ -1066,8 +1069,10 @@ function inboxGatesScreen(projectPath) {
   const rows = items.map((it) => {
     const plan = stripCtl(it.plan);
     const stage = stripCtl(it.stage);
-    const gate = stripCtl(String(it.gate));
-    return `${plan}  [${stage}]  Gate ${gate}  plans/${stage}/${plan}.md`;
+    // Say the DECISION the plan awaits, not the gate number: gate-words maps the
+    // stage to the compact human label ("Finished?", "Build it?"). The number was an
+    // internal code the reader cannot decode.
+    return `${plan}  [${stage}]  ${gateWords.chip(it.stage)}  plans/${stage}/${plan}.md`;
   });
   return _inboxDoorScreen('Plans at gates', items.length, rows, 'No plans at gates.');
 }

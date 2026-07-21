@@ -434,15 +434,25 @@ describe('inbox door screens — aggregation, age, capping, sanitization', () =>
     assert.doesNotMatch(r.text, /\x9b/, 'C1 CSI is stripped');
   });
 
-  test('plans_at_gates_door_lists_each_source_stage_with_its_gate_number', () => {
+  test('plans_at_gates_door_names_the_decision_never_the_gate_number', () => {
+    // INVERTED (plan 00154). Contract from OUTSIDE the test: the owner reads a gate
+    // number as an undecodable internal code ("no numbers"), and gate-words is the
+    // one encoding of what each moment IS in plain words. The TEST was wrong, not the
+    // code: it asserted the door PRINT "Gate 1/2/3", the exact string the owner
+    // objected to; the human replaced that contract. So the number is now a case that
+    // FAILS if it ever returns: each row must carry the decision label (chip) and no
+    // "Gate N", where N is a gate digit.
     const root = mkProject();
     writePlan(root, 'functional', 'f1');
     writePlan(root, 'implementation', 'i1');
     writePlan(root, 'review', 'r1');
     const r = menu.route(['inbox', 'gates'], root);
-    assert.match(r.text, /f1\s+\[functional\]\s+Gate 1\s+plans\/functional\/f1\.md/);
-    assert.match(r.text, /i1\s+\[implementation\]\s+Gate 2\s+plans\/implementation\/i1\.md/);
-    assert.match(r.text, /r1\s+\[review\]\s+Gate 3\s+plans\/review\/r1\.md/);
+    // The decision, in the human's words — never the number.
+    assert.match(r.text, /f1\s+\[functional\]\s+Build this\?\s+plans\/functional\/f1\.md/);
+    assert.match(r.text, /i1\s+\[implementation\]\s+Build it\?\s+plans\/implementation\/i1\.md/);
+    assert.match(r.text, /r1\s+\[review\]\s+Finished\?\s+plans\/review\/r1\.md/);
+    // The leak, fenced: no gate number reaches this door again.
+    assert.doesNotMatch(r.text, /\bGate\s+[0-3]\b/, 'a gate number returned to the door');
   });
 
   test('empty_gates_door_shows_the_empty_message', () => {
