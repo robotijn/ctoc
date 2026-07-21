@@ -12,22 +12,34 @@ const safeFs = require('../lib/safe-fs');
 const { loadState, createState, saveState, STEP_NAMES, isInterruptedSession, formatTimeSince } = require('../lib/state-manager');
 const { detectStack } = require('../lib/stack-detector');
 const { getVersion } = require('../lib/version');
-const { findProjectRoot: findRoot } = require('../lib/project-root');
+const { describeProjectRoot } = require('../lib/project-root');
 const { writeToTerminal } = require('../lib/ui');
 
 /**
- * Find project root by looking for .git, .ctoc, or plans directory
- * Uses the shared utility from lib/project-root.js
- */
-function findProjectRoot(startDir) {
-  return findRoot(startDir);
-}
-
-/**
- * Main session start handler
+ * Main session start handler.
+ *
+ * THE RULE (2026-07-20): a session never creates the evidence it will later read as
+ * proof that a directory is a project. Scaffolding — the plan tree, the learnings
+ * tree, the plan-index files, and CLAUDE.md — runs ONLY when resolution reports an
+ * EVIDENCED marker (`marker !== 'fallback'`: a `.ctoc` root, a `plans` tree, a `.git`
+ * repository, or a project file found on disk).
+ *
+ * The self-ratifying loop this closes: in an empty directory `describeProjectRoot`
+ * returns `marker: 'fallback'` — an explicit admission it found no project. The old
+ * hook discarded that and created `plans/vision` … `plans/done`; on the NEXT session
+ * those very directories resolved as a confident `plans` marker, and CLAUDE.md (which
+ * the lessons injector created) resolved as a `project-file` marker. The guess became
+ * indistinguishable from a fact and ratified itself. Ownership of first-time
+ * scaffolding belongs to the menu (`initProject`), where opening the menu is the
+ * signal the human wants CTOC here; opening a terminal in a directory is not.
  */
 async function main() {
-  const projectPath = findProjectRoot(process.cwd());
+  const rootInfo = describeProjectRoot(process.cwd());
+  const projectPath = rootInfo.root;
+  // Scaffolding requires an evidenced identification. `fallback` means resolution
+  // itself could not identify a project — the one case where writing manufactures
+  // the evidence a later session reads as proof.
+  const identified = rootInfo.marker !== 'fallback';
 
   // 1. Detect project stack
   const stack = detectStack(projectPath);
@@ -73,52 +85,71 @@ async function main() {
     saveState(projectPath, state);
   }
 
-  // 5. Ensure project directories exist (created on first run)
-  const directories = [
-    // Plans workflow (matches init-project.js PLAN_DIRS)
-    'plans/vision',
-    'plans/canvas',          // PLAN_DIRS already has it; SessionStart was missing it
-    'plans/functional',
-    'plans/implementation',
-    'plans/todo',
-    'plans/in-progress',
-    'plans/review',
-    'plans/done',
-    // Learnings system
-    'learnings/pending',
-    'learnings/approved',
-    'learnings/applied'
-  ];
+  // 5. Scaffolding + every project-WRITING side effect run ONLY for an EVIDENCED
+  //    project. When resolution admits it could not identify a project
+  //    (`marker === 'fallback'`) the session writes NOTHING into the working
+  //    directory — see the self-ratifying-loop note on `main()`. State save at step 4
+  //    is deliberately NOT gated: it writes only to the global `~/.ctoc/state/`
+  //    (keyed by a hash of the project path), never into the project tree, so it can
+  //    neither fabricate project identity nor feed any resolver marker.
+  if (identified) {
+    // 5a. Ensure project directories exist (created on first run). Fail-open: a
+    //     broken filesystem (e.g. `plans` exists as a FILE) must never crash session
+    //     start — the same fail-open contract every other side effect below already has.
+    const directories = [
+      // Plans workflow (matches init-project.js PLAN_DIRS)
+      'plans/vision',
+      'plans/canvas',          // PLAN_DIRS already has it; SessionStart was missing it
+      'plans/functional',
+      'plans/implementation',
+      'plans/todo',
+      'plans/in-progress',
+      'plans/review',
+      'plans/done',
+      // Learnings system
+      'learnings/pending',
+      'learnings/approved',
+      'learnings/applied'
+    ];
 
-  for (const subdir of directories) {
-    const dir = path.join(projectPath, subdir);
-    if (!safeFs.existsSync(dir)) {
-      safeFs.mkdirSync(dir, { recursive: true });
+    try {
+      for (const subdir of directories) {
+        const dir = path.join(projectPath, subdir);
+        if (!safeFs.existsSync(dir)) {
+          safeFs.mkdirSync(dir, { recursive: true });
+        }
+      }
+    } catch (err) {
+      console.error('[CTOC] Project directory scaffolding skipped:', err && err.message);
     }
-  }
 
-  // 5a. Plan-index backfill kick (fire-and-forget, fail-open). Never blocks session
-  //     start: the actual reconcile + calibration run in a DETACHED child process;
-  //     this only spawns and returns. Double-guarded — kickBackfillBackground is
-  //     itself non-throwing, and this try/catch is a belt-and-braces backstop so a
-  //     missing/broken bootstrap module can NEVER break session start (the pi1 /
-  //     task-reconcile precedent). Backfilling CTOC's own plans/ is desirable (it
-  //     dogfoods), so no self-repo guard here.
-  try {
-    const { isBackfillNeeded, kickBackfillBackground } = require('../lib/plan-index/bootstrap');
-    if (isBackfillNeeded(projectPath)) kickBackfillBackground(projectPath);
-  } catch (err) {
-    console.error('[CTOC] Plan-index backfill kick skipped:', err && err.message);
-  }
+    // 5b. Plan-index backfill kick (fire-and-forget, fail-open). Never blocks session
+    //     start: the actual reconcile + calibration run in a DETACHED child process;
+    //     this only spawns and returns. Double-guarded — kickBackfillBackground is
+    //     itself non-throwing, and this try/catch is a belt-and-braces backstop so a
+    //     missing/broken bootstrap module can NEVER break session start (the pi1 /
+    //     task-reconcile precedent). It writes `.ctoc/index/` under the root, so it is
+    //     inside the `identified` guard — under a fallback root it would manufacture a
+    //     `.ctoc` the human never asked for.
+    try {
+      const { isBackfillNeeded, kickBackfillBackground } = require('../lib/plan-index/bootstrap');
+      if (isBackfillNeeded(projectPath)) kickBackfillBackground(projectPath);
+    } catch (err) {
+      console.error('[CTOC] Plan-index backfill kick skipped:', err && err.message);
+    }
 
-  // 5b. Ensure CTOC-managed operating-lessons block in CLAUDE.md (fail-open).
-  //     MUST NOT throw, block, or perceptibly slow session start. Double-guarded:
-  //     ensureLessonsBlock itself never throws; the try/catch inside maybeInjectLessons
-  //     is a belt-and-braces backstop. The self-repo guard now keys on PACKAGE IDENTITY
-  //     (the project's own package.json name === 'ctoc', via the detector's isCtocRepo)
-  //     rather than the running hook file's __dirname — so CTOC's own hand-maintained
-  //     CLAUDE.md is protected from ANY install location (installed plugin or dev repo).
-  maybeInjectLessons(projectPath);
+    // 5c. Ensure CTOC-managed operating-lessons block in CLAUDE.md (fail-open).
+    //     MUST NOT throw, block, or perceptibly slow session start. Double-guarded:
+    //     ensureLessonsBlock itself never throws; the try/catch inside maybeInjectLessons
+    //     is a belt-and-braces backstop. The self-repo guard now keys on PACKAGE IDENTITY
+    //     (the project's own package.json name === 'ctoc', via the detector's isCtocRepo)
+    //     rather than the running hook file's __dirname — so CTOC's own hand-maintained
+    //     CLAUDE.md is protected from ANY install location (installed plugin or dev repo).
+    //     It CREATES CLAUDE.md when absent, and CLAUDE.md is itself a `project-file`
+    //     resolver marker — so it too lives inside the `identified` guard, closing the
+    //     second self-ratifying route (a fabricated CLAUDE.md becoming tomorrow's proof).
+    maybeInjectLessons(projectPath);
+  }
 
   // 6. Check for updates (sync cache check only — no stderr output in hooks)
   const version = getVersion();
@@ -140,7 +171,7 @@ async function main() {
   //    sitting at a gate without their decision questions, append the session-driven
   //    dispatch directive so the SESSION MODEL itself dispatches the producers — the
   //    plugin never spawns a second Claude (fail-open: any error → no directive).
-  const context = generateContext(stack, state, version, updateInfo, selfCheckSummary);
+  const context = generateContext(stack, state, version, updateInfo, selfCheckSummary, rootInfo);
   const directive = questionDispatchDirective(projectPath);
   console.log(directive ? context + directive : context);
 }
@@ -342,9 +373,37 @@ function formatFrameworksLine(stack) {
 }
 
 /**
- * Generate CTOC context instructions for Claude
+ * Sanitize a resolver `fallbackReason` for the injected session context (SECURE).
+ *
+ * The reason can carry a raw filesystem error message (`walk failed: EACCES … '/…'`),
+ * which would leak an absolute path — and on some machines a user name — into the
+ * session context, and an unbounded message could flood it. Absolute paths (POSIX and
+ * Windows) are replaced with `<path>`, whitespace is collapsed, and the result is
+ * bounded so no stack frame can fit. The common reason ("no project marker found in
+ * the examined ancestry") contains no path and is returned verbatim.
+ *
+ * @param {*} reason - the resolver's `fallbackReason` (any type; coerced safely).
+ * @returns {string} a bounded, path-free diagnostic safe to inject.
  */
-function generateContext(stack, state, version, updateInfo, selfCheckSummary) {
+function sanitizeReason(reason) {
+  return String(reason || '')
+    .replace(/[A-Za-z]:\\[^\s'"]*/g, '<path>')      // Windows absolute path
+    .replace(/\/[^\s'"]*/g, '<path>')                // POSIX absolute path (ReDoS-safe: single quantifier)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
+}
+
+/**
+ * Generate CTOC context instructions for Claude.
+ *
+ * @param {Object} [rootInfo] - the FULL `describeProjectRoot` verdict. The banner
+ *   names the RESOLVED root (not `process.cwd()`), discloses a working-directory
+ *   mismatch when `sameAsCwd === false`, and, when `marker === 'fallback'`, tells the
+ *   human nothing was created and how to set the directory up. Absent (legacy 5-arg
+ *   callers) → behaviour is exactly as before, rendered from `process.cwd()`.
+ */
+function generateContext(stack, state, version, updateInfo, selfCheckSummary, rootInfo) {
   const stepName = state?.feature ? STEP_NAMES[state.currentStep] : 'Ready';
   const updateLine = updateInfo?.updateAvailable
     ? `\nUpdate available: ${updateInfo.currentVersion} → ${updateInfo.latestVersion} (run: git pull origin main)`
@@ -352,6 +411,18 @@ function generateContext(stack, state, version, updateInfo, selfCheckSummary) {
   const selfCheckLine = selfCheckSummary ? `\n${selfCheckSummary}` : '';
   const databasesLine = formatDatabasesLine(stack);
   const frameworksLine = formatFrameworksLine(stack);
+
+  // The banner renders from the RESOLVED root, never the working directory. A human
+  // who opened a terminal in repo/src/lib/ is operating on repo/, and must be told so.
+  const resolvedRoot = rootInfo && typeof rootInfo.root === 'string' ? rootInfo.root : process.cwd();
+  const workingDir = rootInfo && typeof rootInfo.cwd === 'string' ? rootInfo.cwd : process.cwd();
+  const mismatch = rootInfo ? rootInfo.sameAsCwd === false : false;
+  const projectLine = mismatch
+    ? `Project: ${path.basename(resolvedRoot)}  (working directory: ${path.basename(workingDir)})`
+    : `Project: ${path.basename(resolvedRoot)}`;
+  const unidentifiedLine = rootInfo && rootInfo.marker === 'fallback'
+    ? `\nCTOC: no project identified here (${sanitizeReason(rootInfo.fallbackReason)}). Nothing has been created. Run /ctoc:start to set this directory up as a CTOC project.`
+    : '';
 
   // NOTE: This 16-step banner is the compact, machine-readable copy. The CANONICAL
   // operating-lessons + methodology reference live in .ctoc/templates/operating-lessons.md.
@@ -362,7 +433,7 @@ function generateContext(stack, state, version, updateInfo, selfCheckSummary) {
 ============================================================
 CTOC v${version || '?'} - Your Virtual CTO is Active${updateLine}
 ============================================================
-Project: ${path.basename(process.cwd())}
+${projectLine}${unidentifiedLine}
 Stack: ${stack.languages.join('/') || 'unknown'}${databasesLine}${frameworksLine}
 Iron Loop: ${state?.feature ? `Step ${state.currentStep} (${stepName})` : 'Ready for new feature'}${selfCheckLine}
 

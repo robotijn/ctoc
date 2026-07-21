@@ -1,0 +1,9 @@
+{
+  "content_sha256": "8ff5d919445a568d4a993513b18de173f27d7484faec523f6a9d004191c2d373",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-21T20:46:54.015Z",
+  "approved_by": "human",
+  "plan_basename": "00214-the-setup-check-honors-the-declined-anchor-ctoc-itself-wrote"
+}
