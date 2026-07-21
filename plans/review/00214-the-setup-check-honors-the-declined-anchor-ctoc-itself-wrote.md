@@ -15,6 +15,7 @@ program: fresh-repository-first-run
 files:
   - "src/commands/start.js"
   - "tests/setup-check-honors-declined-anchor.test.js"
+  - "CLAUDE.md"
 scope_extension:
   authorized_by: human
   authorized_at: 2026-07-21
@@ -86,7 +87,56 @@ marker is still correctly "not set up".
 
 ## Decisions Taken Under Ambiguity
 
-(Executor continues here, `###` subheadings only, numbers as inline code spans.)
+### Drove the exported `verifySetup`, not `complianceAnchorUsable`
+`complianceAnchorUsable` is not exported from `src/commands/start.js`; `verifySetup`
+is. The plan permits "the exported surface", and `verifySetup` is the human-facing
+verdict — it is what pushes the anchor reason into `missing`. Each fixture writes
+only `.ctoc/settings.yaml`, and the tests assert on whether `missing` contains an
+entry naming `regulatory_regime`. That isolates the anchor verdict from the
+state/stage-dir artifacts `verifySetup` also checks, so no full `.ctoc/` scaffold is
+needed per fixture.
+
+### The reader's return shape cannot distinguish explicit-empty from absent, so inline-value presence is still detected directly
+`loadActiveProfiles` collapses `active_profiles: []` and "no active_profiles line at
+all" to the same `{ profiles: [], declined: false }`. Deferring to the reader for the
+`declined` fact is enough for the declined anchor, but the explicit-empty case (`[]`,
+usable) and the unconfigured case (no line, not usable) are indistinguishable from the
+reader's return. So the fix still reads the settings file to detect an
+`active_profiles:` line carrying an inline value. This is not a stricter predicate about
+the `declined` fact — it is unchanged, pre-existing logic about the active_profiles
+fact, now reached only when `declined` is not true.
+
+### The MINIMAL fix — only the declined fact changed; block-style handling is untouched
+An earlier draft of this fix widened the active_profiles branch to accept ANY
+`active_profiles:` line (a presence regex), including a bare header and a block-style
+list (`active_profiles:` with items on following `- ` lines). That was over-broad and
+WRONG: `tests/menu-reports-what-init-did.test.js` case `5b` deliberately asserts a
+block-style anchor "counts as missing — the writer refuses a block-style list", because
+`compliance-regime.writeActiveProfiles` does a line-targeted INLINE replacement and can
+never persist onto a block list. That is a real, tested contract, and the plan's
+contract enumerates only inline forms (a non-empty inline list, OR an explicit empty
+`[]`) — it never asked to change block-style handling. The final fix therefore restores
+the exact old inline-value discrimination and adds ONLY the `declined: true` deferral in
+front of it. My initial claim that "no test guarded block-style rejection" was made
+before I ran the full suite; the full suite is the arbiter and it caught the overreach.
+
+### Missing-message wording updated
+The `missing` entry read `(no usable regulatory_regime.active_profiles anchor)`, which
+named only `active_profiles` and would be wrong now that `declined: true` is also a
+usable anchor. It now reads `(no usable regulatory_regime anchor: neither
+active_profiles nor declined)`. Still project-relative, no settings content echoed.
+
+### The plan slightly overstated the red count
+The plan's Step 8 says "the three 'usable' cases where the code is still wrong must be
+RED first". Only ONE case is RED pre-fix: `declined: true`. The `active_profiles:
+[gdpr]` and `active_profiles: []` cases were ALREADY green under the old predicate
+(the old inline-value check returned true for both — `[gdpr]` and `[]` are both
+non-empty inline strings). The live user's `[]` workaround succeeded for exactly that
+reason. The brief's framing (only the declined case is the RED defect; the other two
+are regression guards) is the accurate one. Every green is accounted for by mutation:
+mutating the fallthrough to `return true` reddens the two teeth cases (neither / no
+block); mutating it to `return false` reddens the two usable regression guards while
+the declined case stays green via its own path.
 
 ## Step 8 — TEST (TDD, write first, run, see red)
 
