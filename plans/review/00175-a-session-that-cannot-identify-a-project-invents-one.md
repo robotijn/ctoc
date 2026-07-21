@@ -15,6 +15,7 @@ iron_loop: true
 files:
   - "src/hooks/SessionStart.js"
   - "tests/session-start-does-not-fabricate-a-project.test.js"
+  - "CLAUDE.md"
 ---
 
 # A session that cannot identify a project invents one
@@ -301,3 +302,81 @@ platform and a skip is a gate failure.
    assertion, and Step 8 requires that examination in writing.
 8. **The home-directory fixture uses a stand-in, never the real one.** A test that
    writes to the operator's home directory is a defect whatever it proves.
+
+### Decisions taken during execution (Steps 8-16)
+
+9. **The unidentified-session line names `/ctoc:start`, not `/ctoc:menu`.** The plan's
+   body renders `/ctoc:menu`, but that slash command was renamed to `/ctoc:start`, and
+   `tests/ctoc-start-command.test.js` fences the literal `ctoc:menu` out of every
+   shipped file under `src/`, `docs/`, `README.md` and `CLAUDE.md`. Rendering the plan's
+   string verbatim FAILED that fence. The context now says `Run /ctoc:start`.
+
+10. **Scaffolding, the plan-index backfill kick, and the CLAUDE.md lessons injector are
+    ALL gated on `identified`, not only the directory loop.** Step 11's trace found two
+    more self-ratifying routes the plan's Change 2 did not enumerate: the backfill kick
+    writes `<root>/.ctoc/index/`, manufacturing a `.ctoc`; and `maybeInjectLessons`
+    CREATES `<root>/CLAUDE.md` when absent, and `CLAUDE.md` is itself a `project-file`
+    resolver marker — so under a fallback root run one would create it and run two would
+    resolve `marker: 'project-file'`, the identical loop by a second door. Both now live
+    inside the `if (identified)` block.
+
+11. **`saveState` is deliberately NOT gated.** The plan's Change 2 speculated it writes
+    `<root>/.ctoc/state/`; the landed code writes `CTOC_HOME/state/<hash>.json`
+    (`~/.ctoc/state/`, keyed by a hash of the project path), never into the project tree.
+    It therefore cannot fabricate project identity or feed any resolver marker, so gating
+    it would only cost crash-recovery continuity for a directory later initialised via
+    the menu. The landed code won over the plan's line, as Step 9 instructed.
+
+12. **The directory loop is wrapped fail-open.** The plan's Change 2 wrapped it only in
+    `if (identified)`, but the loop had no `try/catch` and case 12 (a `plans` that is a
+    FILE, in an evidenced project) requires the hook to exit `0` and still emit context.
+    Every other side effect in `main()` is already individually fail-open; the loop now
+    matches, honouring the plan's stated invariant "fail-open is preserved throughout".
+
+13. **`fallbackReason` is sanitized before injection (Step 13 SECURE).** A `walk failed:`
+    reason can carry a raw filesystem error string with an absolute path. `sanitizeReason`
+    replaces POSIX and Windows absolute paths with `<path>`, collapses whitespace, and
+    bounds the result to `200` characters so no stack frame fits. The common reason ("no
+    project marker found in the examined ancestry") has no path and is rendered verbatim.
+
+### Step 8 red-count accounting
+
+Written FIRST, run against pre-fix code. Reds `8`, greens `5`:
+
+- **RED (bit the discard): cases 1, 2, 3, 7, 9, 10, 12, 13.** Each asserts behavior the
+  hook did not yet have. The plan predicted only `{1,2,3,9,10,13}` red — **cases 7 and 12
+  were misclassified as green.** The pre-fix hook always-scaffolds, so "a bare `.ctoc` is
+  not scaffolded" (7) and "fails open on an unwritable scaffold target" (12) both fail
+  today, exactly as a behavior fence should.
+- **GREEN (regression fence, each proven non-vacuous by mutation): cases 4, 5, 6, 8, 11.**
+  Cases 4/5/6 (git/`package.json`/`.ctoc` still scaffolds) went RED when the directory
+  list was emptied. Cases 8 and 11 (boundary rule roots at the inner repository; a bare
+  crypto-home `~/.ctoc` does not capture a project) went RED when the boundary break and
+  the `isProjectCtoc` guard in `project-root.js` were temporarily neutralised. All
+  mutations were reverted; none is already-vacuous, each is already-correct shipped
+  behavior this slice must not regress.
+
+### Findings handed to the sibling slices (00176, 00177)
+
+Traced from `main()` while proving no write reaches disk under a fallback root. The
+self-ratifying loop this anchor slice closes has **two more doors** the sibling slices
+own, and both were fabricating a resolver marker from CTOC's own admission of ignorance:
+
+- **The plan-index backfill kick fabricates `<root>/.ctoc/index/`.** `kickBackfillBackground`
+  (via `src/lib/plan-index/bootstrap.js`, `indexDir`/`statusFile`/`logDirFor`) writes
+  `<root>/.ctoc/index/build-status.json` and `<root>/.ctoc/logs/plan-index-sync.json`,
+  manufacturing a `.ctoc` directory. This is slice **00177's** territory ("a log directory
+  manufactures the marker that gates setup"): a bare `.ctoc` does not by itself resolve as
+  `marker: 'ctoc'` today (`project-root.js` requires `settings.*` or a `plans/` sibling),
+  but it is a `.ctoc` the human never asked for and it defeats the "nothing was created"
+  contract. In THIS slice it is contained inside the `if (identified)` guard; a Write in an
+  un-identified directory can still create `.ctoc/logs/` via other hooks — that is 00177.
+- **The lessons-injector creates `<root>/CLAUDE.md`, which is itself a `project-file`
+  resolver marker.** `maybeInjectLessons → ensureLessonsBlock` CREATES `CLAUDE.md` when
+  absent, and `project-root.js` Pass 2 lists `CLAUDE.md` among the `project-file` markers.
+  So under a fallback root, run one creates it and run two resolves
+  `marker: 'project-file'` — the identical self-ratifying loop by a second door. Contained
+  here inside `if (identified)`.
+- **`saveState` is NOT a door.** It writes only `~/.ctoc/state/<hash>.json` (global home,
+  keyed by a hash of the project path), never the project tree, so it cannot feed any
+  resolver marker and is deliberately left ungated.
