@@ -16,6 +16,31 @@ files:
   - "src/lib/human-facing-scan.js"
   - "src/lib/iron-loop-enforcer.js"
   - "tests/gate-numbers-fence.test.js"
+  - "src/lib/menu-screens.js"
+  - "src/lib/task-view.js"
+  - "CLAUDE.md"
+  - "tests/readme-numbers.test.js"
+  - "src/areas/inbox.js"
+  - "tests/menu-screens-coverage.test.js"
+  - "tests/menu-inbox-routes.test.js"
+  - "tests/menu-task-wiring.test.js"
+scope_extension:
+  authorized_by: human
+  authorized_at: 2026-07-21
+  reason: >
+    The fence works and caught FIVE live gate numbers still rendering at a
+    human that the preceding slices missed: menu-screens.js:1070 (the "Plans
+    at gates" door renders "Gate ${gate}") and task-view.js:249,315,329,357
+    (the task board renders "Gate ${n} ready"). task-view.js was in no
+    preceding slice; menu-screens.js:1070 survived the dashboard slice. These
+    are the point of the whole program — real leaks, not fence debt. The
+    executor correctly REFUSED to baseline them, which would have preserved
+    the exact numbers the owner raged at (green-washing). Creating the module
+    the plan mandated also raises the src/lib count 108->109, breaking the
+    count assertion in readme-numbers.test.js and the prose in CLAUDE.md — a
+    plan omission. The human has ruled on this identical fork five times today:
+    extend the grant so the behaviour and the tests that guard it are fixed
+    together rather than leaving five gate numbers on screen.
 ---
 
 # A fence that fails when a gate number reaches a human
@@ -320,3 +345,189 @@ not have caught the class.
 9. **The enforcer wiring is in THIS slice, not a follow-up.** Building a
    reachability-adjacent fence while leaving the fence itself reachable only from
    its own test would be the exact failure the fence exists to prevent.
+
+### Finding A — the fence works and the shipped product is NOT clean
+
+The scanner and the enforcer check are built, wired, linted, and `26` of `27`
+own-fixture cases are green. The one red is the ratchet over the real repository
+(the plan's case `14`), and it is red for the reason the plan itself named at Step 8:
+a preceding slice did not fully land. The fence found `5` genuine composed
+gate-number leaks that reach a human, all of the `` `Gate ${n}` `` shape whose source
+carries no digit:
+
+- `src/lib/menu-screens.js:1070` — the "Plans at gates" inbox door renders
+  `` `${plan}  [${stage}]  Gate ${gate}  …` ``. Survived the dashboard slice.
+- `src/lib/task-view.js:249` — the task board suffix `` ` → Gate ${t.result.gate} ready` ``.
+- `src/lib/task-view.js:315` — the task-detail line `` `  gate:   Gate ${task.result.gate} ready\n` ``.
+- `src/lib/task-view.js:329` — the next-action label `` `Gate ${gate} ready ▸` ``.
+- `src/lib/task-view.js:357` — the tasks-inbox line `` `  ⊙ Gate ${t.result.gate} ready — …` ``.
+
+`src/lib/task-view.js` was in NO preceding slice's `files:`. `src/lib/menu-screens.js:1070`
+survived the slice that touched that file. Neither file is in THIS plan's `files:`
+grant, so I did not edit them. This is a scope fork for the human.
+
+### Finding B — a false positive found and closed inside my own grant
+
+The composed pattern first matched `src/lib/menu-screens.js:590`
+(`` `…plans at gates${flag}` ``) — the English plural noun "gates" in a count phrase,
+not a number. The pattern was `/\bgates?\s*$/i`; it is now `/\bgates?\s+$/i`
+(require the trailing whitespace that always precedes the interpolated number). The
+real leaks keep firing; the prose no longer does. Locked by a dedicated
+false-positive test, and the tightening is proved to bite by mutation.
+
+### Finding C — creating the module bumps the module count, which the plan did not grant
+
+Creating `src/lib/human-facing-scan.js` raises the `src/lib` top-level count from
+`108` to `109`. `tests/readme-numbers.test.js` asserts that count with exact
+equality, and `CLAUDE.md` states `108 JS modules`. Both must move to `109`. Neither
+`CLAUDE.md` nor `tests/readme-numbers.test.js` is in this plan's `files:` grant. The
+plan told me to create the module but did not grant the two files that pin its count
+— an omission in the plan. This is the second half of the scope fork.
+
+### Finding D — the live error-path leak at actions.js:988 is OUT of this fence's reach
+
+`src/lib/actions.js:988` still holds a live `console.error` printing
+`Gate 3 (review→done) will refuse it` on a Step 14 VERIFY failure. The fence does
+NOT flag it, by design: `src/lib/actions.js` does not return the `{ text, ask, actions }`
+screen contract, so it is neither in `SCREEN_MODULES` nor surfaced by
+`findUnregisteredScreens`. This fence covers rendered SCREEN strings, not
+`console.error` diagnostics in non-screen modules — blind spot `4` (reachability)
+and the registry scope, stated plainly. `src/lib/actions.js` is not in this grant
+regardless. Closing that leak is separate work and a separate scope decision.
+
+### Decision taken — tighten, do not baseline
+
+The five real leaks are trivially fixable (five lines, two files) and represent
+exactly the number on the owner's screen he objected to. Seeding a debt baseline
+that PERMITS them to stay would be green-washing the very defect the fence exists to
+catch — unlike the false-green (`135`) and reachability (`26`) baselines, whose debt
+is too large to clear in one slice. So I did NOT create a baseline file. The correct
+resolution is to FIX the two screen modules, which requires the human to extend the
+grant. I stopped rather than route around the grant.
+
+### Finding E — the registry was hand-seeded and had the SAME blind spot as the leak
+
+The first registry listed only `menu-screens.js`, `streaming-gate.js`, `task-view.js`
+— seeded from the modules I remembered. It OMITTED the entire `src/areas/*` TUI
+family, which is exactly the screen a live gate number had reached: `src/areas/inbox.js`
+renders the inbox the human sees on opening the tool, and printed `` `Gate ${p.gate}` ``
+at line `49`. A fence that scans a hand-picked subset lies about its coverage. Root
+cause: `findUnregisteredScreens` only recognised the `{ text, ask, actions }` object
+contract, so it could not SEE the `render(app) → string` area/tab modules and never
+reported them as unregistered. Fixed: `moduleProducesScreen` now detects BOTH
+contracts (object return AND a `render` export), and a regression test plants an
+unregistered `render`-export module and asserts it is named.
+
+### The registry-completeness audit — measured, all 14 screen modules
+
+Detected screen modules (both contracts) and their leak state, scanned by the fence:
+
+- object contract: `src/commands/menu.js` (clean), `src/lib/menu-screens.js` (LEAK,
+  fixed), `src/lib/streaming-gate.js` (clean), `src/lib/streaming-render.js` (clean),
+  `src/lib/task-view.js` (LEAK ×4, fixed).
+- render-export areas/tabs: `src/areas/agent.js`, `src/areas/inbox.js` (LEAK, fixed),
+  `src/areas/library.js`, `src/areas/pipeline.js`, `src/areas/system.js`,
+  `src/tabs/overview.js`, `src/tabs/review.js`, `src/tabs/tools.js`,
+  `src/tabs/vision.js` — all clean except inbox.
+
+All `14` are now registered. The `3` that leaked were all in the extended grant and
+are fixed; the `11` clean ones are registered read-only (scanning is not editing).
+No screen module is outside the registry, and no registered module leaks.
+
+### Gate-words decisions for each surface
+
+- `src/lib/menu-screens.js:1070` (Plans-at-gates door) has the plan's STAGE, so it
+  consumes `gate-words.chip(it.stage)` — the compact decision label (`Finished?`,
+  `Build it?`). Number gone, decision named.
+- `src/areas/inbox.js:49` (inbox area row) also has the stage → `gate-words.chip(p.stage)`.
+- `src/lib/task-view.js` (`249`, `315`, `329`, `357`) has ONLY the integer
+  `result.gate` — NO stage travels with a task, so `gate-words` (keyed by stage)
+  cannot map it, and I did NOT bend a phrase or add a numeric field to `gate-words`
+  (which is out of grant and deliberately number-free). The task board POINTS AT a
+  decision; the decision screen itself words the moment. So the honest, number-free
+  status is generic: `→ decision ready`, `a decision is waiting for you`,
+  `Decision ready ▸`. The integer still SIGNALS "at a human decision"; it is never
+  printed.
+
+### Decision — the "Plans at gates" header and the raw stage names stay, for now
+
+The section headers (`Plans at gates`) and the raw stage tokens (`[review]`,
+`(functional)`) are the SAME class of internal vocabulary, but they carry no NUMBER,
+so this fence has no teeth on them, and changing them cascades into out-of-grant
+render tests. That is a wording slice of its own. Recorded as a finding, not bent in
+here.
+
+### Finding F — the state-manager gate-number error strings do not reach a human today
+
+`src/lib/state-manager.js:178-195` (`verifyGateApproval`) returns
+`` `Gate ${gateNumber} approval not found` `` and siblings as validation-error
+strings. `verifyGateApproval` has NO live caller anywhere in `src/` (grepped), so
+those strings reach no human today — a latent leak, not a live one. It is the same
+class as `actions.js:988`: an error-RETURN shape, not a screen contract, so the
+fence's registry does not cover it by design. Whether error-return shapes deserve
+their own fence is a separate decision; recorded so a later slice picks it up.
+`src/lib/state-manager.js` is not in this grant.
+
+### Finding G — the suite was DEFENDING the old wording; three test files need inverting
+
+After fixing the `6` leaks, `7` assertions in THREE out-of-grant test files fail
+because they assert the OLD, numbered wording — the "the suite was not failing to
+catch the defect, it was DEFENDING it" pattern this plan exists to end:
+
+- `tests/menu-screens-coverage.test.js` — `1` failing test asserting the door rows
+  read `` `[review]  Gate 3  plans/review/...` `` (lines `443`-`445`).
+- `tests/menu-inbox-routes.test.js` — `1` failing test asserting the door lists each
+  source stage with its gate number.
+- `tests/menu-task-wiring.test.js` — `5` failing tests asserting the task board and
+  detail read `Gate N ready` (S9, the board-suffix case, GS2, GS6, and the
+  taskLabel/planName fallbacks case).
+
+None is in the grant. Each must be INVERTED (assert the number is ABSENT and the new
+wording is present), with the three-part justification, not softened. This is the
+consolidated scope fork: I need those three test files added to `files:` to finish.
+`tests/inbox-coverage.test.js` and `tests/menu-protocol.test.js` still PASS — the
+inbox-area render tests accept the new wording, and `menu.md`'s `Gate N ready` is the
+internal agent-completion protocol token (a machine contract, not a human screen), so
+it is correctly left alone.
+
+### The seven inversions — each with its three-part justification
+
+The grant was extended to the three test files, and each of the seven assertions was
+INVERTED (assert the number ABSENT and the new wording present), never softened. The
+justification is the same contract for all seven and is stated once here, then
+per-site:
+
+- (a) The contract from OUTSIDE the test: the owner reads a gate number as an
+  undecodable internal code and said "no numbers" three times; this program removes
+  them from every human screen; `src/lib/gate-words.js` is the one encoding of what
+  each moment IS in plain words.
+- (b) Why the TEST was wrong, not the code: each assertion demanded the screen PRINT
+  the exact string the owner objected to (`Gate 1/2/3`, `Gate N ready`). The human
+  explicitly replaced that contract, so the test asserted a bug.
+- (c) What newly fails: each site now carries a `doesNotMatch(/\bGate\s+[0-3]\b/)`, so
+  a gate digit returning to that screen is a FAILING case, not a silent regression.
+
+The seven, by site:
+
+1. `menu-screens-coverage.test.js` — the door: `Gate 1/2/3` → the decision label
+   (`Build this?` / `Build it?` / `Finished?`) via `chip(stage)`, plus the
+   no-gate-digit guard.
+2. `menu-inbox-routes.test.js` — the door list: asserted `includes('Gate 1')` /
+   `includes('Gate 3')` → `includes('Build this?')` / `includes('Finished?')`, plus
+   the guard.
+3. `menu-task-wiring.test.js` S9 — inbox line `Gate 3 ready` → `Decision ready`;
+   detail JSON `Gate 3 ready` → `a decision is waiting for you`, plus guards on both.
+4. `menu-task-wiring.test.js` board-suffix — `Gate 2 ready` → `decision ready`, plus
+   the guard.
+5. `menu-task-wiring.test.js` taskLabel/planName fallback — inbox line
+   `Gate 1 ready — gatelbl` → `Decision ready — gatelbl` (the fallback ladder itself
+   is unchanged; only the number is gone), plus the guard.
+6. `menu-task-wiring.test.js` GS2 — detail `Gate 3 ready` → `a decision is waiting for
+   you`, plus the guard; the nav-only gate-safety assertions are untouched.
+7. `menu-task-wiring.test.js` GS6 — detail `Gate 2 ready` → `a decision is waiting for
+   you`, plus the guard.
+
+`tests/inbox-coverage.test.js` and `tests/menu-protocol.test.js` were NOT touched:
+the first already accepts the new inbox-area wording, and the second guards `menu.md`'s
+`Gate N ready`, the machine agent-completion protocol token, which is correctly left
+alone.

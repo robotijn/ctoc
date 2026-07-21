@@ -637,6 +637,7 @@ const CHECKS = [
   { id: 'reachability-fence',          scope: 'architecture', mode: 'thorough', fn: checkReachabilityFence },
   { id: 'dead-export-fence',           scope: 'architecture', mode: 'thorough', fn: checkDeadExportFence },
   { id: 'false-green-fence',           scope: 'architecture', mode: 'thorough', fn: checkFalseGreenFence },
+  { id: 'gate-words-fence',            scope: 'architecture', mode: 'thorough', fn: checkGateWordsFence },
 ];
 
 /**
@@ -792,6 +793,69 @@ function checkFalseGreenFence(root) {
     message: `${fresh.length} NEW false-green site(s) — a check that can report a verdict on input it never received: ` +
       `${shown.join(' | ')}${fresh.length > 5 ? ` (+${fresh.length - 5} more)` : ''}`
   });
+}
+
+/**
+ * Gate-number fence (2026-07-21). The owner's rule: never put a gate number in text
+ * a person reads — say what the MOMENT is (`src/lib/gate-words.js`), not the number.
+ * It was stated three times and applied to prose all three times while the shipped
+ * strings kept the number; a prose rule silently stops being true, so this makes it
+ * a check. `src/lib/human-facing-scan.js` PARSES the screen-producing modules (a text
+ * search cannot — the defect that reached the owner's screen, `` `Gate ${n}` ``, has
+ * no digit in its source) and reports two things: gate numbers that reach a human,
+ * and screen modules missing from the registry (so the registry cannot rot silently).
+ *
+ * UNAVAILABLE IS A FAILURE, never a pass and never a skip. A scan that could not run
+ * — the parser absent, a registry file unreadable — has no verdict to give, and
+ * reporting one would be the false-green defect this repository has fixed repeatedly.
+ * A tree with no `src/lib` is not a CTOC source tree and is CLEAN (nothing to check),
+ * mirroring `checkFalseGreenFence`'s `filesScanned === 0` gate. Thorough mode only.
+ *
+ * @param {string} root - Project root
+ * @returns {{clean: boolean, severity?: string, message?: string}} { clean: true } when
+ *   clean or when this is not a CTOC source tree.
+ */
+function checkGateWordsFence(root) {
+  const scan = require('./human-facing-scan');
+  const path = require('path');
+  const safeFs = require('./safe-fs');
+
+  // Not a CTOC source tree — nothing to check.
+  if (!safeFs.existsSync(path.join(root, 'src', 'lib'))) return CLEAN();
+
+  const unreg = scan.findUnregisteredScreens(root);
+  if (!unreg.available) {
+    // checkJs does not narrow this union on `!available`; the cast is safe — the
+    // unavailable branch IS the { available:false, reason } shape.
+    const reason = /** @type {{ reason: string }} */ (unreg).reason;
+    return finding({ severity: 'block', message: `the gate-number scan could not run: ${reason}` });
+  }
+
+  const reg = scan.scanRegistry(root);
+  if (!reg.available) {
+    const reason = /** @type {{ reason: string }} */ (reg).reason;
+    return finding({ severity: 'block', message: `the gate-number scan could not run: ${reason}` });
+  }
+
+  const problems = [];
+  if (reg.findings.length > 0) {
+    const shown = reg.findings.slice(0, 5).map(
+      (f) => `${f.file}:${f.line}:${f.column} [${f.pattern}] "${f.text}"`
+    );
+    problems.push(
+      `${reg.findings.length} gate number(s) reach a human — say what the moment is ` +
+      `(src/lib/gate-words.js), not the number: ${shown.join(' | ')}` +
+      `${reg.findings.length > 5 ? ` (+${reg.findings.length - 5} more)` : ''}`
+    );
+  }
+  if (unreg.modules.length > 0) {
+    problems.push(
+      `${unreg.modules.length} screen module(s) return the { text, ask, actions } ` +
+      `contract but are not in SCREEN_MODULES: ${unreg.modules.join(', ')}`
+    );
+  }
+  if (problems.length === 0) return CLEAN();
+  return finding({ severity: 'block', message: problems.join(' — ') });
 }
 
 // ─────────────────────────────────────────────────────────────────────

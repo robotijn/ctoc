@@ -189,17 +189,25 @@ describe('NB2 — task-board + task-detail screens (S6–S7, S9)', () => {
     assert.equal(d.actions['◀ Back'], 'tasks');
   });
 
-  it('S9: gate-ready done task shows Gate N ready, no transition', () => {
+  it('S9: gate-ready done task says a decision is ready, no number, no transition', () => {
+    // INVERTED (plan 00154). Contract from OUTSIDE the test: the owner reads "Gate 3"
+    // as an undecodable internal code ("no numbers"). The TEST was wrong, not the code
+    // — it asserted the task board PRINT "Gate 3 ready", the exact leak. A task carries
+    // ONLY the gate integer (no stage), so the board cannot word the specific moment;
+    // it says a decision is ready and drops the number, which is now a case that FAILS
+    // if it returns.
     const reg = mkReg([
       T({ id: 't1', kind: 'review', plan: 'LH1', status: 'done', result: { ok: true, summary: 'gate reached', nextAction: 'browse review', gate: 3 } }),
     ]);
     const line = taskView.tasksInboxLine(reg);
-    assert.match(line, /Gate 3 ready/);
+    assert.match(line, /Decision ready/);
+    assert.doesNotMatch(line, /\bGate\s+[0-3]\b/, 'a gate number returned to the inbox line');
     const d = taskView.renderTaskDetail(reg, 't1');
     const vals = Object.values(d.actions);
     assert.ok(vals.some(v => /^(plan|browse) /.test(v)), 'next-action is a NAV route');
     assert.ok(!vals.some(v => /^claude:/.test(v)), 'no gate-crossing mutation');
-    assert.match(JSON.stringify(d), /Gate 3 ready/);
+    assert.match(JSON.stringify(d), /a decision is waiting for you/);
+    assert.doesNotMatch(JSON.stringify(d), /\bGate\s+[0-3]\b/, 'a gate number returned to the detail screen');
   });
 });
 
@@ -379,7 +387,11 @@ describe('NB2 — edge cases (E1–E7)', () => {
     assert.match(d.text, /status: running/);
   });
 
-  it('renderTasksSection: malformed queued task degrades wait reason; board shows gate suffix', () => {
+  it('renderTasksSection: malformed queued task degrades wait reason; board shows decision-ready suffix', () => {
+    // INVERTED (plan 00154): the board suffix says a decision is ready, never the
+    // number. Contract from OUTSIDE the test: the owner's "no numbers" + gate-words;
+    // the TEST was wrong (it asserted "Gate 2 ready"), the human replaced the
+    // contract, and a gate digit on the board now FAILS.
     const reg = mkReg([
       T({ id: 'q1', kind: 'implement', plan: 'pq', status: 'queued', blockedBy: 'oops' }), // non-array → canRun throws
       T({ id: 'g1', kind: 'review', plan: 'LH1', status: 'done', result: { ok: true, gate: 2 } }),
@@ -387,7 +399,8 @@ describe('NB2 — edge cases (E1–E7)', () => {
     const s = taskView.renderTasksSection(reg);
     assert.match(s, /waits: queued/, 'canRun throw degrades to generic label');
     const board = taskView.renderTaskBoard(reg);
-    assert.match(board.text, /Gate 2 ready/, 'done row carries the gate-ready suffix');
+    assert.match(board.text, /decision ready/, 'done row carries the decision-ready suffix');
+    assert.doesNotMatch(board.text, /\bGate\s+[0-3]\b/, 'a gate number returned to the board');
   });
 
   it('taskLabel/planName fallbacks: label then id when no plan', () => {
@@ -399,10 +412,14 @@ describe('NB2 — edge cases (E1–E7)', () => {
     assert.match(s, /discuss mylabel/, 'planName empty → label');
     assert.match(s, /sync t2/, 'planName + label empty → id');
     // inbox line uses the same fallback ladder for a gated done task without a plan
+    // INVERTED (plan 00154): the fallback ladder (label when no plan) is unchanged;
+    // the gate NUMBER is gone. The TEST was wrong to assert "Gate 1 ready"; a gate
+    // digit here now FAILS.
     const line = taskView.tasksInboxLine(mkReg([
       T({ id: 't9', kind: 'review', plan: null, label: 'gatelbl', status: 'done', result: { ok: true, gate: 1 } }),
     ]));
-    assert.match(line, /Gate 1 ready — gatelbl/);
+    assert.match(line, /Decision ready — gatelbl/);
+    assert.doesNotMatch(line, /\bGate\s+[0-3]\b/, 'a gate number returned to the inbox line');
   });
 
   it('tasksInboxLine: empty → ""; single done → singular phrasing', () => {
@@ -457,8 +474,11 @@ describe('NB2 — gate-safety: next-action is navigation-only (HIGH)', () => {
     assert.ok(!vals.includes('claude:approve review/x.md'), 'gate-crossing option not present');
     // degrades to Back-only (nav-only invariant) — never a non-nav action
     assert.deepEqual(Object.keys(d.actions), ['◀ Back']);
-    // …but the gate is still SHOWN as informational text (parity with board/inbox)
-    assert.match(d.text, /Gate 3 ready/, 'gate shown as text even when the action is dropped');
+    // …but a WAITING DECISION is still SHOWN as informational text (parity with
+    // board/inbox), with no number. INVERTED (plan 00154): the TEST asserted the leak
+    // "Gate 3 ready"; the human replaced the contract and a gate digit now FAILS.
+    assert.match(d.text, /a decision is waiting for you/, 'decision shown as text even when the action is dropped');
+    assert.doesNotMatch(d.text, /\bGate\s+[0-3]\b/, 'a gate number returned to the detail screen');
   });
 
   it('GS3: claude:reject nextAction is likewise dropped (Back-only)', () => {
@@ -496,12 +516,16 @@ describe('NB2 — gate-safety: next-action is navigation-only (HIGH)', () => {
     assert.equal(t.result.nextAction, 'plan review/LH1.md');
   });
 
-  it('GS6: detail echoes Gate N as text even when nextAction is absent', () => {
+  it('GS6: detail echoes a waiting decision as text even when nextAction is absent', () => {
+    // INVERTED (plan 00154): the detail still echoes a waiting decision as text (the
+    // gate integer signals it), but never the number. The TEST asserted "Gate 2
+    // ready"; the human replaced the contract and a gate digit now FAILS.
     const reg = mkReg([
       T({ id: 't1', kind: 'review', plan: 'LH1', status: 'done', result: { ok: true, summary: 's', gate: 2 } }),
     ]);
     const d = taskView.renderTaskDetail(reg, 't1');
-    assert.match(d.text, /Gate 2 ready/, 'gate shown as informational text');
+    assert.match(d.text, /a decision is waiting for you/, 'decision shown as informational text');
+    assert.doesNotMatch(d.text, /\bGate\s+[0-3]\b/, 'a gate number returned to the detail screen');
     assert.deepEqual(Object.keys(d.actions), ['◀ Back'], 'no nextAction → only Back');
   });
 });

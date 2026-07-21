@@ -246,7 +246,12 @@ function renderTaskBoard(registry) {
       const status = t.result && t.result.cancelled ? 'cancelled' : t.status;
       let suffix = '';
       if (t.status === 'done' && t.result && Number.isInteger(t.result.gate)) {
-        suffix = ` → Gate ${t.result.gate} ready`;
+        // The integer signals "this finished task is at a human decision" — that
+        // signal drives the suffix, but the NUMBER is never printed: a person cannot
+        // decode "Gate 3", and the board only points AT the decision (the decision
+        // screen itself words the moment via gate-words). No stage travels with the
+        // task here, so the honest, number-free status is the generic one.
+        suffix = ' → decision ready';
       }
       // Rule 1: only a well-formed `t<n>` id is selectable. A crafted bare-digit
       // ("3") or reserved key ("b"/"back") id is rendered as a NON-selectable row
@@ -274,7 +279,7 @@ function renderTaskBoard(registry) {
 /**
  * The task-detail screen. Unknown / null id → a safe "Task not found" screen whose
  * only option navigates back to the board. A done task carrying `result.nextAction`
- * offers a single navigating option (label `Gate N ready ▸` when `result.gate` is
+ * offers a single navigating option (label `Decision ready ▸` when `result.gate` is
  * set, else `Open <plan> ▸`) whose action is the NAV route string — never a
  * `claude:` mutation, never a gate cross. Always a final `◀ Back` → `tasks`.
  * Selection is by label (never a digit).
@@ -308,11 +313,12 @@ function renderTaskDetail(registry, id) {
   if (TERMINAL.has(task.status) && task.result && task.result.summary) {
     text += `  result: ${stripCtl(task.result.summary)}\n`;
   }
-  // Echo the gate as INFORMATIONAL text (parity with the board/inbox) even when
-  // the next-action is absent or dropped — so a gate-ready done task still SHOWS
-  // "Gate N ready" while the ACTION stays nav-only or Back (never a gate cross).
+  // Echo the decision point as INFORMATIONAL text (parity with the board/inbox) even
+  // when the next-action is absent or dropped — so a task at a human decision still
+  // SHOWS a waiting decision while the ACTION stays nav-only or Back (never a gate
+  // cross). The gate integer is the SIGNAL; it is never printed as a number.
   if (task.result && Number.isInteger(task.result.gate)) {
-    text += `  gate:   Gate ${task.result.gate} ready\n`;
+    text += `  next:   a decision is waiting for you\n`;
   }
   text += '\n\n\n';
 
@@ -326,7 +332,7 @@ function renderTaskDetail(registry, id) {
   if (task.status === 'done' && task.result && task.result.nextAction != null
       && isNavRoute(task.result.nextAction)) {
     const gate = Number.isInteger(task.result.gate) ? task.result.gate : null;
-    const label = gate != null ? `Gate ${gate} ready ▸` : `Open ${planName(task) || 'next'} ▸`;
+    const label = gate != null ? 'Decision ready ▸' : `Open ${planName(task) || 'next'} ▸`;
     options.push({ label, description: 'Navigate to the next action (does not perform it)' });
     actions[label] = stripCtl(String(task.result.nextAction));
   }
@@ -344,7 +350,7 @@ function renderTaskDetail(registry, id) {
  * The INBOX pull-notice fragment for completed background work. Returns `''` when
  * there are no done tasks (so it never perturbs the "Inbox clear" state). Otherwise
  * a `⊙ N background tasks done — awaiting review` line, plus one
- * `⊙ Gate N ready — <plan>` line per gate-ready done task (cap 5). Newline-terminated.
+ * `⊙ Decision ready — <plan>` line per gate-ready done task (cap 5). Newline-terminated.
  * @param {{tasks?:Array<object>}} registry
  * @returns {string}
  */
@@ -354,7 +360,7 @@ function tasksInboxLine(registry) {
   let out = `  ⊙ ${g.done.length} background task${g.done.length === 1 ? '' : 's'} done — awaiting review\n`;
   const gated = g.done.filter((t) => t.result && Number.isInteger(t.result.gate)).slice(0, 5);
   for (const t of gated) {
-    out += `  ⊙ Gate ${t.result.gate} ready — ${planName(t) || stripCtl(t.label) || stripCtl(t.id)}\n`;
+    out += `  ⊙ Decision ready — ${planName(t) || stripCtl(t.label) || stripCtl(t.id)}\n`;
   }
   return out;
 }

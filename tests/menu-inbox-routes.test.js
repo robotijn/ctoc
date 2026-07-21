@@ -111,8 +111,14 @@ describe('R2-C — inbox gates door', () => {
     assert.match(screen.text, /Plans at gates \(2\)/);
     assert.ok(screen.text.includes('feat-x'));
     assert.ok(screen.text.includes('feat-y'));
-    assert.ok(screen.text.includes('Gate 1'), 'functional → Gate 1 shown');
-    assert.ok(screen.text.includes('Gate 3'), 'review → Gate 3 shown');
+    // INVERTED (plan 00154). Contract from OUTSIDE the test: the owner reads a gate
+    // number as an undecodable internal code; gate-words says what each moment IS.
+    // The TEST was wrong, not the code — it asserted the door SHOW "Gate 1"/"Gate 3",
+    // the exact strings the owner objected to. Each source stage now shows its
+    // DECISION label, and a gate number is a case that FAILS if it returns.
+    assert.ok(screen.text.includes('Build this?'), 'functional → its decision, not a number');
+    assert.ok(screen.text.includes('Finished?'), 'review → its decision, not a number');
+    assert.doesNotMatch(screen.text, /\bGate\s+[0-3]\b/, 'a gate number returned to the door');
     assert.equal(bulletRows(screen.text), 2);
     assert.deepEqual(Object.keys(screen.actions), ['◀ Back']);
   });

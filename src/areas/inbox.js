@@ -9,6 +9,7 @@
 
 const { c, line, renderFooter, stripCtl } = require('../lib/tui');
 const { getInboxCounts, listQuestions, listDecisions, listPlansAtGates, listRelatedForInbox } = require('../lib/inbox');
+const gateWords = require('../lib/gate-words');
 
 function render(app) {
   const root = app.projectPath || process.cwd();
@@ -46,7 +47,11 @@ function render(app) {
     if (counts.gatesWaiting > 0) {
       out += `${c.bold}Plans at gates${c.reset}\n`;
       for (const p of listPlansAtGates(root).slice(0, 10)) {
-        out += `  ${c.dim}Gate ${p.gate}${c.reset} ${c.cyan}${stripCtl(p.plan)}${c.reset} ${c.dim}(${stripCtl(p.stage)})${c.reset}\n`;
+        // Say the DECISION waiting, not the gate number: a person cannot decode
+        // "Gate 3", and being handed one reads as evasive. gate-words maps the stage
+        // the plan is sitting in to the compact human label for the choice it awaits
+        // ("Finished?", "Build it?"). The stage stays in parentheses as orientation.
+        out += `  ${c.cyan}${stripCtl(p.plan)}${c.reset} ${c.dim}— ${gateWords.chip(p.stage)} (${stripCtl(p.stage)})${c.reset}\n`;
       }
       out += '\n';
     }
