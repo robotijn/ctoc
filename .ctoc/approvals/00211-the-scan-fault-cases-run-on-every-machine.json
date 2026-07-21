@@ -1,9 +1,9 @@
 {
-  "content_sha256": "99cce06f1c533519165be8efd55b19306e3579cb66297214f0e96fc6fe2c88d4",
+  "content_sha256": "892a1a502ebfdfedb97552391e08bdbfafc44c4f3179f956686421e27f59af97",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-21T11:09:46.858Z",
+  "approved_at": "2026-07-21T11:13:58.216Z",
   "approved_by": "human",
   "plan_basename": "00211-the-scan-fault-cases-run-on-every-machine"
 }
