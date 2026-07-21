@@ -101,6 +101,22 @@ function revoke(p, mode) {
   fs.chmodSync(p, mode);
 }
 
+/**
+ * Make a stage UNREADABLE by a mechanism available on EVERY platform: replace the
+ * stage DIRECTORY with a regular FILE. `existsSync(stageDir)` stays true (a file
+ * exists), so the scan does not treat it as an ABSENT stage; `readdirSync` then
+ * throws ENOTDIR, driving the `stage-unreadable` branch. No permission bits are
+ * touched, so unlike `revoke` this works on win32 and as uid 0. It is a genuine I/O
+ * fault, not a mock: the filesystem really raises ENOTDIR. Empirically proven to
+ * reach the branch (probe against src/lib/stale-detector.js), and proven to BITE by
+ * mutation (see the plan's Step 8 record).
+ */
+function replaceStageWithFile(root, stage) {
+  const stageDir = path.join(root, 'plans', stage);
+  fs.rmSync(stageDir, { recursive: true, force: true });
+  fs.writeFileSync(stageDir, 'this path is a regular file, not a directory\n');
+}
+
 /** Evidence shaped as `verifyStaleCandidate` returns it for a missing-files plan. */
 function evidence(over = {}) {
   return {
@@ -234,6 +250,88 @@ describe('scanCheapCandidates — the scan reports what it could not read', () =
 
     assert.deepEqual(res.unread, [], 'a complete walk has nothing to report as unread');
     assert.equal(res.unreadCount, 0, 'reachable ONLY after every stage and every plan was read');
+  });
+
+  // ── ALWAYS-RUNNABLE COUNTERPARTS (run on EVERY platform, no permission bits) ──
+  // Cases 1/2/3/5/11/12 above induce their fault with chmod, which does NOT revoke
+  // read on win32 and is BYPASSED as root — so on those platforms they announce a
+  // loud skip and the branch they fence goes unmeasured. The coverage denominator
+  // then changes shape by platform (the 99.00–99.03 spread on an unchanged tree).
+  // The three cases below drive the SAME `stage-unreadable` branch by making the
+  // stage path a regular FILE (ENOTDIR on readdir), a genuine I/O fault with NO
+  // permission manipulation, so they run UNCONDITIONALLY — no CAN_REVOKE_READ guard.
+  // They run BESIDE the chmod cases, never replacing them: the loud skip stays as
+  // the stronger, environment-dependent proof of the same branch where it can run.
+  //
+  // Only `stage-unreadable` has a cross-platform inducer. `read-failed` and
+  // `stat-failed` do NOT — the stat-gate at stale-detector.js:979 excludes a
+  // non-regular file as a deliberate NON-fault BEFORE the read at :991, so a
+  // directory-named-`*.md` never reaches the read branch (empirically proven). The
+  // only remaining inducers are permission bits (platform-dependent — the very
+  // thing being escaped), a delete-race (flaky), or a mock (tests the mock, not the
+  // code). All three are forbidden. See the plan's "Decisions Taken Under Ambiguity".
+
+  it('case A: a stage directory that is a FILE yields stage-unreadable on EVERY platform (no chmod)', () => {
+    const root = makeSandbox();
+    // A healthy plan in another SCANNED stage proves the walk continues past the
+    // broken stage rather than aborting. (functional is in GATE_SOURCE_STAGES; the
+    // plan text said "todo", which is not scanned — corrected here.)
+    writePlan(root, 'functional', 'healthy', { files: ['src/present.js'], createFiles: true });
+    replaceStageWithFile(root, 'review');
+
+    const res = scanCheapCandidates(root);
+
+    assert.ok(res.unreadCount >= 1,
+      'an unreadable stage must raise unreadCount even with NO permission manipulation');
+    const entry = res.unread.find((u) => u.reason === 'stage-unreadable');
+    assert.ok(entry, 'replacing the stage dir with a regular file must raise reason "stage-unreadable"');
+    assert.equal(entry.stage, 'review');
+    assert.equal(entry.path, path.posix.join('plans', 'review'),
+      'the entry points at the stage DIRECTORY, standing for every plan the scan could not read');
+    // THE CONTRACT a caller relies on: inbox.js may read count===0 as "clean" ONLY
+    // when unreadCount===0. A whole dropped stage must never render as good news.
+    assert.ok(res.unreadCount > 0,
+      'the PARTIAL-scan signal is set for a dropped stage — this is what keeps a dropped ' +
+      'stage from rendering as a clean backlog');
+  });
+
+  it('case C: the reason vocabulary stays CLOSED for the cross-platform fault', () => {
+    const root = makeSandbox();
+    replaceStageWithFile(root, 'review');
+
+    const res = scanCheapCandidates(root);
+
+    assert.ok(res.unread.length >= 1, 'the fault was induced');
+    for (const u of res.unread) {
+      assert.ok(REASONS.has(u.reason), `reason "${u.reason}" is outside the closed four-value enum`);
+      assert.equal(Object.keys(u).sort().join(','), 'path,reason,stage',
+        'an unread entry carries exactly { path, reason, stage } — no error object, no leak');
+      assert.ok(!path.isAbsolute(u.path), 'paths are repository-relative, never absolute');
+      assert.ok(!u.path.includes(os.tmpdir()), 'the sandbox root never appears in a returned path');
+      // A filesystem error string would carry ENOTDIR / errno / a username.
+      assert.ok(!/EACCES|ENOENT|ENOTDIR|errno|Error/i.test(u.reason),
+        'no raw error message reaches the returned value — it is rendered on a dashboard');
+    }
+  });
+
+  it('case D: the cross-platform stage-unreadable assertion is NOT vacuous (a clean sandbox rejects it)', () => {
+    // Applying case A's assertion to a fully clean, readable backlog must FAIL —
+    // proving case A discriminates on real evidence, not on anything at all. This
+    // is the house vacuity-guard pattern (mirrors case 18 of the edit-protection suite).
+    const clean = makeSandbox();
+    writePlan(clean, 'review', 'healthy', { files: ['src/present.js'], createFiles: true });
+
+    const res = scanCheapCandidates(clean);
+
+    assert.throws(
+      () => {
+        assert.ok(res.unread.find((u) => u.reason === 'stage-unreadable'),
+          'no stage-unreadable entry exists in a clean sandbox');
+      },
+      assert.AssertionError,
+      'case A must not pass when there is no unreadable stage — that would be coverage theatre'
+    );
+    assert.equal(res.unreadCount, 0, 'a clean, fully-read backlog reports nothing unread');
   });
 
   it('case 11: one unreadable plan among five does not abort the walk', () => {

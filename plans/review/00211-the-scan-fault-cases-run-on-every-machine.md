@@ -205,3 +205,65 @@ outranks the plan.
 Confirm: no test file created; no source file modified; the loud-skip design intact; no
 assertion that would pass vacuously; the two deliberate non-faults still not treated as
 faults; `minPct` untouched.
+
+## Decisions Taken Under Ambiguity
+
+### Case B was DROPPED — `read-failed` has no cross-platform inducer, and here is why the next reader must not re-attempt it
+
+The plan's Case B proposed to induce `read-failed` by making the plan path a
+DIRECTORY so `readFileSync` throws `EISDIR`. That mechanism is wrong for this
+subject and was proven wrong empirically before any code was written. In
+`scanCheapCandidates` the stat-gate at `src/lib/stale-detector.js:979`
+(`if (!st.isFile()) continue;`) excludes every non-regular file — a directory or a
+symlink — as a DELIBERATE non-fault, and it runs BEFORE the read at
+`:991`. A directory named `something.md` therefore hits that `continue` and never
+reaches the `read-failed` branch: a probe returned `unread: []`, `unreadCount: 0`
+for exactly that arrangement. The cited precedent
+(`the-edit-protection-says-whether-it-is-running.test.js`) works only because its
+subject, `protectionLiveness`, does NOT stat-gate; this subject does.
+
+There is no genuine cross-platform I/O error that reaches `read-failed` at all. To
+reach it a path must be a present, regular, sub-`1` MiB file whose `readFileSync`
+still throws. The only mechanisms that do that are: permission bits — the exact
+platform-dependent `chmod` this slice exists to escape (a no-op on win32, bypassed
+as root); a delete-race between `lstat` and `readFile` — non-deterministic and so a
+flaky test, forbidden; or a mock of `safe-fs` — which tests the mock, not the code,
+also forbidden. Filesystem physics leave no fourth option. So `read-failed` stays
+covered ONLY where `chmod` can revoke read (POSIX non-root), by the existing cases
+`3`, `11`, `12`, whose loud skip remains the honest signal elsewhere. This is a
+filesystem limit, not laziness. The source is CORRECT and was not touched — the
+non-fault exclusion at `:979` is a documented security boundary and must not be
+weakened to make `read-failed` reachable.
+
+### The plan's claim that `stat-failed` is "already inducible without permissions" is also wrong
+
+The plan excluded `stat-failed` from scope on the grounds that it was "already
+inducible without permissions and already driven by the existing cases." That is
+incorrect. Case `5` induces `stat-failed` with `chmod 0o400` (read but no search
+permission on the stage directory, so `lstatSync` on a child fails `EACCES`), and it
+is guarded by `CAN_REVOKE_READ` like the other chmod cases. There is no
+non-permission, non-race way to make `lstatSync` throw on an entry `readdirSync` just
+returned: the entry provably exists and its parent is a real directory, so the only
+failures left are permission bits or the file vanishing mid-scan. `stat-failed`
+therefore also remains covered only on POSIX non-root, exactly as `read-failed` does.
+
+### What DID land, and what it closes
+
+Cases A, C and D were added, all UNCONDITIONAL — no `CAN_REVOKE_READ` guard — using a
+new helper `replaceStageWithFile` that replaces a stage directory with a regular file
+so `readdirSync` throws `ENOTDIR` while `existsSync` stays true. This drives the
+`stage-unreadable` branch (`:938`) on EVERY platform. That is the single
+highest-value could-not-look branch: one unreadable stage directory drops a WHOLE
+stage — up to a third of the backlog — and a whole stage silently rendering as a
+clean backlog is the loudest false-green. Case A was proven to BITE by mutation:
+removing the `markUnread(stage, 'stage-unreadable')` call at `:938` turned cases A and
+C RED, and reverting restored green; the source is byte-identical to `HEAD`. Case D is
+the vacuity guard (the same assertion against a clean sandbox must throw
+`AssertionError`) and correctly stayed green under the mutation because it induces no
+fault.
+
+The existing chmod cases and their loud skip are UNTOUCHED — the always-runnable
+cases run BESIDE them, not instead of them, so the stronger environment-dependent
+proof remains wherever the environment allows it. This slice closes the biggest of
+the three platform-varying branches, not all three; `read-failed` and `stat-failed`
+remain permission-gated by the filesystem limit described above.
