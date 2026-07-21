@@ -1,0 +1,9 @@
+{
+  "content_sha256": "11d16fab68ae00e0ba593e0469ad39942f69f2523f4245e2fb840e8eda5dd9e8",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-21T18:53:38.417Z",
+  "approved_by": "human",
+  "plan_basename": "00213-the-fence-module-covers-its-own-reachable-branches"
+}
