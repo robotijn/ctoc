@@ -1,4 +1,10 @@
 ---
+approved_by: human
+approved_at: 2026-07-21T11:13:58.165Z
+gate_crossed: implementation → todo
+---
+
+---
 title: "The scan's could-not-look cases run on every machine — a branch covered only on POSIX is a branch measured differently on every platform"
 type: implementation
 parent_plan: 00210-the-coverage-floor-gets-margin-it-can-rely-on
