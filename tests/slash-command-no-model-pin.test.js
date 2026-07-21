@@ -3,7 +3,7 @@
  *
  * A slash command's `model:` frontmatter switches the LIVE session's model —
  * slash commands run inside the user's session, not in a separate process.
- * When `/ctoc:menu` pinned `model: claude-haiku-4-5`, invoking it switched the
+ * When `/ctoc:start` pinned `model: claude-haiku-4-5`, invoking it switched the
  * running session to Haiku; if the conversation exceeded Haiku's context
  * window, autocompact triggered and the session crashed.
  *
@@ -45,12 +45,12 @@ describe('Slash commands — no model pin (v6.9.29 crash-prevention invariant)',
     });
   }
 
-  it('menu.md declares effort: low (fast, minimal-reasoning menu)', () => {
-    const fm = frontmatterOf(fs.readFileSync(path.join(COMMANDS_DIR, 'menu.md'), 'utf8'));
+  it('start.md declares effort: low (fast, minimal-reasoning menu)', () => {
+    const fm = frontmatterOf(fs.readFileSync(path.join(COMMANDS_DIR, 'start.md'), 'utf8'));
     assert.match(
       fm,
       /^effort:\s*low\b/m,
-      'menu.md must declare effort: low so the menu renders with minimal reasoning (it is a deterministic script). effort overrides session effort for that turn only and reverts after — unlike model:, it never switches the session model. See CLAUDE.md model rules.'
+      'start.md must declare effort: low so the menu renders with minimal reasoning (it is a deterministic script). effort overrides session effort for that turn only and reverts after — unlike model:, it never switches the session model. See CLAUDE.md model rules.'
     );
   });
 });

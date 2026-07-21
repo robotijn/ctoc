@@ -612,10 +612,10 @@ describe('NB2 — bounded inputs + pagination (LOW)', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // R3-D — KEY/RECIPE PARITY (a PERMANENT fence).
 //
-// A `claude:*` action key the menu EMITS but menu.md carries no recipe for is a
+// A `claude:*` action key the menu EMITS but start.md carries no recipe for is a
 // DEAD BUTTON: the human picks it and the session has no instruction for what to
 // do. Two shipped buttons were exactly that (`claude:dismiss-stale`,
-// `claude:env-keep-defaults`) while menu.md documented a name nothing emits.
+// `claude:env-keep-defaults`) while start.md documented a name nothing emits.
 // This fence fails the moment anyone adds a key without a recipe.
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -635,7 +635,7 @@ function emittedActionKeys() {
   const files = [
     path.join(SRC, 'lib', 'menu-screens.js'),
     path.join(SRC, 'lib', 'streaming-gate.js'),
-    path.join(SRC, 'commands', 'menu.js'),
+    path.join(SRC, 'commands', 'start.js'),
   ];
   const keys = new Set();
   for (const f of files) {
@@ -647,9 +647,9 @@ function emittedActionKeys() {
   return keys;
 }
 
-/** Every `claude:<key>` documented as a recipe row in src/commands/menu.md. */
+/** Every `claude:<key>` documented as a recipe row in src/commands/start.md. */
 function documentedActionKeys() {
-  const text = fs.readFileSync(path.join(SRC, 'commands', 'menu.md'), 'utf8');
+  const text = fs.readFileSync(path.join(SRC, 'commands', 'start.md'), 'utf8');
   const keys = new Set();
   const re = /^\|\s*`claude:([a-z][a-z0-9-]*)/gm;
   let m;
@@ -657,7 +657,7 @@ function documentedActionKeys() {
   return keys;
 }
 
-describe('R3-D — every emitted claude: action key has a recipe in menu.md', () => {
+describe('R3-D — every emitted claude: action key has a recipe in start.md', () => {
   it('PARITY: no dead buttons — every key the menu emits is documented', () => {
     const emitted = emittedActionKeys();
     const documented = documentedActionKeys();
@@ -669,26 +669,26 @@ describe('R3-D — every emitted claude: action key has a recipe in menu.md', ()
     assert.deepEqual(
       missing,
       [],
-      'These action keys are EMITTED by the menu but have NO recipe in src/commands/menu.md — ' +
+      'These action keys are EMITTED by the menu but have NO recipe in src/commands/start.md — ' +
       'a human can pick them and the session has no instruction for what to do:\n  ' +
       missing.map((k) => `claude:${k}`).join('\n  ')
     );
   });
 
-  it('PARITY(reverse): menu.md documents no recipe for a key nothing emits (a lie in the other direction)', () => {
+  it('PARITY(reverse): start.md documents no recipe for a key nothing emits (a lie in the other direction)', () => {
     const emitted = emittedActionKeys();
     const documented = documentedActionKeys();
     const orphaned = [...documented].filter((k) => !emitted.has(k)).sort();
     assert.deepEqual(
       orphaned,
       [],
-      'menu.md documents recipes for keys the menu never emits (stale instructions):\n  ' +
+      'start.md documents recipes for keys the menu never emits (stale instructions):\n  ' +
       orphaned.map((k) => `claude:${k}`).join('\n  ')
     );
   });
 
   it('the two dead durable-stop buttons now have recipes naming their real functions', () => {
-    const md = fs.readFileSync(path.join(SRC, 'commands', 'menu.md'), 'utf8');
+    const md = fs.readFileSync(path.join(SRC, 'commands', 'start.md'), 'utf8');
     assert.match(md, /claude:dismiss-stale/, 'dismiss-stale recipe present');
     assert.match(md, /dismissStale/, 'the dismiss-stale recipe names the real function');
     assert.match(md, /scanCheapCandidates/, 'the recipe shows how the driver obtains the candidates');
@@ -696,22 +696,22 @@ describe('R3-D — every emitted claude: action key has a recipe in menu.md', ()
     assert.match(md, /environment_prompt_dismissed/, 'the env recipe names the real durable key');
     assert.ok(
       !/lands in slice R2-C2 in this same wave/i.test(md),
-      'menu.md must not deny code that now exists on disk'
+      'start.md must not deny code that now exists on disk'
     );
     assert.ok(
       !/is not a code path on disk here/i.test(md),
-      'menu.md must not claim a shipped code path does not exist'
+      'start.md must not claim a shipped code path does not exist'
     );
   });
 
-  it('menu.md documents --live-agent-ids (the flag the ON-OPEN RECONCILE depends on)', () => {
-    const md = fs.readFileSync(path.join(SRC, 'commands', 'menu.md'), 'utf8');
+  it('start.md documents --live-agent-ids (the flag the ON-OPEN RECONCILE depends on)', () => {
+    const md = fs.readFileSync(path.join(SRC, 'commands', 'start.md'), 'utf8');
     assert.match(md, /--live-agent-ids/, 'the flag syntax is documented');
     assert.match(md, /EMPTY list/i, 'an EMPTY list means unavailable, not "nobody is alive" — stated honestly');
   });
 
-  it('menu.md consumes the autoApprove signal (the one-turn approve is real, not a lie)', () => {
-    const md = fs.readFileSync(path.join(SRC, 'commands', 'menu.md'), 'utf8');
+  it('start.md consumes the autoApprove signal (the one-turn approve is real, not a lie)', () => {
+    const md = fs.readFileSync(path.join(SRC, 'commands', 'start.md'), 'utf8');
     assert.match(md, /autoApprove/, 'the driver instruction reads the autoApprove signal');
   });
 });
@@ -805,7 +805,7 @@ describe('R3-D — inbox escalations door', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('R3-D — isNavRoute allowlist covers every real NAV route', () => {
-  it('N1: `stubs <slug>` and `menu commands` are accepted (they are NAV routes in menu.md)', () => {
+  it('N1: `stubs <slug>` and `menu commands` are accepted (they are NAV routes in start.md)', () => {
     assert.equal(taskView.isNavRoute('stubs my-vision'), true, 'stubs is a NAV route');
     assert.equal(taskView.isNavRoute('menu commands'), true, 'menu is a NAV route');
   });

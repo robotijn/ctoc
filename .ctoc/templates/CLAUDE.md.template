@@ -95,7 +95,7 @@ CTOC ships exactly three slash commands; everything else is reached through the 
 
 | Command | Action |
 |---------|--------|
-| /ctoc:menu | Dashboard — create/approve/advance plans, releases, all features |
+| /ctoc:start | Dashboard — create/approve/advance plans, releases, all features |
 | /ctoc:push | Run quality checks and push (when auto-push is disabled) |
 | /ctoc:update | Update CTOC to the latest version + refresh this file's lessons block |
 

@@ -3,7 +3,7 @@
  *
  * Used to memoize filesystem-heavy operations (plan-counts, vision-counts,
  * inbox-counts) across the menu render and its immediate drill-ins. The cache
- * lives for the lifetime of the Node process; each /ctoc:menu invocation
+ * lives for the lifetime of the Node process; each /ctoc:start invocation
  * spawns a fresh process, so the cache effectively scopes to one menu session.
  *
  * Design goal: make the dashboard render in O(1) after first call, even when
@@ -12,7 +12,7 @@
  *
  * Cache is keyed by (function, args-signature). TTL is per-key. Default 5
  * seconds — long enough to span a menu navigation, short enough that state
- * changes feel immediate on the next /ctoc:menu invocation.
+ * changes feel immediate on the next /ctoc:start invocation.
  */
 
 const DEFAULT_TTL_MS = 5000;

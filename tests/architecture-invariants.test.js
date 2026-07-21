@@ -340,7 +340,7 @@ describe('v8 Architecture — Dispatch authority', () => {
 
 describe('Frontmatter conformance — SKILL.md', () => {
   // ask-me-questions is a verbatim mirror of .ctoc/ask-me-questions.md (the
-  // canonical decision-elicitation format, referenced by menu.md and CLAUDE.md).
+  // canonical decision-elicitation format, referenced by start.md and CLAUDE.md).
   // A test binds skills/ask-me-questions/SKILL.md byte-for-byte to that source,
   // so its frontmatter format (`allowed-tools:`, no `type:`) is fixed by the
   // source of truth and MUST NOT be rewritten. Exempt this single file here

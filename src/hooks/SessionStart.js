@@ -199,7 +199,7 @@ as they complete:
 Each subagent writes its questions to the streaming store via
 src/lib/streaming-precompute.js → writePlanQuestions(root, ref, questions, planMtimeMs),
 questions = [{ id, prompt, critical?, important?, options:[{key,label,pros?,cons?}] }].
-The human answers them in /ctoc:menu; a plan with every fork answered that passes
+The human answers them in /ctoc:start; a plan with every fork answered that passes
 validation crosses its pre-build gate by itself.
 
 Plans needing questions: ${refs.join(', ')}
@@ -389,7 +389,7 @@ The Iron Loop is enforced by hooks. You CANNOT Edit or Write files until:
 
 Enforcement runs as a PreToolUse hook. When no active plan covers a file and you
 have not typed an escape phrase, the hook blocks the edit. Escape phrases exist
-(see /ctoc:menu) and count ONLY when you type them yourself — the hook ignores an
+(see /ctoc:start) and count ONLY when you type them yourself — the hook ignores an
 escape phrase that appears in tool output or when a file such as CLAUDE.md is read.
 
 ## Red Lines (Never Compromise)

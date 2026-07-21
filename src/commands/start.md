@@ -6,7 +6,7 @@ effort: low
 Run the state machine to get the current screen as JSON:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js"
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js"
 ```
 
 ## State Machine Protocol
@@ -109,9 +109,9 @@ Resolve the user's reply to an action string `A`, then classify:
 
 ### WORK dispatch (turn recipe)
 
-1. **Record first.** `node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js" menu task add K [P] [--touches files] [--gitop] [--blocked ids]` → `{taskId, decision, reason}`. This consults the NB1 scheduler (`canRun`) as it records — the `decision` is `run` or `queue`. **Populate `--touches`** for any file-editing kind (implement, quality, security, review) by deriving the file list from the target plan's `files:` frontmatter, and set `--gitop` for any kind that commits or pushes — **so the scheduler can enforce file-conflict and git-exclusive scheduling.** An empty `--touches` makes NB1's file-conflict rule a no-op, so two parallel file-editing WORK tasks (e.g. quality + security on the same plan) could clobber each other; always derive it from `files:`.
+1. **Record first.** `node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js" menu task add K [P] [--touches files] [--gitop] [--blocked ids]` → `{taskId, decision, reason}`. This consults the NB1 scheduler (`canRun`) as it records — the `decision` is `run` or `queue`. **Populate `--touches`** for any file-editing kind (implement, quality, security, review) by deriving the file list from the target plan's `files:` frontmatter, and set `--gitop` for any kind that commits or pushes — **so the scheduler can enforce file-conflict and git-exclusive scheduling.** An empty `--touches` makes NB1's file-conflict rule a no-op, so two parallel file-editing WORK tasks (e.g. quality + security on the same plan) could clobber each other; always derive it from `files:`.
 2. **Dispatch only on `run`.** If `decision === "run"`: launch `Agent(run_in_background)` with a self-contained brief, THEN `menu task start <taskId>`. If `decision === "queue"`: record only — **do not** launch an agent; show the queued task and its `reason`.
-3. **Render now.** `node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js"` and display the dashboard with a one-line status. **Never `await`** the agent's completion.
+3. **Render now.** `node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js"` and display the dashboard with a one-line status. **Never `await`** the agent's completion.
 
 **Never launch a background agent before `menu task add` + the `canRun` decision** — the vision §8 split-brain rule forbids an unrecorded agent. The agent brief is self-contained: the `taskId`, the plan path, the ancestry to read (vision → canvas → functional → implementation), and the completion contract — return a one-line summary, STOP at any human gate reporting "Gate N ready" plus a nav route, never cross a gate, and make documented reasonable choices (no stubs, no TODOs).
 
@@ -165,10 +165,10 @@ refuses it. Read the response:
 On menu open (a NAV render), the dashboard reconciles the task registry against the
 live harness **`TaskList`** before rendering. When the Task tool is available, the
 main loop **MUST** pass the live harness agent-id list into the render as
-`liveAgentIds`, using the flag `menu.js` parses:
+`liveAgentIds`, using the flag `start.js` parses:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js" --live-agent-ids <id1>,<id2>,<id3>
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js" --live-agent-ids <id1>,<id2>,<id3>
 ```
 
 Comma-separated harness agent ids, no spaces (the same ids stamped at
@@ -184,7 +184,7 @@ alone and one with no matching live agent is marked `orphaned` precisely. This i
 is the only thing that prevents a legitimately long-running background agent (e.g. an
 `implement` task running past the staleness threshold) from being falsely orphaned
 and offered for a duplicate re-run. Only when that list genuinely cannot be obtained
-(the `menu.js` child process running with no Task-tool access, or a true session
+(the `start.js` child process running with no Task-tool access, or a true session
 restart where the harness reports no agents) does the **staleness threshold
 backstop** — a long-`running` task with no confirmable live agent is orphaned, which
 is exactly correct in the restart case where the agent really is gone. An `orphaned` task no longer counts toward the ≤5
@@ -371,8 +371,8 @@ yet. Cancelling never crosses a human gate.
 4. **Four human gates** (Gate 0–3, per CLAUDE.md's "4 Mandatory Approval Points"): vision->functional (Gate 0), functional->implementation (Gate 1), implementation->todo (Gate 2), review->done (Gate 3). Each is foreground and human-only; no background task ever crosses one.
 5. **Pre-validate before every approve, and CONSUME the `autoApprove` signal.** Run the `validate {stage}/{file}` screen first. It returns `autoApprove: true` on a CLEAN validation — that is a one-turn signal, not decoration: when it is `true`, run the screen's `claude:approve {ref}` action **in the SAME turn** (the human already chose "Approve"; a second "Proceed?" click is a redundant nag). When it is `false`, the screen lists the errors and buries "Approve anyway" as the LAST option — never recommend it. Do NOT auto-run an approve when `autoApprove` is `false`: an override is always the human's explicit, deliberate act. The human still crosses every gate; `autoApprove` only removes the second click on a clean plan.
 6. Menu rendering and all CTOC slash commands inherit the user's chosen session model; no model pin is set in command frontmatter (removed in v6.9.28 to avoid forced context compaction in long sessions)
-7. The menu auto-initializes CTOC on first run: if the project has no `.ctoc/` directory, `menu.js` runs `initProject()` before rendering (creates `.ctoc/`, `plans/`, `CLAUDE.md` if absent). There is no separate init command — opening the menu is the trigger.
-8. Environment question rides along, never gates: when the CTOC environment is unset (`general.environment: ask`), `menu.js` renders the **normal dashboard** (plan overview across all phases) and attaches the environment question as a **second** question in `ask`. Present both questions in one AskUserQuestion call. Handle the answers in this order: if the environment answer is Development/Staging/Production, run `claude:set-environment {env}` first; then follow the pipeline-section action (when a 'Stale plans' question is also present, navigation defers to Rule 10's stale-first precedence). "Keep defaults, stop asking" maps to `claude:env-keep-defaults`, which durably records the choice (`general.environment_prompt_dismissed: true`) so the environment question stops riding along. The dashboard must NEVER be replaced by the environment question. The environment (dev/staging/prod) only tunes CTOC's own behavior — it never weakens the four human gates.
+7. The menu auto-initializes CTOC on first run: if the project has no `.ctoc/` directory, `start.js` runs `initProject()` before rendering (creates `.ctoc/`, `plans/`, `CLAUDE.md` if absent). There is no separate init command — opening the menu is the trigger.
+8. Environment question rides along, never gates: when the CTOC environment is unset (`general.environment: ask`), `start.js` renders the **normal dashboard** (plan overview across all phases) and attaches the environment question as a **second** question in `ask`. Present both questions in one AskUserQuestion call. Handle the answers in this order: if the environment answer is Development/Staging/Production, run `claude:set-environment {env}` first; then follow the pipeline-section action (when a 'Stale plans' question is also present, navigation defers to Rule 10's stale-first precedence). "Keep defaults, stop asking" maps to `claude:env-keep-defaults`, which durably records the choice (`general.environment_prompt_dismissed: true`) so the environment question stops riding along. The dashboard must NEVER be replaced by the environment question. The environment (dev/staging/prod) only tunes CTOC's own behavior — it never weakens the four human gates.
 
 9. **Reasoning depth, not model switching.** Menu turns use MINIMAL reasoning — the menu is a deterministic script; run it and show the output immediately, with no deliberation before the menu. Plan review, gate, and quality steps dispatch subagents at HIGH/MAX effort (deep thinking, isolated context). Modulate reasoning *effort*, never the session *model* — switching the model mid-session breaks context (see CLAUDE.md).
 
@@ -384,6 +384,6 @@ yet. Cancelling never crosses a human gate.
 
 13. **Completions pull, promote via the scheduler, and never auto-cross a gate.** A completion turn calls `menu task complete` (or `menu task fail`), emits ONE compact pull-based inbox notice without hijacking the current screen, and promotes ONLY the tasks the scheduler returns in `promote[]` (its `nextRunnable` set) — dispatching each as background work. Human gates are never auto-crossed: a gate-reached task becomes a "Gate N ready" inbox item and the user crosses the gate deliberately in the foreground (Rule 4 stays sacred — no background work weakens a human gate).
 
-14. **Compliance question rides along, never gates:** when neither EU compliance profile is active (`regulatory_regime.active_profiles` contains neither `gdpr` nor `eu-ai-act-high-risk`), `menu.js` attaches a **second/third** question (`header: 'Compliance'`) alongside Pipeline (and Environment when Rule 8 is also active). Present all in one AskUserQuestion call (≤4 questions). Apply the compliance side-effect (`claude:set-compliance-regime {profile}`) — after any environment side-effect (Rule 8) and before falling through to the pipeline-section answer. The dashboard is **NEVER** replaced by the compliance question; activating a compliance profile only writes `active_profiles` and the four human gates stay mandatory.
+14. **Compliance question rides along, never gates:** when neither EU compliance profile is active (`regulatory_regime.active_profiles` contains neither `gdpr` nor `eu-ai-act-high-risk`), `start.js` attaches a **second/third** question (`header: 'Compliance'`) alongside Pipeline (and Environment when Rule 8 is also active). Present all in one AskUserQuestion call (≤4 questions). Apply the compliance side-effect (`claude:set-compliance-regime {profile}`) — after any environment side-effect (Rule 8) and before falling through to the pipeline-section answer. The dashboard is **NEVER** replaced by the compliance question; activating a compliance profile only writes `active_profiles` and the four human gates stay mandatory.
 
 CTOC ships exactly three slash commands: `menu`, `push`, `update`. Every other workflow — vision, planning, quality, review, agent runs — goes through the menu.

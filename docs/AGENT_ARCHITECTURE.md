@@ -185,7 +185,7 @@ maxes at 2. A prior corpus-wide deletion in this repo was silently undone by a
 
 ### Front-process vs subagent model rules (corrected v6.9.29)
 
-Claude Code has two execution contexts that matter for model declarations. An earlier version of this document claimed a slash command was "a separate top-level invocation with no session context to preserve" and could therefore declare any model. **That was wrong and it caused crashes.** A slash command's `model:` frontmatter switches the *live session's* model. When `/ctoc:menu` pinned `model: claude-haiku-4-5`, invoking it switched the running session to Haiku; if the session conversation was larger than Haiku's context window, autocompact triggered and the session crashed. The v6.9.29 fix removed the `model:` line from every slash command.
+Claude Code has two execution contexts that matter for model declarations. An earlier version of this document claimed a slash command was "a separate top-level invocation with no session context to preserve" and could therefore declare any model. **That was wrong and it caused crashes.** A slash command's `model:` frontmatter switches the *live session's* model. When `/ctoc:start` pinned `model: claude-haiku-4-5`, invoking it switched the running session to Haiku; if the session conversation was larger than Haiku's context window, autocompact triggered and the session crashed. The v6.9.29 fix removed the `model:` line from every slash command.
 
 | Context | What it is | Model declarations |
 |---|---|---|

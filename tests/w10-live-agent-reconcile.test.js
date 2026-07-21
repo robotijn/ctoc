@@ -16,7 +16,7 @@
  * and the registry (task-registry.js) already know how to consume:
  *   1. a live-agent-id list threaded argv → route → dashboardPipeline →
  *      buildDashboardTable → reconcileState (the `--live-agent-ids <csv>` flag,
- *      parsed by `extractLiveAgentIds` in menu.js);
+ *      parsed by `extractLiveAgentIds` in start.js);
  *   2. an `agentTaskId` recorded on the task at `menu task start` (from
  *      `--agent-id`, defaulting to the task id).
  *
@@ -25,7 +25,7 @@
  * via the REAL registry API in an isolated tmp root. The true-positive ("live →
  * still running") and true-negative ("dead → orphaned") cases live in the SAME
  * file, in the SAME reconcile pass, so a broken "fix" that merely disables
- * staleness detection cannot pass. Case 8 spawns the real `menu.js` process to
+ * staleness detection cannot pass. Case 8 spawns the real `start.js` process to
  * prove the ride-along is not bypassed. Raw fs/os/child_process are permitted in
  * tests/**.
  */
@@ -39,12 +39,12 @@ const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const { extractLiveAgentIds } = require('../src/commands/menu');
+const { extractLiveAgentIds } = require('../src/commands/start');
 const ms = require('../src/lib/menu-screens');
 const taskRegistry = require('../src/lib/task-registry');
 const taskReconcile = require('../src/lib/task-reconcile');
 
-const MENU = path.join(__dirname, '..', 'src', 'commands', 'menu.js');
+const MENU = path.join(__dirname, '..', 'src', 'commands', 'start.js');
 
 // Older than DEFAULT_STALE_MS (30 min). A `running` task this old is orphaned
 // whenever a live set is PRESENT and does not confirm it (the definitive dead
@@ -278,7 +278,7 @@ describe('W10-s4 (H8) — menu task start records agentTaskId', () => {
 });
 
 describe('W10-s4 (H8) — ride-along preserved when only --live-agent-ids is passed', () => {
-  it('8. spawning `menu.js --live-agent-ids a1` still attaches the environment question (integration)', () => {
+  it('8. spawning `start.js --live-agent-ids a1` still attaches the environment question (integration)', () => {
     // env UNSET (no settings.json) → the environment question must ride along.
     // gdpr profile active in settings.yaml suppresses the compliance ride-along
     // (isolate the environment ride-along, mirroring tests/menu-environment.test.js).

@@ -31,9 +31,9 @@
  *      `require(…)` argument (string concatenation / template / variable), or a
  *      base64/xxd/openssl decode piped into an interpreter.
  *
- * WHAT IT STILL ALLOWS: `node -e` in general (every `src/commands/menu.md` recipe —
+ * WHAT IT STILL ALLOWS: `node -e` in general (every `src/commands/start.md` recipe —
  * compliance write, cleanup exec, plan numbering, environment, dismiss-stale —
- * keeps working; asserted verbatim against the live menu.md by
+ * keeps working; asserted verbatim against the live start.md by
  * tests/ledger-forgery-closed.test.js), read-only inspection of the ledger
  * (`cat`/`ls`/`grep`), and the ONE sanctioned ledger writer:
  * `node src/scripts/ledger-backfill.js` (argv-driven, no eval, reviewable).
@@ -349,7 +349,7 @@ function isLedgerForgery(command) {
   if (isLedgerWrite(command)) {
     return {
       deny: true,
-      reason: `writes to the approval ledger (.ctoc/approvals/) are DENIED on the Bash channel — the ledger is human-approval provenance, and splitting the path across a \`cd\` does not change that. Cross the gate through /ctoc:menu; the ONLY sanctioned ledger writer is \`node ${SANCTIONED_WRITER}\` (argv-driven, reviewable).`,
+      reason: `writes to the approval ledger (.ctoc/approvals/) are DENIED on the Bash channel — the ledger is human-approval provenance, and splitting the path across a \`cd\` does not change that. Cross the gate through /ctoc:start; the ONLY sanctioned ledger writer is \`node ${SANCTIONED_WRITER}\` (argv-driven, reviewable).`,
     };
   }
 

@@ -565,7 +565,7 @@ function generateInitialState() {
  * The artifacts a project MUST hold before setup may call itself successful.
  *
  * Deliberately duplicated with the menu's read-back (`verifySetup` in
- * `src/commands/menu.js`). They are two INDEPENDENT checks of the same claim;
+ * `src/commands/start.js`). They are two INDEPENDENT checks of the same claim;
  * sharing one list would let a single mistake pass both of them. If they ever
  * disagree, the cross-layer test in `tests/init-tells-the-truth.test.js` fails —
  * which is the point. Display form (forward slashes) so a message can never
@@ -665,7 +665,7 @@ function record(state, label, write) {
  *     exists, what it would do, and that it did not happen.
  *
  * FOLLOW-UP, named rather than forgotten: nothing OFFERS the hook yet. Offering
- * it means rendering an option in `src/commands/menu.js`, which a separate slice
+ * it means rendering an option in `src/commands/start.js`, which a separate slice
  * owns — two plans editing one command surface is the contention this pipeline
  * keeps tripping over. Until that lands, new projects do not get the background
  * post-commit quality loop. That is a real behaviour change, stated here rather
@@ -963,7 +963,7 @@ function formatInitResult(result) {
   // `ctoc plan new` is NOT a command — no such CLI exists, and telling a brand-new
   // user to run it was the first thing CTOC ever said to them. CTOC ships exactly
   // three slash commands (menu, push, update); every workflow goes through the menu.
-  lines.push('  2. Run /ctoc:menu — create your first plan from the dashboard');
+  lines.push('  2. Run /ctoc:start — create your first plan from the dashboard');
   lines.push('  3. Follow the Iron Loop!');
 
   return lines.join('\n');

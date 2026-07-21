@@ -27,7 +27,7 @@ function render(app) {
   } else if (agent.stale) {
     out += `  ${c.yellow}⚠${c.reset} ${c.bold}Stale lock${c.reset}\n`;
     out += `  Plan was: ${c.dim}${stripCtl(agent.stalePlan || 'unknown')}${c.reset} (process died)\n`;
-    out += `  ${c.dim}Run /ctoc:menu to clean up.${c.reset}\n`;
+    out += `  ${c.dim}Run /ctoc:start to clean up.${c.reset}\n`;
   } else {
     out += `  ${c.dim}○ Idle${c.reset}\n`;
     out += `  No active plan.\n`;

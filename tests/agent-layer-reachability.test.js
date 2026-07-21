@@ -178,7 +178,7 @@ function explain(missing) {
       `\n  • ${c.module}.${c.name}  (${c.source})\n`
       + `      what it is for: ${c.why}\n`
       + `      fix: reference it from the agent layer — name it in the dispatch recipe in\n`
-      + `           src/commands/menu.md, or in the agent definition that should use it,\n`
+      + `           src/commands/start.md, or in the agent definition that should use it,\n`
       + `           qualified (\`${c.name}\`) and near the module name ("${c.module}").`
     )).join('\n');
 }
@@ -200,8 +200,8 @@ describe('agent-layer reachability — curated agent-facing capabilities are vis
     const chars = corpus.reduce((n, c) => n + c.text.length, 0);
     assert.ok(chars > 100000, `the agent-layer corpus reads as ${chars} characters — too small to be real`);
     assert.ok(
-      corpus.some((c) => c.file === path.join('src', 'commands', 'menu.md')),
-      'src/commands/menu.md must be part of the scanned corpus'
+      corpus.some((c) => c.file === path.join('src', 'commands', 'start.md')),
+      'src/commands/start.md must be part of the scanned corpus'
     );
     assert.ok(
       corpus.some((c) => c.file.startsWith(`agents${path.sep}`)),
@@ -245,7 +245,7 @@ describe('agent-layer reachability — curated agent-facing capabilities are vis
     const msg = explain([cap]);
     assert.match(msg, /detectConflicts/, 'the message names the capability');
     assert.match(msg, /DEAD TO THE PIPELINE/, 'the message states the consequence');
-    assert.match(msg, /src\/commands\/menu\.md/, 'the message names where to fix it');
+    assert.match(msg, /src\/commands\/start\.md/, 'the message names where to fix it');
   });
 
   it('the curated list is non-empty and every entry names a source file that exists on disk', () => {

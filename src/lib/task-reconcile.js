@@ -118,7 +118,7 @@ const DEFAULT_TEMP_TTL_MS = 60 * 60_000;
  * PRESUMED-DEAD bound (permanent-deadlock guard). A staleness-orphan's file quarantine is
  * released when the agent is CONFIRMED dead (live list present + its id absent) OR once the
  * orphan's TOTAL age (now − ts.started) reaches this multiple of the SAME kind-aware staleness
- * floor that orphaned it. WHY a second release path is load-bearing: the default /ctoc:menu
+ * floor that orphaned it. WHY a second release path is load-bearing: the default /ctoc:start
  * path passes NO --live-agent-ids, so `liveAgentIds` is null on EVERY pass and the confirmed-
  * dead signal can NEVER fire. Without this bound a staleness-orphan's `touches` stay in the
  * quarantine FOREVER and any rival queued task touching them can NEVER promote — a permanent
@@ -413,7 +413,7 @@ function reconcile(tasks, opts = {}) {
       //
       //   (2) PRESUMED DEAD — the orphan's TOTAL age (now − ts.started) has reached
       //       presumedDeadMultiple × the SAME kind-aware staleness floor that orphaned it. This
-      //       is the load-bearing deadlock guard: the DEFAULT /ctoc:menu path passes no live
+      //       is the load-bearing deadlock guard: the DEFAULT /ctoc:start path passes no live
       //       list, so `live` is null on EVERY pass and signal (1) can never fire. Without a
       //       time bound the files would stay reserved FOREVER and any rival queued task
       //       touching them could never run. The bound keeps protecting a plausibly-alive agent

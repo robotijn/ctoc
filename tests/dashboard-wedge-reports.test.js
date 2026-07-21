@@ -68,7 +68,7 @@ afterEach(() => {
   try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* best-effort */ }
 });
 
-/** Seed the on-disk registry and render the dashboard exactly as `/ctoc:menu` does. */
+/** Seed the on-disk registry and render the dashboard exactly as `/ctoc:start` does. */
 function render(tasks) {
   reg.save(root, mkReg(tasks));
   return menuScreens.buildDashboardTable(root);

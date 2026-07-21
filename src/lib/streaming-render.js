@@ -6,7 +6,7 @@
  *
  * Per the owner's direction change ("make CTOC streaming, fuck the menu"), this is the
  * PRIMARY streaming interface, NOT a menu area/tab. It is deliberately decoupled from
- * `src/commands/menu.js` and the area system: it exposes a plain `{ render, handleKey }`
+ * `src/commands/start.js` and the area system: it exposes a plain `{ render, handleKey }`
  * pair over a host-supplied `app` object, plus the temporary in-memory `exampleTopics`
  * seed and `initBuildFlow` helper. It depends ONLY on:
  *   - `./streaming-flow`  — the pure state machine (the real logic lives there);
@@ -253,7 +253,7 @@ function renderDecomposing(app) {
  * Submit the typed idea. The WARM path (X8): this SPAWNS NOTHING. A blank idea is a
  * non-silent "type your idea first" prompt that stays in the idea prompt. A non-empty
  * idea enters the AWAITING-DECOMPOSITION state and returns immediate feedback; the
- * session model — per `src/commands/menu.md` — then dispatches the `vision-decomposer`
+ * session model — per `src/commands/start.md` — then dispatches the `vision-decomposer`
  * agent, which decomposes the idea and writes topics via `streaming-topics.writeTopics`.
  * The next `render` loads those topics and drives them (see `render`). No cold-start
  * second Claude, no frozen terminal.
@@ -268,7 +268,7 @@ function submitIdea(app) {
     return true;
   }
   // Warm, non-blocking: record the awaiting state + immediate acknowledgment. The model
-  // dispatches vision-decomposer (per menu.md); the next render drives the written topics.
+  // dispatches vision-decomposer (per start.md); the next render drives the written topics.
   app.awaitingDecomposition = true;
   app.pendingIdea = idea;
   app.message = `Breaking "${idea}" into topics…`;

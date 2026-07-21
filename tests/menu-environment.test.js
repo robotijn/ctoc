@@ -9,7 +9,7 @@
  *
  * These tests pin that contract: the primary screen must NEVER be gated by a
  * ride-along. The primary screen is now the STREAMING GATE-DECISION screen (the
- * `/ctoc:menu` default); the environment question still rides along as a second
+ * `/ctoc:start` default); the environment question still rides along as a second
  * question and the classic dashboard stays reachable via its explicit route.
  */
 
@@ -20,7 +20,7 @@ const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
 
-const MENU = path.join(__dirname, '..', 'src', 'commands', 'menu.js');
+const MENU = path.join(__dirname, '..', 'src', 'commands', 'start.js');
 
 const tmpDirs = [];
 function projectWith(settings) {

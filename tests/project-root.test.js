@@ -70,7 +70,7 @@ test('findProjectRoot: an ancestor .ctoc outranks a nested package.json (monorep
 // THE EVIDENCE THAT DECIDED IT. The owner hit this in a real fresh repository and was
 // offered an approval decision about a plan he had never written. It is now reproduced
 // from a fixture as case 14 of tests/fresh-repository-is-its-own-project.test.js: a real
-// `node src/commands/menu.js` process, started in an empty nested repository, printed
+// `node src/commands/start.js` process, started in an empty nested repository, printed
 // `"Approve": "stream approve review/discuss-suggestion-with-editor.md"` — an approval
 // decision about the PARENT project's plan.
 //

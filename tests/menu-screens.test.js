@@ -391,7 +391,7 @@ describe('Menu Screens Tests', () => {
 
   // R6-A — the forced crossing must be AUDITABLE at the action-string surface.
   // "Approve anyway" is the one place a human overrides a failed gate; it must
-  // carry the `--override` token so the menu.md claude:approve recipe records
+  // carry the `--override` token so the start.md claude:approve recipe records
   // override:true + reason via approvePlan. A bare claude:approve makes the
   // override invisible at the menu surface.
   test('validateScreen (failed) "Approve anyway" carries the --override token', () => {
@@ -581,7 +581,7 @@ describe('Menu Screens Tests', () => {
   // R2-C2 item 4 — review `done-all` (W3), menu-side. stageBrowse on the review
   // stage registers a WORD shortcut `done-all-<parent>` per distinct parent among
   // the review plans, mapping to the action key `claude:done-all-<parent>` whose
-  // recipe (approveSubplans(parent, 'review')) already lives in menu.md (same wave).
+  // recipe (approveSubplans(parent, 'review')) already lives in start.md (same wave).
   // Never a numbered option; the session model executes the recipe.
   test('stageBrowse(review) registers a done-all-<parent> word key per parent', () => {
     createPlan('review', 'featx-s1-alpha',

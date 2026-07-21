@@ -40,7 +40,7 @@
  *
  * LIVE ROOTS — a file is alive iff require-reachable from:
  *   1. every hook command registered in .claude-plugin/hooks.json;
- *   2. the shipped slash commands (src/commands/menu.js, push.js, update.js);
+ *   2. the shipped slash commands (src/commands/start.js, push.js, update.js);
  *   3. scripts the pipeline sanctions directly (move-plan.js — whitelisted in the
  *      Bash hook as the agent plan-move API; release.js — the release procedure;
  *      test-gate.js — the npm test entry point);
@@ -88,7 +88,7 @@ const safeFs = require('./safe-fs');
 
 /** Files under src/ that are entry points by construction, not by being required. */
 const SANCTIONED_SCRIPT_ROOTS = [
-  path.join('src', 'commands', 'menu.js'),
+  path.join('src', 'commands', 'start.js'),
   path.join('src', 'commands', 'push.js'),
   path.join('src', 'commands', 'update.js'),
   path.join('src', 'scripts', 'move-plan.js'),
@@ -227,12 +227,12 @@ function argumentText(content, openIdx) {
  * Resolve a PATH literal to a real src file. Two conditions, both required, and
  * together they are what stops a presence-check array from manufacturing edges:
  *
- *   • it must contain a path SEPARATOR — a bare basename (`'menu.js'`) names no
+ *   • it must contain a path SEPARATOR — a bare basename (`'start.js'`) names no
  *     path, and basename matching is precisely how one string used to fan out to
  *     every file that shares it;
  *   • it must resolve UNAMBIGUOUSLY to one real file under src/ — either relative
  *     to the referring file, or as a unique project-relative suffix (covering
- *     `${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js`). Two candidates → no edge; a
+ *     `${CLAUDE_PLUGIN_ROOT}/src/commands/start.js`). Two candidates → no edge; a
  *     guess is worse than a gap in a list that can only be paid off by deletion.
  *
  * @param {string} fromFile - absolute path of the referring file
@@ -292,7 +292,7 @@ function edgesFrom(file, allFiles, projectRoot = null) {
     }
   }
 
-  // A command string that runs a src file by path: `node ".../src/commands/menu.js"`.
+  // A command string that runs a src file by path: `node ".../src/commands/start.js"`.
   NODE_RUNS_SRC_RE.lastIndex = 0;
   while ((match = NODE_RUNS_SRC_RE.exec(content)) !== null) {
     const target = resolvePathLiteral(file, allFiles, match[1]);
@@ -509,7 +509,7 @@ function analyze(projectRoot, options = {}) {
 //      motivating bug;
 //   3. a CALL in a shipped instruction surface — the name invoked as `name(` or
 //      referenced as `require('./x').name` (the session runs it, e.g.
-//      `approveSubplans(parentSlug, 'review')` at menu.md:46, the Gate-3 gate).
+//      `approveSubplans(parentSlug, 'review')` at start.md:46, the Gate-3 gate).
 //      CTOC's recipes use INLINE code, so the signal is CALL SYNTAX, not whether
 //      the recipe sits in a fenced block;
 //   4. a declared export root in .ctoc/reachability-roots.json.
@@ -633,7 +633,7 @@ const SURFACE_REQUIRE_IDX_RE = /require\s*\(\s*['"][^'"]*['"]\s*\)\s*\[\s*['"]([
  * The names a shipped instruction surface actually CALLS — the ONLY surface
  * references the EXPORT fence honors. The distinguishing signal is CALL SYNTAX,
  * not markdown formatting: CTOC's recipes invoke library functions with INLINE
- * code (`approveSubplans(parentSlug, 'review')` at menu.md:46 — the Gate-3
+ * code (`approveSubplans(parentSlug, 'review')` at start.md:46 — the Gate-3
  * done-all gate), not fenced blocks. So a name is credited iff it appears as
  * `name(` (an invocation) OR inside `require('…').name` / `require('…')['name']`
  * (a resolved reference the recipe then runs). A BARE TOKEN in prose — even a

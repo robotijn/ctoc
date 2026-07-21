@@ -34,7 +34,7 @@
  *
  *     // .ctoc/settings.json
  *     { "general": { "entry_point": {
- *         "command": "node src/commands/menu.js",  // required, no shell operators
+ *         "command": "node src/commands/start.js",  // required, no shell operators
  *         "expect": "CTOC v",                      // optional literal substring
  *         "timeout_ms": 30000                      // optional, bounded default
  *     } } }

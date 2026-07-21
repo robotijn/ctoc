@@ -2,10 +2,10 @@
  * Menu auto-init tests (v6.9.32).
  *
  * The `/ctoc:init` slash command was removed. Initialization is now automatic:
- * when `/ctoc:menu` runs in a project with no `.ctoc/` directory, menu.js calls
+ * when `/ctoc:start` runs in a project with no `.ctoc/` directory, start.js calls
  * initProject() before rendering. `ensureInitialized` is that hook.
  *
- * See: CLAUDE.md "Project Init Procedure" and src/commands/menu.md rule 7.
+ * See: CLAUDE.md "Project Init Procedure" and src/commands/start.md rule 7.
  *
  * CONTRACT CHANGE (plan 00156, 2026-07-20). `ensureInitialized` no longer returns
  * a boolean. It returns a VERDICT read back from the filesystem —
@@ -24,7 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const { ensureInitialized } = require('../src/commands/menu.js');
+const { ensureInitialized } = require('../src/commands/start.js');
 
 describe('Menu auto-init — replaces the removed init command (v6.9.32)', () => {
   let dir;
@@ -62,7 +62,7 @@ describe('Menu auto-init — replaces the removed init command (v6.9.32)', () =>
     assert.equal(setup.ok, false, 'an empty .ctoc/ is a marker, not a set-up project');
   });
 
-  it('requiring menu.js does not run the menu (importable without side effects)', () => {
+  it('requiring start.js does not run the menu (importable without side effects)', () => {
     // The require above already happened; if main() had run, the test process
     // would have rendered a dashboard or exited. Reaching here proves the
     // require.main === module guard works.

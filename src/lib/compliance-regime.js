@@ -231,7 +231,7 @@ function regulatoryRegimeRegion(content) {
  * so "None" is a SEPARATE verb: it writes a fixed-literal `declined: true` marker
  * INSIDE the `regulatory_regime:` block. The reader of record
  * (regulatory-regime.js loadActiveProfiles) exposes it as `.declined`, which
- * `needsComplianceRegimePrompt` (menu.js) honors.
+ * `needsComplianceRegimePrompt` (start.js) honors.
  *
  * Truth table (settings.yaml):
  *   missing file            → { ok:false }  (never fabricate a hook-critical file)

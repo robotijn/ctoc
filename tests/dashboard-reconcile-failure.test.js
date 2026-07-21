@@ -319,7 +319,7 @@ describe('dashboard — a reconcile pass that did not produce a trustworthy resu
   // 13 — the promote contract the completion turn reads must describe what it receives.
   it('describes promote[] as the guarded set, not the raw scheduler output', async () => {
     const md = await fs.promises.readFile(
-      path.join(__dirname, '..', 'src', 'commands', 'menu.md'), 'utf8'
+      path.join(__dirname, '..', 'src', 'commands', 'start.md'), 'utf8'
     );
     const promoteLine = md.split('\n').find((l) => l.includes('**Promote.**')) || '';
 

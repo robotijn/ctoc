@@ -15,7 +15,7 @@
  * channel: this checked-in, reviewable, argv-driven script. It parses `process.argv`
  * ONLY — it contains no `eval`, no `new Function`, and evaluates nothing it is given.
  *
- * REACHABILITY: referenced from `src/commands/menu.md` (an instruction-surface root
+ * REACHABILITY: referenced from `src/commands/start.md` (an instruction-surface root
  * the reachability fence honors), which is where a human is told to run it.
  *
  * IT DOES NOT CROSS A HUMAN GATE. It never moves a plan file and never imports
@@ -329,7 +329,7 @@ function run(argv, cwd = process.cwd()) {
 }
 
 // Only `run` is exported: it is the single live entry (the CLI block below and the
-// menu.md recipe both drive it, and the test drives it too). The internal helpers
+// start.md recipe both drive it, and the test drives it too). The internal helpers
 // (parseArgs / backfillVisions / backfillOnePlan / isVisionPlan) are reached only
 // THROUGH run(), so exporting them would be dead exports ("a test is not a caller").
 module.exports = { run };

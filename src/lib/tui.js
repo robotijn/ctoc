@@ -25,7 +25,7 @@ const c = {
 };
 
 // Security (R7-A): strip C0 (0x00-0x1F) and C1 (0x7F-0x9F) control chars before
-// rendering any attacker-influenceable string. The live dashboard (menu.js →
+// rendering any attacker-influenceable string. The live dashboard (start.js →
 // src/areas/*.js + src/tabs/*.js) interpolates agent-writable fields — plan
 // title/slug, `files:` frontmatter, task description, inbox question/decision/gate
 // frontmatter — straight to the terminal. An ESC / CR / C1 byte in such a field

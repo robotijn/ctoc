@@ -44,13 +44,13 @@ const TERMINAL = new Set(['done', 'failed', 'orphaned']);
 // verbs mirror the menu driver's navigation vocabulary; anything else (including
 // any `claude:` action) is rejected.
 //
-// R3-D: `stubs` and `menu` were MISSING from the allowlist while menu.md lists both
+// R3-D: `stubs` and `menu` were MISSING from the allowlist while start.md lists both
 // as NAV routes. The cost was concrete: a `decompose` completion recording
 // `--next "stubs <slug>"` — the natural next hop after decomposition, straight to
 // the human checkpoint that reviews the stubs — was rejected WHOLESALE by the store,
 // so the one route the flow needs was the one route gate-safety forbade. The
 // allowlist stays a real allowlist (word-bounded, no `claude:` verb ever passes);
-// it now simply matches the NAV vocabulary menu.md actually ships.
+// it now simply matches the NAV vocabulary start.md actually ships.
 const NAV_ROUTE = /^(plan|browse|section|inbox|tasks|task|validate|stubs|menu)\b/;
 const CLAUDE_ACTION = /^claude:/;
 

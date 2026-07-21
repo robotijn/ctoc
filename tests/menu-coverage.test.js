@@ -1,6 +1,6 @@
 /**
- * menu.js coverage — HARD, failure-first, branch-pinning tests for the dashboard
- * router (`src/commands/menu.js`).
+ * start.js coverage — HARD, failure-first, branch-pinning tests for the dashboard
+ * router (`src/commands/start.js`).
  *
  * Every test here is written to go RED if a happy-path-only implementation were
  * substituted: it pins an error/catch path, a boundary comparison, a coercion of
@@ -16,24 +16,24 @@
  * REAL temp-dir fixtures, never a fake `fs`.
  *
  * DOCUMENTED UNREACHABLE (never faked):
- *  - `main()` (menu.js ~594-667) and `handleResize` (~519-522) are NOT exported and
+ *  - `main()` (start.js ~594-667) and `handleResize` (~519-522) are NOT exported and
  *    only run when the module is the process entry point / under a TTY. The
  *    `## main() — real behavior, cross-process` suite exercises them by spawning
- *    `node menu.js`, but Node's `--experimental-test-coverage` instruments only the
+ *    `node start.js`, but Node's `--experimental-test-coverage` instruments only the
  *    test process, so that real execution is NOT attributed to this file's line %.
  *    The TTY interactive branch (isTTY true, ~625-638) additionally needs a pseudo-
  *    terminal (node-pty is not a dependency), so it stays uncredited by design.
- *  - The VERSION read-fallback catch (menu.js 244-245) runs only if the VERSION file
+ *  - The VERSION read-fallback catch (start.js 244-245) runs only if the VERSION file
  *    is unreadable at module-load time; the file exists, so the catch is load-time-
  *    only and cannot be re-entered after import.
- *  - `activateCurrentArea`'s catch (menu.js 513-515) fires only when `TABS[tabIndex]`
+ *  - `activateCurrentArea`'s catch (start.js 513-515) fires only when `TABS[tabIndex]`
  *    is out of range; every public entry (left/right/numeric shortcuts) clamps the
  *    index into a valid area, so no public API emits the malformed state it guards.
- *  - `enterSearchMode`'s catch (menu.js 139-140) is a redundant belt-and-suspenders
+ *  - `enterSearchMode`'s catch (start.js 139-140) is a redundant belt-and-suspenders
  *    guard: the underlying `plan-index.search` barrel is itself fully fail-open and
  *    never throws or rejects for ANY query or projectPath (a numeric/object root
  *    still returns real results), so the catch cannot be entered from the public API.
- *  - `render`'s inner `tabModule.renderActions` call (menu.js 337) never runs because
+ *  - `render`'s inner `tabModule.renderActions` call (start.js 337) never runs because
  *    no area module exposes a `renderActions` hook; the actions-mode ARM (335-336) is
  *    covered, but the optional inner call has no real implementation to exercise.
  */
@@ -45,7 +45,7 @@ const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
 
-const menu = require('../src/commands/menu.js');
+const menu = require('../src/commands/start.js');
 const streamingFlow = require('../src/lib/streaming-flow');
 const { TABS } = require('../src/lib/tabs');
 const {
@@ -63,7 +63,7 @@ const {
   app,
 } = menu;
 
-const MENU = path.join(__dirname, '..', 'src', 'commands', 'menu.js');
+const MENU = path.join(__dirname, '..', 'src', 'commands', 'start.js');
 
 // ── temp-dir fixtures ────────────────────────────────────────────────────────
 const tmpDirs = [];
@@ -638,8 +638,8 @@ describe('render() plan-content view — truncation boundary', () => {
 // STREAMING PRIMARY VIEW WIRING — streaming-render is the session's primary screen.
 // The classic dashboard + areas stay reachable via the transitional 'm' bridge (a
 // temporary key the menu-retirement slice removes). Written RED first: against the
-// pre-wiring menu.js the default render showed the classic dashboard and the
-// streaming keys did nothing, so every assertion below failed until menu.js routed
+// pre-wiring start.js the default render showed the classic dashboard and the
+// streaming keys did nothing, so every assertion below failed until start.js routed
 // the streaming view (streamView) through streaming-render.
 // ─────────────────────────────────────────────────────────────────────────────
 describe('streaming primary view — render + key routing (the wiring under test)', () => {

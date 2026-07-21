@@ -4,7 +4,7 @@
  * Tests for the STANDALONE streaming renderer + key handler (streaming interaction
  * model, slice 1). Per the owner's direction change ("make CTOC streaming, fuck the
  * menu") this is NOT a menu area/tab — it is a self-contained render + handleKey pair
- * over a host `app` object, decoupled from src/commands/menu.js and the area system.
+ * over a host `app` object, decoupled from src/commands/start.js and the area system.
  *
  * The keys `b` back and `s` settings emit an INTENT onto `app.streamAction` for the
  * host to act on (no menu-tab coupling). Written RED first, then implemented to green.
@@ -683,7 +683,7 @@ test('b with a NON-empty buffer is a normal character (does not trigger the demo
 // X8 case 1 — the WARM submit path spawns NOTHING and shows the decomposing screen.
 // The old flow synchronously spawned a cold-start `claude -p` here; the warm flow sets
 // an awaiting-decomposition state and returns immediate feedback. The session model
-// (per menu.md) dispatches vision-decomposer to write topics; the next render drives them.
+// (per start.md) dispatches vision-decomposer to write topics; the next render drives them.
 test('submit does NOT spawn a process and shows the "Breaking … into topics" screen', () => {
   const cp = require('child_process');
   const originalSpawnSync = cp.spawnSync;
@@ -820,8 +820,8 @@ test('X8 case 5 — vision-decomposer.md names streaming-topics + calls writeTop
 
 // X8 case 6 — the menu command instructs the model to dispatch vision-decomposer on an
 // idea submit (this is what makes the model decompose, warm, instead of a cold CLI).
-test('X8 case 6 — menu.md instructs dispatch of vision-decomposer on an idea submit', () => {
-  const md = nodeFs.readFileSync(path.join(REPO_ROOT, 'src', 'commands', 'menu.md'), 'utf8');
+test('X8 case 6 — start.md instructs dispatch of vision-decomposer on an idea submit', () => {
+  const md = nodeFs.readFileSync(path.join(REPO_ROOT, 'src', 'commands', 'start.md'), 'utf8');
   assert.match(md, /vision-decomposer/, 'vision-decomposer is named as the dispatch target');
   assert.match(md, /writeTopics/, 'the write path (streaming-topics.writeTopics) is named');
   // The instruction ties the dispatch to a free-text idea submit in the build flow.

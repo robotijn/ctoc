@@ -2,7 +2,7 @@
  * NB3 — Menu Protocol Rewrite (NAV vs WORK). Iron Loop Step 8 (TDD).
  *
  * Two suites, per plans/todo/NB3-menu-protocol-rewrite.md Step 7:
- *   • SPEC-A — doc-contract over src/commands/menu.md. Every assertion slices the
+ *   • SPEC-A — doc-contract over src/commands/start.md. Every assertion slices the
  *     section body from its OWN heading index (the SP2 H1 lesson: a lower-index
  *     prose match must never false-green a deleted section). String-anchored.
  *   • SPEC-B — behavioral over src/lib/menu-screens.js in isolated tmp roots
@@ -24,11 +24,11 @@ const ms = require('../src/lib/menu-screens');
 const taskRegistry = require('../src/lib/task-registry');
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SPEC-A — doc-contract over menu.md (string-anchored, own-heading sliced)
+// SPEC-A — doc-contract over start.md (string-anchored, own-heading sliced)
 // ═══════════════════════════════════════════════════════════════════════════
 
 function readMenuMd() {
-  return fs.readFileSync(path.join(__dirname, '..', 'src', 'commands', 'menu.md'), 'utf8');
+  return fs.readFileSync(path.join(__dirname, '..', 'src', 'commands', 'start.md'), 'utf8');
 }
 
 /**

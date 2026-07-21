@@ -217,9 +217,9 @@ describe('W08-s1: buildBlockMessage — phrase-free and still helpful', () => {
       'the block message must contain no canonical escape phrase at all');
   });
 
-  it('10. still points to /ctoc:menu and names the target (stays actionable)', () => {
+  it('10. still points to /ctoc:start and names the target (stays actionable)', () => {
     const msg = buildBlockMessage('no covering plan', info);
-    assert.ok(msg.includes('/ctoc:menu'), 'block message must point to /ctoc:menu');
+    assert.ok(msg.includes('/ctoc:start'), 'block message must point to /ctoc:start');
     assert.ok(msg.includes('src/lib/x.js'), 'block message must name the target file');
     assert.ok(msg.includes('BLOCKED'), 'block message must still announce it BLOCKED');
   });

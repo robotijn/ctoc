@@ -409,7 +409,7 @@ function main() {
           `\n⚠️  ${withheld.length} plan(s) REPORTED, NOT reverted: this project's approval\n` +
           `    provenance was never recorded in the ledger, so CTOC will not move your plan\n` +
           `    archive. Enforcement is fully active for every other violation kind.\n` +
-          `    Review them:  /ctoc:menu → inbox migration\n` +
+          `    Review them:  /ctoc:start → inbox migration\n` +
           `    Migrate:      ${gateMigration.MIGRATION_COMMAND}\n`);
         // The hook fires on EVERY tool call and logViolation APPENDS, so the withheld
         // set is recorded only when it actually CHANGED. That is the difference

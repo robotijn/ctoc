@@ -21,7 +21,7 @@ Tier 2  Watchers / specialists (99) Opus. They think about the code, structured 
 | Context | Model rule | Why |
 |---|---|---|
 | Front process (terminal `claude` session) | Stays on user's chosen model; CTOC never auto-switches | `/model` mid-session preserves context; Opus→Haiku doesn't fit and breaks the session |
-| Slash commands (`/ctoc:menu`, `/ctoc:push`, `/ctoc:update`) | **MUST NOT declare `model:` in frontmatter** | A slash command's `model:` switches the live session, not a fresh process; pinning Haiku triggers autocompact + crash |
+| Slash commands (`/ctoc:start`, `/ctoc:push`, `/ctoc:update`) | **MUST NOT declare `model:` in frontmatter** | A slash command's `model:` switches the live session, not a fresh process; pinning Haiku triggers autocompact + crash |
 | Subagents (Task tool — Tier 1/2 dispatches) | MAY declare any model | Subagent is a genuinely fresh Claude instance with isolated 200K context, no inheritance from parent |
 
 Slash commands are NOT subagents: they run inside the user's session and must never pin a model. Enforced by `tests/slash-command-no-model-pin.test.js`.
@@ -79,7 +79,7 @@ DEFINE → INSTRUMENT → MEASURE → REVIEW → HYPOTHESIZE → EXPERIMENT → 
 
 Canonical KPI library at `.ctoc/templates/product-kpis.yaml` — 17 KPIs across acquisition/activation/retention/revenue/churn/satisfaction/engagement. SaaS-b2c launch set: signup_completion, activation_rate, time_to_value, w1_retention, free_to_paid_conversion, monthly_churn, mrr.
 
-KPI status and the weekly product review run inside the Product Loop and are reached through the menu — CTOC ships only three slash commands (`menu`, `push`, `update`).
+KPI status and the weekly product review run inside the Product Loop and are reached through the menu — CTOC ships only three slash commands (`start`, `push`, `update`).
 
 The Product Loop is dispatched outside the CTO Chief technical chain — the founder or product manager owns it. The CTO Chief implements the technical wiring (instrumentation, dashboards, feature-flag plumbing) inside Iron Loop Step 10 only.
 
@@ -137,7 +137,7 @@ When Claude is inside a CTOC project, the **PreToolUse enforcement hook** (`src/
 
    **Coverage fails CLOSED, and fail-closed means return `null`, never throw.** `PreToolUse.Edit.js` wraps enforcement in a catch that fails OPEN, so a throw out of `plan-coverage.js` becomes an ALLOW — a permission check whose failure mode is "permission granted". An unlistable stage directory used to do exactly that. Enforced by `tests/unapproved-plan-grants-nothing.test.js`. A denial that was caused by an unapproved or invalidated plan NAMES that plan and the reason, because a lockout the human cannot read is what gets reverted.
 4. **Escape phrase in recent user messages** — allow. See `src/lib/escape-phrases.js` for the canonical list (`hotfix`, `trivial fix`, `urgent`, `skip planning`, `skip iron loop`, `quick fix`, `trivial change`). Case-insensitive, word-bounded.
-5. **Otherwise — BLOCK** with a helpful message redirecting to `/ctoc:menu`.
+5. **Otherwise — BLOCK** with a helpful message redirecting to `/ctoc:start`.
 
 Every decision is logged to `.ctoc/logs/enforcement.json`. Hook fails OPEN on internal error.
 
@@ -161,7 +161,7 @@ wrong on the next project shape, so the project DECLARES instead, in
 
 ```json
 { "general": { "entry_point": {
-    "command": "node src/commands/menu.js",
+    "command": "node src/commands/start.js",
     "expect": "CTOC v",
     "timeout_ms": 30000
 } } }
@@ -202,7 +202,7 @@ legitimate stops are the ONLY stops: work complete, or a real fork surfaced as a
 
 ## Streaming questions — the SESSION dispatches subagents on start (never a second Claude)
 
-CTOC is a plugin inside the Claude command-line interface: plain code cannot dispatch a CTOC subagent, and it must never spawn a second Claude (no `claude -p`, no online API calls). Generation is SESSION-DRIVEN. On start, `src/hooks/SessionStart.js` computes `streaming-precompute.plansNeedingQuestions(root)` and, when it is non-empty, appends a directive to the injected context telling the SESSION MODEL to dispatch up to 5 subagents (the stage producers `product-owner`/`vision-advisor`/`implementation-planner` plus the adversarial critics) to find open issues and generate questions, each writing through `streaming-precompute.writePlanQuestions(root, ref, questions, planMtimeMs)`. When nothing is pending the directive is empty — no session-start noise. `/ctoc:menu` only READS that store (instant, fail-soft); the human never waits for a critique.
+CTOC is a plugin inside the Claude command-line interface: plain code cannot dispatch a CTOC subagent, and it must never spawn a second Claude (no `claude -p`, no online API calls). Generation is SESSION-DRIVEN. On start, `src/hooks/SessionStart.js` computes `streaming-precompute.plansNeedingQuestions(root)` and, when it is non-empty, appends a directive to the injected context telling the SESSION MODEL to dispatch up to 5 subagents (the stage producers `product-owner`/`vision-advisor`/`implementation-planner` plus the adversarial critics) to find open issues and generate questions, each writing through `streaming-precompute.writePlanQuestions(root, ref, questions, planMtimeMs)`. When nothing is pending the directive is empty — no session-start noise. `/ctoc:start` only READS that store (instant, fail-soft); the human never waits for a critique.
 
 ---
 
@@ -244,7 +244,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 445 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 446 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -420,7 +420,7 @@ ctoc/
   VERSION                Source of truth for version
   docs/                  IRON_LOOP.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
   src/                   Source code directory
-    commands/            3 slash commands (menu, push, update)
+    commands/            3 slash commands (start, push, update)
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use, subagent stop)
     lib/                 109 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
@@ -428,7 +428,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 445 test files
+  tests/                 446 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
@@ -439,7 +439,7 @@ ctoc/
 
 | File | Purpose |
 |------|---------|
-| `src/commands/menu.js` | Dashboard router and UI |
+| `src/commands/start.js` | Dashboard router and UI |
 | `src/lib/actions.js` | Plan operations (create, move, approve) |
 | `src/lib/state.js` | Plan state management |
 | `src/lib/quality-gate.js` | Quality enforcement |
@@ -580,7 +580,7 @@ All code MUST run on Windows, macOS, and Linux. Use:
 
 ## Project Init Procedure
 
-Initialization is automatic. There is no init command — when `/ctoc:menu` runs in a project that has no `.ctoc/` directory, `src/commands/menu.js` calls `initProject()` before rendering the dashboard. The procedure (`src/lib/init-project.js`):
+Initialization is automatic. There is no init command — when `/ctoc:start` runs in a project that has no `.ctoc/` directory, `src/commands/start.js` calls `initProject()` before rendering the dashboard. The procedure (`src/lib/init-project.js`):
 
 1. **Detect**: Scan for languages, frameworks, tools (via `src/lib/stack-detector.js`)
 2. **Generate**: Create tailored `CLAUDE.md` from `.ctoc/templates/CLAUDE.md.template`
@@ -691,7 +691,7 @@ ratchet-up only, and an unreadable baseline REFUSES rather than defaulting; 80 i
 the aspirational default for a project with no baseline at all, and the new-code
 target at review — 0
 skipped, 0 flaky, run via `npm test`). CTOC ships exactly **3 slash commands** —
-`/ctoc:menu`, `/ctoc:push`, `/ctoc:update` — and is **always installed from the
+`/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and is **always installed from the
 marketplace**, never from a local path.
 
 <!-- CTOC:LESSONS v1 END -->

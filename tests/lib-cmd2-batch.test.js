@@ -166,7 +166,7 @@ describe('project-root.js', () => {
     // repository and was offered an approval decision on a plan he never wrote. It is
     // reproduced from a fixture as case 14 of
     // tests/fresh-repository-is-its-own-project.test.js, where a real
-    // `node src/commands/menu.js` in an empty nested repository printed
+    // `node src/commands/start.js` in an empty nested repository printed
     // `"Approve": "stream approve review/discuss-suggestion-with-editor.md"` — the
     // PARENT project's plan.
     //

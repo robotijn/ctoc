@@ -224,7 +224,7 @@ describe('reconcileState — two-pass staleness-orphan quarantine persistence', 
 // ─────────────────────────────────────────────────────────────────────────────
 // reconcileState / reconcile — BOUNDED staleness-orphan quarantine (permanent-deadlock
 // regression). A prior wave made the quarantine PERSIST across passes, releasing it only
-// on the CONFIRMED-DEAD signal (live list present + id absent). But the DEFAULT /ctoc:menu
+// on the CONFIRMED-DEAD signal (live list present + id absent). But the DEFAULT /ctoc:start
 // path passes NO --live-agent-ids, so `liveAgentIds` is null on EVERY pass → confirmed-dead
 // NEVER fires → a staleness-orphan's files stay reserved FOREVER → any rival queued task
 // touching them can NEVER promote. That is a permanent scheduler deadlock, WORSE than the

@@ -3,7 +3,7 @@
  *
  * Unlike the unit suites (menu-screens.test.js, menu-environment.test.js)
  * these tests exercise the REAL state machine through the REAL process: each
- * case spawns `node src/commands/menu.js <args>` with the cwd pointed at a
+ * case spawns `node src/commands/start.js <args>` with the cwd pointed at a
  * hermetic temp project, then parses the JSON the process prints. Nothing is
  * imported from src/ — the only contract under test is the observable
  * stdout/exit-code behaviour an external caller (Claude) actually sees.
@@ -11,7 +11,7 @@
  * Discipline: every assertion pins the INTENDED contract. If one fails it is a
  * real bug in the spawned code, not a harness artefact — the harness itself
  * (spawn, fixture writing, JSON parsing) is kept mechanically simple so a
- * failure can only come from menu.js / menu-screens.js / their dependencies.
+ * failure can only come from start.js / menu-screens.js / their dependencies.
  */
 
 const { describe, it, beforeEach, afterEach } = require('node:test');
@@ -22,7 +22,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const REPO = path.resolve(__dirname, '..');
-const MENU = path.join(REPO, 'src', 'commands', 'menu.js');
+const MENU = path.join(REPO, 'src', 'commands', 'start.js');
 
 // All plan stage directories a fully-initialised project carries. `in-progress`
 // is a state in frontmatter rather than a routed stage, but the directory still
@@ -54,7 +54,7 @@ afterEach(() => {
 
 /**
  * Spawn the real menu process inside the temp project.
- * @param {string[]} args - extra argv passed to menu.js (already split)
+ * @param {string[]} args - extra argv passed to start.js (already split)
  * @returns {{ res: import('child_process').SpawnSyncReturns<string>, json: object }}
  */
 function runMenu(args = []) {
@@ -65,13 +65,13 @@ function runMenu(args = []) {
   // Surface spawn failures loudly rather than letting a later JSON.parse throw
   // a confusing error — a non-zero exit or stderr noise is itself a bug signal.
   assert.equal(res.status, 0,
-    `menu.js exited ${res.status} for args [${args.join(' ')}]\nstderr: ${res.stderr}`);
+    `start.js exited ${res.status} for args [${args.join(' ')}]\nstderr: ${res.stderr}`);
   let json;
   try {
     json = JSON.parse(res.stdout);
   } catch (err) {
     assert.fail(
-      `menu.js stdout was not valid JSON for args [${args.join(' ')}]: ` +
+      `start.js stdout was not valid JSON for args [${args.join(' ')}]: ` +
       `${err.message}\n--- stdout ---\n${res.stdout}\n--- stderr ---\n${res.stderr}`);
   }
   return { res, json };

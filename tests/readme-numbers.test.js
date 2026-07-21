@@ -19,7 +19,7 @@ const ROOT = path.join(__dirname, '..');
 const README = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
 const CLAUDE_MD = fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8');
 const IRON_LOOP = fs.readFileSync(path.join(ROOT, 'docs', 'IRON_LOOP.md'), 'utf8');
-const MENU_MD = fs.readFileSync(path.join(ROOT, 'src', 'commands', 'menu.md'), 'utf8');
+const MENU_MD = fs.readFileSync(path.join(ROOT, 'src', 'commands', 'start.md'), 'utf8');
 const ASK_CANONICAL = fs.readFileSync(path.join(ROOT, '.ctoc', 'ask-me-questions.md'), 'utf8');
 const ASK_SKILL = fs.readFileSync(path.join(ROOT, 'skills', 'ask-me-questions', 'SKILL.md'), 'utf8');
 
@@ -382,8 +382,8 @@ describe('R2-D — instruction-surface truth', () => {
     assert.match(IRON_LOOP, /approveSubplans/);
   });
 
-  // W8 — menu.md Rule 11 drops the false "under a second" latency claim.
-  it('menu.md Rule 11 drops "under a second" for the honest WORK-turn phrasing', () => {
+  // W8 — start.md Rule 11 drops the false "under a second" latency claim.
+  it('start.md Rule 11 drops "under a second" for the honest WORK-turn phrasing', () => {
     assert.doesNotMatch(MENU_MD, /under a second/);
     assert.match(MENU_MD, /a short WORK turn — a few tool calls — never a foreground build/);
   });
@@ -391,7 +391,7 @@ describe('R2-D — instruction-surface truth', () => {
   // C1-8 — the start-agent recipe does NOT double-enqueue (startAgent's
   // addAndClaim already records+claims); it forces, stamps the harness id, and
   // surfaces skipped[].
-  it('menu.md start-agent recipe is force-clear, no double menu-task-add, surfaces skipped[]', () => {
+  it('start.md start-agent recipe is force-clear, no double menu-task-add, surfaces skipped[]', () => {
     const startRow = MENU_MD.split('\n').find((l) => l.trimStart().startsWith('| `claude:start-agent`'));
     assert.ok(startRow, 'start-agent action row present');
     assert.match(startRow, /force:\s*true/);
@@ -403,20 +403,20 @@ describe('R2-D — instruction-surface truth', () => {
   });
 
   // seam b — cancel prose tells the two-phase truth, not "terminal cancelled".
-  it('menu.md cancel prose is running→cancelling (files locked), queued→cancelled', () => {
+  it('start.md cancel prose is running→cancelling (files locked), queued→cancelled', () => {
     assert.match(MENU_MD, /running[\s\S]{0,40}cancelling/i);
     assert.match(MENU_MD, /queued[\s\S]{0,80}terminal[\s\S]{0,10}cancelled/i);
     assert.match(MENU_MD, /[\s\S]{0,50}locked until[\s\S]{0,40}(reconcile|gone)/i);
   });
 
   // seam c — the review-stage Gate-3 batch recipe exists.
-  it('menu.md has a done-all review-stage Gate-3 batch recipe via approveSubplans', () => {
+  it('start.md has a done-all review-stage Gate-3 batch recipe via approveSubplans', () => {
     assert.match(MENU_MD, /claude:done-all/);
     assert.match(MENU_MD, /approveSubplans\(parentSlug, 'review'\)/);
   });
 
   // seam d — compliance none writes a durable declined marker, confirm only on ok.
-  it('menu.md compliance none calls declineComplianceRegime and confirms only on ok', () => {
+  it('start.md compliance none calls declineComplianceRegime and confirms only on ok', () => {
     assert.match(MENU_MD, /declineComplianceRegime/);
     assert.match(MENU_MD, /durable/i);
     assert.match(MENU_MD, /ok:\s*true/);
@@ -436,7 +436,7 @@ describe('R2-D — instruction-surface truth', () => {
   it('no "plan-serial" claim survives on any instruction surface', () => {
     for (const [name, doc] of [
       ['README', README], ['CLAUDE.md', CLAUDE_MD], ['IRON_LOOP', IRON_LOOP],
-      ['menu.md', MENU_MD], ['ask-me-questions', ASK_CANONICAL],
+      ['start.md', MENU_MD], ['ask-me-questions', ASK_CANONICAL],
     ]) {
       assert.doesNotMatch(doc, /plan-serial/, `${name} must not claim plan-serial`);
     }
