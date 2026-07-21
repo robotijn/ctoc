@@ -399,7 +399,7 @@ describe('the ratchet over this repository', () => {
     // The first registry was hand-seeded from the files people remembered and omitted
     // the whole src/areas/* family — which is precisely how a live gate number reached
     // the owner's inbox. These entries are the regression guard for that blind spot.
-    for (const rel of ['src/areas/inbox.js', 'src/tabs/review.js', 'src/commands/menu.js']) {
+    for (const rel of ['src/areas/inbox.js', 'src/tabs/review.js', 'src/commands/start.js']) {
       assert.ok(SCREEN_MODULES.includes(rel), `${rel} must be in the registry`);
     }
   });

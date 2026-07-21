@@ -24,7 +24,7 @@
 ## Quick start (if you trust the defaults)
 
 ```
-1. Run /ctoc:menu and start a new vision with project type "saas-b2c"
+1. Run /ctoc:start and start a new vision with project type "saas-b2c"
 2. CTO Chief consults this template
 3. Vision-advisor + product-owner walk through the step-scoped questions
 4. Implementation-planner generates the impl plan against this template's stack

@@ -389,9 +389,9 @@ describe('SP2 — pluralization edge (count === 1)', () => {
   });
 });
 
-describe('SP2 — doc-contract: menu.md stale-first precedence rule (F1 reachability guard)', () => {
-  it('menu.md documents the stale-first precedence rule, anchored in Rule 10 itself', () => {
-    const mdPath = path.join(__dirname, '..', 'src', 'commands', 'menu.md');
+describe('SP2 — doc-contract: start.md stale-first precedence rule (F1 reachability guard)', () => {
+  it('start.md documents the stale-first precedence rule, anchored in Rule 10 itself', () => {
+    const mdPath = path.join(__dirname, '..', 'src', 'commands', 'start.md');
     const md = fs.readFileSync(mdPath, 'utf8');
     // H1: anchor on Rule 10's own heading, not the first /precedence/ match. The
     // env action-entry clause at :53 independently contains "Stale plans",
@@ -399,7 +399,7 @@ describe('SP2 — doc-contract: menu.md stale-first precedence rule (F1 reachabi
     // first keyword false-greens even with Rule 10 deleted. Slicing from Rule
     // 10's index guarantees the env clause (lower index) cannot satisfy this.
     const rule10 = /^10\.\s+\*\*Stale-plans question rides along, navigates with precedence/m;
-    assert.match(md, rule10, 'menu.md must contain Rule 10 with its precedence heading');
+    assert.match(md, rule10, 'start.md must contain Rule 10 with its precedence heading');
     const m = rule10.exec(md);
     const body = md.slice(m.index, m.index + 1200); // Rule 10 body only — env clause at :53 cannot satisfy this
     assert.ok(/inbox stale/.test(body),       'Rule 10 must name the inbox stale route');

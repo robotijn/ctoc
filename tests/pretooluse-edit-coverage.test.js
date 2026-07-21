@@ -501,7 +501,7 @@ describe('enforce — default block (step 5) and the deny reason', () => {
     const reason = JSON.parse(res.stdout).hookSpecificOutput.permissionDecisionReason;
     assert.match(reason, /src\/lib\/blocked\.js/, 'the deny reason names the blocked target');
     assert.match(res.stderr, /BLOCKED/, 'the human banner announces the block');
-    assert.match(res.stderr, /ctoc:menu/, 'the banner points at /ctoc:menu');
+    assert.match(res.stderr, /ctoc:start/, 'the banner points at /ctoc:start');
   });
 });
 

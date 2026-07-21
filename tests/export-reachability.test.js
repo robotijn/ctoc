@@ -58,7 +58,7 @@ describe('dead-export fence — exports reachable from live callers (RATCHET)', 
 
   it('NON-VACUITY (the real guard): a planted dead export in a fixture project is DETECTED', () => {
     // Build a miniature project with the same shape as CTOC: a live root
-    // (src/commands/menu.js) requiring a lib module. The lib exports one name the
+    // (src/commands/start.js) requiring a lib module. The lib exports one name the
     // root uses and one nobody uses anywhere. If the analyzer cannot see the
     // difference, every assertion below is worthless — so prove it can.
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-exportfence-'));
@@ -66,7 +66,7 @@ describe('dead-export fence — exports reachable from live callers (RATCHET)', 
       fs.mkdirSync(path.join(tmp, 'src', 'commands'), { recursive: true });
       fs.mkdirSync(path.join(tmp, 'src', 'lib'), { recursive: true });
       fs.writeFileSync(
-        path.join(tmp, 'src', 'commands', 'menu.js'),
+        path.join(tmp, 'src', 'commands', 'start.js'),
         "const { usedByTheMenu } = require('../lib/live');\nusedByTheMenu();\n"
       );
       fs.writeFileSync(
@@ -171,7 +171,7 @@ describe('dead-export fence — a fence prose and comments cannot disarm', () =>
 
   it('PROSE-ONLY mention → DEAD (a bare markdown token is not a caller)', () => {
     const tmp = build({
-      'src/commands/menu.js':
+      'src/commands/start.js':
         "const { usedByMenu } = require('../lib/live');\nusedByMenu();\n",
       'src/lib/live.js':
         'function usedByMenu() { return 1; }\n' +
@@ -198,7 +198,7 @@ describe('dead-export fence — a fence prose and comments cannot disarm', () =>
     // so the trailing comment survived stripping and the token leaked across
     // modules — resurrecting a dead export. A real lexer strips that comment.
     const tmp = build({
-      'src/commands/menu.js':
+      'src/commands/start.js':
         "const { usedByMenu } = require('../lib/live');\n" +
         "const other = require('../lib/other');\nusedByMenu();\nother.go();\n",
       'src/lib/live.js':
@@ -222,7 +222,7 @@ describe('dead-export fence — a fence prose and comments cannot disarm', () =>
 
   it('FENCED-CODE-BLOCK recipe (require().name) → LIVE (a real executable reference)', () => {
     const tmp = build({
-      'src/commands/menu.js':
+      'src/commands/start.js':
         "const { usedByMenu } = require('../lib/live');\nusedByMenu();\n",
       'src/lib/live.js':
         'function usedByMenu() { return 1; }\n' +
@@ -246,7 +246,7 @@ describe('dead-export fence — a fence prose and comments cannot disarm', () =>
     // is externally called; it calls internalOnly inside its own module. That is a
     // genuine code edge, NOT prose.
     const wired = build({
-      'src/commands/menu.js':
+      'src/commands/start.js':
         "const { publicApi } = require('../lib/mod');\npublicApi();\n",
       'src/lib/mod.js':
         'function internalOnly() { return 42; }\n' +
@@ -265,14 +265,14 @@ describe('dead-export fence — a fence prose and comments cannot disarm', () =>
     // even a prose + path-naming markdown mention must NOT save it. The fence must
     // re-catch its own motivating bug the instant the code edge dies.
     const unwired = build({
-      'src/commands/menu.js':
+      'src/commands/start.js':
         "const { publicApi } = require('../lib/mod');\npublicApi();\n",
       'src/lib/mod.js':
         'function internalOnly() { return 42; }\n' +
         'function publicApi() { return 42; }\n' +
         'module.exports = { publicApi, internalOnly };\n',
       // Prose that even names the src path — must NOT whiten it.
-      'src/commands/menu.md':
+      'src/commands/start.md':
         'The `publicApi` → `internalOnly` path (`src/lib/mod.js`) runs the thing.\n'
     });
     try {
@@ -309,17 +309,17 @@ describe('dead-export fence — a surface CALL is a caller, a prose token is not
   const cleanup = (tmp) => fs.rmSync(tmp, { recursive: true, force: true });
 
   it('INLINE-code call `name(...)` (single backticks, NOT fenced) → LIVE', () => {
-    // The exact shape of menu.md: `approveSubplans(parentSlug, 'review')` — an
+    // The exact shape of start.md: `approveSubplans(parentSlug, 'review')` — an
     // invocation inside single backticks, never a fenced block. R4-B's
     // fenced-only rule buries this; the correct rule credits the call.
     const tmp = build({
-      'src/commands/menu.js':
+      'src/commands/start.js':
         "const { usedByMenu } = require('../lib/live');\nusedByMenu();\n",
       'src/lib/live.js':
         'function usedByMenu() { return 1; }\n' +
         'function recipeCall() { return 2; }\n' +
         'module.exports = { usedByMenu, recipeCall };\n',
-      'src/commands/menu.md':
+      'src/commands/start.md':
         '# Menu\n\nBatch-approve via `recipeCall(parentSlug, \'review\')` on the review list.\n'
     });
     try {
@@ -333,7 +333,7 @@ describe('dead-export fence — a surface CALL is a caller, a prose token is not
 
   it("require('./x').name reference in a recipe → LIVE (a resolved property access)", () => {
     const tmp = build({
-      'src/commands/menu.js':
+      'src/commands/start.js':
         "const { usedByMenu } = require('../lib/live');\nusedByMenu();\n",
       'src/lib/live.js':
         'function usedByMenu() { return 1; }\n' +
@@ -354,7 +354,7 @@ describe('dead-export fence — a surface CALL is a caller, a prose token is not
 
   it('BARE prose token (no paren) → DEAD (documentation is not a caller)', () => {
     const tmp = build({
-      'src/commands/menu.js':
+      'src/commands/start.js':
         "const { usedByMenu } = require('../lib/live');\nusedByMenu();\n",
       'src/lib/live.js':
         'function usedByMenu() { return 1; }\n' +
@@ -375,18 +375,18 @@ describe('dead-export fence — a surface CALL is a caller, a prose token is not
   it('RE-CATCH: completeExecution-shape — bare token + no code edge → DEAD; `name(` → LIVE', () => {
     // completeExecution is named in surfaces ONLY as `completeExecution` (a
     // backtick token, never `completeExecution(`) and lives solely by its
-    // intra-file code edge. Cut the edge, leave the exact menu.md prose, and it
+    // intra-file code edge. Cut the edge, leave the exact start.md prose, and it
     // must die — a surface CALL would save it, a prose token must not.
     const bareDead = build({
-      'src/commands/menu.js':
+      'src/commands/start.js':
         "const { publicApi } = require('../lib/mod');\npublicApi();\n",
       'src/lib/mod.js':
         'function internalOnly() { return 42; }\n' +
         'function publicApi() { return 42; }\n' + // code edge CUT
         'module.exports = { publicApi, internalOnly };\n',
-      // The EXACT prose shape from menu.md line 120: backtick token, then a paren
+      // The EXACT prose shape from start.md line 120: backtick token, then a paren
       // that belongs to the path citation — NOT a call of internalOnly.
-      'src/commands/menu.md':
+      'src/commands/start.md':
         '`publicApi` → `internalOnly` (`src/lib/mod.js`): the plan is validated.\n'
     });
     try {
@@ -399,13 +399,13 @@ describe('dead-export fence — a surface CALL is a caller, a prose token is not
 
     // The same export, now genuinely INVOKED in a recipe → LIVE.
     const calledLive = build({
-      'src/commands/menu.js':
+      'src/commands/start.js':
         "const { publicApi } = require('../lib/mod');\npublicApi();\n",
       'src/lib/mod.js':
         'function internalOnly() { return 42; }\n' +
         'function publicApi() { return 42; }\n' +
         'module.exports = { publicApi, internalOnly };\n',
-      'src/commands/menu.md':
+      'src/commands/start.md':
         'Run `internalOnly(process.cwd())` to do the thing.\n'
     });
     try {
@@ -418,7 +418,7 @@ describe('dead-export fence — a surface CALL is a caller, a prose token is not
   });
 
   it('THE REAL REPO: the recipe-invoked gate exports are LIVE, by name', () => {
-    // The load-bearing regression guard. Each of these is invoked in a menu.md /
+    // The load-bearing regression guard. Each of these is invoked in a start.md /
     // agent recipe as `name(` or require('…').name; R4-B buried all four as DEAD.
     // A change that re-buries the Gate-3 done-all gate as dead must fail here.
     const result = analyzeExports(ROOT);

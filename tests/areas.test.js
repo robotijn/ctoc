@@ -129,7 +129,7 @@ describe('tabs.js compatibility shim (I6)', () => {
   });
 
   it('getTabIndex resolves old tab ids to area indexes (no breaking change)', () => {
-    // Code paths like TABS.findIndex(t => t.id === 'tools') in src/commands/menu.js
+    // Code paths like TABS.findIndex(t => t.id === 'tools') in src/commands/start.js
     // need to continue working. The shim ensures lookups return valid indexes.
     assert.notEqual(tabs.getTabIndex('tools'), -1, 'tools lookup still resolves');
     assert.notEqual(tabs.getTabIndex('overview'), -1, 'overview lookup still resolves');

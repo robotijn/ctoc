@@ -35,11 +35,11 @@ const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
 
-const menu = require('../src/commands/menu');
+const menu = require('../src/commands/start');
 const safeFs = require('../src/lib/safe-fs');
 const { loadActiveProfiles } = require('../src/lib/regulatory-regime');
 
-const MENU_ENTRY = path.join(__dirname, '..', 'src', 'commands', 'menu.js');
+const MENU_ENTRY = path.join(__dirname, '..', 'src', 'commands', 'start.js');
 const INIT_PROJECT_PATH = require.resolve('../src/lib/init-project');
 
 const tmpDirs = [];

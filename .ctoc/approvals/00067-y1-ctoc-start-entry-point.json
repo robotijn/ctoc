@@ -1,9 +1,9 @@
 {
-  "content_sha256": "c0b09c27baab2acdef0a0537b790ccda428b0e12f2797445f403107ca5f96ebc",
+  "content_sha256": "0d5971c1641eccb2331e8b14398d6ad3b1d50021868fdaf614d7049d4f1bc023",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-21T10:33:12.628Z",
+  "approved_at": "2026-07-21T11:02:50.090Z",
   "approved_by": "human",
   "plan_basename": "00067-y1-ctoc-start-entry-point"
 }

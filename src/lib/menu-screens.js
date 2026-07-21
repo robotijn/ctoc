@@ -4,11 +4,11 @@
  * Every screen outputs JSON with { text, ask, actions }.
  *
  * Usage:
- *   node menu.js                            -> streaming-gate.streamingGateScreen()
- *   node menu.js menu commands              -> dashboardCommands()
- *   node menu.js browse {stage}             -> stageBrowse(stage)
- *   node menu.js plan {stage}/{file}        -> streaming-gate.planDecisionScreen(ref)
- *   node menu.js validate {stage}/{file}    -> validateScreen(stage, file)
+ *   node start.js                            -> streaming-gate.streamingGateScreen()
+ *   node start.js menu commands              -> dashboardCommands()
+ *   node start.js browse {stage}             -> stageBrowse(stage)
+ *   node start.js plan {stage}/{file}        -> streaming-gate.planDecisionScreen(ref)
+ *   node start.js validate {stage}/{file}    -> validateScreen(stage, file)
  *
  * Opening a plan is a QUESTION, not a navigation menu. The four plan-menu screens
  * that used to live here — planActions, planActionsMore, reviewActions, discussMenu
@@ -39,7 +39,7 @@ const taskRegistry = require('./task-registry');
 const taskView = require('./task-view');
 // NB4: on-open reconciliation of the registry against the live harness TaskList.
 const taskReconcile = require('./task-reconcile');
-// Streaming gate-decision screen — the new `/ctoc:menu` default. Its routes
+// Streaming gate-decision screen — the new `/ctoc:start` default. Its routes
 // (`stream approve|skip|comment`) live here in the router; the `dashboard` route
 // keeps the classic pipeline overview reachable.
 const streamingGate = require('./streaming-gate');
@@ -493,7 +493,7 @@ function buildDashboardTable(projectPath, opts = {}) {
   // so a session-restart orphan (a `running` task with no live agent) stops blocking
   // the ≤5 concurrency count and is offered for re-run — WITHOUT falsely orphaning a
   // genuinely-live long-running agent. The live agent-id list now flows in from the
-  // caller as `opts.liveAgentIds` (menu.js parses it from the `--live-agent-ids <csv>`
+  // caller as `opts.liveAgentIds` (start.js parses it from the `--live-agent-ids <csv>`
   // argv flag the parent session appends on each on-open render). When it is absent
   // (`undefined`/`null` — a true session restart or the TUI child with no Task access),
   // reconcile falls back to the staleness backstop, exactly as before. Fail-open but NOT
@@ -536,7 +536,7 @@ function buildDashboardTable(projectPath, opts = {}) {
   out += renderReconcileHealth(reconcileThrew, reconcileReport);
   // NB4: surface newly-orphaned tasks on the existing TASKS line as a re-run offer.
   // Re-run is routed through the scheduler (canRun/nextRunnable) by the menu driver,
-  // never a direct launch (menu.md Two-Plane Protocol). No new screen (D-NB4-5).
+  // never a direct launch (start.md Two-Plane Protocol). No new screen (D-NB4-5).
   if (orphanedCount > 0) {
     out += `  ⚠ ${orphanedCount} task${orphanedCount === 1 ? '' : 's'} orphaned — offer re-run\n`;
   }
@@ -1659,7 +1659,7 @@ function stageBrowse(stage, projectPath) {
   // that parent — symmetric to the implementation stage's `todo-all`. WORD shortcut
   // only, never a number. One key PER DISTINCT parent (approveSubplans is per
   // parent); a review plan with no parent_plan contributes none. The action-key
-  // recipe (approveSubplans(parent, 'review')) already lives in menu.md (same wave);
+  // recipe (approveSubplans(parent, 'review')) already lives in start.md (same wave);
   // this only REGISTERS the typed key. Every parent slug is control-stripped and
   // must match a safe slug pattern before it can enter an action key/string (S1 —
   // a hostile parent_plan can neither inject ANSI nor forge a claude: verb).
@@ -1844,7 +1844,7 @@ function validateScreen(stage, file, projectPath) {
   // in planActions/reviewActions; a clean validation must NOT demand a second
   // "Proceed?" click. `autoApprove` is the one-turn SIGNAL: on a clean validation
   // the driver runs `claude:approve` in the SAME turn (the auto-run half lands in
-  // the menu.md instruction surface, R2-D, same wave). On a failed validation the
+  // the start.md instruction surface, R2-D, same wave). On a failed validation the
   // override ("Approve anyway") is DEMOTED to the LAST option, never recommended,
   // and labelled as recording an override. The approve→validate ROUTE and the
   // approve ACTION strings are unchanged (their pins survive).
@@ -1873,7 +1873,7 @@ function validateScreen(stage, file, projectPath) {
     actions['Back'] = `browse ${stage}`;
     options.push({ label: 'Approve anyway', description: 'Override validation and move to the next stage (records an override)' });
     // R6-A — the forced crossing must be AUDITABLE at the action-string surface.
-    // The `--override` token tells the menu.md claude:approve recipe to call
+    // The `--override` token tells the start.md claude:approve recipe to call
     // approvePlan(path, root, { override: { reason } }) — which crosses AND records
     // override:true + the human's reason in both the ledger entry and the plan
     // marker. A bare claude:approve here would make the one forced crossing the one
@@ -1936,7 +1936,7 @@ function decodeB64(v) {
 
 /**
  * Parse `menu task <sub>` args into positionals + flags. Whitespace-free tokens
- * only (argv is split on whitespace by menu.js); `--touches`/`--blocked` split on
+ * only (argv is split on whitespace by start.js); `--touches`/`--blocked` split on
  * a LITERAL comma (no dynamic RegExp). No `new RegExp` anywhere.
  * @param {string[]} subArgs
  * @returns {object}

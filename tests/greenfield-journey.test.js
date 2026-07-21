@@ -54,7 +54,7 @@
  * ── WIRING ────────────────────────────────────────────────────────────────────────
  * The harness lives HERE as local helpers, NOT as src/lib/journey-harness.js — a new
  * src/ file whose only caller is a test is a DEAD FILE under CTOC's reachability
- * fence, and the live wiring (a `ctoc doctor --journey` self-check off menu.md) lands
+ * fence, and the live wiring (a `ctoc doctor --journey` self-check off start.md) lands
  * outside this slice's declared files. See plan decision D1.
  */
 

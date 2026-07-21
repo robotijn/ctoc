@@ -347,7 +347,7 @@ describe('the report is computed, not decorated', () => {
         return realWrite(p, ...rest);
       });
 
-      const { ensureInitialized } = require('../src/commands/menu');
+      const { ensureInitialized } = require('../src/commands/start');
       const verdict = ensureInitialized(d);
 
       assert.strictEqual(verdict.ok, false,

@@ -92,13 +92,13 @@ const safeFs = require('./safe-fs');
  */
 const SCREEN_MODULES = Object.freeze([
   // The menu-router contract ({ text, ask, actions }).
-  'src/commands/menu.js',
+  'src/commands/start.js',
   'src/lib/menu-screens.js',
   'src/lib/streaming-gate.js',
   'src/lib/streaming-render.js',
   'src/lib/task-view.js',
   // The TUI-area contract (module.exports carries `render`). These are the primary
-  // screens `src/commands/menu.js` mounts — the inbox among them, which is exactly
+  // screens `src/commands/start.js` mounts — the inbox among them, which is exactly
   // the screen a live gate number reached because the first, hand-seeded registry
   // omitted this whole family.
   'src/areas/agent.js',
@@ -394,7 +394,7 @@ function accessChain(ts, node) {
  *      all of `text`, `ask`, `actions` (menu-screens, task-view, streaming-gate);
  *   2. the TUI-area contract — `module.exports` carries a `render` member, or
  *      `exports.render`/`module.exports.render` is assigned (the `src/areas/*` and
- *      `src/tabs/*` modules `src/commands/menu.js` mounts, each `render(app) → string`).
+ *      `src/tabs/*` modules `src/commands/start.js` mounts, each `render(app) → string`).
  *
  * @param {any} ts
  * @param {any} sourceFile

@@ -142,7 +142,7 @@ When steps 8-16 are done, complete through the menu's completion route with the
 `taskId` from your brief:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/src/commands/menu.js" menu task complete <taskId> --summary "<one line>"
+node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js" menu task complete <taskId> --summary "<one line>"
 ```
 
 That single call runs the REAL completion (`completeTaskPlan` → `completeExecution`

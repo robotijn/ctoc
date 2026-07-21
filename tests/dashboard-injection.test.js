@@ -1,7 +1,7 @@
 /**
  * R7-A — The LIVE dashboard sanitizes untrusted fields.
  *
- * The mounted dashboard (menu.js → src/areas/*.js + src/tabs/*.js) interpolates
+ * The mounted dashboard (start.js → src/areas/*.js + src/tabs/*.js) interpolates
  * AGENT-WRITABLE fields — plan title/slug, `files:` frontmatter, task description,
  * inbox question/decision/gate frontmatter — straight to the terminal. A field
  * carrying `\x1b[2J\x1b[H` (clear-screen + cursor-home) + `\r` + a C1 byte forges a

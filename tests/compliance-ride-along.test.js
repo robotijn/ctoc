@@ -2,12 +2,12 @@
  * Menu × Compliance-regime ride-along tests (EC1-s3).
  *
  * The compliance-regime selection must reach a real human on the LIVE menu path
- * (`src/commands/menu.js:main()` non-interactive JSON branch) — the SAME
+ * (`src/commands/start.js:main()` non-interactive JSON branch) — the SAME
  * mechanism the environment question uses (`attachEnvironmentQuestion`). The
  * question rides ALONG with the dashboard; it never replaces or gates the plan
  * overview, and it never weakens a human gate.
  *
- * These tests DRIVE THE REAL LIVE MENU end-to-end (execFileSync(menu.js) → parse
+ * These tests DRIVE THE REAL LIVE MENU end-to-end (execFileSync(start.js) → parse
  * JSON → assert), exactly like tests/menu-environment.test.js (the PI4 lesson:
  * test the real mounted path, not an unmounted helper). Selecting a profile
  * persists it via writeActiveProfiles (EC1-s2) to `.ctoc/settings.yaml`.
@@ -20,7 +20,7 @@ const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
 
-const MENU = path.join(__dirname, '..', 'src', 'commands', 'menu.js');
+const MENU = path.join(__dirname, '..', 'src', 'commands', 'start.js');
 const { writeActiveProfiles } = require('../src/lib/compliance-regime');
 
 // A minimal but real settings.yaml carrying the regulatory_regime block the

@@ -9,7 +9,7 @@
  *   1. BACKGROUND, ahead of time — a critique subagent pre-critiques each plan
  *      sitting at a gate and writes its decision QUESTIONS (each with pros, cons,
  *      and a recommendation) to a per-plan FILE. That subagent is dispatched by
- *      menu.md prose (NOT this module); this module is the deterministic JS the
+ *      start.md prose (NOT this module); this module is the deterministic JS the
  *      subagent writes THROUGH: `writePlanQuestions`.
  *
  *   2. FOREGROUND, instant — the streaming gate screen reads the ALREADY-WRITTEN
@@ -487,7 +487,7 @@ function isFresh(root, ref) {
 /**
  * The subset of plans currently at a human gate whose precomputed questions are
  * NOT ready (absent or stale) — i.e. the plans the BACKGROUND dispatcher must
- * (re)generate questions for. menu.md prose iterates this list to spawn critique
+ * (re)generate questions for. start.md prose iterates this list to spawn critique
  * subagents. Pure read, FAIL-SOFT: any failure yields an empty list.
  *
  * (streaming-gate is required lazily to avoid a load-time circular dependency —

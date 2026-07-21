@@ -73,7 +73,7 @@ ratchet-up only, and an unreadable baseline REFUSES rather than defaulting; 80 i
 the aspirational default for a project with no baseline at all, and the new-code
 target at review — 0
 skipped, 0 flaky, run via `npm test`). CTOC ships exactly **3 slash commands** —
-`/ctoc:menu`, `/ctoc:push`, `/ctoc:update` — and is **always installed from the
+`/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and is **always installed from the
 marketplace**, never from a local path.
 
 <!-- CTOC:LESSONS v1 END -->

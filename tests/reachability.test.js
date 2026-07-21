@@ -130,7 +130,7 @@ function makeUnreadable(full) {
 }
 
 /** A minimal live root for a fixture project: the shipped menu slash command. */
-const MENU = 'src/commands/menu.js';
+const MENU = 'src/commands/start.js';
 
 // ─── the live ratchet ───────────────────────────────────────────────────────
 
@@ -154,7 +154,7 @@ describe('dead-code fence — reachability from live roots (RATCHET)', () => {
       'expected a substantial reachable core; the analyzer is probably broken'
     );
     // The three shipped slash commands must always be roots.
-    for (const cmd of ['src/commands/menu.js', 'src/commands/push.js', 'src/commands/update.js']) {
+    for (const cmd of ['src/commands/start.js', 'src/commands/push.js', 'src/commands/update.js']) {
       assert.ok(result.roots.includes(cmd), `${cmd} must be a live root`);
     }
     // A test file can never be a root, and never appear in the graph at all.
@@ -323,7 +323,7 @@ describe('dead-code fence — a citation is not an invocation (planted fixtures)
   it('5 · a surface that RUNS a path IS a root', () => {
     withProject({
       [MENU]: 'module.exports = {};\n',
-      'src/commands/menu.md': 'Run the self-check:\n\n    node src/scripts/invoked.js\n',
+      'src/commands/start.md': 'Run the self-check:\n\n    node src/scripts/invoked.js\n',
       'src/scripts/invoked.js': 'module.exports = {};\n'
     }, (root) => {
       const r = analyze(root);

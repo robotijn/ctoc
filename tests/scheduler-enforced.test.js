@@ -39,7 +39,7 @@ const taskRegistry = require('../src/lib/task-registry');
 const taskReconcile = require('../src/lib/task-reconcile');
 const actions = require('../src/lib/actions');
 const ledger = require('../src/lib/approval-ledger');
-const { extractLiveAgentIds } = require('../src/commands/menu');
+const { extractLiveAgentIds } = require('../src/commands/start');
 
 const MIN = 60_000;
 

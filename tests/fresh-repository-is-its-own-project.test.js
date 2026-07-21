@@ -87,7 +87,7 @@ test('case 2: the fresh repository is actually initialised, not skipped', () => 
     const ancestor = makeCtocProject(path.join(tmp, 'A'));
     const fresh = makeGitDir(mkdirp(path.join(ancestor, 'sub')));
 
-    const { ensureInitialized } = require('../src/commands/menu');
+    const { ensureInitialized } = require('../src/commands/start');
     const resolved = findProjectRoot(fresh);
     // SHAPE ONLY (plan 00156, 2026-07-20). `ensureInitialized` now returns a
     // verdict read back from the filesystem instead of a boolean. THIS SLICE'S
@@ -303,7 +303,7 @@ test('case 14: a real menu process, opened in a fresh nested repository, offers 
 
     const res = spawnSync(
       process.execPath,
-      [path.join(REPO_ROOT, 'src', 'commands', 'menu.js')],
+      [path.join(REPO_ROOT, 'src', 'commands', 'start.js')],
       { cwd: fresh, encoding: 'utf8', timeout: 60000, env: { ...process.env, CI: '1' } }
     );
 

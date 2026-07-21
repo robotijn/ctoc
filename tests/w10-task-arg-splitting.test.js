@@ -1,13 +1,13 @@
 /**
  * W10-s2 (M6) — Behavioral tests: multi-word task args survive intact.
  *
- * Fixes finding M6: src/commands/menu.js re-split every already-shell-tokenized
+ * Fixes finding M6: src/commands/start.js re-split every already-shell-tokenized
  * argv element on whitespace, exploding a quoted value like
  * `--summary "two words here"` into `["two","words","here"]`, so parseTaskArgs
  * stored only the first word and the rest leaked as stray positionals.
  *
  * Two layers, all BEHAVIORAL:
- *   1-2. Direct unit tests of the `splitCliArgs` tokenizer (from src/commands/menu).
+ *   1-2. Direct unit tests of the `splitCliArgs` tokenizer (from src/commands/start).
  *   3-5. End-to-end round-trip: feed `splitCliArgs(...)` output into
  *        menu-screens.route() EXACTLY as main() does, then re-read the on-disk
  *        task registry and assert the stored value is byte-for-byte intact.
@@ -25,7 +25,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { splitCliArgs } = require('../src/commands/menu');
+const { splitCliArgs } = require('../src/commands/start');
 const ms = require('../src/lib/menu-screens');
 const taskRegistry = require('../src/lib/task-registry');
 

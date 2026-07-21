@@ -127,7 +127,7 @@ describe('onboarding template correctness (via real initProject)', () => {
       'expected the brace-form plan directory listing'
     );
 
-    for (const cmd of ['/ctoc:menu', '/ctoc:push', '/ctoc:update']) {
+    for (const cmd of ['/ctoc:start', '/ctoc:push', '/ctoc:update']) {
       assert.ok(content.includes(cmd), `expected slash command: ${cmd}`);
     }
 

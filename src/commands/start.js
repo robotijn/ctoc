@@ -46,7 +46,7 @@ function attachEnvironmentQuestion(result) {
     'Staging': 'claude:set-environment staging',
     'Production': 'claude:set-environment prod',
     // Recipe (persist general.environment_prompt_dismissed:true) lands in the
-    // menu.md instruction surface (R2-D, same wave) — mirrors set-environment.
+    // start.md instruction surface (R2-D, same wave) — mirrors set-environment.
     'Keep defaults, stop asking': 'claude:env-keep-defaults'
   });
   return result;
@@ -804,7 +804,7 @@ function splitCliArgs(cliArgs) {
  * Pull `--live-agent-ids <csv>` out of argv, returning the parsed id array (or
  * undefined when the flag is absent) and the residual args with the flag+value
  * removed (finding H8). The id list originates in the parent Claude session's live
- * TaskList and crosses the `menu.js` child-process boundary via argv ONLY — there
+ * TaskList and crosses the `start.js` child-process boundary via argv ONLY — there
  * is no in-memory handle to the harness here. Absent ⇒ undefined ⇒ the reconcile's
  * staleness backstop governs (true session restart, or the TUI child with no Task
  * access). Present ⇒ authoritative for that one render. argv is stateless: unlike a
@@ -841,7 +841,7 @@ function main() {
   const setupNote = setupMessage(setup);
 
   // Check for non-interactive JSON mode (subcommands passed as args)
-  // Usage: node menu.js [browse functional | plan stage/file | validate stage/file | menu commands]
+  // Usage: node start.js [browse functional | plan stage/file | validate stage/file | menu commands]
   const cliArgs = process.argv.slice(2);
 
   // H8: strip `--live-agent-ids <csv>` FIRST, so the branch decision below uses the
@@ -887,7 +887,7 @@ function main() {
     render();
   } else {
     // Non-interactive with no args: the STREAMING GATE-DECISION screen is the
-    // default. `/ctoc:menu` ASKS the human the pending gate decisions ONE AT A TIME
+    // default. `/ctoc:start` ASKS the human the pending gate decisions ONE AT A TIME
     // — the plans sitting at the three human gates ARE the questions — instead of
     // rendering the navigation dashboard. The classic dashboard stays reachable via
     // the explicit `dashboard` route (menu-screens.route), so nothing is orphaned.

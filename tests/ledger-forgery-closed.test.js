@@ -17,7 +17,7 @@
  * assert the REAL harness deny signal (`hookSpecificOutput.permissionDecision`
  * === "deny" on stdout, exit 2 — src/lib/hook-deny-signal.js). The counterpart
  * assertion is just as load-bearing: EVERY `node -e` recipe extracted VERBATIM
- * from src/commands/menu.md must still be ALLOWED — a false positive that breaks
+ * from src/commands/start.md must still be ALLOWED — a false positive that breaks
  * a menu recipe is a CRITICAL regression, so the recipes are parsed out of the
  * live file rather than copied into the test (they cannot drift apart).
  *
@@ -34,7 +34,7 @@ const { spawnSync } = require('node:child_process');
 
 const REPO = path.resolve(__dirname, '..');
 const HOOK = path.join(REPO, 'src', 'hooks', 'PreToolUse.Bash.js');
-const MENU_MD = path.join(REPO, 'src', 'commands', 'menu.md');
+const MENU_MD = path.join(REPO, 'src', 'commands', 'start.md');
 const stateManager = require(path.join(REPO, 'src', 'lib', 'state-manager'));
 
 const ledger = require('../src/lib/approval-ledger');
@@ -111,7 +111,7 @@ const assertAllowed = (command, why) => {
     `FALSE POSITIVE — legitimate command denied (${why}): ${command}\n  reason: ${d && d.permissionDecisionReason}`);
 };
 
-/** Every `node -e "…"` recipe VERBATIM from menu.md (parsed from the live file). */
+/** Every `node -e "…"` recipe VERBATIM from start.md (parsed from the live file). */
 function menuRecipes() {
   const md = fs.readFileSync(MENU_MD, 'utf8');
   const out = [];
@@ -357,17 +357,17 @@ describe('R3-A item 1 — raw writes to .ctoc/approvals are DENIED', () => {
 });
 
 // =============================================================================
-// 3. NO COLLATERAL DAMAGE — every real menu.md recipe still works
+// 3. NO COLLATERAL DAMAGE — every real start.md recipe still works
 // =============================================================================
 
-describe('R3-A item 1 — no false positives (menu.md recipes must survive)', () => {
-  test('menu.md contains node -e recipes to check (the guard-rail is real)', () => {
+describe('R3-A item 1 — no false positives (start.md recipes must survive)', () => {
+  test('start.md contains node -e recipes to check (the guard-rail is real)', () => {
     assert.ok(menuRecipes().length >= 5,
-      'expected the menu.md node -e recipes to be parsed; a zero count would make this suite vacuous');
+      'expected the start.md node -e recipes to be parsed; a zero count would make this suite vacuous');
   });
 
-  test('EVERY node -e recipe in menu.md is ALLOWED, verbatim', () => {
-    for (const recipe of menuRecipes()) assertAllowed(recipe, 'menu.md recipe');
+  test('EVERY node -e recipe in start.md is ALLOWED, verbatim', () => {
+    for (const recipe of menuRecipes()) assertAllowed(recipe, 'start.md recipe');
   });
 
   test('the sanctioned backfill script is ALLOWED', () => {
@@ -378,7 +378,7 @@ describe('R3-A item 1 — no false positives (menu.md recipes must survive)', ()
 
   test('ordinary development commands are ALLOWED', () => {
     assertAllowed('node --test tests/approval-ledger.test.js', 'a test file named after the ledger is not a forgery');
-    assertAllowed('node src/commands/menu.js', 'the menu itself');
+    assertAllowed('node src/commands/start.js', 'the menu itself');
     assertAllowed('npm test', 'npm');
     assertAllowed('git status', 'git status');
   });
@@ -491,7 +491,7 @@ describe('R3-A item 2 — ledger-backfill.js', () => {
     assert.ok(!/\beval\s*\(|new Function\s*\(/.test(src), 'the sanctioned writer must be argv-driven, never eval-driven');
   });
 
-  test('menu.md references the script (instruction-surface reachability root)', () => {
+  test('start.md references the script (instruction-surface reachability root)', () => {
     const md = fs.readFileSync(MENU_MD, 'utf8');
     assert.match(md, /src\/scripts\/ledger-backfill\.js/, 'the sanctioned writer must be reachable from the menu');
   });

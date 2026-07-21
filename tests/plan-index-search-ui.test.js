@@ -206,14 +206,14 @@ describe('overview export contract (regression)', () => {
 describe('menu search shortcut', () => {
   let menu;
   beforeEach(() => {
-    delete require.cache[require.resolve(path.join(__dirname, '..', 'src', 'commands', 'menu.js'))];
-    menu = require(path.join(__dirname, '..', 'src', 'commands', 'menu.js'));
+    delete require.cache[require.resolve(path.join(__dirname, '..', 'src', 'commands', 'start.js'))];
+    menu = require(path.join(__dirname, '..', 'src', 'commands', 'start.js'));
   });
 
   test('7. enterSearchMode routes: sets search mode on app, returns results', async () => {
     const { mod, restore } = stubBarrel({
       search: async () => [{ planPath: 'hit-1', score: 0.7 }],
-    }, path.join(__dirname, '..', 'src', 'commands', 'menu.js'));
+    }, path.join(__dirname, '..', 'src', 'commands', 'start.js'));
     try {
       assert.equal(typeof mod.enterSearchMode, 'function', 'exposes enterSearchMode');
       const app = { projectPath: process.cwd() };
@@ -249,7 +249,7 @@ describe('menu search shortcut', () => {
   test('11. fail-open — search throws → empty results, no crash', async () => {
     const { mod, restore } = stubBarrel({
       search: async () => { throw new Error('search down'); },
-    }, path.join(__dirname, '..', 'src', 'commands', 'menu.js'));
+    }, path.join(__dirname, '..', 'src', 'commands', 'start.js'));
     try {
       const app = { projectPath: process.cwd() };
       await assert.doesNotReject(() => mod.enterSearchMode(app, 'q'));
@@ -260,7 +260,7 @@ describe('menu search shortcut', () => {
   });
 
   test('12. fail-open — search undefined (barrel getter returns undefined) → empty results', async () => {
-    const { mod, restore } = stubBarrel({ search: undefined }, path.join(__dirname, '..', 'src', 'commands', 'menu.js'));
+    const { mod, restore } = stubBarrel({ search: undefined }, path.join(__dirname, '..', 'src', 'commands', 'start.js'));
     try {
       const app = { projectPath: process.cwd() };
       await assert.doesNotReject(() => mod.enterSearchMode(app, 'q'));
@@ -393,7 +393,7 @@ describe('lib/inbox listRelatedForInbox helper', () => {
 // accumulated, no results render branch) and PASS only once the flow reaches a human.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const MENU = path.join(__dirname, '..', 'src', 'commands', 'menu.js');
+const MENU = path.join(__dirname, '..', 'src', 'commands', 'start.js');
 const AREA_PIPELINE = path.join(__dirname, '..', 'src', 'areas', 'pipeline.js');
 
 /** Capture everything written to process.stdout while `fn` runs; restore after. */
@@ -405,7 +405,7 @@ function captureStdout(fn) {
   return buf;
 }
 
-/** Load menu.js bound to a stubbed barrel (fresh require so overview/pipeline rebind too). */
+/** Load start.js bound to a stubbed barrel (fresh require so overview/pipeline rebind too). */
 function loadMenuWithBarrel(stub) {
   const barrelResolved = require.resolve(BARREL);
   const prevBarrel = require.cache[barrelResolved];

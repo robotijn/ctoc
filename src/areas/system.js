@@ -105,7 +105,7 @@ function render(app) {
  * The static System landing (no sub-mode) has no interactive keys of its own.
  * @param {object} key   readline key object ({name, sequence, ctrl, …})
  * @param {object} app   menu app state
- * @returns {boolean}    true iff the key was consumed (menu.js re-renders)
+ * @returns {boolean}    true iff the key was consumed (start.js re-renders)
  */
 function handleKey(key, app) {
   if (app && app.toolMode) {
@@ -113,7 +113,7 @@ function handleKey(key, app) {
     return toolsTab.handleKey(key, app);
   }
   // Landing: owner-approved lowercase mnemonics open the sub-modes the render
-  // advertises. The internal toolMode values ('1'/'2'/'3') are the ones menu.js's
+  // advertises. The internal toolMode values ('1'/'2'/'3') are the ones start.js's
   // render + tabs/tools.js already expect — d/u/s are the human-facing keys mapped
   // onto them, replacing the bare digits the global router used to eat as area switches.
   const seq = key ? (key.sequence || key.name) : undefined;

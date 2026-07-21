@@ -474,10 +474,10 @@ describe('iron-loop-enforcer — reachability fences return a finding', () => {
   const arch = { mode: 'thorough', scopes: ['architecture'] };
 
   it('blocks when a src file is unreachable from every live root', () => {
-    // Arrange — a sanctioned root (src/commands/menu.js) plus an orphan lib nobody
+    // Arrange — a sanctioned root (src/commands/start.js) plus an orphan lib nobody
     // requires. The file fence must report the orphan.
     const root = mkTmp();
-    write(root, 'src/commands/menu.js', 'module.exports = {};\n');
+    write(root, 'src/commands/start.js', 'module.exports = {};\n');
     write(root, 'src/lib/orphan.js', 'function dead() { return 1; }\nmodule.exports = { dead };\n');
 
     // Act
@@ -492,9 +492,9 @@ describe('iron-loop-enforcer — reachability fences return a finding', () => {
 
   it('blocks when a live module exports a name no live caller uses', () => {
     // Arrange — a live root that exports deadFn but never calls it, with no baseline
-    // file to excuse it. The export fence must report menu.js#deadFn.
+    // file to excuse it. The export fence must report start.js#deadFn.
     const root = mkTmp();
-    write(root, 'src/commands/menu.js',
+    write(root, 'src/commands/start.js',
       'function deadFn() { return 1; }\nmodule.exports = { deadFn };\n');
 
     // Act

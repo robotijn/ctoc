@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * Streaming GATE-DECISION screen — the `/ctoc:menu` default.
+ * Streaming GATE-DECISION screen — the `/ctoc:start` default.
  *
- * The owner's requirement: `/ctoc:menu` must ASK the human the pending gate
+ * The owner's requirement: `/ctoc:start` must ASK the human the pending gate
  * decisions ONE AT A TIME, not render a navigation dashboard. The plans sitting at
  * the three human gates ARE the real questions. This module computes that ordered
  * set of pending decisions and renders the { text, ask, actions } screen the menu
@@ -29,7 +29,7 @@
  * ── Skip semantics (documented) ────────────────────────────────────────────────
  * `stream skip <ref>` is a WITHIN-PASS advance: it shows the next pending decision
  * AFTER <ref> in the ordered list and writes nothing. It intentionally does NOT
- * persist — a fresh `/ctoc:menu` open re-surfaces every still-pending decision,
+ * persist — a fresh `/ctoc:start` open re-surfaces every still-pending decision,
  * which is correct: they are still pending and still the human's to decide. This
  * avoids a persistence/reset design with no behavioral gain.
  *
@@ -1143,7 +1143,7 @@ function gateScreenAt(decisions, index, statusLine, root) {
 
 /**
  * The streaming gate screen: the FIRST pending decision, or the nothing-pending
- * screen when the queue is empty. This is the new `/ctoc:menu` default.
+ * screen when the queue is empty. This is the new `/ctoc:start` default.
  *
  * Question GENERATION is NOT kicked here, and this module spawns no subprocess. The
  * CTOC runtime is a plugin inside the Claude command-line interface — plain code

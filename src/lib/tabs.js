@@ -1,6 +1,6 @@
 /**
  * Tabs (compatibility shim) — re-exports AREAS as TABS so existing callers
- * (TUI code, src/commands/menu.js) keep working during the A3 transition.
+ * (TUI code, src/commands/start.js) keep working during the A3 transition.
  *
  * NEW CODE: import from `./areas` directly. This shim is for backward compat only.
  * See: /Users/doctony/Code/ctoc/plans/in-progress/A3-menu-rethink-impl.md (I6 refinement)
@@ -31,7 +31,7 @@ function getTabByIndex(index) {
 }
 
 // I6: getTabIndex resolves old tab ids to area indexes via the shim.
-// Callers like `TABS.findIndex(t => t.id === 'tools')` in src/commands/menu.js
+// Callers like `TABS.findIndex(t => t.id === 'tools')` in src/commands/start.js
 // continue working because getAreaIndex falls back to TAB_TO_AREA mapping.
 function getTabIndex(id) {
   return getAreaIndex(id);

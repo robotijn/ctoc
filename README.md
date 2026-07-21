@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.13.6-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.13.7-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-124-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-426-blue">
@@ -437,7 +437,7 @@ DEFINE → INSTRUMENT → MEASURE → REVIEW → HYPOTHESIZE → EXPERIMENT → 
 
 Canonical KPI library at `.ctoc/templates/product-kpis.yaml` — **17 KPIs** across acquisition / activation / retention / revenue / churn / satisfaction / engagement. SaaS-b2c launch set: signup_completion, activation_rate, time_to_value, w1_retention, free_to_paid_conversion, monthly_churn, mrr.
 
-KPI status and the weekly product review are reached through the `/ctoc:menu` dashboard — CTOC ships only three slash commands (`menu`, `push`, `update`).
+KPI status and the weekly product review are reached through the `/ctoc:start` dashboard — CTOC ships only three slash commands (`start`, `push`, `update`).
 
 ---
 
@@ -747,7 +747,7 @@ CTOC ships exactly three slash commands. Everything else — vision, planning, q
 
 | Command | Description |
 |---------|-------------|
-| `/ctoc` (alias for `/ctoc:menu`) | Interactive dashboard. Auto-initializes the project on first run (no init command needed). |
+| `/ctoc` (alias for `/ctoc:start`) | Interactive dashboard. Auto-initializes the project on first run (no init command needed). |
 | `/ctoc:push` | Quality checks + push |
 | `/ctoc:update` | Update to latest version (workaround for plugin-cache bug) |
 
@@ -821,7 +821,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.13.6'
+getVersion()       // → '6.13.7'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -838,7 +838,7 @@ ctoc/
 │                    CRITICAL_CONTROL_POINTS.md, CONTINUOUS_IMPROVEMENT.md,
 │                    CONFIG_SOURCES.md, SECURITY_LINT.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
 ├── src/
-│   ├── commands/    3 slash commands — menu, push, update (.md spec + .js impl where needed)
+│   ├── commands/    3 slash commands — start, push, update (.md spec + .js impl where needed)
 │   ├── hooks/       16 Claude Code hooks (session, pre/post tool use, andon-halt,
 │   │                subagent concurrency fence)
 │   ├── lib/         104 JS modules (planning, quality, refinement, dispatcher; the
@@ -891,6 +891,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.13.6** · Built by [@robotijn](https://github.com/robotijn)
+**6.13.7** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

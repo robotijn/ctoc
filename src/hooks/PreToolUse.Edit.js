@@ -329,7 +329,7 @@ function findEscapeInTranscript(transcript) {
  * escape-phrase list ("hotfix, trivial fix, urgent") is intentionally DROPPED:
  * that text used to seed the transcript (as a tool_result) and, combined with
  * the raw-tail matcher, unlock the very next edit — finding H4 / Defect 1. The
- * message stays actionable (it names the target and points at /ctoc:menu) and is
+ * message stays actionable (it names the target and points at /ctoc:start) and is
  * a pure function so its content can be asserted in-process without process.exit.
  *
  * NAMING THE REJECTED PLAN (info.denial). A plan may DECLARE this file and still
@@ -352,15 +352,15 @@ function buildBlockMessage(reason, info) {
   const explanation = denial && denial.plan
     ? `  Why: the plan "${denial.plan}" declares this file, but it grants nothing `
       + `(${denial.reason || 'not approved'}).\n`
-      + `       Only an APPROVED plan grants write access. Approve or re-approve it via /ctoc:menu.\n\n`
+      + `       Only an APPROVED plan grants write access. Approve or re-approve it via /ctoc:start.\n\n`
     : '';
   return `\n[CTOC v7] Edit BLOCKED: ${reason}\n`
     + `  Target: ${target}\n`
     + `  Project: ${project}\n\n`
     + explanation
     + `  Resolution:\n`
-    + `  - Run /ctoc:menu to create or activate a plan that covers this file, OR\n`
-    + `  - If this change is genuinely small, an escape phrase you type yourself will allow it — see /ctoc:menu for the current list.\n\n`;
+    + `  - Run /ctoc:start to create or activate a plan that covers this file, OR\n`
+    + `  - If this change is genuinely small, an escape phrase you type yourself will allow it — see /ctoc:start for the current list.\n\n`;
 }
 
 function block(reason, info) {
@@ -382,7 +382,7 @@ function block(reason, info) {
   // The verbatim phrase list is dropped here too (W08-s1): this deny reason is the
   // other half of "CTOC's own denial" and lands back in the transcript, so it must
   // not advertise the phrases it would otherwise seed.
-  emitDeny(`CTOC: no active plan covers "${info.target_file || '(unknown)'}" and no escape phrase was used. Create/activate a covering plan via /ctoc:menu, or use an escape phrase you type yourself.`);
+  emitDeny(`CTOC: no active plan covers "${info.target_file || '(unknown)'}" and no escape phrase was used. Create/activate a covering plan via /ctoc:start, or use an escape phrase you type yourself.`);
 }
 
 function allow(outcome, info) {

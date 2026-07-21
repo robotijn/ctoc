@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * Streaming GATE-DECISION screen — the new `/ctoc:menu` default.
+ * Streaming GATE-DECISION screen — the new `/ctoc:start` default.
  *
- * The core fix: `/ctoc:menu` must ASK the human the pending gate decisions ONE AT
+ * The core fix: `/ctoc:start` must ASK the human the pending gate decisions ONE AT
  * A TIME, instead of rendering the navigation dashboard. The plans sitting at the
  * three approvePlan gates (functional→implementation, implementation→todo,
  * review→done) ARE the real questions. This suite drives the REAL functions over a
