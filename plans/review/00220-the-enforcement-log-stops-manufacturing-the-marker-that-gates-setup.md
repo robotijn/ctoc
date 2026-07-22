@@ -15,6 +15,21 @@ iron_loop: true
 files:
   - "src/lib/enforcement-log.js"
   - "tests/enforcement-log.test.js"
+  - "tests/the-edit-protection-says-whether-it-is-running.test.js"
+scope_extension:
+  authorized_by: human
+  authorized_at: 2026-07-22
+  reason: >
+    A test outside the original grant was SILENTLY RELYING ON THE DEFECT this
+    plan fixes: the-edit-protection-says-whether-it-is-running.test.js used
+    logEnforcement as a fixture-builder against a bare tmp dir with no .ctoc/,
+    depending on the log write to MANUFACTURE .ctoc/. Once logEnforcement stops
+    fabricating the marker, the fixture's makeRoot has no .ctoc/ and the readback
+    throws (19 failures). The fix is one line in makeRoot — create .ctoc/ so the
+    fixture models a REAL initialised project, which is what a test reading
+    .ctoc/logs/enforcement.json represents. This TIGHTENS the fixture toward
+    reality (Lesson 14), it does not weaken an assertion. Standing ruling: extend
+    the grant, fix the fixture toward reality, in one build.
 ---
 
 # The enforcement log stops manufacturing the marker that gates setup
@@ -242,3 +257,17 @@ dark branch, so the 99 floor is held.
    enforcement hot path with the `appendEntry` re-creation subtlety; the fourth is
    error-path-only. Isolating them keeps each slice's blast radius and review focus
    tight and means a build crash loses only one.
+
+## Decisions Taken During Execution
+
+### A second test silently depended on the fixed defect — `tests/the-edit-protection-says-whether-it-is-running.test.js`
+
+Step 14 exposed `19` failures in `tests/the-edit-protection-says-whether-it-is-running.test.js`, all one cause: its helper `mintDecision` calls `logEnforcement(entry, root)` and reads `entry.timestamp`, while `makeRoot` handed it a bare `os.tmpdir()` directory with **no `.ctoc/`**. The test was using `logEnforcement` as a fixture-builder and silently relying on the exact defect this slice removes — the log write MANUFACTURING `.ctoc/`. Once `logEnforcement` returns `null` in a directory with no marker, `Date.parse(entry.timestamp)` throws. The coverage dip to `98.98%` was the downstream effect of those `19` aborted tests no longer exercising the liveness module. This caller was outside the original grant, so execution STOPPED and the human extended the grant (see the `scope_extension` marker in the frontmatter) before the edit.
+
+### The fixture fix, and why it is a tightening, not a loosening
+
+One line added to `makeRoot`: `fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true })`. The three-part justification the contract demands:
+
+1. **The contract comes from outside the test.** A project that HAS an enforcement log at `.ctoc/logs/enforcement.json` is, by definition, an initialised project — it has the `.ctoc/` marker. A liveness test whose whole subject is reading that log therefore models a REAL initialised project. That contract is set by the product, not by this test.
+2. **The TEST fixture was wrong, not the code.** A bare `os.tmpdir()` directory with no `.ctoc/` is not a project; it only ever "worked" because the buggy `logEnforcement` fabricated the marker for it. The code is now correct; the fixture's premise was false.
+3. **What newly passes.** All `19` cases pass again because `mintDecision` writes a real entry into an existing `.ctoc/logs/` and reads its timestamp. No assertion was weakened, no case deleted, no range widened. The `.ctoc/logs`-creating cases (`~328-329`, `~361-362`) stay green because recursive `mkdirSync` is idempotent; case 8 (`~279-281`) works once `mintDecision` writes the leaf again.

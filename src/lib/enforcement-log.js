@@ -30,17 +30,43 @@ function logPathFor(root) {
 }
 
 /**
- * Append an entry to the enforcement log, losslessly and atomically. Creates the
- * log file and parent directory if missing. Rotates to the last MAX_ENTRIES
- * entries. A corrupt existing file is quarantined, not reset.
+ * Append an entry to the enforcement log, losslessly and atomically — INTO a
+ * project that already exists, and NEVER creating one. Rotates to the last
+ * MAX_ENTRIES entries; a corrupt existing file is quarantined, not reset.
+ *
+ * This audit write is best-effort: both enforcement callers wrap it in a
+ * try/catch that fails open and ignore its return value, so it is permitted to
+ * fail silently. An operation permitted to fail silently must NEVER
+ * create the directory that decides whether a project exists. A fabricated
+ * `.ctoc/` is read by setup and by the private root resolvers as proof the
+ * project is initialised, leaving it permanently half-set-up — a live user hit
+ * exactly this. This is the THIRD of the four `.ctoc/logs` marker producers slice
+ * 00177 identified (the first two — `PreToolUse.Write.js` `appendLog` and the
+ * plan-index sync-log — were fixed in v6.13.12), and it is the one on the live
+ * enforcement hot path (every whitelisted plan-markdown Write reaches it).
+ *
+ * Guarding only the local `mkdirSync` is INSUFFICIENT: `durableLog.appendEntry`
+ * itself re-creates `path.dirname(logPath)` = `root/.ctoc/logs` recursively
+ * (durable-log.js:208-211), so the marker would be manufactured on the very next
+ * line. The guard must therefore RETURN before `appendEntry` is reached when
+ * `.ctoc/` is absent or the root is unusable. The leaf `logs/` is still created
+ * beneath an EXISTING `.ctoc/` — a subdirectory under a marker setup already put
+ * there manufactures nothing.
  *
  * @param {Object} entry - Decision details
  * @param {string} root - Project root
- * @returns {Object} the appended entry (including its timestamp)
+ * @returns {Object|null} the appended entry (with its timestamp), or `null` when
+ *   the write is skipped because there is no `.ctoc/` to log into or the root is bad
  */
 function logEnforcement(entry, root) {
-  const logDir = path.join(root, '.ctoc', 'logs');
-  if (!safeFs.existsSync(logDir)) safeFs.mkdirSync(logDir, { recursive: true });
+  // Never fall back to a bad root (which would resolve the destination against
+  // process.cwd()); a non-string/empty root is a total no-op.
+  if (!root || typeof root !== 'string') return null;
+  const ctocDir = path.join(root, '.ctoc');
+  if (!safeFs.existsSync(ctocDir)) return null; // nothing to log INTO — never CREATE the marker
+
+  const logDir = path.join(ctocDir, 'logs');
+  if (!safeFs.existsSync(logDir)) safeFs.mkdirSync(logDir, { recursive: true }); // the LEAF only
 
   return durableLog.appendEntry(
     logPathFor(root),
