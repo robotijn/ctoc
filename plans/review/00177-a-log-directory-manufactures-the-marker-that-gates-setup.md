@@ -16,6 +16,7 @@ files:
   - "src/hooks/PreToolUse.Write.js"
   - "src/hooks/PostToolUse.plan-index-sync.js"
   - "tests/hooks-do-not-manufacture-the-project-marker.test.js"
+  - "CLAUDE.md"
 ---
 
 # A log directory manufactures the marker that gates setup
@@ -244,3 +245,64 @@ failure.
 8. **Additional `.ctoc` creators found at Step 9 are REPORTED, not fixed.** Scope
    discipline; a sweep is a decision about what to build, and that is the
    operator's to schedule.
+
+### Execution-time findings (Steps 8-14)
+
+The plan was faithful; its site-two correction verified exactly against current
+code. Both changes are implemented and every declared test is green (13/13 in the
+new file). Findings surfaced during execution:
+
+### The `mkdirSync` at each site, verified against live code
+
+Site one: `src/hooks/PreToolUse.Write.js` `appendLog` — the `mkdirSync` IS in this
+function (line ~134). Fixed by Change 1: it now returns early when `.ctoc/` is
+absent and creates only the `logs/` leaf beneath an existing parent. Site two: the
+`mkdirSync` is in `src/lib/plan-index/sync-unit.js` `logNote` (line ~193), reached
+from `PostToolUse.plan-index-sync.js` `main()`. Fixed by Change 2 in the caller
+(`resolveSyncLogDir`), which passes `undefined` into `logNote`'s existing
+`if (!logDir) return;` guard. `sync-unit.js` was NOT needed and NOT edited — the
+plan's correction held, so no grant extension was required for it.
+
+### A THIRD `.ctoc/` producer on the plan-write path — out of scope, reported not fixed
+
+`Step 9` grep of every `mkdirSync` under `src/hooks` and `src/lib` whose path
+contains `.ctoc` found a third producer reachable on a plan write:
+`src/lib/enforcement-log.js` `logEnforcement` (line ~43), called by
+`src/hooks/PreToolUse.Edit.js` `allow()`/`block()` (lines ~391/~370) with
+`project_root`. A plan-markdown Write is WHITELISTED, so the enforcement delegate
+runs `allow('whitelist', { project_root: root })`, which does
+`mkdirSync(root/.ctoc/logs, { recursive: true })` — manufacturing `.ctoc/` in the
+hook's `process.cwd()`. This is why the plan's case 11 as literally written (spawn
+the FULL Write hook via `main()` and assert `.ctoc/` absent) cannot hold within
+this slice's scope. The new test's real-process case therefore drives the advisory
+`run()` path as a real child process (the code THIS slice owns), not `main()`, so
+its red/green tracks this fix and not the unrelated enforcement creator. A fourth,
+error-path-only producer is `PostToolUse.plan-index-sync.js` `logError` (line
+~129-130), which uses `process.cwd()` and is reached only on a sync exception. Both
+are REPORTED for the operator to schedule; neither is a declared file here.
+
+### The two existing coverage-test fixtures were tightened, not weakened
+
+Two tests in `tests/pretooluse-write-coverage.test.js` (`WARNS on a near-duplicate
+… AND appends the log`, and `swallows a throwing stderr.write … STILL appends the
+log`) drove `appendLog` against an EMPTY tmp dir and asserted the durable log file
+existed — i.e. they asserted the old marker-manufacturing behaviour. The contract
+changed from outside the test (this slice's decision: log only into an existing
+`.ctoc/`), so per the fix-the-code-not-the-test rule the CODE is right; the fixture
+was made a real project (one `mkdirSync(dir/.ctoc)` each). The log-persist
+assertions are unchanged — this tightens the fixture toward the real contract, it
+does not loosen an assertion.
+
+### FORK — the documented test-file count needs `CLAUDE.md`, which is outside this grant
+
+Adding `tests/hooks-do-not-manufacture-the-project-marker.test.js` raised the live
+test-file count from 449 to 450. `CLAUDE.md` documents `449` in two lines (the
+`node --test tests/*.test.js` comment and the `tests/  N test files` structure
+line), and `tests/claude-md-*` self-verifies documented-equals-live, so `npm test`
+reported exactly two failures until those two lines read the live count. This was a
+STOP-AND-ASK because `CLAUDE.md` was not originally a declared file. RESOLVED: the
+operator extended this slice's `files:` to include `CLAUDE.md` and re-stamped the
+ledger; the live count was re-measured with the doc's own method
+(`ls tests/*.test.js | wc -l` = 450) and both lines (247 and 431) were set to 450.
+No baseline or whitelist entry was added; the coverage floor is unaffected by the
+new branch (`existsSync` return arm is covered by the new test's case 1).

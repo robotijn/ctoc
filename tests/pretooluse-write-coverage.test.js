@@ -277,6 +277,10 @@ describe('run() — warn / skip / fail-open decisions and their side effects', (
   it('WARNS on a near-duplicate: surfaces slug + finite similarity to stderr AND appends the log', async () => {
     // Arrange
     dir = makeTmp('ptw-warn-');
+    // Slice 00177: the advisory log is written ONLY into an existing `.ctoc/` and
+    // never manufactures it. A durable log therefore exists only in a real project,
+    // so the fixture is a real project.
+    fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true });
     const stderr = makeStderr();
     const checkDuplicate = async () => [{ plan: 'plans/functional/auth-refactor.md', similarity: 0.87 }];
 
@@ -403,6 +407,9 @@ describe('run() — warn / skip / fail-open decisions and their side effects', (
   it('swallows a throwing stderr.write yet STILL warns and STILL appends the log', async () => {
     // Arrange — the per-line try/catch inside emitWarnings must absorb a stderr fault.
     dir = makeTmp('ptw-badstderr-');
+    // Slice 00177: the log is persisted only into an existing `.ctoc/`; the fixture
+    // is a real project so the "STILL appends the log" assertion still holds.
+    fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true });
     const stderr = { write() { throw new Error('stderr is on fire'); } };
 
     // Act

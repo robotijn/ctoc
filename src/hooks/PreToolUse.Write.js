@@ -125,13 +125,26 @@ function deriveSummary(content) {
  * Best-effort append to the advisory log. A log-write failure is swallowed — a
  * logging problem must never break a plan write.
  *
+ * IT NEVER CREATES `.ctoc/`. The log is written ONLY into a `.ctoc/` that already
+ * exists; if the configuration directory is absent, this returns without writing.
+ * This is the rule behind slice 00177: an operation permitted to fail silently must
+ * NEVER create the directory that decides whether a project exists. The original
+ * `mkdirSync(.ctoc/logs, { recursive: true })` fabricated `.ctoc/` as a parent — and
+ * on a bad or absent root the destination falls back to `process.cwd()` — so a plan
+ * write in any directory manufactured the very marker that gated setup. That left
+ * projects permanently half-initialised (dated 2026-07-20). The leaf `logs/` is
+ * still created beneath an existing `.ctoc/`; only manufacturing the MARKER is
+ * forbidden.
+ *
  * @param {string[]} lines
  * @param {string} projectPath
  */
 function appendLog(lines, projectPath) {
   try {
-    const logDir = path.join(projectPath, '.ctoc', 'logs');
-    safeFs.mkdirSync(logDir, { recursive: true });
+    const ctocDir = path.join(projectPath, '.ctoc');
+    if (!safeFs.existsSync(ctocDir)) return; // nothing to log INTO — never CREATE the marker
+    const logDir = path.join(ctocDir, 'logs');
+    safeFs.mkdirSync(logDir, { recursive: true }); // the LEAF only, under an existing parent
     const logFile = path.join(logDir, 'plan-index.log');
     const stamp = new Date().toISOString();
     const body = lines.map((l) => `${stamp} ${l}`).join('\n') + '\n';

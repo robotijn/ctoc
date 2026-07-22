@@ -26,6 +26,25 @@
  */
 
 const path = require('path');
+const safeFs = require('../lib/safe-fs');
+
+/**
+ * Resolve the sync log's destination for a project root — and NEVER manufacture it.
+ * Returns `path.join(root, '.ctoc', 'logs')` ONLY when `.ctoc/` already exists;
+ * otherwise `undefined`, which `sync-unit.js`'s `logNote` treats as "no destination"
+ * (its `if (!logDir) return;` guard). This is slice 00177's rule at site two: a
+ * best-effort log must not create the `.ctoc/` marker that gates setup. `sync-unit.js`
+ * itself is unchanged — the seam it already exposes (a falsy `logDir`) is exactly the
+ * one needed, so the guard lives here at the caller that decides the destination.
+ *
+ * @param {string} root - the plan's resolved project root
+ * @returns {string|undefined} the `.ctoc/logs` path when `.ctoc/` exists, else undefined
+ */
+function resolveSyncLogDir(root) {
+  if (!root || typeof root !== 'string') return undefined;
+  const ctocDir = path.join(root, '.ctoc');
+  return safeFs.existsSync(ctocDir) ? path.join(ctocDir, 'logs') : undefined;
+}
 
 /**
  * True iff `fp` is a Markdown file under a `plans/` directory (at any depth) and
@@ -161,7 +180,9 @@ async function main() {
     if (!wiring) { process.exit(0); return; } // PI0 not integrated → fail-open
 
     const { syncUnit } = require('../lib/plan-index/sync-unit');
-    const logDir = path.join(root, '.ctoc', 'logs');
+    // Name a log destination ONLY when `.ctoc/` already exists — never create it
+    // (slice 00177). `undefined` flows through to `logNote`'s falsy-`logDir` guard.
+    const logDir = resolveSyncLogDir(root);
     const plansRoot = path.join(root, 'plans');
     // AWAIT the sync so the index reflects the write BEFORE we exit. A bare
     // `process.exit(0)` kills an un-awaited microtask before Node ever runs it (the
@@ -204,4 +225,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { isPlanMd };
+module.exports = { isPlanMd, resolveSyncLogDir };
