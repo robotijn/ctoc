@@ -15,6 +15,21 @@ iron_loop: true
 files:
   - "src/lib/plan-recovery.js"
   - "tests/plan-recovery.test.js"
+  - "src/lib/menu-screens.js"
+scope_extension:
+  authorized_by: human
+  authorized_at: 2026-07-22
+  reason: >
+    WIRED-IS-DONE correction (Operating Lesson 16). The planner split the module
+    (this slice) from its only caller (the next slice, 00217), so this slice would
+    ship src/lib/plan-recovery.js with NO live caller — which the reachability
+    fence correctly rejects (26 -> 27 dead files), and 00217 depends_on this slice,
+    deadlocking both. The executor surfaced it and refused to fake a root or
+    baseline the dead file. Per the human's standing rule (a module is reachable in
+    the SAME unit of work that creates it, never a follow-up), the one-line WIRING
+    of recoverOrphanedPlans into buildDashboardTable (after reconcileState at
+    menu-screens.js:513) is folded into this slice. 00217 remains only the DISPLAY
+    of the recovered/surfaced counts, not the wiring.
 ---
 
 # An orphaned in-progress plan is recovered to todo when its builder is gone
@@ -373,3 +388,60 @@ not the conservative default:**
 - The re-queued plan carries a recorded reason ("its builder is no longer running; the
   build is re-queued for a clean rebuild and re-verification") so the human reading the
   menu understands why a plan reappeared in the queue.
+
+## Decisions Taken During Execution
+
+### The `opts.reviewReady` predicate and the review-ready skip were DELETED, not implemented
+The planner's design (Decision `2`, cases `5`/`6`/`13`) still carried an injectable
+`opts.reviewReady` predicate defaulting to `validateForReview`, and a
+`skipped: review-ready-left-for-forward-path` outcome. The human's rebuild resolution
+removes both. The shipped module has NO `reviewReady` option and never requires or calls
+`validateForReview` — a released orphan re-queues regardless of review-readiness. Test
+case `5` proves the rebuild stance directly: a fixture that GENUINELY passes
+`validateForReview` (asserted `.valid === true`) is still re-queued to `todo`, and a
+structural test (`16`) asserts the module neither requires `plan-validator` nor calls
+`validateForReview`.
+
+### The two-slice split was a wired-is-done error; the wiring was folded into this slice
+The planner split the module (this slice) from its only caller (the menu-render slice
+`00217`), which would have shipped `src/lib/plan-recovery.js` with no live caller. The
+reachability fence correctly rejects that (it would raise the unreachable count from `26`
+to `27`), and `00217` `depends_on` this slice, deadlocking both. Rather than fake a
+declared root or baseline the dead file, the executor surfaced the conflict; the human
+authorized Option A (scope extension, re-stamped ledger). `recoverOrphanedPlans` is now
+called from `menu-screens.buildDashboardTable` immediately after the `reconcileState`
+pass — the module is reachable, the fence stays at `26`, and no dead file is added.
+
+### The menu call site is UNWRAPPED, by contract
+`recoverOrphanedPlans` is contractually throw-free (every I/O boundary inside it is
+fail-open; proven by cases `7`, `8`, `14`). The wiring in `buildDashboardTable` therefore
+calls it directly, without a try/catch. A defensive empty `catch` there would have been a
+silent-catch the false-green fence flags as a new site — and it would have swallowed an
+error the function guarantees it never raises. The direct call matches the other
+throw-free calls in that render.
+
+### A failed cleanup-log write is recorded to stderr, never swallowed
+`appendCleanupLog` must not throw (a log failure after a successful move must not be
+misreported as "move failed"), but an empty `catch` is a false-green silent-catch. The
+outer catch records the failure to stderr in the `state.js` fail-open style; case `17`
+covers it and asserts the recovery still succeeds (the plan is in `recovered`, not
+`skipped`).
+
+### Forward-sweep supersession: no race found, no STOP-AND-ASK needed
+The two sweeps target disjoint entry points and never fight over the same plan.
+`cleanupStaleInProgress` runs ONLY from `startAgent`; recovery runs on the menu render
+(`buildDashboardTable`). On the menu hot path recovery re-queues a released orphan to
+`todo` before any later `startAgent` sweep looks at `in-progress`, so a plan recovery
+touches is already gone from `in-progress` before the forward sweep could move it to
+`review`. Recovery also takes only RELEASED orphans and never a `staleness` one, so it
+cannot contend with a live builder. No ping-pong between `todo` and `review` is possible;
+the supersession is by ordering on the hot path, not by mutual exclusion, so no conflict
+required surfacing.
+
+### One planner inaccuracy corrected
+The planner's algorithm wrapped `readPlans` in its own try/catch "for fail-open". That
+catch is dead: `readPlans` is already fail-open for a valid string root (returns `[]` on
+an absent directory), and the only path that reaches it has a string root (the registry
+load did not throw). The shipped module calls `readPlans` directly and relies on its
+documented fail-open, avoiding an uncoverable dead catch. Case `8` (absent
+`in-progress/`) exercises the real fail-open.

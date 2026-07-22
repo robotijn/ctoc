@@ -39,6 +39,7 @@ const taskRegistry = require('./task-registry');
 const taskView = require('./task-view');
 // NB4: on-open reconciliation of the registry against the live harness TaskList.
 const taskReconcile = require('./task-reconcile');
+const planRecovery = require('./plan-recovery');
 // Streaming gate-decision screen — the new `/ctoc:start` default. Its routes
 // (`stream approve|skip|comment`) live here in the router; the `dashboard` route
 // keeps the classic pipeline overview reachable.
@@ -521,6 +522,18 @@ function buildDashboardTable(projectPath, opts = {}) {
     // reason is kept, and renderReconcileHealth puts it on screen.
     reconcileThrew = (err && err.message) ? String(err.message) : String(err);
   }
+  // Recover orphaned plans whose builder is gone. The reconcile pass above wrote the
+  // durable orphan verdict (result.orphanReason) that recovery projects onto the PLAN:
+  // a released (file-freed) orphan is re-queued in-progress→todo for a clean rebuild, a
+  // still-quarantined staleness orphan is only surfaced, and a plan a fresh agent
+  // re-claimed is never touched. Without this the V4 scenario is unchanged — orphaned
+  // plans keep reading as "being built" because nothing re-queues them. This is the LIVE
+  // caller that makes plan-recovery reachable; rendering the recovered/surfaced counts on
+  // screen is the next slice. Called directly (no defensive try/catch): recoverOrphanedPlans
+  // is contractually throw-free — every I/O boundary inside it is fail-open — so wrapping it
+  // would be a swallow of an error it guarantees it never raises, consistent with the other
+  // throw-free calls in this render.
+  planRecovery.recoverOrphanedPlans(root);
   let taskReg;
   try { taskReg = taskRegistry.load(root); } catch { taskReg = taskRegistry.emptyRegistry(); }
   let tasksBlock = '';
