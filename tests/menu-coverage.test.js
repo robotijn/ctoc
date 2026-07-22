@@ -72,6 +72,19 @@ function mkTmp(prefix) {
   tmpDirs.push(d);
   return d;
 }
+// A fully valid, already-set-up project — the only state where "no re-init"
+// (plan 00176) is the correct verdict, since a bare `.ctoc/` now repairs.
+function seedFullySetUpProject(dir) {
+  fs.mkdirSync(path.join(dir, '.ctoc', 'state'), { recursive: true });
+  for (const s of ['vision', 'canvas', 'functional', 'implementation',
+    'todo', 'in-progress', 'review', 'done']) {
+    fs.mkdirSync(path.join(dir, 'plans', s), { recursive: true });
+  }
+  fs.writeFileSync(path.join(dir, '.ctoc', 'settings.yaml'),
+    'version: 1\n\nregulatory_regime:\n  active_profiles: []\n', 'utf8');
+  fs.writeFileSync(path.join(dir, '.ctoc', 'state', 'iron-loop.yaml'), 'step: 1\n', 'utf8');
+  return dir;
+}
 after(() => tmpDirs.forEach(d => fs.rmSync(d, { recursive: true, force: true })));
 
 // ── stdout capture (a real boundary, not render logic) ───────────────────────
@@ -182,11 +195,21 @@ describe('ensureInitialized — auto-init boundary and fail-open catch', () => {
     assert.ok(fs.existsSync(path.join(dir, '.ctoc')), '.ctoc/ created');
   });
 
-  it('is a no-op (attempted false) when .ctoc/ already exists (kills init-always mutant)', () => {
-    const dir = mkTmp('menu-cov-noop-');
-    fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true });
+  it('is a no-op (attempted false) on a fully set-up project (kills init-always mutant)', () => {
+    // CONTRACT INVERSION (plan 00176, 2026-07-21).
+    //  (a) Contract from OUTSIDE the test: the human-approved 00176 repair makes
+    //      the setup trigger the READ-BACK; any missing artifact is repaired.
+    //  (b) Why the prior fixture was wrong, not the code: a BARE `.ctoc/` is not
+    //      "already exists" in the sense this guard means — it is a broken world
+    //      that 00176 now repairs, so it correctly yields attempted:true. The
+    //      guard's real intent is "do NOT re-initialise a project that is already
+    //      COMPLETE", which is exactly what a fully-seeded project proves.
+    //  (c) What newly failed: a bare `.ctoc/` inverts to attempted:true /
+    //      created:non-empty. Re-pointed at a complete project, the init-always
+    //      mutant it kills stays dead — a healthy project must attempt nothing.
+    const dir = seedFullySetUpProject(mkTmp('menu-cov-noop-'));
     const setup = ensureInitialized(dir);
-    assert.equal(setup.attempted, false, 'no second initialization run');
+    assert.equal(setup.attempted, false, 'no re-initialization on a complete project');
     assert.deepEqual(setup.created, [], 'and nothing written — the mutant stays dead');
   });
 

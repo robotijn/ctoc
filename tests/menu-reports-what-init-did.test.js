@@ -198,19 +198,31 @@ describe('the menu reports what initialization actually did', () => {
       `reason must carry the message, got ${JSON.stringify(setup.reason)}`);
   });
 
-  it('7 — the dashboard still renders on a failed setup', () => {
-    // A broken world that survives the process boundary (the safe-fs seam does
-    // not): an empty `.ctoc/` directory. Setup cannot succeed and is not even
-    // attempted, and the human must STILL get the screen that would let them
-    // fix it — fail-open, only the silence changes.
+  it('7 — an empty .ctoc/ is repaired on open, and the screen renders', () => {
+    // CONTRACT INVERSION (plan 00176, 2026-07-21).
+    //  (a) Contract from OUTSIDE the test: the human-approved 00176 repair — a
+    //      missing artifact is REPAIRED on open, not narrated. An empty `.ctoc/`
+    //      is a repairable gap.
+    //  (b) Why the prior assertion was wrong, not the code: it pinned the
+    //      INTERMEDIATE state "empty `.ctoc/` stays broken, message names
+    //      settings.yaml as missing" that 00176 deliberately eliminates by
+    //      repairing. The fail-open PRINCIPLE it protected — the screen must
+    //      still render — is PRESERVED here; the render-on-genuine-FAILURE case
+    //      moves to tests/menu-repairs-what-it-reports-missing.test.js case 7,
+    //      which uses an unrepairable fixture.
+    //  (c) What newly failed: after the repair, `parsed.text` announces "CTOC is
+    //      set up for this project." and no longer names settings.yaml as
+    //      missing, because settings.yaml now exists on disk.
     const dir = freshDir();
     fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true });
     const out = execFileSync(process.execPath, [MENU_ENTRY], { cwd: dir, encoding: 'utf8' });
-    assert.ok(out.trim().length > 0, 'the screen must still render — fail-open');
+    assert.ok(out.trim().length > 0, 'the screen must still render');
     const parsed = JSON.parse(out.slice(out.indexOf('{')));
     assert.ok(typeof parsed.text === 'string' && parsed.text.length > 0);
-    assert.ok(parsed.text.includes('.ctoc/settings.yaml'),
-      'and it must carry the truth about the broken setup');
+    assert.ok(parsed.text.includes('CTOC is set up for this project'),
+      'the empty .ctoc/ was repaired, and the screen says so');
+    assert.ok(fs.existsSync(path.join(dir, '.ctoc', 'settings.yaml')),
+      'and the artifact it once reported missing now exists');
   });
 
   it('8 — an already-set-up, healthy project says nothing', () => {
@@ -231,13 +243,25 @@ describe('the menu reports what initialization actually did', () => {
       `skipped must name the pre-existing artifact, got ${JSON.stringify(setup.skipped)}`);
   });
 
-  it('10 — missing stage directories are caught', () => {
+  it('10 — a missing stage directory is repaired, not merely reported', () => {
+    // CONTRACT INVERSION (plan 00176, 2026-07-21).
+    //  (a) Contract from OUTSIDE the test: the human-approved 00176 repair — a
+    //      missing artifact is recreated on open.
+    //  (b) Why the prior assertion was wrong, not the code: it pinned the
+    //      INTERMEDIATE "missing stage dir stays missing, ok:false" state that
+    //      00176 eliminates. verifySetup STILL catches the gap (its check is
+    //      unchanged); the difference is that setup now acts on what it caught.
+    //  (c) What newly failed: `plans/review` is recreated by the idempotent
+    //      initProject pass, so `ok` is now true and `missing` no longer names
+    //      the directory.
     const dir = seedValidProject(freshDir());
     fs.rmSync(path.join(dir, 'plans', 'review'), { recursive: true, force: true });
     const setup = menu.ensureInitialized(dir);
-    assert.equal(setup.ok, false);
-    assert.ok(setup.missing.some((m) => m.includes('plans/review')),
-      `missing must name the directory, got ${JSON.stringify(setup.missing)}`);
+    assert.equal(setup.ok, true, `the gap must be repaired, missing: ${JSON.stringify(setup.missing)}`);
+    assert.ok(fs.existsSync(path.join(dir, 'plans', 'review')),
+      'the missing stage directory is recreated on disk');
+    assert.ok(setup.missingBefore.some((m) => m.includes('plans/review')),
+      `the pre-check still caught it, missingBefore: ${JSON.stringify(setup.missingBefore)}`);
   });
 
   it('11 — the success message makes no claim beyond what was verified', () => {
@@ -273,16 +297,28 @@ describe('the menu reports what initialization actually did', () => {
     assert.ok(claimsSetUp, 'and must say so');
   });
 
-  it('13 — an empty .ctoc directory is not "already set up"', () => {
-    // A directory that exists but is empty: the old marker check treated the
-    // bare presence of `.ctoc/` as proof the project was configured.
+  it('13 — an empty .ctoc directory is repaired, and the marker never stands in for proof', () => {
+    // CONTRACT INVERSION (plan 00176, 2026-07-21).
+    //  (a) Contract from OUTSIDE the test: the human-approved 00176 repair — an
+    //      empty `.ctoc/` is a repairable gap, not a permanent verdict.
+    //  (b) Why the prior assertion was wrong, not the code: it pinned the
+    //      INTERMEDIATE "empty `.ctoc/` → ok:false" state. Its PRINCIPLE — the
+    //      bare marker must never stand in for proof — is PRESERVED and made
+    //      stronger: instead of only refusing to trust the marker, setup now
+    //      creates the real proof (settings.yaml, state, stage dirs). The
+    //      pre-check (`missingBefore`) records that the marker alone was not
+    //      enough, exactly as the old assertion did.
+    //  (c) What newly failed: the empty `.ctoc/` repairs to ok:true, `missing`
+    //      is empty, and the message is the success sentence.
     const dir = freshDir();
     fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true });
     const setup = menu.ensureInitialized(dir);
-    assert.equal(setup.ok, false, 'an empty .ctoc is not a set-up project');
-    assert.ok(setup.missing.length >= 2, `expected several missing, got ${JSON.stringify(setup.missing)}`);
-    const message = menu.setupMessage(setup);
-    assert.ok(message && message.includes('.ctoc/settings.yaml'), `got: ${message}`);
+    assert.equal(setup.ok, true, 'the empty .ctoc is repaired into a set-up project');
+    assert.ok(setup.missingBefore.length >= 2,
+      `the marker alone was not proof — several artifacts were missing before: ${JSON.stringify(setup.missingBefore)}`);
+    assert.deepEqual(setup.missing, [], 'and none remain missing after the repair');
+    assert.equal(menu.setupMessage(setup), 'CTOC is set up for this project.',
+      'the message reports the genuine, read-back success');
   });
 
   it('14 — the failure message leaks no absolute path and no stack', () => {

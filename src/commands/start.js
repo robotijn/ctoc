@@ -714,15 +714,28 @@ function verifySetup(root) {
  * Auto-initialize CTOC for this project if it has not been set up yet, and
  * return a VERDICT about the result that was read back from the filesystem.
  *
- * Opening the menu is the signal that the user wants CTOC in this project, so
- * initialization happens automatically — there is no separate init command.
- * `initProject()` is idempotent and skips any file that already exists.
+ * THE RULE, learned the hard way: the trigger for setup is the READ-BACK, never
+ * the existence of a directory that any code can create. The dead end this
+ * repairs (created 2026-07-20 by the read-back slice, reported by a live user):
+ * the trigger was `!existsSync(path.join(root, '.ctoc'))`, so initialization was
+ * attempted ONLY when `.ctoc/` was entirely absent. But a Write hook
+ * (`PreToolUse.Write.js`, `appendLog`) creates `.ctoc/logs/` with
+ * `mkdirSync(..., { recursive: true })` BEFORE the human ever opens the menu. So
+ * `.ctoc/` existed, the trigger never fired again, the read-back correctly
+ * reported every artifact missing, and no code path anywhere fixed it: the
+ * project was permanently uninitialisable and the message was an honest dead end.
  *
- * The read-back runs on BOTH paths, not only after an attempt. A `.ctoc/`
- * directory that exists is not evidence the project is configured — an empty
- * one, or one holding a settings file whose compliance anchor the writer can
- * never target, is exactly the state that produced a silent failure weeks
- * later. It counts as missing NOW.
+ * The fix: attempt the idempotent `initProject` whenever the PRE-CHECK read-back
+ * reports anything missing — a bare or partial `.ctoc/` is repaired, not narrated
+ * forever. `initProject()` skips every file already present, so re-running it on
+ * a partial `.ctoc/` writes only the absent artifacts, and a healthy project
+ * (nothing missing) attempts nothing at all. A surface that reports a fixable
+ * problem must attempt the fix; a message that reports a failure the code never
+ * tried to avoid is narration.
+ *
+ * `missingBefore` is kept so a repair is PROVABLE from disk on both sides — a
+ * non-empty `missingBefore` with an empty `missing` is a repair that demonstrably
+ * happened — rather than inferred from what `initProject` claims it wrote.
  *
  * Fails open: a setup problem produces a MESSAGE, never a refusal to render.
  * A caught error is `attempted: true, ok: false` with the message in `reason` —
@@ -731,7 +744,8 @@ function verifySetup(root) {
  *
  * @param {string} [projectPath]
  * @returns {{ attempted: boolean, ok: boolean, created: string[],
- *   skipped: string[], failed: string[], missing: string[], reason: (string|null) }}
+ *   skipped: string[], failed: string[], missing: string[], reason: (string|null),
+ *   missingBefore: string[] }}
  */
 function ensureInitialized(projectPath) {
   const root = projectPath || process.cwd();
@@ -741,11 +755,14 @@ function ensureInitialized(projectPath) {
   let failed = [];
   let reason = null;
 
-  if (!safeFs.existsSync(path.join(root, '.ctoc'))) {
+  // The trigger is the read-back, never the mere presence of `.ctoc/`.
+  const missingBefore = verifySetup(root).missing;
+
+  if (missingBefore.length > 0) {
     attempted = true;
     try {
       const { initProject } = require('../lib/init-project');
-      const report = initProject(root);
+      const report = initProject(root);   // idempotent: skips every file already present
       // The report is KEPT. It records what was actually written; the read-back
       // below records what the world actually holds.
       if (report && Array.isArray(report.created)) created = report.created;
@@ -768,7 +785,30 @@ function ensureInitialized(projectPath) {
   }
 
   const { ok, missing } = verifySetup(root);
-  return { attempted, ok, created, skipped, failed, missing, reason };
+  return { attempted, ok, created, skipped, failed, missing, reason, missingBefore };
+}
+
+/**
+ * Strip the filesystem layout out of a reason before it reaches the screen.
+ *
+ * `reason` can carry an fs error string. The `failed`-path reason is already
+ * scrubbed at its source (`init-project.js` `reportableError` → `<project>` /
+ * `<home>`), but the catch-path reason is raw, so this is the belt-and-braces at
+ * the render seam: ABSOLUTE paths (POSIX and Windows) and any stack frame are
+ * removed and the result is length-bounded. RELATIVE display paths (e.g.
+ * `.ctoc/settings.yaml`) are deliberately preserved — they tell the human WHAT
+ * is wrong without leaking WHERE the project lives.
+ *
+ * @param {string} reason
+ * @returns {string}
+ */
+function sanitizeReason(reason) {
+  return String(reason)
+    .replace(/(^|[\s'"(])(\/[^\s'")]+|[A-Za-z]:\\[^\s'")]+)/g, '$1<path>')
+    .replace(/\s+at\s+\S+:\d+:\d+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
 }
 
 /**
@@ -777,6 +817,17 @@ function ensureInitialized(projectPath) {
  * Single source for both render sites (the interactive screen and the
  * non-interactive JSON screen) so the two can never drift into telling the same
  * person two different stories.
+ *
+ * THE HALF THIS SLICE ADDS (plan 00176): a failure message that reports a
+ * problem setup just TRIED and failed to fix must also say what to DO about it.
+ * An accurate message with no action is a dead end, and accuracy without an
+ * action is the half-fix this exists to complete. Every `!ok` branch therefore
+ * carries a concrete action — never a description alone.
+ *
+ * Wording is unchanged for the success case (Design A): after the read-back
+ * trigger, an attempt is made ONLY when something was missing, so `ok &&
+ * attempted` is always a project that is now genuinely set up — first-time setup
+ * and repair alike get the one honest sentence.
  *
  * @param {{ attempted: boolean, ok: boolean, missing: string[], reason?: (string|null) }} setup
  * @returns {string|null}
@@ -797,9 +848,17 @@ function setupMessage(setup) {
   // different problems). Absent when setup did not run or failed silently — the
   // sentence is then exactly what it was before.
   const why = (setup.attempted && typeof setup.reason === 'string' && setup.reason.length > 0)
-    ? ` Reason: ${setup.reason}.`
+    ? ` Reason: ${sanitizeReason(setup.reason)}.`
     : '';
-  return `${lead} Missing: ${list}.${why} Nothing here will work properly until that is fixed.`;
+  // The ACTION — always present on a failure, derived from `reason` where one
+  // exists, and honest about the absence of a cause where one does not. Once
+  // repair runs on every open, the realistic unrepairable cause is that CTOC
+  // cannot write to `.ctoc/` (a permission or ownership problem); where no cause
+  // was recorded, the action is to retry — never an invented reason.
+  const action = (typeof setup.reason === 'string' && setup.reason.length > 0)
+    ? ' To fix it, make sure CTOC can write to `.ctoc/` in this project (a permission or ownership problem is the usual cause), then reopen CTOC.'
+    : ' To fix it, reopen CTOC to run setup again; if the same paths stay missing, create them yourself.';
+  return `${lead} Missing: ${list}.${why} Nothing here will work properly until that is fixed.${action}`;
 }
 
 /**

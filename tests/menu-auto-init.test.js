@@ -49,17 +49,51 @@ describe('Menu auto-init — replaces the removed init command (v6.9.32)', () =>
     assert.ok(fs.existsSync(path.join(dir, 'plans')), 'plans/ directory was created');
   });
 
-  it('is a no-op when .ctoc/ already exists', () => {
+  it('is a no-op when the project is already fully set up', () => {
+    // CONTRACT INVERSION (plan 00176, 2026-07-21).
+    //  (a) Contract from OUTSIDE the test: the human-approved 00176 repair — the
+    //      setup trigger is the READ-BACK, and any missing artifact is REPAIRED,
+    //      not narrated. A bare `.ctoc/` (marker without artifacts) is a broken
+    //      world, so it now repairs to a set-up project.
+    //  (b) Why the prior assertion was wrong, not the code: it pinned an
+    //      INTERMEDIATE un-repaired state (`bare .ctoc/ → ok:false`) that 00176
+    //      deliberately eliminates. The PRINCIPLE it protected — a marker must
+    //      not stand in for proof — is PRESERVED and strengthened: real proof
+    //      (settings.yaml, state, stage dirs) is now created rather than merely
+    //      demanded. The no-op contract it also encoded ("an existing project is
+    //      left untouched") survives, re-pointed at a genuinely COMPLETE project,
+    //      which is the only state where "already initialized" is true.
+    //  (c) What newly failed: against the repair, a bare `.ctoc/` yields
+    //      attempted:true / created:non-empty / ok:true, inverting all three of
+    //      the old assertions. A healthy project keeps attempted:false /
+    //      created:[] / ok:true, so the mutant this guarded (re-init on every
+    //      open) stays dead.
+    fs.mkdirSync(path.join(dir, '.ctoc', 'state'), { recursive: true });
+    for (const s of ['vision', 'canvas', 'functional', 'implementation',
+      'todo', 'in-progress', 'review', 'done']) {
+      fs.mkdirSync(path.join(dir, 'plans', s), { recursive: true });
+    }
+    fs.writeFileSync(path.join(dir, '.ctoc', 'settings.yaml'),
+      'version: 1\n\nregulatory_regime:\n  active_profiles: []\n', 'utf8');
+    fs.writeFileSync(path.join(dir, '.ctoc', 'state', 'iron-loop.yaml'), 'step: 1\n', 'utf8');
+
+    const setup = ensureInitialized(dir);
+
+    assert.equal(setup.attempted, false, 'a fully set-up project is left untouched');
+    assert.deepEqual(setup.created, [], 'nothing was written');
+    assert.equal(setup.ok, true, 'and it reads back as set up');
+  });
+
+  it('repairs a bare .ctoc/ instead of treating the marker as proof', () => {
+    // The inverse half of the contract above: the bare `.ctoc/` that used to be
+    // reported as "not set up, forever" is now repaired on open (plan 00176).
     fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true });
 
     const setup = ensureInitialized(dir);
 
-    assert.equal(setup.attempted, false, 'an already-initialized project is left untouched');
-    assert.deepEqual(setup.created, [], 'nothing was written');
-    // The fixture is a BARE `.ctoc/` — the marker without the artifacts. The old
-    // boolean called that "initialized"; the verdict reads the world back and
-    // does not. Asserted here so the marker can never again stand in for proof.
-    assert.equal(setup.ok, false, 'an empty .ctoc/ is a marker, not a set-up project');
+    assert.equal(setup.attempted, true, 'a bare .ctoc/ is a repairable gap, not a set-up project');
+    assert.equal(setup.ok, true, `and the repair completes, missing: ${JSON.stringify(setup.missing)}`);
+    assert.ok(fs.existsSync(path.join(dir, '.ctoc', 'settings.yaml')), 'real proof is created on disk');
   });
 
   it('requiring start.js does not run the menu (importable without side effects)', () => {
