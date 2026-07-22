@@ -1,24 +1,26 @@
 /**
- * W06-s6 — Documented counts self-verify against live disk counts.
+ * Documented counts self-verify — but a GROWING tally polices its GENERATOR,
+ * while a FIXED contract still polices the hand-edited literal (plan 00215).
  *
- * Finding S7 (B-family): CLAUDE.md hard-codes component counts in prose
+ * ORIGINAL finding (S7, B-family): CLAUDE.md hard-codes component counts in prose
  * (test files, src/lib modules, hooks, tabs, agents, skills). Nothing checked
- * them against disk, so they rotted silently — "109 test files" and
- * "114 JS modules" both drifted while the suite stayed green.
+ * them against disk, so they rotted silently.
  *
- * This test parses each claimed number out of CLAUDE.md at test time and
- * compares it to a live count taken from disk at test time. NEITHER operand is
- * hard-coded here: hard-coding "259" would just relocate the drift (the same
- * duplicate-literal anti-pattern this workstream exists to kill). Because both
- * operands are computed at runtime, the test tracks the doc and the disk as
- * they change together.
+ * THE TAX (2026-07-21): asserting a hand-edited CLAUDE.md literal against live
+ * disk means every test-first build that adds a `.test.js` moves the live number,
+ * breaks this test, and must edit CLAUDE.md — a file it never declared. Eight
+ * builds paid that tax in one day.
  *
- * PAIRING: W06 owns only this RED tripwire. The doc correction that reconciles
- * the stale numbers is a CLAUDE.md edit OUTSIDE W06's test-only scope — nearest
- * owner W09 (release & metadata truth), with W04 (adds agents) and vision
- * workstream 11 (removes dead modules) also moving counted artifacts. This test
- * goes GREEN once those documented counts are corrected to match disk; it does
- * NOT edit CLAUDE.md.
+ * THE SPLIT (plan 00215):
+ *   - GROWING tallies (test files, src/lib modules, agents, skills) are GENERATED
+ *     into CLAUDE.md by release.js. Here they assert `computeDocCounts` — the ONE
+ *     source of truth release.js uses — equals an INDEPENDENT walk on disk. That
+ *     polices the generator and can NEVER break on adding a file.
+ *   - FIXED contracts (hooks, tabs) keep the exact-equality check of the CLAUDE.md
+ *     literal against disk: a change there is a real event that must be seen.
+ *
+ * The independent walks below (live*) are deliberately NOT computeDocCounts, so
+ * the growing-row assertions cross-check two implementations, not a tautology.
  */
 
 'use strict';
@@ -27,6 +29,8 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+
+const { computeDocCounts } = require('../src/lib/doc-counts');
 
 const ROOT = path.join(__dirname, '..');
 const CLAUDE_MD = fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8');
@@ -84,50 +88,41 @@ function documentedCount(regex) {
   return Number(m[1]);
 }
 
-// One row per documented count. `regex` captures the claimed integer; `live`
-// counts the same artifact on disk. Both operands are runtime-computed.
-const ROWS = [
-  {
-    label: 'test files (test command line: "Run all N test files")',
-    regex: /Run all (\d+) test files/,
-    live: liveTestFiles,
-  },
-  {
-    label: 'test files (project-structure line: "tests/  N test files")',
-    regex: /tests\/\s+(\d+) test files/,
-    live: liveTestFiles,
-  },
-  {
-    label: 'Claude Code hooks (src/hooks/*.js)',
-    regex: /(\d+) Claude Code hooks/,
-    live: liveHooks,
-  },
-  {
-    label: 'JS modules (src/lib/*.js)',
-    regex: /(\d+) JS modules/,
-    live: liveLibModules,
-  },
-  {
-    label: 'dashboard tab files (src/tabs/*.js)',
-    regex: /(\d+) dashboard tab files/,
-    live: liveTabs,
-  },
-  {
-    label: 'agent definitions (agents/**/*.md, excl. _shared)',
-    regex: /(\d+) agent definitions/,
-    live: liveAgents,
-  },
-  {
-    // Anchored to the "skills/" project-structure line so it does not match the
-    // unrelated "creating 5 skill files" example prose elsewhere in CLAUDE.md.
-    label: 'skill files (skills/**/*.md)',
-    regex: /skills\/\s+(\d+) skill files/,
-    live: liveSkills,
-  },
+// GROWING tallies — generated into CLAUDE.md by release.js. Each row asserts the
+// generator (computeDocCounts) equals an INDEPENDENT walk on disk; it never
+// parses the CLAUDE.md literal, so adding a file can never break it. `field` is
+// the computeDocCounts key; `live` is this file's own independent oracle.
+const GROWING_ROWS = [
+  { label: 'test files (computeDocCounts.testFiles)', field: 'testFiles', live: liveTestFiles },
+  { label: 'JS modules src/lib (computeDocCounts.libModules)', field: 'libModules', live: liveLibModules },
+  { label: 'agent definitions excl. _-segments (computeDocCounts.agents)', field: 'agents', live: liveAgents },
+  { label: 'skill files skills/**/*.md (computeDocCounts.skills)', field: 'skills', live: liveSkills },
 ];
 
-describe('CLAUDE.md documented counts self-verify against live disk counts', () => {
-  for (const row of ROWS) {
+// FIXED contracts — the CLAUDE.md literal is policed exactly against disk, so a
+// change (a new hook, a new dashboard tab) surfaces as a RED test, never a silent
+// tally that drifts. `regex` captures the claimed integer from CLAUDE.md.
+const FIXED_ROWS = [
+  { label: 'Claude Code hooks (src/hooks/*.js)', regex: /(\d+) Claude Code hooks/, live: liveHooks },
+  { label: 'dashboard tab files (src/tabs/*.js)', regex: /(\d+) dashboard tab files/, live: liveTabs },
+];
+
+describe('growing counts: the GENERATOR matches an independent disk walk', () => {
+  const generated = computeDocCounts(ROOT);
+  for (const row of GROWING_ROWS) {
+    it(`${row.label}: computeDocCounts equals live disk count`, () => {
+      const live = row.live();
+      assert.equal(
+        generated[row.field],
+        live,
+        `${row.label}: computeDocCounts ${generated[row.field]}, live ${live}`,
+      );
+    });
+  }
+});
+
+describe('fixed contracts: the CLAUDE.md literal is policed exactly against disk', () => {
+  for (const row of FIXED_ROWS) {
     it(`${row.label}: documented count equals live disk count`, () => {
       const documented = documentedCount(row.regex);
       const live = row.live();
