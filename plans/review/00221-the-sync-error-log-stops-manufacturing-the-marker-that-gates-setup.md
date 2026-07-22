@@ -236,3 +236,28 @@ the append/reset/coerce arms covered. No new dark branch, so the 99 floor holds.
 5. **A bare, empty `.ctoc/` still receives the diagnostic (L3 variant).** The rule
    is "do not CREATE the marker", not "judge project health" — one owner for that
    judgement (setup). Same call 00177 made three times.
+
+## Decisions Taken During Execution
+
+### The seam was a plain recursive `mkdirSync`, no durable-log layer
+The recursive-recreate seam the previous two marker-door fixes hit is ABSENT here.
+`safeFs.mkdirSync`/`writeFileSync` are thin validation wrappers that delegate
+straight to `fs` (no `path.dirname` re-creation), so the marker fabrication was the
+single line `safeFs.mkdirSync(logDir, { recursive: true })` at `:149`, where
+`logDir` is `process.cwd()/.ctoc/logs`. The guard is therefore a plain early
+`return` before that line — no deeper layer needed. Verified against the current
+`src/lib/safe-fs.js` on disk.
+
+### The false-negative guard was proven by exporting first, then guarding
+The export (Change 2) was applied BEFORE the guard (Change 1) so L1 could be
+observed genuinely RED against the still-fabricating body: `1` red, with `.ctoc/`
+actually created (`actual: true`). After the guard, all `51` targeted tests pass.
+L2/L3/L4 were green before the guard too — each is an already-correct behaviour of
+the old code (real project persists, leaf still created, hostile-file swallowed),
+not vacuous; they now lock behaviour preservation.
+
+### No plan corrections
+Every cited line matched the current code (`logError` at `:145-162`, call sites at
+`:208`/`:212`/`:218`, exports at `:228`). `logError` has no caller outside `main()`.
+`makeFixture` always creates `.ctoc/logs`+`.ctoc/state`, so B3-B5 stayed byte-for-byte
+green. No fixture outside the grant depended on the fabrication.

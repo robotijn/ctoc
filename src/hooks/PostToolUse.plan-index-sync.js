@@ -140,13 +140,31 @@ function loadWiring(root) {
 
 /**
  * Best-effort error log to `.ctoc/logs/plan-index-sync.json`. Never throws.
+ *
+ * This is the FOURTH of the four best-effort log producers slice 00177 identified
+ * (the sync ERROR path; 00177 fixed the sync DESTINATION and the two on the Write
+ * hook path). A best-effort diagnostic must NEVER manufacture the `.ctoc/` marker:
+ * a fabricated `.ctoc/` is read by setup and by the private root resolvers as proof
+ * a project exists, leaving it permanently half-initialised (a live user hit this).
+ * So write only into a `.ctoc/` that ALREADY exists; create only the `logs/` leaf
+ * beneath it, never the parent marker.
+ *
+ * The `process.cwd()` base is deliberately KEPT and made harmless by the existence
+ * guard, following 00177's own precedent for the sibling `appendLog` fallback —
+ * re-routing this to the plan's resolved root (correct on a symlinked/multi-root
+ * session) is a separate, unshipped improvement, not this marker-manufacturing fix.
+ *
  * @param {Error} err
  */
 function logError(err) {
   try {
     const safeFs = require('../lib/safe-fs');
-    const logDir = path.join(process.cwd(), '.ctoc', 'logs');
-    if (!safeFs.existsSync(logDir)) safeFs.mkdirSync(logDir, { recursive: true });
+    // Never manufacture the marker that gates setup: write only into an existing
+    // `.ctoc/`, and return WITHOUT touching the filesystem when it is absent.
+    const ctocDir = path.join(process.cwd(), '.ctoc');
+    if (!safeFs.existsSync(ctocDir)) return;      // nothing to log INTO — never CREATE
+    const logDir = path.join(ctocDir, 'logs');
+    if (!safeFs.existsSync(logDir)) safeFs.mkdirSync(logDir, { recursive: true }); // LEAF only
     const logPath = path.join(logDir, 'plan-index-sync.json');
     let log = [];
     if (safeFs.existsSync(logPath)) {
@@ -225,4 +243,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { isPlanMd, resolveSyncLogDir };
+module.exports = { isPlanMd, resolveSyncLogDir, logError };

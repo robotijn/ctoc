@@ -50,7 +50,7 @@ const HOOK_PATH = path.join(__dirname, '..', 'src', 'hooks', 'PostToolUse.plan-i
 // Layer A — in-process isPlanMd(): the sync-vs-no-op DECISION. Directly exported.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { isPlanMd } = require(HOOK_PATH);
+const { isPlanMd, logError } = require(HOOK_PATH);
 
 // String inputs. Each row's `kills` names the mutation that would flip it green.
 const STRING_ROWS = [
@@ -100,6 +100,92 @@ for (const row of NON_STRING_ROWS) {
     assert.equal(actual, false, `non-string ${row.id} must never trigger a sync`);
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Layer A2 — in-process logError(): the sync ERROR log's DESTINATION guard.
+//
+// The fourth of the four best-effort log producers slice 00177 identified must NEVER
+// manufacture the `.ctoc/` marker that gates project setup. `logError` anchors on
+// `process.cwd()` by design (see the plan's scope note), so these cases drive it by
+// `process.chdir`-ing into a per-test tmp dir and restoring cwd in `finally` so no
+// change leaks into a sibling test. Fixtures live under os.tmpdir() and are removed in
+// `finally`. No permission fixtures (a skip is a gate failure); L4 uses a
+// file-where-a-directory-is-expected for the hostile-destination case.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function mkLogErrTmp() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'pt-pis-le-'));
+}
+
+// L1 — the reproduction: an error log in an un-initialised directory manufactures NO
+// marker. MUST be red against the unfixed logError (which mkdirSyncs cwd/.ctoc/logs
+// recursively, creating .ctoc/). It is the false-negative guard for the whole slice.
+test('L1_logError_in_uninitialised_dir_creates_no_marker [the reproduction — red before the guard]', () => {
+  const dir = mkLogErrTmp();
+  const savedCwd = process.cwd();
+  try {
+    process.chdir(dir);
+    assert.doesNotThrow(() => logError(new Error('boom')), 'a best-effort log must never throw');
+    assert.equal(fs.existsSync(path.join(dir, '.ctoc')), false,
+      'a diagnostic in a project with no .ctoc/ must NOT fabricate the marker that gates setup');
+  } finally {
+    process.chdir(savedCwd);
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort */ }
+  }
+});
+
+// L2 — a real project (with .ctoc/) still gets its diagnostic persisted.
+test('L2_logError_in_real_project_persists_the_diagnostic [best-effort log preserved]', () => {
+  const dir = mkLogErrTmp();
+  const savedCwd = process.cwd();
+  try {
+    fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true });
+    process.chdir(dir);
+    logError(new Error('boom'));
+    const logPath = path.join(dir, '.ctoc', 'logs', 'plan-index-sync.json');
+    assert.equal(fs.existsSync(logPath), true, 'the diagnostic is persisted in a real project');
+    const log = JSON.parse(fs.readFileSync(logPath, 'utf8'));
+    assert.ok(Array.isArray(log) && log.length >= 1, 'the log is a non-empty array');
+    const last = log[log.length - 1];
+    assert.equal(last.error, 'boom', 'the last entry names the error');
+    assert.equal(last.source, 'PostToolUse.plan-index-sync', 'the last entry names the source');
+  } finally {
+    process.chdir(savedCwd);
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort */ }
+  }
+});
+
+// L3 — the narrowing is to the PARENT marker only: the logs/ LEAF is still created
+// beneath an existing .ctoc/.
+test('L3_logError_creates_the_logs_leaf_under_an_existing_parent [leaf still created]', () => {
+  const dir = mkLogErrTmp();
+  const savedCwd = process.cwd();
+  try {
+    fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true }); // parent exists, no logs/ yet
+    process.chdir(dir);
+    logError(new Error('boom'));
+    const logPath = path.join(dir, '.ctoc', 'logs', 'plan-index-sync.json');
+    assert.equal(fs.existsSync(logPath), true, 'the logs/ leaf IS created under an existing .ctoc/ parent');
+  } finally {
+    process.chdir(savedCwd);
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort */ }
+  }
+});
+
+// L4 — still best-effort on a hostile destination: .ctoc exists as a FILE, not a dir.
+test('L4_logError_stays_best_effort_when_ctoc_is_a_file [no throw on a hostile destination]', () => {
+  const dir = mkLogErrTmp();
+  const savedCwd = process.cwd();
+  try {
+    fs.writeFileSync(path.join(dir, '.ctoc'), 'not a directory'); // .ctoc is a FILE
+    process.chdir(dir);
+    assert.doesNotThrow(() => logError(new Error('boom')), 'a hostile destination must be swallowed, not thrown');
+    assert.equal(fs.statSync(path.join(dir, '.ctoc')).isFile(), true, '.ctoc is left as the file it was');
+  } finally {
+    process.chdir(savedCwd);
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort */ }
+  }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Layer B — subprocess harness: spawn the REAL hook with a module-interception shim.
