@@ -13,8 +13,36 @@ priority: CRITICAL
 program: resolution-and-setup-tell-the-truth
 iron_loop: true
 files:
-  - "src/commands/menu.js"
+  - "src/commands/start.js"
   - "tests/menu-repairs-what-it-reports-missing.test.js"
+  - "CLAUDE.md"
+  - "tests/menu-reports-what-init-did.test.js"
+  - "tests/menu-auto-init.test.js"
+  - "tests/menu-coverage.test.js"
+scope_extension:
+  authorized_by: human
+  authorized_at: 2026-07-21
+  reason: >
+    Filename correction + count bump. The plan declared src/commands/menu.js,
+    which no longer exists: the command was renamed menu.js -> start.js this
+    session (v6.13.7), and the whole setup body (ensureInitialized, verifySetup,
+    setupMessage, the "Nothing here will work properly" message, the
+    fails-open-to-a-message comment) lives in start.js. The executor verified the
+    defect is real and present at start.js:744 (init attempted only when .ctoc/ is
+    entirely absent), refused to touch a file outside its literal grant, and
+    refused to alias a non-existent path. Corrected the target and added CLAUDE.md
+    for the test-file-count bump (448 -> 449) that adding this plan's test file
+    forces.
+    CONTRACT-INVERSION AUTHORIZED (human, 2026-07-21, Design A): the repair makes
+    a bare/partial .ctoc/ end up genuinely set up (real artifacts created), which
+    inverts seven assertions across three sibling test files that a prior shipped
+    fix set (a bare .ctoc/ reads "not set up"). The prior fix's PRINCIPLE survives
+    — the marker no longer stands in for proof because real proof is now created —
+    but its intermediate-state assertions flip. The human chose to invert them
+    (each with the three-part justification) over narrowing the repair, which
+    would reopen the setup dead end. Message wording unchanged ("CTOC is set up
+    for this project") to touch the fewest tests. Grant extended to the three
+    sibling files so the inversions are in-scope.
 ---
 
 # An honest message with no way out is half a fix
@@ -308,3 +336,61 @@ after its own plan got this wrong.
     up front rather than discovered later.** The sentinel makes it a no-op after
     the first install, and consent for it remains an open item from the sibling
     plan.
+
+### Decisions taken during execution (Steps 8-16)
+
+11. **The declared file was stale: the whole setup body lives in
+    `src/commands/start.js`, not `src/commands/menu.js`.** The plan predated the
+    `menu.js` → `start.js` rename (the `/ctoc:menu` → `/ctoc:start` command
+    rename, `v6.13.7`). `menu.js` does not exist on disk; `ensureInitialized`,
+    `verifySetup`, `setupMessage`, `complianceAnchorUsable` and the "Nothing here
+    will work properly" message are all in `start.js`. The trigger the plan cites
+    at `:725` was confirmed present in the landed code as the
+    `!safeFs.existsSync(path.join(root, '.ctoc'))` guard. The grant was
+    re-stamped by the human to point at `start.js` before any edit.
+
+12. **Design A wording was chosen over the plan's "CTOC finished setting up"
+    branch, by human decision.** Under the read-back trigger, `attempted` is true
+    ONLY when something was missing, so every `ok && attempted` outcome is a
+    repair — the plan's four-state message table collapses, and a distinct
+    "finished setting up" sentence would additionally break two existing
+    assertions that pin the success wording (`menu-coverage` line `819` and
+    `menu-reports` case `12`). `ok && attempted` therefore keeps the single honest
+    sentence `CTOC is set up for this project.` for first-time setup and repair
+    alike, and those two assertions did NOT need inverting.
+
+13. **The repair inverts a deliberately-established contract in three sibling test
+    files, not the one the plan named — surfaced, authorized, then inverted with
+    justification.** The sibling slice pinned "a bare `.ctoc/` is a marker, not a
+    set-up project → `ok:false`, no re-init" as a hard contract. The repair makes
+    that identical fixture repair to `ok:true`, so five cases across
+    `tests/menu-reports-what-init-did.test.js` (`7`, `10`, `13`),
+    `tests/menu-auto-init.test.js` (the no-op case) and `tests/menu-coverage.test.js`
+    (the "kills init-always mutant" case) had to invert. Each carries the
+    three-part justification inline: the contract from outside the test is the
+    human-approved `00176` repair; the prior assertion pinned an intermediate
+    un-repaired state `00176` eliminates while its PRINCIPLE (a marker must not
+    stand in for proof) is preserved and strengthened by creating real proof; and
+    the named cases newly fail. The two "no re-init" guards were RE-POINTED at a
+    fully-seeded healthy project (which still yields `attempted:false`,
+    `created:[]`) so their intent survives and the init-always mutant stays dead —
+    they were not deleted. The plan's Step 11 claim that the sibling file "still
+    passes unchanged" was wrong and is corrected here.
+
+14. **`missingBefore` was added to the verdict shape; no other field changed.**
+    It makes a repair provable from disk on both sides (non-empty `missingBefore`
+    with empty `missing`), per decision `6`. Existing consumers read the same
+    fields they always did.
+
+15. **`reason` is sanitized at the render seam by `sanitizeReason`, not only at
+    its source.** The `failed`-path reason is already scrubbed inside
+    `init-project.js`, but the catch-path reason is raw. `sanitizeReason` strips
+    absolute POSIX and Windows paths and any stack frame and bounds the result to
+    `200` characters, while PRESERVING relative display paths like
+    `.ctoc/settings.yaml` — they name WHAT is wrong without leaking WHERE.
+
+16. **The fail-open failure message always carries an action.** With a recorded
+    `reason` the action names the realistic unrepairable cause (CTOC cannot write
+    to `.ctoc/` — a permission or ownership problem) and says to reopen CTOC; with
+    no recorded cause it says to reopen CTOC to retry rather than inventing one.
+    No `!ok` branch produces a description alone.
