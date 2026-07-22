@@ -15,6 +15,8 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
+const { computeDocCounts } = require('../src/lib/doc-counts');
+
 const ROOT = path.join(__dirname, '..');
 const README = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
 const CLAUDE_MD = fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8');
@@ -110,8 +112,12 @@ function countQualityConfigs() {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('Ground truth — project counts (sanity checks)', () => {
-  it('agents/: 124 .md files (excluding _shared/; 128 minus the 5 Tier-3 scouts deleted by F3b)', () => {
-    assert.equal(countAgentMdFiles(), 124);
+  // GROWING tally (plan 00215): agents rise with normal work. Track the generator
+  // (computeDocCounts.agents) instead of a frozen literal, so adding an agent never
+  // taxes an undeclared CLAUDE.md edit. Still a real cross-check: this file's own
+  // independent walk must equal the one source of truth release.js uses.
+  it('agents/: countAgentMdFiles equals computeDocCounts.agents (grows with the project)', () => {
+    assert.equal(countAgentMdFiles(), computeDocCounts(ROOT).agents);
   });
 
   it('agents/: 24 categories (+safety, +legal, +realtime, CU5; -scouts, deleted by F3b)', () => {
@@ -127,12 +133,14 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(count >= 99, `expected >= 99 SKILL.md, got ${count}`);
   });
 
-  it('skills/: total .md count is in v6.9.27+ range (413 → 421 after 8 cross-industry-critique skill adds)', () => {
-    const total = countAllSkillMd();
-    assert.ok(total >= 410 && total <= 430, `expected 410-430 .md files in skills/, got ${total}`);
+  // GROWING tally (plan 00215): total skill .md files rise with normal work. The
+  // old arbitrary 410–430 window is replaced by tracking the generator exactly, so
+  // the count is never a hand-picked range and a skill add never taxes CLAUDE.md.
+  it('skills/: countAllSkillMd equals computeDocCounts.skills (grows with the project)', () => {
+    assert.equal(countAllSkillMd(), computeDocCounts(ROOT).skills);
   });
 
-  it('src/lib/: 109 JS modules at top level (human-facing-scan.js — the fence that keeps a gate number off a screen)', () => {
+  it('src/lib/: top-level JS module count tracks computeDocCounts.libModules (109 today, grows)', () => {
     // 104 → 105: `src/lib/approval-residency.js` was extracted out of
     // `src/hooks/human-gate-check.js` so `src/lib/plan-coverage.js` could consult the
     // SAME approval predicate — a library may not require a hook, and a second
@@ -159,8 +167,10 @@ describe('Ground truth — project counts (sanity checks)', () => {
     // PARSES every screen-producing module (a text search cannot see the composed
     // shape) and fails the build when a gate number reaches a person, and it defends
     // its own registry against rot by detecting both screen contracts.
-    // This is the live disk count, raised because the disk changed.
-    assert.equal(countTopLevelJs("src/lib"), 109);
+    // GROWING tally (plan 00215): src/lib modules rise with normal work. Track the
+    // generator (computeDocCounts.libModules) — release.js writes this number into
+    // CLAUDE.md — instead of a frozen literal a module add would have to hand-edit.
+    assert.equal(countTopLevelJs('src/lib'), computeDocCounts(ROOT).libModules);
   });
 
   it('src/commands/: 3 slash command specs — menu, push, update (v6.9.32)', () => {

@@ -27,6 +27,7 @@
 
 const safeFs = require('../lib/safe-fs');
 const path = require('path');
+const { computeDocCounts } = require('../lib/doc-counts');
 
 const ROOT = process.env.CTOC_RELEASE_ROOT
   ? path.resolve(process.env.CTOC_RELEASE_ROOT)
@@ -73,6 +74,20 @@ const VERSION_UPDATES = [
     pattern: /getVersion\(\)\s+\/\/\s*→\s*'\d+\.\d+\.\d+'/,
     replacement: (v) => `getVersion()       // → '${v}'`
   }
+];
+
+// The GROWING doc counts release.js keeps true in CLAUDE.md (plan 00215). Each
+// entry names a computeDocCounts field and a LINE-TARGETED pattern that captures
+// the prose around the integer, so only the number is rewritten — never a
+// structural change, exactly like the version replacements above. FIXED contracts
+// (slash commands, hooks, tabs) are deliberately NOT here: a change to those is a
+// real event that stays policed by exact-equality tests, never auto-rewritten.
+const COUNT_UPDATES = [
+  { field: 'testFiles', label: 'testFiles', pattern: /(Run all )\d+( test files)/ },
+  { field: 'testFiles', label: 'testFiles', pattern: /(tests\/\s+)\d+( test files)/ },
+  { field: 'libModules', label: 'libModules', pattern: /(lib\/\s+)\d+( JS modules)/ },
+  { field: 'agents', label: 'agents', pattern: /(agents\/\s+)\d+( agent definitions)/ },
+  { field: 'skills', label: 'skills', pattern: /(skills\/\s+)\d+( skill files)/ },
 ];
 
 /**
@@ -234,6 +249,61 @@ function updateVersionInFiles(version, root = ROOT) {
 }
 
 /**
+ * Rewrite the GROWING doc-count lines in CLAUDE.md to the live values, so no
+ * human or executor ever hand-edits them (plan 00215). Only the integer on each
+ * matched line changes. A count line that is EXPECTED but ABSENT is recorded as a
+ * NAMED failure — never a silent no-op — because a generator whose whole job is to
+ * keep a number true must fail loud when it cannot find the line to keep true.
+ *
+ * @param {string} [root] - project root (used to compute the live counts)
+ * @param {{ counts?: object, claudeMdPath?: string }} [opts]
+ *   `counts` overrides the computed counts; `claudeMdPath` overrides the target
+ *   (a test drives a COPY in os.tmpdir(), never the real CLAUDE.md).
+ * @returns {{ updated: string[], failures: string[] }}
+ */
+function updateDocCountsInClaudeMd(root = ROOT, { counts, claudeMdPath } = {}) {
+  const resolved = counts || computeDocCounts(root);
+  const filePath = claudeMdPath || path.join(root, 'CLAUDE.md');
+  const updated = [];
+  const failures = [];
+
+  if (!safeFs.existsSync(filePath)) {
+    console.log('  Skip: CLAUDE.md (not found)');
+    return { updated, failures };
+  }
+
+  let content = safeFs.readFileSync(filePath, 'utf8');
+  const original = content;
+
+  for (const update of COUNT_UPDATES) {
+    const n = resolved[update.field];
+    let matched = false;
+    content = content.replace(update.pattern, (_m, before, after) => {
+      matched = true;
+      return `${before}${n}${after}`;
+    });
+    if (!matched) {
+      console.error(`  ERROR: CLAUDE.md count line for ${update.label} not found`);
+      failures.push(`CLAUDE.md (${update.label} line not found)`);
+    }
+  }
+
+  if (content !== original) {
+    try {
+      atomicWriteFileSync(filePath, content);
+    } catch (err) {
+      console.error(`  ERROR: CLAUDE.md count sync write failed: ${err.message}`);
+      failures.push('CLAUDE.md');
+      return { updated, failures };
+    }
+    updated.push('CLAUDE.md');
+    console.log('  Updated doc counts: CLAUDE.md');
+  }
+
+  return { updated, failures };
+}
+
+/**
  * Run the release sync. Returns a process exit code: 0 on full success, 1 if
  * the version could not be read or any target failed to sync (failing file
  * names are printed to stderr).
@@ -262,6 +332,9 @@ function main(root = ROOT) {
   console.log('\nUpdating version references in docs...');
   failures.push(...updateVersionInFiles(version, root).failures);
 
+  console.log('\nSyncing documented growing counts in CLAUDE.md...');
+  failures.push(...updateDocCountsInClaudeMd(root).failures);
+
   if (failures.length > 0) {
     console.error(
       `Release failed: could not sync ${failures.length} file(s): ${failures.join(', ')}`
@@ -277,10 +350,12 @@ module.exports = {
   getVersion,
   updateJsonVersionFiles,
   updateVersionInFiles,
+  updateDocCountsInClaudeMd,
   atomicWriteFileSync,
   main,
   JSON_VERSION_FILES,
-  VERSION_UPDATES
+  VERSION_UPDATES,
+  COUNT_UPDATES
 };
 
 if (require.main === module) {

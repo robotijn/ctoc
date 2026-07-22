@@ -1,0 +1,9 @@
+{
+  "content_sha256": "27ec189995ff38b18583a1ee68ffcd1a7b502032aa0fd5d6db7ec1a75ca6d105",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-22T10:54:30.625Z",
+  "approved_by": "human",
+  "plan_basename": "00215-the-growing-counts-generate-themselves-instead-of-taxing-every-build"
+}
