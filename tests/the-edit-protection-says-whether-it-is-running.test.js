@@ -44,7 +44,15 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * @returns {string} absolute path to a fresh temp directory
  */
 function makeRoot() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-liveness-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-liveness-'));
+  // A project that HAS an enforcement log is an initialised project — it has the
+  // `.ctoc/` marker. Model that: `logEnforcement` (slice 00220) no longer
+  // manufactures `.ctoc/`, so a fixture that wants a real log must supply the
+  // marker a real project already has. This tightens the fixture toward reality;
+  // it weakens no assertion. The `.ctoc/logs`-creating cases stay idempotent
+  // (recursive mkdir), and case 8 works once mintDecision writes the leaf again.
+  fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true });
+  return dir;
 }
 
 /**

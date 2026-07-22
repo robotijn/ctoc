@@ -147,3 +147,126 @@ describe('enforcement-log — lossless durable append (W11-s2 / M1)', () => {
     console.log('# round-trip: entry read back with timestamp');
   });
 });
+
+/**
+ * The enforcement log never manufactures the project marker (slice 00220).
+ *
+ * A best-effort audit write must NOT create `.ctoc/` when it does not already
+ * exist — a fabricated `.ctoc/` is read by setup and by the private root
+ * resolvers as proof the project exists, leaving it permanently half-initialised.
+ * This is the third of the four `.ctoc/logs` marker producers 00177 identified.
+ *
+ * These cases deliberately do NOT reuse the shared `beforeEach` above (which
+ * pre-creates `.ctoc/`): each builds its own tmp root in the exact state under
+ * test. No permission fixtures, no writes to the real repo root — the
+ * un-initialised world is built by simply NOT creating `.ctoc/`.
+ */
+describe('enforcement-log — never manufactures the project marker (00220)', () => {
+  let enforcementLog;
+  const roots = [];
+
+  beforeEach(() => {
+    delete require.cache[MODULE_PATH];
+    enforcementLog = require('../src/lib/enforcement-log.js');
+  });
+
+  afterEach(() => {
+    while (roots.length) {
+      const r = roots.pop();
+      fs.rmSync(r, { recursive: true, force: true });
+    }
+  });
+
+  const freshRoot = () => {
+    const r = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-enflog-00220-'));
+    roots.push(r);
+    return r;
+  };
+
+  test('5. a log write in an un-initialised directory creates no marker', () => {
+    const root = freshRoot(); // NO .ctoc/ — a fresh, un-initialised checkout
+    assert.ok(!fs.existsSync(path.join(root, '.ctoc')), 'precondition: no .ctoc/');
+
+    const result = enforcementLog.logEnforcement(
+      { tool: 'Write', target_file: 'plans/todo/x.md', outcome: 'whitelist' },
+      root
+    );
+
+    assert.ok(
+      !fs.existsSync(path.join(root, '.ctoc')),
+      '.ctoc/ MUST NOT be manufactured by a best-effort audit write'
+    );
+    assert.deepStrictEqual(enforcementLog.readLog(root), [], 'nothing was persisted');
+    assert.strictEqual(result, null, 'the skipped write returns null (best-effort no-op)');
+    console.log('# 00220: un-initialised dir gets no .ctoc/ from a log write');
+  });
+
+  test('6. the human\'s enforcement decision is unaffected (no throw)', () => {
+    const root = freshRoot(); // NO .ctoc/
+    // The caller in PreToolUse.Edit.js wraps this best-effort; a skip must never
+    // surface as a throw that would interfere with the allow/block outcome.
+    assert.doesNotThrow(() => {
+      enforcementLog.logEnforcement(
+        { tool: 'Edit', target_file: 'src/foo.js', outcome: 'block' },
+        root
+      );
+    }, 'an audit-log skip must not throw');
+    console.log('# 00220: audit skip never interferes with the enforcement outcome');
+  });
+
+  test('7. a real project still gets its log (fix is not over-narrow)', () => {
+    const root = freshRoot();
+    fs.mkdirSync(path.join(root, '.ctoc'), { recursive: true }); // an initialised project
+
+    enforcementLog.logEnforcement(
+      { tool: 'Write', target_file: 'src/bar.js', outcome: 'block' },
+      root
+    );
+
+    const entries = enforcementLog.readLog(root);
+    assert.strictEqual(entries.length, 1, 'the entry is appended in a real project');
+    assert.strictEqual(entries[0].outcome, 'block');
+    assert.ok(typeof entries[0].timestamp === 'string', 'timestamp present');
+    console.log('# 00220: an initialised project still records its audit entry');
+  });
+
+  test('8. the leaf logs/ is created under an existing .ctoc/ parent', () => {
+    const root = freshRoot();
+    fs.mkdirSync(path.join(root, '.ctoc'), { recursive: true }); // parent exists, NO logs/ leaf
+    assert.ok(!fs.existsSync(path.join(root, '.ctoc', 'logs')), 'precondition: no logs/ leaf');
+
+    enforcementLog.logEnforcement({ tool: 'Edit', outcome: 'allow' }, root);
+
+    const logFile = path.join(root, '.ctoc', 'logs', 'enforcement.json');
+    assert.ok(fs.existsSync(logFile), 'the leaf .ctoc/logs/enforcement.json is created');
+    const entries = enforcementLog.readLog(root);
+    assert.strictEqual(entries.length, 1, 'the entry is present under the created leaf');
+    console.log('# 00220: leaf logs/ is created beneath an existing marker');
+  });
+
+  test('9. a bad root never throws and never manufactures anything', () => {
+    // With a falsy root, current main resolves the destination against the process
+    // working directory. Run this inside an isolated tmp cwd so the reproduction
+    // can never write into the real repo root, and so we can observe whether a
+    // `.ctoc/` is fabricated under cwd.
+    const cwdSandbox = freshRoot();
+    const originalCwd = process.cwd();
+    process.chdir(cwdSandbox);
+    try {
+      for (const badRoot of ['', undefined]) {
+        let result;
+        assert.doesNotThrow(() => {
+          result = enforcementLog.logEnforcement({ tool: 'Edit', outcome: 'allow' }, badRoot);
+        }, `a bad root (${JSON.stringify(badRoot)}) must not throw`);
+        assert.strictEqual(result, null, 'a bad root returns null');
+      }
+      assert.ok(
+        !fs.existsSync(path.join(cwdSandbox, '.ctoc')),
+        'a bad root must never fabricate .ctoc/ under the process working directory'
+      );
+    } finally {
+      process.chdir(originalCwd);
+    }
+    console.log('# 00220: a bad root is a total no-op, no .ctoc/ anywhere');
+  });
+});
