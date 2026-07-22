@@ -1,0 +1,9 @@
+{
+  "content_sha256": "50b0d5fba8b1ad0ee7489ac2a8316ceed93d89cdbd5ae729ffd9f1b693b86b99",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-22T12:10:26.334Z",
+  "approved_by": "human",
+  "plan_basename": "00220-the-enforcement-log-stops-manufacturing-the-marker-that-gates-setup"
+}

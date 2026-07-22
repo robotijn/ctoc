@@ -1,0 +1,9 @@
+{
+  "content_sha256": "6c88e563ab9723b38f832d06234f33f49a4d0bd6e7194f31a8d95c5b9a20f182",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-22T12:10:26.303Z",
+  "approved_by": "human",
+  "plan_basename": "00216-an-orphaned-in-progress-plan-is-recovered-to-todo-when-its-builder-is-gone"
+}
