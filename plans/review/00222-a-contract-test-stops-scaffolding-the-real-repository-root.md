@@ -260,3 +260,32 @@ Cross-platform: `path.join`, `os.tmpdir()`, `fs.rmSync` teardown, no shell.
    `IRON_LOOP.md` is copied UNRENDERED while `CLAUDE.md` is rendered) is reported,
    not fixed here — changing init's rendering is a different decision for the
    operator to schedule.
+
+## Decisions Taken During Execution
+
+### The leak was reproduced exactly as the plan predicted
+With the gitignored `.ctoc/state/iron-loop.yaml` moved aside (a fresh-checkout
+condition), the UNCHANGED test 4 passed but left `?? IRON_LOOP.md` in the working
+tree, first line the unrendered `# {{PROJECT_NAME}} — Iron Loop`. Every cited line
+(`init-project.js:795-804`, `start.js:917` `ensureInitialized`, `:613`
+`REQUIRED_STATE`, `.gitignore:6`) verified against current disk — nothing in the
+plan was wrong.
+
+### The new guard was proven non-vacuous by mutation
+Holding the new before/after guard in place but flipping the spawn `cwd` back to
+`REPO` with the state file absent made the guard FAIL with exactly `spawning
+start.js must not scaffold IRON_LOOP.md into the repository root` (`pass 0` /
+`fail 1`). Restoring `cwd: tmpProject` makes it green even with the state file
+absent — the condition that caused the leak.
+
+### Fixture-completeness is asserted directly
+The plan's optional tightening (Test Plan row `4`) is included: the test also asserts
+no `IRON_LOOP.md` under `tmpProject`, proving the seeded fixture is genuinely
+complete so `ensureInitialized()` is a true no-op that writes nothing anywhere.
+
+### Verify was clean at the enforced floor
+`npm test` PASS: `tests 10401`, `pass 10401`, `fail 0`, `skipped 0`; coverage
+`99.01%` at threshold `99%` (the thin margin untouched); `eslint --max-warnings 0`
+exit `0`; false-green, both reachability, and gate-word fences green. After the full
+suite `git status --porcelain` showed only the one modified test file — no stray
+`IRON_LOOP.md`, no untracked artifact.
