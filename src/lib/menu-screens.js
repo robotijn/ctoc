@@ -434,6 +434,60 @@ function renderWedgeReports(report) {
 }
 
 /**
+ * Render the plan-recovery pass's outcome as dashboard lines the human READS.
+ *
+ * 00216 re-queues a dead-builder orphan (in-progress → todo) and surfaces a
+ * still-quarantined staleness orphan, but did so SILENTLY — `recoverOrphanedPlans`'s
+ * return was discarded, so a plan was moved and the human saw nothing. This is that
+ * report's READER. It NAMES what happened in plain words — never a stage name, a gate
+ * number or a plan slug: "re-queued for a clean rebuild" (not "moved to todo"), "the
+ * builder may still be running" (not "still quarantined"). `skipped` (a live re-claim or
+ * a move collision) is deliberately NOT surfaced here: it is a non-event from the human's
+ * seat (nothing happened to the plan), and the collision case already records its own log.
+ *
+ * Returns '' when there is nothing to say (no recovered, no surfaced, no throw), so a
+ * project with no orphaned plans renders BYTE-IDENTICALLY to before this slice — the
+ * contract that protects every existing dashboard substring/count regression test.
+ *
+ * TOTAL and fail-open, mirroring renderWedgeReports/renderReconcileHealth: a null/absent/
+ * malformed report yields fewer lines, never a throw.
+ *
+ * @param {object|null} report  the recoverOrphanedPlans return { recovered, surfaced, skipped },
+ *   each an array; or null when the call threw.
+ * @param {string|null} threw  the caught recovery error message, or null.
+ * @returns {string}  zero or more complete newline-terminated lines, or ''.
+ */
+function renderRecoveryReport(report, threw) {
+  const list = (v) => (Array.isArray(v) ? v : []);
+  const plural = (n) => (n === 1 ? '' : 's');
+  let out = '';
+
+  const recovered = list(report && report.recovered).length;
+  if (recovered > 0) {
+    out += `  ⚠ ${recovered} plan${plural(recovered)} whose builder is no longer running — ` +
+      `re-queued for a clean rebuild and re-verification\n`;
+  }
+
+  const surfaced = list(report && report.surfaced).length;
+  if (surfaced > 0) {
+    out += `  ⚠ ${surfaced} plan${plural(surfaced)} orphaned on staleness alone — ` +
+      `the builder may still be running; not yet recovered\n`;
+  }
+
+  // Belt-and-suspenders: recoverOrphanedPlans is throw-free by contract, but if it ever
+  // does throw the failure is STATED, never swallowed — mirroring renderReconcileHealth. The
+  // message is a control-flow string (recovery's own reasons / an injected fault), stripped of
+  // control bytes and bounded, so no absolute path or terminal escape reaches the screen.
+  if (typeof threw === 'string' && threw.length > 0) {
+    const s = stripCtl(threw);
+    const bounded = s.length > FAILURE_MESSAGE_CAP ? `${s.slice(0, FAILURE_MESSAGE_CAP)}…` : s;
+    out += `  ⛔ plan recovery could not run: ${bounded}\n`;
+  }
+
+  return out;
+}
+
+/**
  * Build the dashboard table text
  * @param {string} projectPath
  * @returns {string} Dashboard table
@@ -522,18 +576,30 @@ function buildDashboardTable(projectPath, opts = {}) {
     // reason is kept, and renderReconcileHealth puts it on screen.
     reconcileThrew = (err && err.message) ? String(err.message) : String(err);
   }
-  // Recover orphaned plans whose builder is gone. The reconcile pass above wrote the
-  // durable orphan verdict (result.orphanReason) that recovery projects onto the PLAN:
-  // a released (file-freed) orphan is re-queued in-progress→todo for a clean rebuild, a
-  // still-quarantined staleness orphan is only surfaced, and a plan a fresh agent
-  // re-claimed is never touched. Without this the V4 scenario is unchanged — orphaned
-  // plans keep reading as "being built" because nothing re-queues them. This is the LIVE
-  // caller that makes plan-recovery reachable; rendering the recovered/surfaced counts on
-  // screen is the next slice. Called directly (no defensive try/catch): recoverOrphanedPlans
-  // is contractually throw-free — every I/O boundary inside it is fail-open — so wrapping it
-  // would be a swallow of an error it guarantees it never raises, consistent with the other
-  // throw-free calls in this render.
-  planRecovery.recoverOrphanedPlans(root);
+  // Recover orphaned plans whose builder is gone, and CAPTURE the result so the human SEES
+  // it. The reconcile pass above wrote the durable orphan verdict (result.orphanReason) that
+  // recovery projects onto the PLAN: a released (file-freed) orphan is re-queued
+  // in-progress→todo for a clean rebuild, a still-quarantined staleness orphan is only
+  // surfaced, and a plan a fresh agent re-claimed is never touched. Recovery MUST run after
+  // reconcileState — the reconciler is what writes the orphanReason markers recovery reads.
+  // 00216 wired this call but discarded its return, so a plan was re-queued SILENTLY; this
+  // slice keeps the report and renderRecoveryReport (below) puts the recovered/surfaced
+  // counts on screen, so a phantom "being built" plan no longer disappears without a word.
+  // recoverOrphanedPlans is contractually throw-free, so this catch is a belt-and-suspenders
+  // guard mirroring the reconcile pattern above — fail-open (a recovery fault must never
+  // brick the dashboard) but NOT silent (the reason is kept and rendered). No liveAgentIds is
+  // passed: 00216 reads the reconciler's PERSISTED verdict (not the live list), and its typed
+  // opts are { now? } only — passing the live list would be an ignored argument that also
+  // fails the typecheck.
+  /** The captured recovery report — its recovered/surfaced counts reach the screen. @type {object|null} */
+  let recoveryReport = null;
+  /** The captured recovery failure message — NOT discarded. See renderRecoveryReport. @type {string|null} */
+  let recoveryThrew = null;
+  try {
+    recoveryReport = planRecovery.recoverOrphanedPlans(root);
+  } catch (err) {
+    recoveryThrew = (err && err.message) ? String(err.message) : String(err);
+  }
   let taskReg;
   try { taskReg = taskRegistry.load(root); } catch { taskReg = taskRegistry.emptyRegistry(); }
   let tasksBlock = '';
@@ -559,6 +625,11 @@ function buildDashboardTable(projectPath, opts = {}) {
   // guard that never ran looked exactly like one that ran and decided to hold. Returns ''
   // for a clean project, so a project with no wedges renders byte-identically.
   out += renderWedgeReports(reconcileReport);
+  // The recovery pass's recovered/surfaced counts finally have a READER (00216 moved the
+  // plans SILENTLY). This sits with the other reconcile-pass findings so a human opening the
+  // menu SEES a phantom "being built" plan was actually re-queued for a rebuild, or is being
+  // held because its builder may still be alive. Returns '' for a clean project — byte-identical.
+  out += renderRecoveryReport(recoveryReport, recoveryThrew);
 
   // Inbox (A3 — async-overnight surface; SP2 adds the possibly-stale stream)
   const inbox = getInboxCounts(root);

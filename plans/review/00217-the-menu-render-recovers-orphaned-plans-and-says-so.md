@@ -208,3 +208,30 @@ re-queues the plan to `todo` and the screen says so.
    contract that protects every existing dashboard regression test.
 4. **The recovery lines join the existing TASKS section** rather than a new screen —
    consistent with the orphan and wedge lines already rendered there.
+
+## Decisions Taken During Execution
+
+### `liveAgentIds` is NOT passed to `recoverOrphanedPlans` — the plan's pseudocode was corrected against the real type contract
+The plan step 1 passed `{ liveAgentIds: opts.liveAgentIds }` "for forward-compatibility".
+The shipped `recoverOrphanedPlans` (00216) types its opts as `{ now?: number }` ONLY and
+reads the reconciler's PERSISTED verdict, not the live list — so the extra property is
+both ignored at runtime and rejected by `tsc --checkJs` (`error TS2353: 'liveAgentIds'
+does not exist in type '{ now?: number }'`), which regressed the typecheck baseline from
+0 to 1. Widening `plan-recovery.js`'s JSDoc is out of this slice's declared `files:`.
+Resolution: call `planRecovery.recoverOrphanedPlans(root)` with no opts. The fail-open
+try/catch and the belt-and-suspenders throw guard are unchanged; only the ignored,
+type-invalid argument is dropped. Code wins over the plan's pseudocode.
+
+### The render helper counts array LENGTHS, and `skipped` is not surfaced
+`recoverOrphanedPlans` returns `{ recovered, surfaced, skipped }` where each is an ARRAY
+(the plan pseudocode wrote `recovered > 0`, treating them as numbers). `renderRecoveryReport`
+uses `.length`. `skipped` (a live re-claim or a move collision) is deliberately NOT
+rendered: from the human's seat nothing happened to the plan, and the collision path already
+records its own cleanup-log entry — surfacing it would be noise, not a finding.
+
+### The lines name the ACTION in plain words, never a stage name
+The plan's example wording "re-queued to todo" names the raw stage `todo`, which is internal
+vocabulary a person cannot decode (the same class the gate-words fence forbids). The rendered
+lines say "re-queued for a clean rebuild and re-verification" (recovered) and "the builder may
+still be running; not yet recovered" (surfaced) — echoing 00216's own `RECOVER_REASON`
+constant, with no stage name, gate number, or plan slug.
