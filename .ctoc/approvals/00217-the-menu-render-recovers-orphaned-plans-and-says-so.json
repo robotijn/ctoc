@@ -1,0 +1,9 @@
+{
+  "content_sha256": "ec0b423d880ab01ee9e947ad724f395fbef0693e85435533cb758866f3836e83",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-23T17:28:47.568Z",
+  "approved_by": "human",
+  "plan_basename": "00217-the-menu-render-recovers-orphaned-plans-and-says-so"
+}
