@@ -16,6 +16,25 @@ files:
   - "src/lib/continuation-queue.js"
   - "tests/continuation-queue.test.js"
   - "src/hooks/SessionStart.js"
+  - "src/hooks/stop-continuation-gate.js"
+  - "tests/stop-continuation-gate-queue.test.js"
+  - "agents/coordinator/cto-chief.md"
+  - "tests/cache-freshness.test.js"
+scope_extension:
+  authorized_by: human
+  authorized_at: 2026-07-22
+  reason: >
+    WIRED-IS-DONE reconciliation (Operating Lesson 16). This slice's module
+    exports a decision API (shouldContinueQueue, recordQueueBlock,
+    registerQueueFork, resolveQueueFork, clearQueue) whose ONLY caller is the
+    Stop-hook block that was planned as a separate slice (00226) for rollback
+    isolation. That split leaves 5 dead exports (export fence 68->73), and the
+    honest fix is not a temporary fake root — it is to build the caller in the
+    SAME unit of work. The human chose: BUILD the Stop-hook block now so the
+    decision API is live, and COMMIT the risky Stop-hook change as its OWN commit
+    so rollback isolation is preserved by the commit (the real unit of revert),
+    not the slice boundary. 00226's two files are folded in here; 00226 is
+    superseded.
 ---
 
 # The approved queue is derived continuation work (slice 1 of 2)
@@ -290,3 +309,130 @@ The module decides "is the approved queue undrained continuation work?" honestly
 and fails open everywhere; the session-start banner shows the human how much
 approved work waits; `continuation.js` is untouched; slice 2 can now wire the
 Stop-hook block on top of this without any further module change.
+
+## Decisions Taken During Execution
+
+### Steps 8–16 outcome: green except ONE fence that needs a file outside the grant
+Built test-first (RED: `MODULE_NOT_FOUND`, all cases fail at require), then the module
+and the banner splice. Results: `eslint --max-warnings 0` exit `0`; new test
+`13`/`0`; false-green fence `17`/`0` (after the fix below); FILE reachability fence
+`26` unreachable, UNCHANGED — `continuation-queue.js` is file-reachable via the
+SessionStart banner; gate-words and gate-numbers fences pass. The SOLE remaining
+failure is the EXPORT-reachability fence.
+
+### The false-green fix (in-scope, applied)
+The scanner flagged two comment-only `catch {}` bodies as new `silent-catch` sites
+(`clearQueue`, and the per-plan classify catch in `approvedFreeQueue`). Baseline is
+ratchet-down only, so both were made explicit with a statement naming what is
+absorbed (`return;` for the housekeeping unlink, `continue;` for the plan-skip) —
+the swallow is now stated, not silent. Fence returns to `17`/`0`.
+
+### FORK (surfaced to the human): the EXPORT fence needs `.ctoc/reachability-roots.json`
+`analyzeExports` reports `5` NEW dead exports — the module's decision API with no
+LIVE caller in THIS slice (a test is never a caller):
+`shouldContinueQueue`, `recordQueueBlock` (both consumed by slice 2's Stop hook),
+`registerQueueFork`, `resolveQueueFork` (executor-prose-driven, like
+`continuation.registerFork`/`resolveFork`), and `clearQueue`. `dead.length` rose
+`68`→`73`. The plan's Step 14 addressed only the FILE fence count (`26`); it did NOT
+account for the EXPORT fence on the slice-2-only exports, and it did NOT list
+`.ctoc/reachability-roots.json` in `files:`. The fence's own message names three
+resolutions: WIRE (slice 2 — explicitly out of scope here), DELETE (impossible — the
+plan mandates these functions and slice 2 needs them), or DECLARE them in
+`.ctoc/reachability-roots.json` (`"exports": [...]`). The only honest path to a green
+export fence in a slice-1-only build is the declared-export-root escape hatch, which
+is a `4`th file outside the declared grant and a reviewable architectural claim that
+slice 2 must later UN-declare when it wires the real caller. Per the brief's explicit
+"if you need another file, STOP AND ASK", this is left for the human rather than
+silently expanding scope.
+
+### RESOLUTION (authorized): the Stop-hook block is built as slice 2, wiring the real callers
+The human chose wired-is-done over a temporary fake root: build the Stop-hook block
+in the same unit of work. `files:` gained `src/hooks/stop-continuation-gate.js` and
+`tests/stop-continuation-gate-queue.test.js`; the ledger was re-stamped (binding
+re-verified `true`). Built test-first: the spawn-based hook test went RED on exactly
+the `3` new-behavior cases (approved queue → exit `2`; fork resolve → exit `2`; the
+bounded kill-test) while `7` regression guards for the shipped explicit-batch
+behavior stayed green. Implemented the derived branch — changing ONLY the
+`!decision.continue` path — per the authoritative superseded design: guard on
+`continuation.status(root) === null` (never override an explicit batch), then
+`shouldContinueQueue` → `recordQueueBlock` (WEDGE-1: persist fail → exit `0`) →
+honest stderr naming the depth → exit `2`; otherwise exit `0`. Hook test now `10`/`0`;
+`continuation.test.js` `17`/`0` (explicit path unchanged). This gave
+`shouldContinueQueue` + `recordQueueBlock` live callers.
+
+### Two exports still lack a live caller — reported, NOT resolved by a fake root
+After wiring the hook the export fence dropped `5`→`2` dead. LIVE now:
+`shouldContinueQueue`, `recordQueueBlock` (hook calls them), and `registerQueueFork`
+(named in the hook's stderr guidance). STILL DEAD: `resolveQueueFork` and
+`clearQueue`. Their honest caller is agent prose — the exact precedent is
+`continuation.resolveFork`, kept live ONLY by the call `continuation.resolveFork(root)`
+in `agents/coordinator/cto-chief.md`, and `continuation.clear`, kept live by
+`complete()`'s intra-file call. Neither an equivalent lives inside this unit's declared
+`files:`. Per the coordinator's explicit instruction — "if they still have no caller,
+tell me; resolve honestly, NOT a fake root; do NOT declare a root" — this is surfaced,
+not forced green. `resolveQueueFork` must be KEPT (it is the required counterpart to
+`registerQueueFork`; a fork that can be set but not cleared is a wedge); `clearQueue`
+is housekeeping with no consumer yet. Recommended honest fix: add
+`agents/coordinator/cto-chief.md` to scope and document the derived-queue fork/resolve
+lifecycle there beside the existing explicit-batch controls (the identical precedent),
+which credits both live with zero fake roots. The export fence remains RED
+(`70` vs baseline `68`) pending that decision.
+
+### Full `npm test` state: `6` failing cases + coverage, from `3` honest issues
+`npm test` true exit `1`, `# fail 6`, coverage `98.99%` < `99%`. Grouped:
+- **A — the `2` uncalled exports** (`resolveQueueFork`, `clearQueue`): `5` cases — the
+  `3` export-reachability assertions plus `2` iron-loop-enforcer cases (the
+  `dead-export-fence` yields a `block`-severity finding, so the enforcer's
+  `summary.block` is `1`, expected `0`). One root cause, five red cases.
+- **B — CF1 cache-freshness broad-flag FALSE POSITIVE** (`1` case): `continuation-queue.js`
+  matches `writeFileSync`/`unlinkSync` AND the stage tokens `'todo'`/`'in-progress'`,
+  but its ONLY write target is `.ctoc/state/continuation-queue.json` (a non-count path);
+  the tokens are read-side enumeration. The fence's own prescribed fix is a WHITELIST
+  entry in `tests/cache-freshness.test.js` with that justification.
+- **Coverage `98.99%`**: the uncovered `clearQueue` body (`11` lines); the other
+  uncovered lines are genuinely-defensive fail-open catches that must NOT be
+  fake-triggered (dev-machine-floor discipline). Resolves if `clearQueue` is deleted,
+  or with an in-grant `clearQueue` test.
+
+FILES NEEDED beyond the current `files:` to reach full green, zero fakes, zero roots:
+`agents/coordinator/cto-chief.md` (wire `resolveQueueFork`, the honest precedent) and
+`tests/cache-freshness.test.js` (the CF1 whitelist). `clearQueue` is the one keep-vs-
+delete call reserved for the coordinator: DELETE (premature, YAGNI — no consumer, and
+its `continuation.clear` analog lives only via `complete()`, which this module lacks)
+clears the dead export AND the coverage gap in one move; KEEP requires wiring it into
+`cto-chief.md` too plus an in-grant coverage test. Everything within the declared
+grant is GREEN (`eslint` `0`; new module `13`/`0`; hook `10`/`0`; `continuation.test.js`
+`17`/`0` no regression; false-green `17`/`0`; FILE reachability `26` unchanged;
+gate-words, gate-numbers pass).
+
+### FULL GREEN reached (authorized three fixes applied)
+The coordinator authorized all three recommendations and added
+`agents/coordinator/cto-chief.md` + `tests/cache-freshness.test.js` to `files:`
+(ledger re-stamped; binding re-verified `true`).
+1. **Wired `resolveQueueFork`** — added a derived-approved-queue control paragraph to
+   `agents/coordinator/cto-chief.md` beside the existing `continuation.resolveFork(root)`
+   control, containing the real invocations `continuationQueue.registerQueueFork(root, reason)`
+   and `continuationQueue.resolveQueueFork(root)`. A genuine surface CALL (not a
+   citation), so `resolveQueueFork` is now a LIVE export.
+2. **Deleted `clearQueue`** — removed the export and its body entirely (premature API,
+   no consumer). No test exercised it, so no test case was removed. This closed its
+   dead export AND the coverage gap its uncovered body caused.
+3. **CF1 — VERIFIED FRESH, then whitelisted** (took the whitelist path, NOT a code
+   fix): `approvedFreeQueue` reads DISK fresh on every call — `safeFs.readdirSync` on
+   `plans/todo/` + `plans/in-progress/` and a fresh `approval-residency`/`approval-ledger`
+   read (`existsSync`/`readFileSync`), with NO cache, memoize, or plan-index anywhere in
+   the path. So the `todo`/`in-progress` tokens are read-side enumeration and its ONLY
+   write is `.ctoc/state/continuation-queue.json`; the CF1 flag is a true false positive.
+   Added the whitelist entry in `tests/cache-freshness.test.js` with that written
+   justification (mirroring the `continuation.js` entry).
+
+Result — full Step 14 GREEN, verbatim true exit codes: `eslint --max-warnings 0` (6
+changed files) `0`; export-reachability `16`/`0` (dead-count `68` = baseline, zero
+`continuation-queue` dead); cache-freshness `23`/`0`; false-green `17`/`0`; FILE
+reachability `21`/`0` (`26` unchanged); gate-words `18`/`0`; gate-numbers `40`/`0`;
+`continuation.test.js` `17`/`0`; new module `13`/`0`; hook `10`/`0`. `npm test` TRUE
+EXIT `0` — coverage `99.03%` (floor `99` untouched), skipped `0`, failed `0`. Coverage
+MOVED `98.99%`→`99.03%` (deleting `clearQueue` removed its uncovered body). The module's
+remaining uncovered lines are defensive fail-open catches (`require`-failure guard,
+`getPlansDir`-throw guard, banner catch) left honestly uncovered — NOT fake-triggered.
+No export lacks a live caller; no fake root; no token-stuffing.

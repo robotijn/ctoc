@@ -411,6 +411,13 @@ function generateContext(stack, state, version, updateInfo, selfCheckSummary, ro
   const selfCheckLine = selfCheckSummary ? `\n${selfCheckSummary}` : '';
   const databasesLine = formatDatabasesLine(stack);
   const frameworksLine = formatFrameworksLine(stack);
+  // The approved-queue depth the continuation gate will act on (slice 1 of the
+  // "when CTOC starts it must not stop" mechanism). Lazy require matches this file's
+  // style and keeps continuation-queue.js reachable from a live hook root. Fail-open:
+  // the helper returns '' for a null/invalid root, so legacy 5-arg callers (no
+  // rootInfo) and projects with no approved work render an unchanged banner.
+  const approvedQueueLine = require('../lib/continuation-queue')
+    .approvedQueueBannerLine(rootInfo && typeof rootInfo.root === 'string' ? rootInfo.root : null);
 
   // The banner renders from the RESOLVED root, never the working directory. A human
   // who opened a terminal in repo/src/lib/ is operating on repo/, and must be told so.
@@ -434,7 +441,7 @@ function generateContext(stack, state, version, updateInfo, selfCheckSummary, ro
 CTOC v${version || '?'} - Your Virtual CTO is Active${updateLine}
 ============================================================
 ${projectLine}${unidentifiedLine}
-Stack: ${stack.languages.join('/') || 'unknown'}${databasesLine}${frameworksLine}
+Stack: ${stack.languages.join('/') || 'unknown'}${databasesLine}${frameworksLine}${approvedQueueLine}
 Iron Loop: ${state?.feature ? `Step ${state.currentStep} (${stepName})` : 'Ready for new feature'}${selfCheckLine}
 
 ## Iron Loop (16 Steps) - NON-NEGOTIABLE

@@ -523,6 +523,13 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
     // authorized-batch state the Stop hook reads). Not a plan/vision/inbox *.md, so
     // the plan-stage/vision/inbox counts are invariant — nothing to invalidate.
     ['continuation.js', 'writes only .ctoc/state/continuation.json (batch state for the Stop continuation-gate); never a counted plan/vision/inbox file'],
+    // Derived approved-queue gate: its ONLY write target is its own counter file
+    // .ctoc/state/continuation-queue.json (writeQueueState). Its READ path
+    // (approvedFreeQueue) is FRESH per call — safeFs.readdirSync on plans/todo/ and
+    // plans/in-progress/ plus a fresh approval-residency read (no cache, no memoize,
+    // no plan-index), so the `todo`/`in-progress` tokens are read-side enumeration,
+    // NOT a write to a counted *.md. Verified fresh, not whitelisted blind.
+    ['continuation-queue.js', 'writes only .ctoc/state/continuation-queue.json (derived-queue counter); the todo/in-progress tokens are a FRESH read-side readdir+residency enumeration, never a write to a counted plan/vision/inbox file'],
     // R4-B: after moveToReviewAfterPush was deleted, sync.js writes only the
     // .ctoc/last-sync timestamp; the `plans` tokens are git CLI args (git add
     // plans/), not fs writes to a counted *.md. No plan/vision/inbox file is written.
