@@ -1,9 +1,9 @@
 {
-  "content_sha256": "791033d4887f7553e52529b43df96aae26e5ed60dc9d4af29fd855e531047817",
+  "content_sha256": "2bd863947ff23864c2b24cd4744d66fb7b67eda0eca759eea9de35ff42c945f4",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-22T12:10:26.425Z",
+  "approved_at": "2026-07-23T17:22:01.854Z",
   "approved_by": "human",
   "plan_basename": "00225-the-approved-queue-is-derived-continuation-work-and-shown-at-session-start"
 }
