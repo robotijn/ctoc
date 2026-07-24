@@ -256,7 +256,7 @@ export async function getUser(id: number): Promise<User> {
 }
 ```
 
-Enforce with Prettier (3.x today, 4.x when GA) + ESLint (or Biome 1.9+ as a unified alternative). Naming rules via `@typescript-eslint/naming-convention`.
+Enforce with Prettier (3.x today, 4.x when GA) + ESLint (or Biome 2.x as a unified alternative). Naming rules via `@typescript-eslint/naming-convention`.
 
 ### SQL
 
@@ -314,7 +314,7 @@ These tiers are the **internal triage view** when producing a human-readable rep
 | Tool | Languages | Role | Notes |
 |---|---|---|---|
 | **Prettier** | JS / TS / JSON / Markdown / CSS / HTML / YAML | Formatter | 3.x current; 4.0 in development through 2026. Run via `pre-commit` / Husky 9 + lint-staged. |
-| **Biome** | JS / TS / JSON | Formatter + linter | Single-binary Rust alternative to Prettier+ESLint. Significantly faster than the Node-based equivalents per Biome's published benchmarks; verify against your own repo. v1.9+ stable. |
+| **Biome** | JS / TS / JSON | Formatter + linter | Single-binary Rust alternative to Prettier+ESLint. Significantly faster than the Node-based equivalents per Biome's published benchmarks; verify against your own repo. v2.x stable. |
 | **ESLint** | JS / TS | Linter | Stylistic rules largely moved to `@stylistic/eslint-plugin`. Use `@typescript-eslint/naming-convention` for casing rules. |
 | **Black** | Python | Formatter | Calendar-versioned (`YY.M.x`). Pin via `pyproject.toml`; verify the current release on PyPI before adopting. |
 | **Ruff** | Python | Lint + format | Single-binary Rust tool; `ruff format` is Black-compatible. Often the default in 2026 greenfield projects. |

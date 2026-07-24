@@ -265,7 +265,7 @@ INSERT INTO events_daily ...
 version: 2
 models:
   - name: events_daily
-    tests:
+    data_tests:
       - dbt_expectations.expect_table_row_count_to_be_between:
           min_value: 100000
           max_value: 5000000
@@ -320,7 +320,7 @@ models:
   - name: orders
     columns:
       - name: user_id
-        tests:
+        data_tests:
           - relationships:
               to: ref('users')
               field: id
@@ -363,9 +363,9 @@ models:
   - name: users
     columns:
       - name: email
-        tests: [not_null, unique]
+        data_tests: [not_null, unique]
       - name: status
-        tests:
+        data_tests:
           - accepted_values:
               values: ['active', 'inactive', 'pending']
 ```
@@ -392,7 +392,7 @@ except Exception:
 # BAD: dbt severity downgraded then forgotten
 # schema.yml
 - name: orders
-  tests:
+  data_tests:
     - unique:
         severity: warn   # never re-promoted; failures pile up unread
 
@@ -481,13 +481,13 @@ models:
   - name: users
     columns:
       - name: email
-        tests: [not_null, unique]
+        data_tests: [not_null, unique]
       - name: status
-        tests:
+        data_tests:
           - accepted_values:
               values: ['active', 'inactive', 'pending']
       - name: user_id
-        tests:
+        data_tests:
           - relationships:
               to: ref('source_users')
               field: id

@@ -288,7 +288,7 @@ gcovr -r . --cobertura coverage.xml --html-details coverage.html \
 pg_prove --recurse --ext .sql t/
 # For uncovered-branch surfacing inside PL/pgSQL procedures:
 # plpgsql_check audits dead code and unreached branches
-psql -c "SELECT * FROM plpgsql_check_function('public.calc_total()', performance_warnings => true);"
+psql -c "SELECT * FROM plpgsql_check_function('public.calc_total()', extra_warnings => true);"
 # Coverage-mapper treats every plpgsql_check warning of dead/unreached as an uncovered_region.
 ```
 

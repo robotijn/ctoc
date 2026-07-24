@@ -57,7 +57,7 @@ Additional patterns you should also know:
 - **Metamorphic properties** — when an exact oracle is unavailable, test *relationships* between outputs (`distance(a,b) == distance(b,a)`, `len(filter(p, xs)) ≤ len(xs)`, `sum(map(2*, xs)) == 2*sum(xs)`).
 - **Targeted property-based testing** — Hypothesis `target()` and similar in jqwik/proptest let you guide the generator toward inputs that *maximize* a metric (latency, branch coverage, output size). Catches performance regressions property tests would otherwise miss.
 - **Pair with mutation testing.** Properties are excellent mutant killers — a `+ → -` mutation in addition fails commutativity instantly; an off-by-one in a length-preserving function dies under the preservation property. If your mutation score is low even with property tests, you're missing properties, not examples.
-- **Seed and persist failures.** Every framework supports replaying a seed (`--hypothesis-seed`, `fc.assert(prop, { seed: ... })`). Persist counterexamples in a regression file (`.hypothesis/examples`, fast-check `examplesPath`) so a CI win sticks — once shrunk, the minimal case becomes a permanent regression test.
+- **Seed and persist failures.** Every framework supports replaying a seed (`--hypothesis-seed`, `fc.assert(prop, { seed: ... })`). Persist counterexamples so a CI win sticks — Hypothesis auto-saves them to its `.hypothesis/examples` database, while fast-check has no such database, so pin the failing run's printed `{ seed, path }` (its `Parameters.path` replay coordinate) as an explicit regression. Once shrunk, the minimal case becomes a permanent regression test.
 
 ## Concept
 

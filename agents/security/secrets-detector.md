@@ -211,7 +211,7 @@ regexes = [
 |---------|---------|-------|
 | Stripe Live | `sk_live_[a-zA-Z0-9]{24,}` | Production key |
 | Stripe Test | `sk_test_[a-zA-Z0-9]{24,}` | Lower severity |
-| Stripe Publishable | `pk_(live|test)_[a-zA-Z0-9]{24,}` | Public, but track |
+| Stripe Publishable | `pk_(live\|test)_[a-zA-Z0-9]{24,}` | Public, but track |
 | Twilio | `SK[a-f0-9]{32}` | API key SID |
 | SendGrid | `SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}` | API key |
 | Slack Bot | `xoxb-[0-9]{10,}-[0-9]{10,}-[a-zA-Z0-9]{24}` | Bot token |

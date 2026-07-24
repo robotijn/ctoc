@@ -151,7 +151,7 @@ See `.ctoc/contracts/_README.md` for the full schema and one worked example.
 
 ## The clause-library
 
-Located at `clause-library/` under the project root or, if the project does not have one, the CTOC default at `.ctoc/templates/clause-library/`. Each file is a **pointer** to a lawyer-reviewed external template:
+Located at `clause-library/` under the project root. CTOC does not ship clause bodies — the library is created and maintained by the project's own counsel, which is why a `referenced_clause` pointing at a file that does not exist is a critical `missing-approved-clause` finding rather than a silent fallback to a bundled default. Each file is a **pointer** to a lawyer-reviewed external template:
 
 ```
 clause-library/
@@ -213,7 +213,7 @@ When the active regime includes Health Insurance Portability and Accountability 
 - Surfaces a `missing-baa` finding (severity: critical) when either is false.
 - Points to `clause-library/baa/hhs-baa-2013.md` for the United States Department of Health and Human Services sample template.
 
-Source: [HIPAA Journal — HIPAA Business Associate Agreement 2026](https://www.hipaajournal.com/hipaa-business-associate-agreement/).
+Source: [HIPAA Journal — What is a HIPAA Business Associate Agreement?](https://www.hipaajournal.com/hipaa-business-associate-agreement/).
 
 ## Findings the tracker emits
 
@@ -240,7 +240,7 @@ You **own** extraction of continuing obligations into the YAML and emission of t
 
 ## Citations
 
-- [HIPAA Journal — HIPAA Business Associate Agreement requirements](https://www.hipaajournal.com/hipaa-business-associate-agreement/) — Business Associate Agreement scope, sub-processor cascade, breach notification cascade.
+- [HIPAA Journal — What is a HIPAA Business Associate Agreement?](https://www.hipaajournal.com/hipaa-business-associate-agreement/) — Business Associate Agreement scope, sub-processor cascade, breach notification cascade.
 - General Data Protection Regulation Article 28 (processor obligations) and Article 30 (Records of Processing Activities) — primary text at [eur-lex.europa.eu](https://eur-lex.europa.eu/eli/reg/2016/679/oj).
 - European Data Protection Board — Recommendations 01/2020 on supplementary measures (Transfer Impact Assessment requirement).
 - Standard Contractual Clauses for international transfers — Commission Implementing Decision (EU) 2021/914.

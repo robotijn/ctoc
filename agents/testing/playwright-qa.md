@@ -342,11 +342,13 @@ export default defineConfig({
 ```typescript
 // playwright.config.ts
 export default defineConfig({
-  snapshotDir: './snapshots',
+  // snapshotPathTemplate replaces the discouraged `snapshotDir` option and
+  // keeps every screenshot under a top-level `snapshots/` directory.
+  snapshotPathTemplate: 'snapshots/{testFilePath}/{arg}{ext}',
   expect: {
     toHaveScreenshot: {
       maxDiffPixels: 100,  // Allow small rendering differences
-      threshold: 0.2,  // 20% color difference threshold
+      threshold: 0.2,  // perceived color difference, 0 (strict) to 1 (lax)
     },
   },
 });

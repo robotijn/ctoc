@@ -43,7 +43,7 @@ You identify, categorize, and prioritize technical debt to help teams make infor
 - **SQALE / SonarQube debt model**: convert findings to *remediation time* (minutes/hours). Total debt expressed as "N days to fix" is the boardroom number. SonarQube exposes this via its Quality Gate API; mirror the same calculation locally for offline scans.
 - **Debt budget per module + PR regression check**: each module declares a debt ceiling (e.g. SonarQube "debt ratio < 5%" or "< 8 hours of debt"). PRs that raise the module above ceiling fail CI. The budget makes the gate enforceable instead of aspirational.
 - **15–20% sprint debt-paydown**: a widely-cited industry rule-of-thumb — allocate too little and debt outpaces paydown, too much and feature delivery stalls. The exact split is a team judgement call, not a measured constant; treat 15–20% as a default to tune against your own churn, not a law. Carry at least one debt item per sprint so the number is never zero.
-- **Deprecation markers need `since` + migration path**: `[Obsolete("Use NewMethod since v3.1", DiagnosticId = "MYLIB001")]`, `@Deprecated(since="3.1", forRemoval=true)`, `@typing.deprecated("Use new_func", category=DeprecationWarning)`. A deprecation without `since` and a named replacement is unactionable — the consumer doesn't know which version added the warning or what to migrate to.
+- **Deprecation markers need `since` + migration path**: `[Obsolete("Use NewMethod since v3.1", DiagnosticId = "MYLIB001")]`, `@Deprecated(since="3.1", forRemoval=true)`, `@warnings.deprecated("Use new_func", category=DeprecationWarning)`. A deprecation without `since` and a named replacement is unactionable — the consumer doesn't know which version added the warning or what to migrate to.
 - **AI-generated code accrues debt faster**: LLM-produced code carries placeholder TODOs, hallucinated APIs, and untyped sketches. Apply stricter marker hygiene on AI-touched files; consider a PR label that triggers a debt-tracker pass.
 
 ## Debt Categories (Findings)
@@ -102,7 +102,7 @@ Enforce via eslint `no-warning-comments` + `@typescript-eslint/no-deprecated` (t
 # BAD: bare TODO; no expiry, no ticket
 # TODO: handle empty list
 
-# BAD: deprecation without typing.deprecated + warnings
+# BAD: deprecation without warnings.deprecated + warnings.warn
 def old_func(x):
     return new_func(x)
 

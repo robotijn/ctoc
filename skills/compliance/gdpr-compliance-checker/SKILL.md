@@ -14,7 +14,7 @@ related_skills:
   - compliance/license-scanner
   - security/secrets-detector
   - specialized/database-reviewer
-  - quality/accessibility-checker
+  - specialized/accessibility-checker
 effort_level: high
 tools: Read, Grep
 model: opus

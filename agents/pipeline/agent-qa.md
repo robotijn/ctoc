@@ -47,6 +47,9 @@ input:
         boundaries: 6
         actionability: 5
         integration: 4
+        robustness: 4
+        calibration: 5
+        research_grounding: 5
         overall: 4.8
       issues: 12
     - round: 2
@@ -56,6 +59,9 @@ input:
         boundaries: 7
         actionability: 6
         integration: 5
+        robustness: 5
+        calibration: 6
+        research_grounding: 6
         overall: 5.8
       issues: 8
   test_results:

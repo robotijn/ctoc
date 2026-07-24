@@ -37,7 +37,7 @@ You detect breaking changes between versions to ensure proper semantic versionin
 ## 2026 Best Practices (Versioning category)
 
 - **SemVer is enforced via CI, not honor system.** Major.Minor.Patch is the contract; "we'll be careful" is not. Every PR runs a diff tool that fails the build when public API changes don't match the proposed version bump. Tools: `cargo-semver-checks` (Rust), `oasdiff` (OpenAPI), `japicmp` / `revapi` (Java), `Microsoft.CodeAnalysis.PublicApiAnalyzers` (C#), `api-extractor` + `tsd` (TS), `abi-compliance-checker` (C/C++), `pylint` deprecated detector (Python).
-- **Deprecation cycle is at least two minor releases before removal.** Mark with the language-native deprecation annotation (`[Obsolete]`, `@Deprecated`, `@deprecated` JSDoc, `typing.deprecated` per PEP 702, `#[deprecated]` in Rust, `[[deprecated]]` in C++14/C23). Every `@deprecated` carries a **reason** AND **migration target** in the docstring — never a bare marker.
+- **Deprecation cycle is at least two minor releases before removal.** Mark with the language-native deprecation annotation (`[Obsolete]`, `@Deprecated`, `@deprecated` JSDoc, `warnings.deprecated` per PEP 702, `#[deprecated]` in Rust, `[[deprecated]]` in C++14/C23). Every `@deprecated` carries a **reason** AND **migration target** in the docstring — never a bare marker.
 - **Major version bump on ANY observable public-API break.** Including: removed symbols, narrowed types, widened required args, changed defaults with semantic meaning, removed enum variants, changed exception/error types, changed event payload shape.
 - **ABI stability is a separate axis for shared libraries.** A C/C++ shared lib can keep source-API stable while breaking ABI (struct layout change, vtable shift, symbol mangling change). For `.so`/`.dll`/`.dylib` consumers, run `abi-compliance-checker` in addition to source-API diff.
 - **Hyrum's law is acknowledged in the deprecation policy.** Document an explicit "observable behavior" clause in the changelog template: bug fixes that change observable output are at minimum minor, sometimes major. Iteration order changes, hash-table seed changes, error message text consumed by parsers — all qualify.
@@ -106,8 +106,8 @@ npx --package=@arethetypeswrong/cli attw <package>.tgz
 # pylint deprecated detector (built-in checker: deprecated-method, deprecated-class)
 pylint --enable=deprecated-method,deprecated-class src/
 
-# pyright / mypy — both honor @typing.deprecated (PEP 702, accepted by Steering Council;
-# mypy gained basic support via #17476; pyright has had it since 1.1.345).
+# pyright / mypy — both honor @warnings.deprecated (PEP 702, accepted by Steering Council;
+# mypy gained basic support via #17476; pyright surfaces it via its reportDeprecated diagnostic).
 pyright --outputjson | jq '.generalDiagnostics[] | select(.rule=="reportDeprecated")'
 
 # griffe — extracts public API and checks for breaking changes between two refs.
@@ -311,7 +311,7 @@ Correct version: **2.0.0** — breaking changes require MAJOR bump per semver.or
 | Language / Surface | Primary tool | Secondary | Detects |
 |---|---|---|---|
 | TypeScript / JS | `@microsoft/api-extractor` | `tsd`, `attw` | signature/type drift, ESM/CJS dual-package issues |
-| Python | `griffe check` + `typing.deprecated` (PEP 702) | `pylint` deprecated detector, `pyright` `reportDeprecated` | signature, public-symbol removal, `@deprecated` usage |
+| Python | `griffe check` + `warnings.deprecated` (PEP 702) | `pylint` deprecated detector, `pyright` `reportDeprecated` | signature, public-symbol removal, `@deprecated` usage |
 | Java 21+ | `japicmp` | `revapi`, Roseau (2025 research, F1=0.99 vs japicmp 0.86) | source + binary incompatible changes |
 | C# / .NET 9 | `Microsoft.CodeAnalysis.PublicApiAnalyzers` | `PublicApiGenerator` | declared-surface drift (PublicAPI.Shipped.txt) |
 | C (C17/C23) | `abi-compliance-checker`, `libabigail` (`abidiff`) | clang `-Wdeprecated-declarations` | header struct/enum layout, ABI |

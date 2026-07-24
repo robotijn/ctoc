@@ -206,7 +206,7 @@ CREATE USER MAPPING FOR app_user SERVER remote_db OPTIONS (user 'admin', passwor
 | Anthropic API key | `sk-ant-api03-[A-Za-z0-9_-]+` | Per Anthropic 2026 docs the canonical prefix is `sk-ant-api03-` |
 | Anthropic OAuth token | `sk-ant-oat01-[A-Za-z0-9_-]+` | Billed against a Claude.ai subscription, distinct from API keys |
 | Google AI / Gemini | `AIza[0-9A-Za-z\-_]{35}` | Same prefix as GCP API keys — disambiguate by referer / restriction |
-| Cohere | high-entropy 40-char; sent as `Bearer ...` | Verify `GET https://api.cohere.com/v1/check-api-key` |
+| Cohere | high-entropy 40-char; sent as `Bearer ...` | Verify `POST https://api.cohere.com/v1/check-api-key` |
 | DeepSeek | high-entropy; GitHub Secret Scanning added validity checks March 2026 | Verify via `GET https://api.deepseek.com/user/balance` |
 
 **Cost-of-leak note.** AI provider keys are uniquely costly to leak: an attacker can run usage up into thousands of dollars within hours before rotation completes. Treat verified-live AI keys as `CRITICAL` and rotate within minutes, not hours.

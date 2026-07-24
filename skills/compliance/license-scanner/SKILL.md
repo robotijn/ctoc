@@ -183,7 +183,7 @@ go-licenses report ./... --template '{{range .}}{{.Name}},{{.LicenseName}},{{.Li
 # Fail build on disallowed:
 go-licenses check ./... --disallowed_types=forbidden,restricted,unknown
 # Alternative: OSV-Scanner now ships license scanning alongside vuln scanning
-osv-scanner --licenses --format json ./...
+osv-scanner --licenses --format json .
 ```
 
 ### C / C++ (vcpkg / Conan — minimal)
@@ -201,7 +201,7 @@ For C/C++ the realistic recommendation is to escalate to ScanCode Toolkit or FOS
 
 ### Multi-language / audit-grade
 ```bash
-fossa analyze && fossa report licenses --format spdx > sbom-licenses.spdx.json
+fossa analyze && fossa report attribution --format spdx > sbom-licenses.spdx.json
 snyk test --print-deps --json-file-output=snyk-licenses.json
 ort analyze -i . -o ort-results && ort evaluate -i ort-results --license-classifications-file classifications.yml
 scancode --license --copyright --package --json scancode-results.json .
@@ -297,7 +297,7 @@ Recommended baseline: per-ecosystem CLI on every PR (diff-mode, fast) + a SaaS o
 
 # SBOM (multi-language)
 - name: Emit SPDX SBOM
-  run: fossa analyze && fossa report licenses --format spdx > sbom-licenses.spdx.json
+  run: fossa analyze && fossa report attribution --format spdx > sbom-licenses.spdx.json
 ```
 
 ## Severity (internal triage vs. refinement-loop output)

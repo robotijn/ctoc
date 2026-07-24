@@ -143,7 +143,7 @@ Find import cycles that create tight coupling.
 | Java / Kotlin | `jdeps -summary`, ArchUnit `slices().should().beFreeOfCycles()` |
 | Rust | `cargo-modules`, `cargo-depgraph` |
 | C# / .NET | `dotnet list package --include-transitive`, NDepend, Roslyn analyzers |
-| C / C++ | `cinclude2dot`, `cpp-dependencies` (NL-eScience) |
+| C / C++ | `cinclude2dot`, `cpp-dependencies` (TomTom) |
 
 ```bash
 npx dependency-cruiser --validate .dependency-cruiser.cjs src/
@@ -283,7 +283,7 @@ Trace import chains; max 5 levels deep before flagging. Long chains indicate acc
 
 - **Header organization is the dependency graph**. Public headers in `include/<module>/*.h`; private headers in `src/<module>/`.
 - **Rule**: a `.c` file in module A must only `#include` public headers of allowed modules.
-- **Tools**: `cpp-dependencies` (eScience), `cinclude2dot` → graphviz → cycle detection, custom AWK/python scripts grepping `#include`.
+- **Tools**: `cpp-dependencies` (TomTom), `cinclude2dot` → graphviz → cycle detection, custom AWK/python scripts grepping `#include`.
 - **Pattern detection**:
   ```bash
   # Domain module must not include any infrastructure header

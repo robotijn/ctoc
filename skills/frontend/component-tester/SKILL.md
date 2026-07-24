@@ -15,7 +15,7 @@ when_to_load:
   - "interaction test"
 related_skills:
   - frontend/visual-regression-checker
-  - testing/unit-test-writer
+  - testing/writers/unit-test-writer
   - specialized/accessibility-checker
 effort_level: medium
 tools: Bash, Read

@@ -85,9 +85,12 @@ well-known package it was likely mistaken for, and prefer the canonical dependen
 ### 2. Export Verification
 ```javascript
 // Check if import exists in package.
-// require() throws ERR_REQUIRE_ESM on ESM-only packages — a load failure here is
-// NOT evidence the export is missing. Use dynamic import for those, or read the
-// package's own "exports"/"types" entry instead of executing it.
+// A require() failure is NOT evidence the export is missing. Older Node (before
+// 20.19 / 22.12) throws ERR_REQUIRE_ESM for any ESM-only package; newer Node can
+// require() a SYNCHRONOUS ESM package but still throws ERR_REQUIRE_ASYNC_MODULE
+// when the module (or its import graph) uses top-level await. Dynamic import()
+// loads both CommonJS and ESM in every case — or read the package's own
+// "exports"/"types" entry instead of executing it.
 const pkg = await import('package-name');
 console.log(Object.keys(pkg));  // List actual exports
 ```

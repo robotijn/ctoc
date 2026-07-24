@@ -70,7 +70,10 @@ A draft changelog is wrong — and the skill emits a `critical` letter — if an
 git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:"%H|%s|%b" --no-merges
 
 # conventional-changelog (Angular preset → Keep a Changelog-ish output)
-npx conventional-changelog -p angular -i CHANGELOG.md -s
+# maintained `conventional-changelog` v8+ bin; `-i` is read-and-write-back
+# (outfile defaults to infile). The old `conventional-changelog-cli` package
+# and its `-s/--same-file` flag are deprecated — do not use them.
+npx conventional-changelog -p angular -i CHANGELOG.md
 
 # semantic-release (dry-run shows next version + changelog)
 npx semantic-release --dry-run
@@ -93,7 +96,6 @@ towncrier build --version 2.3.0
 
 # Validate Keep a Changelog 1.1 structure
 npx @metamask/auto-changelog validate            # maintained validator (add --rc for release candidates)
-# alternative: npx @vtabary/keepachangelog-cli validate CHANGELOG.md
 ```
 
 ## Conventional Commits → Keep a Changelog Section + Semver
@@ -215,7 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ```yaml
 # Conventional-changelog + commit on release branch
 - name: Generate Changelog
-  run: npx conventional-changelog -p angular -i CHANGELOG.md -s -r 0
+  run: npx conventional-changelog -p angular -i CHANGELOG.md -r 0   # -r 0 regenerates the whole file (outfile defaults to infile)
 - name: Commit Changelog
   run: |
     git add CHANGELOG.md

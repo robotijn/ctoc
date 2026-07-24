@@ -52,7 +52,7 @@ You are a paranoid reliability engineer. You assume every external call will fai
 - **Graceful shutdown drains in-flight work** — SIGTERM → stop accepting new requests → finish in-flight (bounded by `terminationGracePeriodSeconds`) → close DB / queue / cache → exit. Kubernetes default is 30s; verify your drain fits.
 - **Chaos-test before prod** — inject latency, drop packets, kill pods, partition the network in staging. Toxiproxy, Chaos Mesh, Litmus, Gremlin. If you have not tested the failure mode, you do not handle the failure mode.
 - **Three-pillar observability tie-in** — every retry attempt, every circuit trip, every DLQ deposit emits a metric (counter / histogram), a structured log line, and a span attribute. Otherwise the system is opaque under stress.
-- **Decorator order matters** — `Retry → CircuitBreaker → Timeout → operation` (Polly v8) so retries exhaust within the breaker's failure window, breaker records final outcome, and timeout caps each attempt. Wrong order produces silent misbehavior.
+- **Decorator order matters** — `Retry → CircuitBreaker → Timeout → operation` (Polly v8) so each attempt passes through the breaker — every failure counts toward the failure rate, and once the breaker opens mid-cycle the remaining retries short-circuit (fail fast) instead of hammering the dependency — while the timeout caps each attempt. Wrong order produces silent misbehavior.
 - **Service-mesh resilience is complementary, not a replacement** — Envoy / Istio sidecars give you retry, timeout, circuit breaker, and outlier detection at the network layer. Use them, but the application layer still owns idempotency, DLQs, and business-aware fallbacks. Mesh retries on a non-idempotent write is the same bug, one layer up.
 
 ## What to Check
@@ -321,7 +321,8 @@ public ChargeResult charge(String cardId, long amount) throws Exception {
         Map.of("Idempotency-Key", idem));
 
     // Decorators applies last-call-outermost: CircuitBreaker is inner, Retry is outer.
-    // Retry exhausts attempts; breaker only records the final outcome — the recommended order.
+    // Retry drives the loop and the breaker sees EVERY attempt, so it trips fast and, once
+    // open mid-cycle, the remaining attempts short-circuit (fail fast) — the recommended order.
     Supplier<ChargeResult> guarded = Decorators.ofSupplier(call)
         .withCircuitBreaker(breaker)
         .withRetry(retry)                                                     // outermost

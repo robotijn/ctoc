@@ -65,16 +65,16 @@ Vision (The Big Picture)
 
 Before decomposing, validate vision readiness by calling `validateVisionReadiness()` from `src/lib/vision-decomposer.js`.
 
-**Gate checks (blocking):**
-- Problem statement present and specific (not just "improve things")
-- Target audience defined with at least one concrete persona or role
-- Success criteria defined with at least one measurable or observable outcome
-- Vision has `type: vision` marker in frontmatter
+**Gate checks (blocking — the function sets `ready: false` if any fail):**
+- Problem statement present (the vision names the problem it solves)
+- Target audience present (the vision names who it serves)
+- Success criteria present (the vision states what success looks like)
 
 **Gate checks (warning, allow proceeding):**
 - Scope/boundaries defined (what is and is not in scope)
-- Key risk identified
-- RICE score present
+- `type: vision` marker in frontmatter (or a `## Vision:` heading)
+
+These are the checks `validateVisionReadiness()` actually performs — presence checks over the vision text. Beyond passing this mechanical gate, apply your own judgment during Phase 1 on whether each statement is specific enough to decompose (a problem statement of "improve things" clears the gate but is not decomposable).
 
 If validation fails (blocking errors), show errors to user and ask them to complete the vision first (link back to Vision Advisor). If only warnings, show them and allow proceeding.
 

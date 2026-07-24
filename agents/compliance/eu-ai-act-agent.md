@@ -58,9 +58,12 @@ When dispatched at a plan stage:
   helper is the deterministic authority for the plan-text → `risk_class` /
   `annex_iii_category` / `confidence` mapping; do not enumerate the mapping
   yourself.
-- Emit an Inbox finding carrying the helper's `risk_class`,
-  `annex_iii_category`, `regulation_ref`, the triggered-obligation list, and
-  `confidence`. A prohibited match (Art. 5) is a stop-ship finding
+- Emit an Inbox finding carrying the helper's classification (`risk_class`,
+  `annex_iii_category`, `confidence`) together with the `regulation_ref` and the
+  triggered-obligation list drawn from the skill's obligation mapping (the helper
+  returns only the three classification fields; obligations are the skill's
+  authority, per **Rule authority (DRY)** below). A prohibited match (Art. 5) is
+  a stop-ship finding
   (`kind: prohibited-use-detected`, `severity: critical`); a chatbot is a
   transparency finding (`kind: missing-transparency`,
   `regulation_ref: "EU-AI-Act Art. 50"`); a GPAI provider triggers the

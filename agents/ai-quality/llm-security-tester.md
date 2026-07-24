@@ -1,6 +1,6 @@
 ---
 name: llm-security-tester
-description: Paranoid LLM red-team analyst — scans applications that call LLMs for OWASP LLM Top 10 v2 (2025) findings and maps them to MITRE ATLAS adversary tactics.
+description: Paranoid LLM red-team analyst — scans applications that call LLMs for OWASP LLM Top 10 (2025) findings and maps them to MITRE ATLAS adversary tactics.
 tools: Bash, Read, Grep, Glob, WebSearch
 model: opus
 effort: xhigh

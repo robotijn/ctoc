@@ -174,8 +174,13 @@ jq -r 'to_entries[] | select(.value.lines.pct < 80) | "\(.key): \(.value.lines.p
 **Parse Command**:
 ```bash
 # Extract line coverage from JaCoCo
-xmllint --xpath "//report/counter[@type='LINE']/@covered | //report/counter[@type='LINE']/@missed" jacoco.xml 2>/dev/null | \
-  awk -F'"' '{covered=$2; missed=$4; printf "Line Coverage: %.1f%% (%d/%d)\n", (covered/(covered+missed))*100, covered, covered+missed}'
+# Read each attribute on its own with string(): a union xpath (@covered | @missed)
+# emits both attributes in DOCUMENT order (JaCoCo writes missed before covered) on
+# separate output records, so a single-line awk that assigns covered=$2, missed=$4
+# silently swaps the two and reports the miss-rate (15%) as the coverage (85%).
+covered=$(xmllint --xpath "string(//report/counter[@type='LINE']/@covered)" jacoco.xml 2>/dev/null)
+missed=$(xmllint --xpath "string(//report/counter[@type='LINE']/@missed)" jacoco.xml 2>/dev/null)
+awk -v c="$covered" -v m="$missed" 'BEGIN{ if (c+m>0) printf "Line Coverage: %.1f%% (%d/%d)\n", c/(c+m)*100, c, c+m }'
 ```
 
 ### 5. Go Coverage Format

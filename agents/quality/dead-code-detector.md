@@ -36,7 +36,8 @@ the older single-purpose tools. Prefer it for any JS/TS project.
 
 Legacy single-purpose alternatives (only if knip cannot be installed):
 `npx ts-prune` (exports — now in maintenance mode, its own README recommends
-knip), `npx unimported` (orphan files), `npx depcheck` (unused dependencies).
+knip), `npx unimported` (orphan files — archived and no longer maintained, its
+README also points to knip), `npx depcheck` (unused dependencies).
 
 ### Python (vulture)
 ```bash

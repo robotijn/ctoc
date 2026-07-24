@@ -85,7 +85,7 @@ Calls to `toHaveScreenshot` without preceding `waitForLoadState('networkidle')`,
 
 ### 8. AI / Visual-AI misuse
 
-Applitools Visual AI and similar perceptual engines have match levels (`Strict`, `Layout`, `Content`, `Dynamic`). Choosing `Layout` for a brand logo or `Strict` for a chart with live data is misconfiguration. Flag obvious mismatches.
+Applitools Visual AI and similar perceptual engines have match levels (`Strict`, `Layout`, `Content`, `Exact`). Choosing `Layout` for a brand logo or `Strict` for a chart with live data is misconfiguration. Flag obvious mismatches.
 
 ## Stabilization recipes
 
@@ -122,11 +122,11 @@ await expect(page).toHaveScreenshot('checkout.png', {
 
 | Tool | Strengths | Trade-offs | When |
 |------|-----------|-----------|------|
-| **Playwright `toHaveScreenshot`** | Built-in; pixelmatch engine; zero extra deps; first-class TS/JS/Python/Java/.NET bindings | Local baselines; you build the review UI; cross-machine drift unless CI-pinned | Default for any Playwright project |
+| **Playwright `toHaveScreenshot`** | Built-in; pixelmatch engine; zero extra deps; part of the `@playwright/test` JS/TS runner | JS/TS only — the snapshot assertion is not in the Python/Java/.NET ports (they capture only); local baselines; you build the review UI; cross-machine drift unless CI-pinned | Default for any `@playwright/test` project |
 | **Chromatic (Storybook)** | Story-based VR; reviewer UI; per-component baselines; managed cloud storage; cross-browser | Storybook-tied; paid above free tier | Design systems · component libraries |
 | **Percy (BrowserStack)** | Cloud rendering; DOM-capture for determinism; AI diffing; integrates with Cypress/Playwright/Selenium | Paid above free tier (5k snapshots/mo on free) | Page-level VR with team review workflow |
 | **Lost Pixel** | Open-source; Docker-first; Storybook + page modes; self-hosted option | Smaller ecosystem; you operate the storage backend | OSS-only stacks; air-gapped projects |
-| **Applitools Eyes** | Visual AI (match levels: Strict/Layout/Content/Dynamic); Storybook addon; Figma plugin for design-vs-prod | Paid; learning curve for match-level tuning | Enterprise; design-system+brand QA; cross-device |
+| **Applitools Eyes** | Visual AI (match levels: Strict/Layout/Content/Exact); Storybook addon; Figma plugin for design-vs-prod | Paid; learning curve for match-level tuning | Enterprise; design-system+brand QA; cross-device |
 | **Cypress `cypress-image-snapshot` / `@percy/cypress`** | Native Cypress integration | Cypress single-browser-at-a-time model; baselines per browser must be wired manually | Existing Cypress test suites |
 | **BackstopJS** | Mature OSS; Docker-rendered references; HTML report | Older API surface; CSS selectors only; less momentum than Playwright/Chromatic in 2026 | Legacy projects already on Backstop |
 | **Storybook + Chromatic** | Component-first; auto-snapshots each story; built by the Storybook team | Storybook-required | Component-library-driven teams |
@@ -135,7 +135,7 @@ await expect(page).toHaveScreenshot('checkout.png', {
 
 ## Language coverage
 
-Visual regression is overwhelmingly TS/JS-driven (Playwright/Cypress/Storybook + Chromatic/Percy). Playwright ships first-class bindings for Python, Java, and .NET, so the same `toHaveScreenshot` semantics apply there. C/C++ and SQL have no native VR surface and are omitted with rationale.
+Visual regression is overwhelmingly TS/JS-driven (Playwright/Cypress/Storybook + Chromatic/Percy). Playwright's `toHaveScreenshot` snapshot assertion is a feature of the `@playwright/test` JS/TS runner ONLY — it does NOT exist in the Python, Java, or .NET ports (verified against the current Playwright source: `PageAssertions` in those ports exposes `hasTitle`/`hasURL`/`matchesAriaSnapshot` and no screenshot assertion). Those ports drive the browser and can capture pixels, but baseline management and the comparison itself come from a third-party image diff (pixelmatch, odiff) or a visual-testing SaaS SDK (Applitools, Percy — which ship Python/Java/.NET SDKs). C/C++ and SQL have no native VR surface and are omitted with rationale.
 
 ### TypeScript / JavaScript (Playwright — primary)
 
@@ -182,108 +182,17 @@ test('checkout — VR', async ({ page }) => {
 });
 ```
 
-### C# / .NET (Microsoft.Playwright)
+### Python, Java, and .NET (Playwright ports — capture only, diff externally)
 
-```csharp
-// Playwright .NET — toHaveScreenshotAsync with masks, thresholds, animations disabled.
-// Browser baselines auto-suffix; cross-browser handled by playwright.config or test setup.
-using Microsoft.Playwright;
-using Microsoft.Playwright.MSTest;
+Playwright's browser bindings are first-class in Python, Java, and .NET, but the visual-comparison assertion (`to_have_screenshot` / `hasScreenshot` / `ToHaveScreenshotAsync`) does NOT exist in those ports — it is a `@playwright/test` (JS/TS) test-runner feature. In these runtimes you capture the pixels with the port's screenshot method and hand the bytes to a diff engine or a SaaS SDK that owns baselines and review:
 
-[TestClass]
-public class CheckoutVisualTests : PageTest
-{
-    [TestMethod]
-    public async Task Checkout_MatchesBaseline()
-    {
-        await Page.Clock.SetFixedTimeAsync(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
-        await Page.GotoAsync("/checkout");
-        await Page.EvaluateAsync("() => document.fonts.ready");
-        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+- **Python** — `page.screenshot(path="checkout.png")`, then compare with `pixelmatch`/`odiff`, or drive the Applitools/Percy Python SDK.
+- **Java** — `page.screenshot(new Page.ScreenshotOptions().setPath(Paths.get("checkout.png")))`, then diff externally, or use the Applitools Java SDK.
+- **C# / .NET** — `await Page.ScreenshotAsync(new() { Path = "checkout.png" })`, then diff externally, or use the Applitools .NET SDK.
 
-        await Expect(Page).ToHaveScreenshotAsync("checkout.png", new()
-        {
-            FullPage    = true,
-            Animations  = ScreenshotAnimations.Disabled,
-            Caret       = ScreenshotCaret.Hide,
-            Threshold   = 0.15f,
-            MaxDiffPixels = 200,
-            MaxDiffPixelRatio = 0.01f,
-            Mask = new[] {
-                Page.Locator(".timestamp"),
-                Page.Locator("[data-testid=ad-slot]"),
-            },
-        });
-    }
-}
-```
+The stabilization steps in the TS/JS example — disable animations, wait for `document.fonts.ready` and `networkidle`, freeze the clock via the Clock API (`page.clock`, available in every port since Playwright 1.45), and mask dynamic regions — apply identically before capture in every port. Only the assertion/baseline layer differs: JS/TS gets it from `@playwright/test`; the other ports get it from the diff engine or SaaS SDK.
 
-Blazor: snapshot the rendered DOM in the browser via Playwright .NET above — same as any other server-rendered app. Do not snapshot the Blazor `RenderTreeFrame`; the rendered HTML is the surface users see.
-
-### Java (Playwright for Java)
-
-```java
-import com.microsoft.playwright.*;
-import com.microsoft.playwright.assertions.LocatorAssertions;
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
-
-public class CheckoutVisualTest {
-    @Test
-    void checkoutMatchesBaseline() {
-        try (Playwright pw = Playwright.create();
-             Browser browser = pw.chromium().launch();
-             BrowserContext ctx = browser.newContext(new Browser.NewContextOptions()
-                 .setViewportSize(1280, 720));
-             Page page = ctx.newPage()) {
-
-            page.clock().setFixedTime("2026-01-01T00:00:00Z");
-            page.navigate("/checkout");
-            page.evaluate("() => document.fonts.ready");
-            page.waitForLoadState(LoadState.NETWORKIDLE);
-
-            assertThat(page).hasScreenshot("checkout.png", new Page.AssertHasScreenshotOptions()
-                .setFullPage(true)
-                .setAnimations(ScreenshotAnimations.DISABLED)
-                .setCaret(ScreenshotCaret.HIDE)
-                .setThreshold(0.15)
-                .setMaxDiffPixels(200)
-                .setMaxDiffPixelRatio(0.01)
-                .setMask(java.util.List.of(
-                    page.locator(".timestamp"),
-                    page.locator("[data-testid=ad-slot]")
-                )));
-        }
-    }
-}
-```
-
-### Python (Playwright Python)
-
-```python
-# Playwright Python — pytest-playwright plugin
-import pytest
-from playwright.sync_api import Page, expect
-
-def test_checkout_matches_baseline(page: Page):
-    page.clock.set_fixed_time("2026-01-01T00:00:00Z")
-    page.goto("/checkout")
-    page.evaluate("() => document.fonts.ready")
-    page.wait_for_load_state("networkidle")
-
-    expect(page).to_have_screenshot(
-        "checkout.png",
-        full_page=True,
-        animations="disabled",
-        caret="hide",
-        threshold=0.15,
-        max_diff_pixels=200,
-        max_diff_pixel_ratio=0.01,
-        mask=[
-            page.locator(".timestamp"),
-            page.locator("[data-testid=ad-slot]"),
-        ],
-    )
-```
+Blazor: snapshot the rendered DOM in the browser via Playwright .NET's `Page.ScreenshotAsync` and diff externally — same as any other server-rendered app. Do not snapshot the Blazor `RenderTreeFrame`; the rendered HTML is the surface users see.
 
 ### Skipped languages (rationale)
 

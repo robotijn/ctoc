@@ -19,22 +19,30 @@ You analyze infrastructure configurations and cloud resource usage to identify c
 
 ## Commands
 
-### Infracost (Terraform)
+### Infracost (Terraform / OpenTofu)
 ```bash
-# Estimate costs (HCL parsing — no cloud credentials needed)
-infracost breakdown --path .
+# The current Infracost CLI centres on `scan` and `inspect`. The older
+# `breakdown`, `diff --compare-to`, and `comment github --policy-path` commands
+# (and local OPA/Rego policy files) are superseded — cost, FinOps, and tagging
+# policies are now organization settings applied automatically by `scan`.
 
-# PR cost diff: save a baseline from the base branch, then diff against it.
-# --compare-to takes a saved Infracost JSON file, NOT a git branch name.
-infracost breakdown --path . --format json --out-file infracost-base.json
-infracost diff --path . --compare-to infracost-base.json
+# Estimate costs — reads infrastructure-as-code from a directory, prices it, and
+# applies your organization's FinOps and tagging policies (HCL parsing; no cloud
+# credentials needed).
+infracost scan                 # scans the current directory
+infracost scan ./terraform     # or a specific path
+infracost scan tfplan.json     # or price a saved Terraform plan file
+infracost scan --json          # machine-readable output
 
-# OPA/Rego cost-policy gate — exits non-zero when a policy denies.
-# Policies are enforced via --policy-path (a .rego file), e.g. at PR comment time:
-infracost comment github \
-  --path infracost-base.json \
-  --policy-path infracost-policy.rego \
-  --repo "$REPO" --pull-request "$PR" --github-token "$GITHUB_TOKEN"
+# Drill into a cached scan result — resource-level detail, cost drivers, and the
+# largest FinOps savings or policy findings.
+infracost inspect --summary            # headline totals
+infracost inspect --top-savings 10     # 10 findings with the largest savings
+infracost inspect --missing-tag Environment  # resources missing a required tag
+
+# Cost policies, budgets, and guardrails are organization settings
+# (`infracost policies`, `infracost budgets`, `infracost guardrails`) enforced by
+# `scan`; wire the pull-request cost check into CI with `infracost ci setup`.
 ```
 
 ### AWS Cost Analysis

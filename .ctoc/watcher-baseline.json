@@ -4,7 +4,7 @@
   "establishedAtVersion": "6.12.78",
   "template": ".ctoc/templates/watcher.md",
   "w1_started": true,
-  "maxLegacy": 123,
+  "maxLegacy": 122,
   "conforming": [
     "agents/iron-loop/advocate-critic.md"
   ],
@@ -90,7 +90,6 @@
     "agents/saas/stripe-subscriptions.md",
     "agents/saas/supabase-data.md",
     "agents/saas/vercel-deploy.md",
-    "agents/saas/workos-sso.md",
     "agents/safety/fault-tree-builder.md",
     "agents/safety/fmeda-analyzer.md",
     "agents/safety/redundancy-pattern-picker.md",

@@ -45,7 +45,7 @@ Five patterns load-bearing for a smart runner in 2026. Skipping any of these is 
 - **Cache test results by content-hash (per-file SHA256), not by branch name**. The cache key is `sha256(file content) → {passed, duration, covered_tests}`. This survives branch switches, rebases, and cherry-picks. Branch-keyed caches mis-fire on rebase.
 - **Detect and quarantine flaky tests, don't retry-loop in silence**. A test that fails then passes on retry is a flake — emit a clear signal, append to `.ctoc/quality-state/flaky-tests.json`, and let the gate-level workflow decide. Silent retry hides real bugs (race conditions, timing assumptions, leaked state). Industry quarantine playbook: name an owner, set a removal date (2 sprints is a common cap), and exclude from the merge-gate count until the owner ships a fix.
 - **Explicit "all tests" override for risky changes**. Config files (tsconfig, .eslintrc, jest.config, vitest.config, pyproject.toml, Cargo.toml, go.mod, pom.xml, build.gradle, .csproj, CMakeLists.txt, package.json/lock), dependency manifests, the test runner itself, and any change to the coverage-map generator force a full suite — no exceptions. The user can also force-run with `ctoc test --all` when intuition says the TIA call graph might be wrong.
-- **No transitive call analysis is the silent killer**. A change to `lib/util.js` that breaks `lib/auth.js` (which calls it) will be missed by naive "filename → test" mapping. The coverage map must encode the call graph or import graph, not just direct test → source coverage. Tools like Bazel and Nx build this from the dependency DAG; runner-level tools (`vitest related`, `jest --findRelatedTests`, pytest-testmon) derive it from per-test coverage collection.
+- **No transitive call analysis is the silent killer**. A change to `lib/util.js` that breaks `lib/auth.js` (which calls it) will be missed by naive "filename → test" mapping. The coverage map must encode the call graph or import graph, not just direct test → source coverage. Tools like Bazel and Nx build this from the dependency DAG; runner-level tools derive it two ways — from the static module import graph (`vitest related`, `jest --findRelatedTests`, which therefore miss dynamic imports) or from per-test runtime coverage (`pytest --testmon`).
 
 ## Trigger
 
@@ -103,7 +103,7 @@ Use the language-native smart runner first; fall back to graph-based monorepo to
 
 ### TypeScript / JavaScript
 ```bash
-# Vitest — derives related tests from per-test coverage; respects transitive imports
+# Vitest — derives related tests from the static import graph (misses dynamic imports); respects transitive imports
 npx vitest related src/file1.ts src/file2.ts
 # Equivalent watch mode: vitest --changed picks up git diff vs HEAD
 

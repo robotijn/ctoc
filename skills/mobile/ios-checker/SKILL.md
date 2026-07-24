@@ -400,8 +400,15 @@ xcodebuild -scheme MyApp \
 ```bash
 # Swift Testing is the modern framework as of Xcode 16+; XCTest is still supported.
 # Either is fine; the skill checks for the presence of at least one and >=80% line coverage on changed files.
+#
+# Unlike `build`, the `test` action needs a CONCRETE, bootable simulator: a bare
+# `generic/platform=iOS Simulator` is rejected ("Testing against a generic
+# destination is not supported"). Generic destinations are valid only for
+# `build` / `build-for-testing`. To avoid hard-pinning a model that a rotating CI
+# image may drop, resolve an available simulator at run time (`xcrun simctl list
+# devices available`) or use `OS=latest` with a device the CI image reliably ships.
 xcodebuild test -scheme MyApp \
-  -destination 'generic/platform=iOS Simulator' \
+  -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
   -resultBundlePath TestResults.xcresult \
   -enableCodeCoverage YES
 ```

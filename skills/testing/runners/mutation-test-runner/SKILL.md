@@ -237,12 +237,12 @@ git diff main > pr.diff && cargo mutants --in-diff pr.diff
 |--------|---------|
 | **Killed** | Test caught the mutation — good |
 | **Survived** | Test missed the bug — gap |
-| **Timeout** | Mutation caused infinite loop — usually killed-equivalent |
+| **Timeout** | Mutation caused a hang / non-termination — **counted as detected** (numerator, same as Killed) |
 | **No Coverage** | Code not exercised by any test at all — coverage problem, not mutation problem |
 | **Equivalent** | Semantically identical to original — unkillable by definition |
 | **Compile Error** | Mutation produced invalid code — tool excludes from score |
 
-**Mutation Score** = `Killed / (Killed + Survived) × 100%`. Timeouts, no-coverage, equivalent, and compile-error mutants are excluded from the denominator.
+**Mutation Score** = `Detected / Valid × 100%` = `(Killed + Timeout) / (Killed + Timeout + Survived + No Coverage) × 100%`. Timeout mutants are **detected** — the hang is the test catching the mutation — so they sit in the numerator alongside Killed. No Coverage stays in the denominator (untested code must drag the score down). Equivalent and compile-error mutants are *invalid* and excluded from both numerator and denominator. This is Stryker's default `mutationScore` — the exact value its `break` threshold gates on. Stryker's separate `mutationScoreBasedOnCoveredCode` = `Detected / (Detected + Survived) × 100%` additionally drops No Coverage from the denominator; quote it only when coverage is already gated elsewhere, and never confuse it with the `break` number.
 
 | Score | Quality |
 |-------|---------|
@@ -285,7 +285,7 @@ The rationale matches `sast-scanner`: a low mutation score on a payment module t
 | Equivalent (flagged) | 12 |
 | Compile Error | 0 |
 
-**Mutation Score**: 85.7% (487 / (487 + 81))
+**Mutation Score**: 84.2% (detected 505 = killed 487 + timeout 18; valid 600 = detected + survived 81 + no-coverage 14; 12 flagged-equivalent excluded)
 **Critical-path score** (Auth/Payment): 78.4%
 **Δ vs. baseline**: −0.6 pp (no regression alert)
 
@@ -325,6 +325,7 @@ measured_mutation_score: 78.4                            # percentage, two decim
 threshold: 75.0                                          # the gate this finding violated (or null for advisory)
 delta_to_baseline: -10.2                                 # pp change vs prior run; null on first run
 mutants_killed: 487
+mutants_timeout: 18                                      # detected, part of the score numerator
 mutants_survived: 81
 mutants_no_coverage: 14
 mutants_equivalent_flagged: 12

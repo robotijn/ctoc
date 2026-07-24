@@ -62,7 +62,7 @@ npm install @workos-inc/node
 # placeholders — never commit real keys
 WORKOS_API_KEY=sk_test_PLACEHOLDER
 WORKOS_CLIENT_ID=client_PLACEHOLDER
-WORKOS_WEBHOOK_SECRET=whsec_PLACEHOLDER
+WORKOS_WEBHOOK_SECRET=<webhook signing secret from WorkOS Dashboard — no fixed prefix>
 WORKOS_COOKIE_PASSWORD=<32+ random bytes via openssl rand -hex 32>
 WORKOS_REDIRECT_URI=https://yourapp.example.com/api/auth/callback
 ```

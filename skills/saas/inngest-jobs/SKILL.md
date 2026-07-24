@@ -92,8 +92,7 @@ The same idempotency + step + retry discipline applies across languages. C/C++ i
 ```typescript
 // BAD: side effect outside step.run — retry double-sends the email
 export const sendWelcomeBad = inngest.createFunction(
-  { id: "send-welcome-bad", retries: 3 },
-  { event: "user/created" },
+  { id: "send-welcome-bad", retries: 3, triggers: { event: "user/created" } },
   async ({ event }) => {
     await sendEmail({ to: event.data.email, template: "welcome" }); // duplicated on every retry
     await db.insert(welcomeSent).values({ userId: event.data.userId });
@@ -108,13 +107,13 @@ export const sendWelcome = inngest.createFunction(
   {
     id: "send-welcome",
     retries: 4,                                       // default; explicit for clarity
+    triggers: { event: "user/created" },              // v4: trigger nests in options
     concurrency: { key: "event.data.tenantId", limit: 5 },
     rateLimit: { limit: 100, period: "1m" },          // protect Resend
     onFailure: async ({ event, error }) => {
       await inngest.send({ name: "welcome/failed", data: { event, error: error.message } });
     },
   },
-  { event: "user/created" },
   async ({ event, step }) => {
     if (!event.data?.userId) throw new NonRetriableError("missing userId");
 
@@ -324,7 +323,7 @@ COMMIT;
 ### 1. Install + initialize
 
 ```bash
-npm install inngest
+npm install inngest   # examples target the v4 SDK (current major) — triggers nest in options
 ```
 
 ```typescript
@@ -358,8 +357,7 @@ export const { GET, POST, PUT } = serve({
 
 ```typescript
 export const weeklyReport = inngest.createFunction(
-  { id: "weekly-report" },
-  { cron: "0 9 * * MON" },                            // Monday 09:00 UTC
+  { id: "weekly-report", triggers: { cron: "0 9 * * MON" } },   // Monday 09:00 UTC
   async ({ step }) => {
     const tenants = await step.run("list-tenants", () =>
       db.query.tenants.findMany({ where: eq(tenants.active, true) })
@@ -387,12 +385,12 @@ export const sendReport = inngest.createFunction(
   {
     id: "send-report",
     retries: 4,
+    triggers: { event: "report/send" },
     concurrency: { key: "event.data.tenantId", limit: 3 },  // per-tenant fairness
     onFailure: async ({ event, error }) => {
       await inngest.send({ name: "report/failed", data: { event, error: error.message } });
     },
   },
-  { event: "report/send" },
   async ({ event, step }) => { /* per-tenant logic, all side effects in step.run */ }
 );
 ```
@@ -404,11 +402,11 @@ export const dunning = inngest.createFunction(
   {
     id: "dunning",
     retries: 0,                                       // Stripe Smart Retries handles billing
+    triggers: { event: "billing/payment-failed" },
     onFailure: async ({ event, error }) => {
       await inngest.send({ name: "dunning/failed", data: { event, error: error.message } });
     },
   },
-  { event: "billing/payment-failed" },
   async ({ event, step }) => {
     await step.sleep("wait-before-email", "10m");
 

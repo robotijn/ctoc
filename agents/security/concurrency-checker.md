@@ -102,7 +102,7 @@ async function fetchData() {
 ### Go
 ```bash
 go test -race ./...   # dynamic data-race detector (instruments the test binary)
-go vet ./...          # static concurrency vet: copylock, loopclosure
+go vet ./...          # static concurrency vet: copylocks, loopclosure, atomic
 staticcheck ./...
 ```
 
@@ -155,8 +155,8 @@ spotbugs -include threads.xml
 ### Async Issues (JavaScript/TypeScript)
 1. **await inside forEach** (`api/batch.ts:23`)
    - Pattern: `items.forEach(async item => await process(item))`
-   - Issue: Runs sequentially, not parallel
-   - Fix: `await Promise.all(items.map(process))`
+   - Issue: `forEach` does not await the async callbacks — the loop returns before any `process(item)` completes, so completion is never awaited and rejections become unhandled (fire-and-forget, callbacks overlap concurrently)
+   - Fix: `await Promise.all(items.map(process))` to run in parallel and await all, or `for (const item of items) await process(item)` to run sequentially
 
 ### Recommendations
 1. Add mutex to cache operations

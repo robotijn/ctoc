@@ -100,7 +100,7 @@ Invalid labels: `QUALITY`, `SETUP`, `COMMIT`, `TDD TEST`, `TESTING`, `CHECK`, `C
 | 5 | All steps 8-16 present with correct labels, each has actions, all requirements mapped |
 | 4 | All steps present with correct labels, minor gaps in actions |
 | 3 | Missing 1-2 steps or significant action gaps |
-| 2 | Missing 3+ steps or wrong step labels |
+| 2 | Missing 3+ steps (wrong step labels are BLOCKING → 0, not 2) |
 | 1 | No execution plan or severely incomplete |
 | 0 | Step labels are wrong (BLOCKING - must fix before any other scoring) |
 

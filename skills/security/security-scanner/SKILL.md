@@ -51,7 +51,7 @@ You are the smallest scope of an *Application Security Posture Management* (ASPM
   2. **PR**: differential SAST against base branch + full SCA + secrets verified + license check. Budget: < 2 min.
   3. **Pre-deploy**: deep SAST (CodeQL), DAST (ZAP/Burp), container scan, IaC scan, SBOM diff. Budget: scheduled, not blocking.
   This skill operates at layers 1 and 2.
-- **SARIF is the lingua franca**. All engines must emit SARIF 2.1.0. You aggregate, you do not re-parse engine-native JSON. SARIF `baselineGuid`, `fingerprints`, and `result.properties.baselineState` let you mark findings `unchanged | new | absent | updated` across runs — this is how you suppress noise without losing signal.
+- **SARIF is the lingua franca**. All engines must emit SARIF 2.1.0. You aggregate, you do not re-parse engine-native JSON. SARIF `baselineGuid`, `fingerprints`, and `result.baselineState` let you mark findings `unchanged | new | absent | updated` across runs — this is how you suppress noise without losing signal.
 - **Policy as code, not as policy doc**. The gate decision lives in `.ctoc/security-policy.yaml` and is enforced by code, not by humans reading a wiki. Treat the policy file like a test fixture: versioned, reviewed, diffed in PRs.
 - **OWASP Top 10 2025 (final)** — the ranking changed in 2025. Use these tags, not the 2021 ones:
 
@@ -450,7 +450,7 @@ The orchestrator emits a `severity: critical` letter when any allowlist entry ex
 | Stage 3 (pre-release, scheduled) | < 30 min | + full SCA + CodeQL full repo + container/IaC + SBOM diff |
 | Stage 4 (aggregate, always) | < 2 s | read SARIF, dedup, baseline-diff, policy-match |
 
-Misses on Stage 1 are treated as bugs and tracked in the [[performance-budget]] skill.
+Misses on Stage 1 are treated as bugs and tracked in the [[performance-validator]] skill.
 
 ## Letter schema (refinement-loop output contract)
 

@@ -27,6 +27,9 @@ You validate that new developers can successfully onboard to the project by test
 | .env.example | Environment template | ✅ |
 | LICENSE | Legal terms | ✅ |
 | CHANGELOG.md | Version history | Recommended |
+| .devcontainer/devcontainer.json | One-command reproducible dev environment (also drives GitHub Codespaces) | Recommended |
+| Bootstrap script (e.g. `scripts/bootstrap`, `Makefile` setup target) | Single command that installs and configures everything | Recommended |
+| Version-pin file (`.nvmrc`, `.tool-versions`, or `engines` in `package.json`) | Pins the toolchain version new developers must use | Recommended |
 
 ### Documentation Sections
 | Section | Purpose |
@@ -102,6 +105,29 @@ npm test 2>&1 || echo "TESTS_FAILED"
 
 # Check coverage
 npm run coverage 2>&1 || echo "COVERAGE_FAILED"
+```
+
+### 5. Container Environment and Version Pinning
+```bash
+# Dev container / Codespaces: the file lives at .devcontainer/devcontainer.json
+# (GitHub Codespaces reads the exact same file).
+if [ -f .devcontainer/devcontainer.json ]; then
+  # Verify it declares an environment: an image, a build, or a compose file.
+  grep -Eq '"(image|build|dockerComposeFile)"' .devcontainer/devcontainer.json \
+    || echo "DEVCONTAINER_NO_ENVIRONMENT"
+else
+  echo "MISSING: .devcontainer/devcontainer.json (no reproducible dev environment)"
+fi
+
+# Bootstrap script: a single command should set the project up from a fresh clone.
+if [ ! -x scripts/bootstrap ] && [ ! -f Makefile ] && ! grep -q '"setup"' package.json 2>/dev/null; then
+  echo "MISSING: bootstrap entry point (scripts/bootstrap, Makefile, or npm setup script)"
+fi
+
+# Version pinning: the toolchain version must be pinned so everyone matches.
+if [ ! -f .nvmrc ] && [ ! -f .tool-versions ] && ! grep -q '"engines"' package.json 2>/dev/null; then
+  echo "MISSING: version pin (.nvmrc, .tool-versions, or engines in package.json)"
+fi
 ```
 
 ## Documentation Quality

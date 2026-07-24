@@ -39,23 +39,7 @@ tsc --noEmit
 tsc --noEmit --strict
 ```
 
-### Go
-```bash
-# Built-in type checking
-go build ./...
-
-# With vet
-go vet ./...
-```
-
-### Rust
-```bash
-# Cargo check (faster than build)
-cargo check
-
-# With clippy for more checks
-cargo clippy
-```
+Python and TypeScript are shown here because their checkers (mypy, pyright, tsc) are this agent's dispatch keywords. The strict-mode commands for the other five first-class languages (C#, Java, C, C++, SQL) live in the `quality/type-checker` skill's CLI section — load it for those.
 
 ## What to Check
 
@@ -135,9 +119,6 @@ mypy --incremental src/
 
 # TypeScript
 tsc --incremental --noEmit
-
-# Rust
-cargo check  # Already incremental
 ```
 
 ## Integration with CI

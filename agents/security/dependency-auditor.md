@@ -188,12 +188,12 @@ cargo deny check licenses
   "vulnerabilities": [
     {
       "package": "lodash",
-      "version": "4.17.15",
-      "cve": "CVE-2021-23337",
+      "version": "4.17.11",
+      "cve": "CVE-2019-10744",
       "severity": "critical",
-      "cvss": 9.8,
+      "cvss": 9.1,
       "title": "Prototype Pollution",
-      "fixedIn": "4.17.21",
+      "fixedIn": "4.17.12",
       "path": "project > webpack > lodash",
       "isDirect": false,
       "exploitAvailable": true,
@@ -245,14 +245,14 @@ cargo deny check licenses
 
 ---
 
-### CRITICAL: CVE-2021-23337 (lodash)
+### CRITICAL: CVE-2019-10744 (lodash)
 
-**Package**: lodash@4.17.15
-**CVSS**: 9.8 (CRITICAL)
+**Package**: lodash@4.17.11
+**CVSS**: 9.1 (CRITICAL)
 **Title**: Prototype Pollution
 
 **Description**:
-Lodash versions prior to 4.17.21 are vulnerable to Prototype Pollution via the setWith and set functions.
+Lodash versions prior to 4.17.12 are vulnerable to Prototype Pollution: the defaultsDeep function can be tricked into adding or modifying properties of Object.prototype using a constructor payload.
 
 **Exploit Available**: Yes (public)
 
@@ -260,19 +260,19 @@ Lodash versions prior to 4.17.21 are vulnerable to Prototype Pollution via the s
 ```
 project
   -> webpack@4.46.0
-    -> lodash@4.17.15 (VULNERABLE)
+    -> lodash@4.17.11 (VULNERABLE)
 ```
 
 **Remediation**:
 ```bash
 # If direct dependency
-npm install lodash@4.17.21
+npm install lodash@4.17.12
 
 # If transitive, add override
 # package.json:
 {
   "overrides": {
-    "lodash": "^4.17.21"
+    "lodash": "^4.17.12"
   }
 }
 npm install
@@ -280,23 +280,22 @@ npm install
 
 **Verification**:
 ```bash
-npm ls lodash  # Should show 4.17.21
+npm ls lodash  # Should show 4.17.12 or later
 ```
 
 ---
 
-### HIGH: CVE-2023-45857 (axios)
+### HIGH: CVE-2021-3749 (axios)
 
 **Package**: axios@0.21.1
-**CVSS**: 9.1 (HIGH)
-**Title**: Server-Side Request Forgery
+**CVSS**: 7.5 (HIGH)
+**Title**: Inefficient Regular Expression Complexity (ReDoS)
 
 **Remediation**:
 ```bash
-npm install axios@1.6.0
+npm install axios@0.21.2
 
-# Note: Major version change - review breaking changes
-# Migration guide: https://github.com/axios/axios/blob/main/MIGRATION_GUIDE.md
+# Patch release - no breaking changes
 ```
 
 ---
@@ -326,8 +325,8 @@ npm install axios@1.6.0
 ### Recommended Actions
 
 #### Immediate (Within 24 Hours)
-1. Upgrade `lodash` to 4.17.21
-2. Upgrade `axios` to 1.6.0 or 0.27.2 (interim)
+1. Upgrade `lodash` to 4.17.12 or later
+2. Upgrade `axios` to 0.21.2 or later
 
 #### This Week
 1. Review medium-severity CVEs

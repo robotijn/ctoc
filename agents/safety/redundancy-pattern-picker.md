@@ -153,7 +153,7 @@ metadata:
 - Channels declared diverse share a dependency you can point to in the repository.
 - Identical redundancy is claimed against a systematic fault class.
 
-**On N-version programming specifically:** the skill's catalogue records that independent implementations of one specification correlate more than independence would predict — the finding from Knight and Leveson in 1986, which an Analog Devices note in 2024 confirms still holds in modern practice. A recommendation of N-version programming that does not acknowledge this residual correlation is incomplete: warn and require the caveat. Treat the pattern as a partial mitigation, never as a guarantee.
+**On N-version programming specifically:** the skill's catalogue records that independent implementations of one specification correlate more than independence would predict — the finding from Knight and Leveson's 1986 multiversion-programming experiment, which ran twenty-seven independent implementations of one specification and measured failure correlation well above the level independence predicts. A recommendation of N-version programming that does not acknowledge this residual correlation is incomplete: warn and require the caveat. Treat the pattern as a partial mitigation, never as a guarantee.
 
 **Never do these:**
 

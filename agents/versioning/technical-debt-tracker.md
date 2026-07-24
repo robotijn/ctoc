@@ -84,8 +84,12 @@ npm audit --json
 
 ### Coverage Gaps
 ```bash
-# Find untested files
-npx jest --coverage --json | jq '.coverageMap | to_entries[] | select(.value.statementMap | length > 0 and .value.s | values | all(. == 0))'
+# Find fully-untested files. The default `json` coverage reporter writes
+# coverage/coverage-final.json (istanbul format, keyed by file path, with
+# per-statement hit counts under `s`). Select files that have statements
+# but where every statement count is zero.
+npx jest --coverage
+jq -r 'to_entries[] | select((.value.s | length > 0) and ([.value.s[]] | all(. == 0))) | .key' coverage/coverage-final.json
 ```
 
 ## Debt Quantification

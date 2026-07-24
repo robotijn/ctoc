@@ -75,17 +75,22 @@ from opentelemetry import metrics
 
 meter = metrics.get_meter("checkout-service")
 
-# RED — rate, errors, duration
-http_requests = meter.create_counter("http.server.requests", description="Count of HTTP requests")
-http_errors = meter.create_counter("http.server.errors", description="Count of HTTP 5xx responses")
+# RED via the ONE stable HTTP server metric in the semantic conventions:
+# http.server.request.duration (histogram, unit "s"). The convention defines
+# NO http.server.requests or http.server.errors counter — Rate is this
+# histogram's request count, and Errors are the subset whose error.type
+# attribute is set (or whose http.response.status_code is 5xx). Both are
+# queries over this one instrument's attributes, not separate metrics.
 http_latency = meter.create_histogram(
     "http.server.request.duration", unit="s", description="HTTP server request duration")
 
-# Recording — labels are BOUNDED (templated route, method, status)
-http_requests.add(1, {"http.route": "/orders/{id}", "http.request.method": "POST",
-                      "http.response.status_code": 200})
+# Recording — labels are BOUNDED (templated route, method, status). Per the
+# convention error.type is populated ONLY on failure, so a success omits it.
+http_latency.record(0.042, {"http.route": "/orders/{id}", "http.request.method": "POST",
+                            "http.response.status_code": 200})
 
-# USE — utilization, saturation
+# USE — utilization, saturation. queue.depth is an application-defined metric
+# (NOT an HTTP semantic-convention name), so it lives under the service's own namespace.
 queue_depth = meter.create_observable_gauge(
     "queue.depth", callbacks=[lambda _: [metrics.Observation(redis.llen("payments"))]])
 ```

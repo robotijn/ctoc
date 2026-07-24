@@ -30,7 +30,7 @@ when_to_load:
 related_skills:
   - compliance/gdpr-compliance-checker
   - compliance/license-scanner
-  - quality/accessibility-checker
+  - specialized/accessibility-checker
 effort_level: medium
 model: opus
 tools: Read, Write, WebFetch

@@ -267,7 +267,7 @@ The detection stack has matured around four layers — registry-check, malicious
 
 | Layer | Tools | Purpose |
 |---|---|---|
-| Existence + audit | `npm audit`, `pip audit`, `cargo audit`, `go list -m`, `nuget audit`, `mvn dependency:resolve` | Does it resolve? Any known CVEs? |
+| Existence + audit | `npm audit`, `pip-audit`, `cargo audit`, `go list -m`, `dotnet list package --vulnerable`, `mvn dependency:resolve` | Does it resolve? Any known CVEs? |
 | Malicious-package detection | **Socket.dev**, **Snyk Open Source**, **Aikido Intel**, **GitHub Advisory Database** | Behavioral analysis catches install-script malware, typosquatting and slopsquatting names; Socket also scores post-install scripts and network calls |
 | Slopsquatting-specific | Community **slopcheck** tools (e.g. the npm and Python CLIs of that name) and public known-hallucination corpora (e.g. the DepScope hallucinations dataset) | Cross-check imports against a corpus of names already observed as LLM hallucinations before install |
 | Signature / provenance | **Sigstore** (`cosign verify`, Rekor lookup), **npm provenance**, **PyPI Trusted Publishers (PEP 740)**, **Maven GPG**, **NuGet signing**, **Go sumdb** | Verify the artifact's chain back to the source repo |
@@ -278,7 +278,7 @@ Recommended pre-merge gate (CI):
 ```bash
 # 1. Resolve and audit
 npm ci && npm audit --omit=dev
-pip install -r requirements.txt && pip audit
+pip install -r requirements.txt && pip-audit
 cargo audit
 go list -m -u all && govulncheck ./...
 

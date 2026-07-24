@@ -1132,3 +1132,4 @@ echo "Dependency check passed"
   "failOnViolation": true,
   "warnOnDegrade": true
 }
+```

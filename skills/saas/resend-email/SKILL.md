@@ -23,7 +23,7 @@ related_skills:
   - saas/stripe-subscriptions
   - saas/clerk-auth
   - security/security-scanner
-  - rate-limiting
+  - saas/rate-limiting
 effort_level: medium
 model: sonnet
 tools: Read, Write, Edit, Bash
@@ -307,9 +307,10 @@ export async function POST(req: NextRequest) {
 
   switch (type) {
     case 'email.bounced':
-      // Resend classifies bounces as 'Permanent' or 'Temporary' (with a finer `subType`
-      // like 'Suppressed' or 'MessageRejected'). Only PERMANENT bounces go to suppression —
-      // Temporary bounces (mailbox full, greylisting) are retried, not suppressed.
+      // Resend classifies bounces as 'Permanent', 'Transient', or 'Undetermined' (with a
+      // finer `subType` like 'Suppressed' or 'MessageRejected'). Only PERMANENT bounces go
+      // to suppression — Transient bounces (mailbox full, message too large) are retried,
+      // and Undetermined is inconclusive, so neither suppresses.
       if (data.bounce?.type === 'Permanent') {
         await db.insert(db.schema.suppressionList).values({
           email: recipient,
@@ -352,9 +353,10 @@ type ResendWebhookEvent = {
   data: {
     email_id: string;
     to: string[];
-    // Resend bounce object: `type` is 'Permanent' | 'Temporary'; `subType` is the finer
-    // reason ('Suppressed', 'MessageRejected', 'MailboxFull', ...); `message` is the SMTP text.
-    bounce?: { type: 'Permanent' | 'Temporary'; subType?: string; message?: string };
+    // Resend bounce object: `type` is 'Permanent' | 'Transient' | 'Undetermined'; `subType`
+    // is the finer reason ('Suppressed', 'MessageRejected', 'MailboxFull', ...); `message` is
+    // the SMTP text.
+    bounce?: { type: 'Permanent' | 'Transient' | 'Undetermined'; subType?: string; message?: string };
   };
 };
 ```
@@ -635,7 +637,7 @@ CREATE TABLE bounce_log (
   id                   BIGSERIAL PRIMARY KEY,
   provider_message_id  TEXT,
   recipient            TEXT NOT NULL,                  -- lowercased
-  bounce_type          TEXT NOT NULL,                  -- Resend: 'Permanent' | 'Temporary' | 'unknown'
+  bounce_type          TEXT NOT NULL,                  -- Resend: 'Permanent' | 'Transient' | 'Undetermined' | 'unknown'
   bounce_subtype       TEXT,                           -- Resend subType: 'Suppressed'|'MessageRejected'|'MailboxFull'|...
   diagnostic           TEXT,                           -- SMTP diagnostic message from provider
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
