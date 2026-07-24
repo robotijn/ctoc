@@ -104,6 +104,8 @@ launch_kpis:
   - id: activation_rate
     target: "> 30%"
     activation_event: "created_first_invoice"  # product-specific
+  - id: time_to_value
+    target: "< 300s"
   - id: w1_retention
     target: "> 25%"
   - id: free_to_paid_conversion
@@ -139,13 +141,13 @@ response:
 
 ## Edge cases
 
-- **Pre-revenue product**: include `free_to_paid_conversion` as "target TBD" but still instrument the event.
+- **Pre-revenue product**: keep `free_to_paid_conversion` at its canonical default (`> 3%`) and revise after the first paying customers — never "TBD" (this is the no-stub rule) — but instrument the event now.
 - **Internal tool / open-source library / command-line tool**: skip Product Loop entirely (no users to retain/convert).
 - **Existing project with no key-performance-indicators**: run a "retroactive DEFINE" — propose key-performance-indicators based on current product state.
 
 ## Critical pitfalls
 
 1. **Defining activation generically** — must be product-specific. "Created first invoice" not "used the product".
-3. **Targets without rationale** — every custom target needs a 1-line `rationale:` field.
-4. **Missing review cadence** — without `next_review.first_review_date`, the loop never starts.
-5. **Forgetting events** — every KPI must trace to a wired event. The implementation-planner verifies this.
+2. **Targets without rationale** — every custom target needs a 1-line `rationale:` field.
+3. **Missing review cadence** — without `next_review.first_review_date`, the loop never starts.
+4. **Forgetting events** — every KPI must trace to a wired event. The implementation-planner verifies this.

@@ -380,6 +380,21 @@ class Triangle:
     def area(self): return 0.5 * self.base * self.height
 ```
 
+### AST-Based Codemod Recipes
+
+When a transformation touches more than about five sites or spans files, name an AST-based codemod instead of a manual edit list — it preserves comments and formatting and applies uniformly. Emit a hand-applicable diff for single-file refactors; emit a codemod recipe for at-scale or cross-file changes. Do not pin a recipe id you cannot verify exists; when no canonical published recipe covers the transform, author it in the project's `codemods/` folder and name it in the plan.
+
+| Language | Tool | Typical use |
+|---|---|---|
+| JavaScript / TypeScript | `jscodeshift` (Meta) | Rename API, switch-to-record, module migrations |
+| TypeScript | `ts-morph` | Type-aware transforms; safer than jscodeshift on typed projects |
+| Python | `libCST` (Instagram) | Comment- and formatting-preserving rewrites |
+| C# | Roslyn `CSharpSyntaxRewriter` + Workspace APIs | Project-wide transforms; ships with the .NET SDK |
+| Java / Kotlin | OpenRewrite | Framework major-version migrations, JUnit 4→5 |
+| C / C++ | custom AST visitor + `clang-apply-replacements` | Apply edits emitted by a project-local LibTooling pass |
+
+The backing skill (`skills/quality/complexity-reducer/SKILL.md`, Tool Integration section) carries the full per-language catalog and worked recipes.
+
 ## Interaction Guidelines
 
 ### When Asked to Reduce Complexity
@@ -429,9 +444,9 @@ Before presenting any refactoring:
 
 ## Related Skills
 
-- `skills/complexity/metrics.md` - Metric definitions
-- `skills/complexity/limits.md` - Threshold values
-- `skills/complexity/refactoring.md` - Pattern catalog
+- `skills/quality/complexity-reducer/SKILL.md` - This agent's backing skill: full pattern catalog, per-language codemod recipes, and the Tool Integration reference
+- `skills/quality/complexity-analyzer/SKILL.md` - Metric definitions and threshold values
+- `skills/testing/writers/unit-test-writer/SKILL.md` - Tests for extracted functions
 
 ## Related Agents
 

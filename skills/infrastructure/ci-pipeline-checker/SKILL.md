@@ -40,10 +40,10 @@ The CI surface is now the **most-targeted supply-chain layer** of a typical soft
 
 - **Pin every `uses:` to a 40-character commit SHA, never a floating tag.** `@v4`, `@main`, `@latest` are all mutation surfaces — the attacker who took over `tj-actions/changed-files` simply rewrote the tags. Customers on hash-pinned versions were not impacted unless they bumped during the exploitation window. Add a trailing `# v4.1.1` comment so humans can still read it.
 - **`permissions: read-all` (or scoped read) at the workflow level; escalate per-job.** A 2026 workflow without an explicit top-level `permissions:` block inherits the repo default (often `write-all`), which is exactly what the `tj-actions` payload abused. The `id-token: write` permission used for OIDC does NOT grant resource writes — it only allows the runner to mint an OIDC token.
-- **OIDC over stored cloud credentials.** AWS / GCP / Azure / OCI federation issues a short-lived token per workflow run; there are no long-lived secrets to leak, rotate, or exfiltrate from logs. Trust policies should lock to `repo:org/name:ref:refs/heads/main` (not wildcards) and, on GitHub Enterprise, key off **repository custom properties as claims** for ABAC trust policies (GA 2026).
+- **OIDC over stored cloud credentials.** AWS / GCP / Azure / OCI federation issues a short-lived token per workflow run; there are no long-lived secrets to leak, rotate, or exfiltrate from logs. Trust policies should lock to `repo:org/name:ref:refs/heads/main` (not wildcards) and, at the organization or enterprise level, can key off **repository custom properties as OIDC claims** (exposed in the token as `repo_property_*`) for attribute-based access-control policies driven by repository metadata instead of hard-coded allowlists.
 - **Required status checks + branch protection.** Every merge to a protected branch must pass: lint, type-check, unit tests, coverage gate (>=80%), SAST (Semgrep/CodeQL → SARIF), SCA (deps audit), secret scan, action-pin audit (zizmor / octoscan), SBOM, and SLSA provenance. Use GitHub **rulesets** (org-wide rules) instead of per-repo branch protection for consistency at scale.
 - **Push-protected secret scanning enabled.** GitHub Push Protection and GitLab Secret Push Protection refuse the push the moment a token is committed — no rewrite-history dance afterward. Cross-link [[secrets-detector]] for the source-tree layer.
-- **SLSA Build Level 3 via artifact attestations.** `actions/attest-build-provenance@<sha>` (or `slsa-framework/slsa-github-generator`) produces an in-toto provenance predicate, signed by a short-lived Sigstore certificate, that binds the artifact digest to the workflow run. Verify on consumption with `gh attestation verify` or `slsa-verifier`.
+- **SLSA Build Level 3 via artifact attestations.** `actions/attest-build-provenance@<sha>` (or `slsa-framework/slsa-github-generator`) produces an in-toto provenance predicate, signed by a short-lived Sigstore certificate, that binds the artifact digest to the workflow run. Verify on consumption with `gh attestation verify` or `slsa-verifier`. As of its v4, `attest-build-provenance` is a thin wrapper over the general `actions/attest`; existing workflows may keep using it, but new implementations should prefer `actions/attest` directly.
 - **Ephemeral runners only.** Self-hosted runners must be **single-use** (job → reset → discard) to prevent state leakage and persistence. GitHub-hosted runners are ephemeral by construction. Never run untrusted PR code on a self-hosted runner attached to a non-public repo.
 - **Block `pull_request_target` and `workflow_run` foot-guns.** These triggers run with the **base-repo** secrets and write token but check out the **PR's** code by default — a classic confused-deputy. If you must, check out an explicit, vetted ref and gate by author / fork.
 - **Concurrency control + timeouts on every job.** `timeout-minutes: <bound>` (default 360 min is far too long); `concurrency: { group: ..., cancel-in-progress: true }` on PR workflows to stop runaway billing and slow-loris CI.
@@ -83,7 +83,7 @@ The CI surface is now the **most-targeted supply-chain layer** of a typical soft
 ## Commands & Tool Integration (2026)
 
 ```bash
-# zizmor — Rust-based GitHub Actions auditor (Trail of Bits, 2024+); flags template injection,
+# zizmor — Rust-based GitHub Actions auditor (zizmorcore project, sponsored by Trail of Bits); flags template injection,
 # excessive permissions, dangerous triggers, unpinned actions, cache poisoning.
 pipx install zizmor
 zizmor --format sarif .github/workflows/ > zizmor.sarif
@@ -113,7 +113,7 @@ ggshield secret scan path .github/
 
 # SLSA / build provenance — attest on release, verify on consume.
 # In the release workflow (pinned to a SHA in real use):
-#   uses: actions/attest-build-provenance@<40-char-sha>   # v1
+#   uses: actions/attest-build-provenance@<40-char-sha>   # pin current release; v4+ wraps actions/attest
 #   with: { subject-path: 'dist/*' }
 # Verify:
 gh attestation verify ./dist/app.tgz --repo org/repo
@@ -353,7 +353,7 @@ permissions: { contents: write, id-token: write, attestations: write }
 steps:
   - uses: actions/checkout@<sha>
   - run: ./build.sh   # produces dist/
-  - uses: actions/attest-build-provenance@<sha>   # v1
+  - uses: actions/attest-build-provenance@<sha>   # pin current release; v4+ wraps actions/attest
     with: { subject-path: 'dist/*' }
 ```
 
@@ -409,7 +409,7 @@ steps:
 
 ## Severity reconciliation (internal triage vs. refinement-loop output)
 
-The tiers above are the **internal triage view** used when emitting a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md) — there is no soft tier on the wire. The triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+The tiers above are the **internal triage view** used when emitting a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md) — there is no soft tier on the wire. The triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |---|---|---|
@@ -459,7 +459,7 @@ reference: https://www.cisa.gov/news-events/alerts/2025/03/18/supply-chain-compr
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

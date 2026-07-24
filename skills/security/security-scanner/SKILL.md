@@ -62,11 +62,11 @@ You are the smallest scope of an *Application Security Posture Management* (ASPM
   | A03:2025 | Software Supply Chain Failures | **new category** (expansion of 2021 A06) |
   | A04:2025 | Cryptographic Failures | down from #2 |
   | A05:2025 | Injection | down from #3 |
-  | A06:2025 | Insecure Design | unchanged |
-  | A07:2025 | Authentication Failures | down from A07 (renamed) |
+  | A06:2025 | Insecure Design | down from #4 (name unchanged) |
+  | A07:2025 | Authentication Failures | same rank #7 (renamed from Identification and Authentication Failures) |
   | A08:2025 | Software or Data Integrity Failures | unchanged-ish |
   | A09:2025 | Security Logging and Alerting Failures | renamed |
-  | A10:2025 | Mishandling of Exceptional Conditions | **new** (replaces SSRF, which absorbed into A01/A10) |
+  | A10:2025 | Mishandling of Exceptional Conditions | **new** (from CWE data; SSRF — old A10 — merged into A01) |
 
   Re-tagging legacy findings is part of the orchestrator's job — your normalizer maps each engine's OWASP field to 2025 codes.
 - **Supply chain is now top-tier, not a sub-bullet**. Because A03:2025 elevates software supply chain failures to the Top 3, dispatch order on the SCA side must always include: package CVE check, transitive depth, typosquat lookup, maintainer-change alert, lockfile drift, and provenance (SLSA level) where available.
@@ -182,7 +182,7 @@ owasp_2025_remap:
   A07_2021: A07_2025     # Auth Failures — same
   A08_2021: A08_2025     # Software/Data Integrity — same
   A09_2021: A09_2025     # Logging & Alerting Failures — renamed
-  A10_2021: A10_2025     # SSRF folded into A01/A10 — see remap_notes
+  A10_2021: A01_2025     # SSRF (CWE-918) merged into Broken Access Control; A10:2025 is a new category with no 2021 predecessor
 ```
 
 A finding that violates `block_if` produces an exit code that fails the build. A `warn_if` finding emits the letter but does not fail. A `pass` finding still appears in `.security/runs/<ts>/report.md` for human review.
@@ -527,7 +527,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — a 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) found by *any dispatched sibling* emits as `severity: critical` in the letter the orchestrator writes to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

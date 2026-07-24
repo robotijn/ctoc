@@ -74,7 +74,7 @@ await expect(page).toHaveScreenshot({
 
 ### Failures
 1. **checkout-page.png**
-   - Diff pixels: 1523 (threshold: 100)
+   - Diff pixels: 1523 (maxDiffPixels: 100)
    - Likely cause: Button color changed
    - Files:
      - Baseline: `baselines/checkout-page.png`

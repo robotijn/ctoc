@@ -46,7 +46,7 @@ model: opus
 Load this skill when any of these are true:
 
 1. The `dsar_handler` control is activated in the active regulatory regime profile (HIPAA enables it by default; GDPR-applicable projects should enable it explicitly).
-2. The current plan touches **personal data** — anything in the GDPR Article 4(1) sense (name, identifier, location, online identifier, factor specific to physical/physiological/genetic/mental/economic/cultural/social identity), the California Consumer Privacy Act §1798.140(o) sense, or the Quebec Law 25 §2 sense.
+2. The current plan touches **personal data** — anything in the GDPR Article 4(1) sense (name, identifier, location, online identifier, factor specific to physical/physiological/genetic/mental/economic/cultural/social identity), the California Consumer Privacy Act §1798.140(v) sense, or the Quebec Law 25 §2 sense.
 3. The user prompt mentions any DSAR-adjacent term in the `when_to_load` list above.
 4. A `compliance/gdpr-compliance-checker` dispatch surfaced a `missing-dsar-workflow` finding.
 
@@ -56,12 +56,12 @@ You are the operational owner of every Data Subject Access Request (DSAR) the co
 
 ## Statutory clocks
 
-The clock starts when the request is **verified**, not when it lands. The verification step itself is bounded — see "Identity verification" below.
+The clock starts on **receipt** of the request, not on completion of identity verification — under General Data Protection Regulation Article 12(3) and the California Consumer Privacy Act regulations, verification runs *inside* the response window and does not pause it. Treat verification as bounded work you must finish early in the window — see "Identity verification" below.
 
 | Regime | Statute | Clock | Extension | Source |
 |---|---|---|---|---|
 | European Union / European Economic Area / United Kingdom | General Data Protection Regulation Article 12(3) | One month from receipt of a verified request | Two further months for complex or numerous requests; data subject must be informed within the original month with reasons | [Exabeam — GDPR Article 17 right of erasure](https://www.exabeam.com/explainers/gdpr-compliance/gdpr-article-17-right-of-erasure-how-it-works-and-7-steps-to-compliance/) |
-| Quebec (Canada) | Loi 25 (Act respecting the protection of personal information in the private sector) §34 and §28.1 | 30 days from receipt of a verified request | None on the response clock; access response is firm 30 days | Loi 25 statutory text |
+| Quebec (Canada) | Loi 25 (Act respecting the protection of personal information in the private sector) §27 (right of access and portability) | 30 days from receipt of a verified request | None on the response clock; access response is firm 30 days | Loi 25 statutory text |
 | California (United States) | California Consumer Privacy Act §1798.130(a)(2), as amended by California Privacy Rights Act | 45 days from receipt of a verifiable request | One further 45 day extension permitted with notice during the first 45 days | [Osano — DSAR overview](https://www.osano.com/articles/data-subject-access-request) |
 | Brazil | Lei Geral de Proteção de Dados Article 19 | 15 days for a "clear and complete" declaration; immediate confirmation of existence | None statutory; longer for full export with justification | Lei Geral de Proteção de Dados statutory text |
 | United States — health-care | Health Insurance Portability and Accountability Act 45 Code of Federal Regulations §164.524 | 30 days from receipt of the request | One further 30 day extension permitted with written notice | Code of Federal Regulations Title 45 |
@@ -80,7 +80,7 @@ The verifier must reach **reasonable certainty** about the requester's identity.
 |---|---|---|
 | Username and email only | Confirmation code to email-on-file plus account password | Sending data to an unauthenticated reply-to address |
 | Profile + transaction history | Email confirmation code + recent transaction reference (last four digits of charge, exact amount, date) | Knowledge-based authentication relying on public records |
-| Special categories (Article 9): health, biometric, sexual orientation, religion, political opinion, trade union | Email + transaction + government-issued identifier last four digits + signed declaration under penalty of perjury (CPRA §1798.130 and General Data Protection Regulation Article 11) | Any single-factor verification |
+| Special categories (Article 9): health, biometric, sexual orientation, religion, political opinion, trade union | Email + transaction + government-issued identifier last four digits + signed declaration under penalty of perjury (CPRA §1798.130 and General Data Protection Regulation Article 12(6), the identity-verification provision) | Any single-factor verification |
 | Behalf-of-minor or behalf-of-deceased | Custody documentation or probate documentation reviewed by counsel | Self-attestation alone |
 
 The verification deadline is **45 days from initial request** for California Consumer Privacy Act purposes (the regulator counts the verification window inside the response window) and **bounded only by reasonableness** for General Data Protection Regulation. Set a hard internal cap of 10 calendar days for verification or escalate; record every prompt the verifier sends in `evidence.verification_log:`.
@@ -106,7 +106,7 @@ scope:
   exceptions_asserted: []   # e.g., legal_hold, tax_retention, fraud_investigation
 ```
 
-**Exceptions are narrow.** Tax retention under United States Internal Revenue Service Publication 583 (seven years) and equivalent statutes can override erasure for financial records, but not for unrelated profile data. Active fraud investigations (General Data Protection Regulation Article 23(1)(d)) can defer disclosure but not indefinitely. Each asserted exception must cite a specific clause and an end date; do not write `exception: "ongoing"` without a calendar date attached.
+**Exceptions are narrow.** Tax retention under the applicable United States Internal Revenue Service period of limitations (generally three years, extending to six years for substantially under-reported income and seven years for a bad-debt or worthless-securities claim — see Internal Revenue Service Publication 583) and equivalent statutes can override erasure for financial records, but not for unrelated profile data. Active fraud investigations (General Data Protection Regulation Article 23(1)(d)) can defer disclosure but not indefinitely. Each asserted exception must cite a specific clause and an end date; do not write `exception: "ongoing"` without a calendar date attached.
 
 ### Stage 3 — Data discovery
 

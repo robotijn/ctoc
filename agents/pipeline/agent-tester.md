@@ -220,14 +220,16 @@ analysis: |
 
 ## Integration
 
+You do not dispatch sibling agents. You report your test results up to CTO Chief, which executes any follow-on dispatch.
+
 ### From Agent-Writer
 Receives: Improved agent definition
 
-### To Agent-QA
-Sends: Test results with pass/fail details
+### To CTO Chief
+Sends: Test results with pass/fail details, for hand-off to Agent-QA.
 
-### Escalation
-If core tests fail repeatedly: Escalate to Agent-Critic for re-evaluation
+### On repeated failure
+If core tests fail repeatedly, the report goes to CTO Chief, which re-dispatches Agent-Critic for re-evaluation — you recommend, CTO Chief executes.
 
 ## Example Test Suite
 

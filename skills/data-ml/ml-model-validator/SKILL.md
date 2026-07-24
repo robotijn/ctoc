@@ -195,12 +195,17 @@ if score >= 0.2:
 ```
 
 ```python
-# Production-shape: Evidently AI report for feature + prediction + target drift
-from evidently.report import Report
-from evidently.metric_preset import DataDriftPreset, TargetDriftPreset
-rpt = Report(metrics=[DataDriftPreset(), TargetDriftPreset()])
-rpt.run(reference_data=ref_df, current_data=cur_df)
-rpt.save_html("drift.html")        # ship to dashboard
+# Production-shape: Evidently report for feature/prediction/target drift (current API, 0.7+)
+from evidently import Dataset, DataDefinition, Report
+from evidently.presets import DataDriftPreset
+# Declare column roles once. Put target/prediction columns in the DataDefinition so
+# their drift is covered too — the current API folds target/prediction drift into the
+# data definition; the legacy (<=0.6.7) TargetDriftPreset is not in evidently.presets.
+schema = DataDefinition(...)
+ref = Dataset.from_pandas(ref_df, data_definition=schema)
+cur = Dataset.from_pandas(cur_df, data_definition=schema)
+result = Report([DataDriftPreset()]).run(cur, ref)   # current first, reference second
+result.save_html("drift.html")     # ship to dashboard
 ```
 
 Edge cases: PSI on bounded categoricals can spike on rare categories — bucket the long tail; concept drift (P(y|x) changes) is invisible without labels — use NannyML's CBPE for performance estimation when labels lag; seasonal drift (Monday vs. Sunday traffic) is not a problem — compare against a matched reference window.
@@ -211,7 +216,7 @@ Edge cases: PSI on bounded categoricals can spike on rare categories — bucket 
 # BAD: saved as a flat pickle, no version, no lineage
 import joblib; joblib.dump(model, "model.pkl")
 
-# SAFE: MLflow registry with stage transitions
+# SAFE: MLflow registry with alias-based promotion
 import mlflow, mlflow.sklearn
 mlflow.set_tracking_uri("http://mlflow.internal:5000")
 with mlflow.start_run() as run:
@@ -224,8 +229,10 @@ with mlflow.start_run() as run:
         input_example=X_train.iloc[:5],
     )
 client = mlflow.MlflowClient()
-client.transition_model_version_stage(
-    name="credit_risk_model", version=42, stage="Staging",
+# Registry STAGES (transition_model_version_stage) are deprecated since MLflow 2.9 and
+# slated for removal — use a mutable ALIAS as the deployment pointer instead.
+client.set_registered_model_alias(
+    name="credit_risk_model", alias="staging", version=42,
 )
 ```
 
@@ -450,7 +457,7 @@ const reply = await openai.chat.completions.create({
     { role: "system", content: prompts.summarizer.v7 },
     { role: "user", content: `<input>${escape(userInput)}</input>` },
   ],
-  response_format: { type: "json_schema", json_schema: Summary.toJSONSchema() },
+  response_format: { type: "json_schema", json_schema: z.toJSONSchema(Summary) },
 });
 const parsed = Summary.parse(JSON.parse(reply.choices[0].message.content!));
 telemetry.track("llm.summarize", {
@@ -489,16 +496,17 @@ The 2026 MLOps surface splits into three layers; pick one per layer.
 | **Fiddler AI** | Drift + explainability + LLM observability in one platform, audit trails for regulated industries | Enterprise pricing | Regulated (finance, healthcare) deployments |
 
 ```bash
-# Evidently — install + run a one-shot report
-pip install "evidently>=0.4"
+# Evidently — install + run a one-shot report (current API, 0.7+)
+pip install "evidently>=0.7"
 python -c "
-from evidently.report import Report
-from evidently.metric_preset import DataDriftPreset
+from evidently import Dataset, DataDefinition, Report
+from evidently.presets import DataDriftPreset
 import pandas as pd
-ref = pd.read_parquet('reference.parquet')
-cur = pd.read_parquet('current.parquet')
-r = Report(metrics=[DataDriftPreset()]); r.run(reference_data=ref, current_data=cur)
-r.save_html('drift.html')
+schema = DataDefinition()   # empty def => Evidently auto-maps columns by type/name
+ref = Dataset.from_pandas(pd.read_parquet('reference.parquet'), data_definition=schema)
+cur = Dataset.from_pandas(pd.read_parquet('current.parquet'), data_definition=schema)
+result = Report([DataDriftPreset()]).run(cur, ref)   # current first, reference second
+result.save_html('drift.html')
 "
 
 # NannyML — performance estimation without labels (CBPE for classification)
@@ -622,7 +630,7 @@ Golden eval present, jailbreak suite present, output schema-validated, prompt ve
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable validation report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable validation report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |-------|----------|--------|
@@ -671,7 +679,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — a 
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every leakage smell, every missing card field, every absent fairness slice, every drift gauge with no alert route, and every LLM hop without injection defense emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

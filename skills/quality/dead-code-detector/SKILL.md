@@ -76,7 +76,7 @@ The single most important distinction in this skill — get it wrong and the loo
 | Unused public exports (library) | NOT a finding by default — public is the API surface | LOW |
 | Unused classes / types | Mark-and-sweep + reflection-aware whitelist | MEDIUM |
 | Orphan files | No `import` / `require` / `using` / `#include` references anywhere | MEDIUM — check for plugin loading |
-| Unused dependencies | `knip` / `depcheck` / `cargo udeps` / `dotnet list package --vulnerable --include-transitive` cross-ref | HIGH (lockfile is ground truth) |
+| Unused dependencies | `knip` / `depcheck` / `cargo udeps` / .NET `ReferenceTrimmer` (RT0002 unused project ref, RT0003 unused package ref) | HIGH (lockfile is ground truth) |
 | Dead database columns | No DML / DDL / ORM property references; cross-ref `information_schema` | MEDIUM — check for ETL / BI / external consumers |
 | Dead database tables / views / procs | Same as columns; plus `sys.dm_db_index_usage_stats` (SQL Server), `pg_stat_user_tables` (Postgres) | MEDIUM |
 | Feature-flagged branches | Branch gated by flag never-taken in production | needs_human_review |
@@ -107,7 +107,7 @@ public class OrderService
 }
 ```
 
-Detection: `dotnet build /p:TreatWarningsAsErrors=true` plus `<AnalysisMode>All</AnalysisMode>` in the csproj. Roslyn analyzers `IDE0005` (unused usings), `IDE0044` (make field readonly), `IDE0051` (unused private member), `IDE0052` (private field assigned-only), `IDE0060` (unused parameter), `CS0162` (unreachable code). CodeQL `csharp/useless-assignment-to-local` and `csharp/unreachable-statement` add cross-procedural reach.
+Detection: `dotnet build /p:TreatWarningsAsErrors=true` plus `<AnalysisMode>All</AnalysisMode>` in the csproj. Roslyn analyzers `IDE0005` (unused usings), `IDE0044` (make field readonly), `IDE0051` (unused private member), `IDE0052` (private field assigned-only), `IDE0060` (unused parameter), `CS0162` (unreachable code). CodeQL `cs/useless-assignment-to-local` (C# query IDs use the `cs/` prefix) plus the `csharp-security-and-quality.qls` suite add cross-procedural reach.
 
 ### Java (21+)
 
@@ -142,11 +142,11 @@ class UserRepo:
     def _fetch(self, user_id: int):     # vulture confidence 60 — looks unused
         ...                              # but may be called via getattr
 
-    def _legacy_export(self):           # vulture confidence 100 — truly unused private
+    def _legacy_export(self):           # also confidence 60 — the score reflects symbol type, not deadness
         pass
 ```
 
-Detection: `ruff check --select F,E,W` for `F401` (unused import), `F811` (redefinition), `F841` (unused local). `vulture src/ --min-confidence 80` for dead functions/classes/attributes — note vulture's confidence reflects how dynamic the symbol is, not how dead it is. Reflection-heavy projects: use `--ignore-decorators` (`@app.route`, `@receiver`, `@click.command`, `@pytest.fixture`) and a whitelist generated with `--make-whitelist`. Pyright/mypy `reportUnusedExpression` flags expression statements with no effect.
+Detection: `ruff check --select F,E,W` for `F401` (unused import), `F811` (redefinition), `F841` (unused local). `vulture src/ --min-confidence 80` for dead functions/classes/attributes — note vulture's confidence reflects how dynamic the symbol is, not how dead it is. Reflection-heavy projects: use `--ignore-decorators` (`@app.route`, `@receiver`, `@click.command`, `@pytest.fixture`) and a whitelist generated with `--make-whitelist`. Pyright `reportUnusedExpression` flags expression statements with no effect (a Pyright-specific rule; mypy has no equivalent named rule — use mypy `--warn-unreachable` for dead branches).
 
 ### C (C17/C23)
 
@@ -162,7 +162,7 @@ int process(int x, int y) {              /* -Wunused-parameter on y */
 static void helper(void) { }             /* -Wunused-function */
 ```
 
-Detection: `gcc -Wall -Wextra -Wunused -Wunused-parameter -Wunreachable-code -Werror`. Clang adds `-Wunreachable-code-aggressive` and `-Wunused-but-set-variable`. clang-tidy: `misc-unused-parameters`, `bugprone-unused-return-value`, `readability-redundant-declaration`. Cross-TU dead code requires link-time analysis (`-flto` + `--gc-sections`) or whole-program tools like `cppcheck --enable=unusedFunction`.
+Detection: `gcc -Wall -Wextra -Wunused -Wunused-parameter -Werror` (GCC does not implement `-Wunreachable-code` — it is an undocumented no-op accepted for backward compatibility, so unreachable-statement detection needs Clang). Clang adds `-Wunreachable-code` and `-Wunreachable-code-aggressive`, plus `-Wunused-but-set-variable`. clang-tidy: `misc-unused-parameters`, `bugprone-unused-return-value`, `readability-redundant-declaration`. Cross-TU dead code requires link-time analysis (`-flto` + `--gc-sections`) or whole-program tools like `cppcheck --enable=unusedFunction`.
 
 ### C++ (20 / 23)
 
@@ -173,12 +173,12 @@ namespace detail {
 class Cache {
     int hits_;                                  // clang-tidy bugprone-unused-private-field
     [[nodiscard]] int get(int) const;
-    void warmUp() { }                           // clang-tidy misc-unused-using-decls / unused-method
+    void warmUp() { }                           // Clang -Wunused-member-function (internal-linkage classes)
 };
 }  // namespace detail
 ```
 
-Detection: clang-tidy with `bugprone-unused-raii`, `bugprone-unused-return-value`, `bugprone-unused-private-field`, `misc-unused-parameters`, `misc-unused-using-decls`, `readability-redundant-*`. GCC/Clang `-Wunused-*` family. `[[nodiscard]]` enforces _call-site_ liveness (caller must use the return). For inter-TU export reachability use IWYU (`include-what-you-use`) and link-time `--gc-sections`.
+Detection: clang-tidy with `bugprone-unused-raii`, `bugprone-unused-return-value`, `bugprone-unused-private-field`, `misc-unused-parameters`, `misc-unused-using-decls` (unused `using` declarations only, not methods), `readability-redundant-*`. GCC/Clang `-Wunused-*` family, plus Clang `-Wunused-member-function` for unused member functions of internal-linkage classes. `[[nodiscard]]` enforces _call-site_ liveness (caller must use the return). For inter-TU export reachability use IWYU (`include-what-you-use`) and link-time `--gc-sections`.
 
 ### JavaScript / TypeScript
 
@@ -198,7 +198,7 @@ export async function handle(req: Request) {
 }
 ```
 
-Detection: `tsc --noUnusedLocals --noUnusedParameters --allowUnreachableCode=false`. Then **knip** (preferred 2026 default — supersedes ts-prune which is in maintenance mode) for unused files, exports, dependencies, and dev dependencies in one pass. `ts-unused-exports` for export-only checks. `tsr` (Line's TypeScript Remove) for actual removal. `eslint`: `no-unused-vars`, `no-unreachable`, `@typescript-eslint/no-unused-vars`. `depcheck` as a fallback for `package.json` audits — knip subsumes it.
+Detection: `tsc --noUnusedLocals --noUnusedParameters --allowUnreachableCode=false`. Then **knip** (preferred 2026 default — supersedes ts-prune which is in maintenance mode) for unused files, exports, dependencies, and dev dependencies in one pass. `ts-unused-exports` for export-only checks. For the actual removal step, `knip --fix` (or `knip --fix-type exports,dependencies`) deletes unused exports and dependencies in place — `tsr` (LINE's TypeScript Remove), the former dedicated remover, was discontinued in 2025 and its own README now directs users to knip. `eslint`: `no-unused-vars`, `no-unreachable`, `@typescript-eslint/no-unused-vars`. `depcheck` as a fallback for `package.json` audits — knip subsumes it.
 
 ### SQL (Postgres / SQL Server / MySQL)
 
@@ -241,7 +241,7 @@ Every one of these defeats static analysis. If any apply, downgrade `confidence`
 
 Dead-code skills have two competing pressures: most findings _feel_ like style nits (unused imports), but a few are genuine latent bugs (unreachable auth check, unused exception handler). The reconciliation: triage tiers below drive the human-readable report; the wire format is uniform.
 
-These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization. The footer block at the bottom of this file restates the same rule for critic-mode dispatch.
+These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization. The footer block at the bottom of this file restates the same rule for critic-mode dispatch.
 
 | Triage tier | Examples | Internal action |
 |-------------|----------|-----------------|
@@ -256,7 +256,7 @@ On the wire (refinement loop) every emitted finding is `severity: critical`. Con
 
 | Language | Default tool | Notes |
 |----------|--------------|-------|
-| TypeScript / JavaScript | **knip** | Supersedes `ts-prune` (maintenance mode 2025) and `depcheck`. Single pass for unused files, exports, deps, dev-deps; framework-aware (Jest, Vitest, Storybook, Webpack, Next.js, etc.). Pair with `tsc --noUnusedLocals --noUnusedParameters`. `tsr` for the actual removal step. `ts-unused-exports` for export-only checks. |
+| TypeScript / JavaScript | **knip** | Supersedes `ts-prune` (maintenance mode 2025) and `depcheck`. Single pass for unused files, exports, deps, dev-deps; framework-aware (Jest, Vitest, Storybook, Webpack, Next.js, etc.). Pair with `tsc --noUnusedLocals --noUnusedParameters`. `knip --fix` performs the removal step (`tsr`, the former dedicated remover, was discontinued in 2025 and points to knip). `ts-unused-exports` for export-only checks. |
 | Python | **ruff + vulture** | `ruff check --select F` handles F401 (unused imports), F811, F841 in milliseconds. `vulture src/ --min-confidence 80` for dead functions/classes/attributes; tune with `--ignore-decorators` and a whitelist. Pyright `reportUnusedExpression`. |
 | C# / .NET 9 | **Roslyn analyzers + dotnet format** | `<AnalysisMode>All</AnalysisMode>` + `TreatWarningsAsErrors`. `dotnet format analyzers --severity info` surfaces IDE0005/0044/0051/0052/0060. CodeQL `csharp-security-and-quality.qls` adds cross-procedural reach. JetBrains Rider/ReSharper `Inspect Code` (`jb inspectcode`). |
 | Java 21+ | **PMD + Error Prone + IntelliJ Inspect Code** | PMD rules: `UnusedPrivateField`, `UnusedPrivateMethod`, `UnusedFormalParameter`, `UnusedLocalVariable`. Error Prone `DeadException`, `UnusedMethod`. SpotBugs `URF_*`. `idea inspect` for whole-program. CodeQL `java-security-and-quality.qls`. |
@@ -353,7 +353,7 @@ The integrator uses `confidence` and `possible_dynamic_usage` to weight findings
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

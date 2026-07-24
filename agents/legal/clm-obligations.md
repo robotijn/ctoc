@@ -166,7 +166,7 @@ findings:
       suggestion: "Configure an extractor. Do not infer the obligations from the filename."
     tags: ["contract", "extraction"]
 
-  - type: "untracked_third_party"
+  - type: "untracked-third-party"
     severity: "high"
     location:
       file: ".ctoc/contracts/obligations.yaml"

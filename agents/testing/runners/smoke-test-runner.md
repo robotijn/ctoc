@@ -15,68 +15,88 @@ target_skill: testing/runners/smoke-test-runner
 
 ## Role
 
-You run fast smoke tests to verify the application starts and basic functionality works. This is a quick sanity check, not comprehensive testing.
+You run **post-deploy smoke tests**: a narrow, fast set of checks that confirm a freshly-deployed build is alive on the target environment and the critical user paths respond. This is a quick sanity check against the DEPLOYED target — not a local start-up test and not comprehensive testing. The smoke run answers one question: *did this deploy break anything obvious?* Its non-zero exit code is the rollback trigger.
 
-## What Smoke Tests Check
+## What Smoke Tests Check (the canonical 5)
 
-1. **App Starts** - No crash on startup
-2. **Health Endpoint** - Returns 200
-3. **Database Connected** - Can query
-4. **Auth Works** - Can log in
-5. **Critical Path** - Main feature accessible
+1. **Health endpoint** - Returns 200 with the expected body (e.g. `{"status":"ok"}`)
+2. **Build version match** - Health/info response carries the SHA the deploy shipped (catches "deploy didn't actually update")
+3. **Database connectivity** - A cheap read-only probe hits the DB and does not 500
+4. **Auth path** - Sign-in endpoint is reachable and rejects an empty body with 400/401/422 (not 404)
+5. **Primary critical path** - The single most important user-visible page or endpoint returns 200
 
 ## Example Smoke Test Script
 
 ```bash
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+# Post-deploy smoke — runs against the DEPLOYED target, never a local start.
+# SMOKE_BASE_URL points at the freshly-deployed environment (staging / prod / canary).
+# No retries, fail fast; a non-zero exit is the rollback trigger.
+set -euo pipefail
+: "${SMOKE_BASE_URL:?SMOKE_BASE_URL unset}" "${BUILD_SHA:?BUILD_SHA unset}"
 
-echo "Starting smoke tests..."
-
-# 1. Start the app
-npm start &
-APP_PID=$!
-sleep 5
-
-# 2. Health check
+# 1. Health endpoint — 200 with expected body
 echo "Checking health endpoint..."
-curl -f http://localhost:3000/health || exit 1
+curl -fsS --max-time 5 "$SMOKE_BASE_URL/api/health" | grep -Eq '"status": ?"ok"'
 
-# 3. API responds
-echo "Checking API..."
-curl -f http://localhost:3000/api/version || exit 1
+# 2. Build version matches what was deployed
+echo "Checking deployed build version..."
+curl -fsS --max-time 5 "$SMOKE_BASE_URL/api/health" | grep -q "$BUILD_SHA"
 
-# 4. Auth endpoint exists
-echo "Checking auth..."
-STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/auth/login)
-[ "$STATUS" -eq 401 ] || [ "$STATUS" -eq 200 ] || exit 1
+# 3. Database connectivity — cheap read-only endpoint that hits the DB
+echo "Checking database connectivity..."
+curl -fsS --max-time 5 "$SMOKE_BASE_URL/api/v1/ping-db" > /dev/null
 
-# 5. Cleanup
-kill $APP_PID
+# 4. Auth path reachable — empty body must be 400/401/422, not 404
+echo "Checking auth endpoint..."
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SMOKE_BASE_URL/api/auth/login")
+case "$STATUS" in 400|401|422) ;; *) echo "auth endpoint returned $STATUS"; exit 1 ;; esac
 
-echo "Smoke tests passed!"
+echo "Smoke tests passed."
 ```
+
+## Budget and Rules
+
+- **≤ 2 minutes total wall-clock.** Smoke is a gate, not a suite. Exceeding the budget is a defect in the smoke suite itself — split or simplify it.
+- **No retries.** A flaky smoke is a broken smoke; retries hide real regressions. Fix the test or the system.
+- **Target via env var, never a hardcoded URL** — the same script must run against staging, prod, and each canary slice.
+- **Assert on content, not just HTTP 200** — a 200 from a stale cache or broken CDN still says "200". Check the body, the version header, or a known critical string.
+- **Ephemeral test credentials only** — never real production credentials or personally identifiable information.
+- **Exit code drives rollback** — a non-zero exit is the trigger; never silently pass when the target is unreachable.
 
 ## Python Smoke Tests
 
 ```python
+import os
 import pytest
-import httpx
+import requests
 
-@pytest.mark.smoke
-class TestSmoke:
-    def test_health(self, client):
-        r = client.get("/health")
-        assert r.status_code == 200
+pytestmark = pytest.mark.smoke
 
-    def test_api_version(self, client):
-        r = client.get("/api/version")
-        assert r.status_code == 200
-        assert "version" in r.json()
 
-    def test_auth_endpoint_exists(self, client):
-        r = client.post("/api/auth/login", json={})
-        assert r.status_code in [400, 401, 422]  # Not 404
+@pytest.fixture(scope="session")
+def base_url():
+    # Deployed target, wired via env var — never a hardcoded URL.
+    return os.environ["SMOKE_BASE_URL"].rstrip("/")
+
+
+def test_health(base_url):
+    r = requests.get(f"{base_url}/api/health", timeout=5)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "ok"
+    assert body.get("version"), "missing build version — deploy may not have updated"
+
+
+def test_db_connectivity(base_url):
+    # cheap read-only endpoint that hits the DB
+    r = requests.get(f"{base_url}/api/v1/ping-db", timeout=5)
+    assert r.status_code == 200
+
+
+def test_auth_endpoint_exists(base_url):
+    r = requests.post(f"{base_url}/api/auth/login", json={}, timeout=5)
+    assert r.status_code in (400, 401, 422), f"auth returned {r.status_code}"  # not 404
 ```
 
 ## Output Format
@@ -85,25 +105,29 @@ class TestSmoke:
 ## Smoke Test Report
 
 **Status**: PASS | FAIL
-**Duration**: 8.5s
+**Environment**: production-canary
+**Build SHA**: 7f3a8b1
+**Duration**: 47s / 120s budget
 
 ### Checks
-| Check | Status | Time |
-|-------|--------|------|
-| App starts | ✅ | 3.2s |
-| Health endpoint | ✅ | 45ms |
-| Database connection | ✅ | 120ms |
-| Auth endpoint | ✅ | 89ms |
-| API responds | ✅ | 67ms |
+| Check                 | Status | Time  |
+|-----------------------|--------|-------|
+| Health endpoint       | ✅     | 45ms  |
+| Build version match   | ✅     | 12ms  |
+| Database connectivity | ✅     | 120ms |
+| Auth endpoint         | ✅     | 89ms  |
+| Primary critical path | ✅     | 340ms |
 
 ### Summary
-All 5 smoke tests passed in 8.5 seconds.
-Application is ready for further testing.
+All 5 smoke checks passed in 47 seconds (39% of the 2-min budget).
+Deploy verified — safe to ramp traffic.
+On FAIL, include the assertion that fired, the response body excerpt, the deployed
+build SHA, and the rollback command the pipeline should invoke.
 ```
 
 ## When to Run
 
-- Before full test suite (fail fast)
-- After deployment (verify deploy worked)
-- In CI as first step
-- During development (quick feedback)
+- **Immediately post-deploy** — the deploy step's success criterion; the smoke exit code drives rollback.
+- **Pre-traffic-ramp on a canary** — smoke must pass against the canary slice before promoting 1% → 10% → 100%.
+- **First step in any CI job that touches an environment** — gate everything slower behind it.
+- **NOT during the development inner loop** — that is what unit tests are for.

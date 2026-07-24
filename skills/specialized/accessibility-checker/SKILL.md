@@ -36,7 +36,7 @@ You are an accessibility analyst verifying conformance to WCAG 2.2 Level AA and 
 
 - **WCAG 2.2 AA is the enforceable floor in 2026, not a stretch goal.** The European Accessibility Act (EAA) became enforceable on 28 June 2025, and EU member-state market-surveillance authorities are now actively investigating non-conforming digital products and services. EN 301 549 (the EU harmonized standard cited by the EAA) is being updated to incorporate WCAG 2.2. Treat WCAG 2.2 AA as the baseline — do not ship below it. ADA Title II (US public-sector) compliance deadlines for large entities also hit in 2026 with WCAG 2.1 AA as the named standard.
 - **Penalties are real.** EAA non-compliance can trigger administrative fines that, depending on member-state implementation, reach figures in the order of €100,000 or low single-digit percentages of annual turnover (see Level Access EAA guide). US ADA settlements routinely run six figures plus mandated remediation. Treat any letter you emit with the seriousness of a security finding.
-- **WCAG 3.0 is a Working Draft — not enforceable yet.** The March 2026 Working Draft introduces 174 "requirements" (renamed from "outcomes") and replaces strict pass/fail grading with Bronze / Silver / Gold tiers (Bronze ≈ WCAG 2.x AA-equivalent). Candidate Recommendation is projected 2026–2027; final Recommendation not before 2028. Do NOT scan for 3.0 conformance today. DO flag forward-incompatible patterns (e.g. APCA-failing contrast that is currently 2.x-compliant) as informational.
+- **WCAG 3.0 is a Working Draft — not enforceable yet.** The current text is a W3C Working Draft (03 March 2026). It restructures conformance around "requirements" (a longer, still-changing list than 2.x's success criteria — the draft itself warns they "are likely to be added, combined, and removed") and a multi-level conformance model that replaces 2.x's single per-criterion pass/fail. The draft states several years of work remain, so it is far from a Recommendation and NOT enforceable today. Do NOT scan for 3.0 conformance. DO flag forward-incompatible patterns (e.g. body-text contrast that passes 2.x's 1.4.3 ratio but would fail the perceptual-contrast direction 3.0 is exploring) as informational only.
 - **Accessibility is judged against the rendered DOM, not source.** Static-HTML scanning misses ~half the failures introduced by SPAs, JS frameworks, and dynamic ARIA. Run axe-core / Pa11y / Lighthouse against the running app under Playwright (or equivalent), and against component-level renders via Storybook a11y.
 - **Three layers are required — automation, manual, assistive tech.** Automated tools surface a meaningful but incomplete share of issues (Deque, the maintainer of axe-core, has consistently described automated coverage as a subset, not a substitute, of full WCAG conformance). Reading order, focus traps, screen-reader coherence, alt-text quality, and target ambiguity all require human review. Emit every letter knowing automation alone cannot certify conformance.
 - **Mobile-first a11y is mandatory.** WCAG 2.2 added Target Size (Minimum) 2.5.8 (24×24 CSS px), Dragging Movements 2.5.7, Focus Not Obscured (Minimum) 2.4.11, and Consistent Help 3.2.6 — most of which fail on mobile views first. Always scan at a mobile viewport (375×667 or smaller) and a desktop viewport.
@@ -268,7 +268,7 @@ Automated coverage requires multiple layers — engine + runner + IDE/CI surface
 | **Pa11y / pa11y-ci** | runner | Headless CLI; sitemap input; CI-friendly; uses axe + HTML CodeSniffer | Page-level only; less rich semantics than e2e-driven | Crawl-and-report CI step |
 | **Lighthouse a11y** | runner | One-shot audit incl. perf/PWA/SEO context; subset of axe-core rules | Less granular than axe directly | Pre-deploy sanity |
 | **Storybook a11y addon** | component | Catches issues in isolated components before they hit pages | Won't catch page-level composition issues | Design-system development |
-| **IBM Equal Access Checker** | engine | Second engine for corroboration; aligns to WCAG 2.1 A/AA + WAI-ARIA 1.2; latest release tested March 2026 | Smaller rule-set diversity than axe ecosystem | Two-engine corroboration |
+| **IBM Equal Access Checker** | engine | Second engine for corroboration; supports WCAG 2.0 / 2.1 / 2.2 rule policies and WAI-ARIA | Smaller rule-set diversity than axe ecosystem | Two-engine corroboration |
 | **Microsoft Accessibility Insights for Web** | manual+auto | Fast Pass (automated) + Assessment (guided manual) + Tab Stops visualizer | Browser-extension UX, not a CI tool | Manual review by reviewers |
 
 ```bash
@@ -288,9 +288,9 @@ npx pa11y-ci --sitemap https://staging.example.com/sitemap.xml \
 npx lighthouse https://staging.example.com \
   --only-categories=accessibility --output=json --output-path=./lh-a11y.json
 
-# IBM Equal Access (Node)
-npx achecker --inputFile=./out/index.html
-# or via the achecker-test-config.js with rule policies pinned to 'WCAG_2_1' / 'WCAG_2_2'
+# IBM Equal Access (Node) — pass the path (file, directory, or a .txt list of paths/URLs) as an argument
+npx achecker ./out/index.html
+# or set the rule policies (e.g. 'WCAG_2_1' / 'WCAG_2_2') in an achecker config file
 ```
 
 ```typescript
@@ -370,7 +370,7 @@ Automated tools find a meaningful subset of WCAG failures; the remainder is in t
 
 ## Severity (internal triage vs. refinement-loop output)
 
-The internal triage tiers below mirror axe-core's `impact` taxonomy (`critical`, `serious`, `moderate`, `minor`) so reporters and triage owners share a vocabulary. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see `agents/_shared/warnings-are-critical.md` and the footer below) — there is no soft tier on the wire. The triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+The internal triage tiers below mirror axe-core's `impact` taxonomy (`critical`, `serious`, `moderate`, `minor`) so reporters and triage owners share a vocabulary. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see `skills/agent-fragments/warnings-are-critical.md` and the footer below) — there is no soft tier on the wire. The triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier (axe-aligned) | Examples | Internal action |
 |---|---|---|
@@ -467,7 +467,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — a 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

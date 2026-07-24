@@ -38,7 +38,7 @@ input:
       - dimension: "{which dimension}"
         location: "{## Section Name or line range}"
         problem: "{specific problem description}"
-        severity: "{high|medium|low}"
+        severity: "{critical|high|medium|low}"
         fix: |
           {Exact text to add/change}
   template: |
@@ -50,9 +50,10 @@ input:
 ### 1. Analyze Issues by Priority
 
 Sort issues by severity:
-1. HIGH - Must fix (affects core functionality)
-2. MEDIUM - Should fix (improves quality)
-3. LOW - Could fix (polish)
+1. CRITICAL - Must fix first (blocks acceptance; agent-critic's verdict cannot ACCEPT while any remain)
+2. HIGH - Must fix (affects core functionality)
+3. MEDIUM - Should fix (improves quality)
+4. LOW - Could fix (polish)
 
 ### 2. Locate Change Points
 
@@ -202,11 +203,13 @@ When fixes conflict:
 
 ## Integration
 
+You do not dispatch sibling agents. You report the improved agent up to CTO Chief, which executes any follow-on dispatch.
+
 ### From Agent-Critic
 Receives: Critique with issues and fixes
 
-### To Agent-Tester
-Sends: Improved agent for validation
+### To CTO Chief
+Sends: The improved agent definition and change log, for hand-off to Agent-Tester — you recommend, CTO Chief executes.
 
 ### Escalation
-If >50% of fixes fail: Escalate to CTO Chief
+If more than half of the fixes fail to apply: the report goes to CTO Chief.

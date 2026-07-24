@@ -212,9 +212,10 @@ test('processes data', () => {
   expect(data.valid).toBe(true);
 });
 
-// ✅ GOOD: Skip with explicit reason
-test.skipIf(!process.env.DB_URL, 'requires DB')('db test', () => {
-  // Clear why it's skipped
+// ✅ GOOD: Skip conditionally, with the reason in a comment
+// (test.skipIf takes ONLY the condition — it has no reason argument)
+test.skipIf(!process.env.DB_URL)('db test', () => {
+  // Skipped when DB_URL is unset — requires a live database
 });
 
 // ✅ GOOD: Fixture failures fail the test

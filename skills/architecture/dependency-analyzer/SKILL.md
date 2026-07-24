@@ -182,7 +182,7 @@ forbidden: [{
 lint-imports --config .importlinter
 # pydeps: visual + cycle detection
 pydeps mypackage --show-cycles --max-bacon 2 --noshow -o deps.svg
-# pyan3 / grimp underlie import-linter; grimp 3.14+ is the current graph engine
+# grimp underlies import-linter as its graph engine (grimp 3.14+ current)
 ```
 `.importlinter` layered contract:
 ```ini
@@ -230,7 +230,7 @@ NDepend.Console MySolution.sln /OutDir reports/
 # Roslyn analyzers: write a DiagnosticAnalyzer that walks SymbolUsage / SemanticModel.GetSymbolInfo
 # "DependsOn"-style queries via the Roslyn API on the Compilation graph
 # Free alternative: NsDepCop enforces namespace dependency rules at build time
-dotnet add package NsDepCop.Analyzers
+dotnet add package NsDepCop
 ```
 `config.nsdepcop`:
 ```xml
@@ -256,7 +256,8 @@ Cycle detection on the header graph: run `tsort` on the merged `.d` files; non-e
 # IWYU works on C++ too; add --no_fwd_decls if you prefer concrete includes
 iwyu_tool.py -p build/ src/
 # Modules (C++20): the build system already produces a module dependency manifest
-# CMake (3.28+) exports module deps under .CXXModules/
+# CMake (3.28+ stabilized C++20 modules) scans each TU to P1689R5 .ddi files and collates
+#   them into CXXModules.json — these are internal build artifacts, not a stable interface
 # deplint / cpp-dependencies for legacy header-only projects
 cpp-dependencies --dir src --graph deps.dot
 ```

@@ -65,7 +65,7 @@ Never assume: input is validated elsewhere; the framework handles security; test
 
 ## Vulnerability Categories
 
-> Ordered with OWASP 2025 prevalence in mind. Broken Access Control (A01) is #1 because it remains 100% prevalent across tested apps. Security Misconfiguration (A05) is now #2 — scan config files before source.
+> Ordered with OWASP 2025 prevalence in mind. Broken Access Control (A01) is #1 because it is the highest-prevalence category (incidence up to ~94% in OWASP 2021 testing). Security Misconfiguration (A05) is now #2 — scan config files before source.
 
 ### 0. Broken Access Control (OWASP A01) — TOP PRIORITY
 
@@ -416,7 +416,7 @@ app.MapPost("/review", async (PrPayload body, IAnthropicClient ai) =>
 });
 ```
 
-**CVE-2025-53773** is a 2025 vulnerability in Visual Studio + GitHub Copilot agent mode where prompt injection via workspace files / chat context enabled remote code execution (Microsoft CVSS 8.8). A separate documented vector — hidden prompt injection in PR descriptions — was published by Legit Security and GitGuardian research; do not conflate the two. Either way: scan any code path that funnels untrusted strings into an LLM prompt.
+**CVE-2025-53773** is a 2025 vulnerability in Visual Studio + GitHub Copilot agent mode where prompt injection via workspace files / chat context enabled local code execution through command injection (CWE-77; CVSS 7.8 per NVD, 8.8 per Microsoft). A separate documented vector — hidden prompt injection in PR descriptions — was published by Legit Security and GitGuardian research; do not conflate the two. Either way: scan any code path that funnels untrusted strings into an LLM prompt.
 
 Other LLM categories to scan: insecure output handling (LLM02 — model output passed to `eval`/`exec`/`innerHTML`), training data poisoning (LLM03), model DoS (LLM04), supply-chain risks in models/datasets (LLM05), sensitive data exposure in prompts (LLM06), insecure plugin design (LLM07), excessive agency (LLM08 — LLM has uncontrolled tool access), over-reliance (LLM09), model theft (LLM10).
 
@@ -585,7 +585,7 @@ Debug mode, CORS, security headers, cookie flags (httpOnly, secure, sameSite), C
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see line ~ end of file and [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see line ~ end of file and [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |-------|----------|--------|
@@ -636,8 +636,8 @@ Two engines dominate; use them complementarily.
 | Tool | Strengths | Trade-offs | When |
 |------|-----------|-----------|------|
 | **Semgrep** | 30+ languages · YAML rules anyone can write in ~10 min · low memory | Lighter semantic analysis than CodeQL; scan time and memory vary with repo size | Every PR / pre-commit |
-| **CodeQL** | Deep semantic + taint-flow analysis · higher precision (lower false-positive rate) · native GitHub integration | 10 languages (C/C++, C#, Go, Java/Kotlin, JS/TS, Python, Ruby, Swift, Rust beta as of 2026) · DB build takes minutes (~30 min on large repos) · QL queries require days to learn | Scheduled / nightly / pre-release |
-| **Bandit** | Python-specialized · ~90 Python-specific rules · Apache 2.0, no paid tier | Python only · SARIF output requires `bandit-sarif-formatter` extra | Python projects always |
+| **CodeQL** | Deep semantic + taint-flow analysis · higher precision (lower false-positive rate) · native GitHub integration | ~10 languages (C/C++, C#, Go, Java/Kotlin, JS/TS, Python, Ruby, Swift, Rust, GitHub Actions) · DB build takes minutes on large repos · QL queries take time to learn | Scheduled / nightly / pre-release |
+| **Bandit** | Python-specialized · Python-specific rule set · Apache 2.0, no paid tier · native SARIF (`-f sarif`) | Python only | Python projects always |
 
 Both Semgrep and CodeQL emit **SARIF** so findings aggregate in GitHub code-scanning. Make SARIF the default output.
 
@@ -655,8 +655,8 @@ codeql database analyze db --format=sarif-latest --output=codeql.sarif \
         codeql/javascript-security-and-quality.qls
 
 # Language-specific complements
-pip install bandit bandit-sarif-formatter
-bandit -r . -f sarif -o bandit.sarif -ll       # Python
+pip install bandit
+bandit -r . -f sarif -o bandit.sarif -ll       # Python (native SARIF)
 gosec -fmt=sarif -out=gosec.sarif ./...        # Go
 npx eslint --plugin security --format=@microsoft/eslint-formatter-sarif --output-file=eslint.sarif
 ./gradlew spotbugsMain                         # Java / Kotlin
@@ -712,7 +712,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — a 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

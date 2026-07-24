@@ -587,7 +587,7 @@ Freshness SLAs declared per source? Volume bounds set? Quarantine table exists a
 
 ## Severity
 
-Internal triage tiers stay in the report for prioritization. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. A silent data-quality regression today is a wrong dashboard, a wrong model, or a wrong invoice tomorrow.
+Internal triage tiers stay in the report for prioritization. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. A silent data-quality regression today is a wrong dashboard, a wrong model, or a wrong invoice tomorrow.
 
 | Triage tier | Examples | Internal action |
 |-------|----------|-----------------|
@@ -689,7 +689,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — a 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every dbt/Soda/Pandera/GE/Deequ warning, every observability-platform alert, every deprecation notice, and every CVE you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

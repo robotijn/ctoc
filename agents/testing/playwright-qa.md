@@ -357,8 +357,10 @@ export default defineConfig({
 test('product card renders correctly', async ({ page }) => {
   await page.goto('/products/test-product');
 
-  // Wait for images to load
-  await page.waitForLoadState('networkidle');
+  // Web-first readiness: wait for the card to be visible, not a discouraged
+  // networkidle. toHaveScreenshot also auto-retries until the render stabilizes.
+  const productCard = page.getByTestId('product-card');
+  await expect(productCard).toBeVisible();
 
   // Hide dynamic content
   await page.evaluate(() => {
@@ -368,7 +370,6 @@ test('product card renders correctly', async ({ page }) => {
   });
 
   // Take snapshot
-  const productCard = page.getByTestId('product-card');
   await expect(productCard).toHaveScreenshot('product-card.png');
 });
 ```
@@ -416,7 +417,10 @@ test.describe('Accessibility - All Pages', () => {
   for (const { name, url } of pages) {
     test(`${name} page is accessible`, async ({ page }) => {
       await page.goto(url);
-      await page.waitForLoadState('networkidle');
+      // goto already waits for the 'load' event; assert the primary landmark is
+      // present (a web-first readiness signal that doubles as an a11y sanity
+      // check) rather than a discouraged networkidle wait.
+      await expect(page.getByRole('main')).toBeVisible();
 
       const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa'])

@@ -59,7 +59,7 @@ If none of the above is true, this skill is inert — the lean default per the r
 
 ## 2026 Best Practices (Real-time category)
 
-- **The V-model is the load-bearing framing.** Each ladder rung corresponds to a left-side step of the V-model (requirements, design, code) verified against the matching right-side rung. SRM Tech's Hardware-in-the-Loop testing reference (https://www.srmtech.com/knowledge-base/blog/hardware-in-the-loop-hil-testing-a-comprehensive-guide/) gives the canonical 2026 framing: Model-in-the-Loop verifies the model against requirements, Software-in-the-Loop verifies the generated or hand-written software against the model, Processor-in-the-Loop verifies the cross-compiled code on the target processor, and Hardware-in-the-Loop verifies the entire electronic control unit in a simulated physical environment. Each rung answers a different verification question; skipping a rung leaves the corresponding question unanswered.
+- **The V-model is the load-bearing framing.** Each ladder rung corresponds to a left-side step of the V-model (requirements, design, code) verified against the matching right-side rung. This is the established V-model verification convention: Model-in-the-Loop verifies the model against requirements, Software-in-the-Loop verifies the generated or hand-written software against the model, Processor-in-the-Loop verifies the cross-compiled code on the target processor, and Hardware-in-the-Loop verifies the entire electronic control unit in a simulated physical environment. Each rung answers a different verification question; skipping a rung leaves the corresponding question unanswered.
 - **Skipping a rung is permissible but never silent.** A pilot project on a non-safety prototype may legitimately go from Model-in-the-Loop straight to a bench Hardware-in-the-Loop, skipping Software-in-the-Loop and Processor-in-the-Loop. The discipline is to *record* the skip and the reasoning: "Software-in-the-Loop skipped because the target compiler is generation-stable for this architecture and Processor-in-the-Loop will catch any deviation." Silence is the failure mode.
 - **The rungs catch different defect classes.** Model-in-the-Loop catches requirement-vs-model mismatches. Software-in-the-Loop catches model-vs-code mismatches. Processor-in-the-Loop catches host-vs-target compiler and runtime mismatches. Hardware-in-the-Loop catches integration faults: timing, electrical, sensor noise, actuator dynamics, fault-injection response. No single rung subsumes the others.
 - **Fault injection lives at Hardware-in-the-Loop.** Stuck-at, bit-flip, broken-wire, sensor-drift, brown-out, electromagnetic-interference, and timing-jitter faults need a real input stage to inject. ISO 26262 Part 4 requires fault-injection testing for Automotive Safety Integrity Level C and D; RTCA DO-178C requires robustness testing at Level A and B. Hardware-in-the-Loop is the rung where these tests run.
@@ -140,7 +140,7 @@ Requirements  ──────────────────────
 **What is real**: the full electronic control unit (the device under test), the wiring loom, the real input-output interfaces, the real sensors and actuators or their high-fidelity hardware emulations.
 **What is simulated**: the plant — the vehicle, the engine, the motor, the fluid system, the patient body, the trading-venue counterparty — running on a real-time computer that closes the control loop fast enough to be indistinguishable from physical hardware.
 **Verifies**: the integrated electronic control unit's behaviour in real time, including timing, electrical, sensor noise, actuator dynamics, and fault-injection response. This is the rung that exercises ISO 26262 Part 4 fault-injection requirements and RTCA DO-178C robustness testing.
-**Typical tooling**: dSPACE SCALEXIO, NI VeriStand + PXI chassis, Speedgoat Performance / Mobile real-time computers, ETAS LABCAR, Opal-RT OP4500/OP5700 for power systems.
+**Typical tooling**: dSPACE SCALEXIO, NI VeriStand + PXI chassis, Speedgoat Performance / Mobile real-time computers, ETAS LABCAR, Opal-RT real-time simulators for power systems.
 **Best for**: integration testing, fault injection, performance-under-load, sensor-failure modes, electrical-fault response, real-time deadline verification on the actual target.
 **Limitations**: rig setup cost is large; throughput is low (tens to hundreds of tests per regression cycle, not thousands); a poorly-qualified rig injects false confidence.
 **Skip implication if missing**: integration, timing, and fault-injection defects ship to acceptance testing or, worse, to the field. For Automotive Safety Integrity Level C / D and RTCA DO-178C Level A / B this is non-negotiable.
@@ -491,11 +491,10 @@ target_line: <line in the artifact, if applicable>
 message: <one-sentence explanation of the gap>
 suggested_fix: <one-sentence remediation>
 reference:
-  - https://www.srmtech.com/knowledge-base/blog/hardware-in-the-loop-hil-testing-a-comprehensive-guide/
   - https://www.dspace.com/en/pub/home/products/hw/simulator_hardware.cfm
-  - https://www.ni.com/en/shop/electronic-test-instrumentation/hardware-in-the-loop-products.html
+  - https://www.ni.com
   - https://www.speedgoat.com/products/real-time-target-machines
-  - https://www.absint.com/timingexplorer/index.htm
+  - https://www.absint.com/ait/index.htm
 ```
 
 The integrator uses `confidence` and `corroborated_by` to weight findings — a Hardware-in-the-Loop measurement exceedance corroborated by `realtime/wcet-budget` is unambiguous; a single-source `inverted_test_pyramid` finding is medium-confidence and may be waived per-project.
@@ -522,11 +521,10 @@ The principle: a missing rung today is the field failure tomorrow. Embedded code
 
 ## References
 
-- SRM Tech — Hardware-in-the-Loop testing comprehensive guide — https://www.srmtech.com/knowledge-base/blog/hardware-in-the-loop-hil-testing-a-comprehensive-guide/
 - dSPACE Hardware-in-the-Loop simulators — https://www.dspace.com/en/pub/home/products/hw/simulator_hardware.cfm
-- NI VeriStand and PXI Hardware-in-the-Loop — https://www.ni.com/en/shop/electronic-test-instrumentation/hardware-in-the-loop-products.html
+- NI VeriStand and PXI Hardware-in-the-Loop — https://www.ni.com
 - Speedgoat real-time target machines — https://www.speedgoat.com/products/real-time-target-machines
-- ETAS LABCAR — https://www.etas.com/en/products/labcar.php
+- ETAS LABCAR — https://www.etas.com
 - Opal-RT real-time simulators for power systems — https://www.opal-rt.com/
 - MathWorks Simulink Test and Coder — https://www.mathworks.com/products/simulink-test.html
 - ISO 26262 Part 4 (system level) and Part 8 (supporting processes) — see AUTOSAR ISO 26262 guide at https://autosar.io/en/insights/iso26262-guide

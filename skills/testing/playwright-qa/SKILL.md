@@ -40,7 +40,7 @@ Mission: Ensure every user journey works across browsers, viewports, and network
 
 The 2026 Playwright doctrine is **"test the user, not the implementation"** — every API in the surface area is built around the accessibility tree. Twelve patterns dominate:
 
-- **Locators over selectors.** `page.locator()`, `page.getByRole()`, `page.getByLabel()`, `page.getByText()`, `page.getByTestId()` are the *only* sanctioned entry points. They auto-wait, retry, and re-query on every action. `page.$()`, `page.$$()`, `page.waitForSelector()` are legacy and emit deprecation warnings — **per the warnings-are-bugs rule, every deprecation use is a critical-severity finding**.
+- **Locators over selectors.** `page.locator()`, `page.getByRole()`, `page.getByLabel()`, `page.getByText()`, `page.getByTestId()` are the *only* sanctioned entry points. They auto-wait, retry, and re-query on every action. `page.$()`, `page.$$()`, `page.waitForSelector()` are flagged **`discouraged`** in Playwright's own API docs — they return `ElementHandle`s that do not auto-wait. Playwright does not runtime-deprecate them and emits no deprecation warning, but the official `eslint-plugin-playwright` errors on them (`no-element-handle`, `no-wait-for-selector`), and **under the warnings-are-bugs rule this skill treats each such lint error as a critical-severity finding**.
 - **Auto-waiting kills sleeps.** Playwright performs actionability checks (visible, stable, enabled, receives events) before every action. Any `page.waitForTimeout(N)` / `setTimeout` / `Thread.sleep` / `time.sleep` / `Task.Delay` in a test is a flake source — replace with `expect(locator).toBeVisible()` or `expect(locator).toHaveText(...)`.
 - **Accessibility-tree assertions.** Prefer `getByRole('button', { name: 'Submit' })` over `getByTestId('submit-btn')`. Why: roles reflect how users *and assistive technology* perceive the page; CSS classes and even test-ids change. The 2026 selector priority is **role > label > placeholder > text > test-id > CSS**. test-id is the fallback when the component has no accessible name.
 - **Trace viewer is the debugger.** `trace: 'on-first-retry'` in `playwright.config.ts` is non-negotiable in CI. Locally use `--trace=on` while debugging. The trace contains DOM snapshots, network log, console log, action log, screenshots — analyze with `npx playwright show-trace trace.zip`.
@@ -97,7 +97,7 @@ The 2026 Playwright doctrine is **"test the user, not the implementation"** — 
 - `page.locator('//div[@class="form"]/button')` — XPath couples to DOM shape
 - `page.locator('button').nth(2)` — positional indexing is implicit ordering coupling
 - `page.locator('#ember-1234')` — framework-generated IDs are unstable
-- `page.$()`, `page.$$()`, `page.waitForSelector()` — **deprecated**, replaced by locators
+- `page.$()`, `page.$$()`, `page.waitForSelector()` — **`discouraged`** (return non-auto-waiting `ElementHandle`s), replaced by locators; `eslint-plugin-playwright` flags them
 
 When the accessibility name is missing: **first request a11y improvement from the dev team** (this is also a real-user bug). Use `getByTestId` as a temporary fallback with a TODO comment + ticket link.
 
@@ -493,7 +493,7 @@ page.route("**/api.stripe.com/**", route ->
         .setBody("{\"id\":\"pi_test_succeeded\",\"status\":\"succeeded\"}")));
 ```
 
-Edge cases: WebSockets — use `page.routeWebSocket()` (TypeScript only as of Playwright 1.55+); GraphQL — match on `**/graphql` and dispatch by `request.postDataJSON().operationName`; gRPC-web — route at the HTTP transport layer; service workers — Playwright supports `serviceWorkers: 'block' | 'allow'` in context options.
+Edge cases: WebSockets — use `page.routeWebSocket()` / `browserContext.routeWebSocket()` (all languages — JavaScript, Python, Java, .NET — since Playwright 1.48); GraphQL — match on `**/graphql` and dispatch by `request.postDataJSON().operationName`; gRPC-web — route at the HTTP transport layer; service workers — Playwright supports `serviceWorkers: 'block' | 'allow'` in context options.
 
 ### 7. Missing accessibility check (cross-link [[accessibility-checker]])
 
@@ -853,17 +853,17 @@ Aggregate Playwright HTML report + Allure (optional) + SARIF (from axe-playwrigh
 7. Never test third-party services directly — mock them with `page.route()` or MSW
 8. Never run E2E without cleanup — fresh context per test
 9. Never add `try/catch + retry` inside a test body — `retries: 2` in CI config only
-10. Never use deprecated APIs (`page.$()`, `page.$$()`, `page.waitForSelector()`) — these are warnings, and **warnings are bugs**
+10. Never use `discouraged` element-handle APIs (`page.$()`, `page.$$()`, `page.waitForSelector()`) — `eslint-plugin-playwright` errors on them (`no-element-handle`, `no-wait-for-selector`), and **warnings are bugs**
 11. Never let a trace go uncollected on failure — `trace: 'on-first-retry'` is non-negotiable
 12. Never rely on test execution order — surfaces under sharding
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable QA report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable QA report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |-------|----------|--------|
-| CRITICAL | Hardcoded real credentials in tests; deprecated Playwright APIs (warnings); test interdependence causing data leak between tenants; missing a11y scan on a regulated page | BLOCK |
+| CRITICAL | Hardcoded real credentials in tests; `discouraged` element-handle Playwright APIs (lint errors); test interdependence causing data leak between tenants; missing a11y scan on a regulated page | BLOCK |
 | HIGH | CSS-selector reliance breaking on every refactor; `waitForTimeout` sleeps; real network calls to third-party services in CI; missing trace on retry | BLOCK |
 | MEDIUM | Sequential CI (no sharding) pushing suite > 30 min; missing `storageState` (login-per-test); flaky popup/dialog races; `toHaveScreenshot` without `mask` of dynamic content | Fix soon |
 | LOW | Class-based page object that could be a fixture; missing `tag` annotations for `--grep`; Allure not configured; Edge skipped from matrix | Backlog |
@@ -884,7 +884,6 @@ These tiers are the **internal triage view** used when you produce a human-reada
 ### HIGH: Hard-coded sleep masking race condition
 **File**: tests/e2e/checkout.spec.ts:42
 **Category**: hard-coded-sleep
-**CWE**: CWE-1059 (insufficient technical documentation — test flake)
 
 ```typescript
 await page.waitForTimeout(3000);
@@ -940,7 +939,7 @@ The integrator uses `confidence` and `engine` to weight findings — a `confiden
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every Playwright deprecation warning, axe violation (any impact), Lighthouse failed audit, visual-diff above threshold, and flaky-retry observation emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

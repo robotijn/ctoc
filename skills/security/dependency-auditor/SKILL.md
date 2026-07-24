@@ -114,7 +114,7 @@ conan graph info conanfile.py --format=json
 # Pipe into OSV-Scanner or Trivy fs.
 
 # General-purpose, ecosystem-agnostic
-osv-scanner --recursive --format json .       # Google OSV, covers 30+ ecosystems incl. vcpkg, Conan, Bazel
+osv-scanner scan --recursive --format json .  # Google OSV, covers 30+ ecosystems incl. vcpkg, Conan, Bazel (v2.x requires the `scan` subcommand)
 trivy fs --scanners vuln,license,secret --format cyclonedx .
 grype dir:. -o sarif                          # Anchore, SARIF output
 ```
@@ -404,7 +404,7 @@ Generate **both** for high-assurance projects — they describe the same graph f
 syft .  -o cyclonedx-json=sbom.cdx.json -o spdx-json=sbom.spdx.json    # universal
 trivy fs --format cyclonedx --output sbom.cdx.json .                   # universal, vuln-aware
 npx @cyclonedx/cyclonedx-npm --output-file sbom.cdx.json               # Node
-cyclonedx-py -r --format json -o sbom.cdx.json                         # Python
+cyclonedx-py requirements requirements.txt --output-format JSON -o sbom.cdx.json  # Python (cyclonedx-py v4+ subcommand CLI; -r flag removed)
 cyclonedx-gomod mod -json -output sbom.cdx.json                        # Go
 cargo cyclonedx --format json                                          # Rust
 mvn org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom              # Maven
@@ -474,7 +474,7 @@ Generate CycloneDX (and SPDX where required), sign with cosign keyless, publish 
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used in the human-readable report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)). There is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used in the human-readable report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)). There is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |---|---|---|
@@ -589,7 +589,7 @@ The integrator uses `reachable` + `epss` + `kev` to weight findings:
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every CVE (low/medium/high/critical), every typosquat candidate, every unmaintained-dep flag, every license violation, every missing-lockfile warning, every missing-SBOM warning emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

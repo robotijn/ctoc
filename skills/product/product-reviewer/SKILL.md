@@ -384,8 +384,9 @@ for sub in stripe.Subscription.list(status="active", limit=100).auto_paging_iter
     for item in sub["items"]["data"]:
         price = item["price"]
         unit = price["unit_amount"] / 100
+        qty = item.get("quantity", 1)   # seat-based plans bill unit_amount * quantity
         interval = price["recurring"]["interval"]
-        mrr += unit * (1 if interval == "month" else 1/12 if interval == "year" else 0)
+        mrr += unit * qty * (1 if interval == "month" else 1/12 if interval == "year" else 0)
 
 print({"funnel": funnel, "mrr_usd": round(mrr, 2)})
 ```
@@ -541,7 +542,7 @@ The integrator uses `confidence` and `kind` to weight findings — a `confidence
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every missing-target, activity-North-Star, no-owner, no-recap, Simpson's-risk, cohort-decay, or MRR-disconnect finding emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

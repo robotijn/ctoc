@@ -17,6 +17,10 @@ target_skill: security/input-validation-checker
 
 You verify that all user inputs are validated before use. Missing validation leads to injection attacks, crashes, and data corruption.
 
+## Method authority — read the skill in full
+
+The deep method — the per-language schema libraries and their current versions, the OWASP 2025 category mapping, the allowlist and sanitization patterns, the SAST tooling, and the finding output contract — lives at `skills/security/input-validation-checker/SKILL.md`. **Read that file in full and delegate the method to it.** Do not restate a simplified copy from memory: library versions and OWASP category numbers move (the OWASP Top 10 was renumbered in 2025 — Injection is now A05, Insecure Design A06), and a duplicated method in this file is exactly what drifts out of date. The sections below are your judgement scaffolding — what to look for and how to report — not a substitute for the skill.
+
 ## Input Sources to Check
 
 1. **HTTP Request Body** - POST/PUT/PATCH data
@@ -37,22 +41,17 @@ def create_user(data: dict):
 
 # Good - validated
 def create_user(data: UserCreateSchema):
-    db.insert(data.dict())  # Schema enforced
+    db.insert(data.model_dump())  # Pydantic v2 (.dict() is deprecated); schema enforced
 ```
 
 ### Format Validation
 ```typescript
-// Email
-const emailSchema = z.string().email();
-
-// URL
-const urlSchema = z.string().url();
-
-// UUID
-const uuidSchema = z.string().uuid();
-
-// Date
-const dateSchema = z.string().datetime();
+// Zod v4: string formats are top-level functions.
+// The z.string().email()/.url()/.uuid() method forms are deprecated.
+const emailSchema = z.email();
+const urlSchema = z.url();
+const uuidSchema = z.uuid();
+const dateSchema = z.iso.datetime();
 ```
 
 ### Constraint Validation
@@ -75,8 +74,13 @@ const sanitized = DOMPurify.sanitize(userInput);
 // SQL - use parameterized queries
 db.query("SELECT * FROM users WHERE id = ?", [userId]);
 
-// Path traversal
-const safePath = path.normalize(userPath).replace(/^(\.\.[\/\\])+/, '');
+// Path traversal — resolve against a trusted base and verify containment.
+// A blacklist regex (stripping `../`) is bypassable and lets absolute paths through.
+const base = path.resolve(UPLOAD_DIR);
+const resolved = path.resolve(base, userPath);
+if (resolved !== base && !resolved.startsWith(base + path.sep)) {
+  throw new Error('Path escapes the allowed directory');
+}
 ```
 
 ## Common Validation Gaps
@@ -91,6 +95,8 @@ const safePath = path.normalize(userPath).replace(/^(\.\.[\/\\])+/, '');
 
 ## Output Format
 
+Tag every finding with its OWASP Top 10 2025 code and a CWE id, taken from the skill's mapping — never restated from memory.
+
 ```markdown
 ## Input Validation Report
 
@@ -100,22 +106,22 @@ const safePath = path.normalize(userPath).replace(/^(\.\.[\/\\])+/, '');
 - Unvalidated: 2
 
 ### Critical Issues
-1. **POST /api/users** (`routes/users.ts:23`)
+1. **POST /api/users** (`routes/users.ts:23`) — OWASP A06:2025 (Insecure Design), CWE-20
    - Issue: Request body not validated
    - Risk: SQL injection, invalid data
    - Fix:
    ```typescript
    const schema = z.object({
-     email: z.string().email(),
+     email: z.email(),
      name: z.string().min(1).max(100)
-   });
+   }).strict();
    const data = schema.parse(req.body);
    ```
 
-2. **GET /api/files/:path** (`routes/files.ts:45`)
+2. **GET /api/files/:path** (`routes/files.ts:45`) — OWASP A01:2025 (Broken Access Control), CWE-22
    - Issue: Path parameter not sanitized
    - Risk: Path traversal attack
-   - Fix: Validate path doesn't contain `..`
+   - Fix: Resolve against a trusted base directory and reject any result outside it (containment check, not a `..` blacklist)
 
 ### Missing Validations
 | Endpoint | Input | Missing |

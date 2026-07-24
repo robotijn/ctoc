@@ -48,7 +48,7 @@ This skill is **heavily weighted toward C/C++** because that is where the memory
 ## 2026 Best Practices (Specialized category)
 
 - **Memory-safe by default**: per CISA's Secure-by-Design directive (publish memory-safety roadmaps by **January 1, 2026**) and the joint NSA/CISA "Reducing Vulnerabilities in Modern Software Development" guidance (June 2025), new systems code SHOULD be written in a memory-safe language — Rust, Go, C#, Java, Swift, Python. Microsoft and Google have both publicly reported that ~70% of their serious security CVEs are memory-safety issues; this number has been steady for the last seven years and is the empirical anchor for the policy push.
-- **If C/C++ is required**: use a modern subset. **No `gets`, `strcpy`, `strcat`, `sprintf`, `scanf("%s")`, `gets_s` (still risky), raw `new`/`delete`, manual `malloc`/`free` without RAII wrapper.** Prefer `std::string`, `std::vector`, `std::span`, `std::string_view`, `std::unique_ptr`, `std::shared_ptr`, `std::expected` (C++23). The C++26 Safety Profiles proposal (P3081, in progress as of 2026) introduces opt-in `[[profiles::enforce(bounds)]]`, `[[profiles::enforce(type)]]`, and `[[profiles::enforce(lifetime)]]` attributes that disable raw pointer arithmetic and force bounds-checked containers. The earlier "Safe C++" extensions proposal was abandoned in favor of Profiles. Use Profiles where your toolchain supports them.
+- **If C/C++ is required**: use a modern subset. **No `gets`, `strcpy`, `strcat`, `sprintf`, `scanf("%s")`, `gets_s` (still risky), raw `new`/`delete`, manual `malloc`/`free` without RAII wrapper.** Prefer `std::string`, `std::vector`, `std::span`, `std::string_view`, `std::unique_ptr`, `std::shared_ptr`, `std::expected` (C++23). WG21's Safety Profiles effort (P3081, still in progress as of 2026 — not a finished C++26 feature) aims to add opt-in, enforceable bounds / type / lifetime safety profiles that flag raw pointer arithmetic and push bounds-checked containers; a competing "Safe C++" language-extension proposal was not adopted. The exact profile-enforcement syntax is not yet stabilized — use Profiles where your toolchain supports them.
 - **Sanitizers in CI are non-negotiable**: AddressSanitizer (ASan), UndefinedBehaviorSanitizer (UBSan), and ThreadSanitizer (TSan) — at minimum — must run on every PR for C/C++/Rust/Objective-C/CUDA. MemorySanitizer (MSan) for uninitialized-read detection on Clang. LeakSanitizer (LSan) is bundled with ASan on Linux/macOS. Treat any sanitizer report as `severity: critical` per warnings-are-bugs.
 - **Bounds-check at every FFI boundary**: even in "safe" languages — Rust `unsafe` blocks, C# `unsafe`/`fixed`/`Marshal`, Java JNI and Foreign Function & Memory API (JEP 454, final in Java 22; MemorySegment + Arena lifetime), Python `ctypes`/`cffi`, JS WebAssembly memory, Node `Buffer`/N-API. The compiler stops checking at the FFI line. Bugs that look like "Rust crashed" are almost always FFI bugs.
 - **Three-axis profiling**: latency (allocation cost) + throughput (alloc rate) + utilization (heap %). All three. An OOM is a degraded-service event — surface unbounded-growth patterns as resilience risks, not just performance issues.
@@ -79,7 +79,7 @@ void greet(const char *name) {
     printf("hello %s\n", buf);
 }
 /* SAFER (C23): use _Generic to dispatch length-checked APIs,
-   or strlcpy where available (BSD/glibc 2.38+/musl 1.2.4+). */
+   or strlcpy where available (BSD and musl since forever; glibc only since 2.38). */
 ```
 
 ```cpp
@@ -399,7 +399,7 @@ int fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0600);
 if (fd < 0) return -1;
 ```
 
-### 10. FFI Safety — CWE-1037 / CWE-695 family
+### 10. FFI Safety — CWE-695 (Use of Low-Level Functionality) / CWE-111 (Direct Use of Unsafe JNI)
 
 Every FFI boundary is a memory-safety boundary. The compiler in language A cannot check what language B does with the bytes.
 
@@ -617,7 +617,7 @@ For each candidate: read context, trace allocation → free, confirm there is no
 | **Coverity (Synopsys)** | Deep interprocedural taint/lifetime | C, C++, Java, C#, JS, Python, Go, Rust | Scheduled scans |
 | **cppcheck** | Buffer overflows, UAF, leaks, dead pointers | C, C++ | Pre-commit |
 | **Microsoft Visual Studio Code Analysis (`/analyze`)** | C++ Core Guidelines, SAL annotations, lifetime | C, C++, C# | MSVC builds |
-| **.NET Managed Debugging Assistants (MDA)** | P/Invoke marshaling, GC handle misuse | C# / .NET | Debug builds (dotnet diagnostics) |
+| **.NET Managed Debugging Assistants (MDA)** | P/Invoke marshaling, GC-handle misuse (`pInvokeStackImbalance`, `marshaling`, `releaseHandleFailed`) | C# — **.NET Framework only** | Enabled via registry / `COMPLUS_MDA` / `app.exe.mda.config`. Removed in .NET 5+ — use `dotnet-gcdump` / `dotnet-counters` there |
 | **Java FFM leak detection** | `MemorySegment` lifecycle bugs (post-close access) | Java 22+ | Runtime — throws cleanly, log/alert |
 | **Miri** | UB in Rust `unsafe` blocks | Rust | Nightly |
 | **Semgrep rules** (`p/c`, `p/cpp`) | Pattern-level: `gets`, `strcpy`, raw new/delete, dangerous casts | C, C++ | Every PR (cross-link [[sast-scanner]]) |
@@ -626,7 +626,7 @@ ASan + UBSan on every PR is the **floor**. MSan + TSan on nightly. Any sanitizer
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |---|---|---|
@@ -735,7 +735,7 @@ The integrator uses `confidence` and `engine` to weight findings:
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

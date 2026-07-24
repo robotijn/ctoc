@@ -44,7 +44,7 @@ You are a contract guardian. You verify that API implementations match their dec
 ## 2026 Best Practices (Specialized category)
 
 - **Schema-first, not code-first.** Write the contract before the handler. OpenAPI 3.1 / AsyncAPI 3 / GraphQL SDL / Protobuf are source-of-truth artifacts checked into the repo; code is generated from them (server stubs and client SDKs) or validated against them on every request/response. Code-first generation (e.g. Swashbuckle, springdoc, FastAPI auto-schema) is acceptable only when the generated artifact is itself committed and diffed in CI — otherwise the contract silently drifts with each handler change.
-- **Breaking-change CI gate.** Every PR that touches an API artifact runs an automated diff against the base branch. `oasdiff breaking` for OpenAPI, `buf breaking` for Protobuf, `graphql-inspector diff` for GraphQL. Detected breaks fail the build unless the PR carries an explicit `breaking-change: approved` label and a migration plan. (oasdiff's project pages describe it as covering "450+ categories of breaking changes" across OpenAPI 3.0 and 3.1 — verify the current rule count on the oasdiff site before pinning a number in your CI documentation.)
+- **Breaking-change CI gate.** Every PR that touches an API artifact runs an automated diff against the base branch. `oasdiff breaking` for OpenAPI, `buf breaking` for Protobuf, `graphql-inspector diff` for GraphQL. Detected breaks fail the build unless the PR carries an explicit `breaking-change: approved` label and a migration plan. (oasdiff's docs describe roughly 500 distinct detected API changes across OpenAPI 3.0 and 3.1 — about 209 of them breaking — verify the current counts on the oasdiff site before pinning a number in your CI documentation.)
 - **Semantic versioning enforced by tooling.** Major bump required on any backward-incompatible change. Minor on additive optional fields. Patch on docs/examples only. The CI gate computes the required bump from the diff and rejects a mismatched `info.version` (or `package` semver in Protobuf).
 - **Consumer-driven contract (CDC) testing alongside schema validation.** Pact-style CDC inverts the relationship — each consumer publishes the subset of the contract it actually uses, and the provider must satisfy the union. Schemathesis / Dredd run the declared schema against the live provider. Both layers are needed: schema testing proves the surface; CDC proves the actual usage works. Bi-directional contract testing (Pactflow) combines both into one verification.
 - **Evolutionary patterns: add, never repurpose.** Add new optional fields. Add new endpoints. Add new enum values only when consumers handle unknown values gracefully (Protobuf does this by default; OpenAPI/JSON Schema does not — see oneOf with `unevaluatedProperties: false` for strictness). NEVER repurpose an existing field's meaning. NEVER tighten a constraint (string -> enum, optional -> required, nullable -> non-nullable) on an existing field.
@@ -91,8 +91,8 @@ Any step that's missing from a project's CI is itself a finding emitted by this 
 
 - Status codes match the documented set (no undocumented `500` leaks, no silent `204` where `200 + body` is declared).
 - Body matches schema for every documented status.
-- Headers as documented — including rate-limit headers (`RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` per RFC 9331 / draft IETF rate-limit-headers).
-- Error envelope consistent across endpoints (RFC 7807 `application/problem+json` recommended).
+- Headers as documented — including rate-limit headers. The IETF draft `draft-ietf-httpapi-ratelimit-headers` now defines the `RateLimit` and `RateLimit-Policy` structured fields; earlier drafts used the `RateLimit-Limit` / `RateLimit-Remaining` / `RateLimit-Reset` triple, still widely deployed. Check which form the API actually emits.
+- Error envelope consistent across endpoints (RFC 9457 `application/problem+json` — obsoletes RFC 7807 — recommended).
 - Cache headers declared where applicable (`ETag`, `Cache-Control`).
 
 ### Breaking-change taxonomy (the categories you enforce)
@@ -131,7 +131,7 @@ Rows marked `safe` are **non-findings** — they do not emit a refinement-loop l
 
 | Tool | Role | Notes |
 |---|---|---|
-| **oasdiff** | Diff & breaking-change detection | 450+ rules; supports 3.0 and 3.1 (3.1 fully supported across diff/breaking/changelog as of 2026). Use `oasdiff breaking` in CI. |
+| **oasdiff** | Diff & breaking-change detection | ~500 detected change types (≈209 breaking); supports OpenAPI 3.0 and 3.1. Use `oasdiff breaking` in CI. |
 | **Spectral (Stoplight)** | Linting / style governance | Built-in `spectral:oas` ruleset; custom rules in YAML. Run on every PR. |
 | **Optic** | Behavioral diff from live traffic | Captures actual request/response, diffs against the declared spec, proposes spec updates. |
 | **openapi-diff (Azure)** | Alternative breaking-change tool | Microsoft's; useful for Azure SDK projects. |
@@ -177,7 +177,7 @@ Rows marked `safe` are **non-findings** — they do not emit a refinement-loop l
 # OpenAPI: lint + breaking-change gate + conformance
 npx @stoplight/spectral-cli lint openapi.yaml
 oasdiff breaking --fail-on WARN openapi-base.yaml openapi-head.yaml
-schemathesis run --checks all http://localhost:3000/openapi.json
+schemathesis run http://localhost:3000/openapi.json    # runs all checks by default
 
 # Protobuf: lint + breaking-change gate
 buf lint
@@ -215,7 +215,7 @@ class User(BaseModel):
     created_at: datetime
     bio: str | None = None    # OPTIONAL: safe to add later
 
-class Error(BaseModel):       # SHARED ERROR ENVELOPE — RFC 7807 style
+class Error(BaseModel):       # SHARED ERROR ENVELOPE — RFC 9457 (problem+json) style
     type: str
     title: str
     status: int
@@ -240,11 +240,11 @@ diff openapi.committed.json openapi.head.json || { echo "schema drift"; exit 1; 
 oasdiff breaking openapi.base.json openapi.head.json
 ```
 
-### C# / .NET 9 (minimal APIs + OpenAPI 3.1)
+### C# / .NET 10 (minimal APIs + OpenAPI 3.1)
 
 ```csharp
-// .NET 9 ships first-class OpenAPI via Microsoft.AspNetCore.OpenApi (replaces Swashbuckle for new projects).
-// The generated document is OpenAPI 3.1 by default.
+// .NET 10 ships first-class OpenAPI via Microsoft.AspNetCore.OpenApi (replaces Swashbuckle for new projects).
+// OpenAPI 3.1 support arrived in .NET 10 and is the default there; the .NET 9 built-in generator emits OpenAPI 3.0.
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi("v2", opt => { opt.OpenApiVersion = OpenApiSpecVersion.OpenApi3_1; });
 var app = builder.Build();
@@ -276,7 +276,8 @@ oasdiff breaking ./openapi/v2.base.json ./openapi/v2.json
 ### Java (Spring Boot + springdoc-openapi)
 
 ```java
-// springdoc-openapi 2.x generates OpenAPI 3.1 documents from Spring annotations.
+// springdoc-openapi 2.x generates OpenAPI 3.0 by default from Spring annotations; set
+// springdoc.api-docs.version=openapi_3_1 for OpenAPI 3.1 output.
 @RestController
 @RequestMapping("/users")
 @Tag(name = "users")
@@ -336,7 +337,7 @@ app.get("/users/:userId", auth, async (req, res) => {
 });
 ```
 
-tRPC alternative: type-safe end-to-end without an OpenAPI document at all — acceptable for **internal** TS-only services; emit OpenAPI via `trpc-openapi` for public APIs.
+tRPC alternative: type-safe end-to-end without an OpenAPI document at all — acceptable for **internal** TS-only services; emit OpenAPI via `trpc-to-openapi` (the maintained successor to `trpc-openapi`, tracking current tRPC) for public APIs.
 
 ### C / C++ (gRPC stubs from Protobuf)
 
@@ -346,6 +347,8 @@ The reference gRPC implementation targets C++ (gRPC core is C, the user-facing A
 // users.proto — the contract. buf lint + buf breaking enforce evolution.
 syntax = "proto3";
 package users.v1;
+
+import "google/protobuf/timestamp.proto";           // required for google.protobuf.Timestamp below
 
 service Users {
   rpc GetUser(GetUserRequest) returns (User);
@@ -408,8 +411,9 @@ ALTER TABLE users RENAME COLUMN display_name TO name;
 
 -- SAFER: additive — add the new column, dual-write, deprecate over a release window
 ALTER TABLE users ADD COLUMN name text GENERATED ALWAYS AS (display_name) STORED;
--- Announce deprecation: emit `Deprecation: true` + `Sunset: <RFC 9651 date>` headers on every response
--- per RFC 8594 / RFC 9745, and document the removal in CHANGELOG.
+-- Announce deprecation: emit a `Deprecation` header (RFC 9745 — a structured-field Date, e.g. `@1688169599`)
+-- and a `Sunset` header (RFC 8594 — an HTTP-date, e.g. `Sun, 30 Jun 2024 23:59:59 GMT`) on every response,
+-- and document the removal in CHANGELOG.
 -- After N releases AND zero consumers reading display_name per access logs:
 ALTER TABLE users DROP COLUMN display_name;
 
@@ -429,7 +433,7 @@ diff views.committed.sql views.head.sql || { echo "view contract drift"; exit 1;
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used in human-readable scan reports. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)). The triage tiers below stay in the report body for prioritization; the letter's `severity` field on the wire is always `critical`.
+These tiers are the **internal triage view** used in human-readable scan reports. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)). The triage tiers below stay in the report body for prioritization; the letter's `severity` field on the wire is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |---|---|---|
@@ -478,7 +482,7 @@ These tiers are the **internal triage view** used in human-readable scan reports
 
 ### Governance Findings
 1. **Missing security requirement** — `GET /admin/metrics` has no `security` block.
-2. **Inconsistent error envelope** — `POST /users` returns flat `{error:"..."}`; everywhere else is RFC 7807.
+2. **Inconsistent error envelope** — `POST /users` returns flat `{error:"..."}`; everywhere else is RFC 9457.
 3. **Missing pagination** — `GET /orders` returns unbounded array, no `page`/`cursor` parameter.
 ```
 
@@ -516,13 +520,13 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — a 
 - **Don't flag vendor schemas** under `node_modules/`, `vendor/`, `bin/`, `obj/`. DO flag your code's drift from them when you re-export their types.
 - **Test code** is lower internal triage severity, but a contract test that calls a production endpoint without auth, or that bypasses CDC verification, is still flagged.
 - **Legacy v1 APIs** in maintenance mode: don't gate on style/lint findings if there's a documented EOL date and active consumer migration. Breaking-change findings still block.
-- **Framework-aware**: FastAPI `response_model_exclude_unset` can hide fields; Spring `@JsonInclude(NON_NULL)` can omit declared fields; ASP.NET Core `[JsonIgnore]` on a documented field is drift; tRPC routers without `trpc-openapi` annotations are invisible to OpenAPI tooling; PostgREST view changes are contract changes.
+- **Framework-aware**: FastAPI `response_model_exclude_unset` can hide fields; Spring `@JsonInclude(NON_NULL)` can omit declared fields; ASP.NET Core `[JsonIgnore]` on a documented field is drift; tRPC routers without `trpc-to-openapi` annotations are invisible to OpenAPI tooling; PostgREST view changes are contract changes.
 
 ---
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

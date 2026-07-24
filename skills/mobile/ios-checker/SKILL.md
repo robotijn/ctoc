@@ -48,7 +48,7 @@ iOS reviews are NOT web reviews. The platform has its own bar — App Review, Ap
 - **Sensitive data goes in Keychain, NEVER `UserDefaults`**: tokens, refresh tokens, OAuth secrets, biometric-protected secrets, even feature flags that gate paid content — all Keychain. Use `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` (or `AfterFirstUnlockThisDeviceOnly` for background needs) so the secret is not part of iCloud Keychain backup and does not survive device-to-device restore. `UserDefaults` is plist on disk, world-readable on a jailbroken device, and included in unencrypted backups by default.
 - **App Transport Security (ATS) on, no exceptions**: Info.plist `NSAppTransportSecurity` should not contain `NSAllowsArbitraryLoads = true`. Per-domain `NSExceptionDomains` entries are allowed only for documented legacy third parties; each exception is a finding. ATS pinning is no longer the recommended approach — use `URLSessionDelegate` + `SecTrust` pinning if you must pin, and ship pin-rotation strategy.
 - **Code signing automated, no manual certificate juggling**: Either Xcode automatic signing + Xcode Cloud OR Fastlane `match` with `setup_ci` and a dedicated CI keychain. Manual signing on a developer laptop that ships to TestFlight is a finding — when the cert expires at 3am Sunday before launch, the team is blocked. `match` stores certs/profiles in a git repo (or S3/GCS) and reinstalls on every CI run; `setup_ci` creates a temporary keychain so login-keychain creds are never touched on a shared runner.
-- **Sign in with Apple offered when third-party SSO is offered**: App Store Review Guideline 4.8 — apps that offer login via Google/Facebook/etc. MUST also offer Sign in with Apple at parity. Missing = rejection. (Email-only apps and enterprise apps are exempt.)
+- **Equivalent privacy-focused login offered when third-party SSO is offered**: App Store Review Guideline 4.8 ("Login Services") — an app that uses a third-party or social login service (Facebook Login, Google Sign-In, Log in with X, Sign In with LinkedIn, Login with Amazon, WeChat Login, etc.) to set up or authenticate the user's PRIMARY account MUST also offer an equivalent login option that (a) limits data collection to name and email, (b) lets the user keep the email private, and (c) does not collect in-app interactions for advertising without consent. Sign in with Apple satisfies all three and is the canonical choice, but it is not the only permitted one. Missing = rejection. Exempt: apps that use only the company's own account system; alternative app marketplaces (and apps from them) using a marketplace login; education/enterprise/business apps requiring an existing education or enterprise account; government or industry-backed citizen-ID / electronic-ID sign-in; and clients for a specific third-party service where the user signs in to that service directly.
 - **Biometric auth (LocalAuthentication) on sensitive flows**: payments, viewing PII, exporting data, changing security settings → `LAContext.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics)`. Use the `.biometryCurrentSet` constraint on Keychain items so a new fingerprint/face re-enrollment invalidates the cached token.
 - **App Sandbox + entitlements minimum**: only request entitlements the app actually uses. Background modes, push, HealthKit, Camera, Microphone, Photos — each unused entitlement is a privacy review finding and an attack surface.
 - **Accessibility traits required**: every interactive view declares `accessibilityLabel`, `accessibilityHint`, `accessibilityValue`. SwiftUI: `.accessibilityLabel(_:)`, `.accessibilityHint(_:)`. UIKit: set on the `UIView`/`UIControl` directly. Pair with [[accessibility-checker]].
@@ -250,17 +250,27 @@ func showPayments() async {
 
 For Keychain items: set `kSecAttrAccessControl` with `.biometryCurrentSet` so re-enrolling Face ID / Touch ID invalidates the stored token (forces fresh login after biometry tampering).
 
-### 8. Missing Sign in with Apple (App Store Guideline 4.8)
+### 8. Missing Equivalent Privacy-Focused Login (App Store Guideline 4.8)
 
-Scan the auth flow: if any of {Google Sign In, Facebook Login, Twitter, GitHub, Microsoft, Sign in with LinkedIn} is present AND it's a consumer-facing app, "Sign in with Apple" MUST be offered with comparable prominence. Missing = App Store rejection at submission.
+Scan the auth flow: if a third-party or social login service (Google Sign-In, Facebook Login, Log in with X, Sign In with LinkedIn, Login with Amazon, WeChat Login, and similar) is used to set up or authenticate the user's PRIMARY account, an equivalent login option meeting Guideline 4.8's three privacy criteria (name+email only, private-email option, no ad tracking without consent) MUST be offered with comparable prominence. Sign in with Apple is the canonical qualifying option; another service meeting the same criteria is also acceptable. Missing = App Store rejection at submission. (An optional social login that is not used to establish the primary account does not trigger the requirement.)
 
 ```swift
-// SAFE: AuthenticationServices Sign in with Apple button
+// SAFE: SwiftUI SignInWithAppleButton (AuthenticationServices, iOS 14+) — the canonical
+//       Guideline 4.8-compliant option. In SwiftUI use this view, NOT UIKit's
+//       ASAuthorizationAppleIDButton (a UIControl that does not take SwiftUI modifiers).
 import AuthenticationServices
+import SwiftUI
 
-ASAuthorizationAppleIDButton(type: .signIn, style: .black)
-    .frame(height: 44)
-    .onTapGesture { startSignInWithApple() }
+SignInWithAppleButton(.signIn) { request in
+    request.requestedScopes = [.fullName, .email]
+} onCompletion: { result in
+    switch result {
+    case .success(let auth): handleAuthorization(auth)
+    case .failure(let error): showError(error)
+    }
+}
+.signInWithAppleButtonStyle(.black)
+.frame(height: 44)
 ```
 
 ### 9. Swift Concurrency / Data Race Findings
@@ -576,7 +586,7 @@ kind:
   - hardcoded-api-key
   - unprotected-url-scheme
   - missing-biometric-auth
-  - missing-sign-in-with-apple
+  - missing-equivalent-login-service   # Guideline 4.8; Sign in with Apple is one qualifying option
   - data-race
   - force-unwrap
   - force-cast
@@ -606,7 +616,7 @@ The integrator uses `confidence` to weight findings — `confidence: low` single
 - NEVER allow `NSAllowsArbitraryLoads = true` in a release configuration.
 - NEVER ship without `PrivacyInfo.xcprivacy` in the app target and every embedded SDK.
 - NEVER allow tracking network calls before `ATTrackingManager.requestTrackingAuthorization` has been answered.
-- NEVER ship a consumer app that offers third-party SSO without Sign in with Apple (Guideline 4.8).
+- NEVER ship an app that uses third-party/social SSO for the user's primary account without offering an equivalent privacy-focused login option (Sign in with Apple qualifies) per Guideline 4.8 "Login Services".
 - NEVER skip `xcodebuild test` in CI.
 - NEVER ship without verified accessibility traits on interactive views.
 - NEVER ship with manual code signing in CI (use Xcode Cloud or `fastlane match` + `setup_ci`).
@@ -615,7 +625,7 @@ The integrator uses `confidence` to weight findings — `confidence: low` single
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

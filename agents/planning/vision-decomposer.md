@@ -57,14 +57,13 @@ Vision (The Big Picture)
 ## Trigger
 
 - When vision status becomes `ready` (all phases complete)
-- Manual: User selects "Convert -> functional plan" on a vision
-- Command: `ctoc vision decompose <name>`
+- Manual: User selects "Convert → functional plan" in Vision Mode (menu action in `src/tabs/vision.js`)
 
 **Single-plan bypass:** If the vision maps to a single functional plan (only 1 goal/workstream identified during Phase 1), the Vision Advisor handles the conversion directly. The Decomposer only activates for 2+ independent workstreams.
 
 ## Pre-Decomposition Gate
 
-Before decomposing, validate vision readiness by calling `validateVisionReadiness()` from `lib/vision-decomposer.js`.
+Before decomposing, validate vision readiness by calling `validateVisionReadiness()` from `src/lib/vision-decomposer.js`.
 
 **Gate checks (blocking):**
 - Problem statement present and specific (not just "improve things")
@@ -86,7 +85,7 @@ If validation fails (blocking errors), show errors to user and ask them to compl
 Before extracting goals, check if a Canvas exists for this vision:
 
 1. Compute the vision slug from the vision filename (strip `.md` extension and any leading stage prefix).
-2. Check `plans/canvas/<vision-slug>.md` (or call `getCanvasForVision(visionSlug)` from `lib/vision-decomposer.js`).
+2. Check `plans/canvas/<vision-slug>.md` (or call `getCanvasForVision(visionSlug)` from `src/lib/vision-decomposer.js`).
 3. If a canvas exists, call `parseCanvas(canvasPath)` and bind the result `{type, blocks}`.
 
 **If canvas type is `lean`:**
@@ -375,7 +374,7 @@ Before presenting stubs to the user, validate the entire decomposition. Every ch
 
 ### Phase 7: Create Functional Plan Stubs
 
-For each goal or slice, create a stub using `createStub()` from `lib/vision-decomposer.js`.
+For each goal or slice, create a stub using `createStub()` from `src/lib/vision-decomposer.js`.
 Or call `decomposeVision(visionPath, goals)` to create all stubs at once.
 
 **createStub parameters:**
@@ -453,10 +452,10 @@ AskUserQuestion({
 The user can iterate (edit, add, remove stubs) until satisfied, then approve for PO Agent refinement.
 
 **Edit operations:**
-- **Merge:** Call `mergeStubs(stubPaths, mergedName)` from `lib/vision-decomposer.js`
+- **Merge:** Call `mergeStubs(stubPaths, mergedName)` from `src/lib/vision-decomposer.js`
 - **Split:** Remove the stub via `removeStub(stubPath)`, then create 2+ new stubs via `createStub()`
-- **Remove:** Call `removeStub(stubPath)` from `lib/vision-decomposer.js`
-- **Add:** Call `createStub(visionSlug, goal, visionPath)` from `lib/vision-decomposer.js`
+- **Remove:** Call `removeStub(stubPath)` from `src/lib/vision-decomposer.js`
+- **Add:** Call `createStub(visionSlug, goal, visionPath)` from `src/lib/vision-decomposer.js`
 
 After any edit, re-run the self-validation checklist (Phase 6) and re-present the table.
 
@@ -465,8 +464,8 @@ After any edit, re-run the self-validation checklist (Phase 6) and re-present th
 When user approves decomposition ("Looks good -- refine all"):
 
 1. For each stub, write status file via `writeStatus(stubPath, { agent: 'product-owner', status: 'working', message: 'Refining stub...' })`
-2. Call `initProductOwnerAgent(stubPath)` from `lib/actions.js` for each stub
-3. Call `completeVision(visionPath)` from `lib/vision-decomposer.js` to move vision to `plans/done/` with `type: vision`
+2. Launch the PO Agent per stub via `initBackgroundAgent(stubPath, AGENT_TYPES.PRODUCT_OWNER, 'Refining stub...')` from `src/lib/actions.js` (both `initBackgroundAgent` and `AGENT_TYPES` are exported there; `AGENT_TYPES.PRODUCT_OWNER` is the string `'product-owner'`)
+3. Call `completeVision(visionPath)` from `src/lib/vision-decomposer.js` to move vision to `plans/done/` with `type: vision`
 4. Return control to the conversation (PO Agent runs as background agent per stub)
 
 **Handoff data passed to PO Agent (via stub file content):**
@@ -592,7 +591,7 @@ Updates vision document:
 - Read (vision document)
 - Write (functional plan stubs)
 - AskUserQuestion (interactive decisions at goal validation and slicing strategy)
-- `lib/vision-decomposer.js`:
+- `src/lib/vision-decomposer.js`:
   - `validateVisionReadiness(visionPath)` -- Pre-decomposition gate
   - `decomposeVision(visionPath, goals)` -- Batch stub creation
   - `createStub(visionSlug, goal, visionPath)` -- Single stub creation
@@ -601,9 +600,9 @@ Updates vision document:
   - `removeStub(stubPath)` -- Delete a stub and its status
   - `mergeStubs(stubPaths, mergedName)` -- Combine stubs
   - `slugify(str)` -- Generate filename-safe slugs
-- `lib/actions.js`:
-  - `initProductOwnerAgent(stubPath)` -- Launch PO Agent per stub
-- `lib/background.js`:
+- `src/lib/actions.js`:
+  - `initBackgroundAgent(stubPath, AGENT_TYPES.PRODUCT_OWNER, message)` -- Launch PO Agent per stub
+- `src/lib/background.js`:
   - `writeStatus(stubPath, statusObj)` -- Set stub processing status
 
 ## Success Criteria

@@ -71,8 +71,8 @@ const debtPatterns = [
 
 ### Static Analysis
 ```bash
-# Complexity analysis
-npx complexity-report src/ --format json
+# Complexity analysis (ESLint core complexity rule, JSON output)
+npx eslint src/ --rule '{"complexity":["error",10]}' --format json
 
 # Duplicate detection
 npx jscpd src/ --reporters json

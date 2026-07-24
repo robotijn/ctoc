@@ -104,16 +104,24 @@ findings:
       suggestion: "Force the protection. Enabling alone is not the wall."
     tags: ["multi-tenancy", "rls"]
 
-  - type: "using-without-with-check"
+  - type: "unconstrained-write-policy"
     severity: "critical"
     location:
       table: "<table name>"
       policy: "<policy name>"
-    message: "Policy filters reads but does not constrain writes"
+    message: "A write path's new-row check does not enforce the tenant predicate"
     confidence: "HIGH"
     context:
       effect: "A tenant can insert or update a row carrying another tenant's identifier."
-      suggestion: "Add the write constraint. A read-only wall is half a wall."
+      suggestion: |
+        Make every write path's new-row check repeat the tenant predicate. The hole
+        is NOT a FOR ALL or FOR UPDATE policy that merely omits WITH CHECK — Postgres
+        reuses that policy's USING predicate as the WITH CHECK and aborts a
+        cross-tenant INSERT/UPDATE. The hole is a permissive check that lets the new
+        row through: an explicit WITH CHECK (true), a separate permissive INSERT
+        policy, or a SELECT-only USING policy paired with an unrestricted write
+        policy. Verify what the new row is actually checked against, not whether the
+        WITH CHECK keyword is present.
     tags: ["multi-tenancy", "rls", "write"]
 
   - type: "bypassrls-leak"

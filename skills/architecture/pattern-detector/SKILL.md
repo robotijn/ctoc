@@ -38,13 +38,13 @@ You detect and classify the architecture pattern used in a codebase. You scan di
 
 The 2026 architecture consensus has shifted noticeably from the 2018–2022 microservices-by-default era. Use these principles when interpreting detector output.
 
-- **Modular monolith is the new default for new projects.** A 2025 CNCF survey found that **42% of organizations that adopted microservices are now consolidating services back into larger deployable units**; cost has overtaken scalability as the dominant architectural constraint ([byteiota](https://byteiota.com/modular-monolith-42-ditch-microservices-in-2026/), [Beyond The Semicolon](https://www.beyondthesemicolon.com/are-microservices-still-worth-it-in-2026-or-should-you-start-with-a-modular-monolith/)). The detector should treat "single deployable with module boundaries" as a positive signal, not a transitional state on the way to microservices.
+- **Modular monolith has become a mainstream default for new projects.** The industry has broadly moved away from microservices-by-default: operational overhead, debugging complexity, and cost push many teams to keep services consolidated in a single deployable with internal module boundaries. The detector should treat "single deployable with module boundaries" as a legitimate target architecture, not a transitional state on the way to microservices. (No hard adoption percentage is asserted here on purpose — the widely-circulated "42% are consolidating" figure traces only to secondary blogs, not to a primary survey the number can be checked against.)
 
 - **Vertical slices are preferred for new features inside a modular monolith.** A vertical slice (one folder per use case, containing handler + validator + domain logic + tests, with minimal sharing across slices) localizes change. Pattern-wise it is compatible with layered, hexagonal, clean, and onion — it is a *packaging strategy* layered on top of an architectural style. When the detector sees `features/<feature-name>/{handler, validator, repo, tests}` it should weight Vertical Slice highly.
 
-- **Microservices stay justified only at real scale.** Choose microservices when team size exceeds ~100 engineers with Conway's-law-driven boundaries, when independent scaling is genuinely needed (e.g. payment service needs 50× the compute of others), polyglot is unavoidable (ML in Python, core in Java, with hard interop costs), or regulatory isolation mandates it (PCI scope reduction). At small/medium scale, **monolith ≈ $15K/mo vs. microservices ≈ $40K–$65K/mo** in total cost of ownership when you include platform team, observability stack, and coordination overhead ([Java Code Geeks](https://www.javacodegeeks.com/2025/12/microservices-vs-monoliths-in-2026-when-each-architecture-wins.html), [Technijian](https://technijian.com/software-development/microservices-vs-monolith-for-startups-the-honest-2026-decision-guide/)). The detector should not penalize a monolith for not being microservices.
+- **Microservices stay justified only at real scale.** Choose microservices when team size exceeds ~100 engineers with Conway's-law-driven boundaries, when independent scaling is genuinely needed (e.g. payment service needs 50× the compute of others), polyglot is unavoidable (ML in Python, core in Java, with hard interop costs), or regulatory isolation mandates it (PCI scope reduction). At small/medium scale, microservices carry a substantially higher total cost of ownership once the platform team, observability stack, and cross-service coordination overhead are counted — the direction is well-established even though the exact multiple varies too widely between sources to quote a defensible figure. The detector should not penalize a monolith for not being microservices.
 
-- **Hexagonal / Clean / Onion still have the same skeleton.** They all enforce: domain depends on nothing; everything else depends inward; infrastructure is replaceable. The detector treats them as a single *family* — what distinguishes them is naming (ports/adapters vs. use-cases/interfaces vs. concentric layers), not their dependency rule. When confidence is split between two of these three, report "Clean-family architecture (Hexagonal/Onion/Clean variant)" rather than forcing a single label ([dev.to](https://dev.to/dev_tips/hexagonal-vs-clean-vs-onion-which-one-actually-survives-your-app-in-2026-273f), [Programming Pulse](https://programmingpulse.vercel.app/blog/hexagonal-vs-clean-vs-onion-architectures)).
+- **Hexagonal / Clean / Onion still have the same skeleton.** They all enforce: domain depends on nothing; everything else depends inward; infrastructure is replaceable. The detector treats them as a single *family* — what distinguishes them is naming (ports/adapters vs. use-cases/interfaces vs. concentric layers), not their dependency rule. When confidence is split between two of these three, report "Clean-family architecture (Hexagonal/Onion/Clean variant)" rather than forcing a single label.
 
 - **Pattern detection is descriptive, not prescriptive.** Report what you find, name what's mixed, surface anti-patterns. Don't push toward a specific pattern. If the codebase is healthy and intentional, "mixed" is a finding, not a verdict.
 
@@ -123,7 +123,7 @@ How the detector reads structure and imports per ecosystem.
 
 | Language / runtime | Folder signal | Module / import signal | Encapsulation / boundary signal |
 |---|---|---|---|
-| **C# / .NET 9** | `src/<Project>/`, solution layout, project-per-bounded-context | `using X.Y.Z;` + project references in `.csproj`; module graph from `dotnet list reference` | `internal` vs `public` access modifier; `InternalsVisibleTo`; module isolation via separate `.csproj` |
+| **C# / .NET 8+** | `src/<Project>/`, solution layout, project-per-bounded-context | `using X.Y.Z;` + project references in `.csproj`; module graph from `dotnet list reference` | `internal` vs `public` access modifier; `InternalsVisibleTo`; module isolation via separate `.csproj` |
 | **Java 21+** | Maven multi-module (`pom.xml` per module), Gradle subprojects, JPMS `module-info.java` | `import a.b.C;` + JPMS `requires` / `exports` directives | JPMS `exports` controls cross-module visibility; package-private by default |
 | **Python 3.12+** | `src/<pkg>/` layout; subpackages with `__init__.py`; `pyproject.toml` per package in monorepo | `from x.y import z` (absolute) vs `.z` (relative); `__init__.py` re-exports define the public API | Underscore-prefix convention (`_internal`); `__all__` in `__init__.py`; runtime enforcement via `import-linter` contracts |
 | **C (header organization)** | `include/` (public) vs `src/` (private); per-module subdirectories; `Makefile` / `CMakeLists.txt` per component | `#include "x.h"` — public headers in `include/`, private headers in `src/` only | `static` functions = file-private; opaque pointer pattern for module boundaries; header-include direction = dependency direction |
@@ -139,12 +139,12 @@ The detector itself is read-only — Read/Grep/Glob/Bash — but a real architec
 
 | Tool | Language | Role |
 |---|---|---|
-| [`dependency-cruiser`](https://github.com/sverweij/dependency-cruiser) | JS / TS | Validates dependency rules from a `.dependency-cruiser.cjs` config; SARIF output for GitHub code-scanning |
+| [`dependency-cruiser`](https://github.com/sverweij/dependency-cruiser) | JS / TS | Validates dependency rules from a `.dependency-cruiser.js` config; reporters include error, GraphViz dot graph, HTML matrix, JSON, mermaid, and TeamCity / Azure DevOps CI formats |
 | [`ArchUnit`](https://www.archunit.org/) | Java / JVM | Architectural rules as JUnit tests — package access, layer order, cycle detection |
-| [`ArchUnitTS`](https://lukasniessen.github.io/ArchUnitTS/) | TypeScript | Port of ArchUnit; includes cohesion / coupling metrics, circular-dependency detection |
+| [`ArchUnitTS`](https://lukasniessen.github.io/ArchUnitTS/) | TypeScript | ArchUnit-inspired (independent, unaffiliated); includes cohesion / coupling metrics (LCOM), circular-dependency detection |
 | [`ArchUnitPython`](https://github.com/LukasNiessen/ArchUnitPython) | Python | AST-based; no runtime hooks; complements `import-linter` |
-| [`NetArchTest`](https://github.com/BenMorris/NetArchTest) | .NET | Fluent API for architectural rules; **note: upstream is dormant (last release 2023)** — for new .NET work prefer Roslyn analyzers + CodeQL, and consider [`NsDepCop`](https://github.com/realvizu/NsDepCop) or `BannedApiAnalyzers` for namespace-level rules |
-| [`import-linter`](https://import-linter.readthedocs.io/) | Python | Contracts in YAML (forbidden / layered / independence); CI gate |
+| [`NetArchTest`](https://github.com/BenMorris/NetArchTest) | .NET | Fluent API for architectural rules; **note: upstream is dormant (no release since v1.3.2 in 2021)** — for new .NET work prefer Roslyn analyzers + CodeQL, and consider [`NsDepCop`](https://github.com/realvizu/NsDepCop) or `BannedApiAnalyzers` for namespace-level rules |
+| [`import-linter`](https://import-linter.readthedocs.io/) | Python | Contracts in INI/TOML (`.importlinter` / `setup.cfg` / `pyproject.toml`), types forbidden / layered / independence; CI gate |
 | [`Sonargraph`](https://www.hello2morrow.com/products/sonargraph) | Polyglot (Java/.NET/C/C++/Python) | Commercial; full architecture model with auto-detected layering |
 | [`NDepend`](https://www.ndepend.com/) | .NET | Commercial; CQLinq queries over the module graph |
 | [Roslyn analyzers](https://learn.microsoft.com/dotnet/csharp/roslyn-sdk/) + `BannedApiAnalyzers` | .NET | Source-level enforcement at compile time |
@@ -224,7 +224,7 @@ Confidence is a triage hint only — every finding the refinement loop emits is 
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable detection report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable detection report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action | Letter `severity` |
 |---|---|---|---|
@@ -261,14 +261,14 @@ reference: https://martinfowler.com/bliki/PresentationDomainDataLayering.html
 - NEVER claim a pattern without import-graph validation.
 - NEVER push a pattern recommendation when scores are mixed — report mixed honestly.
 - NEVER skip anti-pattern flags — they need user awareness.
-- NEVER use invented statistics. Cite measured numbers (CNCF survey, etc.) with attribution; otherwise emit qualitative claims.
+- NEVER use invented statistics, and NEVER launder a secondary blog's number as if it were primary research. If a figure cannot be traced to the primary source that supposedly measured it, emit a qualitative claim instead of a fabricated-looking percentage or dollar amount.
 - NEVER recommend microservices on a small codebase just because the option exists.
 
 ---
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

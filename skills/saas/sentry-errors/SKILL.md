@@ -89,7 +89,7 @@ npm install @sentry/nextjs
 npx @sentry/wizard@latest -i nextjs
 ```
 
-The wizard creates `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`, and `instrumentation.ts`. It also patches `next.config.ts` with `withSentryConfig`. Commit all of them.
+The wizard creates `instrumentation-client.ts` (the current client-init file — it replaced `sentry.client.config.ts`, and is what Turbopack builds require), `sentry.server.config.ts`, `sentry.edge.config.ts`, and `instrumentation.ts`. `instrumentation.ts` imports the server/edge configs and exports `onRequestError = Sentry.captureRequestError` to catch errors from Server Components, middleware, and route handlers. The wizard also patches `next.config.ts` with `withSentryConfig`. Commit all of them.
 
 ### 2. Environment
 
@@ -119,6 +119,7 @@ Sentry.init({
 ```typescript
 // sentry.server.config.ts — SAFE
 import * as Sentry from "@sentry/nextjs";
+import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
 const isProd = process.env.VERCEL_ENV === "production";
 
@@ -127,8 +128,9 @@ Sentry.init({
   environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "development",
   release: process.env.VERCEL_GIT_COMMIT_SHA,           // tie errors to a deploy
   tracesSampleRate: isProd ? 0.1 : 1.0,
+  integrations: [nodeProfilingIntegration()],           // REQUIRED for the two profile* options below to do anything
   profileSessionSampleRate: isProd ? 0.1 : 1.0,         // continuous profiling
-  profileLifecycle: "trace",
+  profileLifecycle: "trace",                            // auto-profile every sampled trace
   sendDefaultPii: false,
   ignoreErrors: [
     "ChunkLoadError",
@@ -175,19 +177,26 @@ Sentry.init({
 
 ### 5. Client config + Session Replay (BAD / SAFE)
 
+Client init lives in `instrumentation-client.ts` (the file that replaced `sentry.client.config.ts`).
+
 ```typescript
-// sentry.client.config.ts — BAD
+// instrumentation-client.ts — BAD
+// (replayIntegration() masks all text/inputs and blocks media BY DEFAULT —
+//  the footgun is explicitly turning that off, plus a 100% session rate.)
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   integrations: [
-    Sentry.replayIntegration(),     // BAD: default masking = none → captures keystrokes
+    Sentry.replayIntegration({
+      maskAllText: false,           // BAD: turns OFF the default text masking → on-screen PII captured
+      blockAllMedia: false,         // BAD: turns OFF the default media blocking
+    }),
   ],
   replaysSessionSampleRate: 1.0,    // BAD: replays every session, blows quota
 });
 ```
 
 ```typescript
-// sentry.client.config.ts — SAFE
+// instrumentation-client.ts — SAFE
 import * as Sentry from "@sentry/nextjs";
 
 Sentry.init({
@@ -311,8 +320,7 @@ sentry:
   dsn: ${SENTRY_DSN}
   environment: ${APP_ENV:development}
   release: ${GIT_COMMIT_SHA:unknown}
-  traces-sample-rate: ${SENTRY_TRACES:0.1}
-  enable-tracing: true
+  traces-sample-rate: ${SENTRY_TRACES:0.1}   # setting this alone enables tracing; the old enable-tracing flag is gone
   send-default-pii: false
   ignored-exceptions-for-type: org.springframework.web.context.request.async.AsyncRequestNotUsableException
   in-app-includes:
@@ -361,6 +369,7 @@ builder.WebHost.UseSentry(o =>
     o.Release = Environment.GetEnvironmentVariable("GIT_COMMIT_SHA");
     o.TracesSampleRate = builder.Environment.IsProduction() ? 0.1 : 1.0;
     o.ProfilesSampleRate = builder.Environment.IsProduction() ? 0.1 : 1.0;
+    o.AddProfilingIntegration();                      // REQUIRED (needs the Sentry.Profiling NuGet package) — ProfilesSampleRate is inert without it
     o.SendDefaultPii = false;
     o.MaxRequestBodySize = RequestSize.None;          // do not capture bodies
     o.AddExceptionFilterForType<OperationCanceledException>();
@@ -516,14 +525,14 @@ CI snippet (GitHub Actions example):
 
 ```yaml
 # .github/workflows/release.yml — uses sentry-cli for release + sourcemap + deploy marker
-- uses: getsentry/action-release@v1
+- uses: getsentry/action-release@v3
   env:
     SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
     SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
     SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
   with:
     environment: production
-    version: ${{ github.sha }}
+    release: ${{ github.sha }}          # `release` — `version` is the deprecated input name
     sourcemaps: ./.next/static
     set_commits: auto
 ```
@@ -598,7 +607,7 @@ reference: https://docs.sentry.io/platforms/javascript/guides/nextjs/configurati
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every Sentry-misconfiguration finding emits as `severity: critical` in the letter to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

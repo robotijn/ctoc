@@ -49,7 +49,7 @@ You operate in two modes:
 - **Prefer immutability or message-passing over locks.** Immutable values are race-free by construction. CSP-style channels (Go, Rust `mpsc`, .NET `System.Threading.Channels`, Kotlin `Channel`) make ownership transfer explicit. The 2026 consensus across language designs: locks are the last resort, not the first tool.
 - **Use the language's race detector.** Go `-race`, Rust Miri / loom, C/C++ ThreadSanitizer + Helgrind/DRD, Java JFR `jdk.VirtualThreadPinned` events, .NET PerfView + dotnet-trace. If the language ships one, ship with it on in CI — the runtime cost is real (2–10× memory, 5–15× CPU on instrumented paths) but cheaper than the post-incident review.
 - **Atomic operations for counters and flags, not locks.** `std::atomic`, `Interlocked`, `AtomicInteger`, `sync/atomic`, `_Atomic`, `Atomics.add`. Lock-free CAS loops for read-modify-write hot paths. Lock only when you need a critical section spanning more than one variable.
-- **Never hold a lock across an await / blocking call.** This is the single highest-yield rule in async code: it converts a contention bug into a deadlock. `lock` + `await` in C# (illegal — compiler now warns), `synchronized` + virtual-thread blocking in Java (carrier pinning), `with lock:` + `await` in Python asyncio (the lock is sync, the await yields).
+- **Never hold a lock across an await / blocking call.** This is the single highest-yield rule in async code: it converts a contention bug into a deadlock. `lock` + `await` in C# (illegal — the compiler rejects `await` in a `lock` body, error CS1996), `synchronized` + virtual-thread blocking in Java (carrier pinning on JDK 21–23), `with lock:` + `await` in Python asyncio (the lock is sync, the await yields).
 - **Structured concurrency**: every spawned task has a scope that owns its lifetime. Java `StructuredTaskScope` (preview, JDK 25+), Swift `TaskGroup`, Kotlin `coroutineScope`, Python `asyncio.TaskGroup` (3.11+), Rust `tokio::task::JoinSet`. No more orphaned tasks, no more "shutdown means hope."
 - **OWASP mapping**: race conditions map to **A01 Broken Access Control** (TOCTOU on auth checks, time-of-check vs. time-of-use on file system) and **A04 Insecure Design** (data races, missing synchronization). Tag every finding with the OWASP id and a CWE — typically CWE-362 (concurrent execution using shared resource), CWE-366 (race condition in thread), CWE-367 (TOCTOU), CWE-833 (deadlock).
 - **Block deployments on critical issues**: a verified race in shared-state code, a confirmed deadlock path, or a TOCTOU on an auth check are all BLOCK-grade. Per the warnings-are-bugs rule, every concurrency finding emits `severity: critical` on the wire to CTO Chief.
@@ -193,7 +193,8 @@ public static Heavy get() { return Holder.INSTANCE; }
 // SAFE — computeIfAbsent is atomic on ConcurrentHashMap
 map.computeIfAbsent(k, this::compute);
 
-// SAFE — StructuredTaskScope (final in JDK 25 LTS — Sept 2025; preview earlier; supersedes ad-hoc ExecutorService)
+// SAFE — StructuredTaskScope (still a PREVIEW API: fifth preview in JDK 25 per JEP 505,
+// sixth preview per JEP 525 — compile/run with --enable-preview; supersedes ad-hoc ExecutorService)
 try (var scope = StructuredTaskScope.open()) {
     var user  = scope.fork(() -> userService.fetch(id));
     var order = scope.fork(() -> orderService.fetch(id));
@@ -433,11 +434,11 @@ ON CONFLICT (email) DO NOTHING RETURNING id;
 | **ThreadSanitizer (TSan)** | Dynamic | C, C++, Rust (limited), Go (alias of -race) | C/C++ projects with shared-state concurrency. Compile with `-fsanitize=thread`. |
 | **Helgrind / DRD** (Valgrind) | Dynamic | C, C++ | When TSan is unavailable or for pthread-specific patterns. Slower than TSan but reaches non-instrumented binaries. |
 | **Java JFR `jdk.VirtualThreadPinned`** | Dynamic | Java 21+ | Always on in production at default 20 ms threshold. Free until a pinning event occurs. |
-| **`jdk.tracePinnedThreads`** (JEP 444) | Dynamic | Java 21–23 | Set `-Djdk.tracePinnedThreads=full` in dev/staging to print stacks when synchronized blocks pin a virtual thread. Less needed on JDK 24+ after JEP 491, still valuable for native-frame pinning. |
-| **`StructuredTaskScope`** lifecycle audit | Static | Java 25+ | Grep for `Executors.newFixedThreadPool` / `CompletableFuture.supplyAsync` that should be `StructuredTaskScope`. |
+| **`jdk.tracePinnedThreads`** (introduced by JEP 444) | Dynamic | Java 21–23 only | Set `-Djdk.tracePinnedThreads=full` in dev/staging to print stacks when synchronized blocks pin a virtual thread. **REMOVED in JDK 24 (JEP 491): setting it on the command line has no effect.** On JDK 24+ the remaining pinning cases — native / Foreign-Function-and-Memory-API frames that call back into blocking Java — are surfaced by the enhanced `jdk.VirtualThreadPinned` JFR event instead. |
+| **`StructuredTaskScope`** lifecycle audit | Static | Java 21+ (preview API, `--enable-preview`) | Grep for `Executors.newFixedThreadPool` / `CompletableFuture.supplyAsync` that should be `StructuredTaskScope`. |
 | **.NET PerfView / dotnet-trace + dotnet-counters** | Dynamic | C# / .NET | When async deadlocks or thread starvation are suspected. `dotnet-trace collect --providers Microsoft-Windows-DotNETRuntime` then PerfView for stack/lock analysis. |
 | **Roslyn analyzers** (`CA2007`, `VSTHRD*`) | Static | C# | Always on. `Microsoft.VisualStudio.Threading.Analyzers` catches `.Result` / `.Wait()` / lock-across-await. |
-| **`concurrencytest` / `pytest-asyncio --mode=strict`** | Dynamic | Python | Stress-test code paths; `asyncio.run`-misuse linter. |
+| **`pytest-asyncio --asyncio-mode=strict`** | Static-ish | Python | Strict mode processes only tests carrying the explicit `@pytest.mark.asyncio` marker, so a coroutine test that is silently never awaited fails discovery instead of passing vacuously. Marker hygiene, not a race detector — Python has no ThreadSanitizer-class detector for pure-Python code. |
 | **`faulthandler` + `sys._is_gil_enabled()` audit** | Static + runtime | Python 3.13t | Confirm whether free-threaded build is in use; gate behavior on it. |
 | **Miri / loom** | Dynamic / model | Rust | Miri catches UB and data races under reduced ordering models; loom enumerates interleavings for lock-free code. (Cross-link [[memory-safety-checker]].) |
 | **TLA+ / SPIN** | Model checker | Algorithm-level | When a lock-free protocol or distributed consensus invariant must be proven; not for whole codebases. Build a small model of the critical section. |
@@ -458,12 +459,12 @@ valgrind --tool=helgrind ./app
 valgrind --tool=drd      ./app
 
 # Java
-java -XX:StartFlightRecording=filename=app.jfr,settings=profile,filename=app.jfr,maxsize=200m -jar app.jar
+java -XX:StartFlightRecording=filename=app.jfr,settings=profile,maxsize=200m -jar app.jar
 java -Djdk.tracePinnedThreads=full -jar app.jar      # JDK 21–23 dev/staging
 
 # Python 3.13 free-threaded
 python3.13t -c "import sys; assert not sys._is_gil_enabled()"
-python3.13t -m pytest -p concurrencytest
+python3.13t -m pytest --asyncio-mode=strict         # marker discipline for async tests
 
 # .NET
 dotnet-trace collect --providers Microsoft-DotNETCore-SampleProfiler,Microsoft-Windows-DotNETRuntime \
@@ -476,11 +477,11 @@ cargo +nightly miri test
 cargo test --features loom
 ```
 
-Aggregate findings into the SARIF flow if the tool supports it (TSan does; many race-detector outputs do not — wrap them via the SARIF converter in your CI pipeline, e.g. `tsan-to-sarif`). Pin a CI step that fails the build whenever this skill emits any letter.
+Race-detector output is plain text, not SARIF — ThreadSanitizer, Helgrind/DRD, and `go test -race` all print human-readable reports, none emit SARIF natively. To fold them into a SARIF-based CI flow, parse each detector's report into SARIF yourself (there is no canonical off-the-shelf converter; write a small regex-to-SARIF shim per detector) or keep the raw reports as CI artifacts. Pin a CI step that fails the build whenever this skill emits any letter.
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization.
+These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization.
 
 | Triage tier | Examples | Internal action |
 |-------|----------|--------|
@@ -576,7 +577,7 @@ The integrator uses `confidence`, `corroborated_by`, and `reproducibility` to we
 
 ## Refinement Loop — critic mode
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every concurrency warning — race detector hit, lock-discipline lint, JFR pinning event, deprecation of a thread-safety API, CVE in a concurrency primitive — emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

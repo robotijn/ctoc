@@ -43,7 +43,7 @@ The landscape shifted materially between 2023 and 2026. Several tools that were 
 ### State, locking, and backends
 
 - **Remote state with locking is non-negotiable.** Local state in a shared repo is a critical finding (state leakage, no concurrency safety, no audit trail). Required backends:
-  - **AWS** — S3 with native state locking (Terraform 1.10+ / OpenTofu 1.8+ support S3-native locking via `use_lockfile = true`; the previously-mandatory DynamoDB table is no longer required, though still supported for older versions). Enforce SSE-KMS + bucket versioning + block-public-access.
+  - **AWS** — S3 with native state locking. Terraform 1.10+ supports S3-native locking via `use_lockfile = true`, and OpenTofu's S3 backend supports `use_lockfile` too; the previously-mandatory DynamoDB table is no longer required. The two ecosystems now DIVERGE on DynamoDB: HashiCorp's S3 backend docs state DynamoDB-based locking is **deprecated and will be removed in a future minor version** (set `dynamodb_table` and `use_lockfile` together only to bridge a migration off DynamoDB), whereas OpenTofu's docs say both mechanisms are fully supported with no deprecation planned. Either way, enforce SSE-KMS + bucket versioning + block-public-access.
   - **GCP** — `gcs` backend with CMEK encryption and object versioning.
   - **Azure** — `azurerm` backend on Storage with blob lease locking + customer-managed key.
   - **HCP Terraform / Terraform Enterprise / Spacelift / env0 / Scalr** — managed backends with built-in locking and RBAC.
@@ -52,7 +52,7 @@ The landscape shifted materially between 2023 and 2026. Several tools that were 
 
 ### Versioning, pinning, modules
 
-- **Explicit version pins on Terraform/OpenTofu, providers, and modules.** `required_version = ">= 1.10.0"`, `required_providers { aws = { source = "hashicorp/aws", version = "~> 5.70" } }`, and modules pinned by tag (`ref=v3.2.1`) — never `ref=main`. Floating versions are reproducibility bugs.
+- **Explicit version pins on Terraform/OpenTofu, providers, and modules.** `required_version = ">= 1.10.0"`, `required_providers { aws = { source = "hashicorp/aws", version = "~> 6.0" } }`, and modules pinned by tag (`ref=v3.2.1`) — never `ref=main`. Floating versions are reproducibility bugs.
 - **Lockfile committed.** `.terraform.lock.hcl` must be in source control and CI must run `terraform init -lockfile=readonly` to fail on drift.
 - **Tofu/Terraform parity.** If the project supports both, pin both `required_version` ranges and run CI matrix.
 
@@ -73,7 +73,7 @@ The landscape shifted materially between 2023 and 2026. Several tools that were 
 
 - **AWS** — S3 buckets need `aws_s3_bucket_public_access_block`, `aws_s3_bucket_server_side_encryption_configuration`, `aws_s3_bucket_versioning`. Security groups: no `0.0.0.0/0` on 22/3389/3306/5432/6379/27017. IAM: no `Action = "*"` or `Resource = "*"` on a `Allow`. EBS/RDS/EFS: encryption-at-rest required. CloudTrail in every account, multi-region.
 - **GCP** — IAM bindings: no `roles/owner` or `roles/editor` to a `member` outside org-trusted SAs. GCS buckets: uniform bucket-level access, no `allUsers`/`allAuthenticatedUsers`. Cloud SQL: no public IP, require SSL. VPC firewall: no `0.0.0.0/0` on SSH/RDP.
-- **Azure** — Storage accounts: `allow_blob_public_access = false`, `min_tls_version = "TLS1_2"`. NSG rules: no `Internet → *` on management ports. Key Vault: purge protection + soft-delete on.
+- **Azure** — Storage accounts: `allow_nested_items_to_be_public = false` (the current azurerm argument; the old `allow_blob_public_access` was renamed), `min_tls_version = "TLS1_2"`. NSG rules: no `Internet → *` on management ports. Key Vault: purge protection + soft-delete on.
 - **Cloudflare** — Zone-level WAF on, DNSSEC on, `always_use_https = true` on the zone settings, no wildcard API tokens (pin to specific zones/accounts).
 - **Kubernetes (via Terraform Kubernetes/Helm providers)** — no privileged pods, non-root user, read-only root FS, resource requests+limits, NetworkPolicy denying all by default.
 - **Vercel** — `passwordProtection` on preview deployments handling internal data; environment variables marked sensitive; framework version pinned.
@@ -92,9 +92,9 @@ The IaC scanning landscape has consolidated. The tools below reflect status as o
 | Tool | Status (2026) | What it is | When to use |
 |------|---------------|-----------|-------------|
 | **Checkov** | Active, primary | 1000+ Terraform-specific policies; graph-based cross-resource checks; multi-IaC (Terraform, CFN, K8s, ARM, Bicep, Ansible, Dockerfile, Helm) | Default scanner in CI |
-| **Trivy** | Active, primary | Absorbed tfsec's rules in 2023 (tfsec deprecated, transition completed 2024); single binary also scans containers, deps, secrets | Default when you also need container/dep scanning in the same step |
+| **Trivy** | Active, primary | Absorbed tfsec's rules (Aqua consolidated scanning into Trivy; tfsec now maintenance-only, all new engineering goes to Trivy); single binary also scans containers, deps, secrets | Default when you also need container/dep scanning in the same step |
 | **KICS** | Active | 2400+ Rego queries across 22+ IaC platforms; breadth-first | When you need the widest platform coverage |
-| **tfsec** | **Deprecated** | Folded into Trivy | Do not adopt for new projects — use Trivy |
+| **tfsec** | **Superseded (maintenance-only)** | Aqua steers users to Trivy; tfsec stays available for now but gets no new engineering | Do not adopt for new projects — use Trivy |
 | **Terrascan** | **Archived (Nov 2025)** | Was Rego-based with 500+ policies | Do not adopt — migrate to Checkov or Trivy |
 | **TFLint** | Active, complementary | Linter (deprecated args, provider-specific validation, instance-type checks) — NOT a security-first scanner | Always run alongside a real security scanner |
 | **Conftest / OPA** | Active | Run org Rego policies against `terraform show -json` plan output | Org-specific guardrails (tagging, allowed instance types, allowed regions) |
@@ -179,7 +179,7 @@ resource "aws_instance" "web" {
 terraform {
   required_version = ">= 1.10.0"
   required_providers {
-    aws    = { source = "hashicorp/aws",    version = "~> 5.70" }
+    aws    = { source = "hashicorp/aws",    version = "~> 6.0" }
     random = { source = "hashicorp/random", version = "~> 3.6" }
   }
   backend "s3" {
@@ -324,26 +324,43 @@ resource "azurerm_storage_account" "sa" {
 ### HCL — Cloudflare
 
 ```hcl
-# BAD: API token with account-wide write, no zone scope
+# BAD: API token with account-wide write, no zone scope; settings downgraded.
+# NOTE: cloudflare_zone_settings_override was REMOVED in Cloudflare provider v5 —
+# each setting is now its own cloudflare_zone_setting resource.
 provider "cloudflare" { api_token = "PLACEHOLDER_BROAD_TOKEN" }
-resource "cloudflare_zone_settings_override" "z" {
-  zone_id = var.zone_id
-  settings { always_use_https = "off"; min_tls_version = "1.0" }   # downgrade attack surface
+resource "cloudflare_zone_setting" "https" {
+  zone_id    = var.zone_id
+  setting_id = "always_use_https"
+  value      = "off"                       # downgrade attack surface
+}
+resource "cloudflare_zone_setting" "tls" {
+  zone_id    = var.zone_id
+  setting_id = "min_tls_version"
+  value      = "1.0"
 }
 
-# SAFE: zone-scoped token from a secrets manager, hardened settings
+# SAFE: zone-scoped token from a secrets manager; one hardened cloudflare_zone_setting
+# per setting (provider v5 schema: zone_id + setting_id + value).
 provider "cloudflare" { api_token = data.vault_kv_secret_v2.cf.data["zone_scoped_token"] }
-resource "cloudflare_zone_settings_override" "z" {
-  zone_id = var.zone_id
-  settings {
-    always_use_https           = "on"
-    min_tls_version            = "1.2"
-    automatic_https_rewrites   = "on"
-    opportunistic_encryption   = "on"
-    security_level             = "medium"
-    browser_check              = "on"
-    ssl                        = "strict"
-  }
+resource "cloudflare_zone_setting" "always_use_https" {
+  zone_id    = var.zone_id
+  setting_id = "always_use_https"
+  value      = "on"
+}
+resource "cloudflare_zone_setting" "min_tls_version" {
+  zone_id    = var.zone_id
+  setting_id = "min_tls_version"
+  value      = "1.2"
+}
+resource "cloudflare_zone_setting" "automatic_https_rewrites" {
+  zone_id    = var.zone_id
+  setting_id = "automatic_https_rewrites"
+  value      = "on"
+}
+resource "cloudflare_zone_setting" "ssl" {
+  zone_id    = var.zone_id
+  setting_id = "ssl"
+  value      = "strict"
 }
 ```
 
@@ -591,7 +608,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — a 
 - NEVER allow hardcoded secrets in `variable.default`, `locals`, or `*.tfvars` checked into the repo.
 - NEVER allow `apply` in CI without a separate `plan` + human approval gate.
 - NEVER allow a public storage default (S3 / GCS / Azure Blob) without an explicit public-access block.
-- NEVER recommend tfsec or Terrascan for new pipelines — both are end-of-life as of 2026 (tfsec folded into Trivy; Terrascan archived Nov 2025).
+- NEVER recommend tfsec or Terrascan for new pipelines — tfsec is superseded by Trivy (maintenance-only, no new engineering), and Terrascan is fully end-of-life (repository archived by Tenable on 20 Nov 2025).
 - NEVER let `count` be used over an identity-bearing collection where `for_each` is correct.
 - NEVER let a deprecation warning ship "for later" — warnings are bugs.
 
@@ -599,7 +616,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — a 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

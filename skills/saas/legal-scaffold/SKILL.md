@@ -306,7 +306,7 @@ Contact: {{CONTACT_EMAIL}} · Privacy: {{PRIVACY_EMAIL}}
 
 ## 5. Third parties we share data with
 {{THIRD_PARTIES_TABLE}}  (see live list at /legal/subprocessors)
-We do not sell your data. (CCPA/CPRA §1798.140(t): no sale or sharing for cross-context behavioral advertising.)
+We do not sell your data. (Under the CPRA-amended CCPA, "sell" is defined at §1798.140(ad) and "share" for cross-context behavioral advertising at §1798.140(ah); we do neither.)
 
 ## 6. Data retention
 See /legal/retention for the per-category schedule.
@@ -403,7 +403,7 @@ You indemnify us against third-party claims arising from your misuse or your con
 {{JURISDICTION}}. [REVIEW: consumer protection laws of customer's residence may apply notwithstanding the choice of law; e.g., EU consumer-rights directive, Quebec C.c.Q.]
 
 ## 12. Disputes
-[REVIEW: binding arbitration with class-action waiver (US-style) OR exclusive court jurisdiction (EU/CA/UK preferred). US arbitration must comply with FAA + provide an opt-out window. For EU consumers, mandatory arbitration is generally unenforceable for B2C — use ODR per Regulation 524/2013.]
+[REVIEW: binding arbitration with class-action waiver (US-style) OR exclusive court jurisdiction (EU/CA/UK preferred). US arbitration must comply with FAA + provide an opt-out window. For EU consumers, mandatory pre-dispute arbitration is generally unenforceable for B2C (Unfair Terms Directive 93/13/EEC). Offer Alternative Dispute Resolution via a certified ADR body under the Consumer ADR Directive 2013/11/EU. Note: the EU ODR platform was discontinued on 20 July 2025 and Regulation (EU) 524/2013 was repealed by Regulation (EU) 2024/3228 — do not link the old ODR platform.]
 
 ## 13. Changes
 Material changes notified 30 days before. Continued use after the effective date constitutes acceptance.
@@ -431,7 +431,7 @@ Same template approach — generated from the same fact set. Key constraints per
 - AI-generated or manipulated audio/image/video/text (deepfakes / synthetic media) must be labeled in a machine-readable manner.
 - AI-generated text published to inform the public on matters of public interest must be disclosed.
 - Emotion-recognition and biometric-categorization systems must inform exposed individuals.
-- Penalties: up to €35M or 7% of global annual turnover.
+- Penalties for an Article 50 transparency breach fall under the "other obligations" tier of Art. 99(4): up to €15M or 3% of worldwide annual turnover (whichever is higher). The €35M / 7% ceiling (Art. 99(3)) applies only to Art. 5 prohibited practices, not to transparency failures.
 
 ## Production-readiness integration
 
@@ -490,7 +490,7 @@ The categories below are exactly the `kind` values this skill emits in its lette
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when this skill produces a human-readable audit report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when this skill produces a human-readable audit report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |---|---|---|
@@ -526,7 +526,7 @@ The integrator uses `confidence` and `regulation` to weight findings — a direc
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every missing-policy, outdated-policy, regulatory-gap, or operational gap (missing DPA, missing subprocessor list, no DSAR endpoint) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

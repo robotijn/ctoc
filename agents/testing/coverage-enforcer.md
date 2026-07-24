@@ -325,7 +325,9 @@ Code is **critical** if any of these apply:
 
 ```bash
 # Find payment-related uncovered code
-grep -l "payment\|charge\|refund\|billing" $(grep "^DA:.*,0$" coverage/lcov.info | cut -d: -f2 | sort -u)
+# LCOV carries the source path on SF: lines only; track it while scanning DA:line,0 (uncovered) lines
+uncovered_files=$(awk '/^SF:/{sub(/^SF:/,"");file=$0} /^DA:.*,0$/{print file}' coverage/lcov.info | sort -u)
+grep -l "payment\|charge\|refund\|billing" $uncovered_files 2>/dev/null
 
 # Find auth-related uncovered code
 grep -rn "authenticate\|authorize\|session\|token" --include="*.ts" src/ | \
@@ -502,10 +504,10 @@ echo "$DATE,$COMMIT,$BRANCH,$COVERAGE" >> coverage-history.csv
 ### Last 10 Commits
 | Date | Commit | Coverage | Delta |
 |------|--------|----------|-------|
-| 2024-01-15 | abc123 | 82.5% | +0.5% |
-| 2024-01-14 | def456 | 82.0% | +1.2% |
-| 2024-01-13 | ghi789 | 80.8% | -0.2% |
-| 2024-01-12 | jkl012 | 81.0% | +0.3% |
+| 2026-01-15 | abc123 | 82.5% | +0.5% |
+| 2026-01-14 | def456 | 82.0% | +1.2% |
+| 2026-01-13 | ghi789 | 80.8% | -0.2% |
+| 2026-01-12 | jkl012 | 81.0% | +0.3% |
 
 ### 30-Day Trend
 ```
@@ -546,7 +548,7 @@ fi
 ## Coverage Enforcement Report
 
 **Status**: PASS
-**Timestamp**: 2024-01-15T10:30:00Z
+**Timestamp**: 2026-01-15T10:30:00Z
 **Commit**: abc123def
 **Branch**: feature/user-auth
 
@@ -582,7 +584,7 @@ None - all files meet coverage requirements.
 ## Coverage Enforcement Report
 
 **Status**: FAIL
-**Timestamp**: 2024-01-15T10:30:00Z
+**Timestamp**: 2026-01-15T10:30:00Z
 **Commit**: xyz789abc
 **Branch**: feature/checkout-flow
 

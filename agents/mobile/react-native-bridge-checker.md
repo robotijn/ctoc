@@ -38,21 +38,25 @@ You validate React Native native modules work correctly across iOS and Android, 
 ### Missing Platform Implementation
 ```typescript
 // Module works on iOS but crashes on Android
-import { NativeModule } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
+
+const { MyModule } = NativeModules;
 
 // Check platform availability
-if (Platform.OS === 'android' && !NativeModule.methodName) {
+if (Platform.OS === 'android' && !MyModule?.methodName) {
   console.warn('Method not available on Android');
 }
 ```
 
 ### Bridge Overhead
 ```typescript
+const { MyModule } = NativeModules;
+
 // BAD - many bridge calls
-items.forEach(item => NativeModule.process(item));
+items.forEach(item => MyModule.process(item));
 
 // GOOD - batch
-NativeModule.processBatch(items);
+MyModule.processBatch(items);
 ```
 
 ## Output Format

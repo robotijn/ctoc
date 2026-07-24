@@ -74,7 +74,7 @@ Differential scanning is what lets this skill stay under the 30-second PR budget
 
 ```bash
 # OSV-Scanner — recommended default. Supports 19+ lockfile formats.
-# v2.3.5 (March 2026) added transitive scanning for Python requirements.txt via deps.dev API.
+# v2.3.5 (March 2025) added transitive scanning for Python requirements.txt via deps.dev API.
 osv-scanner scan source --recursive .                  # full scan (for baselining)
 
 # PR mode via GitHub Action: reports ONLY new vulns introduced in the PR
@@ -162,8 +162,9 @@ dependencies = ["requests>=2.32.0,<3", "pyyaml>=6.0.1,<7"]
 # Fast PR-time
 pip-audit --strict --requirement requirements.txt --format json
 osv-scanner scan source --lockfile=poetry.lock      # or uv.lock, Pipfile.lock
-# v2.3.5+ OSV-Scanner transitive scan for requirements.txt via deps.dev:
-osv-scanner scan source --experimental-transitive-scan --lockfile=requirements.txt
+# v2.3.5+ OSV-Scanner resolves transitive deps for requirements.txt via deps.dev
+# (on by default for supported manifests; add --no-resolve to stay offline/faster):
+osv-scanner scan source --lockfile=requirements.txt
 ```
 
 ### Maven / Gradle (Java / Kotlin)
@@ -319,8 +320,8 @@ openssl:shared=False
 ```
 
 ```bash
-# vcpkg
-vcpkg install --x-manifest-root=. --x-feature=secure
+# vcpkg (manifest mode installs the pinned deps from vcpkg.json)
+vcpkg install --x-manifest-root=.
 osv-scanner scan source --lockfile=vcpkg.json
 # Conan
 conan lock create conanfile.txt
@@ -351,7 +352,7 @@ cargo about generate about.hbs
 
 | Tool | Strength | Trade-off | When |
 |---|---|---|---|
-| **OSV-Scanner** (v2.3.5+, 2026) | 19+ lockfile formats · 11+ ecosystems · OSV.dev coverage · PR-mode action · transitive Python (requirements.txt) added in v2.3.5 | No reachability built in; pair with govulncheck for Go or [[dependency-auditor]] for cross-language reachability | Default PR scanner |
+| **OSV-Scanner** (v2.3.5+) | 19+ lockfile formats · 11+ ecosystems · OSV.dev coverage · PR-mode action · transitive Python (requirements.txt) added in v2.3.5 | No reachability built in; pair with govulncheck for Go or [[dependency-auditor]] for cross-language reachability | Default PR scanner |
 | **npm audit** | Built-in, zero install, fast | npm-only; some false positives in dev-only paths | Use with `--omit=dev --audit-level=high` |
 | **pip-audit** | PyPA-maintained, reads installed env or requirements | Python only | Python projects always |
 | **cargo audit** | Reads `Cargo.lock` against RustSec advisory DB | Rust only | Rust projects always |
@@ -456,7 +457,7 @@ Scanned: package-lock.json (delta vs origin/main) · pyproject.toml unchanged ·
 Time: 7.4s · OSV-Scanner v2.3.5 · cached DB (last refresh: 2026-05-19)
 
 ### CRITICAL — direct, new in this PR
-1. **axios 0.21.0** — CVE-2021-3749 (SSRF, CVSS 9.1)
+1. **axios 0.21.0** — CVE-2021-3749 (ReDoS, CVSS 7.5)
    - Path: package.json (direct)
    - Delta: new (base branch had axios 1.7.7)
    - Reachable: unknown (defer to [[dependency-auditor]] for call-graph)
@@ -498,7 +499,7 @@ package: <name>                                # e.g., axios
 version: <resolved-version>                    # e.g., 0.21.0 (from lockfile)
 ecosystem: npm | pypi | maven | nuget | cargo | go | conan | vcpkg
 vulnerability_id: CVE-2021-3749                # or GHSA-..., RUSTSEC-..., GO-..., OSV id
-cvss: 9.1                                      # CVSS v3.1 base score from advisory
+cvss: 7.5                                      # CVSS v3.1 base score from advisory
 fix_available: true | false
 fix_version: ">=1.7.7"                         # null if no fix exists
 direct: true | false                           # direct dep vs transitive
@@ -507,7 +508,7 @@ reachable: true | false | unknown              # unknown is allowed at PR-time
 delta: new | unchanged | regressed             # vs base branch lockfile
 license: MIT                                   # populated for license-class findings
 file: package-lock.json                        # which lockfile / manifest
-message: "axios 0.21.0 vulnerable to SSRF via CVE-2021-3749"
+message: "axios 0.21.0 vulnerable to ReDoS via CVE-2021-3749"
 fix: "npm install axios@^1.7.7"
 reference: https://osv.dev/vulnerability/CVE-2021-3749
 defer_to_auditor: false                        # true if needs deep transitive/reachability analysis
@@ -519,7 +520,7 @@ The integrator uses `confidence`, `direct`, `reachable`, and `delta` to weight f
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

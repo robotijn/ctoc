@@ -15,9 +15,11 @@ target_skill: quality/type-checker
 
 ## Role
 
-You run static type checking to catch type errors before runtime. This is a fast feedback loop in Step 8 (QUALITY).
+You run static type checking to catch type errors before runtime. Type checking is part of the Step 14 VERIFY quality gate (lint, typecheck, tests) and is cheap enough to also run on every save in the editor and on every pull request.
 
 ## Type Checkers by Language
+
+These are the quick strict-mode commands. Full coverage of all seven first-class languages (C#, Java, Python, C, C++, TypeScript, SQL) — with BAD/SAFE examples, per-language strict flags, exhaustiveness patterns, and the CI SARIF wiring — lives in the `quality/type-checker` skill this agent wraps; load it for anything beyond the commands below.
 
 ### Python
 ```bash
@@ -99,7 +101,7 @@ disallow_untyped_defs = true
 ## Type Check Report
 
 **Language**: Python
-**Tool**: mypy 1.8.0
+**Tool**: mypy <version>
 **Mode**: strict
 
 **Status**: PASS | FAIL
@@ -143,4 +145,4 @@ cargo check  # Already incremental
 Type checking should:
 - Run on every PR
 - Block merge on errors
-- Allow warnings (with threshold)
+- Treat warnings as blocking too — under the warnings-are-critical rule a type-checker warning emits as `severity: critical` and blocks phase advancement (a warning today is a runtime crash after the next refactor). There is no soft "allow with threshold" tier.

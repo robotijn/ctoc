@@ -33,14 +33,15 @@ pip-licenses --allow-only="MIT;BSD;Apache"
 
 ### Go
 ```bash
-go-licenses report ./... --template=json
+go-licenses report ./...   # CSV report (module, version, license) — the default format
+go-licenses check ./...    # exits non-zero on forbidden/restricted licenses
 ```
 
 ### Multi-language
 ```bash
 # FOSSA
 fossa analyze
-fossa report licenses
+fossa report attribution
 
 # Snyk
 snyk test --json
@@ -71,12 +72,14 @@ ort analyze -i . -o results
 | AGPL-3.0 | Network use triggers copyleft |
 | MPL-2.0 | File-level copyleft |
 
+The bare `GPL-2.0`, `GPL-3.0`, `LGPL-2.1`, `LGPL-3.0`, and `AGPL-3.0` identifiers are deprecated on the SPDX License List — scanners emit the explicit `-only` or `-or-later` forms (for example `GPL-3.0-only`, `GPL-3.0-or-later`), and the "only" vs "or-later" distinction changes compatibility. Treat the bare form as the license family.
+
 ### Problematic
 | License | Issue |
 |---------|-------|
 | AGPL-3.0 | SaaS trigger - may require open-sourcing |
-| SSPL | Controversial, not OSI approved |
-| BSL | Time-delayed open source |
+| SSPL-1.0 | Controversial, not OSI approved |
+| BUSL-1.1 | Business Source License — time-delayed open source (do not confuse with `BSL-1.0`, the permissive Boost Software License) |
 | Commercial | Requires paid license |
 | Unknown | Cannot determine compliance |
 
@@ -88,7 +91,7 @@ MIT → GPL: ✅ Compatible (one way)
 GPL → MIT: ❌ Not compatible
 Apache-2.0 → GPL-3.0: ✅ Compatible
 Apache-2.0 → GPL-2.0: ❌ Not compatible (patent clause)
-GPL-2.0 → GPL-3.0: ❌ Not compatible (only clause)
+GPL-2.0-only → GPL-3.0: ❌ Not compatible (no "or-later" clause to upgrade under)
 ```
 
 ## What to Check
@@ -185,7 +188,7 @@ GPL-2.0 → GPL-3.0: ❌ Not compatible (only clause)
   run: npx license-checker --production --csv > licenses.csv
 
 - name: Upload Report
-  uses: actions/upload-artifact@v4
+  uses: actions/upload-artifact@v7
   with:
     name: license-report
     path: licenses.csv

@@ -45,7 +45,7 @@ You are a paranoid localization reviewer. You assume every English literal in so
 - **Locale negotiation**: parse `Accept-Language` header (RFC 9110 weighted q-values), fall back to IP geolocation, then to a configured default. Always honor an explicit user choice over either signal. Persist the chosen locale in a cookie / user profile.
 - **Unicode NFC normalization at input boundaries**: incoming text (form submissions, API payloads, URLs containing usernames) must be normalized to NFC before storage or comparison. Different keyboards / OSes produce visually-identical strings in NFC vs NFD — comparing them without normalizing yields false negatives.
 - **RTL needs CSS logical properties, not directional ones**: `margin-inline-start` instead of `margin-left`; `padding-inline-end` instead of `padding-right`; `border-inline-start-width`; `inset-inline-start` for absolute positioning. Hardcoded `left`/`right` in CSS is an RTL bug.
-- **Locale-aware date / number / currency formatting**: use `Intl.DateTimeFormat`, `Intl.NumberFormat`, `Intl.RelativeTimeFormat`, `Intl.ListFormat`, `Intl.PluralRules`, `Intl.Segmenter` (browsers + Node 22+). Server-side: ICU4J / Babel / .NET `CultureInfo`. Never `toString()` a date, never `${price}` a currency.
+- **Locale-aware date / number / currency formatting**: use `Intl.DateTimeFormat`, `Intl.NumberFormat`, `Intl.RelativeTimeFormat`, `Intl.ListFormat`, `Intl.PluralRules`, `Intl.Segmenter` (modern browsers + Node.js built with full ICU). Server-side: ICU4J / Babel / .NET `CultureInfo`. Never `toString()` a date, never `${price}` a currency.
 - **Key-based, not English-based**: translation keys are stable identifiers (`auth.signup.cta`), not English text. English-based keys (`"Sign up now!"`) break on copy edits — every English tweak forces every other locale to retranslate.
 - **Pseudo-localization in CI**: build a `qps-ploc` locale that wraps every string with accents and length expansion (`[!!Ŝíǵñ úƥ ñöŵ!!]`). Run E2E tests against it. Catches both hardcoded strings (raw English appears under pseudo) and length overflow (German, Finnish, and other locales are routinely longer than English; pseudo-loc applies an explicit expansion factor so the layout breaks under test rather than in production).
 - **AI translation needs human review**: machine translation (DeepL, Google Translate, GPT/Claude) gets you 70–90% of the way; native-speaker review catches register, idiom, gender defaults, and politeness levels. Crowdin / Lokalise / Transifex 2026 pipelines compose MT + glossary + QA + human review as separate stages — flag any locale that skipped the human step.
@@ -80,7 +80,7 @@ toast.error(intl.formatMessage({ id: "error.generic" }));
 <h1>Welcome to our app</h1>
 return BadRequest("User not found");
 
-// SAFE (.NET 9 — IStringLocalizer + .resx, ICU.NET for plurals)
+// SAFE (.NET 9 — IStringLocalizer + .resx; ICU plurals need a MessageFormat library, see the concatenation section below)
 @inject IViewLocalizer L
 <h1>@L["welcome.title"]</h1>
 
@@ -196,10 +196,13 @@ intl.formatMessage({ id: 'inbox.new_count' }, { count });
 // BAD: string interpolation + ternary plural
 var msg = $"You have {count} new " + (count == 1 ? "message" : "messages");
 
-// SAFE: ICU.NET / Microsoft.Extensions.Localization.PluralRules (or LibraryNS)
-// .resx key "inbox.new_count" with ICU pattern:
+// SAFE: Microsoft.Extensions.Localization has NO built-in ICU plural selection —
+//   IStringLocalizer is .resx + indexer only. For ICU plural/select on .NET use a
+//   third-party ICU MessageFormat library (e.g. MessageFormat.NET — NuGet "MessageFormat")
+//   and keep the whole ICU pattern in the resource, then format it with that library:
+// .resx key "inbox.new_count" =
 //   "{count, plural, one {You have # new message} other {You have # new messages}}"
-var msg = _localizer.GetIcuString("inbox.new_count", new { count });
+// var msg = formatter.FormatMessage(pattern, new Dictionary<string, object?> { ["count"] = count });
 ```
 
 ```java
@@ -222,7 +225,7 @@ mf.format(Map.of("count", count));
 { "items": "{count, plural, zero {لا توجد عناصر} one {عنصر واحد} two {عنصران} few {# عناصر} many {# عنصراً} other {# عنصر}}" }
 ```
 
-Flag: any locale file where a plural ICU pattern is missing CLDR categories required by that locale per the [Unicode CLDR plural rules](https://www.unicode.org/cldr/charts/supplemental/language_plural_rules.html).
+Flag: any locale file where a plural ICU pattern is missing CLDR categories required by that locale per the [Unicode CLDR plural rules](https://www.unicode.org/cldr/charts/latest/supplemental/language_plural_rules.html).
 
 ### 3. Missing gender / select forms
 
@@ -349,8 +352,8 @@ if (input.normalize('NFC') === stored.normalize('NFC')) { ... }
 ```
 
 ```sql
--- SAFE (PostgreSQL): use the unaccent extension or store NFC; pg_collation-aware text type
-SELECT * FROM users WHERE name = normalize($1, NFC);     -- pg_normalize (citus-extension or unicode SQL/JSON 2023)
+-- SAFE (PostgreSQL): normalize to NFC before comparison; store NFC at write time
+SELECT * FROM users WHERE name = normalize($1, NFC);     -- normalize()/IS NORMALIZED: built-in since PostgreSQL 13
 ```
 
 ### 10. Bidi / control-character injection
@@ -375,8 +378,8 @@ If the project ships to >1 locale but has no `qps-ploc` pseudo locale in its bui
 ### Phase 1: Quick pattern scan (find hardcoded literals)
 
 ```bash
-# JSX/TSX literal text outside i18n wrappers
-rg --type tsx --type jsx ">[A-Z][a-z]+ [a-z ]+<" .          # crude — high recall, low precision
+# JSX/TSX literal text outside i18n wrappers (rg type `ts` covers *.tsx, `js` covers *.jsx)
+rg --type ts --type js ">[A-Z][a-z]+ [a-z ]+<" .           # crude — high recall, low precision
 
 # Concatenation candidates
 rg -n "\"\\s*\\+\\s*\\w+|\\w+\\s*\\+\\s*\"" .              # "foo " + bar / bar + " foo"
@@ -429,7 +432,7 @@ Confirm a `qps-ploc` (or equivalent: `en-XA`, `xx-pseudo`) locale exists, is bui
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when producing the human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when producing the human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |---|---|---|
@@ -475,7 +478,7 @@ These tiers are the **internal triage view** used when producing the human-reada
 ```json
 "inbox.new_count": "{count, plural, one {У вас # сообщение} few {У вас # сообщения} many {У вас # сообщений} other {У вас # сообщения}}"
 ```
-**Reference**: https://www.unicode.org/cldr/charts/supplemental/language_plural_rules.html
+**Reference**: https://www.unicode.org/cldr/charts/latest/supplemental/language_plural_rules.html
 
 ### HIGH: String concatenation across translatable boundary
 **File**: `src/components/Toolbar.tsx:78`
@@ -497,20 +500,20 @@ toast.error(intl.formatMessage({ id: 'error.upload_failed_with_file' }, { filena
 | Tool | Strengths | Trade-offs | When |
 |---|---|---|---|
 | **i18n-ally** (VS Code) | inline preview, missing-key highlight, supports react-intl/i18next/Lingui/vue-i18n | per-developer; doesn't run in CI | Author-time |
-| **FormatJS CLI** (`@formatjs/cli`) | ICU extraction, compile, lint of ICU patterns; SARIF output via `formatjs --format sarif` | TS/JS only | CI on every PR |
+| **FormatJS CLI** (`@formatjs/cli`) | ICU extraction (`extract`), compilation (`compile`), and missing-key verification (`verify --source-locale en --missing-keys`) | TS/JS only; no native SARIF output (`--format` selects a TMS formatter, not SARIF) | CI on every PR |
 | **lingui extract / compile** | macro-driven extraction; small runtime; compiled message catalogs | adoption curve | Lingui projects |
 | **i18next-scanner** | finds `t()` keys, writes/updates locale JSON | regex-based, occasional false positives | i18next projects |
 | **react-intl** + **`@formatjs/intl`** | ICU MessageFormat, polyfills for older runtimes | React only | React projects |
 | **ICU MessageFormat tooling** (`@formatjs/icu-messageformat-parser`) | pattern AST → custom linters | low-level | Custom CI checks |
 | **Crowdin / Lokalise / Transifex APIs** | TM + glossary + MT + human review; XLIFF 2.x export | paid; vendor lock-in mitigated by XLIFF export | All locales |
 | **Pseudo-loc**: `i18nfix`, `pseudoloc`, `@formatjs/cli --pseudo-locale en-XA` | catches hardcoded strings + length overflow before native review | needs E2E coverage to be useful | CI |
-| **.NET ResX Manager** + **Multilingual App Toolkit** + **xliff via `dotnet-xliff`** | round-trips .resx ↔ XLIFF 2.x; integrates with translators | Windows-leaning UI | .NET projects |
+| **ResXResourceManager** + **Multilingual App Toolkit** | round-trip .resx ↔ XLIFF 2.x; integrates with translators | Windows-leaning UI | .NET projects |
 | **Java ICU4J** + **TMS-XLIFF round-trip** | ICU plural/gender/format on JVM | classpath bloat (~12 MB) | JVM apps with i18n |
 | **Python Babel** (`pybabel extract / init / update / compile`) | gettext + ICU; pluralrules from CLDR | gettext .po format is dated but ubiquitous | Python projects |
 | **Mozilla Fluent** (`fluent-rs`, `@fluent/bundle`) | gender/select native, designer-friendly syntax | smaller ecosystem than ICU | New projects choosing modern format |
 | **AI translation QA**: LanguageTool + DeepL + GPT/Claude-as-reviewer | grammar + register + glossary adherence | NEVER ship MT-only; require human review per locale | After MT draft |
 
-Aggregate FormatJS lint output and locale coverage reports as SARIF where possible (`formatjs --format sarif`); aggregate into the same GitHub code-scanning surface SAST uses. A CI step MUST fail the build whenever this skill emits any letter — per warnings-are-bugs, every finding is `critical` on the wire.
+Convert this skill's findings and FormatJS `verify` output into SARIF in a wrapper step — FormatJS itself emits no SARIF (its `--format` flag selects a Translation Management System formatter) — and feed the same GitHub code-scanning surface SAST uses. A CI step MUST fail the build whenever this skill emits any letter — per warnings-are-bugs, every finding is `critical` on the wire.
 
 ## Special Considerations
 
@@ -538,7 +541,7 @@ plural_category_missing: few | many | (omit if n/a)
 source_pattern: '{count, plural, one {...} other {...}}'  # optional
 message: "Russian requires CLDR categories one, few, many, other — got only one+other"
 suggested_fix: "Add 'few' and 'many' branches: {count, plural, one {...} few {...} many {...} other {...}}"
-reference: https://www.unicode.org/cldr/charts/supplemental/language_plural_rules.html
+reference: https://www.unicode.org/cldr/charts/latest/supplemental/language_plural_rules.html
 ```
 
 The integrator uses `confidence` and `corroborated_by` to weight findings — a `confidence: low` single-source finding doesn't block phase advancement on its own, but two engines agreeing escalates it. `locale_affected: all` (e.g. RTL breaks, pseudo-loc missing) is treated as wider blast radius than a single-locale missing key.
@@ -547,7 +550,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — a 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every hardcoded user-facing string, missing plural / gender form, RTL break, locale-mismatched format, missing key, and pseudo-loc gap emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

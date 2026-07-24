@@ -50,7 +50,7 @@ You are a paranoid database reviewer. You assume every migration can lock a hot 
 - **RLS is mandatory for multi-tenant data on Postgres**: shared-schema multi-tenancy without RLS is a `WHERE tenant_id = ?` away from a cross-tenant data leak. RLS gives you defense-in-depth at the database layer; the application's tenant filter is still required, but RLS catches the bugs. (Caveat: RLS interacts with connection pooling — every checkout must reset session variables. See § Multi-tenancy below.)
 - **NOT NULL constraints require backfill before enforcement**: `ALTER TABLE ... ALTER COLUMN ... SET NOT NULL` scans the whole table and acquires an `ACCESS EXCLUSIVE` lock. Two-step it: backfill in batches with the column nullable, then add the constraint with a validated `CHECK` first (NOT VALID + VALIDATE) and only flip the column to `NOT NULL` after.
 - **Postgres 11+ adds-column-with-default is metadata-only**: a constant default no longer rewrites the table. A volatile default (`now()`, `gen_random_uuid()`) DOES rewrite. Reviewers must distinguish.
-- **Postgres 17 `MERGE` with `RETURNING` and 18 `pg_createsubscriber`**: PG17 finalized `MERGE ... RETURNING` and added incremental `pg_basebackup`. PG18 (released 2025) shipped `pg_createsubscriber` to turn a physical standby into a logical subscriber, enabling near-zero-downtime major-version upgrades — the standby is converted, upgraded with `pg_upgrade`, then a single connection-string flip finalizes the cutover.
+- **Postgres 17 shipped `pg_createsubscriber` and incremental backup; Postgres 18 added native `uuidv7()`**: PG17 allowed `MERGE ... RETURNING`, added incremental backup (`pg_basebackup --incremental` plus `pg_combinebackup`), and introduced `pg_createsubscriber` to convert a physical standby into a logical subscriber — enabling near-zero-downtime major-version upgrades (convert the standby, upgrade it with `pg_upgrade`, then a single connection-string flip finalizes the cutover). PG18 (released 2025) added a built-in `uuidv7()` function, so time-ordered UUID primary keys no longer need an extension, and extended `pg_createsubscriber` with `--all`, `--clean`, and `--enable-two-phase`.
 - **Soft-delete vs. hard-delete is a deliberate decision per table**: soft-delete (`deleted_at TIMESTAMPTZ`) for tables under audit / regulatory / recovery requirements; hard-delete for ephemeral data (sessions, tokens, GDPR-mandated erasure). Mixing the two on related tables creates orphan rows. Document the choice in the migration.
 - **Every destructive migration has a documented rollback plan**. `DROP TABLE` and `DROP COLUMN` are one-way doors. A rollback plan is either "restore from backup" (acceptable for tables we have proven we can restore from PITR in time) or "two-phase: rename + grace period + drop in next release."
 - **Migration rollback ≠ data rollback**: a reversible DDL does not undo the data it modified. Reviewers must call out which migrations need pre-migration snapshots vs. which can rely on logical reversal alone.
@@ -173,7 +173,7 @@ CREATE TABLE documents (
 
 -- SAFE: RLS + FORCE + policy reading session variable
 CREATE TABLE documents (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),         -- consider uuidv7() via extension for ordered PKs
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),         -- PG18: uuidv7() is built-in (ordered PKs); pre-18 needs an extension
   tenant_id UUID NOT NULL,
   title TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -205,14 +205,19 @@ ORDER BY
 ### SQL — MySQL 9 (dialect note)
 
 ```sql
--- BAD: ALTER TABLE adding a generated column with ALGORITHM=COPY
+-- BAD: adding a STORED generated column forces a full table rebuild (ALGORITHM=COPY).
+-- MySQL cannot add a STORED generated column in place — the server must evaluate the
+-- expression for every existing row — so ALGORITHM=INPLACE is REJECTED for this op.
 ALTER TABLE orders ADD COLUMN total_cents BIGINT AS (price_cents * quantity) STORED;
 
--- SAFE: check INPLACE eligibility; MySQL 8.0+ supports online DDL for most ops
+-- SAFE: a VIRTUAL generated column adds in place with LOCK=NONE (value computed on read,
+-- not stored). This is the only generated-column add that MySQL runs online.
 ALTER TABLE orders
-  ADD COLUMN total_cents BIGINT AS (price_cents * quantity) STORED,
+  ADD COLUMN total_cents BIGINT AS (price_cents * quantity) VIRTUAL,
   ALGORITHM=INPLACE, LOCK=NONE;
--- If the planner rejects INPLACE, use gh-ost / pt-online-schema-change on tables > ~1 GB.
+-- InnoDB can build a secondary index on the VIRTUAL column if you need to filter/sort on it.
+-- If STORED is truly required (e.g. to persist the value), the rebuild is unavoidable in
+-- native DDL — use gh-ost / pt-online-schema-change on tables > ~1 GB.
 ```
 
 ### SQL — SQL Server (dialect note)
@@ -393,10 +398,10 @@ SELECT id, email, created_at FROM users WHERE email = 'test@example.com';
 | Tool | Purpose | When to use |
 |------|---------|-------------|
 | **squawk** | Postgres-only migration linter (Rust, OSS, free). Catches the obvious lock-acquiring DDL: non-CONCURRENT index, ADD NOT NULL, RENAME, etc. | Every PR touching a Postgres migration. |
-| **atlas (atlasgo.io)** | Schema-as-code, supports Postgres / MySQL / SQL Server / SQLite / ClickHouse. State-based diffing. `atlas migrate lint` (Atlas Pro since Oct 2025) does 50+ migration risk checks. | Teams adopting schema-as-code; OSS edition does diffs, paid edition does lint. |
+| **atlas (atlasgo.io)** | Schema-as-code, supports Postgres / MySQL / SQL Server / SQLite / ClickHouse. State-based diffing. `atlas migrate lint` (Atlas Pro) analyzes migrations for destructive operations, breaking schema changes, and lock-acquiring DDL. | Teams adopting schema-as-code; OSS edition does diffs, paid edition does lint. |
 | **sqlcheck** | Heuristic anti-pattern detector for SQL (OSS). | Optional, low-signal but free. |
 | **Liquibase 4.x** | XML/YAML/JSON/SQL changesets with rollback definitions; multi-dialect. | JVM-heavy stacks; Spring Boot migrations. |
-| **Flyway 11+** | Simpler than Liquibase; SQL-first; community-edition still free post-Teams-tier discontinuation (May 2025). | Lightweight migration tracking in any stack. |
+| **Flyway 11+** | Simpler than Liquibase; SQL-first; the Community edition is free and open-source. | Lightweight migration tracking in any stack. |
 | **pgmustard** | EXPLAIN-output analyzer; turns Postgres plans into prioritized findings. | Reviewing slow-query candidates. |
 | **pg_stat_statements** | Postgres extension; required reading before every review. | Always on in production. |
 | **pgloader** | Bulk data migration (e.g., MySQL → Postgres, CSV → Postgres). | One-off data migrations, not schema reviews. |
@@ -459,7 +464,7 @@ SELECT id, email, created_at FROM users WHERE email = 'test@example.com';
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable review report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [`agents/_shared/warnings-are-critical.md`](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable review report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [`skills/agent-fragments/warnings-are-critical.md`](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |---|---|---|
@@ -510,7 +515,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings. A `co
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

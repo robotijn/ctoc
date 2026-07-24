@@ -180,6 +180,7 @@ metadata:
 - A function at the higher integrity levels has no target-level evidence. Where the regime declares the ladder, this is critical regardless of project size — and there is no unit-test override.
 - A rung is skipped with no documented rationale and no accepted residual risk.
 - The rig is not qualified.
+- Real-time fidelity is insufficient for the system under test — a rig that cannot keep up is not reproducing the system's timing, so its evidence does not describe the system.
 - Fault injection does not cover the dangerous failure modes the failure-mode analysis catalogued.
 - A hardware measurement exceeds the computed execution-time bound.
 

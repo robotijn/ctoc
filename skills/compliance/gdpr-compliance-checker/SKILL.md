@@ -46,7 +46,7 @@ You validate GDPR and privacy compliance by analyzing how personal data is colle
 - **DPO appointment threshold (Article 37)** — mandatory when the core activities consist of large-scale systematic monitoring of data subjects (e.g., behavioural advertising platforms, IoT trackers, ad-tech) or large-scale processing of special categories. Even when not mandatory, naming a privacy lead with documented authority is the 2026 norm.
 - **Breach notification readiness (Article 33) — 72-hour clock** — the clock starts from the moment of "awareness," not from the moment of the incident. The notification must include: nature of breach, categories and approximate number of data subjects, DPO/contact point, likely consequences, and mitigation measures. The EU Digital Omnibus proposal under consultation may extend this to 96 hours, but until adopted, 72 hours is the binding rule. Where breach is likely to result in **high risk** to rights and freedoms, the data subjects themselves must also be informed (Article 34) without undue delay.
 - **Subprocessor list public** — Article 28 requires the controller to know, document, and authorize every processor. Published subprocessor lists with notification of changes are the 2026 norm and align with SOC2 / ISO 27001 vendor management.
-- **EU-US data flows under DPF or SCCs** — the EU-US Data Privacy Framework remains active but legally contested (a fresh Schrems-style challenge is ongoing). For new architectures in 2026, prefer EU-region data residency where feasible, fall back to DPF-certified US processors with Standard Contractual Clauses + Transfer Impact Assessment as the legally durable choice.
+- **EU-US data flows under DPF or SCCs** — the EU-US Data Privacy Framework remains active and survived its first court test: the EU General Court upheld it in September 2025 (the Latombe challenge was dismissed), and an appeal is now pending before the Court of Justice. For new architectures in 2026, prefer EU-region data residency where feasible, fall back to DPF-certified US processors with Standard Contractual Clauses + Transfer Impact Assessment as the legally durable choice.
 - **Continuous compliance > point-in-time audits** — high-risk systems scanned daily, lower-risk monthly. RoPA updated continuously. Pair with [[audit-log-checker]] for the dual-obligation chain: consent grants/revokes AND DSAR fulfilment AND erasure events all need immutable audit trail.
 - **Genuine consent UX (not dark patterns)** — reject-all must be as visually prominent as accept-all (CNIL, ICO, BfDI consistent guidance). Cross-link to [[accessibility-checker]] — a consent banner that fails WCAG fails genuine-informed-consent for screen-reader users by definition.
 
@@ -528,7 +528,7 @@ posthog.capture('signup', { email: euUser.email, ip: euUser.ip });
 posthog.init(KEY, { api_host: 'https://eu.i.posthog.com' });
 ```
 
-Flag any third-party SDK / API call shipping PII to a region whose adequacy status isn't documented. Use the European Commission's adequacy decision list (UK, Switzerland, Japan, South Korea, Israel, NZ, Argentina, Canada-commercial, Uruguay, Faroe Islands, Guernsey, Isle of Man, Jersey, Andorra) as the allowlist. The EU-US DPF is active but under live challenge — annotate transfers under DPF with a fallback-SCC plan.
+Flag any third-party SDK / API call shipping PII to a region whose adequacy status isn't documented. Use the European Commission's adequacy decision list (UK, Switzerland, Japan, South Korea, Israel, NZ, Argentina, Brazil, Canada-commercial, Uruguay, Faroe Islands, Guernsey, Isle of Man, Jersey, Andorra) as the allowlist — treat it as a living list and re-check the Commission's page, since decisions are added (Brazil, January 2026) and can be suspended. The EU-US DPF is active but under live challenge — annotate transfers under DPF with a fallback-SCC plan.
 
 ### 8. Dark Patterns in Consent UI
 
@@ -543,7 +543,7 @@ Flag any third-party SDK / API call shipping PII to a region whose adequacy stat
 <button class="btn-secondary">Manage Preferences</button>
 ```
 
-Cross-link [[accessibility-checker]] — a consent banner that fails WCAG 2.2 AA (color contrast, keyboard focus, screen-reader labels, no-keyboard-trap) cannot collect *genuine, informed* consent from disabled users. The two regulations interlock: GDPR Article 7 requires consent be unambiguous and freely given; the European Accessibility Act (EAA, in force June 2025) makes inaccessible consent UI a separate violation.
+Cross-link [[accessibility-checker]] — a consent banner that fails WCAG 2.2 AA (color contrast, keyboard focus, screen-reader labels, no-keyboard-trap) cannot collect *genuine, informed* consent from disabled users. The two regulations interlock: GDPR Article 7 requires consent be unambiguous and freely given; the European Accessibility Act (EAA, applying from 28 June 2025) makes inaccessible consent UI a separate violation.
 
 ## Output Format (human-readable scan report)
 
@@ -599,7 +599,7 @@ Cross-link [[accessibility-checker]] — a consent banner that fails WCAG 2.2 AA
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |---|---|---|
@@ -659,7 +659,7 @@ The integrator uses `confidence` and `reachable` to weight findings — a `confi
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

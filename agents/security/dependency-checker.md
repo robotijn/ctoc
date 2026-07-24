@@ -28,7 +28,7 @@ npm audit fix  # Auto-fix where possible
 ### Python
 ```bash
 pip-audit --format json
-safety check --json
+safety scan --output json
 ```
 
 ### Go
@@ -90,12 +90,12 @@ go list -u -m all
 
 ### Critical Vulnerabilities
 1. **lodash** < 4.17.21
-   - CVE-2021-23337: Prototype pollution
+   - CVE-2021-23337: Command injection via template
    - Fix: `npm update lodash`
    - Severity: CRITICAL
 
 2. **axios** < 0.21.2
-   - CVE-2021-3749: SSRF
+   - CVE-2021-3749: ReDoS (inefficient regular expression)
    - Fix: `npm update axios`
    - Severity: HIGH
 

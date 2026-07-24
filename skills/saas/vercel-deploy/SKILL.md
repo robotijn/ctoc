@@ -47,27 +47,27 @@ Vercel hosts JavaScript / TypeScript first-class (Next.js + serverless functions
 - **C# / .NET 9** — not hosted by Vercel. Use Azure App Service or Azure Container Apps. See [[saas/azure-deploy]] (planned). Vercel can still host the Next.js frontend that calls a .NET API.
 - **Java / Spring Boot** — not hosted by Vercel. Use Cloud Run, Fly.io, or Render. Vercel hosts the frontend only.
 - **C / C++** — not hosted by Vercel. Out of scope.
-- **SQL** — DB is external (Vercel Postgres, Supabase, Neon, RDS). This skill covers connection-string env var hygiene, not DB internals.
+- **SQL** — DB is external (Supabase, Neon, RDS, or Postgres provisioned through the Vercel Marketplace). This skill covers connection-string env var hygiene, not DB internals.
 
 ## 2026 Best Practices
 
-- **Fluid Compute is default-on for new projects** — existing projects must opt in via Project Settings. Fluid lets one function instance serve multiple concurrent invocations, so I/O-bound API routes share warm instances and cold-start cost amortizes across requests. Per Vercel's published guidance, typical Next.js App Router apps with DB-backed routes see a meaningful reduction in billed function invocations; cost impact depends on workload shape — measure on your own routes before quoting a number.
-- **Concurrency tuning** — Fluid Compute allows tuning concurrency per function via `vercel.json` `functions.<glob>` config. `1` = legacy single-request behavior. Higher values (e.g. `10`) for I/O-bound DB / third-party API routes. The exact config key has evolved; check current Vercel docs before pinning. Leave default unless you have a measured reason to change.
+- **Fluid Compute is default-on for new projects** — existing projects opt in via Project Settings → Functions, or by setting `"fluid": true` in `vercel.json`. Fluid lets one function instance serve multiple concurrent invocations, so I/O-bound API routes share warm instances and cold-start cost amortizes across requests. Fluid bills active CPU time plus provisioned memory time — time spent waiting on I/O (database queries, AI model calls) is not billed as CPU — so DB-backed App Router routes get cheaper the more they wait; cost impact depends on workload shape, so measure on your own routes before quoting a number.
+- **Concurrency is automatic under Fluid Compute** — Fluid shares a single warm instance across multiple concurrent invocations by itself (Node.js and Python runtimes); there is NO per-function concurrency key in `vercel.json`. The tunable per-function sub-keys are `runtime`, `maxDuration`, `regions`, `functionFailoverRegions`, `includeFiles`/`excludeFiles`, and `supportsCancellation` — `memory` is a dashboard setting under Fluid, not a `vercel.json` key. Functions auto-scale up to 30,000 concurrent invocations on Hobby/Pro and 100,000+ on Enterprise; you configure nothing.
 - **Environment scoping is non-negotiable** — Vercel exposes four scopes: Production, Preview, Development, and (branch-specific) Preview overrides. Production secrets MUST never appear in Preview. Use Stripe / Clerk / database staging keys for Preview.
 - **`.env.local` is local-only** — never commit. Pair with [[security/secrets-detector]] in CI to catch accidental commits.
-- **Sensitive flag for secrets** — when adding via CLI: `vercel env add MY_SECRET production --sensitive`. The value is hidden in the dashboard and cannot be read back via CLI; it can only be overwritten.
+- **Secrets are sensitive by default on Production and Preview** — `vercel env add MY_SECRET production` now stores the value as `sensitive` automatically: hidden in the dashboard and in `vercel env ls`, available only to builds and at runtime, and overwrite-only (never readable back). Passing `--sensitive` is explicit but no longer required; `--no-sensitive` downgrades it to merely encrypted (team policy may forbid opting out). Development targets cannot be sensitive — `--sensitive` on a development target errors.
 - **`vercel env pull` for local parity** — generates `.env.local` from the project's dashboard values. Gitignored by default. Use `vercel env pull --environment=preview` to mirror preview.
 - **`vercel env run` for ephemeral access** — runs a one-off command with project env vars injected, without writing them to disk. Use in scripts that need prod-like config briefly.
 - **Edge runtime for low-latency, geo-distributed routes** — middleware, auth checks, geo redirects. Edge runtime does NOT support ISR, native Node APIs, or `fs`. Note: as of 2024 Vercel reverted page rendering from Edge back to Node by default (Lee Robinson's public correction) — Node + streaming was measurably faster for typical SSR. Treat Edge as a targeted tool, not the default.
-- **Node runtime (default) for ISR, streaming SSR, DB clients, Stripe webhooks** — full Node API surface, longer timeouts (60s on Pro, 300s on Enterprise).
+- **Node runtime (default) for ISR, streaming SSR, DB clients, Stripe webhooks** — full Node API surface and long durations. With Fluid Compute the default max duration is 300s on every plan, extensible per-function up to 800s on Pro/Enterprise (1800s extended, in beta), versus Edge's 25s-to-first-byte streaming window.
 - **Preview deployment per PR** — the GitHub integration creates a unique preview URL per commit. Use Vercel Toolbar to comment + share. Treat preview as a real staging environment with isolated DB.
 - **Preview DBs must be isolated** — never point preview at the prod database; use a branch DB (Neon, Supabase, PlanetScale branching) or a dedicated staging DB.
-- **Custom domain with HTTPS** — domain in Vercel Dashboard; Let's Encrypt cert auto-provisioned; HTTP→HTTPS redirect automatic; HSTS headers should be explicit in `next.config.ts` for subdomains.
+- **Custom domain with HTTPS** — domain in Vercel Dashboard; a managed TLS certificate is auto-provisioned and auto-renewed; HTTP→HTTPS redirect automatic; HSTS headers should be explicit in `next.config.ts` for subdomains.
 - **Image optimization on** — `next/image` uses Vercel's Image Optimization by default. AVIF + WebP, on-demand resize, cached at the edge.
 - **Bundle analyzer in CI** — `@next/bundle-analyzer` runs on PRs; fail the build if first-load JS exceeds a budget. Cross-link [[frontend/bundle-analyzer]].
 - **Speed Insights + Analytics** — `@vercel/speed-insights` (Core Web Vitals on real users) and `@vercel/analytics` (pageviews + custom events). Both have free tiers sufficient for early SaaS.
 - **Build & Deploy hooks** — for non-Git-driven redeploys (e.g. CMS publish triggers a rebuild). Generated in Project Settings → Git → Deploy Hooks. Treat the URL as a secret (it's an auth token).
-- **`vercel.json` is documented infra** — keep it in the repo. Pin `framework`, `installCommand`, route-level `runtime`/`maxDuration`/`memory`, redirects, headers.
+- **`vercel.json` is documented infra** — keep it in the repo. Pin `framework`, `installCommand`, `fluid`, route-level `maxDuration` (and `regions`), redirects, headers. Route-level `memory` is not a `vercel.json` key under Fluid Compute — it lives in the dashboard.
 
 ## Categories
 
@@ -241,20 +241,19 @@ export default config;
   "installCommand": "pnpm install --frozen-lockfile",
   "outputDirectory": "apps/web/.next",
   "functions": {
-    "app/api/webhooks/stripe/route.ts": {
-      "maxDuration": 30,
-      "memory": 1024
-    },
-    "app/api/long-job/route.ts": {
-      "maxDuration": 60,
-      "memory": 2048
-    }
+    "app/api/webhooks/stripe/route.ts": { "maxDuration": 30 },
+    "app/api/long-job/route.ts":        { "maxDuration": 300 }
   },
   "redirects": [
     { "source": "/docs", "destination": "/documentation", "permanent": true }
   ]
 }
 ```
+
+> Under Fluid Compute (default-on for new projects) `memory` is NOT a `vercel.json`
+> key — set the default function memory / CPU size in Project Settings → Functions in
+> the dashboard. `vercel.json` still owns `maxDuration`, `runtime`, `regions`, and the
+> include/exclude globs.
 
 ### 9. Bloated bundle size
 
@@ -287,7 +286,7 @@ ANALYZE=true pnpm build
 ### 10. Python on Vercel — handler shape
 
 ```python
-# api/index.py — FastAPI on Vercel Python runtime
+# app.py — FastAPI on the Vercel Python runtime
 from fastapi import FastAPI
 import os
 
@@ -298,31 +297,46 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 def health():
     return {"ok": True}
 
-# Vercel Python runtime expects the module to expose `app` for ASGI frameworks,
-# or a `handler(request)` function for raw WSGI/HTTP.
+# Vercel loads a Python entrypoint from a known filename (app.py, index.py,
+# server.py, main.py, wsgi.py, asgi.py — at the project root or inside src/, app/,
+# or api/) and looks for a top-level name:
+#   app          -> most ASGI/WSGI frameworks, including FastAPI and Flask
+#   application  -> Django and other WSGI apps
+#   handler      -> a class inheriting http.server.BaseHTTPRequestHandler
+# For a custom module path, set tool.vercel.entrypoint = "pkg.module:app" in
+# pyproject.toml.
 ```
 
 ```text
-# requirements.txt — pin exact versions; no ranges
-fastapi==0.115.5
-uvicorn==0.32.1
-pydantic==2.10.3
+# requirements.txt — pin exact versions; no ranges. (pyproject.toml with a
+# uv.lock, or a Pipfile + Pipfile.lock, work too.) Do NOT add an ASGI server
+# such as uvicorn — Vercel provides the server; you export `app`, it invokes it.
+fastapi==0.117.1
 ```
 
 ```json
-// vercel.json — declare Python runtime + max duration
+// vercel.json — Python is an officially supported runtime, so you do NOT set a
+// `runtime` string for it (that key is the npm package name of a COMMUNITY
+// runtime, e.g. "vercel-php@0.5.2"). Pin the Python version with pyproject.toml
+// `requires-python`, a `.python-version` file, or `Pipfile.lock` — supported
+// versions are 3.12 (default), 3.13, 3.14. vercel.json only overrides duration
+// and trims the bundle:
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/*.py": {
-      "runtime": "python3.12",
-      "maxDuration": 60,
-      "memory": 1024
+      "maxDuration": 300,
+      "excludeFiles": "{tests/**,**/test_*.py,fixtures/**}"
     }
   }
 }
 ```
 
-Python runtime caveats: cold starts are slower than Node; no native filesystem persistence; package size limits apply (50MB compressed / 250MB uncompressed). Heavy ML deps belong on a dedicated inference service, not Vercel.
+Python runtime caveats: cold starts are slower than Node; no native filesystem
+persistence; there is no automatic tree-shaking, so trim the bundle with
+`excludeFiles`. The Python bundle limit is 500 MB uncompressed (vs 250 MB for other
+runtimes); Large Functions raise that to 5 GB but require Fluid Compute with Active
+CPU. Heavy ML dependencies still belong on a dedicated inference service, not Vercel.
 
 ## Implementation pattern
 
@@ -350,8 +364,10 @@ vercel env add STRIPE_SECRET_KEY preview --sensitive
 # Pull into .env.local for local dev parity
 vercel env pull .env.local --environment=development
 
-# Run a one-off command with prod env injected (no file written)
-vercel env run -- pnpm db:migrate
+# Run a one-off command with prod env injected (no file written).
+# `vercel env run` defaults to the development environment — pass -e production
+# (or -e preview) to target another scope.
+vercel env run -e production -- pnpm db:migrate
 ```
 
 Per-scope checklist for a typical b2c-subscription SaaS:
@@ -374,7 +390,7 @@ Per-scope checklist for a typical b2c-subscription SaaS:
 2. Vercel shows required DNS records (A / ALIAS / CNAME).
 3. Add records at DNS provider (Cloudflare: orange-cloud OFF for ALIAS; ON only for CNAME with Vercel-recommended config).
 4. Wait for verification (typically minutes).
-5. HTTPS auto-provisioned via Let's Encrypt; rotates automatically.
+5. HTTPS: a managed TLS certificate is auto-provisioned and auto-renewed.
 6. Configure redirects: vercel.com → yourapp.com handled in Settings → Domains → Set Primary.
 ```
 
@@ -395,14 +411,18 @@ Per-scope checklist for a typical b2c-subscription SaaS:
 ```json
 {
   "functions": {
-    "app/api/webhooks/stripe/route.ts": { "maxDuration": 30, "memory": 1024 },
-    "app/api/heavy-job/route.ts":       { "maxDuration": 60, "memory": 2048 },
-    "app/api/health/route.ts":          { "maxDuration": 5,  "memory": 128 }
+    "app/api/webhooks/stripe/route.ts": { "maxDuration": 30 },
+    "app/api/heavy-job/route.ts":       { "maxDuration": 300 },
+    "app/api/health/route.ts":          { "maxDuration": 5 }
   }
 }
 ```
 
-Memory and `maxDuration` are billed; right-size each route.
+`maxDuration` is per-route in `vercel.json` (integer seconds, `1` to your plan's
+maximum). Fluid Compute bills active CPU time plus provisioned memory time, so a
+generous `maxDuration` on a mostly-I/O route is cheap — the timeout caps a runaway,
+it does not set the bill. Default function memory / CPU size is a dashboard setting
+under Fluid, not a `vercel.json` key.
 
 ### 6. ISR for content pages
 
@@ -410,8 +430,9 @@ Memory and `maxDuration` are billed; right-size each route.
 // app/blog/[slug]/page.tsx — Node runtime (default), ISR every hour
 export const revalidate = 3600;
 
-export default async function Post({ params }: { params: { slug: string } }) {
-  const post = await fetchPost(params.slug);
+export default async function Post({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;   // Next.js 15: params is a Promise — await it
+  const post = await fetchPost(slug);
   return <article>{post.body}</article>;
 }
 
@@ -434,7 +455,7 @@ pnpm add @vercel/analytics @vercel/speed-insights
 
 ```tsx
 // app/layout.tsx
-import { Analytics } from "@vercel/analytics/react";
+import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -466,21 +487,26 @@ curl -X POST "$VERCEL_DEPLOY_HOOK_URL"
 
 ### 9. Fluid Compute
 
+Fluid Compute has been default-on for new projects since 23 April 2025. Enable it two ways:
+
 ```
-1. Project → Settings → Functions → Fluid Compute → enable (default-on for new projects post-2025).
-2. Optionally tune concurrency in vercel.json:
+Dashboard:  Project → Settings → Functions → Fluid Compute → toggle on → Save → redeploy.
+vercel.json: set "fluid": true (useful to enable per-environment / per-deployment).
 ```
 
 ```json
 {
-  "functions": {
-    "app/api/db-heavy/*": { "maxConcurrency": 10 },
-    "app/api/cpu-bound/*": { "maxConcurrency": 1 }
-  }
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "fluid": true
 }
 ```
 
-When in doubt, leave concurrency at the platform default; only tune after measuring p50/p99 under load.
+Concurrency is NOT configured. Fluid automatically shares one warm instance across
+concurrent invocations (Node.js and Python), prioritising idle capacity before it
+scales up — there is no `maxConcurrency` key, and none is needed. It auto-scales to
+30,000 concurrent invocations on Hobby/Pro and 100,000+ on Enterprise. The only
+per-function knob that touches this behaviour is `maxDuration` (how long one
+invocation may run); the memory / CPU size is a dashboard setting.
 
 ### 10. GitHub integration / preview workflow
 
@@ -497,9 +523,10 @@ Once the GitHub app is connected, every PR auto-deploys to `yourapp-pr-NNN-yourt
 | **@next/bundle-analyzer** | Bundle size visualization + CI budget | `pnpm add -D @next/bundle-analyzer`; wire into `next.config.ts` |
 | **@vercel/analytics** | Pageviews + custom events | `pnpm add @vercel/analytics` |
 | **@vercel/speed-insights** | Core Web Vitals on real users | `pnpm add @vercel/speed-insights` |
-| **Vercel Postgres / Neon** | Managed Postgres with branch DBs | Dashboard → Storage → Create |
-| **Vercel KV (Redis)** | Edge-friendly KV store | Dashboard → Storage → Create |
-| **Vercel Blob** | Object storage (S3-equivalent) | Dashboard → Storage → Create |
+| **Marketplace Postgres** (Neon / Supabase) | Managed Postgres with branch DBs; credentials auto-injected as env vars. First-party "Vercel Postgres" is retired — provision via the Marketplace. | `vercel install neon` (or `supabase`) |
+| **Marketplace Redis / KV** (Upstash) | Key-value cache, sessions, rate-limit store. First-party "Vercel KV" is retired — provision via the Marketplace. | `vercel install upstash` |
+| **Vercel Blob** (first-party) | Large-file / object storage | `pnpm add @vercel/blob`; store created in Dashboard → Storage |
+| **Vercel Edge Config** (first-party) | Global sub-millisecond read store (flags, redirect maps) | Dashboard → Storage → Edge Config |
 | **Vercel Toolbar** | Inline comments + state share on preview deploys | Browser extension; preview-only |
 | **Sentry** | Errors + performance | `pnpm add @sentry/nextjs`; cross-link [[saas/sentry-errors]] |
 
@@ -524,13 +551,13 @@ ANALYZE=true pnpm build
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** for human-readable deploy reports. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)). The triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** for human-readable deploy reports. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)). The triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |-------------|----------|-----------------|
 | CRITICAL | Prod secret in committed `.env`, prod Stripe key in Preview scope, Preview pointing at Prod DB, missing required env var on Prod (build broken) | BLOCK deploy |
 | HIGH | Edge runtime + Node API mismatch, ISR on Edge (silently broken), no HSTS on subdomain, no custom domain (apex on `*.vercel.app`), bundle > budget, missing build command in monorepo | BLOCK release |
-| MEDIUM | Same Sentry DSN across scopes, missing `maxDuration` on long route (default 10s fails), no bundle analyzer in CI, missing Speed Insights | Fix soon |
+| MEDIUM | Same Sentry DSN across scopes, `maxDuration` too low for a long route (504 `FUNCTION_INVOCATION_TIMEOUT` before it finishes), no bundle analyzer in CI, missing Speed Insights | Fix soon |
 | LOW | Missing redirects (`/docs` → `/documentation`), missing Permissions-Policy header, no Build Hook configured for CMS | Backlog |
 
 ## Letter schema (refinement-loop output contract)
@@ -556,7 +583,7 @@ The integrator uses `confidence` to weight findings — a `confidence: low` stat
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every Vercel deploy warning, build warning, deprecation notice, missing-env-var warning, and runtime-mismatch warning emits as `severity: critical` in the letter to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
@@ -572,6 +599,10 @@ The principle: a Vercel deploy warning today is a customer-facing 500 tomorrow. 
 - [Vercel CLI `env` reference](https://vercel.com/docs/cli/env)
 - [Edge Runtime](https://vercel.com/docs/functions/runtimes/edge)
 - [Vercel Runtimes overview](https://vercel.com/docs/functions/runtimes)
+- [Python runtime](https://vercel.com/docs/functions/runtimes/python)
+- [`vercel.json` configuration reference](https://vercel.com/docs/project-configuration/vercel-json)
+- [Vercel Functions limits (duration, memory, bundle size)](https://vercel.com/docs/functions/limitations)
+- [Vercel Storage overview (Blob, Edge Config, Marketplace)](https://vercel.com/docs/storage)
 - [Streaming from Node.js and Edge on Vercel](https://vercel.com/blog/streaming-for-serverless-node-js-and-edge-runtimes-with-vercel-functions)
 - [Vercel custom domains](https://vercel.com/docs/projects/domains)
 - [Production checklist for launch](https://vercel.com/docs/production-checklist)

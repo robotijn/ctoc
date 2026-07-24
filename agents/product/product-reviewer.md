@@ -140,7 +140,7 @@ findings:
       suggestion: "Fix a recurring slot. The cadence is the mechanism."
     tags: ["product", "cadence"]
 
-  - type: "cross_source_divergence"
+  - type: "mrr_disconnect"
     severity: "critical"
     location:
       file: ".ctoc/product-loop/reviews/<date>.md"
@@ -153,10 +153,10 @@ findings:
       diverging_skills: ["saas/posthog-analytics", "saas/stripe-subscriptions"]
       effect: "Neither source shows this alone. One of them is measuring the wrong thing."
       suggestion: "Reconcile before writing any hypothesis on either number."
-    tags: ["product", "divergence", "cross-source"]
+    tags: ["product", "revenue", "mrr", "cross-source"]
 
   - type: "first_review_overreach"
-    severity: "high"
+    severity: "critical"
     location:
       file: ".ctoc/product-loop/reviews/<date>.md"
     message: "First review states trends with no prior baseline"
@@ -232,9 +232,8 @@ The skill's own severity table maps its critical findings to blocking Gate 3 adv
 | Aggregate conclusion hides a segment cliff | BLOCK Gate 3 advancement |
 | No recurring review cadence | BLOCK Gate 3 advancement |
 | Action item without owner or due date | BLOCK Gate 3 advancement |
-| Behaviour and revenue data diverge on the same funnel | BLOCK — reconcile before any hypothesis |
 | Cohort retention degrading three or more weeks | WARN — fix this review cycle |
-| Signup volume rising, revenue flat | WARN — fix this review cycle |
+| Signup volume rising, revenue flat (MRR disconnect) | WARN — reconcile before any hypothesis; fix this review cycle |
 | No recap of prior actions | WARN — fix this review cycle |
 | First review writing hypotheses with no baseline | WARN — fix next cycle |
 | Single red metric not drilled by segment | WARN — fix next cycle |

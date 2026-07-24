@@ -27,7 +27,7 @@ swiftlint lint --reporter json
 ### Build
 ```bash
 xcodebuild -scheme MyApp \
-  -destination 'platform=iOS Simulator,name=iPhone 15' \
+  -destination 'generic/platform=iOS Simulator' \
   build
 ```
 
@@ -42,7 +42,7 @@ xcodebuild test -scheme MyApp \
 Critical rules to enforce:
 - `force_unwrapping` - Avoid `!`
 - `force_cast` - Avoid `as!`
-- `implicit_return` - Explicit returns
+- `force_try` - Avoid `try!`
 - `trailing_whitespace` - Clean code
 
 ## Output Format

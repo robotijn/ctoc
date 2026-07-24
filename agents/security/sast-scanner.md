@@ -701,8 +701,8 @@ The following were reviewed and determined not exploitable:
 
 ### Scan Configuration
 
-- Scanner: CTOC SAST Agent v1.0
-- Rules: OWASP Top 10 2021, CWE Top 25
+- Scanner: CTOC SAST scan
+- Rules: OWASP Top 10 2025, CWE Top 25
 - Languages: Python, JavaScript, Go, Java
 - Excluded: `node_modules/`, `vendor/`, `venv/`, `.git/`
 ```

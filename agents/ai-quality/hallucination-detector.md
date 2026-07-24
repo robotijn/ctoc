@@ -19,17 +19,23 @@ You detect code that may contain AI hallucinations - references to non-existent 
 
 ## What to Detect
 
-### Non-Existent Imports
+### Wrong or Non-Existent Imports
 ```typescript
-// HALLUCINATION - Package doesn't exist
-import { useQuery } from 'react-query';  // Actually @tanstack/react-query
+// STALE PACKAGE - the name still installs but was renamed; new code should not use it
+import { useQuery } from 'react-query';  // Renamed to @tanstack/react-query at v4
 
-// HALLUCINATION - Function doesn't exist
-import { hashSync } from 'bcrypt';  // bcrypt doesn't work in browser, should be bcryptjs
+// WRONG PACKAGE FOR THE ENVIRONMENT - hashSync exists, but bcrypt is a native
+// module that needs a compiler; use bcryptjs where native builds aren't available
+import { hashSync } from 'bcrypt';
 
-// HALLUCINATION - Made-up package
-import { validateEmail } from 'email-validator-pro';  // Doesn't exist
+// HALLUCINATION - Made-up package that does not exist on any registry
+import { validateEmail } from 'email-validator-pro';
 ```
+
+Three distinct failure classes hide under "bad import": a *renamed* package
+(real, but superseded), a package that is *wrong for the target environment*
+(real exports, wrong runtime), and a *fabricated* package (exists nowhere). Only
+the last is a true hallucination — do not report the first two as non-existent.
 
 ### Wrong API Usage
 ```typescript
@@ -62,14 +68,27 @@ const data = useAutoFetch('/api/data');  # Not a standard hook
 # Check if package exists
 npm view package-name version 2>/dev/null || echo "NOT FOUND"
 
-# Python
-pip index versions package-name 2>/dev/null || echo "NOT FOUND"
+# Python — query the stable PyPI JSON API (200 = exists, 404 = does not).
+# Prefer this over `pip index versions`, which pip flags as experimental and
+# may remove without warning.
+curl -sf "https://pypi.org/pypi/package-name/json" >/dev/null && echo "FOUND" || echo "NOT FOUND"
 ```
+
+**Existence is necessary, not sufficient — this is the slopsquatting trap.** A
+hallucinated name that resolves on the registry is *more* dangerous than one that
+404s, because an attacker may have pre-registered the exact name a model tends to
+invent. For any import whose name looks model-generated (plausible but not the one
+the ecosystem actually uses), treat a clean "it exists" as inconclusive: check the
+package's age, download volume, repository link, and maintainer against the
+well-known package it was likely mistaken for, and prefer the canonical dependency.
 
 ### 2. Export Verification
 ```javascript
-// Check if import exists in package
-const pkg = require('package-name');
+// Check if import exists in package.
+// require() throws ERR_REQUIRE_ESM on ESM-only packages — a load failure here is
+// NOT evidence the export is missing. Use dynamic import for those, or read the
+// package's own "exports"/"types" entry instead of executing it.
+const pkg = await import('package-name');
 console.log(Object.keys(pkg));  // List actual exports
 ```
 
@@ -77,7 +96,7 @@ console.log(Object.keys(pkg));  // List actual exports
 ```typescript
 // Compare against actual type definitions
 import { AxiosRequestConfig } from 'axios';
-// AxiosRequestConfig.body doesn't exist for GET
+// AxiosRequestConfig has no `body` field for any method — the payload goes in `data`
 ```
 
 ### 4. Pattern Matching
@@ -94,19 +113,22 @@ const hallucinations = [
 
 ## Common AI Hallucinations
 
-### Package Names
-| Hallucinated | Actual |
+### Package Names (renamed, misused, or unnecessary — not phantom)
+These are real packages an AI reaches for out of habit; flag them as stale or
+wrong-for-context, never as non-existent.
+
+| Written | Prefer |
 |--------------|--------|
-| `react-query` | `@tanstack/react-query` |
-| `bcrypt` (browser) | `bcryptjs` |
-| `node-fetch` (Node 18+) | built-in `fetch` |
-| `axios.post` body param | use `data` not `body` |
+| `react-query` | `@tanstack/react-query` (renamed at v4) |
+| `bcrypt` (no native toolchain) | `bcryptjs` |
+| `node-fetch` (modern Node) | global `fetch` |
+| `axios.post` `body` param | use `data`, not `body` |
 
 ### Method Names
 | Hallucinated | Actual |
 |--------------|--------|
-| `moment.formatISO()` | `moment().toISOString()` |
-| `lodash.chunk()` on string | Only works on arrays |
+| `moment.formatISO()` | `moment().toISOString()` (formatISO is date-fns) |
+| `lodash.deepClone()` | `lodash.cloneDeep()` |
 | `Array.flatMap()` polyfill | Built-in since ES2019 |
 | `React.useAutoEffect()` | Doesn't exist |
 
@@ -131,10 +153,10 @@ const hallucinations = [
 
 ### Details
 
-**1. Non-existent Package Import** (High Confidence)
+**1. Stale / Renamed Package Import** (High Confidence)
 - File: `src/api.ts:1`
 - Code: `import { useQuery } from 'react-query'`
-- Issue: Package `react-query` was renamed
+- Issue: `react-query` still installs but was renamed at v4 — not a true phantom package
 - Fix: `import { useQuery } from '@tanstack/react-query'`
 
 **2. Non-existent Method** (High Confidence)

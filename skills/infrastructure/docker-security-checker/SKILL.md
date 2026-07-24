@@ -37,7 +37,7 @@ You are a paranoid container-security analyst. You treat every Dockerfile as a p
 
 ## 2026 Best Practices (Infrastructure category)
 
-- **Runtime base-image preference order**: **distroless > Chainguard/DHI > Alpine > Debian-slim > full Debian/Ubuntu**. Distroless images contain only the app and its runtime dependencies — no shell, no package manager, no `curl`/`wget`/`apt`/`apk`. An attacker who lands RCE inside a distroless container cannot spawn a shell, cannot install tools, cannot `curl | sh`. Use `gcr.io/distroless/cc`, `gcr.io/distroless/static`, `gcr.io/distroless/nodejs:20`, `gcr.io/distroless/java21-debian12`, or `mcr.microsoft.com/dotnet/aspnet:9.0-distroless` for the runtime stage. If distroless is too restrictive (you genuinely need `sh` for a wrapper), Docker Hardened Images (DHI, released late 2025 under Apache 2.0) and Chainguard images are the next-best — pre-stripped, pre-scanned, continuously updated.
+- **Runtime base-image preference order**: **distroless > Chainguard/DHI > Alpine > Debian-slim > full Debian/Ubuntu**. Distroless images contain only the app and its runtime dependencies — no shell, no package manager, no `curl`/`wget`/`apt`/`apk`. An attacker who lands RCE inside a distroless container cannot spawn a shell, cannot install tools, cannot `curl | sh`. Use `gcr.io/distroless/cc`, `gcr.io/distroless/static`, `gcr.io/distroless/nodejs20-debian12`, `gcr.io/distroless/java21-debian12`, or — for .NET — `mcr.microsoft.com/dotnet/aspnet:9.0-noble-chiseled` (chiseled: no shell, no package manager, non-root by default) or the true-distroless `mcr.microsoft.com/dotnet/aspnet:9.0-azurelinux3.0-distroless` for the runtime stage. The `-debianNN` suffix on the Google distroless names tracks the Debian generation — `-debian13` is the current one (an omitted distribution now resolves to it), so treat the `-debian12` variants as the older generation and move up as your language version gains a `-debian13` build. If distroless is too restrictive (you genuinely need `sh` for a wrapper), Docker Hardened Images (DHI, released late 2025 under Apache 2.0) and Chainguard images are the next-best — pre-stripped, pre-scanned, continuously updated.
 - **Multi-stage build is mandatory**: a `builder` stage with compilers and `dev` dependencies, then a runtime stage with only the artifact. Never ship a compiler, `git`, `curl`, or test tooling in the runtime image. Multi-stage cuts attack surface and image size in one move.
 - **Pin base images by digest, not tag**: `FROM node:20.11.0-alpine` is a moving target the moment Alpine rebases. Use `FROM node:20.11.0-alpine@sha256:...` so the build is reproducible and a registry takeover cannot retarget your base layer. Renovate / Dependabot keep the digest fresh.
 - **Sign every image with Cosign + Sigstore; verify in CI and at admission**: keyless signing via OIDC (GitHub Actions, GitLab, Google) means no long-lived private keys. The signature lands in the OCI registry alongside the image; Rekor records it in the transparency log; Fulcio issues the short-lived cert. Verify with `cosign verify <image> --certificate-identity ... --certificate-oidc-issuer ...` at deploy time and via Kubernetes admission (Kyverno / Sigstore Policy Controller).
@@ -45,7 +45,7 @@ You are a paranoid container-security analyst. You treat every Dockerfile as a p
 - **No `curl ... | sh` inside the Dockerfile**: piping a fetched script into a shell during build is the textbook supply-chain attack. Fetch with a pinned digest, verify the checksum, then execute as a file. Cross-link to [[secrets-detector]] — Dockerfile fetches that need credentials must use BuildKit `--mount=type=secret`, never `ARG SECRET=...` or `ENV SECRET=...`.
 - **`.dockerignore` is non-negotiable**: without one, `COPY . .` ships your `.git/`, `.env`, `node_modules/.cache`, `.aws/`, `.ssh/`, build artifacts, and editor swap files into the image layer history. Layer history is forever — even a `RUN rm -rf` doesn't reclaim the earlier layer. Cross-link [[secrets-detector]] for the secret-in-layer-history class.
 - **Never store secrets in image layers**: `ENV API_KEY=...`, `ARG DATABASE_PASSWORD`, or `RUN echo "$TOKEN" > /etc/cred` all bake the secret into a layer that ships to whoever can `docker pull`. Use BuildKit secret mounts (`RUN --mount=type=secret,id=npm,target=/root/.npmrc npm ci`) or runtime injection (Vault, AWS/GCP/Azure secret managers). `docker history --no-trunc <image>` reveals everything.
-- **Image vulnerability scan in CI on every build**: Trivy / Grype on every PR, fail the build on `CRITICAL`. Trivy 0.68+ supports read-only DB mode for concurrent scans. Cross-link [[dependency-auditor]] — image scans and language-level SCA overlap but neither subsumes the other.
+- **Image vulnerability scan in CI on every build**: Trivy / Grype on every PR, fail the build on `CRITICAL`. For parallel CI scans, give Trivy a shared cache backend (`--cache-backend memory`, or Redis for persistence) — the default filesystem cache locks under concurrency. Cross-link [[dependency-auditor]] — image scans and language-level SCA overlap but neither subsumes the other.
 - **SBOM on every build, attested**: `syft <image> -o spdx-json` produces an SPDX SBOM; BuildKit attaches it as an attestation. Without an accurate bill of materials, "are we affected by CVE-2026-XXXX?" takes hours instead of seconds.
 - **Runtime security observability**: Falco watches for post-build threats — shell spawns inside production containers, unexpected `execve`, writes to `/etc/passwd`, outbound traffic to unknown hosts. Container image scanning catches what is *there*; Falco catches what is *happening*.
 
@@ -75,8 +75,9 @@ docker buildx build --sbom=true --provenance=true -t myapp:1.2.3 .
 
 ### Image signing + verification (Cosign keyless)
 ```bash
-# sign in CI with GitHub OIDC — no long-lived key
-COSIGN_EXPERIMENTAL=1 cosign sign --yes registry.example.com/myapp@sha256:<digest>
+# sign in CI with GitHub OIDC — no long-lived key.
+# Keyless is the DEFAULT since Cosign 2.0 — the old COSIGN_EXPERIMENTAL=1 flag was removed.
+cosign sign --yes registry.example.com/myapp@sha256:<digest>
 
 # verify on deploy
 cosign verify registry.example.com/myapp@sha256:<digest> \
@@ -97,7 +98,7 @@ docker history --no-trunc myapp:1.2.3 | grep -i -E "(secret|token|key|password)"
 | 1 | `:latest` tag (no version pin) | HIGH | CIS 4.2 |
 | 2 | Running as root (missing `USER` or `USER root`) | CRITICAL | CIS 4.1 |
 | 3 | `COPY .env` or secrets in build context | CRITICAL | CIS 4.10 |
-| 4 | `curl ... | sh` or `wget ... | bash` in `RUN` | CRITICAL | OWASP A06 supply chain |
+| 4 | `curl ... | sh` or `wget ... | bash` in `RUN` | CRITICAL | OWASP A08 integrity |
 | 5 | Missing `.dockerignore` | HIGH | CIS 4.10 |
 | 6 | Secret baked into image layer (ENV / ARG / RUN echo) | CRITICAL | CIS 4.10 |
 | 7 | Missing `HEALTHCHECK` | MEDIUM | CIS 4.6 |
@@ -126,22 +127,26 @@ RUN dotnet publish -c Release -o /out
 ENTRYPOINT ["dotnet", "/out/MyApi.dll"]
 # Runs as root, ships SDK to prod, secret in layer, no HEALTHCHECK, :latest tag.
 
-# SAFE — multi-stage, distroless runtime, non-root, no secrets in layer
+# SAFE — multi-stage, chiseled runtime, non-root, no secrets in layer
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 COPY ["MyApi.csproj", "./"]
 RUN dotnet restore --use-lock-file --locked-mode
 COPY . .
 RUN dotnet publish "MyApi.csproj" -c Release -o /app/publish \
-    /p:UseAppHost=false /p:PublishTrimmed=true
+    /p:UseAppHost=false
+# Framework-dependent publish (matches the aspnet shared-framework runtime image below).
+# Do NOT add PublishTrimmed here: in .NET 8+ it implies SelfContained, which conflicts with the
+# aspnet runtime image and `dotnet MyApi.dll` launch — and trimming is unsupported for ASP.NET Core.
 
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-distroless AS final
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-noble-chiseled AS final
 WORKDIR /app
 COPY --from=build /app/publish .
-USER $APP_UID                                # non-root uid baked into the distroless tag
+USER $APP_UID                                # non-root uid (1654) exported by the chiseled tag; image is non-root by default
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD ["/app/MyApi", "--healthcheck"]
+# Chiseled has no shell — no shell-form HEALTHCHECK. Publishing with UseAppHost=false emits
+# only MyApi.dll (no native ./MyApi apphost), so rely on the orchestrator's HTTP probe against
+# an ASP.NET health-checks endpoint (app.MapHealthChecks("/healthz")) instead of a Dockerfile HEALTHCHECK.
 ENTRYPOINT ["dotnet", "MyApi.dll"]
 # Connection string injected at runtime via the orchestrator's secret manager.
 ```
@@ -410,14 +415,14 @@ RUN --mount=type=secret,id=npm,target=/root/.npmrc npm ci
 
 | Tool | What it does | When to use | Output |
 |------|--------------|-------------|--------|
-| **Trivy** (Aqua) | All-in-one scanner: image CVEs, IaC, secrets, license, SBOM. Read-only DB mode (0.68+) for concurrent CI scans. | Every PR, fail on CRITICAL | SARIF, JSON, CycloneDX, SPDX |
+| **Trivy** (Aqua) | All-in-one scanner: image CVEs, IaC, secrets, license, SBOM. For concurrent CI scans use a shared cache backend (`--cache-backend memory` or Redis); the default filesystem cache locks under parallelism. | Every PR, fail on CRITICAL | SARIF, JSON, CycloneDX, SPDX |
 | **Grype** (Anchore) | Fast CVE scanner; consumes Syft SBOM directly. Improved Java JAR and Python detection in 2026 releases. | Every PR (often paired with Trivy for corroboration) | SARIF, JSON |
 | **Snyk Container** | Enterprise scanning with contextual / reachability prioritization; developer-focused remediation guidance. | Enterprise CI; commercial license | SARIF, JSON |
 | **Anchore Engine / Enterprise** | SBOM-driven scanning + policy engine; CI/CD admission policies. | Regulated environments needing policy attestation | JSON, OPA |
 | **Docker Scout** | Native to Docker Desktop / Docker Hub; vulnerability + base-image-recommendation. | Local developer feedback; baseline in Docker-Hub-centric workflows | JSON, SARIF |
 | **Cosign + Sigstore** | Keyless image signing via OIDC; Fulcio (short-lived certs), Rekor (transparency log). | Every image at publish; verify at deploy + admission | OCI signature object |
 | **dive** | Layer-by-layer image inspector — surfaces bloat, accidental file inclusion. | Local image audit, CI gate on image-size delta | TUI / CI score |
-| **hadolint** | Dockerfile linter — ~80 rules (DL1000–DL4006, SC*). | Pre-commit + PR | JSON, SARIF, TTY |
+| **hadolint** | Dockerfile linter — 60+ Dockerfile rules (`DL1001`–`DL4006`) plus embedded ShellCheck (`SC*`) checks on the shell inside `RUN`. | Pre-commit + PR | JSON, SARIF, TTY |
 | **syft** (Anchore) | SBOM generator (SPDX, CycloneDX); BuildKit default scanner plugin. | Every build, attached as attestation | SPDX-JSON, CycloneDX-JSON |
 | **Falco** | Runtime security: eBPF-based syscall monitoring; declarative rules; SIEM-ready. | Production runtime; not a build-time scanner | JSON / SIEM forwarding |
 | **Docker Bench for Security** | Shell script that checks the host + daemon against CIS Docker Benchmark. | Host hardening audit (quarterly) | Pass/fail report |
@@ -434,7 +439,7 @@ trivy image registry.example.com/myapp:${SHA} \
     --format sarif --output trivy.sarif \
     --severity HIGH,CRITICAL --exit-code 1
 syft registry.example.com/myapp:${SHA} -o spdx-json > sbom.spdx.json
-COSIGN_EXPERIMENTAL=1 cosign sign --yes \
+cosign sign --yes \
     registry.example.com/myapp@${DIGEST}
 ```
 
@@ -531,7 +536,7 @@ image_ref: registry.example.com/myapp@sha256:<digest> # for image findings; null
 package: openssl                                      # for CVE findings; null otherwise
 installed_version: 3.0.11-1                           # null for non-CVE findings
 fixed_version: 3.0.13-1                               # null if no fix available (CVE w/ no patched version)
-cwe: CWE-798                                          # if mappable
+cwe: CWE-250                                          # if mappable (CWE-250 = execution with unnecessary privileges, i.e. root)
 cis_docker: "4.1"                                     # CIS Docker Benchmark control id, if applicable
 message: "Image runs as root — missing USER directive"
 suggested_fix: |

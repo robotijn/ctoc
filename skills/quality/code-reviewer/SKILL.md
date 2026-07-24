@@ -737,14 +737,14 @@ The integrator uses `confidence` and `triage_tier` to weight findings — a `con
 
 - **Vendor / generated code**: don't review `node_modules/`, `vendor/`, `dist/`, `target/`, `bin/`, `obj/`, generated protobuf, generated OpenAPI clients. DO review the boundary code calling them.
 - **Legacy migrations**: don't gate on style violations in code marked for migration in `## Decisions Taken Under Ambiguity`. Annotate, track via [[technical-debt-tracker]], move on.
-- **Hot-path performance**: only flag a readability cost if measured. Don't propose a clarity refactor that demonstrably regresses a benchmarked hot path; cross-ref [[performance-analyzer]].
+- **Hot-path performance**: only flag a readability cost if measured. Don't propose a clarity refactor that demonstrably regresses a benchmarked hot path; cross-ref [[performance-validator]].
 - **AI-generated code markers**: if a PR description mentions Copilot / Claude / Cursor / Cody / Augment authorship, apply extra scrutiny to imports (hallucinated packages), generic names, and verbose boilerplate. Don't reject for being AI-written; reject for failing the same standards as human code.
 
 ---
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

@@ -37,30 +37,52 @@ You review database changes for safety, performance, and correctness. Bad migrat
 
 ## Dangerous Operations
 
+Syntax and lock behavior differ per engine, so label the dialect on every
+example. The examples below are PostgreSQL; the accompanying notes give the
+MySQL / SQL Server equivalents where they diverge.
+
 ### BLOCK (Requires Review)
 ```sql
--- Data loss risk
+-- Irreversible data loss (both dialects)
 DROP TABLE users;
 ALTER TABLE orders DROP COLUMN customer_id;
 
--- Lock table (on large tables)
-ALTER TABLE users ADD COLUMN email VARCHAR(255) NOT NULL;
+-- Postgres: full-table scan under ACCESS EXCLUSIVE, blocking reads AND writes
+-- for the duration on a large table.
+ALTER TABLE users ALTER COLUMN email SET NOT NULL;
 
--- Slow on large tables
-ALTER TABLE orders ADD INDEX idx_date (order_date);
+-- Postgres: a non-concurrent index build holds a SHARE lock, blocking writes
+-- until it finishes. (MySQL writes this as ALTER TABLE orders ADD INDEX ...)
+CREATE INDEX idx_orders_date ON orders(order_date);
 ```
 
 ### SAFE Alternatives
 ```sql
--- Add nullable column first
-ALTER TABLE users ADD COLUMN email VARCHAR(255);
--- Then backfill
-UPDATE users SET email = 'unknown@example.com' WHERE email IS NULL;
--- Then add constraint
-ALTER TABLE users MODIFY email VARCHAR(255) NOT NULL;
+-- Postgres: expand -> backfill -> contract, each step non-blocking.
+SET lock_timeout = '3s';            -- fail fast instead of queueing behind a held lock
 
--- Create index concurrently (PostgreSQL)
-CREATE INDEX CONCURRENTLY idx_date ON orders(order_date);
+-- 1. Expand: add the column nullable (PG11+: a CONSTANT default is metadata-only,
+--    no table rewrite; a VOLATILE default such as now() still rewrites).
+ALTER TABLE users ADD COLUMN email VARCHAR(255);
+
+-- 2. Backfill in batches OUTSIDE this migration; a single UPDATE locks every
+--    touched row and bloats the table.
+UPDATE users SET email = 'unknown@example.com' WHERE email IS NULL;  -- illustrative; batch in production
+
+-- 3. Contract: enforce NOT NULL WITHOUT the blocking scan. Validate a CHECK
+--    first, then flip the column -- the valid CHECK lets SET NOT NULL skip its
+--    own scan (postgresql.org/docs ALTER TABLE). A plain SET NOT NULL after the
+--    backfill would still take ACCESS EXCLUSIVE and scan the whole table, so it
+--    is NOT the safe path.
+ALTER TABLE users ADD CONSTRAINT users_email_not_null CHECK (email IS NOT NULL) NOT VALID;
+ALTER TABLE users VALIDATE CONSTRAINT users_email_not_null;   -- scans without blocking writers
+ALTER TABLE users ALTER COLUMN email SET NOT NULL;            -- near-instant
+ALTER TABLE users DROP CONSTRAINT users_email_not_null;
+
+-- Build the index without locking writers.
+CREATE INDEX CONCURRENTLY idx_orders_date ON orders(order_date);
+-- MySQL has no CONCURRENTLY keyword: add a secondary index online with
+-- ALGORITHM=INPLACE, LOCK=NONE instead.
 ```
 
 ## Query Analysis

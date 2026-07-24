@@ -61,7 +61,7 @@ You are a paranoid traffic-shaping engineer. You assume every endpoint can be ab
 - **Atomic increment + TTL or it's wrong.** Naive `INCR + EXPIRE` has a race: if INCR returns 1 and the process dies before EXPIRE, the key never expires. Either use Redis 7+'s `SET ... EX` semantics or a Lua script that does both atomically. `redis-cell` exposes `CL.THROTTLE` which does the right thing in one round trip.
 - **TTL on every rate-limit key.** A user who hits the endpoint once and never returns must not occupy RAM forever. TTL = window size (sliding/fixed) or `bucket_capacity / refill_rate` (token bucket).
 - **Exemption for trusted internal traffic.** Webhook IPs from your payment provider (Stripe publishes theirs), monitoring probes, internal mTLS-authenticated services, JWT-claim-based bypass (`{"rl_bypass": true}` signed by an internal CA only). NOT a static IP allowlist editable by web devs — that becomes a backdoor.
-- **Exemption for legitimate retries.** A client doing exponential backoff after a 429 must not be re-penalised. Use idempotency keys to deduplicate retried requests so they don't double-count against the limit. Honor `X-Idempotency-Key` headers per RFC standard idempotency patterns.
+- **Exemption for legitimate retries.** A client doing exponential backoff after a 429 must not be re-penalised. Use idempotency keys to deduplicate retried requests so they don't double-count against the limit. Honor the `Idempotency-Key` header (the de-facto convention — Stripe and the IETF httpapi Internet-Draft both use it, with no `X-` prefix; it is a draft, not an RFC).
 - **Distinct error semantics.** 429 from rate limit ≠ 503 from outage ≠ 402 from quota exhaustion (paid plan limit hit). A client library cannot recover correctly if you conflate them. Reserve 429 for "back off and retry," and 402 / structured error for "you've used your monthly allotment, upgrade."
 - **Fail open on rate-limit infra failure — except for security endpoints.** If Redis is down, a public read endpoint should serve traffic (degraded) rather than reject everything. But `/login` must fail closed: a missing rate limiter on auth = unlimited brute force. Configure `fail_strategy` per endpoint.
 - **Observability is non-negotiable.** Emit a metric on every limited request: `rate_limit_hits{scope, endpoint, tenant_id}`. Alert when any single tenant or IP hits sustained limit. This is also the signal that catches integration partners about to break the API.
@@ -226,10 +226,10 @@ try {
 // BAD (Bucket4j): "60 per minute" with refillIntervally at the top of each minute
 //   At 11:59:30 a client uses all 60 tokens. At 12:00:00 the bucket refills.
 //   In a 1-second span (11:59:59 → 12:00:01) the client sends 120 requests — 2× burst.
-Bandwidth limit = Bandwidth.classic(60, Refill.intervally(60, Duration.ofMinutes(1)));
+Bandwidth limit = Bandwidth.builder().capacity(60).refillIntervally(60, Duration.ofMinutes(1)).build();
 
 // SAFE: greedy refill — tokens are added continuously, smoothing bursts
-Bandwidth limit = Bandwidth.classic(60, Refill.greedy(60, Duration.ofMinutes(1)));
+Bandwidth limit = Bandwidth.builder().capacity(60).refillGreedy(60, Duration.ofMinutes(1)).build();
 Bucket bucket = Bucket.builder().addLimit(limit).build();
 
 if (!bucket.tryConsume(1)) {
@@ -267,7 +267,7 @@ function getTrustedClientIp(req: Request): string {
 await rl.consume(userId);
 
 // SAFE: deduplicate idempotent retries by idempotency key (last 5 min)
-const idem = req.headers.get('x-idempotency-key');
+const idem = req.headers.get('idempotency-key');
 if (idem) {
   const seen = await redis.set(`idem:${userId}:${idem}`, '1', 'NX', 'EX', 300);
   if (seen === null) {
@@ -404,7 +404,7 @@ limiter = Limiter(
     key_func=key_user_or_ip,
     storage_uri="redis://redis:6379/0",
     strategy="moving-window",       # sliding-window log
-    headers_enabled=True,           # emits RateLimit-* headers
+    headers_enabled=True,           # emits legacy X-RateLimit-* headers (not the unprefixed IETF field)
 )
 
 app.state.limiter = limiter
@@ -439,7 +439,7 @@ def login_view(request):
 ```java
 // BAD: in-memory bucket on multi-instance deployment
 private final Bucket bucket = Bucket.builder()
-    .addLimit(Bandwidth.classic(60, Refill.greedy(60, Duration.ofMinutes(1))))
+    .addLimit(limit -> limit.capacity(60).refillGreedy(60, Duration.ofMinutes(1)))
     .build();
 // → 3 pods enforce 3 × 60 = 180/min
 
@@ -469,7 +469,7 @@ class RateLimitFilter extends OncePerRequestFilter {
 
             var bucket = buckets.builder().build(scope.key, () ->
                 BucketConfiguration.builder()
-                    .addLimit(Bandwidth.classic(scope.cap, Refill.greedy(scope.cap, scope.window)))
+                    .addLimit(limit -> limit.capacity(scope.cap).refillGreedy(scope.cap, scope.window))
                     .build());
 
             ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
@@ -598,7 +598,7 @@ SELECT count(*) FROM rate_events
 | **Bucket4j** + Redisson / `bucket4j-redis` | Java/Kotlin | Token bucket, distributed via Redis-CAS, Spring Boot starter, JCache integration | Spring Boot / Quarkus / Micronaut |
 | **.NET `Microsoft.AspNetCore.RateLimiting`** | C# / .NET 9 | Built-in, partitioned, four algorithms (fixed, sliding, token bucket, concurrency), in-process only | ASP.NET Core 7+; single-instance or sticky-session deployments |
 | **AspNetCoreRateLimit** + Redis | C# / .NET | Distributed across pods (the .NET built-in is in-process) | Multi-instance ASP.NET Core |
-| **slowapi** | Python | FastAPI / Starlette, Redis-backed, sliding-window-log, IETF headers built in | Python web APIs |
+| **slowapi** | Python | FastAPI / Starlette, Redis-backed, moving-window (sliding-log), legacy `X-RateLimit-*` headers via `headers_enabled` | Python web APIs |
 | **django-ratelimit** | Python / Django | Per-view decorator, Redis or memcache backend, group-key support | Django apps |
 | **Redis + redis-cell** | Any (Redis module) | `CL.THROTTLE` — GCRA (generic cell rate algorithm), atomic, one round trip | Any backend that can speak Redis |
 | **NGINX `limit_req`** | Edge / reverse proxy | Leaky bucket at the edge, kernel-fast, zero app cost | First line of defence, anti-DoS |
@@ -619,7 +619,7 @@ Internal triage tiers for this skill's human-readable scan reports:
 | MEDIUM | Wrong status code (503 instead of 429); missing IETF/legacy headers on 429; fixed window where sliding would smooth boundary bursts; no idempotency dedup on retries | Fix soon |
 | LOW | No observability metric on limit hits; TTL not set on rate-limit keys (memory leak risk); no cost-based limiting on AI endpoints | Backlog |
 
-**On the wire, every finding emitted to CTO Chief via the refinement loop is `severity: critical`** per the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md). The triage tiers above survive in the report body for prioritisation; the letter's `severity` field is always `critical`.
+**On the wire, every finding emitted to CTO Chief via the refinement loop is `severity: critical`** per the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md). The triage tiers above survive in the report body for prioritisation; the letter's `severity` field is always `critical`.
 
 ## Letter schema (refinement-loop output contract)
 
@@ -679,7 +679,7 @@ The integrator weights `confidence` × `reachable` to decide blocking: a `confid
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every missing rate limit on a security-sensitive endpoint, every per-IP-only limit on a multi-tenant API, every in-memory limiter on a multi-instance deployment, and every 503-where-429-was-needed emits as `severity: critical` in the letter to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

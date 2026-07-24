@@ -239,40 +239,40 @@ When the user starts a new idea exploration, create the vision file by calling `
 
 ## Phase 1: Problem Discovery
 ### Problem Statement
-(not yet answered)
+⏳ (not yet answered)
 
 ### Target User
-(not yet answered)
+⏳ (not yet answered)
 
 ### Problem Severity
-(not yet answered)
+⏳ (not yet answered)
 
 ## Phase 2: Value Proposition
 ### Success Criteria
-(not yet answered)
+⏳ (not yet answered)
 
 ### Impact Scale
-(not yet answered)
+⏳ (not yet answered)
 
 ## Phase 3: Scope Definition
 ### Minimum Viable Scope
-(not yet answered)
+⏳ (not yet answered)
 
 ### Explicit Exclusions
-(not yet answered)
+⏳ (not yet answered)
 
 ### Dependencies
-(not yet answered)
+⏳ (not yet answered)
 
 ## Phase 4: Risk Assessment
 ### Failure Modes
-(not yet answered)
+⏳ (not yet answered)
 
 ### Unknowns
-(not yet answered)
+⏳ (not yet answered)
 
 ### Assumptions
-(not yet answered)
+⏳ (not yet answered)
 
 ## Phase 5: Summary
 (Generated after all phases complete)
@@ -452,7 +452,7 @@ When the vision contains 2 or more independent workstreams, hand off to the Visi
 **Handoff steps:**
 1. Tell the user: "This vision has multiple independent workstreams. I will hand off to the Vision Decomposer to break it into separate plans."
 2. Update vision status to `ready` (not `converted` -- the decomposer handles that)
-3. The decomposer will call `validateVisionReadiness(visionPath)` from `lib/vision-decomposer.js` to verify the vision is complete
+3. The decomposer will call `validateVisionReadiness(visionPath)` from `src/lib/vision-decomposer.js` to verify the vision is complete
 4. The decomposer creates stubs via `createStub()` and presents them to the user (human checkpoint at Gate 0)
 
 **Do NOT decompose if:** The vision maps to a single functional plan. Convert directly using the single-plan protocol above.
@@ -594,7 +594,6 @@ These techniques are embedded in the Question Formulation Rules above. This sect
 - **Blue Ocean Strategy** -- W. Chan Kim & Renee Mauborgne (blueoceanstrategy.com). ERRC framework. Used in: competitive differentiation questions.
 - **RICE Scoring** -- Intercom. Prioritization framework. Used in: vision summary scoring, multiple-approach comparison.
 - **Opportunity Solution Trees** -- Teresa Torres / ProductTalk. Visual discovery mapping. Used in: gap analysis structure, opportunity prioritization.
-- **LLM Agent Patterns** -- Agentic LLM research (2025-2026). Chain-of-thought reasoning, tool integration, ambiguity resolution. Used in: decision tree structure, assumption-handling protocol.
 
 
 ---

@@ -54,9 +54,9 @@ A mature program runs four layers, in this order — earliest to latest:
 
 | Layer | Goal | Tool of choice | Typical latency |
 |---|---|---|---|
-| **Pre-commit hook** | Block the secret before it leaves the developer's machine | Gitleaks (`gitleaks protect --staged`) or `detect-secrets-hook` | ms–s |
-| **PR / CI diff scan** | Catch what slipped past the hook; diff-only for speed | Gitleaks or TruffleHog `--since-commit` / `--baseline-file` | seconds |
-| **Full git-history scan (scheduled)** | Catch what was committed years ago and never rotated | TruffleHog `git file://. --only-verified` | minutes (per repo) |
+| **Pre-commit hook** | Block the secret before it leaves the developer's machine | Gitleaks (`gitleaks git --pre-commit --staged`) or `detect-secrets-hook` | ms–s |
+| **PR / CI diff scan** | Catch what slipped past the hook; diff-only for speed | Gitleaks or TruffleHog `--since-commit` / `--branch` | seconds |
+| **Full git-history scan (scheduled)** | Catch what was committed years ago and never rotated | TruffleHog `git file://. --results=verified` | minutes (per repo) |
 | **Platform push protection** | Last-line block at the remote; also catches force-pushes | GitHub Secret Scanning + Push Protection (free on public repos; GHAS on private), GitLab Secret Push Protection | server-side |
 
 **Baseline strategy.** First run on an existing repo will surface a wall of historical findings. Use `detect-secrets scan > .secrets.baseline` to capture the accepted state, then `detect-secrets scan --baseline .secrets.baseline` on every future run. New findings = real findings. Audit the baseline regularly — it is allowlist territory and rots silently.
@@ -109,7 +109,7 @@ public class StripeService {
 // BAD (Java 21): hardcoded AWS key pair in a constant
 public final class S3Client {
     private static final String AWS_KEY = "AKIA<PLACEHOLDER-DOCS-EXAMPLE>";
-    private static final String AWS_SECRET = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+    private static final String AWS_SECRET = "<PLACEHOLDER-40CHAR-SECRET-NOT-A-REAL-KEY>";
 }
 
 // SAFE: use the default credential provider chain (env, profile, IMDS, IRSA, etc.)
@@ -239,7 +239,7 @@ CREATE USER MAPPING FOR app_user SERVER remote_db OPTIONS (user 'admin', passwor
 | Bitbucket app password | `ATBB[A-Za-z0-9]{32}` |
 | Azure DevOps PAT | high-entropy 52-char base32 |
 
-**Verification.** `curl -sS -H "Authorization: token $TOKEN" https://api.github.com/user | jq '.login,.scopes'` — also surfaces the granted scope, which sets the blast radius.
+**Verification.** `curl -sS -I -H "Authorization: Bearer $TOKEN" https://api.github.com/user | grep -i x-oauth-scopes` — the `X-OAuth-Scopes` response header lists the token's granted scopes, which set the blast radius. Drop `-I` and pipe the JSON body to `jq '.login'` to confirm the owning account.
 
 **Fine-grained PATs vs. classic.** Fine-grained PATs are repo/org-scoped and expire by default — still a finding when committed, but lower blast radius. Classic PATs default to broad scopes; treat any leaked classic PAT with `repo` or `admin:org` scope as CRITICAL.
 
@@ -332,8 +332,8 @@ Developers commit a secret, notice, delete in the next commit, and assume it's g
 
 ```bash
 # Find every blob in history matching a pattern
-trufflehog git file://. --json --only-verified --include-detectors=all
-gitleaks detect --source . --redact --report-format sarif --report-path gitleaks.sarif
+trufflehog git file://. --json --results=verified --include-detectors=all
+gitleaks git --redact --report-format sarif --report-path gitleaks.sarif .
 git log -p -S "AKIA" --all                 # exact string search across history
 git log -p -G "sk_(live|test)_[A-Za-z0-9]" --all   # regex across patches
 ```
@@ -375,24 +375,24 @@ git push --force --tags
 
 ```bash
 # TruffleHog — filesystem + git, only verified live findings
-trufflehog filesystem . --json --only-verified
-trufflehog git file://. --json --only-verified
+trufflehog filesystem . --json --results=verified
+trufflehog git file://. --json --results=verified
 
 # TruffleHog — Docker image (catches secrets baked into layers)
-trufflehog docker --image myorg/api:latest --json --only-verified
+trufflehog docker --image myorg/api:latest --json --results=verified
 
 # TruffleHog — entire GitHub org (paid plan or PAT with org-read)
-trufflehog github --org=your-org --json --only-verified --include-issue-comments
+trufflehog github --org=your-org --json --results=verified --issue-comments
 
-# Gitleaks — current tree (skips history); fast pre-PR check
-gitleaks detect --source . --no-git --report-format sarif --report-path gitleaks.sarif
+# Gitleaks — directory scan, no git history (skips history); fast pre-PR check
+gitleaks dir --report-format sarif --report-path gitleaks.sarif .
 
 # Gitleaks — full git history with custom config and baseline
-gitleaks detect --source . --config .gitleaks.toml --baseline-path .gitleaks-baseline.json \
-                --report-format sarif --report-path gitleaks.sarif
+gitleaks git --config .gitleaks.toml --baseline-path .gitleaks-baseline.json \
+             --report-format sarif --report-path gitleaks.sarif .
 
-# Gitleaks — pre-commit (in .git/hooks/pre-commit or via pre-commit framework)
-gitleaks protect --staged --redact
+# Gitleaks — pre-commit (via the pre-commit framework; this is the hook's own command)
+gitleaks git --pre-commit --staged --redact
 
 # detect-secrets — baseline workflow
 detect-secrets scan > .secrets.baseline
@@ -420,8 +420,8 @@ All scanners that matter in 2026 emit **SARIF**. Make SARIF the default output a
 # AWS — minimal IAM call, no side effects
 AWS_ACCESS_KEY_ID=AKIA... AWS_SECRET_ACCESS_KEY=... aws sts get-caller-identity
 
-# GitHub PAT — returns user + scopes
-curl -sS -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" \
+# GitHub PAT — returns the owning user (add -I to read granted scopes from the X-OAuth-Scopes header)
+curl -sS -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" \
      https://api.github.com/user
 
 # Stripe — list charges page with secret key (read-only)
@@ -511,7 +511,7 @@ Document every rotation in an incident ticket with: detection time, exposure win
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |---|---|---|
@@ -599,7 +599,7 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          extra_args: --only-verified --fail
+          extra_args: --results=verified --fail
 
       - name: Gitleaks
         uses: gitleaks/gitleaks-action@v2
@@ -668,7 +668,7 @@ The integrator uses `confidence` and `verified` to weight findings:
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

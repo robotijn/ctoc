@@ -56,6 +56,8 @@ You also enforce the privacy boundary: events leave the user's browser or your s
 
 ```bash
 npm install posthog-js posthog-node
+# React app? also install the dedicated React package (imports below use it):
+npm install @posthog/react
 # Python (server)
 pip install posthog
 # Other SDKs: Go (posthog-go), Ruby (posthog-ruby), PHP (posthog-php), iOS, Android,
@@ -78,7 +80,7 @@ POSTHOG_PROJECT_API_KEY=phc_PROJECT_API_KEY_PLACEHOLDER   # server-side uses the
 // app/providers.tsx
 'use client';
 import posthog from 'posthog-js';
-import { PostHogProvider } from 'posthog-js/react';
+import { PostHogProvider } from '@posthog/react';
 
 if (typeof window !== 'undefined') {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
@@ -203,7 +205,7 @@ await ph.shutdown();
 
 ```typescript
 // Client-side — read once per session, store the variant.
-import { useFeatureFlagVariantKey } from 'posthog-js/react';
+import { useFeatureFlagVariantKey } from '@posthog/react';
 
 function CheckoutFlow() {
   const variant = useFeatureFlagVariantKey('checkout_redesign_2026_q2'); // 'control' | 'variant_a' | 'variant_b'
@@ -700,7 +702,7 @@ Init the client with `api_host: '/ph'`. Ad-blockers see only a same-origin reque
 
 ## Refinement Loop — critic mode (v6.9.15-aligned)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every analytics defect — missing identify, missing group, PII leakage, unredacted recording, wrong-key-class, taxonomy drift, per-render capture — emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

@@ -41,7 +41,7 @@ You are a skeptical reviewer of AI-generated code. You assume every import, ever
 
 The hallucination landscape has shifted from "LLM gets the wrong name" to "attackers register the wrong name as malware." Detection must be paired with verification against an authoritative source for every imported artifact.
 
-- **Slopsquatting is the dominant supply-chain vector** for AI-generated code. The Lasso Security / USENIX Security 2025 study analyzed >576,000 code samples across 16 LLMs and measured the **5–22% range** of recommended package imports that do not exist on the official registry (lower bound for closed-frontier models, upper for open-source ~13B class). Attackers register the most-hallucinated names on npm and PyPI within hours. Treat every AI-suggested package import as untrusted until the registry confirms it existed BEFORE the LLM's training cutoff.
+- **Slopsquatting is the dominant supply-chain vector** for AI-generated code. The USENIX Security 2025 study by Spracklen et al. (*We Have a Package for You! A Comprehensive Analysis of Package Hallucinations by Code Generating LLMs*) analyzed 576,000 code samples across 16 LLMs and measured **roughly 5–22%** of recommended package imports as non-existent on the official registry (about 5% for commercial frontier models, about 22% for open-source models). Attackers register the most-hallucinated names on npm and PyPI within hours. Treat every AI-suggested package import as untrusted until the registry confirms it existed BEFORE the LLM's training cutoff.
 - **Verify-every-import** is the new baseline. Before any AI-generated code merges:
   - npm: `npm view <pkg>` returns a non-empty JSON object **and** the package was first published before the model's training cutoff.
   - PyPI: `pip index versions <pkg>` succeeds **and** the package has provenance via PyPI Trusted Publishers (PEP 740 attestations) when available.
@@ -54,7 +54,7 @@ The hallucination landscape has shifted from "LLM gets the wrong name" to "attac
 - **Verify API methods exist in the documented version**, not just "in the library." A function that was renamed, removed, or never existed is a hallucination. Check the package's `package.json` exports / `.pyi` stubs / `module-info.java` / Cargo docs.rs / Go pkg.go.dev against the called method.
 - **Detect inconsistent claims** within the same artifact. When function name says X, docstring says Y, and observable behavior is Z, the LLM has drifted. Concretely: signature says `def foo(x: int)` but docstring says "accepts a string" → hallucinated docstring OR hallucinated signature. Flag the disagreement; do not let the integrator pick one silently.
 - **Prefer retrieval-augmented over pure generative for fact-heavy answers.** When an AI must cite a CVE, a benchmark, a price, a version number, an API spec, or a quote: the answer should come through retrieval against an indexed authoritative source (docs, CVE database, vendor pricing page, paper PDF), with the citation verifiable. Span-level verification (REFIND, SemEval 2025) and metamorphic testing of RAG (MetaRAG, 2025) are the current state-of-the-art for catching fabricated citations even inside RAG pipelines.
-- **AI code carries elevated error rate** — Veracode 2024 measured ~40% of AI-generated code contains at least one security flaw; combined with the 5–22% phantom-package rate, AI code must clear the same review bar as handwritten code. No fast-track to merge.
+- **AI code carries elevated error rate** — Veracode's 2025 GenAI Code Security Report measured that AI-generated code introduced at least one security flaw in ~45% of tests (100+ models across Java, Python, C#, and JavaScript); combined with the 5–22% phantom-package rate, AI code must clear the same review bar as handwritten code. No fast-track to merge.
 - **Multi-technique detection**: pattern matching + AST analysis + registry verification + signature verification. Any single technique leaves a leak. Single-technique findings get `confidence: low`; corroboration by a second technique escalates to `confidence: high`.
 - **Deterministic AST analysis** gives 100% precision on semantic errors when structurally grounded — e.g. "this method does not exist on this class" can be verified deterministically from the library's type stubs / declaration files.
 
@@ -89,7 +89,7 @@ import { hashSync } from 'bcrypt';                   // works in Node, NOT in br
 
 // HALLUCINATION — wrong import path inside a real package
 import { Switch } from 'react-router-dom';           // removed in v6; use Routes
-import { z } from 'zod/v4';                          // 'zod/v4' is not an export path
+import { z } from 'zod/schemas';                     // no such subpath — Zod's real subpaths are 'zod/v4', 'zod/v4-mini', 'zod/v3'
 
 // VERIFICATION
 //   npm view react-smart-cache version
@@ -134,8 +134,8 @@ using EntityFrameworkCore.AsyncQueries;          // No such namespace; async is 
 var result = db.Users.FromSqlRaw(query, args, validate: true);  // FromSqlRaw has no 'validate' parameter
 
 // VERIFICATION
-//   dotnet add package NewtonsoftEx.AdvancedJson --dry-run    (NU1101 if missing)
-//   nuget search NewtonsoftEx.AdvancedJson
+//   dotnet package search NewtonsoftEx.AdvancedJson          (empty result = not on NuGet)
+//   dotnet add package NewtonsoftEx.AdvancedJson             (NU1101 if the id doesn't resolve)
 //   Inspect dotnet reflection on the .dll for the method signature
 //   Also verify NuGet package signature: dotnet nuget verify <pkg>.nupkg
 ```
@@ -184,14 +184,14 @@ use tokio_advanced::runtime::SmartRuntime;       // crates.io: not found
 use serde_json_ext::Value;                       // not found
 
 // HALLUCINATION — wrong path inside a real crate
-use reqwest::async_client::AsyncClient;          // it's reqwest::Client (sync feature gates the blocking one)
+use reqwest::async_client::AsyncClient;          // it's reqwest::Client; the blocking client is reqwest::blocking::Client behind the "blocking" feature
 
 // HALLUCINATION — wrong feature flag
 // Cargo.toml: tokio = { version = "1", features = ["full-async"] }   ← 'full-async' is not a real feature
 
 // VERIFICATION
 //   cargo search tokio_advanced                          (empty result = hallucinated)
-//   cargo info reqwest                                    (lists exports for the resolved version)
+//   cargo info reqwest                                    (metadata + features; use docs.rs/<crate> for the exported API)
 //   Crates have been-yanked check via crates.io API:
 //     curl https://crates.io/api/v1/crates/<name>/<version> | jq .version.yanked
 ```
@@ -224,10 +224,10 @@ C/C++ have no centralized package registry equivalent to npm/PyPI/Maven/NuGet/cr
 ### 1. Package existence + signature
 ```bash
 # npm — exists + provenance attestation
-npm view <pkg> --json 2>/dev/null | jq '{name, version, _attestations}'
-# PyPI — exists + Trusted Publisher attestation (PEP 740)
+npm view <pkg> --json 2>/dev/null | jq '{name, version, attestations: .dist.attestations}'
+# PyPI — exists + Trusted Publisher attestation (PEP 740, served by the Integrity API)
 pip index versions <pkg> 2>/dev/null && \
-  curl -s "https://pypi.org/pypi/<pkg>/json" | jq '.info.attestations'
+  curl -s "https://pypi.org/integrity/<pkg>/<version>/<filename>/provenance"
 # Maven Central — exists + GPG signature
 curl -fI "https://repo1.maven.org/maven2/<g>/<a>/<v>/<a>-<v>.jar.asc"
 # NuGet — exists + author/repo signature
@@ -269,7 +269,7 @@ The detection stack has matured around four layers — registry-check, malicious
 |---|---|---|
 | Existence + audit | `npm audit`, `pip audit`, `cargo audit`, `go list -m`, `nuget audit`, `mvn dependency:resolve` | Does it resolve? Any known CVEs? |
 | Malicious-package detection | **Socket.dev**, **Snyk Open Source**, **Aikido Intel**, **GitHub Advisory Database** | Behavioral analysis catches install-script malware, typosquatting and slopsquatting names; Socket also scores post-install scripts and network calls |
-| Slopsquatting-specific | **Lasso slopsquatting detector**, **`slopcheck` CLI**, **DepScope Hallucinations Dataset** (cuttalo/depscope-hallucinations-dataset — 161+ entries across 19 ecosystems, updated daily as of May 2026) | Cross-check imports against a known-hallucinated corpus before install |
+| Slopsquatting-specific | Community **slopcheck** tools (e.g. the npm and Python CLIs of that name) and public known-hallucination corpora (e.g. the DepScope hallucinations dataset) | Cross-check imports against a corpus of names already observed as LLM hallucinations before install |
 | Signature / provenance | **Sigstore** (`cosign verify`, Rekor lookup), **npm provenance**, **PyPI Trusted Publishers (PEP 740)**, **Maven GPG**, **NuGet signing**, **Go sumdb** | Verify the artifact's chain back to the source repo |
 | OSS health | **OpenSSF Scorecard**, **deps.dev**, **Dependency-Track** | Maintenance signal — abandoned packages are slopsquatting bait |
 
@@ -283,14 +283,15 @@ cargo audit
 go list -m -u all && govulncheck ./...
 
 # 2. Slopsquatting / known-hallucination corpus
-slopcheck --manifest package.json
-slopcheck --manifest requirements.txt
+#    (slopcheck-family tools scan the repo's manifests/config for hallucinated names;
+#     check the specific tool's --help for its exact invocation and flags)
+slopcheck .
 
 # 3. Malicious-package detection (Socket as example)
-socket ci scan --pr
+socket ci                       # alias for 'socket scan create --report'; non-zero exit on unhealthy alerts
 
 # 4. Signature / provenance
-npm view <pkg> --json | jq '._attestations'   # must be non-empty for critical deps
+npm view <pkg> --json | jq '.dist.attestations'   # must be non-empty for critical deps
 cosign verify-attestation --type slsaprovenance <artifact>
 
 # 5. Health
@@ -323,7 +324,7 @@ Any layer reporting **hallucinated, unsigned, or unscored** for a critical depen
 |---|---|
 | `fs.readFileSync(path, { throwOnError: true })` | not a real option |
 | `tokio` feature `full-async` | actual feature is `full` |
-| Postgres `USING hash_advanced` | only `btree, hash, gist, gin, spgist, brin, hash` etc. — no `hash_advanced` |
+| Postgres `USING hash_advanced` | built-in access methods are `btree, hash, gist, spgist, gin, brin` — no `hash_advanced` |
 
 ## Output Format
 
@@ -374,7 +375,7 @@ Any layer reporting **hallucinated, unsigned, or unscored** for a critical depen
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |---|---|---|
@@ -426,7 +427,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings. A `co
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

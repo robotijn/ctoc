@@ -48,7 +48,7 @@ Six patterns dominate this skill. None of them is line-only.
 
 - **Track branch coverage, not just line.** Line coverage gives false confidence — code with an `if` and no `else` reports 100% line coverage when only the true path was tested. Industry best practice: branches are the load-bearing metric for any conditional logic; line coverage is a coarse smoke test (Atlassian, Codecov, Coco/Qt 2026 guidance).
 - **Diff-coverage on PRs (a.k.a. "patch coverage") is more useful than whole-repo coverage.** Gate new code at 80%+ on changed lines; let legacy churn upward via the boy-scout rule rather than blocking every PR on untested legacy. Codecov's `patch` check and Coveralls' diff comparison are the canonical implementations. `diff-cover` (Python) drives the same gate for tools without native support.
-- **Mutation testing is the quality signal for "did the test actually assert anything?"** Coverage tells you the line ran. Mutation score tells you the assertion would have caught a planted bug. Pair gates with `testing/runners/mutation-test-runner` for any AI-generated suite — Veracode 2024 measured ~40% of AI-generated code contains at least one flaw, and assertion-free tests are the most common failure mode. Target 80%+ mutation score on critical paths; aim higher on payment/auth modules. Stryker (JS/TS, .NET, more), PIT (Java/Kotlin), mutmut/Cosmic Ray (Python) are the mature engines.
+- **Mutation testing is the quality signal for "did the test actually assert anything?"** Coverage tells you the line ran. Mutation score tells you the assertion would have caught a planted bug. Pair gates with `testing/runners/mutation-test-runner` for any AI-generated suite — Veracode's 2025 GenAI Code Security Report measured 45% of AI-generated code samples failing security tests (introducing an OWASP Top 10 vulnerability), and assertion-free tests are the most common failure mode. Target 80%+ mutation score on critical paths; aim higher on payment/auth modules. Stryker (JS/TS, .NET, more), PIT (Java/Kotlin), mutmut/Cosmic Ray (Python) are the mature engines.
 - **Exclude generated code, never count it.** Protobuf, GraphQL codegen, OpenAPI clients, EF migrations, Angular/React generator output, parser tables — none of these should appear in the denominator. Configure exclusions in the coverage tool itself (`.coveragerc`, `jest.config.js` `coveragePathIgnorePatterns`, `coverlet.runsettings`, `jacoco` `excludes`). Audit the exclude list every release — it is the most-abused escape hatch.
 - **Don't gate on 100% overall — gate critical paths at 95%+ with mutation testing.** Chasing 100% globally creates assertion-free tests written purely to satisfy the counter (test smell: "no-op coverage"). Critical paths (payments, auth, RLS, billing) at 95%+ branch coverage **with** a measured mutation score > 80% is a stronger signal than 100% line coverage everywhere.
 - **Coverage on PR comments, not on a dashboard nobody opens.** Codecov and Coveralls post the delta directly on the PR. The right place to see "this PR drops coverage by 3%" is alongside the diff, not in a weekly report.
@@ -308,7 +308,7 @@ reportgenerator -reports:"**/coverage.cobertura.xml" -targetdir:coverage-report 
 grep -E '^Line coverage:' coverage-report/Summary.txt   # parse + compare
 ```
 
-`coverlet.collector` (the data collector) is the .NET 9 default — the older `coverlet.msbuild` path still works but the collector integrates with `dotnet test` reporters and `dotnet-coverage` merging. Pair with **Stryker.NET** for mutation: `dotnet tool install -g dotnet-stryker && dotnet stryker --threshold-high 85 --threshold-low 75 --threshold-break 70`.
+`coverlet.collector` (the data collector) is the .NET 9 default — the older `coverlet.msbuild` path still works but the collector integrates with `dotnet test` reporters and `dotnet-coverage` merging. Pair with **Stryker.NET** for mutation: `dotnet tool install -g dotnet-stryker && dotnet stryker --break-at 70` (fail the pipeline when the mutation score drops below the `break-at` floor; `threshold-high`/`threshold-low` set the report bands in `stryker-config.json`).
 
 ### Java 21+ — JaCoCo + Maven/Gradle
 
@@ -322,7 +322,7 @@ mvn clean verify        # jacoco-maven-plugin binds to verify phase via the rule
 ./gradlew test jacocoTestCoverageVerification
 ```
 
-Pair with **PIT** for mutation: `mvn org.pitest:pitest-maven:mutationCoverage -DmutationThreshold=80 -DcoverageThreshold=80`. Java 21+ adds `--enable-preview` flags that JaCoCo handles via `excludeBootstrapClassloaderOnly=true`.
+Pair with **PIT** for mutation: `mvn org.pitest:pitest-maven:mutationCoverage -DmutationThreshold=80 -DcoverageThreshold=80`.
 
 ### Python 3.12+ — coverage.py + pytest-cov
 
@@ -335,7 +335,7 @@ pytest --cov=src --cov-branch --cov-report=term-missing --cov-report=xml --cov-f
 diff-cover coverage.xml --compare-branch=origin/main --fail-under=80
 ```
 
-`.coveragerc` or `pyproject.toml` `[tool.coverage.run] branch = true` is mandatory — without it, coverage.py reports line-only and the `if/else` blindness above applies. Pair with **mutmut** or **Cosmic Ray** for mutation: `mutmut run --paths-to-mutate=src/ --tests-dir=tests/`.
+`.coveragerc` or `pyproject.toml` `[tool.coverage.run] branch = true` is mandatory — without it, coverage.py reports line-only and the `if/else` blindness above applies. Pair with **mutmut** or **Cosmic Ray** for mutation: `mutmut run` (mutmut 3.x reads `source_paths` and the test selection from `[tool.mutmut]` in `pyproject.toml`; the old `--paths-to-mutate` / `--tests-dir` CLI flags were removed).
 
 ### C (C17/C23) — gcov + lcov
 
@@ -376,11 +376,11 @@ Pair with **mull** (LLVM-based mutation testing for C/C++) for mutation score. C
 
 ```bash
 # SAFE: Vitest with v8 provider (fast, native), branch coverage on
-vitest run --coverage --coverage.provider=v8 --coverage.reporter=lcov --coverage.reporter=text --coverage.branches=75 --coverage.lines=80
+vitest run --coverage --coverage.provider=v8 --coverage.reporter=lcov --coverage.reporter=text --coverage.thresholds.branches=75 --coverage.thresholds.lines=80
 # When source maps are mangled (Vue SFCs, Svelte, complex TSX), prefer istanbul:
 vitest run --coverage --coverage.provider=istanbul
 # Legacy Jest/CRA path: nyc wrapper
-nyc --reporter=lcov --reporter=text --branches=75 --lines=80 --functions=85 npm test
+nyc --check-coverage --reporter=lcov --reporter=text --branches=75 --lines=80 --functions=85 npm test
 ```
 
 `provider=v8` is fast and built-in but reports based on V8's coverage data — branch detection is coarser than Istanbul on highly transpiled code. For Vue/Svelte/JSX-heavy projects, `istanbul` is more accurate at the cost of build-time overhead. Pair with **Stryker** for mutation.
@@ -436,18 +436,18 @@ ignore:
 
 ```bash
 # diff-cover: local CI gate without a host
-diff-cover coverage.xml --compare-branch=origin/main --fail-under=80 --html-report diff.html
+diff-cover coverage.xml --compare-branch=origin/main --fail-under=80 --format html:diff.html
 ```
 
 ### Mutation engines (quality signal)
 
 | Language | Engine | Threshold gate |
 |----------|--------|----------------|
-| JavaScript / TypeScript | **Stryker** | `npx stryker run --thresholds.high=85 --thresholds.low=75 --thresholds.break=70` |
-| .NET (C# / F# / VB) | **Stryker.NET** | `dotnet stryker --threshold-high 85 --threshold-low 75 --threshold-break 70` |
+| JavaScript / TypeScript | **Stryker** | `npx stryker run` — set `"thresholds": { "high": 85, "low": 75, "break": 70 }` in `stryker.conf.json` (below `break` exits 1; `thresholds` has no CLI form) |
+| .NET (C# / F# / VB) | **Stryker.NET** | `dotnet stryker --break-at 70` |
 | Java / Kotlin | **PIT** | `mvn pitest:mutationCoverage -DmutationThreshold=80` |
-| Python | **mutmut** / Cosmic Ray | `mutmut run --paths-to-mutate=src/`; threshold via report parsing |
-| C / C++ | **mull** | `mull-runner-13 --report-dir=mull-report ./app_test` |
+| Python | **mutmut** / Cosmic Ray | `mutmut run` (paths in `[tool.mutmut]`); threshold via report parsing |
+| C / C++ | **mull** | `mull-runner --report-dir=mull-report ./app_test` |
 
 ### Coverage tool matrix per language
 
@@ -458,7 +458,7 @@ diff-cover coverage.xml --compare-branch=origin/main --fail-under=80 --html-repo
 | Python 3.12+ | coverage.py + pytest-cov | `branch = true` | `diff-cover coverage.xml` | mutmut / Cosmic Ray |
 | C (C17/C23) | gcov + lcov | `--rc lcov_branch_coverage=1` | lcov + diff-cover | mull |
 | C++ (20/23) | gcov + llvm-cov (+ OpenCppCoverage on Windows) | llvm-cov branch native | llvm-cov export lcov + diff-cover | mull |
-| TypeScript | Vitest v8 + Istanbul + nyc | `--coverage.branches=75` | Codecov patch / diff-cover | Stryker |
+| TypeScript | Vitest v8 + Istanbul + nyc | `--coverage.thresholds.branches=75` | Codecov patch / diff-cover | Stryker |
 | SQL | pgTAP (Postgres) | function-level via `pg_proc` ∪ `pg_stat_user_functions` | manual diff check | (none mature — use plpgsql_check static) |
 
 ## Priority Matrix for Untested Lines
@@ -570,7 +570,7 @@ fi
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable enforcement report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. Every one of the seven categories above (line-only-threshold, no-diff-coverage, excluded-files-growing, coverage-on-test-code, mutation-never-measured, missing-data-driven, threshold-as-target-gaming) emits at `critical`, regardless of how the triage tier below would describe it. The triage tiers below stay in the report body for human prioritization, but the letter's `severity` field is always `critical` and the `kind` field carries the category.
+These tiers are the **internal triage view** used when you produce a human-readable enforcement report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. Every one of the seven categories above (line-only-threshold, no-diff-coverage, excluded-files-growing, coverage-on-test-code, mutation-never-measured, missing-data-driven, threshold-as-target-gaming) emits at `critical`, regardless of how the triage tier below would describe it. The triage tiers below stay in the report body for human prioritization, but the letter's `severity` field is always `critical` and the `kind` field carries the category.
 
 | Triage tier | Examples | Internal action recommendation |
 |-------------|----------|--------------------------------|
@@ -614,13 +614,13 @@ The integrator uses `confidence`, `kind`, and `critical_path` to prioritize — 
 7. Never trust coverage without assertions — pair critical-path gates with **mutation testing**.
 8. Never block on test utilities, fixtures, or the test code itself.
 9. Never set a global 100% target — it produces shallow assertion-free tests.
-10. Never count flaky tests toward coverage; coordinate with [[testing/runners/flaky-test-tracker]] to quarantine them first.
+10. Never count flaky tests toward coverage; quarantine them first, then measure.
 
 ---
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every below-threshold finding, every uncovered critical path, every excluded-files-list growth, every mutation-low signal, and every coverage regression emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

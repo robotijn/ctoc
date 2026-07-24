@@ -59,9 +59,9 @@ You are a paranoid compliance auditor. Your job is to assume that on **11 Septem
   7. **Timestamp** — when the SBOM was generated
   Plus three **practice** requirements: data format must be machine-readable (SPDX, CycloneDX, or SWID are the named conforming formats); SBOMs must be regenerated when components change; depth must cover at least one level of transitive dependencies. **An SBOM missing any of these seven fields is non-conforming.**
 
-- **Format choice: SPDX 2.3+ or CycloneDX 1.6+** — both are explicitly recognized; CRA Art. 13(25) text requires a *commonly used and machine-readable* format. ([Sbomify comparison](https://sbomify.com/2026/01/15/sbom-formats-cyclonedx-vs-spdx/), [FOSSA](https://fossa.com/blog/sbom-formats-compared-explained/).)
+- **Format choice: SPDX 2.3+ or CycloneDX 1.6+** — CRA Annex I, Part II, point (1) requires the SBOM to be in a *commonly used and machine-readable* format covering at least the top-level dependencies. The CRA text does not name a format; SPDX and CycloneDX are the two commonly-used machine-readable formats that satisfy it (SWID is the third NTIA-named format). ([Sbomify comparison](https://sbomify.com/2026/01/15/sbom-formats-cyclonedx-vs-spdx/), [FOSSA](https://fossa.com/blog/sbom-formats-compared-explained/).)
   - **CycloneDX 1.6** (2024, ECMA-424) — component-centric, originated in OWASP, strongest vulnerability/VEX integration, native CBOM (cryptography BoM) and ML-BoM extensions. Default choice for security/CRA-driven programs.
-  - **SPDX 2.3** (ISO/IEC 5962:2021) — package-and-relationship model, strongest license metadata, broad tool support. Default for license-compliance-driven programs. SPDX 3.0 (2024) splits into profiles; many tools still pin SPDX 2.3 — verify your toolchain before adopting 3.0.
+  - **SPDX 2.3** (Linux Foundation, 2022) — package-and-relationship model, strongest license metadata, broad tool support. Default for license-compliance-driven programs. Note the ISO-standardized SPDX version is the earlier **2.2.1**, published as ISO/IEC 5962:2021 — 2.3 itself is a Linux Foundation spec, not (yet) an ISO standard. SPDX 3.0 (2024) splits into profiles; many tools still pin SPDX 2.3 — verify your toolchain before adopting 3.0.
   - If unsure, emit **CycloneDX 1.6** as the primary format and an SPDX 2.3 export alongside — most generators support both.
 
 - **Signing is non-optional**: unsigned SBOMs are repudiable. Sign with **Sigstore cosign** (keyless OIDC) or x.509 over the SBOM artifact. CRA's "verifiable" requirement is interpreted by most legal commentary to require a tamper-evident chain from build → SBOM → distribution. ([OpenSSF on CRA / SBOM signing](https://openssf.org/public-policy/eu-cyber-resilience-act/).)
@@ -374,7 +374,7 @@ dotnet tool install --global CycloneDX
 dotnet CycloneDX ./src/AcmeApp.csproj -o ./out --json --include-project-references --set-version 2.4.1
 ```
 
-Pitfalls: `dotnet CycloneDX` defaults can omit project-reference traversal — use `--include-project-references` for multi-project solutions. `Microsoft.Sbom.Tool` produces SPDX 2.2; if you need 2.3+, post-process or switch to `dotnet CycloneDX`.
+Pitfalls: `dotnet CycloneDX` defaults can omit project-reference traversal — use `--include-project-references` for multi-project solutions. `Microsoft.Sbom.Tool` defaults to SPDX 2.2, which is *below* the SPDX 2.3+ floor; pass `-mi SPDX:3.0` to emit SPDX 3.0 (above the floor), or switch to `dotnet CycloneDX` for CycloneDX 1.6. Verify the current release supports SPDX 3.0 before pinning.
 
 ### Java 21+ (Maven / Gradle)
 
@@ -430,9 +430,13 @@ Pitfalls: `pip freeze` is **not** an SBOM (no relationships, no PURLs, no metada
 sbom-tool generate -b ./build -bc . -pn acme-c-app -pv 2.4.1 \
   -nsb https://acme.example -m ./manifest
 
-# Conan native SBOM hook (Conan 2.x)
+# Conan native SBOM (Conan 2.x): the built-in conan.tools.sbom module's CycloneDX
+# generator (cyclonedx_1_4 / cyclonedx_1_6) is wired into the recipe's generate()
+# method — the 1.6-capable path. See https://docs.conan.io/2/security/sboms.html
 conan install . --output-folder=build --build=missing
-conan sbom build --format cyclonedx-1.6 --output build/bom.json
+# An experimental `conan sbom:cyclonedx --format 1.4_json .` command exists in
+# conan-extensions (needs cyclonedx-python-lib) but emits only up to 1.4; use the
+# built-in module above when you need CycloneDX 1.6.
 ```
 
 Pitfalls: vendored sources (a `third_party/` directory copied in) are invisible to package-manager-based generators. Augment with `syft scan ./build -o cyclonedx-json` to catch vendored code. Header-only libraries with no build artifact still count as components — declare them manually if the toolchain misses them.
@@ -455,7 +459,7 @@ Pitfalls: STL and compiler runtime are usually omitted — that's fine if you st
 ### TypeScript / JavaScript
 
 ```bash
-# npm v10.5+ has a native sbom command
+# npm 9.6+ has a native sbom command (--sbom-format accepts cyclonedx | spdx)
 npm sbom --sbom-format cyclonedx > bom.json
 npm sbom --sbom-format spdx > bom.spdx.json
 
@@ -480,7 +484,7 @@ Database schemas and stored procedures are not "software components" in the NTIA
 |------|------|-----------|------------|
 | **Syft (Anchore)** | General SBOM generator | Single binary; broadest language coverage; emits both CycloneDX and SPDX; scans filesystems, container images, and archives | Post-hoc scanner — sees what's there, not what the build resolved. Use as a fallback or a verification check, not the canonical source |
 | **CycloneDX CLI** | Format conversion + merge + validation | Authoritative for CycloneDX validation; merges multi-module SBOMs into one; converts between formats and spec versions | Generation requires per-language plugins (cyclonedx-maven, cyclonedx-py, etc.) |
-| **Microsoft `sbom-tool`** | Build-output SBOM, SPDX 2.2 | Integrates with .NET SDK natively; works across languages via build directory scanning; published by Microsoft, used internally for Microsoft products | SPDX 2.2 (not 2.3) at time of writing — verify the current release before pinning |
+| **Microsoft `sbom-tool`** | Build-output SBOM, SPDX 2.2 default / SPDX 3.0 opt-in | Integrates with .NET SDK natively; works across languages via build directory scanning; published by Microsoft, used internally for Microsoft products | Defaults to SPDX 2.2 (below the 2.3+ floor); emits SPDX 3.0 via `-mi SPDX:3.0` — verify the current release supports it before pinning |
 | **Sigstore cosign** | Signing | Keyless OIDC signing; transparency log (Rekor) — verifiable years later; widely adopted; OSI / OpenSSF stewardship | Requires OIDC identity provider (GitHub/GitLab/Google/etc.) in the build pipeline |
 | **OWASP Dependency-Track** | SBOM inventory + vulnerability monitoring | Open-source; ingests CycloneDX SBOMs; continuous vulnerability monitoring against the inventory; VEX-aware; CRA-shaped audit trail | Self-hosted; needs operational care (database, upgrades) |
 | **GUAC** | SBOM graph aggregation | Graph database over many SBOMs + attestations; cross-product dependency queries (e.g. "every product that contains log4j 2.14") — exactly the lookup needed for ENISA notifications | Maturing project; expect operational rough edges |
@@ -490,7 +494,7 @@ Database schemas and stored procedures are not "software components" in the NTIA
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |-------|----------|--------|
@@ -539,9 +543,9 @@ These tiers are the **internal triage view** used when you produce a human-reada
 
 ## Special Considerations
 
-- **Open-source projects**: the CRA contains explicit carve-outs for non-commercial open-source software (Recital 18, Art. 3(18)). A project that is purely upstream, with no commercial steward and no monetary exchange, is not directly in CRA scope as a "manufacturer." But the moment a vendor *integrates* that OSS into a commercial product, the vendor inherits SBOM and reporting obligations for the whole stack. Don't tell an upstream OSS maintainer they must comply; do tell the downstream vendor they must.
+- **Open-source projects**: the CRA contains explicit carve-outs for non-commercial open-source software (Recital 18; "free and open-source software" is defined in Art. 3, point (48)). A project that is purely upstream, with no commercial steward and no monetary exchange, is not directly in CRA scope as a "manufacturer." But the moment a vendor *integrates* that OSS into a commercial product, the vendor inherits SBOM and reporting obligations for the whole stack. Don't tell an upstream OSS maintainer they must comply; do tell the downstream vendor they must.
 - **Internal-only tools**: products not "placed on the market" are out of scope. An internal-only line-of-business app is not in CRA scope. But: if you sell access to the app (SaaS), it is in scope as a product with digital elements remotely accessed.
-- **Open-source steward** (CRA Art. 24): a new role with lighter-touch obligations than a manufacturer. Foundations stewarding OSS used in commercial products fall here. Different SBOM expectations.
+- **Open-source steward** (CRA Art. 24): a new role with lighter-touch obligations than a manufacturer. Foundations stewarding OSS used in commercial products fall here. Different SBOM expectations, and — per Art. 64(10) — stewards are **fully exempt from administrative fines**; enforcement against a steward is corrective action, not a penalty. The vulnerability-reporting duty (from 11 Sep 2026) still applies to them.
 - **Legacy products on the market before 11 Dec 2027**: there is no grandfather clause for products still receiving substantial updates after that date — substantial updates re-trigger compliance. Confirm with legal counsel before relying on a legacy carve-out.
 - **Third-party SBOMs**: if a vendor ships you a sub-component with its own SBOM, you must **integrate** it into your product SBOM (CycloneDX `externalReferences` or SPDX `relationship: CONTAINS`). Don't ignore vendor SBOMs and re-scan their binaries — you'll lose precision.
 - **VEX is part of the answer, not a bypass**: filing a 24h notification under CRA is required when a vuln is actively exploited, regardless of whether you have a VEX statement asserting *not_affected*. VEX reduces scanner noise; it does not remove the reporting duty.
@@ -598,7 +602,7 @@ The integrator uses `confidence` to weight findings. A `confidence: low` finding
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every CRA non-conformance, every missing NTIA field, every unsigned SBOM, every absent runbook step, every deprecation in the toolchain (e.g. SPDX 2.2 when 2.3+ is available), and every CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

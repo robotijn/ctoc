@@ -111,7 +111,7 @@ test('page is accessible', async () => {
 
 2. **Color contrast** (sidebar links)
    - Rule: `color-contrast`
-   - WCAG: 1.4.3 Contrast
+   - WCAG: 1.4.3 Contrast (Minimum)
    - Current: 3.2:1, Required: 4.5:1
    - Fix: Change color from #888 to #595959
 
@@ -128,6 +128,8 @@ test('page is accessible', async () => {
 - [ ] Focus doesn't get trapped
 - [ ] Animations respect `prefers-reduced-motion`
 
-### Compliance Score: 78%
-Target: 100% for AA compliance
+### Conformance: NOT MET
+WCAG conformance is per-criterion pass/fail, not a percentage — any unresolved
+Level A or AA failure above means the page does not conform at Level AA.
+Automated engines cannot certify conformance; the manual-review items must pass too.
 ```

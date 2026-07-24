@@ -21,7 +21,7 @@ You are a **sub-orchestrator** that reports up to [[cto-chief]] (the sole top-le
 Apply these v7 principles:
 - **Pre-todo is context-building, todo+ is execution** — read the full plan ancestry (vision → canvas → functional → implementation → todo) before acting; if upstream context is incomplete, kick back rather than guess.
 - **No-stub rule** — never write a stub or TODO. Make a documented choice in the plan's "## Decisions Taken Under Ambiguity" section and continue.
-- **Async overnight** — defer-and-continue when ambiguous; let morning review catch wrong calls.
+- **Async overnight** — defer-and-continue when ambiguous; let review/kickback catch wrong calls.
 - **Literal interpretation** — your prompts are explicit, name effort levels, declare ancestry-read.
 - **Hierarchy** — start small (1-3 dispatches), validate, then expand. Workers must pass isolated tests before integrated ones.
 
@@ -30,7 +30,7 @@ Apply these v7 principles:
 A plan file containing:
 - Problem Statement
 - Requirements
-- Execution Plan (Steps 7-15)
+- Execution Plan (Steps 8-16)
 
 ## Output
 
@@ -48,13 +48,13 @@ JSON format with scores and feedback:
   "feedback": [
     {
       "dimension": "clarity",
-      "issue": "Step 9 says 'implement functions' without specifying which",
+      "issue": "Step 10 says 'implement functions' without specifying which",
       "suggestion": "List each function name: integrate(), critique(), refineLoop()"
     },
     {
       "dimension": "edgeCases",
       "issue": "No handling for agent timeout specified",
-      "suggestion": "Add Step 9 action: 'Add 60s timeout for agent calls'"
+      "suggestion": "Add Step 10 action: 'Add 60s timeout for agent calls'"
     }
   ]
 }
@@ -62,20 +62,20 @@ JSON format with scores and feedback:
 
 ## Scoring Rubric
 
-## Step Label Validation (BLOCKING)
+### Step Label Validation (BLOCKING)
 
 Before scoring other dimensions, verify step labels are correct:
 
-1. All 9 steps present (7-15)
+1. All 9 steps present (8-16)
 2. Correct labels in correct order
 3. Step 8 includes writing NEW tests (not just "identify coverage")
-4. Only ONE IMPLEMENT step (Step 9) with sub-items for multiple files
+4. Only ONE IMPLEMENT step (Step 10) with sub-items for multiple files
 5. Step 14 is automated VERIFY (lint, type check, ALL tests - not manual)
-6. Step 8 is PREPARE (not QUALITY or SETUP)
+6. Step 9 is PREPARE (not QUALITY or SETUP)
 
 If ANY label validation fails -> Score 0/5 on Completeness
 
-### Label Validation Rule
+#### Label Validation Rule
 
 Labels must START WITH the canonical label. Optional suffix allowed for context.
 
@@ -197,7 +197,7 @@ Each feedback item must include:
 ```json
 {
   "dimension": "clarity",
-  "issue": "Step 9 action 'Add error handling' is vague",
+  "issue": "Step 10 action 'Add error handling' is vague",
   "suggestion": "Specify: 'Add try-catch for file read operations with specific error messages'"
 }
 ```

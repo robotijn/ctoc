@@ -72,15 +72,16 @@ Every finding — plan-stage or code-stage — passes through the following
 
 1. `validateFindingSchema` — asserts `gdpr_article` is a valid code; a finding
    that would mint an out-of-schema code is rejected loudly here.
-2. `normalizeSeverity` — forces the finding's severity to the refinement-loop
-   contract.
+2. `normalizeSeverity` — forces the finding's severity to `critical`, the
+   warnings-are-critical contract the refinement loop consumes.
 3. `routeFinding` — routes a code-stage finding (has `target_file`) to a
    refinement-loop letter, and a plan-stage finding (no `target_file`) to the
    Inbox.
 
-This agent describes the emission **contract**. The wiring that performs the
-actual Inbox / letter write lives in EC2-s4; this definition names the path,
-s4 implements the write.
+This agent describes the emission **contract**. The runtime wiring that performs
+the actual Inbox / letter write lives outside this definition, in
+`src/lib/gdpr-agent-runner.js` (`runGdprFindings`) — this definition names the
+contract, the runner performs the write.
 
 ## Rule authority (DRY)
 

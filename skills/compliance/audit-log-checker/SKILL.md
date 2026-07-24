@@ -73,7 +73,7 @@ Schema-level finding. Inspect DDL: if no `REVOKE` is present, or no trigger rais
 
 ### 4. No hash chain (silent tamper undetectable)
 
-Without a per-row hash chain (or signed batches), an attacker who *does* reach the table can rewrite history and you will never know. Emit a finding whenever the schema has no `prev_hash`/`row_hash` columns and no equivalent (e.g., AWS QLDB, an external append-only ledger, or anchored Merkle roots).
+Without a per-row hash chain (or signed batches), an attacker who *does* reach the table can rewrite history and you will never know. Emit a finding whenever the schema has no `prev_hash`/`row_hash` columns and no equivalent (an external append-only ledger, or anchored Merkle roots; AWS QLDB filled this role until its July 2025 retirement).
 
 ### 5. Missing actor
 
@@ -588,12 +588,12 @@ Skip — audit logging in these languages typically delegates to a system-level 
 | Layer | Tools | Use |
 |---|---|---|
 | **DB-level append-only** | Postgres `REVOKE` + triggers, MySQL `BLACKHOLE`+binlog ingest, Postgres temporal tables, Oracle Flashback Data Archive | Make UPDATE/DELETE impossible from the app principal |
-| **Ledger / immutable store** | AWS QLDB (legacy, EOL July 2025 — migrate to Aurora PostgreSQL with QLDB-style ledger gem), Amazon S3 Object Lock (compliance mode), Azure Immutable Blob, GCS Bucket Lock | Cold tier / regulator-grade archive |
-| **Audit-log monitoring SaaS** | Datadog Audit Trail, Vanta, Drata, Tugboat Logic | Continuous-compliance dashboards, evidence for SOC 2 |
-| **Per-language hash-chain libs** | Node: `immutable-log`, `chained-merkle`; Python: `audit-python`, `hash-chain`; Java: `audit-java`; .NET: `Microsoft.AspNetCore.DataProtection` for keyed HMAC | Drop-in row-hash + verify-chain helpers |
-| **Pipeline** | OpenTelemetry audit-event semantic conventions, Fluent Bit with the `redact` filter, Vector with `parse_logfmt` + `redact` transforms | Structured ingest, PII redaction in transit |
+| **Ledger / immutable store** | AWS QLDB (retired July 31 2025 — AWS's recommended path is Aurora PostgreSQL, which drops QLDB's built-in cryptographic verifiability, so keep the app-side HMAC chain for tamper-evidence), Amazon S3 Object Lock (compliance mode), Azure Immutable Blob, GCS Bucket Lock | Cold tier / regulator-grade archive |
+| **Audit-log monitoring SaaS** | Datadog Audit Trail, Vanta, Drata, OneTrust Certification Automation (formerly Tugboat Logic) | Continuous-compliance dashboards, evidence for SOC 2 |
+| **Per-language row-hash primitive** | The keyed row-hash needs no third-party audit-log framework — use the standard-library HMAC-SHA256 each of the code samples above already uses: Node `crypto.createHmac`, Python `hmac` (both stdlib), .NET `System.Security.Cryptography.HMACSHA256`, Java `javax.crypto.Mac`. For anchored Merkle roots in the cold tier, `merkletreejs` or `@openzeppelin/merkle-tree` (npm) are real, widely-used Merkle libraries. | Compute each `row_hash` and re-walk the chain to verify — a stdlib HMAC and, optionally, a Merkle library, not a bespoke "audit-log" package |
+| **Pipeline** | OpenTelemetry log/event semantic conventions (a dedicated audit-log convention is still an open proposal, not shipped), Fluent Bit with a `lua` or `modify` filter for masking (or the Nightfall filter), Vector with `parse_logfmt` + `redact` transforms | Structured ingest, PII redaction in transit |
 | **Search / hot tier** | OpenSearch / Elasticsearch with index-lifecycle policies, ClickHouse, Postgres + `pg_partman` | 3-month hot, then roll to cold |
-| **Verification** | `auditctl verify`, custom HMAC walk job that re-derives each `row_hash` and compares against stored value | Nightly cron + on-demand for incident response |
+| **Verification** | Custom HMAC walk job that re-derives each `row_hash` from `canonical_json(row) || prev_hash` and compares against the stored value | Nightly cron + on-demand for incident response |
 
 ## Severity (internal triage vs. refinement-loop output)
 

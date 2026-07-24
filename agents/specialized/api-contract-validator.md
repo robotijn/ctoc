@@ -15,26 +15,54 @@ target_skill: specialized/api-contract-validator
 
 ## Role
 
-You verify that API implementations match their documented contracts (OpenAPI, GraphQL schema). Contract violations break client integrations.
+You verify that API implementations match their declared contracts — OpenAPI 3.1, AsyncAPI 3, GraphQL schema definition language, and Protobuf/gRPC — detect breaking changes against the base version, and enforce backward-compatible (additive) schema evolution. Contract violations break client integrations silently: the server returns a 200, the body parses up to the renamed field, and the consumer crashes in production on the first shape that no longer matches its generated SDK.
 
 ## Tools
 
-### OpenAPI Validation
+Lint the contract, diff it for breaking changes, and run the declared schema
+against the live implementation. Use the engine that matches the contract type.
+
+### OpenAPI (3.0 / 3.1)
 ```bash
-# Validate schema
+# Lint / style governance (built-in spectral:oas ruleset)
 npx @stoplight/spectral-cli lint openapi.yaml
 
-# Test implementation matches schema
-npx dredd openapi.yaml http://localhost:3000
+# Breaking-change diff against the base version — fail CI on a break
+# (oasdiff is a Go binary — install via brew/go/Docker, not npm)
+oasdiff breaking openapi.base.yaml openapi.head.yaml
+
+# Conformance: run the declared schema against the running service
+schemathesis run http://localhost:3000/openapi.json   # property-based fuzz — prefer this
+npx dredd openapi.yaml http://localhost:3000          # example-driven (archived Nov 2024, still runs)
 ```
 
-### GraphQL Validation
+### AsyncAPI (3.x)
 ```bash
-# Validate schema
-npx graphql-inspector validate schema.graphql
+# Same linter, AsyncAPI ruleset
+npx @stoplight/spectral-cli lint asyncapi.yaml
+```
 
-# Detect breaking changes
-npx graphql-inspector diff old.graphql new.graphql
+### GraphQL
+```bash
+# Breaking-change diff between two schemas
+npx @graphql-inspector/cli diff old.graphql new.graphql
+
+# Validate operation documents (queries/fragments) against a schema
+# (both a documents glob AND the schema are required arguments)
+npx @graphql-inspector/cli validate './src/**/*.graphql' schema.graphql
+```
+
+### Protobuf / gRPC
+```bash
+# Lint, then diff for breaking changes against a git ref
+buf lint
+buf breaking --against '.git#branch=main'
+```
+
+### Consumer-driven contract testing (across all types)
+```bash
+# Verify no deployed consumer breaks before shipping the provider
+pact-broker can-i-deploy --pacticipant provider --version "$GIT_SHA" --to-environment production
 ```
 
 ## What to Check

@@ -349,7 +349,7 @@ npx playwright test --shard=1/4 --reporter=blob
 ### TypeScript / JavaScript — Cypress
 
 ```bash
-# Parallel via Cypress Cloud (or open-source alternative Currents)
+# Parallel via Cypress Cloud (or self-hostable open-source sorry-cypress; Currents is the commercial alternative)
 npx cypress run --record --parallel \
   --key $CYPRESS_RECORD_KEY \
   --ci-build-id $GITHUB_RUN_ID \
@@ -379,9 +379,9 @@ pytest $(cat shard_$(printf "%02d" $((SHARD_INDEX-1))))
 ### C# / .NET 9 — Microsoft.Playwright
 
 ```bash
-# Install browsers (one-time)
-dotnet tool install --global Microsoft.Playwright.CLI
-playwright install --with-deps
+# Install browsers (one-time) — build first, then run the generated PowerShell script
+dotnet build
+pwsh bin/Debug/net9.0/playwright.ps1 install --with-deps
 
 # Run E2E project — Microsoft.Playwright.NUnit / .MSTest / .Xunit packages
 dotnet test tests/E2E.csproj \
@@ -395,23 +395,22 @@ dotnet test tests/E2E.csproj \
 PLAYWRIGHT_SHARD=1/4 dotnet test tests/E2E.csproj
 ```
 
-In `playwright.config` for .NET (via `PlaywrightSettings` in test setup), set tracing/video/screenshot to `OnFirstRetry` / `RetainOnFailure` / `OnlyOnFailure` respectively.
+Configure .NET Playwright via a `.runsettings` `<Playwright>` node (browser name, `<LaunchOptions>` such as `Headless`) — there is no JavaScript-style `playwright.config` for .NET. The NUnit/MSTest/xUnit base classes have no `OnFirstRetry` trace mode either: capture trace/video/screenshot on failure in your test-cleanup (`[TearDown]`) code, calling `Context.Tracing.StartAsync(...)` / `StopAsync(...)`, or gate it on an environment variable.
 
 ### Java — Playwright for Java
 
 ```bash
-# Maven
+# Maven — JUnit 5 tag + real Surefire rerun/fork properties.
+# Playwright for Java has NO built-in tracing/video/screenshot property: enable them in
+# test code via context.tracing().start(new Tracing.StartOptions()...) and
+# browser.newContext(new NewContextOptions().setRecordVideoDir(...)). Gate on your own
+# System.getProperty(...) if you want CLI control.
 mvn test -Dgroups=e2e \
-  -Dplaywright.tracing=retain-on-failure \
-  -Dplaywright.video=retain-on-failure \
-  -Dplaywright.screenshot=only-on-failure \
   -Dsurefire.rerunFailingTestsCount=2 \
-  -Dsurefire.forkCount=2
+  -DforkCount=2
 
 # Gradle
-./gradlew e2eTest \
-  -Pplaywright.tracing=retain-on-failure \
-  -Pplaywright.video=retain-on-failure
+./gradlew e2eTest
 
 # Sharding: use Surefire/Failsafe groups, or run with -Dshard.index=N -Dshard.total=M
 # and partition in @BeforeAll based on testInfo.
@@ -432,7 +431,7 @@ SQL is a data layer, not a user-facing layer. Database integration tests belong 
 
 ## Letter schema (refinement-loop output contract)
 
-The letter schema below is the wire format. **Every emitted letter has `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The internal triage tiers in the "Severity" section below stay in the human-readable report body for prioritization, but the letter's `severity` field is always `critical`. The `confidence` and `kind` fields carry the nuance: a single-shard flake emits as `severity: critical, confidence: low, kind: flake`; a reproducible cross-browser failure emits as `severity: critical, confidence: high, kind: failure`. The integrator weighs these together — `confidence: low` single-source flakes do not block phase advancement alone, but two browsers agreeing on the same failure always does.
+The letter schema below is the wire format. **Every emitted letter has `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The internal triage tiers in the "Severity" section below stay in the human-readable report body for prioritization, but the letter's `severity` field is always `critical`. The `confidence` and `kind` fields carry the nuance: a single-shard flake emits as `severity: critical, confidence: low, kind: flake`; a reproducible cross-browser failure emits as `severity: critical, confidence: high, kind: failure`. The integrator weighs these together — `confidence: low` single-source flakes do not block phase advancement alone, but two browsers agreeing on the same failure always does.
 
 When emitting a finding via the refinement loop, write the letter with these fields:
 
@@ -476,10 +475,10 @@ On the wire: every letter is `severity: critical`. The triage tiers stay in the 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agent-fragments/warnings-are-critical.md):
 
 - Every test failure, every flake on retry, every quarantine SLA expiry, every suite-budget overrun, and every trace/video/screenshot configuration gap you find emits as `severity: critical` in the letter you write to CTO Chief.
-- The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
+- The [letter schema](../../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
 - Findings block phase advancement (critical → medium) until resolved or explicitly waived in the plan's `## Decisions Taken Under Ambiguity` section.
 
 The principle: a flaky test today is a customer-visible failure after the next deploy. A suite that runs without traces is a suite that cannot be debugged when it eventually fails. Code that ships green-with-untriagable-failures ships with known latent risk.

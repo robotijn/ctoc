@@ -536,11 +536,11 @@ When a refactor is mechanical (rename, extract, inline) and the IDE supports it,
 | C# | **CodeRush** / **ReSharper** command-line refactors | Mass refactors driven from CI |
 | Java / Kotlin | **OpenRewrite** | Spring Boot major-version migrations, Junit 4→5, sealed interface migration |
 | Java | **Error Prone Refaster** | Compile-time template-driven refactors |
-| C / C++ | `clang-tidy` + `clang-format` | Modernize checks, replace switch-with-variant (clang-tidy 18+) |
+| C / C++ | `clang-tidy` + `clang-format` | `modernize-*` fixes; `readability-function-cognitive-complexity` flags hot spots (no auto-fix). No upstream switch-to-variant fixit exists — see the C++ example above |
 | C / C++ | `clang-apply-replacements` | Apply edits emitted by custom AST visitors |
 | Rust | `rustfix` + `cargo clippy --fix` | Auto-apply lint suggestions |
 | Go | `gofmt -r` (rewrite rules) + `go fix` | Pattern-based rewrites |
-| SQL | IDE structural search (DataGrip/Rider); `pgrx`-style tools for Postgres | Manual; no dominant 2026 codemod ecosystem |
+| SQL | IDE structural search (DataGrip/Rider) | Manual; no dominant 2026 codemod ecosystem |
 
 ### Complexity metrics tools (read before recommending)
 
@@ -550,7 +550,7 @@ When a refactor is mechanical (rename, extract, inline) and the IDE supports it,
 | **lizard** | 20+ | CLI, fast; CC + NLOC + token-count |
 | **radon** | Python | CC + Halstead + MI |
 | **complexity-report** / `eslint-plugin-sonarjs` | JS / TS | Per-function CC and cognitive |
-| **dotnet-counters** / `Metrics.exe` (legacy) / **SonarAnalyzer for .NET** | C# | Roslyn analyzers; ships with rules CA1505, CA1502 |
+| **Microsoft.CodeAnalysis.NetAnalyzers** (CA1502 cyclomatic, CA1505 maintainability) / **SonarAnalyzer.CSharp** (cognitive complexity) | C# | CA rules ship in the .NET SDK; SonarAnalyzer adds cognitive complexity on top |
 | **PMD** / **Checkstyle** | Java | Cyclomatic, NPath, NCSS |
 | **PMD CPD** | many | Token-based duplication detection (Rule of Three input) |
 | **clang-tidy** (`readability-function-cognitive-complexity`) | C / C++ | Cognitive complexity directly |
@@ -594,7 +594,7 @@ suggested_diff: |                                     # OR refactor_recipe (mutu
   @@ ...
 refactor_recipe:                                      # alternative when codemod is named
   tool: libcst | jscodeshift | roslyn | clang-tidy | ts-morph | openrewrite | ide
-  recipe_id: "libcst.codemod.RemoveTrailingPass"
+  recipe_id: "libcst.codemod.commands.remove_unused_imports.RemoveUnusedImportsCommand"
   scope: file | directory | repo
   estimated_sites: 12
 message: "decompose long order pipeline via Extract Method × 3"
@@ -611,7 +611,7 @@ Mutual exclusion: emit `suggested_diff` for hand-applicable single-file refactor
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md) **with the carve-out documented in this skill's Severity section**:
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md) **with the carve-out documented in this skill's Severity section**:
 
 - The default warnings-are-critical rule says every warning emits as `severity: critical`. For this skill, that rule is narrowed: refactor recommendations are advisory and carry their natural severity unless they meet one of the two critical-trigger conditions (target function on the critical path of the current plan with CC ≥ 25 or Cognitive ≥ 30, OR refactor required to unblock a Gate 2 → Gate 3 advancement).
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) accepts the full severity range for this skill — refactor findings are inherently graded, unlike security findings.

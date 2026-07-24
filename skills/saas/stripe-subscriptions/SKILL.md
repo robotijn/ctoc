@@ -48,8 +48,9 @@ You implement Stripe Subscriptions correctly the first time: checkout, webhooks 
 - **Handle every relevant webhook event** — silent dropouts are the #1 cause of churn-by-accident. The minimum event set: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.trial_will_end` (3 days before trial ends — send a heads-up email), `invoice.paid`, `invoice.payment_failed`, `invoice.upcoming` (renewal preview), `payment_intent.requires_action` (3DS challenge needed).
 - **Stripe Checkout (hosted) for signup** — PCI scope minimized; less code to maintain; SCA-ready by construction.
 - **Customer Portal for plan changes** — let Stripe handle the UI for plan upgrades, downgrades, payment-method updates, invoice history. Don't rebuild it.
-- **Smart Retries + dunning emails** — Stripe handles retry cadence (3 attempts over 3 weeks by default); your job is the dunning email content via Resend / SendGrid. Test the full failed-payment path in test mode before launch.
-- **Proration is handled by Stripe** — when changing plans mid-cycle, `proration_behavior: 'create_prorations'` (default) computes the credit. Preview via `invoices.retrieveUpcoming` so the UI shows the prorated amount before the user confirms.
+- **Smart Retries + dunning emails** — Stripe handles retry timing: Smart Retries uses a model to pick when to re-attempt a failed charge (recommended default 8 attempts within 2 weeks; the window is configurable from 1 week to 2 months). Turn Smart Retries off for a fixed custom schedule of up to 3 retries at day intervals you set. Either way, Stripe owns the cadence; your job is the dunning email content via Resend / SendGrid. Test the full failed-payment path in test mode before launch.
+- **Proration is handled by Stripe** — when changing plans mid-cycle, `proration_behavior: 'create_prorations'` (default) computes the credit. Preview via `invoices.createPreview` so the UI shows the prorated amount before the user confirms. (The old `invoices.retrieveUpcoming` / `GET /v1/invoices/upcoming` was deprecated in the Basil release, 2025-03-31, and removed in favor of `POST /v1/invoices/create_preview`; on Dahlia only `createPreview` exists.)
+- **`current_period_end` lives on the subscription ITEM, not the top-level Subscription.** The Basil release (2025-03-31) moved `current_period_start` / `current_period_end` off the `Subscription` object onto each `SubscriptionItem`. Read `subscription.items.data[0].current_period_end` — the top-level field returns `undefined` on Basil and later (Dahlia included), and the endpoint still returns 200, so the breakage is silent. For multi-item subscriptions with mixed intervals, iterate the items and take the earliest `current_period_end` yourself — there is no top-level aggregate field for it on the Subscription object.
 - **SCA / 3DS (PSD2)** — Strong Customer Authentication is enforced in the EU/UK and increasingly elsewhere. Stripe Checkout, the Billing API, and PaymentIntents are SCA-ready. For off-session subscription charges, save the payment method with `setup_future_usage: 'off_session'` so the card is authenticated at setup; renewal charges then attempt frictionless 3DS2 first, fall back to challenge if the issuer requires it. Listen for `payment_intent.requires_action` and surface the authentication URL.
 - **Tax**: if selling globally, use **Stripe Tax** (enable on Checkout sessions with `automatic_tax: { enabled: true }`) OR a Merchant-of-Record provider like Paddle. Don't compute VAT / GST / sales tax yourself — the rate tables change quarterly per jurisdiction.
 - **Hardcoded price IDs are a smell** — use **lookup_keys** (`STRIPE_PRICE_PRO_MONTHLY=pro_monthly`) and resolve at runtime via `prices.list({ lookup_keys: [...] })`. Lets you swap price IDs between test/live without code changes.
@@ -221,7 +222,8 @@ export async function POST(req: NextRequest) {
 }
 
 // SAFE: raw body, signature verified, idempotency in same tx, queue slow work
-export const config = { api: { bodyParser: false } };   // App Router: body is raw by default
+// App Router route handlers deliver the raw body via req.text() — no bodyParser config needed.
+// (The Pages-Router `export const config = { api: { bodyParser: false } }` is ignored here; don't add it.)
 
 export async function POST(req: NextRequest) {
   const body = await req.text();                                       // raw bytes
@@ -291,6 +293,9 @@ async function handleSubscriptionChange(tx: any, sub: Stripe.Subscription) {
   if (!userId) throw new Error(`subscription ${sub.id} missing userId metadata`);
   const item = sub.items.data[0];
   const planId = item.price.lookup_key ?? item.price.id;
+  // Basil (2025-03-31) moved current_period_end OFF the Subscription onto the item.
+  // sub.current_period_end is undefined on Basil+/Dahlia — read it from the item.
+  const currentPeriodEnd = new Date(item.current_period_end * 1000);
 
   await tx.insert(subscriptions).values({
     userId,
@@ -298,14 +303,14 @@ async function handleSubscriptionChange(tx: any, sub: Stripe.Subscription) {
     stripeSubscriptionId: sub.id,
     planId,
     status: sub.status,
-    currentPeriodEnd: new Date(sub.current_period_end * 1000),
+    currentPeriodEnd,
     cancelAtPeriodEnd: sub.cancel_at_period_end,
     trialEnd: sub.trial_end ? new Date(sub.trial_end * 1000) : null,
   }).onConflictDoUpdate({
     target: subscriptions.stripeSubscriptionId,
     set: {
       planId, status: sub.status,
-      currentPeriodEnd: new Date(sub.current_period_end * 1000),
+      currentPeriodEnd,
       cancelAtPeriodEnd: sub.cancel_at_period_end,
       trialEnd: sub.trial_end ? new Date(sub.trial_end * 1000) : null,
       updatedAt: new Date(),
@@ -314,7 +319,11 @@ async function handleSubscriptionChange(tx: any, sub: Stripe.Subscription) {
 }
 
 async function handlePaymentFailed(tx: any, invoice: Stripe.Invoice) {
-  const subId = invoice.subscription as string | null;
+  // Basil (2025-03-31) removed the top-level invoice.subscription field and moved it under
+  // parent.subscription_details.subscription (present when invoice.parent.type === 'subscription_details').
+  // On Basil+/Dahlia, reading invoice.subscription returns undefined — the handler would silently
+  // skip and never mark past_due or send dunning, i.e. involuntary churn goes unnoticed.
+  const subId = invoice.parent?.subscription_details?.subscription as string | null | undefined;
   if (!subId) return;
   await tx.update(subscriptions)
     .set({ status: 'past_due', updatedAt: new Date() })
@@ -357,11 +366,15 @@ export async function previewPlanChange(newLookupKey: string) {
   const prices = await stripe.prices.list({ lookup_keys: [newLookupKey], active: true, limit: 1 });
   if (!prices.data[0]) throw new Error('invalid plan');
 
-  const upcoming = await stripe.invoices.retrieveUpcoming({
+  // createPreview replaces the removed invoices.retrieveUpcoming (GET /v1/invoices/upcoming).
+  // Modification params moved under subscription_details.{items,proration_behavior}.
+  const upcoming = await stripe.invoices.createPreview({
     customer: sub.stripeCustomerId,
     subscription: sub.stripeSubscriptionId,
-    subscription_items: [{ id: sub.itemId, price: prices.data[0].id }],
-    subscription_proration_behavior: 'create_prorations',
+    subscription_details: {
+      items: [{ id: sub.itemId, price: prices.data[0].id }],
+      proration_behavior: 'create_prorations',
+    },
   });
 
   return {
@@ -375,10 +388,12 @@ export async function previewPlanChange(newLookupKey: string) {
 ## Implementation pattern (C# / .NET 9 / ASP.NET Core minimal API)
 
 ```csharp
-// Program.cs — Stripe client with pinned version
+// Program.cs — Stripe client
 using Stripe;
 StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
-StripeConfiguration.ApiVersion = "2026-04-22.dahlia";
+// StripeConfiguration.ApiVersion is READ-ONLY (`=> ApiVersion.Current`) — assigning it does not
+// compile. It is pinned to the Stripe.net package release, so pin the API version by pinning the
+// NuGet package version. To override on a single call, set RequestOptions.StripeVersion = "2026-04-22.dahlia".
 ```
 
 ```csharp
@@ -497,7 +512,11 @@ public class StripeConfig {
   @Value("${stripe.secret-key}") private String secretKey;
   @PostConstruct void init() {
     Stripe.apiKey = secretKey;
-    Stripe.API_VERSION = "2026-04-22.dahlia";   // PIN
+    // NOTE: stripe-java has NO settable global API version — Stripe.API_VERSION is a
+    // `public static final` constant baked into the SDK release (assigning it does not compile).
+    // You PIN the API version by pinning the stripe-java dependency version in your build file;
+    // each SDK release targets exactly one Stripe API version. To override on a single call, pass
+    // RequestOptions.builder().setStripeVersionOverride("2026-04-22.dahlia").build().
   }
 }
 ```
@@ -737,7 +756,7 @@ CREATE TABLE webhook_log_bad (
 
 After drafting v1 the obvious gaps surfaced and were fixed in v2 above:
 
-1. **v1 didn't pin the API version.** Added explicit `stripe.api_version = '2026-04-22.dahlia'` pinning in all four languages + frontmatter on webhook endpoints. Verified the version from `docs.stripe.com/upgrades` search.
+1. **v1 didn't pin the API version.** Added explicit pinning where the SDK exposes a settable global — `new Stripe(key, { apiVersion })` (TypeScript) and `stripe.api_version` (Python) — and documented the correct mechanism where it does NOT: stripe-java (`Stripe.API_VERSION` is a `final` constant) and stripe-dotnet (`StripeConfiguration.ApiVersion` is read-only) pin via the SDK/package version, with `RequestOptions` version-override for a single call. Plus the API-version setting on each webhook endpoint. Verify the current version at `docs.stripe.com/upgrades` before pinning.
 2. **v1 conflated webhook idempotency with API idempotency.** Two separate problems with two separate fixes: `Idempotency-Key` header on outbound mutating calls, and `event.id` UNIQUE table for inbound webhooks. v2 covers both with dedicated `kind` values in the letter schema.
 3. **v1's webhook handler did dedup-then-business in two transactions.** Race window: crash between insert-event and do-work leaves "fulfilled but not recorded" → next retry double-fulfills. v2 wraps both in one transaction (TS, .NET, Python use `ON CONFLICT DO NOTHING` in-tx; Java relies on JPA `@Transactional` + PK constraint).
 4. **v1 didn't cover SCA / 3DS at all.** Added `payment_intent.requires_action` to the event list, `sca-not-handled` finding kind, and `setup_future_usage: 'off_session'` discussion for off-session renewals.
@@ -834,8 +853,12 @@ The integrator uses `confidence` to weight findings — a `confidence: low` patt
 
 ## Sources
 
-- [Stripe API versioning](https://docs.stripe.com/api/versioning) — pinned version is `2026-04-22.dahlia`
+- [Stripe API versioning](https://docs.stripe.com/api/versioning) — flora-named releases (Acacia → Basil → Clover → Dahlia)
+- [Stripe Dahlia changelog](https://docs.stripe.com/changelog/dahlia) — `2026-04-22.dahlia` is a real published Dahlia release (Dahlia began at `2026-03-25.dahlia`)
 - [Stripe API upgrades changelog](https://docs.stripe.com/upgrades)
+- [Create a preview invoice](https://docs.stripe.com/api/invoices/create_preview) — `stripe.invoices.createPreview` with `subscription_details.{items,proration_behavior}`
+- [Invoice preview API deprecations (Basil, 2025-03-31)](https://docs.stripe.com/changelog/basil/2025-03-31/invoice-preview-api-deprecations) — `GET /v1/invoices/upcoming` (`invoices.retrieveUpcoming`) removed in favor of `create_preview`
+- [Deprecate subscription current_period_start/end (Basil, 2025-03-31)](https://docs.stripe.com/changelog/basil/2025-03-31/deprecate-subscription-current-period-start-and-end) — fields moved from Subscription onto SubscriptionItem
 - [Stripe Webhooks docs](https://docs.stripe.com/webhooks) — signature verification, raw body requirement
 - [Stripe Subscriptions webhooks](https://docs.stripe.com/billing/subscriptions/webhooks) — event catalog
 - [Stripe SCA readiness](https://docs.stripe.com/strong-customer-authentication) — PSD2 / 3DS2 flow
@@ -847,7 +870,7 @@ The integrator uses `confidence` to weight findings — a `confidence: low` patt
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

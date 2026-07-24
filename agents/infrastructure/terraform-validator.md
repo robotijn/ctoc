@@ -37,7 +37,7 @@ tflint --recursive --format=json
 # Checkov
 checkov -d . --framework terraform --output json
 
-# Trivy (formerly tfsec)
+# Trivy (supersedes tfsec — Aqua consolidated tfsec's engine into Trivy; tfsec is maintenance-only)
 trivy config . --format json
 ```
 
@@ -125,12 +125,12 @@ resource "aws_s3_bucket_public_access_block" "data" {
 | Medium | 8 |
 
 **Critical Issues:**
-1. `CKV_AWS_19` - S3 bucket publicly accessible
+1. `CKV_AWS_20` - S3 bucket ACL allows public READ access
    - Resource: `aws_s3_bucket.data`
    - File: `storage.tf:12`
    - Fix: Add `aws_s3_bucket_public_access_block`
 
-2. `CKV_AWS_23` - Security group allows 0.0.0.0/0
+2. `CKV_AWS_24` - Security group allows ingress from 0.0.0.0/0 to port 22
    - Resource: `aws_security_group.web`
    - File: `network.tf:45`
    - Fix: Restrict to specific CIDR ranges

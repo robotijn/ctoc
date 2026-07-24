@@ -27,7 +27,7 @@ This agent produces **business** output (unit economics), not technical output. 
 You produce a **unit economics model** that's accurate enough to inform stack decisions, infra budget, and go/no-go.
 
 The five numbers that matter:
-1. **LTV** (Lifetime Value) — average revenue per customer over their lifetime
+1. **LTV** (Lifetime Value) — contribution margin per customer over their lifetime (revenue net of per-customer costs, not gross revenue)
 2. **CAC** (Customer Acquisition Cost) — what it costs to acquire one customer
 3. **Payback period** — months to recover CAC from gross margin
 4. **Gross margin %** — (revenue − COGS) / revenue
@@ -48,7 +48,7 @@ pricing:
     - name: team
       price_monthly: 49
       price_annual: 490
-  free_to_paid_conversion_rate_target: 5%   # industry default: 3-7% for B2C
+  free_to_paid_conversion_rate_target: 5   # percent; industry rule of thumb 3-7 for B2C
 
 acquisition:
   primary_channel: organic | paid | content | referral | sales
@@ -71,24 +71,43 @@ team:
 
 ## Calculations
 
+The fact set states percentages as whole numbers (`stripe_fee_pct: 2.9`
+means 2.9%, `monthly_churn_pct_target: 5` means 5%). Convert each to a
+fraction before it enters a formula — treating `2.9` as `2.9` rather than
+`0.029` inverts the sign of the result.
+
 ```javascript
-// LTV
-const arpu_monthly = avg_price * (1 - stripe_fee_pct) - infra_per_user - support_per_user;
-const customer_lifetime_months = 1 / churn_monthly;
+// Per-transaction Stripe cost on one monthly charge (percent fee + fixed fee)
+const stripe_cost = avg_price * (stripe_fee_pct / 100) + stripe_fee_fixed;
+
+// ARPU after per-user costs = monthly contribution margin per customer, in dollars
+const arpu_monthly = avg_price - stripe_cost - infra_per_user - support_per_user;
+
+// Gross margin as a fraction of revenue (contribution / revenue)
+const gross_margin = arpu_monthly / avg_price;
+
+// LTV — contribution-margin LTV, not gross-revenue LTV
+const churn_monthly = churn_monthly_pct / 100;          // 5 -> 0.05
+const customer_lifetime_months = 1 / churn_monthly;      // 0.05 -> 20 months
 const LTV = arpu_monthly * customer_lifetime_months;
 
-// CAC (blended)
+// CAC (blended) — paid_fraction + organic_fraction must sum to 1
 const CAC = paid_cac * paid_fraction + organic_cac * organic_fraction;
 
-// Payback period
+// Payback period — months of contribution margin to recover CAC
 const payback_months = CAC / arpu_monthly;
 
-// MRR target
-const required_mrr_for_sustainability = team_monthly_burn / gross_margin_pct;
+// MRR target — revenue needed so contribution margin covers the burn
+const required_mrr_for_sustainability = team_monthly_burn / gross_margin;
 const customers_needed = required_mrr_for_sustainability / avg_price;
 ```
 
-## Health benchmarks (for SaaS in 2026)
+## Health benchmarks (software-as-a-service rules of thumb)
+
+These thresholds are widely cited industry guidelines, not laws — the LTV:CAC
+"3" and the 12-month payback are heuristics that vary by segment, stage, and
+sales motion. Treat a value inside a band as a signal to investigate, never as
+a pass/fail verdict, and always report the assumptions behind it.
 
 | Metric | Green | Yellow | Red |
 |---|---|---|---|
@@ -113,13 +132,13 @@ unit_economics:
     payback_months: 1.7
     gross_margin_pct: 92
     monthly_burn: 3000
-    customers_needed_to_break_even: 158
+    customers_needed_to_break_even: 171   # burn 3000 / contribution margin 17.50
     months_to_break_even_assuming_growth_X: 9
   health: green
-  benchmarks_used: "2026 B2C SaaS averages"
+  benchmarks_used: "software-as-a-service rules of thumb (see benchmark table)"
   flags:
     - "Churn assumption (5%) is industry default — validate with first 100 users"
-    - "CAC assumes 80% organic — review when adding paid acquisition"
+    - "CAC assumes ~67% organic / 33% paid — review when scaling paid acquisition"
   next_actions:
     - "Validate pricing with 5 customer interviews"
     - "Track actual churn weekly for first 90 days"

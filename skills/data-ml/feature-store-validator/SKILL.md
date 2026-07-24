@@ -35,7 +35,7 @@ You are a paranoid MLOps reviewer. You assume every feature in the store is wron
 
 ## 2026 Best Practices (Data/ML category)
 
-- **Point-in-time joins are non-negotiable.** Every training example must see only feature values whose event timestamp `<=` the example timestamp. Without "as-of" joins, future labels leak into past features. The published symptom: offline AUC inflates while online performance collapses. Any feature view used for training MUST go through the store's point-in-time API (`get_historical_features` in Feast, `get_features_for_training` in Tecton, `get_batch_data` in Hopsworks); never a naive `LEFT JOIN ... ON entity_id`.
+- **Point-in-time joins are non-negotiable.** Every training example must see only feature values whose event timestamp `<=` the example timestamp. Without "as-of" joins, future labels leak into past features. The published symptom: offline AUC inflates while online performance collapses. Any feature view used for training MUST go through the store's point-in-time API (`get_historical_features` in Feast, `get_features_for_events` in Tecton, `feature_view.training_data()` in Hopsworks — note Hopsworks' `get_batch_data()` is point-in-time correct too but is for batch *inference*, not training); never a naive `LEFT JOIN ... ON entity_id`.
 - **Single transform path, two stores.** Training-serving skew comes from one place: the same conceptual feature computed by two different code paths. The 2026 standard is one feature definition (Python / SQL / DSL) that materializes into BOTH the offline store (training, backfill) and the online store (real-time serving). If you find a feature whose online code differs from its offline code, that is a critical finding regardless of whether the numbers currently match.
 - **Online/offline consistency must be monitored, not assumed.** Even with a single transform path, async materialization, late-arriving data, and store-specific encodings introduce drift. Production feature stores in 2026 sample N entities per feature view on a schedule, fetch from both stores, and alert on mismatch rate. Default sample size in mature deployments: 1000+ entities per view per check. Alert when mismatch rate > 1%.
 - **Feature versioning + deprecation policy.** Every feature view carries an explicit `version` integer. Schema changes (dtype change, semantic change, transform change) bump the version. Old versions stay readable for at least one full sprint after the new version ships, with a deprecation notice attached and an owner-acknowledged removal date. Models pin to a specific version at inference — never "latest."
@@ -200,23 +200,41 @@ features = store.get_online_features(
 ).to_dict()
 ```
 
-In Tecton: pin via `feature_service_version`. In Hopsworks: pin via `feature_view.version`. In Feast: encode version in the feature view name (Feast doesn't have first-class versioning yet; the community pattern is `name__vN`).
+In Tecton: pin by naming a specific deployed Feature Service (versioning is a property of the published service, not a client-side argument). In Hopsworks: pin via `feature_view.version` (e.g. `fs.get_feature_view(name, version=3)`). In Feast: encode version in the feature view name (Feast doesn't have first-class versioning yet; the community pattern is `name__vN`).
 
 ### 6. Hot Online Feature With No Offline Backfill
 
 A real-time feature exists in the online store but never materializes to the offline store. Training jobs can't reproduce it → models trained on a different feature set than they serve on → permanent training-serving skew.
 
 ```python
-# BAD: stream-only feature
-StreamFeatureView(name="last_5min_clicks", source=kafka_source, online=True, offline=False)
-
-# SAFE: dual sink — write through to offline for training reproducibility
-StreamFeatureView(
-    name="last_5min_clicks",
-    source=kafka_source,
-    sinks=[OnlineSink(redis), OfflineSink(bigquery)],   # tee to both
-    online=True, offline=True,
+# BAD: Kafka stream source with NO batch_source. The StreamFeatureView is
+# online-only; get_historical_features() has nothing to read, so training
+# cannot reproduce the served feature -> permanent training-serving skew.
+kafka_source = KafkaSource(
+    name="clicks_stream",
+    kafka_bootstrap_servers="broker:9092",
+    topic="clicks",
+    timestamp_field="event_timestamp",
+    message_format=JsonFormat(schema_json="..."),
+    # no batch_source -> no offline copy
 )
+StreamFeatureView(name="last_5min_clicks", source=kafka_source, online=True)
+
+# SAFE: give the Kafka source a batch_source (a warehouse table the stream also
+# lands in). The StreamFeatureView derives its offline store from it, so
+# get_historical_features() reproduces the exact serving feature for training.
+kafka_source = KafkaSource(
+    name="clicks_stream",
+    kafka_bootstrap_servers="broker:9092",
+    topic="clicks",
+    timestamp_field="event_timestamp",
+    message_format=JsonFormat(schema_json="..."),
+    batch_source=BigQuerySource(table="proj.clicks.clicks_log",
+                                timestamp_field="event_timestamp"),
+)
+StreamFeatureView(name="last_5min_clicks", source=kafka_source, online=True)
+# For ad-hoc stream ingestion, tee to BOTH stores explicitly on push:
+#   store.push("clicks_push_source", df, to=PushMode.ONLINE_AND_OFFLINE)
 ```
 
 ### 7. Missing Freshness SLA
@@ -294,7 +312,7 @@ feature_requirements = {
 
 ## Tool Integration (2026)
 
-The 2026 landscape consolidated after Databricks acquired Tecton (2025). Five platforms cover most of the deployed base; cloud-native variants serve teams committed to a single hyperscaler.
+Databricks acquired Tecton's assets in 2025 (announced August 2025), folding its real-time feature pipelines into the Databricks Lakehouse and Agent Bricks stack. The platforms below cover most of the deployed base; cloud-native variants serve teams committed to a single hyperscaler.
 
 | Platform | Strengths | Trade-offs | When |
 |---|---|---|---|
@@ -312,16 +330,21 @@ The 2026 landscape consolidated after Databricks acquired Tecton (2025). Five pl
 feast apply                                          # validates definitions, fails on schema/owner gaps
 feast registry-dump                                  # inspect registered feature views
 feast materialize-incremental $(date -u +%FT%TZ)
-feast validate                                       # community plugin: schema + ownership checks
+feast feature-views list                             # inspect registered views (add --tags to filter by owner/version)
+# Data validation is NOT a CLI command: use the DQM module (feast.dqm.ge_profiler)
+# to validate a saved dataset against a reference profile programmatically.
 
-# Hopsworks — built-in feature monitoring + lineage
-hopsworks feature-store fg-monitor --name user_stats --window 1d --reference 30d
-hopsworks feature-store lineage --feature-view user_orders__v3
+# Hopsworks — feature monitoring & lineage are Python-SDK / UI only (there is no such CLI):
+#   fg.create_feature_monitoring(name="amt_monitor") \
+#     .with_detection_window(window_length="1w").with_reference_window(window_length="2w") \
+#     .compare_on(feature_name="amount", metric="mean", threshold=0.2).save()
+#   fg.get_feature_monitoring_configs()          # inspect configured monitors
+#   # lineage/provenance: feature-group / feature-view provenance API + Hopsworks UI
 
 # Tecton — feature-as-code apply with diff
 tecton plan                                          # diff vs prod registry
 tecton apply                                         # gated by reviewer-approved PR
-tecton materialization-status --feature-view fraud_features
+tecton materialization-status fraud_features         # feature-view name is positional
 
 # Cross-platform: generate as-of join in SQL via the offline store SDK
 # Replace placeholders before running — none of the values below are real:
@@ -360,22 +383,22 @@ var features = hash.ToDictionary(e => (string)e.Name!, e => (string)e.Value!);
 ```
 
 ```java
-// Java 21 — Tecton Java SDK online retrieval (pin feature_service_version)
+// Java 21 — Tecton HTTP Java client (ai.tecton:java-client) online retrieval.
+// Version pinning is by the DEPLOYED feature service you name, not a client-side
+// int — the client has no featureServiceVersion parameter.
 import ai.tecton.client.TectonClient;
 import ai.tecton.client.request.GetFeaturesRequest;
+import ai.tecton.client.request.GetFeaturesRequestData;
+import ai.tecton.client.response.GetFeaturesResponse;
 
-TectonClient client = TectonClient.builder()
-        .url(System.getenv("TECTON_URL"))
-        .apiKey(System.getenv("TECTON_API_KEY"))
-        .build();
+TectonClient client = new TectonClient(
+        System.getenv("TECTON_URL"), System.getenv("TECTON_API_KEY"));
 
-GetFeaturesRequest req = GetFeaturesRequest.builder()
-        .workspaceName("prod")
-        .featureServiceName("fraud_features")
-        .featureServiceVersion(7)                          // pinned
-        .joinKeyMap(Map.of("user_id", userId))
-        .build();
-var resp = client.getFeatures(req);
+GetFeaturesRequestData data = new GetFeaturesRequestData()
+        .addJoinKey("user_id", userId);
+GetFeaturesRequest req = new GetFeaturesRequest("prod", "fraud_features", data);
+GetFeaturesResponse resp = client.getFeatures(req);
+var values = resp.getFeatureValuesAsMap();
 ```
 
 ```typescript
@@ -488,7 +511,7 @@ C and C++ are intentionally out of scope: feature-store client SDKs do not targe
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |-------|----------|--------|
@@ -549,7 +572,7 @@ The integrator uses `confidence` and `kind` to route the finding. `training_serv
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

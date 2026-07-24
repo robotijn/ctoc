@@ -60,7 +60,7 @@ npx cypress run --spec "cypress/e2e/auth.cy.ts"
 
 - name: Upload artifacts
   if: failure()
-  uses: actions/upload-artifact@v3
+  uses: actions/upload-artifact@v4
   with:
     name: playwright-report
     path: playwright-report/
@@ -119,7 +119,6 @@ If the project has Docker, **E2E tests MUST run against the containerized app**.
 
 ```yaml
 # docker-compose.e2e.yml
-version: '3.8'
 services:
   app:
     build: .
@@ -150,7 +149,7 @@ services:
 docker build -t app:e2e .
 
 # 2. Start containerized app
-docker-compose -f docker-compose.e2e.yml up -d
+docker compose -f docker-compose.e2e.yml up -d
 
 # 3. Wait for health
 ./scripts/wait-for-health.sh http://localhost:3000/health
@@ -159,7 +158,7 @@ docker-compose -f docker-compose.e2e.yml up -d
 BASE_URL=http://localhost:3000 npx playwright test
 
 # 5. Cleanup
-docker-compose -f docker-compose.e2e.yml down -v
+docker compose -f docker-compose.e2e.yml down -v
 ```
 
 ### Required Checks Before Deploy
@@ -206,7 +205,7 @@ docker-compose -f docker-compose.e2e.yml down -v
 
 ## Zero Tolerance: Flaky E2E Tests
 
-**0 flaky tests allowed.** This is a BLOCKING rule at Step 13 (VERIFY).
+**0 flaky tests allowed.** This is a BLOCKING rule at Step 14 (VERIFY).
 
 | Situation | Action |
 |-----------|--------|
@@ -218,7 +217,7 @@ docker-compose -f docker-compose.e2e.yml down -v
 
 Flaky test handling:
 1. Retry up to 2 times automatically
-2. If still fails after 2 retries -> BLOCK Step 13
+2. If still fails after 2 retries -> BLOCK Step 14
 3. Fix the root cause before proceeding
 4. NEVER mark as "known flaky" and ignore
 

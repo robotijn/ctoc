@@ -21,14 +21,14 @@ You run mutation testing to verify that tests actually catch bugs, not just cove
 
 ### Python (mutmut)
 ```bash
-# Run mutation testing
-mutmut run --paths-to-mutate=src/
+# Run mutation testing (source paths come from config; see below)
+mutmut run
 
-# Show results
-mutmut results
+# Scope to matching mutant names (Unix glob over module.function names)
+mutmut run "my_module*"
 
-# Show surviving mutants
-mutmut show <id>
+# Review mutants interactively (killed / survived / timeout / skipped)
+mutmut browse
 ```
 
 ### JavaScript/TypeScript (Stryker)
@@ -36,8 +36,8 @@ mutmut show <id>
 # Run Stryker
 npx stryker run
 
-# With config
-npx stryker run --configFile=stryker.conf.js
+# With an explicit config file (passed as a positional argument)
+npx stryker run stryker.conf.js
 ```
 
 ### Java (PIT)
@@ -72,7 +72,7 @@ cargo mutants
 | Score | Quality |
 |-------|---------|
 | 80%+ | Good test suite |
-| 60-80% | Needs improvement |
+| 60-79% | Needs improvement |
 | <60% | Serious gaps |
 
 ## Output Format
@@ -123,9 +123,8 @@ cargo mutants
 ```ini
 # setup.cfg
 [mutmut]
-paths_to_mutate=src/
-tests_dir=tests/
-runner=pytest
+source_paths=src/
+pytest_add_cli_args_test_selection=tests/
 ```
 
 ### Stryker (JavaScript)
