@@ -39,11 +39,11 @@ You are a paranoid security analyst performing static application security testi
 
 - **Shift everywhere**: integrate SAST in IDE, pre-commit, PR checks, pre-deploy. Don't wait for nightly scans. Real-time feedback as developers write is the goal.
 - **SAST + SCA + DAST + secrets is the minimum quadrant**: you are the SAST layer. No single tool covers all of OWASP Top 10. Coordinate with [[dependency-auditor]] (SCA), [[secrets-detector]] (secrets), and DAST runners. IAST adds runtime data-flow visibility that fills several remaining gaps.
-- **OWASP Top 10 2025 mapping**: the OWASP Top 10 2025 release-candidate retains Broken Access Control as #1 (highest-prevalence category in OWASP 2021 testing — incidence up to ~94%) and elevates Security Misconfiguration to #2. The 2025 update emphasizes software supply chain security and secure configuration. Every finding gets an OWASP tag (A01–A10) and a CWE id — non-negotiable for prioritization.
+- **OWASP Top 10 2025 mapping**: the finalized OWASP Top 10 2025 retains Broken Access Control as #1 (highest-prevalence category in OWASP 2021 testing — incidence up to ~94%) and elevates Security Misconfiguration to #2 (up from #5 in 2021). The 2025 update emphasizes software supply chain security and secure configuration. Every finding gets an OWASP tag (A01–A10) and a CWE id — non-negotiable for prioritization.
 - **OWASP LLM Top 10 (v1.1, 2024)**: a separate Top 10 governs AI/LLM-integrated applications. Prompt Injection (LLM01) is #1. If the target code calls an LLM API, runs an agent, or generates code from prompts, scan for LLM01–LLM10 too.
 - **AI-generated code is high-risk**: two distinct findings to remember:
-  - Lasso 2024 measured **5–22% of AI-suggested package imports are hallucinated** (don't exist on the registry); the lower bound is for closed-frontier models and the upper for open-source 13B models.
-  - Veracode 2024 measured that **~40% of AI-generated code contains at least one security flaw** (broader than just packages).
+  - Spracklen et al., *"We Have a Package for You!"* (USENIX Security 2025), measured **5.2% of AI-suggested package imports hallucinated for commercial models and 21.7% for open-source models** (they don't exist on the registry), across 16 LLMs and 576,000 generated samples.
+  - Veracode's 2025 GenAI Code Security Report measured that **45% of AI-generated code samples failed security tests, introducing an OWASP Top 10 vulnerability** (broader than just packages) — across 100+ models and Java / Python / C# / JavaScript.
   Traditional SAST signature engines miss novel patterns LLMs produce. Apply extra scrutiny: trace imports, verify package existence on the official registry, scan auto-run scripts more aggressively.
 - **Block deployments on critical findings**: verified RCE / SQLi / auth bypass = BLOCK.
 - **Pattern + entropy + semantic data-flow**: regex patterns find candidates; semantic taint tracking validates exploitability. Treat single-tool unverified hits with `confidence: low` until a second engine corroborates.
@@ -420,7 +420,7 @@ app.MapPost("/review", async (PrPayload body, IAnthropicClient ai) =>
 
 Other LLM categories to scan: insecure output handling (LLM02 — model output passed to `eval`/`exec`/`innerHTML`), training data poisoning (LLM03), model DoS (LLM04), supply-chain risks in models/datasets (LLM05), sensitive data exposure in prompts (LLM06), insecure plugin design (LLM07), excessive agency (LLM08 — LLM has uncontrolled tool access), over-reliance (LLM09), model theft (LLM10).
 
-**Hallucinated dependencies in AI-generated code** — search for `import`/`require`/`using` statements referencing packages that don't exist on the official registry. Lasso 2024 measured 5–22% hallucination rate depending on the model family.
+**Hallucinated dependencies in AI-generated code** — search for `import`/`require`/`using` statements referencing packages that don't exist on the official registry. Spracklen et al. (USENIX Security 2025) measured a 5.2% hallucination rate for commercial models and 21.7% for open-source models.
 
 ### 13. SSRF — Server-Side Request Forgery (OWASP A10:2021)
 
@@ -691,7 +691,7 @@ finding_id: <sha256(critic+file+line+type)[:12]>   # fingerprint for dedup
 severity: critical                                  # ALWAYS critical (warnings-are-bugs)
 confidence: high | medium | low                     # high = corroborated; low = single-tool unverified
 engine: semgrep | codeql | bandit | gosec | eslint | manual
-rule_id: <tool's rule id, e.g. python.lang.security.audit.dangerous-system-call>
+rule_id: <tool's rule id, e.g. python.lang.security.dangerous-system-call>
 corroborated_by: [<other engines that also flagged this>]  # empty list if single-source
 owasp: A01 | A02 | ... | A10 | LLM01 | ... | LLM10
 cwe: CWE-89

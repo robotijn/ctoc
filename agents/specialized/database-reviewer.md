@@ -61,8 +61,9 @@ CREATE INDEX idx_orders_date ON orders(order_date);
 -- Postgres: expand -> backfill -> contract, each step non-blocking.
 SET lock_timeout = '3s';            -- fail fast instead of queueing behind a held lock
 
--- 1. Expand: add the column nullable (PG11+: a CONSTANT default is metadata-only,
---    no table rewrite; a VOLATILE default such as now() still rewrites).
+-- 1. Expand: add the column nullable (PG11+: a NON-VOLATILE default is metadata-only,
+--    no table rewrite -- now()/CURRENT_TIMESTAMP are STABLE and qualify; only a
+--    VOLATILE default such as clock_timestamp() still rewrites the table).
 ALTER TABLE users ADD COLUMN email VARCHAR(255);
 
 -- 2. Backfill in batches OUTSIDE this migration; a single UPDATE locks every

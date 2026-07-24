@@ -42,7 +42,8 @@ npx stryker run stryker.conf.js
 
 ### Java (PIT)
 ```bash
-mvn org.pitest:pitest-maven:mutationCoverage
+# test-compile ensures test classes exist before the goal runs (per PIT's Maven quickstart)
+mvn test-compile org.pitest:pitest-maven:mutationCoverage
 ```
 
 ### Rust (cargo-mutants)
@@ -64,10 +65,12 @@ cargo mutants
 
 - **Killed**: Test caught the mutation ✅
 - **Survived**: Test missed the bug ❌
-- **Timeout**: Mutation caused infinite loop
-- **No Coverage**: Code not covered by tests
+- **Timeout**: Mutation ran too long (often an infinite loop). Counts as detected — a hung test fails in continuous integration.
+- **No Coverage**: Code not covered by tests. Counts as undetected — no test could have caught it.
 
-**Mutation Score** = Killed / Total × 100%
+**Mutation Score** = Detected / Valid × 100% = (Killed + Timeout) / (Killed + Timeout + Survived + No Coverage) × 100%
+
+Timeouts count toward Detected (Stryker, PIT, mutmut, and cargo-mutants all treat a timed-out mutant as caught). Compile errors and runtime errors are INVALID mutants and are excluded from the denominator entirely, not counted against the score.
 
 | Score | Quality |
 |-------|---------|
@@ -92,7 +95,7 @@ cargo mutants
 | Timeout | 8 |
 | No Coverage | 4 |
 
-**Mutation Score**: 82%
+**Mutation Score**: 85%   (Detected 209 = Killed 201 + Timeout 8; Valid 245 = 209 + Survived 32 + No Coverage 4; 209 / 245 = 85%)
 
 ### Surviving Mutants (Top 5)
 1. `src/calculator.py:45`

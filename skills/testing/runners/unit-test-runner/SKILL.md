@@ -407,7 +407,7 @@ Persist a **timing CSV** (`.test-durations`, `.nx/timing.json`, etc.) in the rep
 
 ## Severity (internal triage vs. refinement-loop output) — reconciliation
 
-The skill keeps two views of severity. The **internal triage view** (table below) is used for the human-readable report ordering and for the action recommendation column. The **wire-level letter severity** is always `critical` per [warnings-are-critical.md](../../../agent-fragments/warnings-are-critical.md) — there is no `warn` / `medium` / `low` on the wire; the [letter schema](../../../../.ctoc/architecture/refinement-loop-schema.json) rejects them.
+The skill keeps two views of severity. The **internal triage view** (table below) is used for the human-readable report ordering and for the action recommendation column. The **wire-level letter severity** is always `critical` per [warnings-are-critical.md](../../../agent-fragments/warnings-are-critical.md) — this runner emits no `warn` / `medium` / `low` on the wire. The [letter schema](../../../../.ctoc/architecture/refinement-loop-schema.json) `severity` enum is `critical` / `medium` / `low`, so it rejects `warn`; emitting only `critical` is the warnings-are-bugs policy, not a schema constraint (the triage tier rides in `kind`, never `severity`).
 
 Reconciliation rule: the runner emits one letter per finding with `severity: critical`. The integrator uses `confidence`, `kind`, and `reachable`-equivalent signals (here: `delta_to_baseline` and `seed` reproducibility) to decide whether to block the phase immediately or surface for review. The internal triage tier is conveyed via the `kind` field, not via the `severity` field.
 

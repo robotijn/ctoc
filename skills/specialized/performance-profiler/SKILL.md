@@ -125,7 +125,7 @@ eBPF-based profilers (parca-agent, Pixie, Pyroscope eBPF) avoid the frame-pointe
 py-spy record -o profile.svg --pid <pid> --duration 60
 
 # Python-vs-native + memory in one pass, then save the report
-scalene app.py               # profiles: Python time vs native time vs memory
+scalene run app.py           # profiles: Python time vs native time vs memory → scalene-profile.json
 scalene view --html          # writes scalene-profile.html (or: scalene view --cli)
 
 # Allocation forensics (memray ≥ 1.13)

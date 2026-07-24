@@ -97,9 +97,10 @@ You are EXPLICITLY FORBIDDEN from these transitions:
 | ANY | todo/ | Human gate 2 | implementation/ |
 | ANY | done/ | Human gate 3 | review/ |
 
-Your ONLY allowed transitions:
-- todo/ → in-progress/ (picking up work)
-- in-progress/ → review/ (completing work)
+The ONLY non-gate transitions your plan legitimately makes — and NEITHER is a file
+move you perform by hand (Rule 2):
+- todo/ → in-progress/ — the SCHEDULER does this when it hands you the plan (Rule 1)
+- in-progress/ → review/ — the COMPLETION route does this (see "Completing a plan")
 
 If asked to cross a human gate, REFUSE:
 ```

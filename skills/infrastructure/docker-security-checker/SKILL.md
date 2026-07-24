@@ -37,7 +37,7 @@ You are a paranoid container-security analyst. You treat every Dockerfile as a p
 
 ## 2026 Best Practices (Infrastructure category)
 
-- **Runtime base-image preference order**: **distroless > Chainguard/DHI > Alpine > Debian-slim > full Debian/Ubuntu**. Distroless images contain only the app and its runtime dependencies — no shell, no package manager, no `curl`/`wget`/`apt`/`apk`. An attacker who lands RCE inside a distroless container cannot spawn a shell, cannot install tools, cannot `curl | sh`. Use `gcr.io/distroless/cc`, `gcr.io/distroless/static`, `gcr.io/distroless/nodejs20-debian12`, `gcr.io/distroless/java21-debian12`, or — for .NET — `mcr.microsoft.com/dotnet/aspnet:9.0-noble-chiseled` (chiseled: no shell, no package manager, non-root by default) or the true-distroless `mcr.microsoft.com/dotnet/aspnet:9.0-azurelinux3.0-distroless` for the runtime stage. The `-debianNN` suffix on the Google distroless names tracks the Debian generation — `-debian13` is the current one (an omitted distribution now resolves to it), so treat the `-debian12` variants as the older generation and move up as your language version gains a `-debian13` build. If distroless is too restrictive (you genuinely need `sh` for a wrapper), Docker Hardened Images (DHI, released late 2025 under Apache 2.0) and Chainguard images are the next-best — pre-stripped, pre-scanned, continuously updated.
+- **Runtime base-image preference order**: **distroless > Chainguard/DHI > Alpine > Debian-slim > full Debian/Ubuntu**. Distroless images contain only the app and its runtime dependencies — no shell, no package manager, no `curl`/`wget`/`apt`/`apk`. An attacker who lands RCE inside a distroless container cannot spawn a shell, cannot install tools, cannot `curl | sh`. Use `gcr.io/distroless/cc`, `gcr.io/distroless/static`, `gcr.io/distroless/nodejs20-debian12`, `gcr.io/distroless/java21-debian12`, or — for .NET — `mcr.microsoft.com/dotnet/aspnet:9.0-noble-chiseled` (chiseled: no shell, no package manager, non-root by default) or the true-distroless `mcr.microsoft.com/dotnet/aspnet:9.0-azurelinux3.0-distroless` for the runtime stage. The `-debianNN` suffix on the Google distroless names tracks the Debian generation — `-debian13` is the current one (an omitted distribution now resolves to it), so treat the `-debian12` variants as the older generation and move up as your language version gains a `-debian13` build. If distroless is too restrictive (you genuinely need `sh` for a wrapper), Docker Hardened Images (DHI, released May 2025; images distributed under Apache 2.0) and Chainguard images are the next-best — pre-stripped, pre-scanned, continuously updated.
 - **Multi-stage build is mandatory**: a `builder` stage with compilers and `dev` dependencies, then a runtime stage with only the artifact. Never ship a compiler, `git`, `curl`, or test tooling in the runtime image. Multi-stage cuts attack surface and image size in one move.
 - **Pin base images by digest, not tag**: `FROM node:20.11.0-alpine` is a moving target the moment Alpine rebases. Use `FROM node:20.11.0-alpine@sha256:...` so the build is reproducible and a registry takeover cannot retarget your base layer. Renovate / Dependabot keep the digest fresh.
 - **Sign every image with Cosign + Sigstore; verify in CI and at admission**: keyless signing via OIDC (GitHub Actions, GitLab, Google) means no long-lived private keys. The signature lands in the OCI registry alongside the image; Rekor records it in the transparency log; Fulcio issues the short-lived cert. Verify with `cosign verify <image> --certificate-identity ... --certificate-oidc-issuer ...` at deploy time and via Kubernetes admission (Kyverno / Sigstore Policy Controller).
@@ -445,7 +445,7 @@ cosign sign --yes \
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [../../agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 **Reconciliation rule (triage tier → letter)**: triage tier never lowers the letter's severity. The triage tier informs the *integrator*'s decision about which findings to surface to the user first and which to defer for a later iteration, but every emitted letter carries `severity: critical`. The `confidence` and `corroborated_by` fields, not severity, are what the integrator uses to deduplicate and weight findings across engines.
 
@@ -472,7 +472,7 @@ These tiers are the **internal triage view** used when you produce a human-reada
 ### Dockerfile Analysis (hadolint)
 | Rule | Severity | Line | Message |
 |------|----------|------|---------|
-| DL3007 | error | 1 | Using latest tag |
+| DL3007 | warning | 1 | Using latest tag |
 | DL3002 | warning | 14 | Last USER should not be root |
 | DL3018 | warning | 9 | Pin versions in apk add |
 
@@ -561,7 +561,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — a 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

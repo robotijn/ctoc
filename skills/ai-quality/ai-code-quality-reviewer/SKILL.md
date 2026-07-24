@@ -18,7 +18,7 @@ related_skills:
   - quality/code-smell-detector
   - security/sast-scanner
   - security/dependency-auditor
-  - quality/concurrency-checker
+  - security/concurrency-checker
 effort_level: high
 tools: Read, Grep
 model: opus
@@ -43,7 +43,7 @@ You review AI-generated code for quality issues specific to AI generation patter
 
 - **Every AI-generated PR needs human review** — no exception, no fast-track. A 2026 study of agent-authored pull requests in popular repositories ("These Aren't the Reviews You're Looking For," arXiv 2605.02273) found **84% received no human review or were reviewed only by other agents**. The PR-review gate is the load-bearing safety net.
 - **Treat AI suggestions as junior-dev work — assume errors until proven otherwise**. The 2025 Stack Overflow Developer Survey found **66% of developers name "AI solutions that are almost right, but not quite" as their top frustration**, and **45% report debugging AI-generated code is more time-consuming**. Tone the review accordingly: skeptical, line-by-line.
-- **Verify every import exists on the registry**. The USENIX Security 2025 study *We Have a Package for You!* (Spracklen et al.) measured package-hallucination rates of **at least 5.2% for commercial models and 21.7% for open-source models** (19.7% of 2.23M generated code samples contained a hallucinated package), and found **43% of hallucinated names recur on every one of ten identical prompt runs** — meaning attackers can pre-register the predictable names (slopsquatting). For dependency verification, cross-link [[dependency-auditor]].
+- **Verify every import exists on the registry**. The USENIX Security 2025 study *We Have a Package for You!* (Spracklen et al.) measured package-hallucination rates of **at least 5.2% for commercial models and 21.7% for open-source models** (across 576,000 generated code samples, 440,445 of the 2.23M package references — 19.7% — were hallucinated), and found **43% of hallucinated names recur on every one of ten identical prompt runs** — meaning attackers can pre-register the predictable names (slopsquatting). For dependency verification, cross-link [[dependency-auditor]].
 - **Verify package signatures and provenance**. Sigstore / npm provenance / PEP 740 attestations are now table stakes — flag any AI-introduced dependency without an attestation.
 - **Apply extra scrutiny to AI-generated tests**. AI tests routinely encode the *current implementation* rather than the *specification* (pass-through assertions, tautological mocks, assertions that only check truthiness). Coverage numbers from such suites give false confidence — treat 100% AI-test coverage as "unknown" until each assertion is read.
 - **Check for outdated API patterns and framework-version mismatch**. Models trained mid-2024 still emit React 18 hook idioms in React 19 codebases, .NET 7 APIs in .NET 9 projects, Java 11 patterns in Java 21+ projects, deprecated Python 3.10 idioms in 3.12 code. Verify the project's framework version *before* approving any "modernization."
@@ -147,13 +147,13 @@ These categories are AI-generation-specific. Each one carries cross-links to sib
 
 ### A. Hallucinated import / fictional package
 
-The single highest-impact category. The model emits an `import` / `require` / `using` / `from ... import` that references a package the registry does not contain. Per the USENIX Security 2025 study *We Have a Package for You!* (Spracklen et al.), 43% of hallucinated names recur on every one of ten identical prompt runs — meaning attackers pre-register the predictable names on the registry (slopsquatting). A real case: the npm package `react-codeshift` — a name no real tool uses, conflating `jscodeshift` and `react-codemod` — was registered as a slopsquat in January 2026 and spread through AI-generated agent-skill files before it could be defensively claimed; similar conflations appear across ecosystems.
+The single highest-impact category. The model emits an `import` / `require` / `using` / `from ... import` that references a package the registry does not contain. Per the USENIX Security 2025 study *We Have a Package for You!* (Spracklen et al.), 43% of hallucinated names recur on every one of ten identical prompt runs — meaning attackers pre-register the predictable names on the registry (slopsquatting). A real case: `react-codeshift` — a name no real codemod tool uses, conflating `jscodeshift` and `react-codemod` — resolves on npm today only to a defensive placeholder published in January 2026 whose own package description reads "Placeholder to prevent dependency confusion": a security researcher pre-registered the predictable slop name before an attacker could. That a package name RESOLVES on the registry is therefore not proof it is real; similar conflations appear across ecosystems.
 
 Cross-link: [[dependency-auditor]] runs the actual registry-existence + signature checks. This skill flags the pattern; dependency-auditor blocks the install.
 
 ```typescript
 // TypeScript — AI ANTI-PATTERN
-import { transform } from "react-codeshift";        // does not exist on npm; classic LLM conflation
+import { transform } from "react-codeshift";        // no real codemod tool; npm name now resolves only to a defensive placeholder — classic LLM conflation
 import { debounce } from "lodash-utilities";        // hallucinated; correct is lodash or lodash.debounce
 ```
 
@@ -387,7 +387,7 @@ Action: `ai_pattern_kind: missing_business_rule`, `severity: critical`. Compare 
 **1. Hallucinated import — `react-codeshift`**
 - File: `src/transforms/codemod.ts:3`
 - Code: `import { transform } from "react-codeshift";`
-- Evidence: not present on npm registry; likely conflation of jscodeshift + react-codemod
+- Evidence: npm name resolves only to a defensive placeholder, not a functional codemod tool; likely conflation of jscodeshift + react-codemod
 - Fix: replace with `jscodeshift` (verify intended API) or remove
 - Route: [[dependency-auditor]] for blocking install
 
@@ -417,7 +417,7 @@ The 2026 review stack assumes layered AI-detection across IDE → PR → CI → 
 |------|------|------|
 | **GitHub Copilot review filters** | Per-PR AI-author flag, auto-tag of AI-generated diffs, configurable rules block patterns (hallucinated imports, debug prints, vacuous tests) before they hit reviewer | Every PR |
 | **Claude Code self-critique** | The integrator in Iron Loop calls this skill as a critic. Self-critique runs before the human gate; findings become letters | Step 11 (REVIEW), Step 16 (FINAL-REVIEW) |
-| **Cursor rules** (`.cursor/rules/*.mdc`) | Pre-suggest filters: "never propose a package not in lockfile," "always verify framework version before suggesting hook." Best practice in 2026 is `.mdc` rule files under `.cursor/rules/` checked into every repo — the legacy single-file `.cursorrules` is deprecated and silently ignored in Agent mode | Editor time |
+| **Cursor rules** (`.cursor/rules/*.mdc`) | Pre-suggest filters: "never propose a package not in lockfile," "always verify framework version before suggesting hook." Best practice in 2026 is version-controlled `.mdc` rule files under `.cursor/rules/` — the current Cursor docs define project rules solely as `.mdc` files there and no longer document the legacy single-file `.cursorrules`, which is deprecated | Editor time |
 | **Aikido AI Code Reviewer** | Third-party AI code-review service. Pairs with sast-scanner for security + quality on AI diffs | PR + nightly |
 | **Veracode AI Audit** | Compliance + security on AI-generated code. Reuses the Veracode 45%-flaw study findings | Scheduled |
 | **Custom git hooks for AI-detection** | Pre-commit / pre-push: detect AI-author signatures (Copilot, Cursor, Claude Code), require a `[ai-reviewed]` trailer on commit message, reject commits with no human reviewer if commit-trailer says `Generated-by: ai` | Local + CI |
@@ -454,7 +454,7 @@ corroborated_by: [<other engines that also flagged this — dependency-auditor, 
 target_file: src/transforms/codemod.ts
 target_line: 3
 source_hint: "import statement"                      # what generation step likely produced this
-message: "Hallucinated import: 'react-codeshift' not on npm; likely jscodeshift+react-codemod conflation"
+message: "Hallucinated import: 'react-codeshift' resolves only to a defensive placeholder on npm, not a real codemod tool; likely jscodeshift+react-codemod conflation"
 suggested_fix: "Replace with jscodeshift; verify intended API surface."
 reachable: true | false | unknown                    # is the offending line on a real call path?
 delta_to_baseline: new | unchanged | regressed       # vs prior review baseline if any
@@ -477,7 +477,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — a 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

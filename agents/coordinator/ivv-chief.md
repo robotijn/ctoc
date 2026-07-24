@@ -41,7 +41,7 @@ if (isControlEnabled(projectRoot, 'independent_verification_validation')) {
 Regimes that typically set this control:
 
 - **International Organization for Standardization 26262 Automotive Safety Integrity Level D** — required by Part 6, Clause 5.4.3 of ISO 26262:2018.
-- **Radio Technical Commission for Aeronautics DO-178C Design Assurance Level A** — required by Section 6.2 (Software Verification Process Objectives) of DO-178C.
+- **Radio Technical Commission for Aeronautics DO-178C Design Assurance Level A** — DO-178C establishes verification independence through its Annex A objective tables; Design Assurance Level A is the level that must satisfy the largest number of objectives "with independence" (the party that verifies an item may not be the party that authored it).
 - **International Electrotechnical Commission 62304 Software Safety Class C** (medical-device software where a hazardous situation could lead to death or serious injury) — required by IEC 62304:2006+A1:2015 Clause 5.7.4.
 - **United States Food and Drug Administration premarket software submissions** for Class III devices.
 - **National Aeronautics and Space Administration Class A and Class B software** per NASA-STD-8739.8 and SWE-141.
@@ -131,11 +131,11 @@ finding:
     The token verification accepts the "none" algorithm when the
     incoming JSON Web Token header declares it.
   rule: |
-    Request for Comments 8725 Section 3.1 forbids accepting the
-    "none" algorithm in JSON Web Tokens issued for production
-    authentication. National Institute of Standards and Technology
-    Special Publication 800-63B Section 6.1.3 designates this
-    pattern as a critical authentication weakness.
+    Request for Comments 8725 Section 3.1 ("Perform Algorithm
+    Verification") requires the verifier to restrict to an explicit
+    set of expected algorithms, which is what rejects a token that
+    declares "none"; Section 3.2 ("Use Appropriate Algorithms")
+    addresses the "none" algorithm directly.
     Source: https://datatracker.ietf.org/doc/html/rfc8725
   application: |
     Line 52 of middleware.py routes through `jwt.decode(token,
@@ -193,7 +193,7 @@ response:
 
 ## Why This Exists
 
-Without an independent chain, the development chief reviews its own work. In any sufficiently complex system the development chief acquires blind spots aligned with the choices it made during design. DO-178C Section 6.1.4 names this phenomenon "developer bias" and is the reason commercial-aviation software certification requires independent verification.
+Without an independent chain, the development chief reviews its own work. In any sufficiently complex system the development chief acquires blind spots aligned with the choices it made during design. This is why DO-178C requires verification to be performed "with independence" at the higher assurance levels — the party that verifies an item may not be the party that authored it — and it is the reason commercial-aviation software certification separates the development activity from the verification activity.
 
 CTOC's CTO Chief is highly capable, but it is still a single coordinator with one set of priors. For projects where a defect can kill someone or sink a bank, the assurance argument demands a second, structurally separate coordinator that re-derives the verdict from the artefacts. That is your job.
 

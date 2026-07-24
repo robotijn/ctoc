@@ -18,7 +18,7 @@ related_skills:
   - quality/complexity-analyzer
   - quality/code-reviewer
   - testing/writers/unit-test-writer
-  - quality/dead-code-finder
+  - quality/dead-code-detector
 effort_level: high
 tools: Read, Grep
 model: opus

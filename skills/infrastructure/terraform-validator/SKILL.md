@@ -188,7 +188,7 @@ terraform {
     region         = "us-east-1"
     encrypt        = true
     kms_key_id     = "alias/tfstate"
-    use_lockfile   = true                             # native S3 locking, TF 1.10+ / Tofu 1.8+
+    use_lockfile   = true                             # native S3 locking, TF 1.10+ / Tofu 1.10+
   }
 }
 

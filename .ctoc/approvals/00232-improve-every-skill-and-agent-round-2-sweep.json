@@ -1,0 +1,11 @@
+{
+  "content_sha256": "499e124810a50380faa577bbdd856074b08d7ce68cb6febd8a74ed153cb0571d",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-24T15:44:03.700Z",
+  "approved_by": "human",
+  "plan_basename": "00232-improve-every-skill-and-agent-round-2-sweep",
+  "override": true,
+  "override_reason": "Human authorized round-2 corpus sweep via \"continue\" 2026-07-24; continuation of approved program 00230."
+}

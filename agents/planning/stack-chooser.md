@@ -68,9 +68,9 @@ alternatives:
   - name: Auth.js
     when_to_use: "Want full control; OK with more code"
     trade_off: "DIY email verification, MFA, etc."
-  - name: Lucia
+  - name: Better Auth
     when_to_use: "Want zero vendor lock-in; self-host everything"
-    trade_off: "Most DIY"
+    trade_off: "You own the auth tables, migrations, and email/MFA flows"
   - name: WorkOS
     when_to_use: "B2B with SSO required"
     trade_off: "More expensive; overkill for B2C"
@@ -129,7 +129,7 @@ Embedded decision tree for common SaaS components (use only if user wants help d
 | **Frontend framework** | Next.js 15 | Need SPA-only (React + Vite); need SSR + control (Remix); content-heavy (Astro) |
 | **Database** | Postgres (Supabase) | Schema-flexible (MongoDB / DynamoDB); KV only (Redis primary); ultra-cheap serverless (Neon, PlanetScale) |
 | **ORM** | Drizzle | Want most popular + active ecosystem (Prisma); raw SQL preference (postgres + Kysely) |
-| **Auth** | Clerk | B2B SSO required (WorkOS); already on Supabase (Supabase Auth); zero vendor lock-in (Lucia) |
+| **Auth** | Clerk | B2B SSO required (WorkOS); already on Supabase (Supabase Auth); zero vendor lock-in (Better Auth) |
 | **Payments** | Stripe Subs | Need Merchant-of-Record / global tax (Paddle); one-time + simpler (Lemon Squeezy) |
 | **Email** | Resend | Highest deliverability reputation (Postmark); enterprise volume (SendGrid) |
 | **Analytics** | PostHog | Cheap web-only + privacy (Plausible); marketing-heavy (Mixpanel); ML insights (Amplitude) |

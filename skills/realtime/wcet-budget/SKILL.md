@@ -65,7 +65,7 @@ If none of the above is true, this skill is inert — the lean default per the r
 - **Modern processors make naive measurement unsafe.** Out-of-order execution, branch prediction, speculative execution, multi-level cache, prefetchers, write buffers, and shared bus arbitration each contribute non-monotonic timing effects. A measurement that hits a warm cache today can miss the cache tomorrow with a different interrupt pattern and run several times longer. The aiT toolchain explicitly models cache, pipeline, and branch prediction for supported architectures (ARM, Power Architecture, TriCore/AURIX, V850, x86, RISC-V on selected microcontrollers).
 - **Cache and pipeline jitter must be bounded, not averaged.** A static analyser assumes the worst safe cache state at every basic block — usually a cold cache — unless the analyst proves a warmer state. Pipeline state is similarly assumed pessimistic. The result is conservative; the discipline is to reduce pessimism by giving the analyser more program facts (loop bounds, recursion bounds, infeasible-path annotations), not by switching the bound off.
 - **Loop bounds are mandatory inputs.** A static Worst-Case Execution Time analyser cannot bound a `while (cond)` whose iteration count is data-dependent without an explicit annotation. Missing or wrong loop bounds are the most common source of unsound or unanalysable results. The annotation language (aiT's `AIS` format, LDRA's pragmas) belongs in the source tree, version controlled, reviewed at every architectural change.
-- **Multicore changes the question.** On a single core the Worst-Case Execution Time depends on the task's instruction stream and the local microarchitectural state. On a multicore platform it additionally depends on contention for the shared last-level cache, the shared memory bus, the shared interconnect, and shared peripheral channels. The established ARINC 653 and AUTOSAR Classic multicore discipline is that hard-real-time tasks on multicore platforms need **Robust Time Partitioning** — strict CPU pinning, cache colouring or partitioning, memory-bandwidth budgets, and per-core interrupt steering — without which no per-task Worst-Case Execution Time bound is portable across run-time conditions. See AbsInt's TimingExplorer and TimeWeaver pages for the multicore extension to the analysis pipeline (https://www.absint.com/timingexplorer/index.htm).
+- **Multicore changes the question.** On a single core the Worst-Case Execution Time depends on the task's instruction stream and the local microarchitectural state. On a multicore platform it additionally depends on contention for the shared last-level cache, the shared memory bus, the shared interconnect, and shared peripheral channels. The established ARINC 653 and AUTOSAR Classic multicore discipline is that hard-real-time tasks on multicore platforms need **Robust Time Partitioning** — strict CPU pinning, cache colouring or partitioning, memory-bandwidth budgets, and per-core interrupt steering — without which no per-task Worst-Case Execution Time bound is portable across run-time conditions. See AbsInt's TimeWeaver page for the hybrid multicore extension to the analysis pipeline (https://www.absint.com/timeweaver/index.htm).
 - **Pad the bound with a safety margin, then verify on hardware.** Industrial practice for RTCA DO-178C Level A and ISO 26262 Automotive Safety Integrity Level D is to add a documented safety margin — larger for measurement-based analysis than for sound static analysis, and larger still for measurement-only on multicore — and then verify the padded budget at Hardware-in-the-Loop using worst-case input vectors. The size of the margin is a documented, justified engineering decision, not a fixed constant. The margin compensates for hardware revisions, compiler-version changes, and inputs the analyst did not foresee.
 - **The Worst-Case Execution Time artifact is a living document.** A frozen binary produces a frozen Worst-Case Execution Time table. Any change to the compiler, the optimiser flags, the linker layout, the target silicon revision, the memory map, or the source code invalidates prior bounds and requires re-analysis. ISO 26262 Part 8 (Supporting processes — change management) is the applicable area.
 - **Underestimation is the cardinal sin.** A safe over-estimate causes schedulability rejection (fixable). An underestimate causes a deadline miss in flight (not fixable). When uncertain, the analyst emits a more pessimistic bound; soundness beats tightness whenever they conflict.
@@ -77,7 +77,7 @@ These tools are referenced as load-bearing in 2026 industrial practice. CTOC doe
 | Tool | Vendor | Analysis family | What it actually provides | Reference |
 |---|---|---|---|---|
 | **aiT** | AbsInt | Static (sound, abstract-interpretation) | Per-task upper bound on Worst-Case Execution Time computed from the binary plus a microarchitectural model. Models cache, pipeline, branch prediction for supported targets (ARM, Power Architecture, TriCore/AURIX, V850, x86, RISC-V on selected microcontrollers). Outputs an annotated control-flow graph and a textual report. Used in RTCA DO-178C Level A and ISO 26262 Automotive Safety Integrity Level D programmes. | https://www.absint.com/ait/index.htm |
-| **TimingExplorer / TimeWeaver** | AbsInt | Static + measurement (multicore extension) | Combines aiT-style static analysis with on-target trace measurement to bound timing on multicore platforms under contention. Targets ARM Cortex-A / -R multicore, Power Architecture multicore. Recommended companion to Robust Time Partitioning. | https://www.absint.com/timingexplorer/index.htm |
+| **TimeWeaver** | AbsInt | Hybrid (static + non-intrusive measurement) | Combines aiT-style static path analysis with on-target instruction-level trace measurement to bound timing on multicore platforms where inter-core interference cannot be fully controlled. Recommended companion to Robust Time Partitioning. | https://www.absint.com/timeweaver/index.htm |
 | **LDRA TBwcet** | LDRA | Measurement-based | Automates on-target Worst-Case Execution Time measurement via a test-harness wrapper (paired with TBexec), integrated with the LDRA Testbed coverage and traceability suite. Strength is the integration with structural coverage at Modified Condition Decision Coverage and Statement Coverage; the timing analysis sits inside the same artifact that already demonstrates DO-178C objectives. | https://ldra.com/products/tbwcet/ |
 | **RapiTime** | Rapita Systems | Hybrid (measurement + static structure) | Injects instrumentation into the source, collects timing on the actual target hardware, then combines those measurements with static control-flow structure to derive a worst-case bound with a documented safety margin. Strength is target-accuracy; weakness is dependence on input coverage. Often paired with aiT for the sound static safety net. | https://www.rapitasystems.com/products/rapitime |
 | **OTAWA / Heptane / Chronos** | Academic (open source) | Static | Open-source research toolchains used in teaching and in publications. Useful for cross-checking commercial tool output during a research-grade evaluation; not qualified per RTCA DO-178C unless the user does the qualification work themselves. | https://www.otawa.fr/ |
@@ -130,7 +130,7 @@ tasks:
     wcet_microseconds:
       bound: <integer, the upper bound that is claimed safe>
       method: static | measurement | hybrid
-      tool: aiT | LDRA TBwcet | RapiTime | TimingExplorer | OTAWA | custom
+      tool: aiT | LDRA TBwcet | RapiTime | TimeWeaver | OTAWA | custom
       tool_version: <string>
       safety_margin_pct: <integer, the percentage padding added on top of the raw analyser output>
       raw_analyser_output_microseconds: <integer, before margin>
@@ -400,7 +400,7 @@ task_id: <reference to the offending real-time task>
 deadline_microseconds: <integer>
 bound_microseconds: <integer or null>
 method: static | measurement | hybrid | absent
-tool: aiT | LDRA TBwcet | RapiTime | TimingExplorer | OTAWA | custom | none
+tool: aiT | LDRA TBwcet | RapiTime | TimeWeaver | OTAWA | custom | none
 tool_version: <string or null>
 target_file: .ctoc/realtime/wcet/<plan-id>.yaml
 target_line: <line in the artifact, if applicable>
@@ -408,7 +408,7 @@ message: <one-sentence explanation of the gap>
 suggested_fix: <one-sentence remediation>
 reference:
   - https://www.absint.com/ait/index.htm
-  - https://www.absint.com/timingexplorer/index.htm
+  - https://www.absint.com/timeweaver/index.htm
   - https://ldra.com/products/tbwcet/
   - https://www.rapitasystems.com/products/rapitime
   - https://www.embedded.com/wcet-analysis-getting-it-right/
@@ -440,7 +440,7 @@ The principle: a missing or unsound Worst-Case Execution Time today is the deadl
 ## References
 
 - AbsInt aiT Worst-Case Execution Time Analyzer — https://www.absint.com/ait/index.htm
-- AbsInt TimingExplorer and TimeWeaver (multicore extension) — https://www.absint.com/timingexplorer/index.htm
+- AbsInt TimeWeaver (hybrid static + measurement multicore WCET analysis) — https://www.absint.com/timeweaver/index.htm
 - LDRA TBwcet — https://ldra.com/products/tbwcet/
 - Rapita Systems RapiTime — https://www.rapitasystems.com/products/rapitime
 - Embedded.com — Worst-Case Execution Time analysis: getting it right — https://www.embedded.com/wcet-analysis-getting-it-right/

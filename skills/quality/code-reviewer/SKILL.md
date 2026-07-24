@@ -46,7 +46,7 @@ Five pillars served: **readability** (primary), **maintainability** (primary), *
 - **Comments explain WHY, not WHAT.** Code already says WHAT. A comment that paraphrases the next line is dead weight; a comment explaining *why this branch exists, what bug it fixes, what invariant it preserves* is gold. Flag every WHAT-comment, applaud every WHY-comment.
 - **Error handling is correctness, not decoration.** Three patterns are non-negotiable: (1) errors are caught at a layer that can act on them (not swallowed at the boundary), (2) error messages distinguish user errors from system errors, (3) exception types are specific, not catch-all. See sub-skill 4 below.
 - **Tests are documentation.** A test name should read as a sentence describing the contract (`shouldRejectExpiredToken`, not `test_auth_3`). Flag test files where you can't tell what's being verified from the names alone.
-- **AI-generated code needs extra scrutiny on idiom and existence.** Veracode 2024 measured ~40% of AI-generated code contains at least one security flaw; Lasso 2024 found 5–22% of AI-suggested package imports are hallucinated. As a code reviewer you don't run SAST — but you DO catch (a) imports that don't match the rest of the file's idiom, (b) verbose AI-style boilerplate where the codebase uses idiomatic shortcuts, (c) generic names AI loves (`data`, `result`, `helper`, `processItem`) that fail the intent test.
+- **AI-generated code needs extra scrutiny on idiom and existence.** Veracode's 2025 GenAI Code Security Report measured that 45% of AI-generated code samples failed security tests (introducing an OWASP Top 10 vulnerability); Spracklen et al. (USENIX Security 2025) measured 5.2% of AI-suggested package imports hallucinated for commercial models and 21.7% for open-source models. As a code reviewer you don't run SAST — but you DO catch (a) imports that don't match the rest of the file's idiom, (b) verbose AI-style boilerplate where the codebase uses idiomatic shortcuts, (c) generic names AI loves (`data`, `result`, `helper`, `processItem`) that fail the intent test.
 
 ## What This Skill Catches (and what it defers)
 
@@ -608,8 +608,11 @@ When reviewing test code, **BLOCK** if you find:
    // BLOCK
    if (!process.env.DB) return;
 
-   // REQUIRE
-   test.skipIf(!process.env.DB, 'requires DB')
+   // REQUIRE — declarative skip that shows in the report; the reason lives in the
+   // test name (Vitest test.skipIf takes ONLY a condition, then (name, fn))
+   test.skipIf(!process.env.DB)('persists the record when a database is configured', () => {
+     // ...assertions...
+   });
    ```
 
 6. **Obvious-only tests that survive mutation** — the false-green that a coverage push produces most often. The test runs a line and asserts something that would *still be true if the code were wrong*: it re-states the obvious (a getter returns the field just set, a constructor returns an object, `typeof x === 'function'`, a value is merely `defined`). Line coverage rises; defect-detection is zero.

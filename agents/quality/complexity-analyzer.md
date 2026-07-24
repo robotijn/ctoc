@@ -62,9 +62,9 @@ Decision Points:
 **Method**: Count control structures with nesting penalty
 
 ```
-Base: +1 for each control structure
+Base: +1 for each control structure (a ternary/conditional operator is one)
 Nesting: +1 additional per nesting level
-No penalty: Null-coalescing, simple ternary, early returns
+No penalty: null-coalescing operators, early returns / guard clauses
 ```
 
 **Threshold**: <= 15 per function (configurable)

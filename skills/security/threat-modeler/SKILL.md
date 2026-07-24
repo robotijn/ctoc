@@ -19,7 +19,6 @@ when_to_load:
 related_skills:
   - security/sast-scanner
   - compliance/gdpr-compliance-checker
-  - compliance/privacy-by-design-checker
   - architecture/pattern-detector
 effort_level: high
 tools: Bash, Read, Grep, Glob
@@ -53,7 +52,7 @@ You are the design-time companion to [[sast-scanner]] (code-time), [[dependency-
 - **Every threat has an owner and a mitigation status**. Threats without owners get lost. Mitigation status is one of: `accepted` (acknowledged residual risk, signed off), `mitigated` (control implemented), `transferred` (insurance / vendor), `avoided` (feature dropped), or `pending` (in backlog with target date).
 - **CRA Art. 13 and GDPR Art. 25** legally require design-time threat decomposition for in-scope products in the EU market. The CRA does not mandate a specific methodology — STRIDE or PASTA both satisfy — but the threat model must be documented, comprehensive, and updated through the product lifecycle (planning, design, development, production, delivery, maintenance).
 - **Track the threat-model lineage**. Each version of the model corresponds to a specific architecture revision. When the data-flow diagram changes, a new model version is produced and the diff is reviewed.
-- **CycloneDX TMBOM (Threat Model Bill of Materials)** is the emerging interchange format so models can move between tools (pytm ↔ Threat Dragon ↔ Threagile). Prefer tools that already participate in TMBOM or that emit a serializable JSON/YAML model.
+- **Open Threat Model (OTM)** — the IriusRisk-maintained, platform-independent JSON/YAML format (https://github.com/iriusrisk/OpenThreatModel) — is the emerging interchange effort so models can move between tools (pytm ↔ Threat Dragon ↔ Threagile). It is still early (schema at 0.2.0 at time of writing); prefer tools that emit a serializable JSON/YAML model and verify current OTM support before assuming portability.
 
 ## Why this exists (gap analysis)
 
@@ -230,7 +229,7 @@ The repo has a threat-model file but no CI step runs `pytm`, Threat Dragon valid
 
 | Tool | Strengths | Trade-offs | When |
 |---|---|---|---|
-| **OWASP Threat Dragon** | Free, browser-based, drag-and-drop DFDs, JSON model file is version-controllable, OWASP-maintained | Visual-first (less natural for code-first teams); cross-tool interop with pytm/Threagile is still emerging via the CycloneDX TMBOM effort and not yet stable in published file formats | Mixed teams (devs + PMs + designers reviewing together) |
+| **OWASP Threat Dragon** | Free, browser-based, drag-and-drop DFDs, JSON model file is version-controllable, OWASP-maintained | Visual-first (less natural for code-first teams); cross-tool interop with pytm/Threagile is still emerging (via the Open Threat Model effort) and not yet stable in published file formats | Mixed teams (devs + PMs + designers reviewing together) |
 | **pytm (OWASP)** | Threat-modeling-as-code in Python; the model IS the source code; diagrams + reports are outputs; CI-native; OWASP project | Python-only DSL; visual-first reviewers find the abstraction unfamiliar; smaller community than Threat Dragon | Engineering-led teams with strong CI culture |
 | **Threagile** | YAML-based threat model with built-in rule engine (~40 built-in risk rules; verify the current count in `pkg/risks/builtin/` at https://github.com/Threagile/threagile); generates DFD + risk report from YAML; CI-friendly | Steeper learning curve for the YAML schema; opinionated on rule set | Java/Go shops, large monorepos |
 | **IriusRisk** | Commercial; integrates with Jira/GitHub; imports Microsoft TMT files; large built-in threat library | Paid tier; vendor lock-in unless export is exercised regularly | Regulated industries (finance, health) needing audit trail and SoX/PCI evidence |
@@ -238,7 +237,7 @@ The repo has a threat-model file but no CI step runs `pytm`, Threat Dragon valid
 | **ThreatSpec** | Threat-modeling-as-code via inline source comments; generates report from annotations | Tied to comment hygiene; less expressive than pytm | Small services where the model fits in code annotations |
 | **Tutamantic (Tutamen Threat Model Automator)** | Automates architectural threat modeling; growing tool | Smaller community; verify maturity at adoption time | Architecture-first teams; evaluate carefully |
 
-The CycloneDX **TMBOM (Threat Model Bill of Materials)** effort aims to make threat models portable across pytm, Threat Dragon, Threagile, and Open Threat Model. As of the writing of this skill, TMBOM is an active effort but not yet a stable interchange format in shipped tool releases — verify current status at https://cyclonedx.org/ before assuming portability.
+The **Open Threat Model (OTM)** effort (IriusRisk-maintained, https://github.com/iriusrisk/OpenThreatModel) aims to make threat models portable across tools — pytm, Threat Dragon, Threagile — via a platform-independent JSON/YAML schema. As of the writing of this skill, OTM is an active effort (schema at 0.2.0) but not yet a stable, widely-implemented interchange format in shipped tool releases — verify current status before assuming portability.
 
 ## Threat-Modeling-as-Code Examples
 

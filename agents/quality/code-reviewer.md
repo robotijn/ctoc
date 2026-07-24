@@ -195,8 +195,11 @@ When reviewing test code, **BLOCK** if you find:
    // BLOCK THIS
    if (!process.env.DB) return;
 
-   // REQUIRE THIS
-   test.skipIf(!process.env.DB, 'requires DB')
+   // REQUIRE THIS — skip loudly with a reason (Node built-in test runner)
+   test('needs DB', (t) => {
+     if (!process.env.DB) { t.skip('requires DB'); return; }
+     // ... real assertions
+   });
    ```
 
 ### Why This is BLOCK-worthy

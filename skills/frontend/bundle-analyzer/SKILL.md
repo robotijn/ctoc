@@ -15,7 +15,7 @@ when_to_load:
 related_skills:
   - frontend/component-tester
   - frontend/visual-regression-checker
-  - frontend/dead-code-detector
+  - quality/dead-code-detector
   - quality/performance-validator
   - specialized/performance-profiler
 effort_level: medium

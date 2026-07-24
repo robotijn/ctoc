@@ -402,9 +402,15 @@ Each slice is a COMPLETE small implementation plan written to
 ```yaml
 title: "<slice title>"
 type: implementation
-parent_plan: <parent-slug>          # the functional plan's slug (bare slug, matching
-                                     # how parent_vision stores a reference; the
-                                     # validator resolves it across stages)
+parent_plan: <parent-slug>          # the functional plan's slug as a BARE slug — no
+                                     # stage prefix, no `.md`. `listSubplans` /
+                                     # `approveSubplans` (src/lib/actions.js) match it by
+                                     # exact string equality against the parent slug,
+                                     # scanning every stage. (This is NOT the form
+                                     # vision-decomposer uses for `parent_vision`, which
+                                     # stores a stage-prefixed `vision/<slug>.md` path; a
+                                     # path here would fail the equality match and the
+                                     # batch would find zero siblings.)
 depends_on: <sibling slugs, comma-separated, or none>
 files:                               # the FOCUSED file list for THIS slice only (~1–3),
   - <path/for/this/slice/only>       # so the PreToolUse coverage hook scopes edits here

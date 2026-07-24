@@ -116,7 +116,7 @@ You require a runbook for each incident class below. A missing runbook is a `mis
 | EU NIS2 | Significant incident, essential/important entity | National CSIRT early warning | 24 hours |
 | EU NIS2 | (same trigger) | National CSIRT notification | 72 hours |
 | EU NIS2 | (same trigger) | National CSIRT final report | 1 month |
-| SEC 17 CFR 229.106 | Material cybersecurity incident, US-listed issuer | Form 8-K Item 1.05 | 4 business days from materiality determination |
+| SEC 17 CFR 249.308 (Form 8-K) | Material cybersecurity incident, US-listed issuer | Form 8-K Item 1.05 | 4 business days from materiality determination |
 | US CIRCIA (pending) | "Covered cyber incident" at covered critical-infrastructure entity (NPRM April 2024; final rule expected 2025–2026) | CISA report | 72 hours (24 hours for ransom payment) |
 | HIPAA Breach Notification | Unsecured PHI breach affecting ≥500 individuals | HHS OCR + media | 60 calendar days |
 | US state AG laws | PII of residents of that state | State AG + affected residents | Varies (commonly "without unreasonable delay"; CA: most expedient time) |

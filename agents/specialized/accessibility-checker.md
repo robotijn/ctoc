@@ -27,14 +27,17 @@ You verify web accessibility compliance with WCAG 2.2 Level AA guidelines. Acces
 ```typescript
 import { AxeBuilder } from '@axe-core/playwright';
 
+// axe-core tags are DISCRETE, not cumulative: wcag22aa carries only the
+// rules NEW in 2.2, so a full 2.2 Level AA audit must list every
+// constituent tag (2.0 A+AA, 2.1 A+AA, 2.2 AA).
 const results = await new AxeBuilder({ page })
-  .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
+  .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
   .analyze();
 ```
 
 ### CLI
 ```bash
-npx axe --tags wcag2aa https://localhost:3000
+npx axe --tags wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa http://localhost:3000
 ```
 
 ### React Testing Library

@@ -358,8 +358,8 @@ message: <one-sentence summary>
 suggested_fix: <concrete remediation>
 references:
   - https://www.analog.com/en/resources/app-notes/mitigation-of-common-cause-failures-in-safety-critical-systems.html    # 2024 Analog Devices common-cause guidance
-  - https://webstore.iec.ch/publication/22273                                                                              # IEC 61508 Part 2 (architectures and beta factor)
-  - https://webstore.iec.ch/publication/22275                                                                              # IEC 61508 Part 6 Annex D (beta-factor table)
+  - https://webstore.iec.ch/publication/22273                                                                              # IEC 61508:2010 Part 2 (hardware architectural constraints — hardware fault tolerance and safe failure fraction)
+  - https://webstore.iec.ch/publication/22273                                                                              # IEC 61508:2010 Part 6 Annex D (beta-factor table)
   - https://www.iso.org/standard/68389.html                                                                                # ISO 26262 Part 6 (Product development at the software level)
 ```
 

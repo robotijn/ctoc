@@ -92,7 +92,7 @@ go list -u -m all
 1. **lodash** < 4.17.21
    - CVE-2021-23337: Command injection via template
    - Fix: `npm update lodash`
-   - Severity: CRITICAL
+   - Severity: HIGH (CVSS 3.1: 7.2)
 
 2. **axios** < 0.21.2
    - CVE-2021-3749: ReDoS (inefficient regular expression)

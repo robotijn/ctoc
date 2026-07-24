@@ -101,9 +101,25 @@ describe('SaaS skills v8 conformance', () => {
     }
   });
 
-  it('every saas skill has a corresponding redirect stub at agents/saas/<name>.md', () => {
+  // Owner-removed from the agent menu (kept as a skill, no agent stub). The saas
+  // agent list is generated 1:1 from saas skills; removing a name here is the ONLY
+  // way to take that skill off the agent menu while keeping its capability. Adding a
+  // name is a menu-removal decision that belongs to the owner, never to a build fix.
+  const OFF_MENU_SAAS_SKILLS = new Set([
+    'workos-sso', // Removed from the menu 2026-07-24 at the owner's request; skill retained.
+  ]);
+
+  it('every on-menu saas skill has a corresponding redirect stub at agents/saas/<name>.md', () => {
     for (const skill of listSaasSkills()) {
       const name = path.basename(path.dirname(skill));
+      if (OFF_MENU_SAAS_SKILLS.has(name)) {
+        // Intentionally agent-less: the skill exists but is off the agent menu.
+        assert.ok(
+          !exists(path.join(projectRoot, 'agents/saas', `${name}.md`)),
+          `${name} is marked off-menu but a stub still exists — remove it or un-mark it`
+        );
+        continue;
+      }
       const stubPath = path.join(projectRoot, 'agents/saas', `${name}.md`);
       assert.ok(exists(stubPath), `missing redirect stub agents/saas/${name}.md`);
       const stub = read(stubPath);

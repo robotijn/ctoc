@@ -267,7 +267,7 @@ require (
 ```go
 // SAFE go.mod with patched version; go.sum committed; GOSUMDB=on (default)
 require (
-    github.com/golang-jwt/jwt/v5 v5.2.1
+    github.com/golang-jwt/jwt/v5 v5.2.2   // v5.2.1 and below are vulnerable to CVE-2025-30204; fix is v5.2.2
 )
 ```
 

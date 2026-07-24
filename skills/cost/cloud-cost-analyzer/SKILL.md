@@ -104,7 +104,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
 
 Flag patterns: `resource "aws_(instance|db_instance|eks_cluster|s3_bucket|ebs_volume)"` blocks without a `tags =` attribute; `aws_s3_bucket` without a corresponding `aws_s3_bucket_lifecycle_configuration`; instance types in the `*xlarge`/`*2xlarge`/`*4xlarge` family without an explicit Reserved Instance / Savings Plan reference in the same module; `aws_eip` without `instance` or `network_interface` association; `aws_db_instance` with `instance_class` larger than `db.t3.medium` and no commitment.
 
-Run `infracost diff --path . --compare-to <baseline-branch>` on every PR and post the cost delta as a PR comment.
+On every PR, snapshot the base branch with `infracost breakdown --format json --out-file infracost-base.json`, then run `infracost diff --path . --compare-to infracost-base.json` (the `--compare-to` flag takes an Infracost JSON file, not a branch name) and post the cost delta with `infracost comment github`.
 
 ### TypeScript / JavaScript — cloud SDK cost queries
 
@@ -393,11 +393,18 @@ Cost optimization in 2026 is a layered stack: native cloud tools for the per-clo
 Recommended baseline pipeline:
 
 ```bash
-# PR-time — Infracost cost diff posted to PR
-infracost breakdown --path . --format json --out-file infracost.json
-infracost diff --path . --compare-to <baseline-branch> --format github-comment
-infracost diff --path . --compare-to <baseline-branch> \
-    --policy-path ./infracost-policies   # tagging policy, region/family constraints
+# PR-time — Infracost cost diff posted to PR (v0.x CLI)
+# 1. On the base branch, snapshot the baseline breakdown to JSON:
+infracost breakdown --path . --format json --out-file infracost-base.json
+# 2. On the PR branch, diff against that baseline JSON
+#    (--compare-to takes an Infracost JSON file, not a branch; diff --format is json|diff):
+infracost diff --path . --compare-to infracost-base.json --format json --out-file infracost.json
+# 3. Post the diff as a PR comment; tagging / FinOps policy checks attach here via --policy-path
+#    (--policy-path is a flag on `infracost comment`, not on breakdown/diff):
+infracost comment github --repo <org/repo> --pull-request <N> \
+    --path infracost.json --policy-path ./infracost-policies --github-token "$GITHUB_TOKEN"
+# Note: Infracost is migrating to a v2 CLI where `infracost scan` / `infracost inspect`
+# supersede breakdown/diff; the v0.x commands above still ship in the latest release (v0.10.x).
 
 # Cluster-time — OpenCost / Kubecost
 kubectl cost namespace --historical --window 7d

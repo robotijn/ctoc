@@ -49,7 +49,7 @@ You audit dependencies for security vulnerabilities, maintenance status, and lic
 ## 2026 Best Practices (Security category)
 
 - **Multi-feed correlation is mandatory, not optional.** NVD alone misses findings that appear in OSV.dev (Google), GHSA (per-ecosystem curated), RustSec, PyPA, Go vulndb, and Linux distro feeds. A scanner using one feed misses real CVEs. Confirm at least three feeds plus CISA KEV correlation.
-- **Reachability before severity.** Endor Labs' 2024 benchmark showed reachability suppresses 60–80% of false positives on Java/Python codebases. A CVSS 9.8 in `lodash.template()` doesn't matter if your code never calls `lodash.template()`. Tools: Endor Labs, Snyk Reachable Vulnerabilities, Socket Reachability. When call-graph data isn't available, emit `reachable: unknown` — never silently presume `true`.
+- **Reachability before severity.** Endor Labs' 2024 benchmark showed reachability suppresses 60–80% of false positives on Java/Python codebases. A CVSS 7.2 in `lodash.template()` doesn't matter if your code never calls `lodash.template()`. Tools: Endor Labs, Snyk Reachable Vulnerabilities, Socket Reachability. When call-graph data isn't available, emit `reachable: unknown` — never silently presume `true`.
 - **Prioritize with CVSS + EPSS + KEV, not CVSS alone.** EPSS (Exploit Prediction Scoring System, FIRST.org) gives the 30-day exploitation probability. KEV (CISA Known Exploited Vulnerabilities) is the ground-truth list of CVEs being exploited in the wild right now. A CVSS 7.5 with EPSS > 0.5 and KEV listing outranks a CVSS 9.8 with EPSS 0.001.
 - **Direct vs transitive matters.** A direct dep is your decision; a transitive one needs a remediation path (override, resolution, `pnpm.overrides`, `npm overrides`, `[patch.crates-io]`, Gradle resolution strategy, Maven `dependencyManagement`). Letters must declare `direct_or_transitive`.
 - **Pin and lock everything.** No floating ranges in production. Lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Pipfile.lock`, `poetry.lock`, `go.sum`, `Cargo.lock`, `packages.lock.json`) checked in. Validate lockfile integrity on every CI run (`npm ci`, `pnpm install --frozen-lockfile`, `pip-sync`, `cargo --locked`).
@@ -121,7 +121,7 @@ grype dir:. -o sarif                          # Anchore, SARIF output
 
 ### 2. Typosquatting (and slopsquatting from AI-generated code)
 
-Attackers publish near-identical names: `requets` (for `requests`), `colorama-py`, `cross-env-shell`, `react-dom-router`. Lifespan is short but install counts can spike before removal. **Slopsquatting** (2024-2026 term) is the AI variant: LLMs hallucinate package names that don't exist, attackers race to publish them. Lasso 2024 measured 5–22% hallucinated import rates.
+Attackers publish near-identical names: `requets` (for `requests`), `colorama-py`, `cross-env-shell`, `react-dom-router`. Lifespan is short but install counts can spike before removal. **Slopsquatting** (2024-2026 term) is the AI variant: LLMs hallucinate package names that don't exist, attackers race to publish them. Spracklen et al. (USENIX Security 2025) measured hallucinated import rates of 5.2% for commercial models and 21.7% for open-source models across 16 LLMs.
 
 ```javascript
 // BAD: name distance 1 from popular package; runs postinstall
@@ -474,7 +474,7 @@ Generate CycloneDX (and SPDX where required), sign with cosign keyless, publish 
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used in the human-readable report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)). There is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used in the human-readable report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [../../agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)). There is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |---|---|---|
@@ -503,9 +503,9 @@ These tiers are the **internal triage view** used in the human-readable report. 
   "vulnerabilities": [
     {
       "package": "lodash", "version": "4.17.15", "ecosystem": "npm",
-      "vulnerability_id": "GHSA-jf85-cpcp-j695",
+      "vulnerability_id": "GHSA-35jh-r3h4-6jhm",
       "cve": "CVE-2021-23337",
-      "cvss": 9.8, "epss": 0.42, "kev": false,
+      "cvss": 7.2, "epss": 0.42, "kev": false,
       "severity": "critical",
       "title": "Command Injection in lodash.template",
       "fixedIn": "4.17.21",
@@ -538,9 +538,9 @@ engine: osv-scanner | trivy | grype | snyk | endorlabs | socket | npm-audit | pi
 package: lodash                                 # name as the ecosystem renders it
 version: 4.17.15                                # resolved (locked) version
 ecosystem: npm | pypi | maven | nuget | cargo | go | vcpkg | conan | rubygems | composer
-vulnerability_id: GHSA-jf85-cpcp-j695           # GHSA-… or CVE-… or OSV-…
+vulnerability_id: GHSA-35jh-r3h4-6jhm           # GHSA-… or CVE-… or OSV-…
 cve: CVE-2021-23337                             # parallel field when GHSA also maps to a CVE
-cvss: 9.8                                       # base score, CVSS 3.1 / 4.0
+cvss: 7.2                                       # base score, CVSS 3.1 / 4.0
 epss: 0.42                                      # 30-day exploit probability (0-1)
 kev: true | false                               # CISA KEV listing
 fix_available: true | false
@@ -554,7 +554,7 @@ owasp: A06                                      # always A06 for this skill
 cwe: CWE-1395                                   # if mapped
 message: "lodash 4.17.15 in webpack dep chain has reachable command-injection sink"
 fix: "Add npm overrides: lodash@^4.17.21; verify with npm ls lodash"
-reference: https://osv.dev/vulnerability/GHSA-jf85-cpcp-j695
+reference: https://osv.dev/vulnerability/GHSA-35jh-r3h4-6jhm
 ```
 
 The integrator uses `reachable` + `epss` + `kev` to weight findings:

@@ -189,7 +189,6 @@ metadata:
 |---|---|
 | `cto-chief` | Coordinator — dispatches you and receives your verdict |
 | `multi-tenancy-row-level` | Consumes your verified organisation as its policy input — the two layers of one boundary |
-| `workos-sso` | The enterprise identity path; watch the seam where both exist |
 | `input-validation-checker` | Names the same line you do when an identifier arrives from the request |
 | `sast-scanner` | Owns the handler's own weaknesses |
 | `secrets-detector` | Owns the key in source |

@@ -236,7 +236,6 @@ metadata:
 | `supabase-data` | Same tables, platform view. Overlapping by design — reconcile both passes; either finding blocks |
 | `database-reviewer` | Owns the schema and the cost of your policy predicates |
 | `clerk-auth` | Supplies the identity your policies are built from; a forgeable identifier is your breach |
-| `workos-sso` | Supplies organisation-scoped identity in the enterprise path |
 | `sast-scanner` | Owns the application-layer authorisation bugs that defeat the second wall |
 | `input-validation-checker` | Owns the request-supplied identifier that must never reach a policy |
 | `llm-security-tester` | Owns the retrieval path that crosses your boundary at the newest surface |

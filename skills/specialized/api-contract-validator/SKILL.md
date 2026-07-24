@@ -44,7 +44,7 @@ You are a contract guardian. You verify that API implementations match their dec
 ## 2026 Best Practices (Specialized category)
 
 - **Schema-first, not code-first.** Write the contract before the handler. OpenAPI 3.1 / AsyncAPI 3 / GraphQL SDL / Protobuf are source-of-truth artifacts checked into the repo; code is generated from them (server stubs and client SDKs) or validated against them on every request/response. Code-first generation (e.g. Swashbuckle, springdoc, FastAPI auto-schema) is acceptable only when the generated artifact is itself committed and diffed in CI — otherwise the contract silently drifts with each handler change.
-- **Breaking-change CI gate.** Every PR that touches an API artifact runs an automated diff against the base branch. `oasdiff breaking` for OpenAPI, `buf breaking` for Protobuf, `graphql-inspector diff` for GraphQL. Detected breaks fail the build unless the PR carries an explicit `breaking-change: approved` label and a migration plan. (oasdiff's docs describe roughly 500 distinct detected API changes across OpenAPI 3.0 and 3.1 — about 209 of them breaking — verify the current counts on the oasdiff site before pinning a number in your CI documentation.)
+- **Breaking-change CI gate.** Every PR that touches an API artifact runs an automated diff against the base branch. `oasdiff breaking` for OpenAPI, `buf breaking` for Protobuf, `graphql-inspector diff` for GraphQL. Detected breaks fail the build unless the PR carries an explicit `breaking-change: approved` label and a migration plan. (oasdiff's docs describe 506 distinct detected API changes across OpenAPI 3.0 and 3.1 — 212 of them breaking — verify the current counts on the oasdiff site before pinning a number in your CI documentation.)
 - **Semantic versioning enforced by tooling.** Major bump required on any backward-incompatible change. Minor on additive optional fields. Patch on docs/examples only. The CI gate computes the required bump from the diff and rejects a mismatched `info.version` (or `package` semver in Protobuf).
 - **Consumer-driven contract (CDC) testing alongside schema validation.** Pact-style CDC inverts the relationship — each consumer publishes the subset of the contract it actually uses, and the provider must satisfy the union. Schemathesis / Dredd run the declared schema against the live provider. Both layers are needed: schema testing proves the surface; CDC proves the actual usage works. Bi-directional contract testing (Pactflow) combines both into one verification.
 - **Evolutionary patterns: add, never repurpose.** Add new optional fields. Add new endpoints. Add new enum values only when consumers handle unknown values gracefully (Protobuf does this by default; OpenAPI/JSON Schema does not — see oneOf with `unevaluatedProperties: false` for strictness). NEVER repurpose an existing field's meaning. NEVER tighten a constraint (string -> enum, optional -> required, nullable -> non-nullable) on an existing field.
@@ -131,7 +131,7 @@ Rows marked `safe` are **non-findings** — they do not emit a refinement-loop l
 
 | Tool | Role | Notes |
 |---|---|---|
-| **oasdiff** | Diff & breaking-change detection | ~500 detected change types (≈209 breaking); supports OpenAPI 3.0 and 3.1. Use `oasdiff breaking` in CI. |
+| **oasdiff** | Diff & breaking-change detection | 506 detected change types (212 breaking); supports OpenAPI 3.0 and 3.1. Use `oasdiff breaking` in CI. |
 | **Spectral (Stoplight)** | Linting / style governance | Built-in `spectral:oas` ruleset; custom rules in YAML. Run on every PR. |
 | **Optic** | Behavioral diff from live traffic | Captures actual request/response, diffs against the declared spec, proposes spec updates. |
 | **openapi-diff (Azure)** | Alternative breaking-change tool | Microsoft's; useful for Azure SDK projects. |
@@ -276,8 +276,9 @@ oasdiff breaking ./openapi/v2.base.json ./openapi/v2.json
 ### Java (Spring Boot + springdoc-openapi)
 
 ```java
-// springdoc-openapi 2.x generates OpenAPI 3.0 by default from Spring annotations; set
-// springdoc.api-docs.version=openapi_3_1 for OpenAPI 3.1 output.
+// Current springdoc-openapi 2.x generates OpenAPI 3.1 by default from Spring annotations;
+// older 2.x releases defaulted to 3.0. Set springdoc.api-docs.version=openapi_3_1 to pin
+// OpenAPI 3.1 output explicitly.
 @RestController
 @RequestMapping("/users")
 @Tag(name = "users")

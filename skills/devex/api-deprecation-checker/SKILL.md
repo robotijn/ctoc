@@ -45,7 +45,7 @@ This skill is paired with — and explicitly distinct from — [[backwards-compa
 The 2026 deprecation playbook is built on two RFCs and one OpenAPI convention:
 
 - **RFC 8594 — `Sunset` header is mandatory on every deprecated endpoint**. The value is an HTTP-date indicating when the URI will stop responding. Without it, "deprecated" is a vibe, not a contract. After the sunset date, return **`410 Gone`** — not `404` — so confused clients see the difference between "wrong URL" and "this URL is intentionally retired." RFC 8594 also defines a `sunset` link relation type — pair `Sunset:` with a `Link: <…>; rel="sunset"` pointing to the deprecation/sunset policy page.
-- **RFC 9745 — the `Deprecation` HTTP response header field** (formerly an IETF draft, now an RFC) carries the deprecation timestamp itself as an HTTP-date. Use `Deprecation` to say *"this is deprecated as of X"* and `Sunset` to say *"it will stop working on Y"*. Pair both with `Link: <migration-guide-url>; rel="deprecation"` (per RFC 9745) and `Link: <successor-url>; rel="successor-version"`.
+- **RFC 9745 — the `Deprecation` HTTP response header field** (formerly an IETF draft, now a Standards Track RFC, March 2025) carries the deprecation date itself as a **Structured Field Date** (RFC 9651 §3.3.7) — an `@`-prefixed Unix timestamp such as `Deprecation: @1768435200`, **not** an HTTP-date. (The earlier `draft-dalal-deprecation-header` used an HTTP-date; the published RFC deliberately does not — `Sunset` keeps the HTTP-date form, `Deprecation` does not.) Use `Deprecation` to say *"this is deprecated as of X"* and `Sunset` to say *"it will stop working on Y"*. Pair both with `Link: <migration-guide-url>; rel="deprecation"` (per RFC 9745) and `Link: <successor-url>; rel="successor-version"`.
 - **OpenAPI `deprecated: true` on every retiring operation**, plus the `x-sunset` extension — an oasdiff convention (an `x-` vendor extension, not part of the core spec) — carrying the same date as the `Sunset` header. Tools like `oasdiff` and `openapi-generator` read these to produce migration reports. (A live OpenAPI 3.3 proposal would fold this inline by making `deprecated` polymorphic — an object carrying `sunset`, `successor`, and documentation — rather than standardizing `x-sunset`.)
 
 Operationally that gives:
@@ -87,7 +87,7 @@ public IActionResult ListUsersV1Obsolete() => Ok(_db.Users.ToList());
 [HttpGet("/api/v1/users")]
 public IActionResult ListUsersV1(HttpResponse resp)
 {
-    resp.Headers.Append("Deprecation", "Wed, 15 Jan 2026 00:00:00 GMT");           // RFC 9745
+    resp.Headers.Append("Deprecation", "@1768435200");                             // RFC 9745 Structured Field Date (= Wed, 15 Jan 2026 00:00:00 GMT)
     resp.Headers.Append("Sunset",      "Thu, 31 Dec 2026 00:00:00 GMT");           // RFC 8594
     resp.Headers.Append("Link",        "<https://docs.example.com/migrations/users-v2>; rel=\"deprecation\"");
     resp.Headers.Append("Link",        "<https://api.example.com/v2/users>; rel=\"successor-version\"");
@@ -114,7 +114,7 @@ public List<Order> listOrdersV1() { return repo.findAll(); }
 @GetMapping("/api/v1/orders")
 public ResponseEntity<List<Order>> listOrdersV1() {
     return ResponseEntity.ok()
-        .header("Deprecation", "Wed, 15 Jan 2026 00:00:00 GMT")
+        .header("Deprecation", "@1768435200")                       // RFC 9745 Structured Field Date (= Wed, 15 Jan 2026 00:00:00 GMT)
         .header("Sunset",      "Thu, 31 Dec 2026 00:00:00 GMT")
         .header("Link",        "<https://docs.example.com/migrations/orders-v2>; rel=\"deprecation\"")
         .header("Link",        "</api/v2/orders>; rel=\"successor-version\"")
@@ -144,7 +144,7 @@ from warnings import deprecated  # Python 3.13+; use typing_extensions.deprecate
 @app.get("/v1/items", deprecated=True,                                # surfaces in OpenAPI as deprecated: true
          openapi_extra={"x-sunset": "2026-12-31"})                    # x-sunset extension
 def list_items_v1(response: Response):
-    response.headers["Deprecation"] = "Wed, 15 Jan 2026 00:00:00 GMT" # RFC 9745
+    response.headers["Deprecation"] = "@1768435200"                  # RFC 9745 Structured Field Date (= Wed, 15 Jan 2026 00:00:00 GMT)
     response.headers["Sunset"]      = "Thu, 31 Dec 2026 00:00:00 GMT" # RFC 8594
     response.headers["Link"]        = (
         '<https://docs.example.com/migrations/items-v2>; rel="deprecation", '
@@ -370,8 +370,8 @@ migration_guide_url: "https://docs.example.com/migrations/users-v2"   # null if 
 consumer_traffic_last_30d: <int> | null                    # rolling 30-day request count; if telemetry available
 suggested_fix: |
   Add headers:
-    Deprecation: Wed, 15 Jan 2026 00:00:00 GMT
-    Sunset:      Thu, 31 Dec 2026 00:00:00 GMT
+    Deprecation: @1768435200                        # RFC 9745 Structured Field Date (= Wed, 15 Jan 2026 00:00:00 GMT)
+    Sunset:      Thu, 31 Dec 2026 00:00:00 GMT       # RFC 8594 HTTP-date
     Link:        <https://docs.example.com/migrations/users-v2>; rel="deprecation"
     Link:        </api/v2/users>; rel="successor-version"
   Add to OpenAPI: deprecated: true, x-sunset: "2026-12-31".

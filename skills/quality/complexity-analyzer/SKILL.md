@@ -94,7 +94,7 @@ Decision points (+1 each, base 1): `if`, `else if`/`elif`, `for`/`foreach`, `whi
 
 ### 2. Cognitive Complexity (SonarSource definition)
 
-+1 per control structure; +1 additional per nesting level; +1 per logical-operator sequence change; recursion +1. No penalty for null-coalescing, simple ternaries on a single line, or early returns.
++1 per control structure (`if`, `else if`/`else`, `for`/`foreach`, `while`/`do-while`, `catch`, `switch`, and the ternary/conditional operator `?:`); +1 additional per nesting level for a nested structure (a nested ternary receives this nesting increment too); +1 per logical-operator sequence change; recursion +1. No penalty for null-coalescing (`??`) or early returns — these are not control-flow branches under the SonarSource model. (The ternary operator DOES increment, single-line or not; SonarSource lists it under structural increments alongside `if`.)
 
 | Tier | Range | Internal triage |
 |------|-------|-----------------|
@@ -230,7 +230,7 @@ def calculate_discount(order, customer) -> Decimal:
             return Decimal("0")
     return Decimal("0")
 
-# AFTER — CC=5, Cognitive=3, Nesting=1
+# AFTER — CC=5, Cognitive=4, Nesting=1
 def calculate_discount(order, customer) -> Decimal:
     if order is None or customer is None or not customer.is_active:
         return Decimal("0")
@@ -258,7 +258,7 @@ double calculate_discount(const order_t *order, const customer_t *c) {
     return 0.0;
 }
 
-/* AFTER — CC=5, Cognitive=3, Nesting=1 */
+/* AFTER — CC=5, Cognitive=4, Nesting=1 */
 double calculate_discount(const order_t *order, const customer_t *c) {
     if (order == NULL || c == NULL || !c->is_active) return 0.0;
     if (order->total <= 100.0) return 0.0;
@@ -284,7 +284,7 @@ double calculate_discount(const Order* order, const Customer* c) {
     return 0.0;
 }
 
-// AFTER — CC=5, Cognitive=3, Nesting=1 (std::optional + guard clauses)
+// AFTER — CC=5, Cognitive=4, Nesting=1 (std::optional + guard clauses)
 double calculate_discount(const Order* order, const Customer* c) {
     if (!order || !c || !c->is_active()) return 0.0;
     if (order->total() <= 100.0) return 0.0;
@@ -310,7 +310,7 @@ function calculateDiscount(order?: Order, c?: Customer): number {
   return 0;
 }
 
-// AFTER — CC=5, Cognitive=3, Nesting=1
+// AFTER — CC=5, Cognitive=4, Nesting=1
 function calculateDiscount(order?: Order, c?: Customer): number {
   if (!order || !c || !c.isActive) return 0;
   if (order.total <= 100) return 0;

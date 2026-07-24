@@ -240,7 +240,7 @@ public:
     }
 };
 
-// SAFE: C++20 concepts + a single bump() helper, called with member pointer
+// SAFE: a single bump() helper templated on a pointer-to-member (auto non-type template parameter); one lock policy
 class Stats {
     std::mutex m_; int reads_ = 0, writes_ = 0;
     template <auto Member>

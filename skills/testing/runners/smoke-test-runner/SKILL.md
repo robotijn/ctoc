@@ -359,7 +359,7 @@ SQLCMDPASSWORD="$MSSQL_PASSWORD" \
 echo "smoke: mssql OK"
 ```
 
-The `SELECT 1` pattern is the canonical liveness probe across PostgreSQL, MySQL, SQL Server, and Oracle. It does not lock, does not touch data, and runs in single-digit milliseconds.
+The `SELECT 1` pattern is the canonical liveness probe across PostgreSQL, MySQL, and SQL Server; Oracle rejects a `SELECT` with no `FROM`, so the Oracle idiom is `SELECT 1 FROM DUAL` (this is exactly why connection pools such as HikariCP special-case Oracle's validation query). It does not lock, does not touch data, and runs in single-digit milliseconds.
 
 ## When to Run
 

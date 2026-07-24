@@ -1,0 +1,11 @@
+{
+  "content_sha256": "3e2f8e2673ae017be011c955dd56cd6713c844cbdadf429e3a4097d7c7de6aa5",
+  "hash_scope": "specification",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-24T12:17:45.683Z",
+  "approved_by": "human",
+  "plan_basename": "00231-durable-watchdog-resumes-stalled-autonomous-runs",
+  "override": true,
+  "override_reason": "Human approved done 2026-07-24 (Push + mark both done). Work shipped and gate-green: sweep 7cec02e, watchdog a22eb55. Plans lack machine-readable step markers but VERIFY genuinely passed (npm test fail 0, coverage 99.01%)."
+}

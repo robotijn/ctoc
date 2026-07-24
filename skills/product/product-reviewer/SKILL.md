@@ -31,7 +31,7 @@ tools: Read, Write, Bash, WebFetch
 # Product Reviewer (product skill)
 
 > Tier 2 specialist for the **REVIEW** step of the Product Loop (`docs/PRODUCT_LOOP.md`).
-> Persona-gated implicitly via CTO Chief: only dispatched when founder/pm/technical-founder requests.
+> Dispatched OUTSIDE the CTO Chief technical chain — the founder or product manager runs it directly at the Product Loop's REVIEW step (per `docs/PRODUCT_LOOP.md`), not through the Iron Loop.
 > Converted to skill in CTOC v6.4 product-loop B2 sweep; refreshed for 2026 best practices.
 
 ## Role

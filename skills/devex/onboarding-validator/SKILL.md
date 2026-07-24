@@ -332,9 +332,8 @@ pnpm = "9.12.0"
 # scripts/bootstrap.sh fragment for TS
 # corepack shipped with Node 14.19–24 and activates the pnpm version pinned in
 # `packageManager`. It was removed from the Node distribution in 25+, so prefer a
-# standalone pnpm (mise, the pnpm install script, or `npm i -g pnpm`) — pnpm's own
-# docs now recommend standalone install. This line uses corepack when present and
-# does not fail the bootstrap when it is absent.
+# standalone pnpm (mise, the pnpm install script, or `npm i -g pnpm`) on Node 25+.
+# This line uses corepack when present and does not fail the bootstrap when absent.
 corepack enable 2>/dev/null || command -v pnpm >/dev/null || { echo "install pnpm: https://pnpm.io/installation"; exit 1; }
 pnpm install --frozen-lockfile        # fails if lockfile is stale
 pnpm run db:setup

@@ -21,8 +21,8 @@ You audit feature flags to identify stale flags that should be removed, track fl
 
 ### Common Implementations
 ```javascript
-// LaunchDarkly (server SDK: variation(flagKey, context, defaultValue))
-if (ldClient.variation('new-checkout', context, false)) { }
+// LaunchDarkly (server SDK: variation(flagKey, context, defaultValue) — async, returns a Promise)
+if (await ldClient.variation('new-checkout', context, false)) { }
 
 // Environment variable
 if (process.env.FEATURE_NEW_CHECKOUT === 'true') { }

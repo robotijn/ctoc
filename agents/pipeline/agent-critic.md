@@ -836,7 +836,7 @@ This critic's methodology draws from:
 
 | Source | Contribution to This Critic |
 |--------|----------------------------|
-| ISO 25010:2023 | 8 quality characteristics mapped to agent evaluation dimensions |
+| ISO 25010:2023 | Nine product-quality characteristics (the 2023 revision added Safety and renamed Usability to Interaction Capability) mapped to agent evaluation dimensions |
 | ISO 25059 (AI Quality) | Robustness as a first-class quality dimension for AI systems |
 | CISQ ISO 5055 | Automated measurement of quality from source (structural analysis approach) |
 | RLHF Reward Modeling | Bottom-up scoring, advantage function metaphor, gradient signal quality |

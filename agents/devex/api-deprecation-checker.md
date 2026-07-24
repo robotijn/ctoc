@@ -109,8 +109,11 @@ to find first-party deprecations the compiler or runtime will warn on.
 # TypeScript compiler warnings
 tsc --noEmit 2>&1 | grep -i deprecated
 
-# ESLint deprecation rules
-npx eslint . --rule 'deprecation/deprecation: error'
+# ESLint: the typescript-eslint no-deprecated rule (typed linting) flags use of
+# @deprecated-tagged symbols. It replaced the archived eslint-plugin-deprecation
+# (whose deprecation/deprecation rule is no longer maintained). Enable
+# @typescript-eslint/no-deprecated in the config, then:
+npx eslint .
 
 # Python
 python -W default::DeprecationWarning -c "import mymodule"

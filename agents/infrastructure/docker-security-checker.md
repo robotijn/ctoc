@@ -142,9 +142,9 @@ CMD ["node", "dist/app.js"]
 ### Dockerfile Analysis (Hadolint)
 | Rule | Severity | Count |
 |------|----------|-------|
-| DL3007 | Error | 1 |
+| DL3007 | Warning | 1 |
 | DL3002 | Warning | 1 |
-| DL3008 | Info | 3 |
+| DL3008 | Warning | 3 |
 
 **Issues:**
 1. `DL3007` (Line 1): Using `latest` tag

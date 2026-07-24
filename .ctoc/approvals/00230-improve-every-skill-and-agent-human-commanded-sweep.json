@@ -1,0 +1,11 @@
+{
+  "content_sha256": "e9e1f14d17517e4052ad55022ed0417e480aedf43b9cc3c53f05e1a78468eadf",
+  "hash_scope": "specification",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-24T12:17:45.655Z",
+  "approved_by": "human",
+  "plan_basename": "00230-improve-every-skill-and-agent-human-commanded-sweep",
+  "override": true,
+  "override_reason": "Human approved done 2026-07-24 (Push + mark both done). Work shipped and gate-green: sweep 7cec02e, watchdog a22eb55. Plans lack machine-readable step markers but VERIFY genuinely passed (npm test fail 0, coverage 99.01%)."
+}

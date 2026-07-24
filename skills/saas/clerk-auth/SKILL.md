@@ -28,7 +28,7 @@ related_skills:
   - saas/multi-tenancy-row-level
   - security/input-validation-checker
   - security/sast-scanner
-  - api/rate-limiting
+  - saas/rate-limiting
 effort_level: medium
 model: opus
 tools: Read, Write, Edit, Bash
@@ -212,7 +212,8 @@ async def me(authorization: str = Header()):
 
 # SAFE (Python 3.12 / FastAPI): clerk-backend-api with authenticate_request
 from fastapi import FastAPI, Request, HTTPException, Depends
-from clerk_backend_api import Clerk, AuthenticateRequestOptions
+from clerk_backend_api import Clerk
+from clerk_backend_api.security import AuthenticateRequestOptions
 import os
 
 app = FastAPI()
