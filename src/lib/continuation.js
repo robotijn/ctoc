@@ -106,6 +106,10 @@ function startBatch(root, opts = {}) {
     forkReason: null,
     blocks: 0,
     maxBlocks,
+    // Staleness clock for the resume watchdog (resume-watchdog.js). NOT part of the
+    // shouldContinue decision path — that stays timestamp-free and deterministic; only
+    // the session-open resume verdict measures how long a batch has been idle.
+    lastAdvanceMs: Date.now(),
   };
   write(root, state);
   return state;
@@ -122,6 +126,9 @@ function advance(root) {
   if (!state || !state.active) return null;
   state.remaining = Math.max(0, (state.remaining || 0) - 1);
   if (state.remaining === 0) state.active = false;
+  // Re-stamp the staleness clock: the batch just made progress, so it is not idle.
+  // The resume watchdog measures staleness from this moment.
+  state.lastAdvanceMs = Date.now();
   write(root, state);
   return state;
 }

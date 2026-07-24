@@ -173,7 +173,12 @@ async function main() {
   //    plugin never spawns a second Claude (fail-open: any error → no directive).
   const context = generateContext(stack, state, version, updateInfo, selfCheckSummary, rootInfo);
   const directive = questionDispatchDirective(projectPath);
-  console.log(directive ? context + directive : context);
+  // The durable-watchdog resume (plan 00231): when the human opens a new session and
+  // an unfinished, fork-free batch has gone idle past the stall threshold, inject the
+  // "drive the next unit" directive so the run picks up exactly where it stalled. Empty
+  // (quiet start) for no batch / complete / forked / fresh / the kill-switch.
+  const resume = resumeInjection(projectPath);
+  console.log(context + (directive || '') + (resume || ''));
 }
 
 /**
@@ -235,6 +240,62 @@ validation crosses its pre-build gate by itself.
 
 Plans needing questions: ${refs.join(', ')}
 `;
+}
+
+/**
+ * Read the configured stall threshold (minutes) from `.ctoc/settings.json`
+ * (`continuation.stallMinutes`). Returns `undefined` for an absent / unreadable /
+ * invalid value so the caller applies resume-watchdog's own 90-minute default.
+ * FAIL-SOFT: never throws — a broken settings file must not affect session start.
+ *
+ * @param {string} projectPath - absolute path to the project root.
+ * @returns {number|undefined} a positive number of minutes, or undefined to default.
+ */
+function readStallMinutes(projectPath) {
+  try {
+    const p = path.join(projectPath, '.ctoc', 'settings.json');
+    if (!safeFs.existsSync(p)) return undefined;
+    const parsed = JSON.parse(safeFs.readFileSync(p, 'utf8'));
+    const v = parsed && parsed.continuation ? Number(parsed.continuation.stallMinutes) : NaN;
+    return Number.isFinite(v) && v > 0 ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The durable-watchdog RESUME injection (plan 00231, resume-on-session-open subset).
+ *
+ * On every session start, load the persisted continuation batch state and ask
+ * resume-watchdog whether it should be resumed — true ONLY for an active, fork-free
+ * batch with remaining units that has gone idle past the stall threshold. When true,
+ * inject `resumeDirective` so the session model picks the batch back up exactly where
+ * it stalled; when false (no batch / complete / forked / fresh advance) inject nothing
+ * — a quiet start. Requiring resume-watchdog here is also what keeps that module (and
+ * its two exports) reachable from a live hook root.
+ *
+ * The existing kill-switch `CTOC_SKIP_CONTINUATION=1` disarms the whole never-idle
+ * system, this injection included — one switch for rollback isolation.
+ *
+ * FAIL-OPEN: any error (bad root, broken require, unreadable state) yields '' — the
+ * resume injection can never break session start, and never wrongly resumes.
+ *
+ * @param {string} projectPath - absolute path to the project root.
+ * @returns {string} the resume directive to append, or '' when nothing should resume.
+ */
+function resumeInjection(projectPath) {
+  if (typeof projectPath !== 'string' || projectPath.length === 0) return '';
+  if (process.env.CTOC_SKIP_CONTINUATION === '1') return '';
+  try {
+    const continuation = require('../lib/continuation');
+    const { shouldResume, resumeDirective } = require('../lib/resume-watchdog');
+    const state = continuation.status(projectPath);
+    const verdict = shouldResume(state, Date.now(), { stallMinutes: readStallMinutes(projectPath) });
+    if (!verdict || verdict.resume !== true) return '';
+    return resumeDirective(state);
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -488,4 +549,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, generateContext, questionDispatchDirective, formatDatabasesLine, formatFrameworksLine, shouldInjectLessons, maybeInjectLessons };
+module.exports = { main, generateContext, questionDispatchDirective, resumeInjection, formatDatabasesLine, formatFrameworksLine, shouldInjectLessons, maybeInjectLessons };

@@ -200,6 +200,24 @@ It is OPT-IN (inert with no batch — safe to ship enabled), FORK-AWARE, BOUNDED
 FAIL-OPEN (any error → allow), and ESCAPABLE (`CTOC_SKIP_CONTINUATION=1`). The two
 legitimate stops are the ONLY stops: work complete, or a real fork surfaced as a question.
 
+**Durable watchdog — resume on the NEXT session open, because nothing can wake a dead
+one.** The Stop gate above only fires while the session is ALIVE; a session that runs
+out of tokens, hits a rate limit, or is closed cannot re-inject anything. There is NO
+durable, code-armable scheduler in the Claude command-line runtime — `CronCreate` is
+session-only (its `durable` flag "has no effect"), and a `RemoteTrigger` cloud routine
+runs on claude.ai with no access to the LOCAL repository — and CTOC must never spawn a
+second Claude. So the honest maximum is resume-on-session-open: `continuation.advance`
+and `startBatch` stamp `lastAdvanceMs`; `src/lib/resume-watchdog.js` exposes the PURE,
+FAIL-OPEN `shouldResume(batchState, nowMs, opts)` (resume true only for an active,
+fork-free batch with `remaining > 0` whose stamp is older than the stall threshold —
+default 90 min, `continuation.stallMinutes` in `.ctoc/settings.json`) and
+`resumeDirective(batchState)` (names only the human batch label + remaining count — no
+plan number, no path, no secret); `SessionStart.resumeInjection` reads the state and
+injects the directive on start, so an unfinished run picks up exactly where it stalled
+the moment the human returns. It does NOT — and by the runtime's physics cannot — wake a
+closed or idle session on its own. Same guardrails as the Stop gate: OPT-IN, FORK-AWARE,
+ESCAPABLE (`CTOC_SKIP_CONTINUATION=1`). Enforced by `tests/resume-watchdog.test.js`.
+
 ## Streaming questions — the SESSION dispatches subagents on start (never a second Claude)
 
 CTOC is a plugin inside the Claude command-line interface: plain code cannot dispatch a CTOC subagent, and it must never spawn a second Claude (no `claude -p`, no online API calls). Generation is SESSION-DRIVEN. On start, `src/hooks/SessionStart.js` computes `streaming-precompute.plansNeedingQuestions(root)` and, when it is non-empty, appends a directive to the injected context telling the SESSION MODEL to dispatch up to 5 subagents (the stage producers `product-owner`/`vision-advisor`/`implementation-planner` plus the adversarial critics) to find open issues and generate questions, each writing through `streaming-precompute.writePlanQuestions(root, ref, questions, planMtimeMs)`. When nothing is pending the directive is empty — no session-start noise. `/ctoc:start` only READS that store (instant, fail-soft); the human never waits for a critique.
@@ -244,7 +262,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 455 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 456 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -422,13 +440,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (start, push, update)
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use, subagent stop)
-    lib/                 112 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 113 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 455 test files
+  tests/                 456 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
