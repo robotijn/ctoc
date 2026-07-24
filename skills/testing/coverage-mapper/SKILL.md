@@ -40,7 +40,7 @@ You build and maintain two artifacts:
 1. **The file → test mapping** that enables smart test selection (which tests exercise which source files).
 2. **The uncovered-code → risk mapping** that tells writer skills *where to add tests next* — weighted by criticality, churn, complexity, change-in-PR, and ownership.
 
-**Role split — non-negotiable.** This skill MAPS coverage findings to risk and SUGGESTS where to add tests. It does NOT enforce thresholds and does NOT block merges. The gate is [[coverage-enforcer]]; the runner is [[smart-test-runner]]; the authors are the writer skills (unit/integration/e2e test makers). Coverage-mapper produces structured signals; the other three act on them.
+**Role split — non-negotiable.** This skill MAPS coverage findings to risk and SUGGESTS where to add tests. It does NOT enforce thresholds and does NOT block merges. The gate is [[coverage-enforcer]]; the runner is [[smart-test-runner]]; the authors are the writer skills (unit/integration/e2e test writers). Coverage-mapper produces structured signals; the other three act on them.
 
 **Core Principle**: Coverage is an INPUT to risk, not a goal. A 100%-covered codebase with shallow assertions is worse than 80%-covered with strong assertions on the right paths. Map uncovered code to risk; let the gate decide pass/fail.
 
@@ -65,7 +65,7 @@ A useful 2026 risk-score combines (weights are project-tunable defaults; reconci
 |---|---|---|
 | **Criticality of the module** | Auth, payments, crypto, RBAC, SQL builders — failures here are user-facing or security-critical | `.ctoc/settings.yaml` → `critical_paths:` allowlist, or path heuristics (`auth/`, `payments/`, `security/`) |
 | **Churn (git log frequency)** | Files changed often have more chances to introduce regressions | `git log --since=90.days --name-only | sort | uniq -c` |
-| **Cyclomatic complexity** | Complex branches = more untested edge cases | `radon`, `eslint-plugin-sonarjs`, `lizard`, `pmd-cpd` |
+| **Cyclomatic complexity** | Complex branches = more untested edge cases | `radon`, `eslint-plugin-sonarjs`, `lizard`, `pmd` (CyclomaticComplexity rule) |
 | **Call-count / fan-in** | Widely-used helpers; a bug ripples | Static call-graph analysis or runtime tracing |
 | **Uncovered-kind** | Error path > branch > line > function-without-callers | From coverage report (`b`, `s`, `f` counters) |
 | **In-PR delta** | New-uncovered lines block, pre-existing don't | Diff against `origin/main` |
@@ -77,14 +77,14 @@ The mapper categorizes every uncovered region. Categories drive both the `risk_s
 
 | Category | Example | Default risk weight | Writer to dispatch |
 |---|---|---|---|
-| **Uncovered error path** | `except ValueError:` body never executed | high | unit-test-maker (error path tests) |
-| **Uncovered branch in critical module** | `if user.is_admin:` else-branch in auth | critical | integration-test-maker |
-| **Uncovered file in high-churn area** | File with 12 commits/90d, 0% covered | high | unit-test-maker (foundational) |
-| **Uncovered new code in PR** | Lines added in this PR with no assertion | critical | unit-test-maker (PR-blocking) |
-| **Uncovered catch block** | `try: ... except: log` — failure swallowed | high | unit-test-maker (negative case) |
-| **Uncovered conditional in security-sensitive path** | Path-traversal check, SQL escape, JWT verify | critical | integration-test-maker + sast-scanner cross-check |
+| **Uncovered error path** | `except ValueError:` body never executed | high | unit-test-writer (error path tests) |
+| **Uncovered branch in critical module** | `if user.is_admin:` else-branch in auth | critical | integration-test-writer |
+| **Uncovered file in high-churn area** | File with 12 commits/90d, 0% covered | high | unit-test-writer (foundational) |
+| **Uncovered new code in PR** | Lines added in this PR with no assertion | critical | unit-test-writer (PR-blocking) |
+| **Uncovered catch block** | `try: ... except: log` — failure swallowed | high | unit-test-writer (negative case) |
+| **Uncovered conditional in security-sensitive path** | Path-traversal check, SQL escape, JWT verify | critical | integration-test-writer + sast-scanner cross-check |
 | **Uncovered trivial getter / ctor / DTO field** | `def name(self): return self._name` | informational | none — suppress |
-| **Uncovered dead code (no callers)** | Function exists, nobody calls it | informational | refactoring-suggester (delete, don't test) |
+| **Uncovered dead code (no callers)** | Function exists, nobody calls it | informational | dead-code-detector (delete, don't test) |
 
 Informational rows are **emitted but suppressed in the writer dispatch list** unless the user explicitly asks `show trivial`.
 
@@ -179,7 +179,7 @@ Two layers: (1) coverage-format parsers per language, (2) aggregation + risk-ran
 | C / C++ | gcov → lcov → gcovr | `g++ --coverage`, `gcov`, `lcov --capture`, `gcovr --xml-pretty` | gcovr emits Cobertura XML for CI |
 | Go | Go cover profile | `go test -coverprofile=cover.out -covermode=atomic ./...` | `go tool cover -html=cover.out` for review |
 | Rust | tarpaulin / llvm-cov | `cargo tarpaulin --out Lcov`, `cargo llvm-cov --lcov` | llvm-cov is closer to source-level truth |
-| SQL (pgTAP) | TAP output | `pg_prove --recurse t/` | Coverage in SQL means "every branch in the procedural code (PL/pgSQL) has a test"; pgTAP gives the assertion layer, but line-level coverage on PL/pgSQL is sparse — track via `plpgsql_check.plpgsql_show_dependency_tb` for unreached blocks |
+| SQL (pgTAP) | TAP output | `pg_prove --recurse t/` | Coverage in SQL means "every branch in the procedural code (PL/pgSQL) has a test"; pgTAP gives the assertion layer, but line-level coverage on PL/pgSQL is sparse — surface unreached blocks via `plpgsql_check_function(..., extra_warnings => true)`, which warns on dead code and code after `RETURN` |
 
 ### Layer 2 — aggregation + risk-rank platforms
 
@@ -187,7 +187,7 @@ Two layers: (1) coverage-format parsers per language, (2) aggregation + risk-ran
 |---|---|---|
 | **Codecov** | Unified PR comment, diff coverage, "Unexpected Coverage Changes" detection, 20+ format support (LCOV, Cobertura XML, JaCoCo XML, clover, gcov, ...), component-based grouping | PR-blocking diff coverage, multi-language repos |
 | **diff-cover** (Python) | Local-first; prints diff coverage to console; CI-friendly; LCOV + Cobertura input | Lightweight repos, pre-push hook |
-| **SonarQube Cloud / Sonar IDE** | Test coverage + "new code" coverage parameter, multi-tool ingestion (LCOV, JaCoCo, OpenCover, Cobertura, ...), quality-gate integration | Org-wide quality gates |
+| **SonarQube Cloud / SonarQube for IDE** | Test coverage + "new code" coverage parameter, multi-tool ingestion (LCOV, JaCoCo, OpenCover, Cobertura, ...), quality-gate integration | Org-wide quality gates |
 | **Datadog Code Coverage** | Test-impact analysis, flakiness correlation, real-runtime tracing for risk weighting | Large monorepos with CI cost concerns |
 | **Qodana** (JetBrains) | Coverage + static analysis in one report, IDE-integrated | JetBrains-stack teams |
 
@@ -492,7 +492,7 @@ async function incrementalUpdate(changedTestFiles) {
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |---|---|---|
@@ -528,7 +528,7 @@ risk_inputs:
   reachable: true | false | unknown
 delta_to_baseline: new | unchanged | regressed         # vs. previous map run
 suggested_test: "Add a test that passes a JWT with mismatched `iss` claim — expect rejection."
-suggested_writer: unit-test-maker | integration-test-maker | e2e-test-maker | refactoring-suggester
+suggested_writer: unit-test-writer | integration-test-writer | e2e-test-writer | dead-code-detector
 reference: <link to internal docs or external best-practice URL>
 ```
 
@@ -550,7 +550,7 @@ The integrator uses `confidence` and `risk_score` to weight findings — a `conf
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every uncovered region with `risk_score >= threshold` emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

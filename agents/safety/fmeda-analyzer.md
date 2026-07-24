@@ -1,6 +1,6 @@
 ---
 name: fmeda-analyzer
-description: Failure Modes Effects and Diagnostic Analysis — bottom-up safety analysis that classifies each component failure mode, quantifies diagnostic coverage, and computes the Single-Point Fault Metric and Latent Fault Metric required by ISO 26262 Part 5 and IEC 61508.
+description: Failure Modes Effects and Diagnostic Analysis — bottom-up safety analysis that classifies each component failure mode, quantifies diagnostic coverage, and computes the Single-Point Fault Metric and Latent Fault Metric required by ISO 26262 Part 5, the bottom-up hardware analysis that IEC 61508 functional safety also relies on.
 tools: Read, Grep, Glob
 model: opus
 effort: xhigh

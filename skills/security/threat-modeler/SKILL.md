@@ -149,7 +149,7 @@ GOAL: Read another user's medical records
 ATT&CK and ATLAS are not methodologies — they are **catalogues of attacker behavior**. You use them to tag threats produced by STRIDE/PASTA/LINDDUN/attack trees with canonical technique IDs so reviewers can cross-reference real-world attacker tradecraft.
 
 - **MITRE ATT&CK**: the canonical taxonomy of adversary tactics and techniques for traditional IT systems. Organized by tactic (Initial Access, Execution, Persistence, ...) with technique IDs like `T1078` (Valid Accounts) and `T1190` (Exploit Public-Facing Application). See https://attack.mitre.org/.
-- **MITRE ATLAS**: the AI/ML-system equivalent. Adversarial Threat Landscape for Artificial-Intelligence Systems. As of ATLAS v5.4.0 (February 2026), it publishes 16 tactics, 84 techniques, 56 sub-techniques, 32 mitigations, and 42 case studies (see https://atlas.mitre.org/). The 2025–2026 expansion focused on agentic-AI threats; representative new technique IDs include `AML.T0051` (LLM Prompt Injection — direct + indirect sub-techniques), `AML.T0100` (AI Agent Clickbait), "Publish Poisoned AI Agent Tool", and "Escape to Host" (agent sandbox break-out). Pin the exact version (`atlas_version: v5.4.0`) in the threat model file so the model's claims are reproducible even after the catalogue evolves.
+- **MITRE ATLAS**: the AI/ML-system equivalent. Adversarial Threat Landscape for Artificial-Intelligence Systems. ATLAS is expanding rapidly, with much of the 2025–2026 growth focused on agentic-AI threats; consult the current release at https://atlas.mitre.org/ (and the source data at https://github.com/mitre-atlas/atlas-data) for the live tactic, technique, sub-technique, mitigation, and case-study counts rather than a snapshot that goes stale between releases. Representative agentic technique IDs include `AML.T0051` (LLM Prompt Injection — with direct and indirect sub-techniques) and `AML.T0100` (AI Agent Clickbait), alongside techniques such as "Publish Poisoned AI Agent Tool" and "Escape to Host" (agent sandbox break-out) — resolve any ID against the version you are citing. Pin the exact ATLAS version you used (`atlas_version: <the release current when the model was authored>`) in the threat model file so the model's claims are reproducible even after the catalogue evolves.
 
 If your system uses an LLM, calls an LLM API, or runs an autonomous agent, **every threat that involves the model boundary must carry an ATLAS technique ID** in addition to (not instead of) ATT&CK IDs. For agentic systems specifically, threats at the agent's *tool-use* boundary (function-calling, MCP, plugin) need separate ATLAS coverage from threats at the *model* boundary — these are different attack surfaces.
 
@@ -232,7 +232,7 @@ The repo has a threat-model file but no CI step runs `pytm`, Threat Dragon valid
 |---|---|---|---|
 | **OWASP Threat Dragon** | Free, browser-based, drag-and-drop DFDs, JSON model file is version-controllable, OWASP-maintained | Visual-first (less natural for code-first teams); cross-tool interop with pytm/Threagile is still emerging via the CycloneDX TMBOM effort and not yet stable in published file formats | Mixed teams (devs + PMs + designers reviewing together) |
 | **pytm (OWASP)** | Threat-modeling-as-code in Python; the model IS the source code; diagrams + reports are outputs; CI-native; OWASP project | Python-only DSL; visual-first reviewers find the abstraction unfamiliar; smaller community than Threat Dragon | Engineering-led teams with strong CI culture |
-| **Threagile** | YAML-based threat model with built-in rule engine (~38 built-in rules per the v1.x ruleset, verify at https://threagile.io); generates DFD + risk report from YAML; CI-friendly | Steeper learning curve for the YAML schema; opinionated on rule set | Java/Go shops, large monorepos |
+| **Threagile** | YAML-based threat model with built-in rule engine (~40 built-in risk rules; verify the current count in `pkg/risks/builtin/` at https://github.com/Threagile/threagile); generates DFD + risk report from YAML; CI-friendly | Steeper learning curve for the YAML schema; opinionated on rule set | Java/Go shops, large monorepos |
 | **IriusRisk** | Commercial; integrates with Jira/GitHub; imports Microsoft TMT files; large built-in threat library | Paid tier; vendor lock-in unless export is exercised regularly | Regulated industries (finance, health) needing audit trail and SoX/PCI evidence |
 | **Microsoft Threat Modeling Tool** | Free, Windows-only desktop; STRIDE-first; large historical install base; integrates with IriusRisk for import; under Microsoft's **Modern Lifecycle Policy** (active support, no announced end-of-life as of mid-2026 per https://learn.microsoft.com/en-us/lifecycle/products/threat-modeling-tool) | Windows-only desktop app, so unsuitable as the *primary* model for cross-platform / CI-first teams; pair with a YAML/JSON export for repo storage | Windows-only Microsoft-stack shops needing the visual STRIDE editor |
 | **ThreatSpec** | Threat-modeling-as-code via inline source comments; generates report from annotations | Tied to comment hygiene; less expressive than pytm | Small services where the model fits in code annotations |
@@ -369,7 +369,7 @@ detail:
               status: Open
               severity: Critical
               type: "InformationDisclosure"
-              attackIds: ["T1530"]                     # Data from Cloud Storage Object
+              attackIds: ["T1530"]                     # Data from Cloud Storage
               linddunIds: ["I", "D"]                    # Identifiability, Disclosure
               description: "Audit-log queries leak existence of other tenants"
               owner: "@platform-team"
@@ -449,7 +449,7 @@ A simple annotation processor enforces: every controller method touching a trust
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** when this skill writes a human-readable threat-model report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire.
+These tiers are the **internal triage view** when this skill writes a human-readable threat-model report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire.
 
 | Triage tier | Examples | Internal action recommendation |
 |---|---|---|
@@ -496,13 +496,13 @@ engine: threat-modeler                              # this skill
 corroborated_by: [<other critics that flagged a related finding>]   # e.g. ["sast-scanner"] when SAST found a concrete vuln aligned with a missing threat
 kind: missing_model | stale_model | missing_privacy_threats | missing_attack_tags | missing_atlas_tags | unmitigated_threat | ownerless_threat | ungoverned_model | missing_trust_boundaries | unsigned_risk_acceptance | model_not_in_ci
 methodology: stride | pasta | linddun | linddun-go | attack-tree | tara | mixed
-atlas_version: <e.g. v5.4.0>                        # pin the ATLAS catalogue version when atlas_ids is set
+atlas_version: <the ATLAS release current when the model was authored>   # pin the ATLAS catalogue version when atlas_ids is set
 threat_id: <id from the model, when the finding references a specific threat>
 asset: <name of the asset / component the threat targets>
 mitigation_status: mitigated | pending | accepted | transferred | avoided | absent
 target_file: threats/threat-model.yaml              # or the file that should exist
 target_line: <line in the model file, if applicable>
-owasp: A01..A10 | LLM01..LLM10                      # OWASP Top 10 (2021) and OWASP Top 10 for LLM Applications (v2025)
+owasp: A01..A10 | LLM01..LLM10                      # OWASP Top 10 (2025) and OWASP Top 10 for LLM Applications (v2025)
 cwe: CWE-XXX                                        # if applicable
 attack_ids: ["T1078", "T1190"]                      # MITRE ATT&CK technique IDs
 atlas_ids:  ["AML.T0051", "AML.T0100"]              # MITRE ATLAS technique IDs (LLM/ML/agentic systems)
@@ -532,7 +532,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — a 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every missing model, stale model, missing privacy analysis, missing ATT&CK/ATLAS tag, unmitigated threat, ownerless threat, ungoverned model, missing trust boundary, unsigned risk acceptance, and model-not-in-CI finding emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

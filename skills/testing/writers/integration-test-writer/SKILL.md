@@ -193,7 +193,10 @@ def pg():
 
 @pytest.fixture(scope="session")
 async def engine(pg):
-    eng = create_async_engine(pg.get_connection_url().replace("postgresql://", "postgresql+asyncpg://"))
+    # get_connection_url() defaults to the psycopg2 (sync) driver; ask for asyncpg
+    # explicitly so the URL is postgresql+asyncpg:// — a .replace() on "postgresql://"
+    # is a silent no-op because the default URL already reads "postgresql+psycopg2://".
+    eng = create_async_engine(pg.get_connection_url(driver="asyncpg"))
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield eng
@@ -289,37 +292,35 @@ TEST_F(UserRepoTest, CreateUser) {
     EXPECT_EQ(u.id, 1);   // passes whether or not the real SQL works
 }
 
-// SAFE: Testcontainers-cpp launches a real Postgres; libpqxx talks to it.
+// SAFE: talk to a REAL Postgres via libpqxx. There is NO official Testcontainers
+// for C++ (the supported languages are Java, Go, .NET, Node, Python, Rust, Ruby,
+// PHP, Haskell, Clojure, Elixir, Scala and C/"Native"), so start the container
+// OUTSIDE the test — a CI service container, a docker-compose service, or
+// `docker run` in a harness step — and pass its connection string in via the
+// environment. Per-test isolation: a pqxx transaction that is never committed, so
+// its destructor rolls back everything the test wrote.
 #include <gtest/gtest.h>
 #include <pqxx/pqxx>
-#include <testcontainers/testcontainers.hpp>
+#include <cstdlib>
 
 class UserRepoTest : public ::testing::Test {
 protected:
-    static testcontainers::PostgresContainer pg_;
-    pqxx::connection conn_{pg_.connection_string()};
-
-    static void SetUpTestSuite()    { pg_.start(); run_migrations(pg_.connection_string()); }
-    static void TearDownTestSuite() { pg_.stop(); }
-
-    void SetUp() override {
-        pqxx::work tx(conn_);
-        tx.exec0("BEGIN");                       // explicit SAVEPOINT pattern
+    // One connection for the whole suite; migrations run once against the real engine.
+    static pqxx::connection& conn() {
+        static pqxx::connection c{std::getenv("TEST_DATABASE_URL")};  // postgresql://.../test
+        return c;
     }
-    void TearDown() override {
-        pqxx::work tx(conn_);
-        tx.exec0("ROLLBACK");                    // discard everything this test inserted
-    }
+    static void SetUpTestSuite() { run_migrations(std::getenv("TEST_DATABASE_URL")); }
 };
-testcontainers::PostgresContainer UserRepoTest::pg_{"postgres:17-alpine"};
 
 TEST_F(UserRepoTest, CreateUser_PersistsAndIsRetrievable) {
-    UserRepo repo(&conn_);
+    pqxx::work tx{conn()};                       // BEGIN; never committed -> destructor ROLLBACKs
+    UserRepo repo(tx);                            // repo runs its SQL inside this transaction
     auto u = repo.create(UserBuilder{}.with_email("a@example.test").build());
     auto found = repo.find(u.id);
     ASSERT_TRUE(found.has_value());
     EXPECT_EQ(found->email, "a@example.test");
-}
+}                                                 // tx out of scope -> rollback -> clean DB next test
 ```
 
 ### 6. TypeScript (Vitest + Testcontainers + MSW + supertest)
@@ -456,7 +457,7 @@ These are the seven recurring failure modes. Flag any you see in the target code
 
 | Tool / library | Languages | What it gives you | When to use |
 |---|---|---|---|
-| **Testcontainers** | Java, .NET, Python, Go, Node/TS, Rust, Haskell, C++ | Real Docker containers for Postgres, MySQL, Redis, Kafka, RabbitMQ, Elasticsearch, MongoDB, Localstack, etc. | Default for any integration test that touches a DB or broker |
+| **Testcontainers** | Java, .NET, Python, Go, Node/TS, Rust, Ruby, Haskell (no official C++ binding — start the container outside the test) | Real Docker containers for Postgres, MySQL, Redis, Kafka, RabbitMQ, Elasticsearch, MongoDB, Localstack, etc. | Default for any integration test that touches a DB or broker |
 | **TestServer / WebApplicationFactory** | ASP.NET Core | In-process HTTP host; share DI with the real app | API integration tests on .NET |
 | **Spring Boot Test slices** | Java/Kotlin | `@SpringBootTest`, `@DataJpaTest`, `@WebMvcTest`, `@ServiceConnection` | Spring apps; auto-wire Testcontainers via `@ServiceConnection` (Spring Boot 3.1+) |
 | **pytest-postgresql / pytest-mysql** | Python | Spin up a local DB process via pytest fixtures (alternative to Testcontainers for CI without Docker) | When Docker is not available in CI |
@@ -482,8 +483,10 @@ dotnet test ./tests/Integration.Tests --filter "Category=Integration"
 # Node/TS — Vitest with Testcontainers; one worker per test file
 vitest run --pool=threads --test-timeout=30000 tests/integration
 
-# SQL — pgTAP via pg_prove against a Testcontainers-managed Postgres
-pg_prove -d "$(testcontainers pg url)" tests/sql/*.sql
+# SQL — pgTAP via pg_prove against a Testcontainers-managed Postgres.
+# The harness (a fixture, docker-compose, or CI service container) exports the
+# connection string; pg_prove reads it. Testcontainers is a library, not a CLI.
+pg_prove -d "$TEST_DATABASE_URL" tests/sql/*.sql
 ```
 
 ## TDD Flow
@@ -525,7 +528,7 @@ pg_prove -d "$(testcontainers pg url)" tests/sql/*.sql
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when this skill produces a human-readable integration-test report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`. Reconciliation: triage CRITICAL/HIGH/MEDIUM/LOW all collapse to wire `severity: critical`; the distinction survives via the `confidence` and `kind` fields, which the integrator weights when ordering fixes.
+These tiers are the **internal triage view** used when this skill produces a human-readable integration-test report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agent-fragments/warnings-are-critical.md](../../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`. Reconciliation: triage CRITICAL/HIGH/MEDIUM/LOW all collapse to wire `severity: critical`; the distinction survives via the `confidence` and `kind` fields, which the integrator weights when ordering fixes.
 
 | Triage tier | Examples | Internal action recommendation |
 |-------|----------|--------|
@@ -578,10 +581,10 @@ The integrator uses `confidence` and `kind` to weight findings. `kind: mocked_bo
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agent-fragments/warnings-are-critical.md):
 
 - Every missing integration test, mocked DB at the boundary, isolation failure, missing error-path test, or contract drift you find emits as `severity: critical` in the letter you write to CTO Chief.
-- The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
+- The [letter schema](../../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
 - Findings block phase advancement (critical → medium) until resolved or explicitly waived in the plan's `## Decisions Taken Under Ambiguity` section.
 
 The principle: an integration test that passes against a mocked DB or an in-memory substitute is a known latent failure — it ships green while the real query path is unverified. A warning today is a customer-visible bug after the next schema change or version upgrade.

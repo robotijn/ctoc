@@ -21,15 +21,20 @@ You analyze infrastructure configurations and cloud resource usage to identify c
 
 ### Infracost (Terraform)
 ```bash
-# Estimate costs
+# Estimate costs (HCL parsing — no cloud credentials needed)
 infracost breakdown --path .
 
-# Compare branches
-infracost diff --path . --compare-to main
+# PR cost diff: save a baseline from the base branch, then diff against it.
+# --compare-to takes a saved Infracost JSON file, NOT a git branch name.
+infracost breakdown --path . --format json --out-file infracost-base.json
+infracost diff --path . --compare-to infracost-base.json
 
-# Policy check
-infracost breakdown --path . --format json | \
-  infracost output --path /dev/stdin --policy cost-policy.rego
+# OPA/Rego cost-policy gate — exits non-zero when a policy denies.
+# Policies are enforced via --policy-path (a .rego file), e.g. at PR comment time:
+infracost comment github \
+  --path infracost-base.json \
+  --policy-path infracost-policy.rego \
+  --repo "$REPO" --pull-request "$PR" --github-token "$GITHUB_TOKEN"
 ```
 
 ### AWS Cost Analysis
@@ -42,8 +47,12 @@ aws ce get-cost-and-usage \
   --group-by Type=DIMENSION,Key=SERVICE
 
 # Unused resources
+# Unattached EBS volumes (status "available" == not attached to any instance)
 aws ec2 describe-volumes --filters "Name=status,Values=available"
-aws ec2 describe-addresses --filters "Name=association-id,Values="
+# Unassociated Elastic IPs (charged while not associated) — filter client-side
+# for a null AssociationId, since there is no server-side filter for "unattached".
+aws ec2 describe-addresses \
+  --query 'Addresses[?AssociationId==`null`].[PublicIp,AllocationId]' --output table
 ```
 
 ### Kubernetes Cost
@@ -51,9 +60,10 @@ aws ec2 describe-addresses --filters "Name=association-id,Values="
 # kubectl-cost plugin
 kubectl cost namespace --historical
 
-# OpenCost
-kubectl port-forward -n opencost svc/opencost 9090:9090
-curl http://localhost:9090/allocation/compute
+# OpenCost — the API is served on port 9003 (9090 is the UI); the
+# /allocation endpoint requires a `window` query parameter.
+kubectl port-forward -n opencost svc/opencost 9003:9003
+curl "http://localhost:9003/allocation?window=today&aggregate=namespace"
 ```
 
 ## Optimization Categories
@@ -79,7 +89,7 @@ curl http://localhost:9090/allocation/compute
 - Unattached Elastic IPs
 - Old snapshots
 - Stopped but not terminated instances
-- Over-provisioned EBS (gp3 vs gp2)
+- Legacy gp2 volumes not migrated to gp3 (gp3 is cheaper per GB with a higher free performance baseline)
 
 ### Architecture Optimization
 - Use Aurora Serverless for variable load
@@ -93,23 +103,17 @@ curl http://localhost:9090/allocation/compute
 ```hcl
 # EXPENSIVE
 resource "aws_instance" "web" {
-  instance_type = "m5.2xlarge"  # Over-provisioned?
-  count         = 10            # All on-demand?
+  instance_type = "m5.2xlarge"  # Over-provisioned for the measured load?
+  count         = 10            # All on-demand — no commitment or Spot coverage?
 }
 
-# OPTIMIZED
+# OPTIMIZED — right-size to observed utilization. For fault-tolerant tiers,
+# move capacity onto Spot via a mixed-instances Auto Scaling group (a launch
+# template + aws_autoscaling_group), not a bare aws_instance, so the scheduler
+# can diversify instance types and fall back to on-demand.
 resource "aws_instance" "web" {
-  instance_type = "m5.large"    # Right-sized
+  instance_type = "m5.large"    # Right-sized to observed CPU/memory
   count         = 10
-
-  # Use spot for non-critical
-  lifecycle {
-    ignore_changes = [instance_type]
-  }
-}
-
-resource "aws_spot_fleet_request" "web_spot" {
-  # 60-90% cheaper
 }
 ```
 
@@ -135,6 +139,12 @@ resources:
 ```
 
 ## Output Format
+
+Every dollar figure below is an illustrative PLACEHOLDER showing report shape only.
+Never emit these numbers as fact. Populate real figures from the live sources above
+(Infracost breakdown JSON, AWS Cost Explorer / GCP Recommender / Azure Cost
+Management, OpenCost allocation) at analysis time — cloud list prices, discounts,
+and instance rates change continually and vary by region and account.
 
 ```markdown
 ## Cloud Cost Analysis Report

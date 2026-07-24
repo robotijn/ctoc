@@ -129,7 +129,20 @@ Include all evidence with file:line locations
 - Inner layers must not import outer layers
 - Use cases import only entities
 
-### 4. Vertical Slice Architecture
+### 4. Onion Architecture
+**Primary Markers** (must have 2+):
+- `domain/` or `domain-model/` at the center with zero outward imports
+- `application/` or `application-services/` wrapping the domain
+- `infrastructure/` on the outermost ring
+- Concentric-layer naming (core -> domain services -> application -> infrastructure)
+
+**Critical Check:**
+- The dependency rule points inward only: infrastructure -> application -> domain, never the reverse
+- Domain center imports nothing from outer rings
+
+**Clean-family note:** Clean, Hexagonal, and Onion share one dependency rule (domain depends on nothing; everything depends inward). What distinguishes them is naming — ports/adapters (Hexagonal) vs. use-cases/interface-adapters (Clean) vs. concentric rings (Onion). When the top two scores are both in this family and within the Mixed threshold of each other, report `Clean-family (variant: <best-match>)` rather than forcing a single label (see Phase 4).
+
+### 5. Vertical Slice Architecture
 **Primary Markers:**
 - `features/` or `modules/` or `slices/`
 - Each subdirectory contains its own: handler, model, validator, tests
@@ -138,7 +151,7 @@ Include all evidence with file:line locations
 - Features are self-contained (own routes, services, models)
 - Minimal imports between feature directories
 
-### 5. MVC (Model-View-Controller)
+### 6. MVC (Model-View-Controller)
 **Primary Markers** (must have all 3):
 - `views/` or `templates/`
 - `controllers/`
@@ -148,7 +161,7 @@ Include all evidence with file:line locations
 - Has views/templates for rendering
 - Frontend or full-stack focused
 
-### 6. CQRS (Command Query Responsibility Segregation)
+### 7. CQRS (Command Query Responsibility Segregation)
 **Primary Markers** (must have 2+):
 - `commands/` directory with command handlers
 - `queries/` directory with query handlers
@@ -163,7 +176,7 @@ Include all evidence with file:line locations
 - Commands and queries are clearly separated
 - Different models for read vs write operations
 
-### 7. Event Sourcing
+### 8. Event Sourcing
 **Primary Markers:**
 - `events/` with event definitions
 - `aggregates/` with event-sourced entities
@@ -176,7 +189,7 @@ Include all evidence with file:line locations
 **Critical Check:**
 - State derived from event replay, not direct storage
 
-### 8. Domain-Driven Design (DDD)
+### 9. Domain-Driven Design (DDD)
 **Primary Markers** (must have 3+):
 - `aggregates/` or aggregate root classes
 - `value-objects/` or value object pattern
@@ -191,7 +204,7 @@ Include all evidence with file:line locations
 **Critical Check:**
 - Ubiquitous language in code matches domain terms
 
-### 9. Microservices
+### 10. Microservices
 **Primary Markers:**
 - Multiple `package.json`, `go.mod`, or `Cargo.toml` in separate dirs
 - Service-specific directories with independent deployability
@@ -206,7 +219,7 @@ Include all evidence with file:line locations
 - Services are independently deployable
 - No shared database access between services
 
-### 10. Modular Monolith
+### 11. Modular Monolith
 **Primary Markers** (must have 2+):
 - Single deployable unit
 - `modules/` or `bounded-contexts/` with clear boundaries
@@ -354,9 +367,12 @@ Grep("class.*ValueObject", type="py,ts,java,cs")
 ```
 confidence = min(100, base_score)
 
-if highest_score - second_highest < 20:
-    result = "Mixed/Unclear"
-    confidence = max(confidence - 20, 0)
+if highest_score - second_highest < 15:
+    if both top patterns are in the Clean-family (Clean / Hexagonal / Onion):
+        result = "Clean-family (variant: <best-match>)"
+    else:
+        result = "Mixed/Unclear"
+        confidence = max(confidence - 20, 0)
 
 if critical_check_failed:
     confidence = max(confidence - 30, 0)
@@ -470,7 +486,7 @@ If multiple `package.json`, `go.mod`, or `pyproject.toml` found:
 | Medium confidence | 50-79 | Pattern present with deviations |
 | Low confidence | 20-49 | Partial or mixed patterns |
 | Unclear | < 20 | No dominant pattern |
-| Mixed threshold | < 20 point gap | Top two patterns too close |
+| Mixed threshold | < 15 point gap | Top two patterns too close |
 
 ## Output Format
 
@@ -610,7 +626,7 @@ src/repositories/UserRepo.ts:15
 **Status**: MIXED
 **Primary Pattern**: Layered (45% confidence)
 **Secondary Pattern**: Hexagonal (40% confidence)
-**Gap**: 5 points (threshold: 20)
+**Gap**: 5 points (threshold: 15)
 **Analysis**: Codebase appears to be transitioning between patterns.
 
 **Transition Evidence:**

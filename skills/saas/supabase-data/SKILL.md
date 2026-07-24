@@ -43,18 +43,19 @@ You set up Supabase as the data layer of a SaaS — Postgres (pooled), migration
 
 - **Anon key is client-side only.** It identifies the project; it is not a secret, but it MUST be paired with RLS and least-privilege grants on every table. If RLS is off on a table the anon key holds, the table is world-readable/writable. Per Supabase docs ([Securing your API](https://supabase.com/docs/guides/api/securing-your-api)), the anon role respects RLS; the service_role does not.
 - **Service-role key is server-side only.** It bypasses RLS. Never ship in a browser bundle, never put it behind a `NEXT_PUBLIC_` prefix, never embed in a Vite `import.meta.env` exposed to the client, never log it. Use only from Server Components, Route Handlers / API routes, Edge Functions, background jobs, and migrations.
+- **New key format (`sb_publishable_` / `sb_secret_`) — same security model.** Supabase now issues `sb_publishable_...` (client-safe, the publishable equivalent of `anon`) and `sb_secret_...` (server-only, the secret equivalent of `service_role`; Supabase recommends it over the JWT `service_role` key where possible). They are added ALONGSIDE the legacy `anon`/`service_role` JWTs, which keep working until you explicitly disable them in Dashboard → Settings → API Keys — there is no forced-migration deadline. Every rule here still holds: a publishable key requires RLS on every table; a secret key bypasses RLS and never reaches a browser. Per [Understanding API keys](https://supabase.com/docs/guides/api/api-keys).
 - **RLS enabled AND forced on every user-data table.** `ENABLE ROW LEVEL SECURITY` lets table owners and service_role bypass; `FORCE ROW LEVEL SECURITY` makes even the table owner subject to policies. Forcing matters when the table owner runs jobs against the same DB. See [Supabase RLS docs](https://supabase.com/docs/guides/database/postgres/row-level-security).
 - **Custom JWT claims for org membership.** Use a Custom Access Token Auth Hook (Postgres function or HTTP endpoint) to inject `org_id`, `role`, and other org-scoped claims into the JWT at issuance. Policies read them via `(auth.jwt() ->> 'org_id')`. Per [Custom Claims docs](https://supabase.com/docs/guides/database/postgres/custom-claims-and-role-based-access-control-rbac), never put authorization claims in `user_metadata` — end users can modify that. Use `app_metadata` or claims injected by the hook.
 - **Edge Functions for privileged ops.** Anything that requires bypassing RLS (Stripe webhooks, admin reports, cross-tenant aggregation) runs in a Deno Edge Function with the service_role key loaded from `Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")` — never from a body parameter, header, or query string. The function MUST verify caller authorization before doing privileged work.
 - **Storage policies mirror table RLS.** Storage uses `storage.objects` with the same Postgres RLS engine. A user who can read row `tenants.id = X` should also read `bucket_id = 'tenant-X-files'`. Per [Storage Access Control](https://supabase.com/docs/guides/storage/security/access-control), define policies on `storage.objects` filtered by `(storage.foldername(name))[1]` or a custom column.
-- **Use Supavisor (transaction mode, port 6543) for serverless.** Serverless functions create short-lived connections that exhaust Postgres `max_connections` quickly. Supavisor (Cloudflare-fronted) pools at the cluster layer. The direct port (5432) is for long-lived processes (migrations, workers). Per [Supavisor FAQ](https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI), transaction mode is incompatible with prepared statements — set `prepare: false` in postgres-js / disable in Prisma.
+- **Use Supavisor (transaction mode, port 6543) for serverless.** Serverless functions create short-lived connections that exhaust Postgres `max_connections` quickly. Supavisor pools at the cluster layer. Port 5432 — the direct connection or Supavisor session mode — is for long-lived processes (migrations, workers) and keeps prepared statements. Per [Supavisor FAQ](https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI), transaction mode is incompatible with prepared statements — set `prepare: false` in postgres-js / disable in Prisma.
 - **Realtime subscriptions enforce RLS.** Realtime temporarily assumes the subscriber's identity and runs an internal query to check if their RLS policies would let them see the changed row before broadcasting. RLS-off table = real-time changes broadcast to everyone subscribed. RLS-on with broken policy = nothing broadcast. Test both branches.
 - **PostgREST RPC functions must be RLS-aware.** A `SECURITY DEFINER` function runs with the definer's privileges (often `postgres`), bypassing the caller's RLS. Either avoid `SECURITY DEFINER` for user-facing RPC, or inside the function explicitly check `auth.uid()` / `(auth.jwt() ->> 'org_id')` and re-filter every query. Every `SECURITY DEFINER` function MUST also `SET search_path = ''` (or to a pinned schema list) and reference all objects with fully qualified names — otherwise a search_path hijack lets a low-priv role shadow `public.foo` with a malicious table and capture definer privileges.
 - **Never invent substitutes for `auth.uid()`.** Don't pass `user_id` as a function parameter and trust it; don't read it from a header; don't read it from a body field. Read from `auth.uid()` (set by GoTrue from the verified JWT) or `auth.jwt()`. Anything else is forgeable.
 - **Index every column referenced in an RLS policy.** RLS policies run on every row read; an unindexed `user_id`/`org_id` reference on a 1M-row table is the #1 source of Supabase performance complaints. Wrap `auth.uid()` in `(select auth.uid())` so the planner caches it once per query (Supabase performance docs).
 - **Separate Supabase projects per environment.** Production, staging, preview each get their own project — separate URL, keys, DB. A staging bug must never touch prod data.
 - **Migrations are versioned.** Use Supabase CLI (`supabase db diff` → `supabase migration new`) or Drizzle/Prisma. Never edit prod schema in the Studio UI without capturing it as a migration. CI should fail on drift.
-- **Backups verified.** Pro tier: daily backups, 7-day retention. Team+: PITR. Run a restore drill at least quarterly; an untested backup is a wish.
+- **Backups verified.** Pro plan: 7-day daily-backup retention (Team 14 days, Enterprise up to 30). Point-in-Time Recovery is a paid add-on on Pro and above (7 / 14 / 28-day windows) and REPLACES daily backups once enabled. Run a restore drill at least quarterly; an untested backup is a wish.
 
 ## Implementation pattern
 
@@ -76,8 +77,12 @@ You set up Supabase as the data layer of a SaaS — Postgres (pooled), migration
 # Pooled (Supavisor, transaction mode) — use this for serverless / edge
 DATABASE_URL=postgres://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-0-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true
 
-# Direct — migrations only, long-lived workers
-DIRECT_DATABASE_URL=postgres://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-0-<region>.pooler.supabase.com:5432/postgres
+# Direct — migrations only, long-lived workers. True direct: db-host, username `postgres`,
+# IPv6 by default (add the IPv4 add-on, or use the session-pooler line below, on IPv4-only nets).
+DIRECT_DATABASE_URL=postgres://postgres:<DB_PASSWORD>@db.<PROJECT_REF>.supabase.co:5432/postgres
+# IPv4-only network (most CI, some serverless)? Use Supavisor SESSION mode — pooler host, port
+# 5432, username `postgres.<PROJECT_REF>`. Same long-lived semantics; prepared statements OK:
+# postgres://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-0-<region>.pooler.supabase.com:5432/postgres
 
 # Public — browser-safe; respects RLS
 NEXT_PUBLIC_SUPABASE_URL=https://<PROJECT_REF>.supabase.co
@@ -297,7 +302,7 @@ export const db = drizzle(queryClient);
 
 ### 11. Backups + restore drill
 
-Pro: daily backups, 7-day retention. Team+: PITR up to 14 days.
+Pro: 7-day daily-backup retention (Team 14, Enterprise up to 30). PITR is a paid add-on on Pro and above (7 / 14 / 28-day windows) and replaces daily backups when enabled.
 
 ```
 Quarterly restore drill:
@@ -744,7 +749,7 @@ HAVING NOT c.relrowsecurity OR NOT c.relforcerowsecurity OR count(p.polname) = 0
 
 ## Refinement Loop — critic mode (v6.9.8+)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

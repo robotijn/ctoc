@@ -803,7 +803,7 @@ Incident response has its own well-known severity scale (SEV0/SEV1/SEV2/SEV3) us
 | **SEV2** | Degraded service, contained vulnerability | Single-tenant data exposure caught at WAF |
 | **SEV3** | Low-impact issue, informational | Suspicious login from new ASN, single account |
 
-When this skill emits a finding to CTO Chief via the refinement loop, **every letter is `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)). The SEV0–SEV3 scale stays in the runbook body for SLA decisions; the wire field is always `critical`. A missing runbook today is a customer-visible breach tomorrow.
+When this skill emits a finding to CTO Chief via the refinement loop, **every letter is `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)). The SEV0–SEV3 scale stays in the runbook body for SLA decisions; the wire field is always `critical`. A missing runbook today is a customer-visible breach tomorrow.
 
 ## Output Format
 
@@ -892,7 +892,7 @@ related_skills: [compliance/audit-log-checker, compliance/sbom-cra-checker,
 
 ## Refinement Loop — critic mode (v6.9.8+)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every missing IR artifact (runbook, rotation, tree, evidence step, postmortem, ENISA wiring, exercise record) emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

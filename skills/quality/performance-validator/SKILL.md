@@ -155,7 +155,7 @@ These don't measure performance — they measure your benchmark harness. Flag th
 
 - **No warmup**: timing the first call captures JIT/Hotspot/V8 compilation time, not steady-state.
 - **GC interference**: no `gc.collect()` / forced GC between iterations on a memory-sensitive bench; or GC fires mid-measurement and adds 100ms.
-- **Dead-code elimination**: the compiler proves the result is unused and skips the work entirely → benchmark "runs in 0ns." Use `Blackhole.consume(x)` (JMH), `Consumer<T>` (BenchmarkDotNet), `criterion::black_box(x)` (criterion.rs), `bencher.iter(|| black_box(...))`.
+- **Dead-code elimination**: the compiler proves the result is unused and skips the work entirely → benchmark "runs in 0ns." Use `Blackhole.consume(x)` (JMH), `Consumer.Consume(x)` (BenchmarkDotNet), `criterion::black_box(x)` (criterion.rs), `bencher.iter(|| black_box(...))`.
 - **Loop optimization**: the JIT hoists the loop body out because the input is loop-invariant; vary inputs each iteration.
 - **Hand-rolled timing loops**: `start = time.time(); for _ in range(1000): f(); end = time.time()` — no warmup, no statistical model, no outlier removal. Replace with the language's standard harness.
 - **Single sample**: one measurement per commit. You need ≥10 samples for stability; ≥50 for tail percentiles.
@@ -185,6 +185,7 @@ k6 run --summary-export=k6-summary.json \
        --out json=k6-detail.json \
        -e BASE_URL=https://staging.example.com loadtest.js
 # loadtest.js declares: export const options = { thresholds: { http_req_duration: ['p(95)<200','p(99)<500'] }, ... };
+# Note: current k6 discourages --summary-export; prefer a handleSummary() export in the script for full control.
 
 # CLI benchmark
 hyperfine --warmup 3 --min-runs 20 --export-json hf.json \
@@ -192,13 +193,14 @@ hyperfine --warmup 3 --min-runs 20 --export-json hf.json \
 
 # .NET microbenchmark
 dotnet run -c Release --project Benchmarks -- --filter '*' \
-    --exporters JSON --memoryDiagnoser
+    --exporters JSON --memory     # -m/--memory enables MemoryDiagnoser
 
 # JVM microbenchmark
 java -jar benchmarks.jar -wi 5 -i 10 -f 2 -rf json -rff jmh.json
 
-# Rust microbenchmark
-cargo bench --bench parser -- --baseline main --save-baseline candidate
+# Rust microbenchmark (--baseline and --save-baseline are mutually exclusive; two steps)
+cargo bench --bench parser -- --save-baseline main        # on main: record the baseline
+cargo bench --bench parser -- --baseline main             # on the PR: compare against it
 
 # Python microbenchmark
 pytest --benchmark-only --benchmark-json=pyt.json --benchmark-warmup=on \
@@ -220,7 +222,7 @@ Aggregate all measurement JSON into the validator's input. Emit one letter per b
 
 ## Per-language anti-patterns: BAD → SAFE
 
-These are the per-language patterns this skill scans for. Detection is via [[grep-pattern]] + AST checks; severity per warnings-are-bugs (all critical on the wire).
+These are the per-language patterns this skill scans for. Detection is via grep-based pattern matching + AST checks; severity per warnings-are-bugs (all critical on the wire).
 
 ### C# / .NET 9 — allocations, ArrayPool, Span<T>
 
@@ -547,7 +549,7 @@ These are the **internal triage view** for the human-readable scan report. When 
 
 ## Severity (reconciliation with refinement loop)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md). Every regression, every microbenchmark anti-pattern, every "measurement without budget" emits as `severity: critical` in the letter to CTO Chief. The letter schema rejects `warn` — there is no soft tier. The triage tiers above govern your human-readable report; the wire format does not.
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md). Every regression, every microbenchmark anti-pattern, every "measurement without budget" emits as `severity: critical` in the letter to CTO Chief. The letter schema rejects `warn` — there is no soft tier. The triage tiers above govern your human-readable report; the wire format does not.
 
 The principle: a 12% p95 regression today, ignored because "it's only 12%," compounds across 30 commits per quarter into a 4× user-visible slowdown. Performance is a one-way ratchet: easy to lose, hard to recover.
 
@@ -589,7 +591,7 @@ The integrator uses `confidence` and `samples` to weight: a 1-sample measurement
 2. ≥20 measurement samples for means; ≥50 for p99.
 3. Pin to a specific CPU core (`taskset -c 2`) or use a dedicated CI runner with no neighbors.
 4. Disable CPU frequency scaling and turbo on the bench host: `cpupower frequency-set -g performance`.
-5. Use the harness's own `black_box` / `Blackhole` / `Consumer<T>` to prevent dead-code elimination.
+5. Use the harness's own `black_box` / `Blackhole` / `Consumer` to prevent dead-code elimination.
 6. Vary inputs across iterations — a constant input can be loop-invariant-hoisted by the JIT.
 7. Compare means AND percentiles AND standard deviation. A flat mean with growing stddev is a flakiness regression.
 8. Run the benchmark twice and compare; if the two runs disagree by more than the harness's confidence interval, the benchmark itself is unstable — fix it before trusting it.
@@ -613,7 +615,7 @@ bench('everything', () => {
 
 ## Refinement Loop — critic mode (v6.9.16)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every performance budget violation, every regression past the declared threshold, every microbenchmark anti-pattern, every "measurement without budget," and every benchmark-tool deprecation you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

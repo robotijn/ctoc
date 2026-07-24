@@ -73,7 +73,7 @@ The E2E philosophy in 2026 is harsher about scope than it was five years ago. Br
 ## Tools
 
 - **Playwright** (recommended) — fastest, most stable, native parallel sharding, cross-browser (Chromium / Firefox / WebKit), official bindings for **TypeScript, Python, .NET (C#), and Java**. Default choice for new projects in 2026.
-- **Cypress** — JavaScript/TypeScript only; strong DX and time-travel debugger; in-browser execution model imposes architectural limits (no native multi-tab, no cross-origin without workarounds). Reasonable for frontend-heavy teams already on Chromium-only.
+- **Cypress** — JavaScript/TypeScript only; strong DX and time-travel debugger; in-browser execution model imposes architectural limits (no native multi-tab; cross-origin works only inside a `cy.origin()` block, one origin per top-level block). Reasonable for frontend-heavy teams already on Chromium-only.
 - **Selenium** — broadest browser/language matrix but the slowest and flakiest. Justify before picking it for new work.
 
 ## Test Structure — TypeScript (Playwright)
@@ -160,7 +160,9 @@ describe('Profile (golden path)', () => {
     cy.visit('/profile');
     cy.findByLabelText(/display name/i).clear().type('Alice');
     cy.findByRole('button', { name: /save/i }).click();
-    cy.findByRole('status').should('contain.text', /saved/i);
+    // regex text match needs .invoke('text').should('match', ...) —
+    // should('contain.text', /re/) stringifies the RegExp and never matches
+    cy.findByRole('status').invoke('text').should('match', /saved/i);
     cy.injectAxe();
     cy.checkA11y(null, { runOnly: ['wcag2a', 'wcag2aa', 'wcag22aa'] });
   });
@@ -271,8 +273,8 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
     var axe = new AxeBuilder(page)
         .withTags(java.util.List.of("wcag2a", "wcag2aa", "wcag22aa"))
         .analyze();
-    org.junit.jupiter.api.Assertions.assertTrue(axe.violations.isEmpty(),
-        () -> axe.violations.toString());
+    org.junit.jupiter.api.Assertions.assertTrue(axe.getViolations().isEmpty(),
+        () -> axe.getViolations().toString());
 }
 ```
 
@@ -287,9 +289,11 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
 5. `getByTestId('submit')` — only when none of the above work; treat as a code smell that the element is missing an accessible name.
 6. **Never** CSS classes, XPath, generated IDs, or nth-child indexing.
 
+Prefer `Locator`s — every `getBy*` returns one — over `page.$` / `page.$$` / `querySelector`, whose `ElementHandle`s are inherently racy (they point at a captured DOM node that goes stale) and are discouraged in current Playwright. A `Locator` re-resolves on every use; an `ElementHandle` does not.
+
 ## Failure Categories (with severity reconciliation)
 
-These are the categories this skill emits as critic findings. Severity reconciliation: the table column **Internal triage** is what appears in the human-readable scan report; **Letter severity** is what goes on the wire to CTO Chief. Per the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md), every letter severity is `critical` — there is no soft tier on the wire.
+These are the categories this skill emits as critic findings. Severity reconciliation: the table column **Internal triage** is what appears in the human-readable scan report; **Letter severity** is what goes on the wire to CTO Chief. Per the [warnings-are-critical rule](../../../agent-fragments/warnings-are-critical.md), every letter severity is `critical` — there is no soft tier on the wire.
 
 | Category | Internal triage | Letter severity | Why |
 |---|---|---|---|
@@ -351,7 +355,7 @@ jobs:
 ### Always covered (golden paths)
 - Signup → email verification → first login
 - Login (success + locked-out / invalid-credential error path)
-- The single key conversion event for the product (checkout, subscription start, first activation moment per [`.ctoc/templates/product-kpis.yaml`](../../../.ctoc/templates/product-kpis.yaml))
+- The single key conversion event for the product (checkout, subscription start, first activation moment per [`.ctoc/templates/product-kpis.yaml`](../../../../.ctoc/templates/product-kpis.yaml))
 - One representative cross-system flow (OAuth redirect, Stripe Checkout return, webhook-driven status update)
 
 ### Selectively covered (only if no lower tier can reach it)
@@ -418,7 +422,7 @@ jobs:
 
 ## Red Lines
 
-- Never use arbitrary `waitForTimeout` / `Task.Delay` / `Thread.sleep`.
+- Never use arbitrary `waitForTimeout` / `cy.wait(<number>)` / `Task.Delay` / `Thread.sleep`. (`cy.wait('@alias')` on a routed request is fine; `cy.wait(3000)` on a fixed duration is the anti-pattern.)
 - Never use CSS class, XPath, nth-child, or generated-ID selectors.
 - Never share state between tests; never share a credential across runs.
 - Never E2E what could be unit- or integration-tested.
@@ -470,10 +474,10 @@ The integrator uses `confidence` and `kind` to weight findings. `confidence: low
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
-- The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
+- The [letter schema](../../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
 - Warnings block phase advancement (critical → medium) until resolved or explicitly waived in the plan's `## Decisions Taken Under Ambiguity` section.
 
 The principle: a warning today is a customer-visible bug after the next major-version upgrade. Code that ships green-with-warnings ships with known latent failures.

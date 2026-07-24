@@ -59,14 +59,15 @@ go install github.com/trufflesecurity/trufflehog/v3@latest
 trufflehog filesystem . --json
 
 # With verification (checks if secrets are live!)
-trufflehog filesystem . --json --only-verified
+trufflehog filesystem . --json --results=verified
 
-# Exclude common false positive directories
-trufflehog filesystem . --json \
-  --exclude-paths=".git,node_modules,vendor,.venv,dist,build"
+# Exclude common false-positive paths — --exclude-paths points to a FILE of
+# newline-separated regexes (one per line), NOT an inline comma-separated list
+printf '%s\n' '.git/' 'node_modules/' 'vendor/' '.venv/' 'dist/' 'build/' > th-excludes.txt
+trufflehog filesystem . --json --exclude-paths=th-excludes.txt
 
 # Filter by detector
-trufflehog filesystem . --json --detector="aws,github,slack"
+trufflehog filesystem . --json --include-detectors="aws,github,slack"
 
 # Concurrency for large repos
 trufflehog filesystem . --json --concurrency=20
@@ -91,7 +92,7 @@ trufflehog git file://. --json --max-depth=50
 trufflehog git https://github.com/org/repo.git --json
 
 # With verification
-trufflehog git file://. --json --only-verified
+trufflehog git file://. --json --results=verified
 ```
 
 ### GitHub Organization Scan
@@ -100,8 +101,8 @@ trufflehog git file://. --json --only-verified
 # Scan all repos in an org
 trufflehog github --org=your-org --json
 
-# Include forks and archived repos
-trufflehog github --org=your-org --json --include-forks --include-archived
+# Include forks (archived repos are scanned by default; add --exclude-archived to skip them)
+trufflehog github --org=your-org --json --include-forks
 ```
 
 ## Secondary Tool: Gitleaks
@@ -114,8 +115,9 @@ Gitleaks is faster and lightweight, good for CI/CD pipelines.
 # macOS
 brew install gitleaks
 
-# Linux
-curl -sSfL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_8.18.0_linux_x64.tar.gz | tar xz
+# Linux — resolve the latest release tag, then download the matching linux_x64 asset
+VERSION=$(curl -sSf https://api.github.com/repos/gitleaks/gitleaks/releases/latest | grep -oP '"tag_name":\s*"\K[^"]+')
+curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/${VERSION}/gitleaks_${VERSION#v}_linux_x64.tar.gz" | tar xz
 
 # Docker
 docker pull zricethezav/gitleaks:latest
@@ -127,20 +129,20 @@ go install github.com/gitleaks/gitleaks/v8@latest
 ### Scans
 
 ```bash
-# Current state only (no git history)
-gitleaks detect --source . --no-git --report-format json --report-path secrets-report.json
+# Current state only (no git history) — the `dir` subcommand scans a path, not history
+gitleaks dir --report-format json --report-path secrets-report.json .
 
-# Git history scan
-gitleaks detect --source . --report-format json --report-path secrets-report.json
+# Git history scan — the `git` subcommand scans commit history
+gitleaks git --report-format json --report-path secrets-report.json .
 
 # Scan specific commits
-gitleaks detect --source . --log-opts="--since='2024-01-01'" --report-format json
+gitleaks git --log-opts="--since='2024-01-01'" --report-format json .
 
-# Pre-commit hook mode
-gitleaks protect --source . --staged
+# Pre-commit hook mode (scan staged changes)
+gitleaks git --pre-commit --staged .
 
 # With custom config
-gitleaks detect --source . --config=.gitleaks.toml --report-format json
+gitleaks git --config=.gitleaks.toml --report-format json .
 ```
 
 ### Custom Rules (.gitleaks.toml)
@@ -215,8 +217,8 @@ regexes = [
 | Slack Bot | `xoxb-[0-9]{10,}-[0-9]{10,}-[a-zA-Z0-9]{24}` | Bot token |
 | Slack User | `xoxp-[0-9]{10,}-[0-9]{10,}-[0-9]{10,}-[a-f0-9]{32}` | User token |
 | Slack Webhook | `https://hooks.slack.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[a-zA-Z0-9]+` | Webhook URL |
-| OpenAI | `sk-[a-zA-Z0-9]{48}` | API key |
-| Anthropic | `sk-ant-[a-zA-Z0-9\-_]{95}` | API key |
+| OpenAI | `sk-(proj\|svcacct\|admin)-[A-Za-z0-9_-]+` (modern) · `sk-[A-Za-z0-9]{48}` (legacy) | modern keys embed the `T3BlbkFJ` marker |
+| Anthropic | `sk-ant-api03-[A-Za-z0-9_-]{93}AA` · `sk-ant-admin01-[A-Za-z0-9_-]{93}AA` (admin) | API key |
 
 ### Database Credentials
 
@@ -298,7 +300,7 @@ TruffleHog has built-in verification for 800+ secret types:
 
 ```bash
 # Only report verified (live) secrets
-trufflehog filesystem . --json --only-verified
+trufflehog filesystem . --json --results=verified
 
 # Report all but mark verification status
 trufflehog filesystem . --json  # Look for "Verified: true" in output
@@ -758,7 +760,7 @@ To prevent future secret commits:
 # Install gitleaks pre-commit hook
 cat > .git/hooks/pre-commit << 'EOF'
 #!/bin/bash
-gitleaks protect --staged --redact --verbose
+gitleaks git --pre-commit --staged --redact --verbose .
 if [ $? -ne 0 ]; then
     echo "Secrets detected! Commit blocked."
     exit 1
@@ -772,7 +774,7 @@ Or use pre-commit framework:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.18.0
+    rev: v8.30.1   # pin to the current release; `pre-commit autoupdate` refreshes it
     hooks:
       - id: gitleaks
 ```
@@ -793,8 +795,8 @@ repos:
 ---
 
 **Scanner Versions**:
-- TruffleHog: v3.63.0
-- Gitleaks: v8.18.0
+- TruffleHog: <detected version, e.g. from `trufflehog --version`>
+- Gitleaks: <detected version, e.g. from `gitleaks version`>
 
 **Detectors Used**: 800+ (TruffleHog full set)
 ```
@@ -826,7 +828,7 @@ jobs:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
-          extra_args: --only-verified
+          extra_args: --results=verified
 
       - name: Gitleaks Scan
         uses: gitleaks/gitleaks-action@v2

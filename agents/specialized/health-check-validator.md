@@ -61,6 +61,25 @@ async def ready():
     }
 ```
 
+### Unhealthy Response Format
+When a check fails, return the failing status code (503 for readiness) with a
+machine-readable body. RFC 9457 (Problem Details for HTTP APIs, which obsoletes
+RFC 7807) is a convenient format — not a requirement — using media type
+`application/problem+json` and the members `type`, `title`, `status`, `detail`,
+`instance`:
+```json
+{
+  "type": "https://example.com/probs/dependency-unavailable",
+  "title": "Not ready",
+  "status": 503,
+  "detail": "database check failed",
+  "instance": "/ready"
+}
+```
+The critical rule is that an unhealthy endpoint MUST return a non-2xx status —
+returning 200 with a body saying "unhealthy" is the defect to flag, because
+orchestrators route on the status code, not the body.
+
 ### Kubernetes Probes
 ```yaml
 livenessProbe:
@@ -80,7 +99,29 @@ readinessProbe:
   periodSeconds: 5
   timeoutSeconds: 3
   failureThreshold: 2
+
+startupProbe:
+  httpGet:
+    path: /startup
+    port: 8080
+  periodSeconds: 5
+  failureThreshold: 30
 ```
+
+A slow-starting container gets up to `failureThreshold × periodSeconds` to
+finish starting (plus `initialDelaySeconds`) — the example above allows 150s.
+Once the startup probe first succeeds, the kubelet starts running the liveness
+and readiness probes and stops polling the startup probe. Flag a slow-starting
+app that has no startup probe: the liveness probe then kills the container
+mid-startup.
+
+### Graceful Shutdown
+On termination Kubernetes sends SIGTERM and removes the pod from Service
+endpoints; after the pod's `terminationGracePeriodSeconds` (30s by default) it
+sends SIGKILL. Flag an app that ignores SIGTERM or has no drain: it should stop
+accepting new work, finish in-flight requests, close connections, and exit
+inside the grace window. A `preStop` hook or a short sleep before exit covers
+the propagation lag while the endpoint removal reaches every kube-proxy.
 
 ## Output Format
 

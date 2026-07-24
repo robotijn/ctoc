@@ -52,7 +52,7 @@ Cross-link: if a profiler finding violates a declared SLO budget, also notify [[
 
 ## 2026 Best Practices (Specialized category)
 
-- **Profile in production, continuously, not just dev.** Grafana Cloud Profiles processed 19.5 PB of profiling data on the Pyroscope 2.0 architecture in 2025 (Grafana Labs / InfoQ, May 2026). Lab benches don't reproduce production workloads — cache topology, tenant skew, GC heap shape, and tail latency only show up in prod. Use a sampler that adds **~1% CPU or less** (Parca / Polar Signals / Pyroscope eBPF agents are at or below this threshold per their published documentation).
+- **Profile in production, continuously, not just dev.** Lab benches don't reproduce production workloads — cache topology, tenant skew, GC heap shape, and tail latency only show up in prod, which is why managed continuous-profiling backends (Grafana Cloud Profiles, Polar Signals) run samplers against live fleets rather than benchmarks. Use a sampler that adds **~1% CPU or less** (Parca / Polar Signals / Pyroscope eBPF agents are at or below this threshold per their published documentation).
 - **Flame graph must be readable by engineering AND product.** Wide bar = wide blame. If a PM can't point at "that orange band" and say "that's checkout serialization," the graph isn't usable as a shared artifact. Name frames in business terms when collapsing inlined helpers.
 - **Differential profiling is the unit of work.** Single flame graphs say "this is hot." Differential flame graphs (base vs. head, red = slower-after, blue = faster-after) say "this is hot **because of that commit**." Make differential the default; raw flame graph is the exception. CI-integrated diff profiling (Codspeed, Sentry differential flame graphs) lets a PR carry its regression attribution into review.
 - **Attribute regressions to a deploy/commit, not a wall-clock window.** Tag every continuous profile with `commit_sha`, `deploy_id`, `tenant`, `region`. A profile without those labels is unattributable and gets discarded by the bisect step.
@@ -84,19 +84,19 @@ Each finding's letter declares one `kind`. The integrator uses `kind` to pick th
 
 | Tool | Engine | Strengths | When |
 |---|---|---|---|
-| **Pyroscope 2.0** (Grafana) | eBPF + language SDKs | Mature multi-tenancy, Grafana-native flame graphs, FlameQL, differential views, OTel profiles signal | Default for Grafana shops; production-scale (proven at 19.5 PB scale per Grafana Labs) |
+| **Grafana Pyroscope** | eBPF + language SDKs | Mature multi-tenancy, Grafana-native flame graphs, differential views, OTel profiles signal | Default for Grafana shops; production-scale, multi-tenant |
 | **Parca** (Polar Signals OSS) | eBPF (parca-agent) | Pure OSS, Prometheus-style labels, cleanest k8s integration | OSS-first shops, k8s-heavy |
 | **Polar Signals Cloud** | eBPF + FrostDB | Hosted Parca, FrostDB for query speed | Teams wanting hosted Parca |
 | **Datadog Profiler** | language agents | Tight APM correlation (trace ↔ profile join) | Datadog APM users |
-| **Sentry Profiling** | language agents + sampling | Per-transaction profile attached to error traces, differential flame graphs in PR review | Sentry-as-APM users |
-| **Pixie** (CNCF) | eBPF | k8s observability + ad-hoc scripting (PxL) | Pre-installed k8s clusters wanting on-cluster pyql |
+| **Sentry Profiling** | language agents + sampling | Per-transaction profiles attached to traces, differential flame graphs for regression detection | Sentry-as-APM users |
+| **Pixie** (CNCF) | eBPF | k8s observability + ad-hoc scripting (PxL) | Pre-installed k8s clusters wanting on-cluster PxL scripting |
 
 ### Language-specific (deep-dive)
 
 | Stack | Tools | Notes |
 |---|---|---|
 | **C# / .NET 9** | `dotnet-counters`, `dotnet-trace`, `EventPipe`, PerfView, JetBrains dotTrace, Visual Studio Profiler | `dotnet-trace collect --providers Microsoft-DotNETCore-SampleProfiler` → `.nettrace` → speedscope/PerfView. `dotnet-counters monitor` for live counters (GC, exceptions, threadpool). PerfView for ETW + GC root analysis on Windows. |
-| **Java 21+** | async-profiler (sampling, no safepoint bias), JFR (JDK Flight Recorder, built-in to OpenJDK), JMC (Mission Control), VisualVM | `async-profiler -e cpu,alloc,lock -d 30 -f profile.jfr <pid>` — JFR output lets you combine CPU + allocation + lock events in one recording. JFR is the always-on production option. |
+| **Java 21+** | async-profiler (sampling, no safepoint bias), JFR (JDK Flight Recorder, built-in to OpenJDK), JMC (Mission Control), VisualVM | `asprof -e cpu --alloc 2m --lock 10ms -d 30 -f profile.jfr <pid>` — the primary event is `-e`; allocation and lock sampling are added with the `--alloc`/`--lock` options (or `--all`), giving CPU + allocation + lock in one JFR recording. JFR is the always-on production option. |
 | **Python 3.12+** | py-spy (sampling, attach-to-running-process, no restart), Scalene (Python-vs-native split + memory), memray (allocation deep-dive), cProfile (deterministic, dev-only) | py-spy for prod flame graphs at near-zero overhead; Scalene when you need to know "is this Python time or native time?"; memray for allocation forensics. |
 | **C (C17/23)** | `perf record -F 99 -g`, Brendan Gregg FlameGraph, heaptrack (allocations), valgrind massif (heap snapshots), bpftrace | `perf record` + `stackcollapse-perf.pl` + `flamegraph.pl` is the canonical Linux pipeline. heaptrack for alloc, massif for sampled heap snapshots. |
 | **C++ (20/23)** | perf + FlameGraph, Tracy (frame-by-frame profiler — game dev favourite), gperftools (CPU + heap), Intel VTune, callgrind | Tracy gives microsecond-resolution frame markers; gperftools `pprof` for CPU + heap with the same `pprof` UI as Go. |
@@ -124,8 +124,9 @@ eBPF-based profilers (parca-agent, Pixie, Pyroscope eBPF) avoid the frame-pointe
 # Attach to a running process, sample 60s, output flame graph
 py-spy record -o profile.svg --pid <pid> --duration 60
 
-# Python-vs-native + memory in one pass
-scalene --cli --html app.py > scalene.html
+# Python-vs-native + memory in one pass, then save the report
+scalene app.py               # profiles: Python time vs native time vs memory
+scalene view --html          # writes scalene-profile.html (or: scalene view --cli)
 
 # Allocation forensics (memray ≥ 1.13)
 memray run -o app.bin app.py
@@ -139,16 +140,18 @@ python -m cProfile -o profile.pstats app.py
 
 ```bash
 # Combined CPU + allocation + lock profile, JFR output
-./async-profiler/profiler.sh -e cpu,alloc,lock -d 60 -f profile.jfr <pid>
+# (asprof is the current async-profiler CLI; profiler.sh was renamed)
+asprof -e cpu --alloc 2m --lock 10ms -d 60 -f profile.jfr <pid>
 
 # JDK Flight Recorder (built-in, near-zero overhead — production always-on)
 jcmd <pid> JFR.start name=app duration=60s filename=app.jfr settings=profile
 jcmd <pid> JFR.stop name=app
 # Analyze in JDK Mission Control (jmc) or convert to flame graph
-jfr2flame app.jfr > flame.html
+# (jfr-converter.jar ships with async-profiler releases)
+java -jar jfr-converter.jar --cpu app.jfr flame.html
 
 # Lock contention specifically
-./async-profiler/profiler.sh -e lock -d 30 -f locks.svg <pid>
+asprof -e lock -d 30 -f locks.svg <pid>
 ```
 
 ### C# / .NET 9
@@ -401,7 +404,7 @@ SET LOCAL work_mem = '256MB';
 
 ## Severity reconciliation (triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** when you produce a human-readable profile report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)). The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** when you produce a human-readable profile report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)). The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |---|---|---|
@@ -519,7 +522,7 @@ The integrator uses `confidence` and `baseline_compared` to weight findings — 
 
 ## Refinement Loop — critic mode (v6.9.16)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every profiler-flagged hot path, allocation regression, lock-contention finding, missing-index plan, and cold-start above its SLO emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

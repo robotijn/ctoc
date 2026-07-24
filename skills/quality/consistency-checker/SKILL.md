@@ -57,7 +57,7 @@ Five pillars served: **readability** + **maintainability**.
 |---|---|---|
 | Variables / locals | language idiom: `snake_case` (Python, Rust, SQL), `camelCase` (JS/TS, Java, C#-local), `lowerCamelCase` (Go-private) | Don't mix within a language. |
 | Functions / methods | verb-led: `getUser`, `create_order`, `parse_input` | Avoid noun-only function names. |
-| Types / classes / interfaces | `PascalCase` (most), `PascalCase` with `I`-prefix only if existing convention demands (legacy .NET; modern C# guidance drops `I` only when not interface) | TypeScript: no `I` prefix per official style. |
+| Types / classes / interfaces | `PascalCase` (most); C# interfaces take an `I` prefix (`IDisposable`, `IWorkerQueue`) per current Microsoft guidance, enforced by analyzer CA1715 | TypeScript: no `I` prefix per official style. |
 | Constants | `SCREAMING_SNAKE_CASE` (Python, JS/TS module-const, C/C++ macros), `PascalCase` (C# `const`/`static readonly`) | |
 | Files | `kebab-case.ts` (web/JS-TS most), `snake_case.py` (Python PEP 8), `PascalCase.cs` (C#), `snake_case.rs` (Rust), `snake_case.go` (Go) | Match language ecosystem. |
 | Branches | `<type>/<scope>-<short-desc>` e.g. `feat/billing-stripe-webhooks`, `fix/auth-jwt-leeway` | Should mirror Conventional-Commit types. |
@@ -410,7 +410,7 @@ The integrator uses `confidence` and `occurrences_count` to weight findings — 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

@@ -43,7 +43,7 @@ The non-negotiables — every one of these maps to a finding category below.
   - **Schema-per-tenant** — one Postgres schema per tenant, same DB. Migrations multiply. Picked for B2B mid-market where customers want logical isolation but not separate DB cost.
   - **Database-per-tenant** — separate DB per tenant. Enterprise / regulated (healthcare, finance, gov). Highest cost, hardest noisy-neighbor protection, easiest "we will delete your DB" answer to a deletion request.
 - **RLS enabled AND forced on every tenant-scoped table.** `ENABLE ROW LEVEL SECURITY` alone is bypassed by the **table owner** and any superuser-equivalent role. Without `FORCE ROW LEVEL SECURITY`, a migration script, a `psql` admin session, or any code that authenticated as the owner sees everything. The pair is mandatory: `ENABLE` + `FORCE`.
-- **`USING` clause for read; `WITH CHECK` clause for write.** A policy with only `USING` lets a tenant **insert or update a row with someone else's `org_id`**. `USING` filters what you can read; `WITH CHECK` filters what you are allowed to write. Use both. For `FOR ALL` policies, declare both explicitly — do not rely on `WITH CHECK` defaulting from `USING` if your intent differs.
+- **`USING` clause for read; `WITH CHECK` clause for write.** `USING` filters which existing rows are visible to `SELECT` and reachable by `UPDATE` / `DELETE`; `WITH CHECK` filters which new rows an `INSERT` or `UPDATE` may write. For `FOR ALL` and `FOR UPDATE` policies an omitted `WITH CHECK` **defaults to the `USING` expression** — so a `USING`-only policy already blocks a cross-tenant write; it does not silently allow one. The real write-side hole is an **explicit** `WITH CHECK (true)` (or one weaker than `USING`), which re-opens the write path. Declare `WITH CHECK` explicitly and never make it more permissive than `USING`. (`FOR INSERT` policies must use `WITH CHECK` — a `USING` clause is not even valid there; `FOR DELETE` is the mirror, `USING` only.)
 - **Claims-based current tenant via session config or a JWT-claim helper.** Set the tenant context once per connection / request. Two patterns:
   - `SELECT set_config('app.current_org', $1, true)` at request start, then policies read `current_setting('app.current_org', true)`.
   - Supabase / PostgREST: read directly from `auth.jwt() ->> 'org_id'` (Supabase) or `current_setting('request.jwt.claims', true)::json ->> 'org_id'` (PostgREST).
@@ -53,7 +53,7 @@ The non-negotiables — every one of these maps to a finding category below.
 - **Integration test every tenant boundary.** For every tenant-scoped table, write a test: seed data as tenant B, set context to tenant A, run `SELECT *`, assert `0 rows`. Run it in CI. A category that has no isolation test is a leak waiting to happen.
 - **Migrations preserve RLS.** New tables default to `rowsecurity = false`. A CI check that lists tables in `public` with `rowsecurity = false` and fails the build is non-negotiable. Use **pgroll** (`xataio/pgroll`) for zero-downtime expand/contract migrations when adding columns the policy depends on — pgroll lets the old and new schema versions coexist so the policy can be updated before the old shape is removed.
 - **No `SECURITY DEFINER` function on a user-reachable path without an explicit allowlist.** `SECURITY DEFINER` functions run with the **definer's** privileges, which usually means they bypass RLS. Either mark them `SECURITY INVOKER` or audit every caller.
-- **`org_id` is immutable post-insert.** If a row's tenant column can be `UPDATE`d, an attacker who finds an update endpoint can move their row into another tenant or hijack one. Add a trigger or `WITH CHECK (org_id = OLD.org_id)`.
+- **`org_id` is immutable post-insert.** If a row's tenant column can be `UPDATE`d, an attacker who finds an update endpoint could try to move their row into another tenant. The standard UPDATE policy already blocks *that*: with `WITH CHECK (org_id = current_setting('app.current_org', true)::uuid)`, an `UPDATE` cannot set `org_id` to a *different* tenant — the new row must still match the caller's tenant. To forbid changing `org_id` **at all** (even within reach), add a `BEFORE UPDATE` trigger that raises when `NEW.org_id <> OLD.org_id`. A policy `WITH CHECK` cannot reference `OLD` — `OLD`/`NEW` exist only in triggers — so old-vs-new immutability is a trigger's job, not a policy's.
 
 ## Implementation pattern (RLS for B2B org-scoped SaaS)
 
@@ -195,11 +195,14 @@ ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 CREATE POLICY p ON invoices FOR ALL USING (org_id = current_setting('app.current_org', true)::uuid);
 -- → A migration script running as the owner sees every tenant. A connection-pool bug that ends up as the owner role leaks everything.
 
--- BAD: USING without WITH CHECK on FOR ALL — read is filtered, but INSERT/UPDATE can write rows belonging to another tenant.
+-- BAD: an EXPLICIT permissive WITH CHECK re-opens writes. USING filters reads, but WITH CHECK (true)
+--   accepts ANY org_id on INSERT/UPDATE. (A USING-only FOR ALL policy would NOT leak — its WITH CHECK
+--   defaults to the USING expression; the hole is an explicit WITH CHECK weaker than USING.)
 CREATE POLICY p_bad ON invoices
   FOR ALL
-  USING (org_id = current_setting('app.current_org', true)::uuid);
-INSERT INTO invoices (org_id, amount) VALUES ('<other-tenant-uuid>', 999); -- accepted, data is now owned by another tenant.
+  USING      (org_id = current_setting('app.current_org', true)::uuid)
+  WITH CHECK (true);
+INSERT INTO invoices (org_id, amount) VALUES ('<other-tenant-uuid>', 999); -- accepted: WITH CHECK (true) permits it.
 
 -- BAD: SECURITY DEFINER function that bypasses RLS, reachable from the app.
 CREATE FUNCTION total_revenue() RETURNS numeric LANGUAGE sql SECURITY DEFINER AS $$
@@ -367,7 +370,7 @@ public class TenantInterceptor implements HandlerInterceptor {
 
 1. **rls-disabled** — a tenant-scoped table where `pg_class.relrowsecurity = false`. Worst case: full cross-tenant read.
 2. **rls-not-forced** — `relrowsecurity = true` but `relforcerowsecurity = false`. Owner / `BYPASSRLS` roles see all rows. Migration scripts, admin scripts, and any code that ends up on the owner role leaks everything.
-3. **using-without-with-check** — a `FOR ALL` / `FOR INSERT` / `FOR UPDATE` policy with `USING` but no `WITH CHECK`. Read is filtered; **write is not.** A tenant can `INSERT` or `UPDATE` rows with another tenant's id.
+3. **using-without-with-check** — a write policy whose `WITH CHECK` is explicitly weaker than its `USING` (e.g. `WITH CHECK (true)`), so read is filtered but **write is not**: a tenant can `INSERT` or `UPDATE` rows with another tenant's id. Note the Postgres default — on `FOR ALL` / `FOR UPDATE` an omitted `WITH CHECK` safely falls back to the `USING` expression, so this finding fires on an explicit permissive `WITH CHECK`, not on the mere absence of one. (`FOR INSERT` requires `WITH CHECK`; `USING` is not valid there.)
 4. **missing-tenant-id-in-where** — application code that performs DML against a tenant-scoped table without an `org_id` / `user_id` predicate. RLS will catch it, but the missing filter signals the app does not have defense in depth, and reads against non-tenant-scoped joins (e.g. report views) may still leak.
 5. **missing-cross-tenant-isolation-test** — no integration test that seeds data as tenant B, queries as tenant A, asserts 0 rows. Categories with no test are categories that will leak.
 6. **security-definer-on-user-path** — a `SECURITY DEFINER` function reachable from a user-facing route. Definer functions run with the definer's privileges and typically bypass RLS. Either mark `SECURITY INVOKER` or document an explicit allowlist with input validation.
@@ -408,7 +411,7 @@ pgroll complete                                              # contract — drop
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when this skill produces a human-readable report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization.
+These tiers are the **internal triage view** used when this skill produces a human-readable report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization.
 
 | Triage tier | Examples | Internal action |
 |-------|----------|--------|
@@ -480,7 +483,7 @@ The integrator uses `confidence` and `corroborated_by` (e.g. `pg_policies` says 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

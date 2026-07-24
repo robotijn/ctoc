@@ -21,8 +21,8 @@ You audit feature flags to identify stale flags that should be removed, track fl
 
 ### Common Implementations
 ```javascript
-// LaunchDarkly
-if (ldClient.variation('new-checkout', user, false)) { }
+// LaunchDarkly (server SDK: variation(flagKey, context, defaultValue))
+if (ldClient.variation('new-checkout', context, false)) { }
 
 // Environment variable
 if (process.env.FEATURE_NEW_CHECKOUT === 'true') { }
@@ -58,9 +58,15 @@ const flagPatterns = [
 | Fully Rolled Out | 100% | **Ready for cleanup** |
 | Cleanup | Removed | Code deleted |
 
+This lifecycle applies to release and experiment toggles. Permanent flags (kill switches, operational toggles, permission/entitlement gates) do not retire and are excluded from cleanup.
+
 ### Staleness Criteria
 ```javascript
 const isStale = (flag) => {
+  // Permanent flags — kill switches, operational toggles, permission/entitlement
+  // gates — are long-lived by design and are NEVER cleanup candidates. Only
+  // release and experiment toggles are transient. Do not report these as stale.
+  if (flag.permanent) return false;
   return (
     // 100% enabled for > 30 days
     (flag.percentage === 100 && flag.daysAtFullRollout > 30) ||

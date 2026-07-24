@@ -32,8 +32,8 @@ You detect architectural violations and dependency issues as part of the Smart Q
 **Tools by Language**:
 | Language | Tool |
 |----------|------|
-| JavaScript/TypeScript | madge --circular |
-| Python | deptry, pydeps |
+| JavaScript/TypeScript | dependency-cruiser --validate (canonical for CI), madge --circular |
+| Python | import-linter, pydeps |
 | Go | go mod graph (cycle detection) |
 | Java | jdeps |
 | Rust | cargo-depgraph |
@@ -42,10 +42,11 @@ You detect architectural violations and dependency issues as part of the Smart Q
 
 ```bash
 # JavaScript/TypeScript
+npx depcruise --validate .dependency-cruiser.cjs src   # dependency-cruiser
 npx madge --circular src/
 
-# Python
-deptry src/
+# Python (import-linter: define forbidden/independence contracts in .importlinter)
+lint-imports
 
 # Go
 go mod graph | tsort 2>&1 | grep -i cycle

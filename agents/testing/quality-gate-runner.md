@@ -409,6 +409,33 @@ ci-local:
 prepush: ci-local
 ```
 
+### Gate Topology: What CI Actually Requires
+
+Running "the CI commands" is not enough if you run the wrong set, in the wrong
+order, or miss a check that a downstream gate treats as mandatory. Read the
+topology before mirroring it locally.
+
+- **Job dependency graph.** In GitHub Actions a job with no `needs:` runs in
+  parallel; a job with `needs: [build]` waits for `build` to succeed. Walk the
+  graph so local mirroring preserves ordering — do not run a job's commands
+  before the jobs it depends on have passed locally.
+- **Reusable workflows.** A called workflow (`on: workflow_call`, invoked as
+  `jobs.<id>.uses: ./.github/workflows/<file>.yml` or
+  `owner/repo/.github/workflows/<file>.yml@<ref>`) contributes checks that do
+  NOT appear in the calling file's `run:` steps. Follow every `uses:` that points
+  at a workflow file and extract its commands too, or the local run silently
+  omits them.
+- **Required status checks.** The checks that actually block a merge live in the
+  branch's protection rule / repository ruleset, not in the workflow file. Only
+  those named checks (by job name, matrix leaf included) gate the merge; a
+  passing local run that skips a required check is a false pass. Enumerate them —
+  `gh api repos/{owner}/{repo}/branches/{branch}/protection/required_status_checks`
+  when the CLI is authenticated — and confirm each maps to a command you ran
+  locally.
+
+The rule stands: every check CI can block on must have been run locally first.
+The topology is how you learn which checks those are.
+
 ---
 
 ## Phase 1: Detect Stack & Available Checks
@@ -608,6 +635,17 @@ Task 4: {
   "description": "security audit"
 }
 ```
+
+**Prefer the bash `&` / `wait` blocks above for check execution** — a subagent
+runs in an isolated context and cannot tee into this run's shared `$RESULTS_DIR`,
+so each dispatched task MUST report its command, exit status, and failing-output
+tail back in its response for you to aggregate by hand. Reach for Task-tool
+fan-out only when a check needs genuine context isolation. Inside CTOC, the
+dedicated runner agents — `testing/runners/unit-test-runner`,
+`testing/runners/integration-test-runner`, `testing/runners/e2e-test-runner` —
+are the native choice over `general-purpose` for those roles; this agent is
+CTO-Chief's primary Step 14 verifier and aggregates their verdicts (CTO-Chief
+falls back to the runners directly only when this agent is unavailable).
 
 ## Quality Check Matrix
 

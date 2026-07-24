@@ -42,7 +42,7 @@ You do **not** flag complexity in isolation — every finding ships with the met
 
 ## 2026 Best Practices (Quality category)
 
-Five pillars served: **readability** + **maintainability**.
+Two pillars served: **readability** + **maintainability**.
 
 ### Hard limits (defaults — overridable per-project in `.ctoc/settings.yaml`)
 
@@ -65,8 +65,8 @@ These are **defaults**, not laws. Generated code, parsers, and state machines le
 - **New-code-first**: enforce thresholds on changed lines and new functions only. Legacy hotspots get a separate `## Backlog` section, not a build failure. SonarQube's "Clean as You Code" model is the canonical pattern; mirror it.
 - **Cognitive > Cyclomatic for human review, Cyclomatic > Cognitive for test-coverage budgeting.** A high-CC function needs more test paths; a high-cognitive function needs to be split. Report both — they tell different stories.
 - **NPath catches what CC misses.** Cyclomatic ignores combinatorial path explosion; NPath multiplies path-counts through sequential branches. Three sequential `if/else` blocks score CC=4 but NPath=8. Use NPath as a tie-breaker when CC is borderline.
-- **Halstead Difficulty + Effort track distinct cognitive load.** Recent neuroscience research (PMC 2023; ScienceDirect 2025) found Halstead Effort and Difficulty correlate with EEG-measured cognitive load better than raw McCabe CC on small functions. Use Halstead for short, dense functions (CC stays low but the function is still hard to read).
-- **No single metric is sufficient.** A 2026 ScienceDirect study on complementarity in complexity metrics concluded that no single metric fully captures perceived complexity; emit at least cyclomatic + cognitive + one structural metric (nesting OR function length) per finding.
+- **Halstead Difficulty + Effort track a distinct axis.** Halstead measures operator/operand density that cyclomatic complexity ignores. Use it for short, dense functions where CC stays low but the code is still hard to read.
+- **No single metric is sufficient.** No one metric fully captures perceived complexity — a long-standing finding across the complexity-metrics literature. Emit at least cyclomatic + cognitive + one structural metric (nesting OR function length) per finding.
 - **Guard clauses lower cognitive complexity without changing CC.** Recommend them in findings; they're a cheap win.
 - **Self-documenting names + comments-explain-WHY-not-WHAT**: high cognitive complexity is often a comprehension problem; suggest renaming before refactoring.
 - **AI-generated code skews long.** Generative coding assistants produce verbose functions; treat any function > 100 LOC born in a single commit as a complexity-suspect even before measuring.
@@ -557,7 +557,7 @@ def create_invoice(inv: InvoiceInput): ...
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when this skill produces a human-readable scan report. When the skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when this skill produces a human-readable scan report. When the skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |-------------|----------|-------------------------------|
@@ -572,16 +572,17 @@ These tiers are the **internal triage view** used when this skill produces a hum
 
 | Tool | Languages | Strengths | When |
 |------|-----------|-----------|------|
-| **SonarQube 11+ / Sonar Server / SonarLint** | 30+ | Cognitive Complexity (canonical implementation), "Clean as You Code" new-code gate, SARIF output, IDE integration | Every PR; IDE pre-commit |
-| **lizard** | 20+ (C/C++, Python, Java, JS/TS, C#, Go, Swift, Rust, Lua, ...) | Multi-language single binary, ccn + cognitive + token count + parameter count, JSON/XML/CSV output | CI for polyglot repos |
+| **SonarQube (Server & Cloud) / SonarLint** | 30+ | Cognitive Complexity (canonical implementation), "Clean as You Code" new-code gate, SARIF output, IDE integration | Every PR; IDE pre-commit |
+| **lizard** | 20+ (C/C++, Python, Java, JS/TS, C#, Go, Swift, Rust, Lua, ...) | Multi-language single binary, cyclomatic (CCN) + NLOC + token count + parameter count (no cognitive complexity), XML/CSV output | CI for polyglot repos |
 | **radon** | Python | CC, MI (Maintainability Index), raw, Halstead — all four | Python projects |
 | **xenon** | Python | Wraps radon; fails CI on threshold breach | Python CI gate |
 | **gocyclo** + **gocognit** | Go | CC and cognitive | Go CI |
 | **eslint** `complexity` + `max-lines-per-function` + `max-params` + `max-depth` | JS/TS | Built-in rules; integrates with Prettier/Biome | JS/TS pre-commit |
-| **PMD** (`CyclomaticComplexity`, `CognitiveComplexity`, `NPathComplexity`, `ExcessiveParameterList`, `ExcessiveMethodLength`) | Java, Apex | NPath + DIT + fan-out; mature ruleset | Java CI |
+| **PMD** (`CyclomaticComplexity`, `CognitiveComplexity`, `NPathComplexity`, `ExcessiveParameterList`, `NcssCount`) | Java, Apex | NPath + method/class NCSS length + import fan-out (`ExcessiveImports`); mature ruleset | Java CI |
 | **Checkstyle** (`CyclomaticComplexity`, `NPathComplexity`, `JavaNCSS`, `ClassFanOutComplexity`) | Java | NCSS counts, fan-out | Java IDE/CI |
 | **Roslyn analyzers** — `CA1502` (cyclomatic), `CA1505` (maintainability), `CA1501` (DIT), `CA1506` (class coupling) | C# / VB.NET | Ships with .NET SDK; `<AnalysisMode>All</AnalysisMode>` in csproj | .NET build |
-| **Clang static analyzer** (`StmtComplexity` family — alpha checkers under `alpha.core`) + Clang-Tidy `readability-function-cognitive-complexity` and `readability-function-size` | C/C++ | Cognitive + statement-tree size limits, in-tree with Clang | C/C++ build |
+| **Clang-Tidy** (`readability-function-cognitive-complexity`, `readability-function-size`) | C/C++ | Cognitive complexity + function-size limits, in-tree with Clang | C/C++ build |
+| **clippy** (`clippy::cognitive_complexity`) | Rust | Allow-by-default lint (enable via `#![warn(clippy::cognitive_complexity)]`); threshold set by `cognitive-complexity-threshold` in `clippy.toml` (default 25); renamed from `cyclomatic_complexity`. lizard also covers Rust cyclomatic | Rust CI (`cargo clippy`) |
 | **CodeClimate / Qlty** | Multi | Maintainability score aggregate, GitHub annotations | PR dashboards |
 | **plato** | JS (legacy) | HTML visualization, Halstead — fine for offline reports; not actively maintained | One-off audits only |
 | **multimetric** | 7 langs | Aggregates Halstead, CC, MI, fan-in/fan-out | Polyglot dashboards |
@@ -589,7 +590,7 @@ These tiers are the **internal triage view** used when this skill produces a hum
 
 ```bash
 # Polyglot — fast, every PR
-lizard -C 10 -L 50 -a 5 --CCN 10 --languages cpp,java,python,javascript,csharp,go .
+lizard -C 10 -L 50 -a 5 --languages cpp,java,python,javascript,csharp,go .
 lizard --xml -o lizard.xml .                          # CI-friendly output
 
 # Python — radon emits per-metric JSON
@@ -693,7 +694,7 @@ When emitting a finding via the refinement loop, write the letter with these fie
 finding_id: <sha256(critic+file+line+metric_kind)[:12]>   # fingerprint for dedup
 severity: critical                                         # ALWAYS critical (warnings-are-bugs)
 confidence: high | medium | low                            # high = ≥2 engines agree; low = single-tool unverified
-engine: sonarqube | lizard | radon | xenon | gocyclo | gocognit | eslint | pmd | checkstyle | roslyn | clang-tidy | multimetric | manual
+engine: sonarqube | lizard | radon | xenon | gocyclo | gocognit | eslint | pmd | checkstyle | roslyn | clang-tidy | clippy | multimetric | manual
 metric_kind: cyclomatic | cognitive | npath | halstead_difficulty | halstead_effort | halstead_volume | function_length | parameter_count | nesting_depth | depth_of_inheritance | fan_in | fan_out | unjustified_suppression
 measured_value: 41                                         # numeric measurement from the engine
 threshold: 15                                              # configured limit for this metric
@@ -770,7 +771,7 @@ complexity-analyzer:
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every cyclomatic/cognitive/NPath/Halstead/length/parameter/nesting/DIT/fan-out threshold breach you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

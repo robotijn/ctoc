@@ -101,7 +101,8 @@ async function fetchData() {
 
 ### Go
 ```bash
-go vet -race ./...
+go test -race ./...   # dynamic data-race detector (instruments the test binary)
+go vet ./...          # static concurrency vet: copylock, loopclosure
 staticcheck ./...
 ```
 

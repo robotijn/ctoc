@@ -53,7 +53,7 @@ Apply the **five pillars** framing — every quality check should name which pil
 
 ### Pick one pattern and enforce its dependency direction
 
-A project must commit to **one** structural style. Mixing them silently is itself the most common violation. The four supported styles share the same underlying rule — **outer rings may depend on inner rings, never the reverse** — but differ in how they slice the codebase. Pick by team size, integration breadth, and domain complexity:
+A project must commit to **one** structural style. Mixing them silently is itself the most common violation. The supported styles share the same underlying rule — **outer rings may depend on inner rings, never the reverse** — but differ in how they slice the codebase. Pick by team size, integration breadth, and domain complexity:
 
 | Pattern | Best for | Dependency rule | Indicator it's wrong fit |
 |---------|----------|-----------------|--------------------------|
@@ -244,7 +244,7 @@ Trace import chains; max 5 levels deep before flagging. Long chains indicate acc
           .whereLayer("Presentation").mayNotBeAccessedByAnyLayer();
       @ArchTest static final ArchRule no_cycles = slices().matching("..(*)..").should().beFreeOfCycles();
       @ArchTest static final ArchRule domain_pure = noClasses().that().resideInAPackage("..domain..")
-          .should().dependOnClassesThat().resideInAnyPackage("..infrastructure..", "javax.persistence..");
+          .should().dependOnClassesThat().resideInAnyPackage("..infrastructure..", "jakarta.persistence..", "javax.persistence..");
   }
   ```
 
@@ -450,7 +450,7 @@ Reconciliation rule: **the wire severity is always `critical`** (warnings-are-bu
 | C / C++ | `cpp-dependencies`, `include-what-you-use`, `cinclude2dot` | Header graph is the dependency graph. |
 | PHP | **deptrac** | Layer enforcement via YAML config; mature ecosystem. |
 | Multi-language | **Sonargraph**, **Lattix** | Commercial, polyglot, used in enterprise audits. |
-| Java | **modularity-maven-plugin** | Enforces JPMS rules during build. |
+| Java | JPMS `module-info.java` (javac-enforced) | `exports` / `requires` enforced at compile- and run-time — no plugin needed (see the Java section above). |
 
 Aggregate violations into a single report. Treat every emitted letter as `critical` on the wire — per warnings-are-bugs, this skill's findings block phase advancement until resolved or explicitly waived in the plan's `## Decisions Taken Under Ambiguity`.
 
@@ -480,7 +480,7 @@ The integrator uses `confidence` and `delta_to_baseline` to weight findings. A `
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

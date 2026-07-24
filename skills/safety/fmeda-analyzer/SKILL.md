@@ -54,14 +54,14 @@ If none of the above is true, this skill is inert — the lean default per the r
 
 ## 2026 Best Practices (Safety category)
 
-- **FMEDA quantifies, FMEA categorises, Fault Tree Analysis decomposes.** The 2022 IEEE paper "Application of System Theoretic Process Analysis, FMEA, FMEDA, and FTA to Cyber-Physical Systems" makes the distinction explicit: FMEA produces a qualitative ranking, FMEDA produces the numeric metrics that ISO 26262 and IEC 61508 require, and Fault Tree Analysis traces a single undesired top event back to its basic events (https://www.computer.org/csdl/proceedings-article/cyber-physical-systems/2022). All three are complementary; none of them substitutes for the others.
+- **FMEDA quantifies, FMEA categorises, Fault Tree Analysis decomposes.** The three analyses are complementary and none substitutes for the others: FMEA produces a qualitative ranking of failure modes, FMEDA produces the numeric metrics that ISO 26262 and IEC 61508 require (Single-Point Fault Metric, Latent Fault Metric, diagnostic coverage), and Fault Tree Analysis traces a single undesired top event back to its basic events.
 - **Diagnostic coverage matters more than reliability.** A component with a high failure rate but ninety-nine percent diagnostic coverage is safer than a component with a low failure rate and zero diagnostics. ISO 26262 Part 5 Annex D defines diagnostic coverage as the fraction of dangerous failure modes that are detected by an on-line safety mechanism within the Fault Tolerant Time Interval. The Single-Point Fault Metric is the proportion of single-point and residual faults to the total dangerous-failure rate, weighted by diagnostic coverage.
 - **The Latent Fault Metric guards against the second failure.** Multi-point faults remain hidden until a second failure activates the dangerous condition. ISO 26262 requires the Latent Fault Metric — the proportion of latent multi-point faults that are detected by a proof test or by a periodic safety mechanism — to exceed ninety percent for ASIL D and eighty percent for ASIL C (per Part 5 Annex F).
-- **Failure-rate sources must be cited.** Use IEC TR 62380 (FIDES), IEC 61709, MIL-HDBK-217F, or the device supplier's published failure-in-time number. Inventing a failure rate is grounds for IV and V rejection. When the device sheet does not publish a number, escalate to the supplier rather than guessing.
+- **Failure-rate sources must be cited.** Use IEC TR 62380, FIDES (the Institut pour la Maîtrise des Risques reliability methodology), IEC 61709, MIL-HDBK-217F, or the device supplier's published failure-in-time number. Inventing a failure rate is grounds for IV and V rejection. When the device sheet does not publish a number, escalate to the supplier rather than guessing.
 - **De-rating is mandatory.** A semiconductor's published failure-in-time number assumes a specific junction temperature, voltage, and operating profile. Real-world conditions degrade the number. Apply the supplier's de-rating curve or fall back to the conservative bound from IEC 61709.
-- **Common-cause failures defeat redundancy.** When the FMEDA assumes redundancy, the common-cause failure fraction (the beta-factor in IEC 61508 Part 6) must be quantified separately. The 2024 Analog Devices application note "Mitigation of Common-Cause Failures in Safety-Critical Systems" warns that correlated faults (shared power, shared clock, shared package, shared algorithm, shared supplier lot) can collapse a redundancy claim to no redundancy at all.
+- **Common-cause failures defeat redundancy.** When the FMEDA assumes redundancy, the common-cause failure fraction (the beta-factor in IEC 61508 Part 6) must be quantified separately. Correlated faults (shared power, shared clock, shared package, shared algorithm, shared supplier lot) can collapse a redundancy claim to no redundancy at all.
 - **Software FMEDA differs from hardware FMEDA.** ISO 26262 Part 6 calls for a software-level analysis that enumerates failure modes of each software unit (incorrect initialisation, stack overflow, deadlock, race, memory corruption, control-flow corruption), maps them to safety mechanisms (memory protection unit, dual-channel comparison, control-flow monitoring, watchdog), and quantifies the diagnostic coverage of each mechanism. Hardware metrics borrow the Single-Point Fault Metric vocabulary, but the failure-rate concept is qualitative for software — the discipline is the same.
-- **FMEDA is a living document.** A frozen design produces a frozen FMEDA. Any architectural change (different microcontroller, different power topology, different safety mechanism) requires a delta-FMEDA that re-verifies the metrics. ISO 26262 Part 8 Clause 7 (Change Management) is the applicable clause.
+- **FMEDA is a living document.** A frozen design produces a frozen FMEDA. Any architectural change (different microcontroller, different power topology, different safety mechanism) requires a delta-FMEDA that re-verifies the metrics. ISO 26262 Part 8 (Supporting processes), change management, is the applicable clause.
 
 ## Inputs (what this skill reads)
 
@@ -425,11 +425,11 @@ A failure mode is marked `dangerous-undetected` with no `diagnostic_mechanism`. 
 
 ### 4. Common-cause failure unanalysed
 
-The architecture declares redundancy (dual channel, dual modular redundancy, lockstep) but the FMEDA contains no `common_cause_factor` or `beta_factor` entry. Per the 2024 Analog Devices guidance, this is the single most common way that a paper claim of redundancy collapses to a single point of failure in practice. Emit `kind: common_cause_not_analysed`.
+The architecture declares redundancy (dual channel, dual modular redundancy, lockstep) but the FMEDA contains no `common_cause_factor` or `beta_factor` entry. This is a common way that a paper claim of redundancy collapses to a single point of failure in practice. Emit `kind: common_cause_not_analysed`.
 
 ### 5. Diagnostic coverage out of range or unsourced
 
-A `diagnostic_coverage_pct` value is reported without a citation to the diagnostic mechanism's coverage analysis. ISO 26262 Part 5 Annex D defines four coverage tiers (low approximately 60 percent, medium approximately 90 percent, high approximately 99 percent); coverage claims must map to a tier and to evidence. Emit `kind: unsourced_coverage`.
+A `diagnostic_coverage_pct` value is reported without a citation to the diagnostic mechanism's coverage analysis. ISO 26262 Part 5 Annex D defines three coverage tiers (low approximately 60 percent, medium approximately 90 percent, high approximately 99 percent); coverage claims must map to a tier and to evidence. Emit `kind: unsourced_coverage`.
 
 ### 6. Metric threshold miss
 
@@ -466,9 +466,8 @@ gap: <e.g., 2.6 percentage points>
 message: <one-sentence summary>
 suggested_fix: <concrete remediation>
 references:
-  - https://www.computer.org/csdl/proceedings-article/cyber-physical-systems/2022    # IEEE FMEA / FMEDA / FTA comparative paper
-  - https://www.iso.org/standard/68383.html                                          # ISO 26262 Part 5 (Product development at the hardware level)
-  - https://webstore.iec.ch/publication/22273                                        # IEC 61508 Part 2 (Requirements for electronic safety-related systems)
+  - https://www.iso.org/obp/ui/#iso:std:iso:26262:-5:ed-2:v1:en                       # ISO 26262-5:2018 (Product development at the hardware level)
+  - https://webstore.iec.ch/publication/22273                                        # IEC 61508:2010 (functional safety of electrical/electronic/programmable electronic safety-related systems)
 ```
 
 ## Special Considerations
@@ -482,7 +481,7 @@ references:
 
 ## Refinement Loop — critic mode
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every missing component, unsourced failure rate, undiagnosed dangerous mode, unanalysed common-cause, unsourced coverage, metric miss, and stale FMEDA emits as `severity: critical` in the letter to CTO Chief.
 - The letter schema rejects `warn` — there is no soft tier on the wire.

@@ -27,24 +27,30 @@ You find code that is never executed or referenced. Dead code adds confusion, in
 
 ## Tools
 
-### TypeScript (ts-prune)
+### JavaScript / TypeScript (knip — primary)
 ```bash
-npx ts-prune
+npx knip
 ```
+knip finds unused files, exports, AND dependencies in one pass, so it replaces
+the older single-purpose tools. Prefer it for any JS/TS project.
 
-### JavaScript (unimported)
-```bash
-npx unimported
-```
+Legacy single-purpose alternatives (only if knip cannot be installed):
+`npx ts-prune` (exports — now in maintenance mode, its own README recommends
+knip), `npx unimported` (orphan files), `npx depcheck` (unused dependencies).
 
 ### Python (vulture)
 ```bash
 vulture src/
 ```
 
-### Dependencies (depcheck)
+### Go (staticcheck — includes the U1000 unused-code analyzer)
 ```bash
-npx depcheck
+staticcheck ./...
+```
+
+### Rust (cargo-udeps — unused dependencies; requires nightly)
+```bash
+cargo +nightly udeps
 ```
 
 ## Detection Patterns

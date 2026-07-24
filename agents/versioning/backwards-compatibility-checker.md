@@ -46,23 +46,21 @@ You detect breaking changes between versions to ensure proper semantic versionin
 
 ### TypeScript API Comparison
 ```bash
-# Extract public API
+# Extract the public API surface into a committed report
 npx api-extractor run --local
 
-# Compare API reports
+# Compare API reports — a diff here IS the type-compatibility signal
 diff api-report-v1.api.md api-report-v2.api.md
-
-# Type compatibility check
-npx ts-api-compare old-types.d.ts new-types.d.ts
 ```
 
 ### OpenAPI Comparison
 ```bash
-# Compare OpenAPI specs
+# Compare OpenAPI specs (openapi-diff is a real npm CLI)
 npx openapi-diff old-spec.yaml new-spec.yaml
 
-# Validate breaking changes
-npx oasdiff breaking old-spec.yaml new-spec.yaml
+# Classify breaking vs non-breaking changes and fail CI on a break.
+# oasdiff is a Go binary — install via brew/go/Docker, NOT npm.
+oasdiff breaking old-spec.yaml new-spec.yaml --fail-on ERR
 ```
 
 ### Package Comparison

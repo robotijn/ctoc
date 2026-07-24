@@ -92,7 +92,8 @@ cz bump --changelog                # bump version + update CHANGELOG.md
 towncrier build --version 2.3.0
 
 # Validate Keep a Changelog 1.1 structure
-npx keep-a-changelog-cli validate CHANGELOG.md   # community tool; alternatives exist
+npx @metamask/auto-changelog validate            # maintained validator (add --rc for release candidates)
+# alternative: npx @vtabary/keepachangelog-cli validate CHANGELOG.md
 ```
 
 ## Conventional Commits → Keep a Changelog Section + Semver
@@ -221,7 +222,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     git commit -m "docs: update changelog for v${{ env.VERSION }}"
 
 # release-please (recommended for libraries)
-- uses: googleapis/release-please-action@v4
+- uses: googleapis/release-please-action@v5
   with:
     release-type: node    # or python, java, go, rust, etc.
 
@@ -244,7 +245,7 @@ No single tool fits every project. Pick by language, repo shape, and release phi
 | **semantic-release** | Fully automated · parses Conventional Commits · publishes to npm/GitHub releases in one step · widely adopted in JS/TS | Commits ARE the changelog — output reads like a commit log unless heavily templated · weak native monorepo support · all-or-nothing release cadence | Single-package JS/TS libs that want zero-touch releases |
 | **changesets** | Authors write **intent** (a `.changeset` file) separate from commits · first-class monorepo support · human reviews/edits the changeset before release · changelog reads like product notes, not git log | More ceremony per change · authors must remember to write a changeset · less weekly download volume than semantic-release | Monorepos, libraries that prioritize narrative changelogs |
 | **release-please** (Google) | Generates a **release PR** that bumps versions + updates CHANGELOG.md · review-and-merge gate before every release · supports 15+ languages (node, python, java, go, rust, ruby, php, dart, terraform, helm, …) | Requires Conventional Commits discipline · GitHub-only · the release PR can collect stale conflicts on busy repos | Multi-language repos, teams that want a human gate without writing changesets |
-| **conventional-changelog** | Library that powers many other tools · Angular preset is the de-facto baseline · works as a CLI or programmatically | Lower-level — you'll typically wrap it in `standard-version`, `release-it`, or a custom script | Building your own pipeline |
+| **conventional-changelog** | Library that powers many other tools · Angular preset is the de-facto baseline · works as a CLI or programmatically | Lower-level — you'll typically wrap it in `commit-and-tag-version` (the maintained fork of the deprecated `standard-version`), `release-it`, or a custom script | Building your own pipeline |
 | **commitizen** (Python) | Author-facing `cz commit` wizard + `cz bump --changelog` in one tool · respects Keep a Changelog · works in any language but Python-native | Python install dependency for non-Python projects | Python projects; teams onboarding Conventional Commits |
 | **towncrier** (Python) | News-fragment workflow — each PR drops a `newsfragments/123.feature` file; `towncrier build` assembles them at release · used by Twisted, pip, attrs, pytest | Extra file per PR · authors must learn the fragment format · doesn't auto-derive version | Mature Python libraries that need carefully-curated release notes |
 | **release-drafter** (GitHub Action) | Auto-drafts a GitHub Release as PRs are merged · category labels (feature/bug/breaking) drive sections · zero CLI · language-agnostic | Lives only in GitHub Releases UI — doesn't write CHANGELOG.md by default · category mapping is label-based, not commit-based | Any-language GitHub project that publishes via Releases (works for C#/.NET, Java/Maven, etc.) |
@@ -299,7 +300,7 @@ The integrator uses `confidence` to weight findings — a `confidence: low` infe
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every changelog defect (missing section, wrong section name, missing migration guide, internal-leak, wrong semver bump, missing CVE entry) emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

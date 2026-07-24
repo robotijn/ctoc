@@ -65,7 +65,7 @@ The refinement-loop letter's `type_kind` field is drawn from this list. Each cat
 | `dynamic_type` | Use of a deliberately untyped type (`dynamic` C#, `Any` Py, `unknown` TS without narrowing) | per-tool warnings; manual rule |
 | `null_violation` | Reference assumed non-null where the type allows null | `strictNullChecks` (tsc), `<Nullable>enable</Nullable>` (C#), mypy default |
 | `unsafe_cast` | Cast that bypasses the type system without runtime check | `noImplicitOverride`, `noUncheckedIndexedAccess`, `as any` audit |
-| `non_exhaustive_union` | Switch/match on a discriminated union missing a variant | `noFallthroughCasesInSwitch` (tsc), pyright `reportMatchNotExhaustive`, Java `--enable-preview` + sealed `switch` |
+| `non_exhaustive_union` | Switch/match on a discriminated union missing a variant | `noFallthroughCasesInSwitch` (tsc), pyright `reportMatchNotExhaustive`, Java sealed `switch` (JEP 441, GA in 21 — no `--enable-preview`) |
 | `generic_variance` | Variance violation (covariant where contravariant expected, or vice versa) | tsc `strictFunctionTypes`, mypy `--strict` |
 | `runtime_type_check_needed` | Boundary input (HTTP body, JSON, env var) used as a typed value without parse | manual — pair with parse-don't-validate audit |
 | `escape_hatch_unjustified` | `any` / `dynamic` / `// @ts-ignore` / `# type: ignore` / `!` without a comment explaining the invariant | tsc `noImplicitAny`, mypy `warn_unused_ignores`, ESLint `@typescript-eslint/no-explicit-any` |
@@ -508,7 +508,7 @@ Gotchas to flag: `BIGINT` -> `JS Number` truncation (use string IDs at the API e
 | Go | `go build ./...`, `go vet ./...`, `gopls check` | `staticcheck`, `golangci-lint`, `nilaway` | Go's type system is weaker; pair with linters that emulate sum types via interfaces |
 | Ruby | `srb tc` (Sorbet) or `steep check` (RBS) | RuboCop with Sorbet plugin | Gradual typing — start with `# typed: false`, ratchet to `# typed: strict` |
 
-Aggregate type-check output as **SARIF** where the tool supports it (pyright, ESLint, clang-tidy, Roslyn analyzers do; mypy via `mypy-to-sarif`) so findings land in the GitHub code-scanning dashboard alongside SAST.
+Aggregate type-check output as **SARIF** where the tool supports it (ESLint via `@microsoft/eslint-formatter-sarif`, Roslyn analyzers via MSBuild `-p:ErrorLog=<file>.sarif,version=2.1` — GitHub code scanning requires SARIF 2.1.0, and the `ErrorLog` default is v1; mypy and pyright have no native SARIF output and need an external converter) so findings land in the GitHub code-scanning dashboard alongside SAST.
 
 ```bash
 # CI snippets — fail the build on any type error or any newly-introduced warning
@@ -578,7 +578,7 @@ Type-checker triage tiers (internal report) vs refinement-loop letter severity (
 | MEDIUM | bare primitive used where a newtype would prevent a confusable bug (`string` for IDs); validation-not-parsing at a boundary | `critical` |
 | LOW | missing return type annotation; unused `# type: ignore`; stylistic type-alias suggestion | `critical` |
 
-Per the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md), **every finding emits `severity: critical` on the wire**. The triage tiers stay in the human report body for prioritization. A type-checker warning today is a runtime crash after the next refactor.
+Per the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md), **every finding emits `severity: critical` on the wire**. The triage tiers stay in the human report body for prioritization. A type-checker warning today is a runtime crash after the next refactor.
 
 ## Output Format
 
@@ -654,7 +654,7 @@ The integrator uses `confidence` and `strict_mode` to weight findings — a `str
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

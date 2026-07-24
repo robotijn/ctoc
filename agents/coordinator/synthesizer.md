@@ -215,7 +215,7 @@ response:
     tokens_used: <int>
     tool_calls: <int>
     subagents_dispatched: 0
-    model: opus-4-7
+    model: opus
 ```
 
 ## Edge cases

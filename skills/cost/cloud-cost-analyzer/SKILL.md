@@ -211,7 +211,7 @@ GetCostAndUsageRequest cur = GetCostAndUsageRequest.builder()
 ce.getCostAndUsage(cur);
 ```
 
-Flag patterns: `RunInstancesRequest.builder()` without `.tagSpecifications(...)`; `CreateBucketRequest` without a corresponding `PutBucketLifecycleConfigurationRequest`; AWS SDK v1 (`com.amazonaws.services.*`) without v2 migration plan — v1 entered maintenance mode in 2024.
+Flag patterns: `RunInstancesRequest.builder()` without `.tagSpecifications(...)`; `CreateBucketRequest` without a corresponding `PutBucketLifecycleConfigurationRequest`; AWS SDK v1 (`com.amazonaws.services.*`) without a v2 migration plan — v1 entered maintenance mode on 31 July 2024 and reached end-of-support on 31 December 2025 (no further fixes, including security), so any remaining v1 usage is a migration finding.
 
 ### C# / .NET — Azure Cost Management SDK
 
@@ -267,7 +267,7 @@ LIMIT 20;
 SELECT
     warehouse_name,
     SUM(credits_used) AS credits,
-    SUM(credits_used) * 3 AS approx_usd        -- $3/credit Standard edition; adjust for your contract
+    SUM(credits_used) * 3 AS approx_usd        -- illustrative: ~$3/credit Enterprise on-demand (Standard ~$2); use YOUR contract rate
 FROM snowflake.account_usage.warehouse_metering_history
 WHERE start_time >= DATEADD(day, -7, CURRENT_TIMESTAMP())
 GROUP BY warehouse_name
@@ -381,7 +381,7 @@ Cost optimization in 2026 is a layered stack: native cloud tools for the per-clo
 
 | Tool | Layer | Strengths | When |
 |---|---|---|---|
-| **Infracost** | IaC / PR-time | Cost diff comment on every Terraform PR; tagging policies; 70+ Well-Architected checks | Every PR touching IaC |
+| **Infracost** | IaC / PR-time | Cost diff comment on every Terraform PR; tagging policies; FinOps policies and cost guardrails | Every PR touching IaC |
 | **Kubecost / OpenCost** | Kubernetes | Per-namespace / per-pod / per-label cost; supports custom queries (e.g. cost per inference). Kubecost was acquired by IBM in Sep 2024 and built on OpenCost. | Any shared K8s cluster |
 | **Finout** | Multi-cloud platform | Cross-cloud cost rollup, virtual tagging, alerting | Org-level FinOps reporting |
 | **AWS Cost Explorer + Compute Optimizer** | Native AWS | 13 months history; rightsizing recommendations; Cost Anomaly Detection (free) | All AWS accounts |
@@ -414,8 +414,8 @@ aws ec2 describe-addresses --query "Addresses[?AssociationId==null]"
 
 # GCP
 gcloud recommender recommendations list \
-  --project=<project> --location=global \
-  --recommender=google.compute.instance.IdleResourceRecommender
+  --project=<project> --location=<zone> \
+  --recommender=google.compute.instance.IdleResourceRecommender   # idle-VM recommendations are zonal, not global
 
 # Azure
 az consumption usage list --top 100
@@ -494,7 +494,7 @@ Numbers above are illustrative — populate with actual cost-explorer output.
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable cost report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable cost report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |---|---|---|
@@ -530,7 +530,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings. A `co
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every cost-tagging gap, missed commitment, idle resource, missing lifecycle, oversized instance, missing anomaly alert, missing PR-time cost preview, AI/GPU on-demand-for-steady-workload finding, and unattributed cost spike emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

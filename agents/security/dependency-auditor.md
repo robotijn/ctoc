@@ -414,8 +414,8 @@ Generate Software Bill of Materials for compliance:
 # Node.js
 npx @cyclonedx/cyclonedx-npm --output-file sbom.json
 
-# Python
-cyclonedx-py -r --format json -o sbom.json
+# Python (cyclonedx-py v4+ uses subcommands; the pre-v4 `-r` flag was removed)
+cyclonedx-py requirements requirements.txt --output-format JSON -o sbom.json
 
 # Go
 cyclonedx-gomod mod -json -output sbom.json

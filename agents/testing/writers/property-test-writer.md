@@ -100,8 +100,8 @@ test('addition is commutative', () => {
 proptest! {
     #[test]
     fn reverse_twice_is_identity(xs: Vec<i32>) {
-        let reversed: Vec<_> = xs.iter().rev().rev().cloned().collect();
-        prop_assert_eq!(xs, reversed);
+        // reverse() is the function under test, not the stdlib iterator.
+        prop_assert_eq!(reverse(reverse(xs.clone())), xs);
     }
 }
 ```

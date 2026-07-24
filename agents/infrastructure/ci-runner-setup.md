@@ -48,7 +48,9 @@ How do you want to run GitHub Actions?
     [+] Clean environment each run
     [+] GitHub manages security updates
     [+] Always available, no maintenance
-    [-] 2000 free minutes/month limit (private repos)
+    [-] Per-minute pricing on private repos beyond a monthly
+        free-minutes allowance (allowance varies by plan; Windows
+        and macOS bill at premium multiples) — check current pricing
     [-] Queue time during peak hours
     [-] Can't access local resources
 
@@ -91,10 +93,13 @@ can be DANGEROUS because:
 3. Secrets in your environment may be exposed
 
 RECOMMENDATIONS:
-- Restrict runner to specific workflows only
-- Disable fork PR runs: `pull_request_target` not `pull_request`
-- Use ephemeral runners (containers) instead
-- Consider GitHub-hosted for public repos
+- Route fork PRs to GitHub-hosted runners; reserve self-hosted
+  for push events on trusted branches only
+- NEVER use `pull_request_target` + checkout of the PR head — it
+  runs with your secrets and a write token (the "pwn request")
+- Use ephemeral runners (fresh container per job) instead of
+  persistent ones
+- Require approval for first-time contributors' workflow runs
 
 Do you want to continue with self-hosted setup? [y/N]
 ===============================================================
@@ -151,7 +156,12 @@ gh api -X POST repos/{owner}/{repo}/actions/runners/registration-token | jq -r .
 
 ```bash
 cd ~/actions-runner
-./config.sh --url https://github.com/{owner}/{repo} --token YOUR_TOKEN --name "local-$(hostname)" --labels "self-hosted,local,linux"
+# --ephemeral makes the runner exit and deregister after ONE job, so no
+# state (dropped binaries, mutated $PATH, cached creds) leaks into the next job.
+./config.sh --url https://github.com/{owner}/{repo} --token YOUR_TOKEN \
+  --name "host-$(hostname)-$(uuidgen | cut -c1-8)" \
+  --labels "self-hosted,linux,x64,ephemeral" \
+  --ephemeral --unattended
 ```
 
 ### Step 4: Install as Service
@@ -160,6 +170,12 @@ cd ~/actions-runner
 sudo ./svc.sh install
 sudo ./svc.sh start
 sudo ./svc.sh status
+# NOTE: an --ephemeral runner serves one job and then goes idle; svc.sh only
+# supervises the process, it does NOT re-register with a fresh token. For
+# continuous ephemeral capacity, autoscaling (Actions Runner Controller on
+# Kubernetes), GitLab Runner Helm, or the cost trade-off across hosted
+# alternatives, use the fuller infrastructure/ci-runner-setup skill — this
+# single-host recipe is for a one-off private-repo runner only.
 ```
 
 ### Step 5: Update Workflows (Hybrid)
@@ -170,11 +186,11 @@ For hybrid setup, update workflow files:
 # Before
 runs-on: ubuntu-latest
 
-# After (hybrid with fallback)
-runs-on: ${{ vars.RUNNER_LABELS || 'ubuntu-latest' }}
+# After (hybrid with fallback) — pin the hosted fallback, never *-latest
+runs-on: ${{ vars.RUNNER_LABELS || 'ubuntu-24.04' }}
 
 # Or use labels
-runs-on: [self-hosted, local]
+runs-on: [self-hosted, linux]
 ```
 
 ## Output Format
@@ -186,15 +202,15 @@ runs-on: [self-hosted, local]
               [OK] RUNNER SETUP COMPLETE
 ===============================================================
 
-Runner Name:   local-your-hostname
-Labels:        self-hosted, local, linux
+Runner Name:   host-your-hostname-a1b2c3d4
+Labels:        self-hosted, linux, x64, ephemeral
 Status:        Running
 
 Your preference has been saved to ~/.ctoc/settings.yaml
 
 Next steps:
 1. Your workflows will now use this runner for jobs with:
-   runs-on: [self-hosted, local]
+   runs-on: [self-hosted, linux]
 
 2. Check runner status anytime with:
    ctoc ci runner status
@@ -222,7 +238,9 @@ Common issues:
 - Network connectivity issues
 
 To retry: ctoc ci runner setup
-To remove: rm -rf ~/actions-runner && gh api -X DELETE ...
+To remove: cd ~/actions-runner && ./config.sh remove --token \
+  $(gh api -X POST repos/{owner}/{repo}/actions/runners/remove-token | jq -r .token)
+  then: rm -rf ~/actions-runner   # deregister first, delete second
 
 ===============================================================
 ```

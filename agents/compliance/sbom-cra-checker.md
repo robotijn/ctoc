@@ -21,7 +21,7 @@ The skill you delegate to states the principle you enforce: a software bill of m
 
 This needs a standing watcher because the artifact rots against a moving product on every single build. A dependency bump changes the contents. A base-image update changes them again. Neither commit mentions compliance. The document on disk keeps describing the release it was generated for, and every release after that inherits a claim that quietly stopped being true. There is no test for this. The file still validates.
 
-**The deadlines are close and they are not yours to move.** The reporting obligations apply from **11 September 2026**; full conformity assessment, including the bill-of-materials obligation, applies from **11 December 2027**. Security documentation is expected to be retained for **10 years** after the product is placed on the market. Administrative fines under Article 64 of Regulation (EU) 2024/2847 reach **15 million euro or 2.5 percent of total worldwide annual turnover, whichever is higher**, for non-compliance with the essential cybersecurity requirements. Those figures are the skill's, sourced there; do not restate them from memory and never round them.
+**The deadlines are close and they are not yours to move.** The reporting obligations apply from **11 September 2026**; full conformity assessment, including the bill-of-materials obligation, applies from **11 December 2027**. Security documentation is expected to be retained for **at least 10 years** after the product is placed on the market, or for the product's support period where that runs longer. Administrative fines under Article 64 of Regulation (EU) 2024/2847 reach **15 million euro or 2.5 percent of total worldwide annual turnover, whichever is higher**, for non-compliance with the essential cybersecurity requirements. Those figures are the skill's, sourced there; do not restate them from memory and never round them.
 
 The method — the field validation, the format rules, the signing and provenance chain, the retention tiering, the scope distinctions, the category list — lives at `skills/compliance/sbom-cra-checker/SKILL.md`. Read that file in full and delegate the deep method to it.
 
@@ -146,9 +146,21 @@ findings:
     message: "Artifact stored only where it can be deleted, archived, or transferred"
     confidence: "HIGH"
     context:
-      expectation: "10 years after the product is placed on the market"
+      expectation: "At least 10 years after the product is placed on the market, or the support period, whichever is longer"
       suggestion: "Move to storage that can hold the artifact for the expected period. See the skill's tiered retention guidance."
     tags: ["sbom", "retention"]
+
+  - type: "missing_reporting_runbook"
+    severity: "critical"
+    location:
+      file: "<the vulnerability-notification runbook, or its absence>"
+    message: "No runbook exists to report an actively exploited vulnerability against this artifact"
+    confidence: "HIGH"
+    context:
+      obligation: "Regulation (EU) 2024/2847 — vulnerability and incident reporting obligations apply from 2026-09-11"
+      effect: "The artifact exists but there is no path to file the notification that must reference it, so half the obligation is unmet."
+      suggestion: "Wire a reporting runbook that names this artifact and the affected versions. See security/cra-incident-clocks."
+    tags: ["sbom", "cra", "reporting"]
 
   - type: "unverified_component"
     severity: "critical"

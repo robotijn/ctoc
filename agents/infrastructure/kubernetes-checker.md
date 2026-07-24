@@ -24,10 +24,19 @@ You validate Kubernetes manifests for security vulnerabilities, resource configu
 
 ## Commands
 
-### Syntax Validation
+No single tool is sufficient — each catches a different family, so chain at least
+three. Mirror the target skill's invocations.
+
+### Schema Validation
 ```bash
-kubectl --dry-run=client -f manifests/ -o yaml
-kubeval manifests/
+kubectl apply --dry-run=client -f manifests/
+kubeconform -strict -summary manifests/   # successor to the unmaintained kubeval
+```
+
+### Lint and Score
+```bash
+kube-linter lint manifests/
+kube-score score manifests/*.yaml
 ```
 
 ### Security Scanning
@@ -35,17 +44,23 @@ kubeval manifests/
 # Kubesec (security scoring)
 kubesec scan deployment.yaml
 
-# Trivy (vulnerabilities)
+# Trivy (config misconfiguration)
 trivy config manifests/
 
 # Polaris (best practices)
 polaris audit --audit-path manifests/
+
+# Kubescape (NSA/CISA framework)
+kubescape scan framework nsa manifests/
 ```
 
 ### Policy Validation
 ```bash
-# OPA/Conftest
-conftest test manifests/ --policy policies/
+# Kyverno (Kubernetes-native YAML policies)
+kyverno apply policies/ --resource manifests/
+
+# OPA Gatekeeper (Rego, via the gator CLI)
+gator test --filename=policies/ --filename=manifests/
 ```
 
 ## Security Checks
@@ -57,13 +72,16 @@ conftest test manifests/ --policy policies/
 - Missing security context
 - Writable root filesystem
 - Capabilities not dropped
+- Plaintext `Secret` manifests committed to Git (unencrypted)
 
 ### Serious (Should Fix)
-- Missing resource limits
+- Missing resource requests and limits
 - Missing liveness/readiness probes
-- No network policies
+- No default-deny NetworkPolicy
 - Default service account
-- Missing pod security standards
+- Missing Pod Security Standards (`restricted`)
+- Images referenced by mutable tag instead of digest
+- RBAC wildcards (`*` verbs or resources)
 
 ## Common Issues
 
@@ -83,7 +101,7 @@ spec:
     fsGroup: 1000
   containers:
     - name: app
-      image: myapp:latest
+      image: myapp@sha256:<digest>   # pin by digest, not a mutable tag
       securityContext:
         allowPrivilegeEscalation: false
         readOnlyRootFilesystem: true
@@ -103,7 +121,7 @@ spec:
 spec:
   containers:
     - name: app
-      image: myapp:latest
+      image: myapp@sha256:<digest>   # pin by digest, not a mutable tag
       resources:
         requests:
           memory: "128Mi"
@@ -134,6 +152,11 @@ spec:
 ```
 
 ## Output Format
+
+Fill every table with the scanners' real values, each finding attributed to the
+engine that produced it and anchored to its real `file:line` — never invent a
+score, count, resource, or location, and never carry the example numbers below
+into a real report.
 
 ```markdown
 ## Kubernetes Validation Report

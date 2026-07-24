@@ -45,7 +45,7 @@ You test UI components in isolation to verify they render correctly and respond 
 - **Storybook is the component-testing platform in 2026.** The legacy `@storybook/test-runner` is superseded by the **Vitest addon** (Storybook 9+), which runs stories as tests inside a real browser via Vitest's `@vitest/browser` integration. Each story becomes a test case; `play()` functions become interaction tests; the addon also runs a11y and visual checks. Cross-link [[accessibility-checker]] and [[visual-regression-checker]].
 - **userEvent over fireEvent.** `@testing-library/user-event` v14+ simulates real browser interactions (focus management, IME, paste, hover trails) far more accurately than the low-level `fireEvent`. Use `fireEvent` only for events `userEvent` cannot model (e.g., `scroll` to a specific position).
 - **Cover all four UI states.** Loading, error, empty, and populated. A component that only has a happy-path test is undertested. Use MSW (Mock Service Worker) v2 to intercept `fetch`/XHR at the network layer instead of mocking the data-fetching hook (which is implementation).
-- **Accessibility is a component-level concern.** Run `jest-axe` (`@axe-core/react`) or `@axe-core/playwright` on every rendered component. Cross-link [[accessibility-checker]] — but every interactive component gets at least one axe assertion at the component level too. Keyboard navigation (`tab`, `enter`, `escape`, arrow keys) is a required test for any focusable component.
+- **Accessibility is a component-level concern.** Run `jest-axe` (the `toHaveNoViolations` matcher, for jsdom/Vitest) or `@axe-core/playwright` (for real-browser runs) on every rendered component. Do not confuse either with `@axe-core/react`, which logs violations to the console at development time and provides no test assertion. Cross-link [[accessibility-checker]] — but every interactive component gets at least one axe assertion at the component level too. Keyboard navigation (`tab`, `enter`, `escape`, arrow keys) is a required test for any focusable component.
 - **Snapshot tests only for stable visual output.** HTML snapshots over dynamic data are flake factories. Use them for: deterministic SVG icons, stable error-page markup, design-system primitive trees. Use [[visual-regression-checker]] (Chromatic / Percy / Playwright `toHaveScreenshot`) for pixel-level checks — never `toMatchSnapshot` for visuals.
 - **Mock the minimum.** Mock external boundaries (network via MSW, time via `vi.useFakeTimers`, randomness, geolocation). Do NOT mock the data hook, the context, or the child component. Each mock you add is a piece of the test that no longer reflects production.
 - **Performance budget.** Browser-mode tests run roughly 2–4× slower per case than jsdom because real layout/paint happens. Plan for parallel sharding in CI; keep total component-test wall time under the team's PR-feedback budget.
@@ -192,11 +192,12 @@ import Tooltip from './Tooltip';
 //                   test.browser.instances = [{ browser: 'chromium' }]
 
 test('Tooltip: hover reveals real layout-positioned tooltip', async () => {
-  const { getByRole } = render(<Tooltip label="Saved at 12:01" trigger="Save" />);
-  const button = getByRole('button', { name: /save/i });
+  // vitest-browser-react's render is async (awaited) and returns a screen object
+  const screen = await render(<Tooltip label="Saved at 12:01" trigger="Save" />);
+  const button = screen.getByRole('button', { name: /save/i });
 
   await button.hover();             // real pointer event, real CSS :hover
-  await expect.element(getByRole('tooltip')).toBeVisible();
+  await expect.element(screen.getByRole('tooltip')).toBeVisible();
   // bounding box is real — jsdom would return all zeros
 });
 ```
@@ -205,8 +206,10 @@ test('Tooltip: hover reveals real layout-positioned tooltip', async () => {
 
 ```typescript
 // Button.stories.tsx
-import type { Meta, StoryObj } from '@storybook/react';
-import { expect, userEvent, within } from '@storybook/test';
+// Storybook 9 uses framework-based imports: @storybook/react-vite here
+// (@storybook/nextjs-vite for Next.js) — not the bare @storybook/react renderer.
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, userEvent, within } from 'storybook/test';
 import { Button } from './Button';
 
 const meta: Meta<typeof Button> = { component: Button };
@@ -255,13 +258,13 @@ using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-public class CounterTests : TestContext
+public class CounterTests : BunitContext   // bUnit v2 renamed TestContext → BunitContext
 {
     [Fact]
     public void Counter_increments_on_click()
     {
-        // Arrange
-        var cut = RenderComponent<Counter>(p => p.Add(c => c.Start, 0));
+        // Arrange — bUnit v2 uses Render<T>() (was RenderComponent<T>() in v1)
+        var cut = Render<Counter>(p => p.Add(c => c.Start, 0));
 
         // Act — find by accessible name, not by CSS class
         cut.Find("button[aria-label='Increment']").Click();
@@ -274,7 +277,7 @@ public class CounterTests : TestContext
     [Fact]
     public void Counter_renders_loading_state()
     {
-        var cut = RenderComponent<Counter>(p => p.Add(c => c.IsLoading, true));
+        var cut = Render<Counter>(p => p.Add(c => c.IsLoading, true));
         cut.Find("[role='status'][aria-label='Loading']").MarkupMatches("Loading...");
     }
 }
@@ -291,8 +294,10 @@ public async Task UserCard_renders_error_state_on_500()
     mockHttp.When("/api/user/1").Respond(System.Net.HttpStatusCode.InternalServerError);
     Services.AddScoped(_ => new HttpClient(mockHttp) { BaseAddress = new Uri("http://localhost") });
 
-    var cut = RenderComponent<UserCard>(p => p.Add(c => c.Id, "1"));
-    cut.WaitForAssertion(() => cut.Find("[role='alert']").TextContent.Contains("Failed"));
+    var cut = Render<UserCard>(p => p.Add(c => c.Id, "1"));
+    // Assert.Contains THROWS on mismatch; a bare .Contains(...) bool would be discarded
+    // by WaitForAssertion and never actually verify the text.
+    cut.WaitForAssertion(() => Assert.Contains("Failed", cut.Find("[role='alert']").TextContent));
 }
 ```
 
@@ -341,9 +346,9 @@ public async Task UserCard_renders_error_state_on_500()
 | **Storybook + Vitest addon** (Storybook 9+) | Stories-as-tests with `play()` interaction, a11y addon, visual checks; supersedes legacy `@storybook/test-runner` | Design-system components, component-library projects |
 | **Playwright component testing** (`@playwright/experimental-ct-*`) | Cross-browser CT, JSX serialized to browser | When you need same harness as Playwright E2E; experimental in 2026 |
 | **Cypress component testing** | Mature CT, Chrome-family by default | Teams already invested in Cypress E2E; want stable (non-experimental) CT |
-| **bUnit** | Blazor (.NET 9+) component testing; `RenderComponent<T>`, `Find`, `MarkupMatches` | Blazor projects |
+| **bUnit** (2.x, targets .NET 8+) | Blazor component testing; inherit `BunitContext`, then `Render<T>`, `Find`, `MarkupMatches` | Blazor projects |
 | **MSW v2** (Mock Service Worker) | Network-layer mocking via `http.get/post`; works in node and browser | Replace all `vi.mock('./useFetch')` data-hook mocks |
-| **jest-axe / @axe-core/react / @axe-core/playwright** | Accessibility assertions in component tests | Every interactive component; pair with [[accessibility-checker]] |
+| **jest-axe / @axe-core/playwright** | Accessibility assertions in component tests (`toHaveNoViolations` for jsdom/Vitest; `@axe-core/playwright` for real-browser runs) | Every interactive component; pair with [[accessibility-checker]] |
 | **Chromatic / Percy / Playwright `toHaveScreenshot`** | Visual regression layer; runs on top of Storybook stories or Playwright tests | Pair with [[visual-regression-checker]] — never use HTML snapshots for visuals |
 
 ### Quick CI snippets
@@ -420,7 +425,7 @@ dotnet test --logger "trx;LogFileName=bunit.trx"
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable test-coverage report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable test-coverage report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |---|---|---|
@@ -472,7 +477,7 @@ The integrator uses `confidence` and `kind` to weight findings — a `confidence
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

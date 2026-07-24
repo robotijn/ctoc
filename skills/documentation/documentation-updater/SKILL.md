@@ -35,7 +35,7 @@ You update documentation to reflect code changes. Runs in Step 15 (DOCUMENT) of 
 
 - **Docs live alongside code in the same repo**. Documentation-as-code is the default in 2026. Markdown + a static-site generator (Docusaurus, MkDocs, Mintlify, Astro Starlight, Hugo) rendered from the same Git tree the code lives in. Binary doc formats are rejected. PR-gated changes to `docs/` go through the same review as code.
 - **Diataxis four-quadrant model** is the canonical IA: every doc page is one of *tutorial* (learning-oriented), *how-to* (task-oriented), *reference* (information-oriented), or *explanation* (understanding-oriented). Mixing modes on a page is a smell — split it.
-- **CI lints links and tests snippets**. A docs PR with a broken link or a code block that no longer compiles is a failing build. Tools: lychee or markdown-link-check (links), Vale (prose style), language-specific runners for fenced code blocks (Python `doctest`, Rust `cargo test --doc`, TS `tsx`/`vitest`, Java `JCoTester`/Spring REST Docs snippet inclusion).
+- **CI lints links and tests snippets**. A docs PR with a broken link or a code block that no longer compiles is a failing build. Tools: lychee or markdown-link-check (links), Vale (prose style), language-specific runners for fenced code blocks (Python `doctest`, Rust `cargo test --doc`, TS `tsx`/`vitest`, Java `@snippet` external files (JEP 413) compiled in the test build, or Spring REST Docs snippets generated from passing tests).
 - **API docs are auto-generated from code**. Hand-written API tables drift. The source of truth is the code (docstrings, JSDoc/TSDoc, Javadoc, XML doc comments, doc-strings + type annotations) or an OpenAPI/AsyncAPI/GraphQL schema. The site renders from those — never from a hand-typed copy.
 - **OpenAPI is the doc source for HTTP APIs**. The handler decorators (FastAPI, NestJS, Spring, ASP.NET Core, Express + zod-openapi) emit the spec; the site renders it (Redocly, Scalar, Mintlify, Swagger UI). Hand-edited OpenAPI files are tech debt unless the framework can't emit them.
 - **ADRs for big decisions**. Architecturally significant choices (framework, database, auth model, queue, infra provider, public API contract, breaking change) get an ADR in `docs/adr/` using the **MADR template** (`adr/madr` on GitHub — full or minimal variant, annotated or bare). ADRs are append-only: superseded records link to the replacement; accepted records are never edited in place.
@@ -154,7 +154,7 @@ int user_create(const char *email, const char *name, user_t **out);
 ### C++
 - **Generator**: Doxygen (default) — same syntax as C, with C++-specific tags (`@tparam` for template parameters).
 - **Source format**: `/// ` lines or `/** ... */` blocks.
-- **Modern complement**: `mkdocs-doxygen` / `m.css` for Markdown-flavoured rendering on top of Doxygen XML.
+- **Modern complement**: `doxybook2` or `mkdoxy` convert Doxygen XML to Markdown for rendering in an MkDocs/static-site theme; `m.css` is a modern drop-in replacement for Doxygen's stock HTML output.
 
 ```cpp
 /// @brief Create a new user.
@@ -376,7 +376,7 @@ API / contract:
 |------|-----|
 | **OpenAPI** | Source-of-truth for HTTP APIs; render with Scalar / Redocly / Swagger UI / Mintlify |
 | **AsyncAPI** | Same idea for event-driven / message-queue APIs |
-| **GraphQL SDL + graphql-doc-generator** | GraphQL schemas |
+| **GraphQL SDL** rendered by `@edno/docusaurus2-graphql-doc-generator`, `spectaql`, or `dociql` | GraphQL schemas |
 
 ADR / decisions:
 

@@ -45,9 +45,9 @@ The testing landscape in 2026 has converged on a small set of non-negotiable exe
 - **Per-worker process isolation for true parallel safety.** Threaded workers share heap and global state; module-level caches and singletons corrupt parallel runs. Use process-pool workers (Vitest `pool: 'forks'`, Jest's default child processes, pytest-xdist `--dist=loadfile`) unless you have measured that the suite is leaf-pure. Setting `--no-isolate` speeds Vitest up but only if you've audited every test file for shared state — opt-in, never default.
 - **File-watching for fast local feedback.** `vitest`, `jest --watch`, `pytest-watch`, `cargo watch -x test`, `dotnet watch test` give sub-second feedback on the affected slice via test-graph awareness. The runner should detect a TTY and propose watch mode; in CI it must explicitly disable watch.
 - **CI uses sharding, not "run everything on one big box".** GitHub Actions matrix with `SHARD`/`TOTAL_SHARDS` env vars; balance by historical execution time, not test count — equal time per shard is the goal. Bazel `shard_count`, Nx Cloud Atomizer, Turborepo task-splitting, and GitHub matrix all solve this; pick one and persist a timing CSV in the repo so the next run is balanced.
-- **Fail-fast on first failure for PR feedback.** PR scans want short signal: `--bail=1` (Jest/Vitest), `pytest -x`, `cargo test --no-fail-fast=false`, `dotnet test --blame --no-restore -- --stopOnFailure=true`. Scheduled / pre-release runs do the opposite — full sweep with `--no-bail` to surface every flake at once.
-- **Test result caching by content hash.** Nx, Turborepo, Bazel, and Vitest's experimental `--changed` use the source + dep graph to skip tests whose inputs have not changed since the last green run. The runner must honor cache hits explicitly: report `cached: true` per file, never silently pretend the test ran.
-- **Runner choice (2026 landscape).** Vitest is the default for Vite/Next/Astro stacks; Jest remains for legacy CRA/Webpack. Pytest dominates Python with xdist for parallel and pytest-randomly for ordering. JUnit Platform Console Launcher (JUnit 5/6) replaces the older `runner` API — Gradle `test { useJUnitPlatform() }` and Maven Surefire `<useJUnitPlatform>` are the wire format; `maxParallelForks` controls process-level parallelism on top. For C# / .NET 9, `dotnet test` invokes VSTest by default but `Microsoft.Testing.Platform` (the new MTP runner) is GA for .NET 9 with native parallel execution. For C/C++, CTest's `--parallel N` and `ctest -j N` are the two equivalent flags. For SQL, `pg_prove --jobs N` runs pgTAP files in parallel processes against separate test databases.
+- **Fail-fast on first failure for PR feedback.** PR scans want short signal: `--bail=1` (Jest/Vitest), `pytest -x`, and for Rust simply omit `--no-fail-fast` (fail-fast is the `cargo nextest` / `cargo test` default; `--no-fail-fast` is a plain boolean flag that turns fail-fast *off*). Scheduled / pre-release runs do the opposite — a full sweep that surfaces every flake at once (`--bail=0`, `cargo nextest run --no-fail-fast`).
+- **Test result caching by content hash.** Nx, Turborepo, Bazel, and Vitest's `--changed` use the source + dep graph to skip tests whose inputs have not changed since the last green run. The runner must honor cache hits explicitly: report `cached: true` per file, never silently pretend the test ran.
+- **Runner choice (2026 landscape).** Vitest is the default for Vite/Next/Astro stacks; Jest remains for legacy CRA/Webpack. Pytest dominates Python with xdist for parallel and pytest-randomly for ordering. JUnit Platform Console Launcher (JUnit 5/6) replaces the older `runner` API — Gradle `test { useJUnitPlatform() }` and Maven Surefire `<useJUnitPlatform>` are the wire format; `maxParallelForks` controls process-level parallelism on top. For C# / .NET, `dotnet test` invokes VSTest by default but `Microsoft.Testing.Platform` (the MTP runner) is a GA opt-in alternative (native `dotnet test` MTP mode arrives with the .NET 10 SDK via a `global.json` `test.runner` setting; parallelism is delegated to the test framework, not a platform flag). For C/C++, CTest's `--parallel N` and `ctest -j N` are the two equivalent flags. For SQL, `pg_prove --jobs N` runs pgTAP files in parallel processes against separate test databases.
 
 ## Test Commands by Language (7-language coverage)
 
@@ -150,14 +150,14 @@ dotnet test --configuration Release \
             --collect:"XPlat Code Coverage" \
             --results-directory ./TestResults \
             -- RunConfiguration.MaxCpuCount=0 \
-               RunConfiguration.DisableParallelization=false \
                RunConfiguration.TreatNoTestsAsError=true \
                xUnit.ParallelizeAssembly=true \
                xUnit.ParallelizeTestCollections=true
-# .NET 9 Microsoft.Testing.Platform (MTP) — opt-in via project property
-# <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
-# then:
-dotnet run --project tests/MyApp.Tests -- --parallel --report-trx --coverage
+# Microsoft.Testing.Platform (MTP) — opt-in via project property
+# <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner> (xUnit.v3)
+# then run the test app directly and pass MTP options (parallelism is configured
+# by the test framework, not a platform flag; --coverage and --report-trx are extensions):
+dotnet run --project tests/MyApp.Tests -- --report-trx --coverage
 
 # vstest.console direct invocation for sharding fan-out
 vstest.console.exe MyApp.Tests.dll \
@@ -401,13 +401,13 @@ Language-specific runners and the sharding layer that orchestrates them.
 | Runner — C++ | **CTest** + **GoogleTest** + `gtest_discover_tests` | All C++ projects |
 | Runner — SQL | **`pg_prove --jobs N`** (pgTAP); **tSQLt** for SQL Server with sqlcmd loop | All SQL test suites |
 | Sharding / orchestration | **Nx Cloud Atomizer** (auto-split by historical time), **Turborepo** (task graph + remote cache), **Bazel** (`shard_count`, deterministic), **GitHub Actions matrix** (`SHARD/TOTAL_SHARDS` strategy) | Any monorepo or CI with > 30s test wall-clock |
-| Watch / fast feedback | `vitest`, `jest --watch`, `pytest-watch`, `cargo watch -x nextest`, `dotnet watch test` | Local dev only — never in CI |
+| Watch / fast feedback | `vitest`, `jest --watch`, `pytest-watch`, `cargo watch -x 'nextest run'`, `dotnet watch test` | Local dev only — never in CI |
 
 Persist a **timing CSV** (`.test-durations`, `.nx/timing.json`, etc.) in the repo. The next CI run uses it to balance shards — equal time, not equal count.
 
 ## Severity (internal triage vs. refinement-loop output) — reconciliation
 
-The skill keeps two views of severity. The **internal triage view** (table below) is used for the human-readable report ordering and for the action recommendation column. The **wire-level letter severity** is always `critical` per [warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md) — there is no `warn` / `medium` / `low` on the wire; the [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects them.
+The skill keeps two views of severity. The **internal triage view** (table below) is used for the human-readable report ordering and for the action recommendation column. The **wire-level letter severity** is always `critical` per [warnings-are-critical.md](../../../agent-fragments/warnings-are-critical.md) — there is no `warn` / `medium` / `low` on the wire; the [letter schema](../../../../.ctoc/architecture/refinement-loop-schema.json) rejects them.
 
 Reconciliation rule: the runner emits one letter per finding with `severity: critical`. The integrator uses `confidence`, `kind`, and `reachable`-equivalent signals (here: `delta_to_baseline` and `seed` reproducibility) to decide whether to block the phase immediately or surface for review. The internal triage tier is conveyed via the `kind` field, not via the `severity` field.
 
@@ -456,7 +456,7 @@ The integrator uses `confidence` and `seed` to weight findings — a `confidence
 Valid (the ONLY exception) — platform-specific test guarded by an explicit reason string:
 
 ```javascript
-// Vitest 2026 API — skipIf takes a condition and a reason
+// Vitest API — skipIf takes only a condition; the reason lives in the test name
 test.skipIf(process.platform !== 'linux')('io_uring ring buffer (Linux-only)', () => {
   // ...
 });
@@ -505,8 +505,10 @@ const db = await connectDB(); // throws if unavailable
 
 // BAD
 if (!process.env.DB_URL) return;
-// GOOD
-test.skipIf(!process.env.DB_URL, 'Requires DB_URL environment variable');
+// GOOD — skipIf takes only the condition; the reason lives in the test name
+test.skipIf(!process.env.DB_URL)('requires DB_URL environment variable', () => {
+  // ...
+});
 
 // BAD: fixture swallows error
 beforeEach(async () => {
@@ -544,10 +546,10 @@ test('user exists', () => {
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agent-fragments/warnings-are-critical.md):
 
 - Every failed test, every flake, every coverage drop, every execution-time regression beyond the configured threshold, and every misconfiguration (serial-on-multi-core, no-isolation, no-fail-fast, unseeded-random) emits as `severity: critical` in the letter you write to CTO Chief.
-- The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
+- The [letter schema](../../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
 - Findings block phase advancement until resolved or explicitly waived in the plan's `## Decisions Taken Under Ambiguity` section.
 
 The principle: a slow or flaky suite today is a CI bottleneck and a deployment-day surprise tomorrow. Tests that run fast, deterministically, and in parallel are the difference between "we deploy ten times a day" and "we deploy on Tuesday with everyone watching".

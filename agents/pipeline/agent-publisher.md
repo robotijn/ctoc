@@ -65,13 +65,13 @@ test -f "${agent_path}"
 
 ### 2. Write Agent File
 
-```javascript
-await fs.writeFile(agentPath, agentContent);
-```
+Write the final `agent_content` to `agent_path` using the Write tool (your only
+file-writing capability — you have Read, Write, and Bash, not a JavaScript
+runtime).
 
 ### 3. Update Grades
 
-Update `~/.ctoc/agents/grades.yaml`:
+Update `.ctoc/agents/grades.yaml` (project-relative, the canonical store declared in `.ctoc/architecture/tier-definitions.yaml`):
 
 ```yaml
 security-scanner:
@@ -91,7 +91,7 @@ security-scanner:
 
 ### 4. Update Capability Index
 
-Update `~/.ctoc/agents/capability-index.yaml`:
+Update `.ctoc/agents/capability-index.yaml` (project-relative, alongside `grades.yaml`):
 
 ```yaml
 security-scanner:
@@ -120,8 +120,12 @@ security-scanner:
 
 ### 5. Create Commit
 
+Stage the agent file AND every tracked artifact you updated (grades, capability
+index, and audit log all live under the git-tracked `.ctoc/agents/`), so the
+commit matches the `updates` you report:
+
 ```bash
-git add "${agent_path}"
+git add "${agent_path}" .ctoc/agents/grades.yaml .ctoc/agents/capability-index.yaml .ctoc/agents/audit.log
 git commit -m "agent: update ${agent_name} to score ${score} (${rounds} rounds)
 
 - Status: ${status}
@@ -133,7 +137,7 @@ Co-Authored-By: Agent-Critic <noreply@ctoc.dev>"
 
 ### 6. Create Audit Entry
 
-Append to `~/.ctoc/agents/audit.log`:
+Append to `.ctoc/agents/audit.log`:
 
 ```
 2025-02-02T14:30:00Z PUBLISH security-scanner
@@ -187,10 +191,10 @@ recovery:
 
 ```yaml
 status: "failed"
-error: "Permission denied writing to ~/.ctoc/agents/grades.yaml"
+error: "Permission denied writing to .ctoc/agents/grades.yaml"
 recovery:
   - "Check file permissions"
-  - "Ensure ~/.ctoc directory exists"
+  - "Ensure .ctoc/agents/ directory exists"
 ```
 
 ### Validation Failure
@@ -231,8 +235,8 @@ Actions:
 ### From Agent-QA
 Receives: QA report with PROCEED verdict
 
-### To Pipeline Orchestrator
-Sends: Publish result
+### To CTO Chief
+Sends: Publish result (you report up to [[cto-chief]]; there is no separate pipeline orchestrator)
 
 ### Notifications
 On success: Log to audit trail
@@ -271,21 +275,18 @@ publish_result:
 
 ## Batch Publishing
 
-When multiple agents complete simultaneously:
+When multiple agents complete simultaneously, process them sequentially to avoid
+git conflicts, then make ONE commit for the whole batch (not a commit per agent):
 
-```javascript
-async function batchPublish(agents) {
-  const results = [];
+1. For each agent in turn: run pre-publish validation, write the agent file, and
+   update `grades.yaml`, `capability-index.yaml`, and `audit.log` — but do NOT
+   commit yet.
+2. After every agent is written and its records updated, stage all changed files
+   and make a single batch commit with Bash:
 
-  for (const agent of agents) {
-    // Publish sequentially to avoid git conflicts
-    const result = await publish(agent);
-    results.push(result);
-  }
-
-  // Single commit for batch
-  await git.commit(`agent: batch update ${agents.length} agents`);
-
-  return results;
-}
+```bash
+git add agents/ .ctoc/agents/grades.yaml .ctoc/agents/capability-index.yaml .ctoc/agents/audit.log
+git commit -m "agent: batch update ${count} agents"
 ```
+
+Return one `publish_result` per agent plus the shared batch commit hash.

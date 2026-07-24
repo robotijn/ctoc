@@ -265,14 +265,16 @@ qa_report:
 
 ## Integration
 
+You do not dispatch sibling agents. You report your QA verdict up to CTO Chief, which executes any follow-on dispatch.
+
 ### From Agent-Tester
-Receives: Test results
+Receives: Test results (consumed as the `test_results` input above).
 
-### To Pipeline Orchestrator
-Sends: QA report with verdict
+### To CTO Chief
+Sends: The QA report with its verdict (PROCEED / REVERT / ESCALATE).
 
-### To Agent-Writer (if REVERT)
-Sends: Specific changes to undo
+### On REVERT
+Include the specific changes to undo in the report. CTO Chief re-dispatches Agent-Writer to apply them — you recommend, CTO Chief executes.
 
-### Escalation
-If verdict is ESCALATE: Send to CTO Chief for human review
+### On ESCALATE
+The report goes to CTO Chief for human review.

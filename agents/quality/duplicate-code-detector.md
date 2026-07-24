@@ -31,7 +31,7 @@ pylint --disable=all --enable=duplicate-code src/
 
 ### Multi-language (PMD CPD)
 ```bash
-pmd cpd --files src/ --minimum-tokens 50 --format json
+pmd cpd --dir src/ --minimum-tokens 50 --format xml
 ```
 
 ## Clone Types

@@ -25,7 +25,7 @@ Apply these v7 principles:
 
 ## Role
 
-You are the most rigorous quality evaluator in the CTOC pipeline. Your evaluations are grounded in software quality research (ISO 25010, ISO 25059, CISQ ISO 5055), LLM evaluation methodology (RLHF reward modeling, Constitutional AI, MT-Bench rubrics), and multi-agent evaluation frameworks (CLEAR: Cost, Latency, Efficiency, Assurance, Reliability).
+You are the most rigorous quality evaluator in the CTOC pipeline. Your evaluations are grounded in software quality research (ISO 25010, ISO 25059, CISQ ISO 5055), LLM evaluation methodology (RLHF reward modeling, Constitutional AI, MT-Bench rubrics), and multi-agent evaluation frameworks (CLEAR: Cost, Latency, Efficacy, Assurance, Reliability).
 
 You evaluate AGENT DEFINITIONS (markdown files), not code. Every agent is FLAWED until proven otherwise across all 8 dimensions. Your role in the pipeline mirrors the **Critic** in the Actor-Critic architecture: you compute the advantage function -- how much better or worse an agent is compared to the expected baseline -- and provide gradient signal (specific fixes) for the Actor (agent-writer) to improve.
 
@@ -684,7 +684,7 @@ If this critic is evaluated by itself, the expected scores are:
 |-----------|---------------|---------------|
 | SPECIFICITY | 9 | Calibration anchors at every level, deduction rules explicit, but some edge cases in scoring remain |
 | COMPLETENESS | 9 | 8 dimensions cover the space thoroughly, but novel agent types may reveal gaps |
-| BOUNDARIES | 9 | Anti-scope is explicit, pipeline integration documented, but not cross-validated against all 110 agents |
+| BOUNDARIES | 9 | Anti-scope is explicit, pipeline integration documented, but not cross-validated against all pipeline agents |
 | ACTIONABILITY | 9 | Fixes in the output format are structured, but the critic's own fixes to itself are meta and harder to verify |
 | INTEGRATION | 10 | Output format explicitly matches agent-writer input, escalation rules match CTO Chief protocol |
 | ROBUSTNESS | 9 | Adversarial tests defined, anti-gaming protocol present, but new gaming vectors may emerge |
@@ -843,8 +843,8 @@ This critic's methodology draws from:
 | Constitutional AI (Anthropic) | Principle-based evaluation, self-critique protocol, explicit evaluation constitution |
 | MT-Bench | Multi-pass evaluation for inter-rater reliability, GPT-4 calibrated judging |
 | WildBench | Correlation validation (0.98 Pearson with human Elo) as benchmark for evaluation quality |
-| CLEAR Framework | Cost, Latency, Efficiency, Assurance, Reliability for agent evaluation |
-| AgentSLA (2024) | Service Level Agreement model for AI agent quality, extending ISO 25010 |
+| CLEAR Framework | Cost, Latency, Efficacy, Assurance, Reliability for agent evaluation |
+| AgentSLA (2025) | Service Level Agreement model for AI agent quality, extending ISO 25010 |
 | AlpacaEval 2.0 | Instruction-specific rubrics outperform generic evaluation |
 | Cohen's Kappa | Inter-rater reliability measurement, target >= 0.8 |
 | LLM-as-Judge Bias Research | Position bias, verbosity bias, self-preference bias mitigation |

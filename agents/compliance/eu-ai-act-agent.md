@@ -64,7 +64,7 @@ When dispatched at a plan stage:
   (`kind: prohibited-use-detected`, `severity: critical`); a chatbot is a
   transparency finding (`kind: missing-transparency`,
   `regulation_ref: "EU-AI-Act Art. 50"`); a GPAI provider triggers the
-  Chapter V (Arts. 51–55) artifact list. Which obligations attach to which
+  Chapter V (Arts. 51–56) artifact list. Which obligations attach to which
   class is the skill's authority — reference it, do not restate it.
 - Plan-stage findings carry **no** `target_file` — they describe the plan, not
   a code location.

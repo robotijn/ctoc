@@ -49,6 +49,15 @@ go test -bench=. -cpuprofile=cpu.prof
 - Memory leaks
 - Excessive garbage collection
 
+### Lock Contention
+- Threads blocked waiting on a mutex or lock
+- Hot locks held across expensive work (I/O, allocation)
+- Serialized sections that could be lock-free or sharded
+
+### Cold Start
+- First-invocation initialization latency (serverless, JIT warm-up, connection setup)
+- Work done at startup that could be lazy or cached across invocations
+
 ### I/O Bottlenecks
 - N+1 queries
 - Missing connection pooling

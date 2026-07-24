@@ -68,7 +68,7 @@ These are the four execution-time failure modes the runner must detect and label
 ### 1. Shared DB causing flakes
 Symptoms: tests pass alone, fail in a suite; pass with `-j 1`, fail with `-j 8`; test N writes a row test N+1 asserts is absent.
 Root cause: all workers/tests pointing at one schema with no isolation layer.
-Letter `kind`: `shared-db-flake`. Fix path: enable transaction-savepoint rollback (SQLAlchemy `nested=True`, JPA `@Transactional` + rollback, .NET `TransactionScope`) **or** schema-per-test (`CREATE SCHEMA t_${WORKER}_${TEST_ID}` then `SET search_path`). Kick the design choice back to [[testing/writers/integration-test-writer]].
+Letter `kind`: `shared-db-flake`. Fix path: enable transaction-savepoint rollback (SQLAlchemy `begin_nested()`, JPA `@Transactional` + rollback, .NET `TransactionScope`) **or** schema-per-test (`CREATE SCHEMA t_${WORKER}_${TEST_ID}` then `SET search_path`). Kick the design choice back to [[testing/writers/integration-test-writer]].
 
 ### 2. Slow Testcontainers startup (cache image)
 Symptoms: first test in a run takes 30–90s before any assertion fires; CI cold runs >> warm runs; image pulls visible in container logs every run.
@@ -97,7 +97,7 @@ pytest tests/integration -v --tb=short -n auto \
 pytest tests/integration -v -n auto                # python-testcontainers wires the DSN
 
 # Per-test savepoint isolation (SQLAlchemy)
-pytest tests/integration -v --rollback-savepoint   # via the suite's conftest fixture
+pytest tests/integration -v --rollback-savepoint   # project-defined flag your conftest registers via pytest_addoption; not a stock pytest option
 
 # Coverage
 pytest tests/integration --cov=src --cov-report=term --cov-fail-under=80
@@ -105,11 +105,11 @@ pytest tests/integration --cov=src --cov-report=term --cov-fail-under=80
 
 ### Node.js / TypeScript
 ```bash
-# Jest — one worker per Testcontainer to avoid double-booting the DB
-npm run test:integration -- --maxWorkers=4 --runInBand=false
+# Jest — cap workers so each Testcontainer maps to one worker, not many
+npm run test:integration -- --maxWorkers=4
 
-# Vitest — same idea, threads pool with isolate:true
-npx vitest run --pool=threads --poolOptions.threads.isolate=true tests/integration
+# Vitest — threads pool; per-file isolation is on by default (opt out with --no-isolate)
+npx vitest run --pool=threads tests/integration
 
 # Playwright component / API integration
 npx playwright test tests/integration --workers=4 --reporter=line
@@ -126,9 +126,9 @@ TEST_DB_URL=postgres://localhost/test go test -tags=integration -parallel 4 ./..
 
 ### Java (JUnit 5 + Testcontainers)
 ```bash
-# Maven Surefire forked JVM per class, parallel classes
-mvn -Dtest='*IT' \
-    -Dsurefire.forkCount=4 -Dsurefire.reuseForks=true \
+# Failsafe runs the *IT suite in the verify phase; 4 reused forks, parallel classes
+mvn -Dit.test='*IT' \
+    -DforkCount=4 -DreuseForks=true \
     -Djunit.jupiter.execution.parallel.enabled=true \
     -Djunit.jupiter.execution.parallel.mode.default=concurrent \
     verify
@@ -250,7 +250,7 @@ The 2026 landscape converges on three execution patterns. Use the one that match
 
 | Pattern | Strengths | Trade-offs | When |
 |---------|-----------|------------|------|
-| **Testcontainers with reuse** | Sub-second restart on dev machines; one config across Java/Python/Node/Go/.NET/Rust | Reuse is **dev-only** per the project; experimental flag; configs must match exactly to reuse | Developer machines, fast inner loop |
+| **Testcontainers with reuse** | Sub-second restart on dev machines; same Testcontainers API across languages (the reuse flag itself is not in every binding — Python has none) | Reuse is **dev-only** per the project; experimental flag; configs must match exactly to reuse | Developer machines, fast inner loop |
 | **Dockerized CI services** (GitHub Actions `services:`, GitLab CI `services:`) | First-class scheduler integration; clean job-per-run; cached layers across jobs | One service definition per job; can't easily share state across matrix legs | CI / scheduled runs |
 | **Per-worker fresh container** | Maximum isolation; tests can do destructive DDL safely | Slowest; worst CI bill; lowest throughput | Replication, startup, upgrade tests |
 
@@ -279,10 +279,15 @@ await pg.StartAsync();
 ```
 
 ```python
-# Python — testcontainers-python with reuse hash so re-runs latch onto the same container
+# Python — testcontainers-python has no reuse flag (unlike Java/.NET/Go/Node).
+# Share one container across the run with a session-scoped fixture instead.
+import pytest
 from testcontainers.postgres import PostgresContainer
-pg = PostgresContainer("postgres:16-alpine").with_reuse()
-pg.start()
+
+@pytest.fixture(scope="session")
+def pg():
+    with PostgresContainer("postgres:16-alpine") as container:
+        yield container
 ```
 
 ### GitHub Actions services (CI path)
@@ -376,7 +381,7 @@ pytest tests/integration -n auto
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable run report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable run report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agent-fragments/warnings-are-critical.md](../../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples                                                                                                      | Internal action recommendation |
 |-------------|---------------------------------------------------------------------------------------------------------------|--------------------------------|
@@ -410,10 +415,10 @@ The integrator uses `confidence` and `observed_runs` to weight findings — a `c
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
-- The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
+- The [letter schema](../../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
 - Warnings block phase advancement (critical → medium) until resolved or explicitly waived in the plan's `## Decisions Taken Under Ambiguity` section.
 
 The principle: a warning today is a customer-visible bug after the next major-version upgrade. Code that ships green-with-warnings ships with known latent failures.

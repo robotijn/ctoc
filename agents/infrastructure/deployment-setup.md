@@ -521,7 +521,7 @@ Write the deployment config to `.ctoc/settings.json` under the `deployment` key 
 - Use a secrets vault (HashiCorp Vault, AWS Secrets Manager, etc.) — never env files in repos
 - Short-lived credentials preferred over long-lived tokens; rotate regularly
 
-**Pipeline hardening (aligned with OWASP SPVS):**
+**Pipeline hardening (aligned with the OWASP Top 10 CI/CD Security Risks):**
 - Require signed commits/tags for release branches
 - Use ephemeral CI runners with clean workspaces — no persistent state between builds
 - Enable MFA for CI/CD admin accounts; apply least-privilege access

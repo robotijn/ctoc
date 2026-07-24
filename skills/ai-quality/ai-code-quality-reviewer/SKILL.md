@@ -41,16 +41,16 @@ You review AI-generated code for quality issues specific to AI generation patter
 
 ## 2026 Best Practices (AI Quality category)
 
-- **Every AI-generated PR needs human review** — no exception, no fast-track. AI-merged-without-review rates rose ~31% YoY in 2026 industry data; incident rates per PR rose with them. The PR-review gate is the load-bearing safety net.
-- **Treat AI suggestions as junior-dev work — assume errors until proven otherwise**. Industry tracking in 2026 indicates 43% of AI-suggested edits required debugging follow-up and 66% of developers report AI output is "almost right, but not quite." Tone the review accordingly: skeptical, line-by-line.
-- **Verify every import exists on the registry**. Lasso 2024 measured **5–22% of AI-suggested package imports are hallucinated** (lower bound for frontier closed models, upper for open-source 13B models). Industry follow-up in 2025–2026 reports up to ~20% non-existent references in some samples, with **43% of hallucinated names repeating across prompts** — meaning attackers can pre-register the predictable names (slopsquatting). For dependency verification, cross-link [[dependency-auditor]].
+- **Every AI-generated PR needs human review** — no exception, no fast-track. A 2026 study of agent-authored pull requests in popular repositories ("These Aren't the Reviews You're Looking For," arXiv 2605.02273) found **84% received no human review or were reviewed only by other agents**. The PR-review gate is the load-bearing safety net.
+- **Treat AI suggestions as junior-dev work — assume errors until proven otherwise**. The 2025 Stack Overflow Developer Survey found **66% of developers name "AI solutions that are almost right, but not quite" as their top frustration**, and **45% report debugging AI-generated code is more time-consuming**. Tone the review accordingly: skeptical, line-by-line.
+- **Verify every import exists on the registry**. The USENIX Security 2025 study *We Have a Package for You!* (Spracklen et al.) measured package-hallucination rates of **at least 5.2% for commercial models and 21.7% for open-source models** (19.7% of 2.23M generated code samples contained a hallucinated package), and found **43% of hallucinated names recur on every one of ten identical prompt runs** — meaning attackers can pre-register the predictable names (slopsquatting). For dependency verification, cross-link [[dependency-auditor]].
 - **Verify package signatures and provenance**. Sigstore / npm provenance / PEP 740 attestations are now table stakes — flag any AI-introduced dependency without an attestation.
 - **Apply extra scrutiny to AI-generated tests**. AI tests routinely encode the *current implementation* rather than the *specification* (pass-through assertions, tautological mocks, assertions that only check truthiness). Coverage numbers from such suites give false confidence — treat 100% AI-test coverage as "unknown" until each assertion is read.
 - **Check for outdated API patterns and framework-version mismatch**. Models trained mid-2024 still emit React 18 hook idioms in React 19 codebases, .NET 7 APIs in .NET 9 projects, Java 11 patterns in Java 21+ projects, deprecated Python 3.10 idioms in 3.12 code. Verify the project's framework version *before* approving any "modernization."
-- **Veracode 2024 measured ~40% of AI-generated code contains at least one security flaw** (broader than packages alone). Pair this skill with [[sast-scanner]] for the security pass — this skill catches the qualitative AI smells; sast-scanner catches the exploitable ones.
-- **Cite-your-sources prompting reduces hallucination 20–40%** in published studies — encourage upstream prompts to require citations.
+- **Veracode's 2025 GenAI Code Security Report measured that 45% of AI-generated code samples introduced an OWASP Top 10 security flaw** — the security pass rate has stayed near 55%, flat since 2024 (broader than packages alone). Pair this skill with [[sast-scanner]] for the security pass — this skill catches the qualitative AI smells; sast-scanner catches the exploitable ones.
+- **Citation-enforced prompting reduces hallucination** — published citation-grounded and retrieval-augmented-generation studies report meaningful reductions (general and medical-domain evaluations, not package-specific). Encourage upstream prompts to require citations.
 - **Prompt drift detection**: when an AI agent edits files repeatedly, its later edits often contradict earlier decisions (the system prompt drops out of effective context). Compare the diff against the plan's `## Decisions Taken Under Ambiguity` section — any silent reversal is a critical finding.
-- **The "edited working code" failure mode**: the most common AI regression in 2026 is *unrelated edits that slip into a one-line change*. Reject any diff that touches files outside the stated scope without justification.
+- **The "edited working code" failure mode**: a common AI regression is *unrelated edits that slip into a one-line change*. Reject any diff that touches files outside the stated scope without justification.
 
 ## Common AI Code Issues
 
@@ -147,7 +147,7 @@ These categories are AI-generation-specific. Each one carries cross-links to sib
 
 ### A. Hallucinated import / fictional package
 
-The single highest-impact category. The model emits an `import` / `require` / `using` / `from ... import` that references a package the registry does not contain. Per Lasso 2024 (5–22% hallucination rate) and 2025–2026 follow-up research, 43% of hallucinated names recur across prompts — meaning attackers pre-register the predictable names on the registry (slopsquatting). The named example reported in early 2026 is the fictional npm package `react-codeshift` (LLMs conflate `jscodeshift` and `react-codemod`); similar conflations appear across ecosystems.
+The single highest-impact category. The model emits an `import` / `require` / `using` / `from ... import` that references a package the registry does not contain. Per the USENIX Security 2025 study *We Have a Package for You!* (Spracklen et al.), 43% of hallucinated names recur on every one of ten identical prompt runs — meaning attackers pre-register the predictable names on the registry (slopsquatting). A real case: the npm package `react-codeshift` — a name no real tool uses, conflating `jscodeshift` and `react-codemod` — was registered as a slopsquat in January 2026 and spread through AI-generated agent-skill files before it could be defensively claimed; similar conflations appear across ecosystems.
 
 Cross-link: [[dependency-auditor]] runs the actual registry-existence + signature checks. This skill flags the pattern; dependency-auditor blocks the install.
 
@@ -286,7 +286,7 @@ Action: `ai_pattern_kind: ai_sql_injection`, `severity: critical`, `confidence: 
 
 ### F. Framework-version mismatch (React 19 vs 18 hooks, Java 21 vs 11, .NET 9 vs 7)
 
-Distinct from category B (deprecated API) — this one is *contract mismatch* between the AI suggestion's assumed version and the project's actual version. Symptoms include `ReactCurrentDispatcher` undefined errors when React 19 RC and react-dom 18.x are mixed; `Thread.ofVirtual()` absent when project still targets Java 17; `record` patterns rejected on Java 16; `using` declarations rejected on C# 7.
+Distinct from category B (deprecated API) — this one is *contract mismatch* between the AI suggestion's assumed version and the project's actual version. Symptoms include `ReactCurrentDispatcher` undefined errors when react 19 and react-dom 18.x are mixed; `Thread.ofVirtual()` absent when project still targets Java 17; `record` patterns rejected on Java 16; `using` declarations rejected on C# 7.
 
 ```typescript
 // React 19 project — AI emits React 18-only API
@@ -417,12 +417,12 @@ The 2026 review stack assumes layered AI-detection across IDE → PR → CI → 
 |------|------|------|
 | **GitHub Copilot review filters** | Per-PR AI-author flag, auto-tag of AI-generated diffs, configurable rules block patterns (hallucinated imports, debug prints, vacuous tests) before they hit reviewer | Every PR |
 | **Claude Code self-critique** | The integrator in Iron Loop calls this skill as a critic. Self-critique runs before the human gate; findings become letters | Step 11 (REVIEW), Step 16 (FINAL-REVIEW) |
-| **Cursor rules** (`.cursorrules`) | Pre-suggest filters: "never propose a package not in lockfile," "always verify framework version before suggesting hook." Best practice in 2026 is a rules file checked into every repo | Editor time |
+| **Cursor rules** (`.cursor/rules/*.mdc`) | Pre-suggest filters: "never propose a package not in lockfile," "always verify framework version before suggesting hook." Best practice in 2026 is `.mdc` rule files under `.cursor/rules/` checked into every repo — the legacy single-file `.cursorrules` is deprecated and silently ignored in Agent mode | Editor time |
 | **Aikido AI Code Reviewer** | Third-party AI code-review service. Pairs with sast-scanner for security + quality on AI diffs | PR + nightly |
-| **Veracode AI Audit** | Compliance + security on AI-generated code. Reuses the Veracode 40%-flaw study findings | Scheduled |
+| **Veracode AI Audit** | Compliance + security on AI-generated code. Reuses the Veracode 45%-flaw study findings | Scheduled |
 | **Custom git hooks for AI-detection** | Pre-commit / pre-push: detect AI-author signatures (Copilot, Cursor, Claude Code), require a `[ai-reviewed]` trailer on commit message, reject commits with no human reviewer if commit-trailer says `Generated-by: ai` | Local + CI |
 
-Recommended minimum: `.cursorrules` + Copilot review filters + this skill as a critic in Iron Loop + dependency-auditor + sast-scanner. The combination catches the high-impact AI-specific failure modes (hallucination, framework mismatch, vacuous test, security smell) before merge.
+Recommended minimum: `.cursor/rules/*.mdc` + Copilot review filters + this skill as a critic in Iron Loop + dependency-auditor + sast-scanner. The combination catches the high-impact AI-specific failure modes (hallucination, framework mismatch, vacuous test, security smell) before merge.
 
 ## Severity (internal triage vs. refinement-loop output)
 

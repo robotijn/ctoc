@@ -49,7 +49,7 @@ The 2026 consensus across the QuickCheck heritage (Haskell QuickCheck → Hypoth
 - **Combine with example-based tests, never replace.** Example tests document *intent* in human-readable form ("the empty cart returns total = 0") and serve as regression markers for specific historical bugs. Property tests test universal truths. Use both: example tests for the spec narrative and shipped regressions; property tests for the surface no human will enumerate.
 - **Best targets are pure functions, parsers, serializers, encoders, calculators, data transforms.** These have well-defined inputs and outputs, no side effects, and natural round-trip / idempotency / oracle properties. Reach for property tests *first* on any code that converts between representations (JSON, protobuf, URL params, base64), normalizes data, computes deterministic results, or implements an algorithm with a known reference.
 - **Budget shrink depth, generator complexity, and example counts deliberately.** CI runs need to stay under their time budget. Typical pattern: `max_examples=100` in PR CI (fast), `max_examples=1000` nightly, full shrink budget in both. Cap deep recursion explicitly (e.g. `st.recursive(..., max_leaves=50)`, `fc.letrec` with depth caps) — otherwise property tests can drift into combinatorial explosions that hide real failures behind timeouts.
-- **Stateful / model-based testing for complex flows.** When the unit under test holds mutable state (caches, queues, ledgers, in-memory DBs, sessions), use Hypothesis `RuleBasedStateMachine`, fast-check `fc.commands`, jqwik `@StateMachine`, or QuickCheck-State-Machine equivalents. You write a simple deterministic *model* of the system; the framework generates random *sequences* of operations, runs them against both, and asserts they agree. This finds ordering bugs that single-call property tests can't.
+- **Stateful / model-based testing for complex flows.** When the unit under test holds mutable state (caches, queues, ledgers, in-memory DBs, sessions), use Hypothesis `RuleBasedStateMachine`, fast-check `fc.commands`, jqwik `ActionChain`, or QuickCheck-State-Machine equivalents. You write a simple deterministic *model* of the system; the framework generates random *sequences* of operations, runs them against both, and asserts they agree. This finds ordering bugs that single-call property tests can't.
 
 Additional patterns you should also know:
 
@@ -210,7 +210,7 @@ Use the framework idiomatic to the target language. All listed frameworks shrink
 |--------------------|-----------|-----------------|---------|--------------|
 | Python 3.12+ | **Hypothesis** | pytest, unittest | yes | The reference implementation. Stateful (`RuleBasedStateMachine`), targeted (`target()`), persisted database of failing examples. |
 | TypeScript / JS | **fast-check** | Vitest, Jest, Mocha, node:test | yes | `fc.assert(fc.property(...))`, `fc.commands` for stateful, `fc.letrec` for recursive generators. |
-| Java 21+ | **jqwik** | JUnit 5 / 6 platform | yes | `@Property`, `@ForAll`, `@StateMachine`. In maintenance mode in 2026 (verify upstream activity before adopting for new projects). |
+| Java 21+ | **jqwik** | JUnit 5 platform | yes | `@Property`, `@ForAll`; stateful via `ActionChain` (`net.jqwik.api.state`; the older `net.jqwik.api.stateful` `ActionSequence` API still ships). |
 | Java 21+ | **junit-quickcheck** | JUnit 4/5 | yes | Annotation-driven, inspired by Haskell QuickCheck. Alternative when jqwik feels too heavy. |
 | C# / .NET 9 | **FsCheck** | xUnit, NUnit, MSTest | yes | `Prop.ForAll`, `FsCheck.Xunit` for `[Property]` attribute on xUnit. Run with `dotnet test`. |
 | C++20/23 | **rapidcheck** | gtest, Catch2, doctest | yes | `rc::check`, `rc::gen::*`. Header-only or CMake target. Stateful support via `rc::state::check`. |
@@ -336,10 +336,12 @@ static enum theft_trial_res prop_roundtrip(struct theft *t, void *arg1) {
 }
 
 int main(void) {
+    /* theft ships no built-in string generator: define str_info yourself as a
+       struct theft_type_info with alloc/free/hash/shrink/print callbacks. */
     struct theft_run_config cfg = {
         .name = "round-trip",
         .prop1 = prop_roundtrip,
-        .type_info = { &theft_str_info },
+        .type_info = { &str_info },
         .trials = 200,
     };
     return theft_run(&cfg) == THEFT_RUN_PASS ? 0 : 1;
@@ -457,7 +459,7 @@ const user = fc.record({
 ```markdown
 ## Property Tests Written
 
-**Framework**: Hypothesis 6.151.x
+**Framework**: Hypothesis 6.x
 **Test File**: `tests/property/test_properties.py`
 
 **Properties Discovered**:
@@ -544,10 +546,10 @@ The integrator uses `confidence` to weight findings. Two related findings (e.g. 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agent-fragments/warnings-are-critical.md):
 
 - Every missing invariant, disabled shrinker, no-exception-only assertion, and untested stateful flow you find emits as `severity: critical` in the letter you write to CTO Chief.
-- The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
+- The [letter schema](../../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
 - Findings block phase advancement (critical → medium) until resolved or explicitly waived in the plan's `## Decisions Taken Under Ambiguity` section.
 
 The principle: a missing property today is a customer-visible edge-case bug tomorrow. Code that ships with only example tests ships with known unexplored input space.

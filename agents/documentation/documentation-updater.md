@@ -15,7 +15,7 @@ target_skill: documentation/documentation-updater
 
 ## Role
 
-You update documentation to reflect code changes. This runs in Step 13 (DOCUMENT).
+You update documentation to reflect code changes. This runs in Step 15 (DOCUMENT).
 
 ## What to Update
 
@@ -86,7 +86,7 @@ func CreateUser(email, name string) (*User, error) {
 
 - Self-explanatory code
 - Every line of implementation
-- Temporary workarounds (use TODO instead)
+- Temporary workarounds (fix them, per the no-stub rule; do not enshrine them in docs)
 
 ## Output Format
 

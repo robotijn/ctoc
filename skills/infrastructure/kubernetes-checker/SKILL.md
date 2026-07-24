@@ -43,11 +43,11 @@ The 2026 Kubernetes hardening baseline is defense-in-depth across eight domains:
 - **Resource requests AND limits are mandatory**. Missing requests = scheduler can't plan; missing limits = noisy-neighbor and OOM cascades. Flag any container without both for CPU and memory. ResourceQuota at the namespace level is the backstop.
 - **Probes: `liveness` + `readiness` + `startup` for every workload**. Cross-link [[health-check-validator]] for probe semantics — startupProbe is mandatory for any image that takes > 10s to warm up (otherwise liveness will kill it before it serves). Probes without `failureThreshold` or with `initialDelaySeconds: 0` are flagged.
 - **Secrets via External Secrets Operator (ESO) or Vault Agent Injector**. Raw `kind: Secret` resources committed to Git are a `severity: critical` finding regardless of whether they look real — the next developer assumes the pattern is OK. ESO syncs from AWS Secrets Manager / GCP Secret Manager / Azure Key Vault / Vault / Akeyless / Pulumi ESC and supports auto-rotation. If a `Secret` must exist, it MUST be SOPS-encrypted or sealed-secrets-encrypted.
-- **Image digest pinning over tag, including `:latest`**. The 2025–2026 supply-chain attack wave (Docker Hub tag-overwrite incidents, PyPI package-takeover compromises documented by Datadog Security Labs and others) demonstrated that tags are mutable trust-on-first-use anchors. Use `image: registry/app@sha256:abc...` not `image: registry/app:1.2.3`. Tag-only references are flagged `high`; `:latest` is `critical`. The upstream image-build hygiene lives in [[docker-security-checker]] — this skill validates the manifest consumes a digest.
+- **Image digest pinning over tag, including `:latest`**. A registry tag is a mutable, trust-on-first-use pointer — it can be re-pushed to point at a different image after review, so a passing scan of `app:1.2.3` does not bind the bytes that actually run. A `@sha256:` digest is content-addressed and immutable. Use `image: registry/app@sha256:abc...` not `image: registry/app:1.2.3`. Tag-only references are flagged `high`; `:latest` is `critical`. The upstream image-build hygiene lives in [[docker-security-checker]] — this skill validates the manifest consumes a digest.
 - **`imagePullPolicy: Always` is required when tags are used**, but a digest-pinned image makes the policy moot (digest is immutable). Flag `IfNotPresent` + tag combinations.
 - **Image signature verification at admission** via cosign / sigstore — enforced through Kyverno `verifyImages` or Connaisseur. SBOM (CycloneDX or SPDX) attached as OCI artifact; SLSA provenance level 3+ for production workloads.
-- **Shift-left scanning in PR**: kube-linter, kube-score, kubeconform/kubeval, kubesec, Trivy config, Polaris, Datree. None of these alone is enough — they catch different families; chain at least three.
-- **Policy-as-code at admission**: Kyverno (Kubernetes-native YAML policies, CNCF graduated 2025) or OPA Gatekeeper (Rego, CNCF graduated, more flexible/heavier). Kyverno is the recommended default in 2026 for YAML-first teams; Gatekeeper when external-data lookups (e.g., cross-cluster, IAM) are needed.
+- **Shift-left scanning in PR**: kube-linter, kube-score, kubeconform/kubeval, kubesec, Trivy config, Polaris. None of these alone is enough — they catch different families; chain at least three. (Datree, once common here, is unmaintained since 2023 — see the tool table — and should not be added to new pipelines.)
+- **Policy-as-code at admission**: Kyverno (Kubernetes-native YAML policies, CNCF graduated March 2026) or OPA Gatekeeper (Rego, built on the CNCF-graduated Open Policy Agent project, more flexible/heavier). Kyverno is the recommended default in 2026 for YAML-first teams; Gatekeeper when external-data lookups (e.g., cross-cluster, IAM) are needed.
 - **GitOps reconciliation (Argo CD / Flux) is the deployment plane**. Live drift from Git is a finding. `kubectl edit` in production is a finding. The cluster IS the manifest in Git.
 - **Encryption at rest with KMS v2** for etcd Secrets — flag clusters without `EncryptionConfiguration` referencing a KMS provider.
 - **Dedicated ServiceAccount per workload**. The `default` SA is never bound to anything; `automountServiceAccountToken: false` unless explicitly needed.
@@ -89,18 +89,18 @@ No single tool catches the full table above; chain at least three. All emit eith
 | **kubeval** | Legacy schema validator; kept for compatibility | Maintenance has shifted to kubeconform | Legacy CI; prefer kubeconform |
 | **kubesec** | Risk-scored security analysis per resource, highlights pod-security violations | Older; some checks now better covered by kube-linter + PSA | Spot-checks; security review |
 | **Polaris** | Best-practices auditor + dashboard, cluster grading view | Less mutation-friendly than Kyverno | Cluster-wide audit, exec dashboard |
-| **Datree** | Centralized policy engine, custom rules in YAML, Helm-aware | Maintenance status has shifted in 2024–2026 (project ownership changed); verify the current release cadence before pinning in CI | Custom org policies (where actively maintained) |
+| **Datree** | Centralized policy engine, custom rules in YAML, Helm-aware | UNMAINTAINED — the backing company shut down in July 2023; the `datreeio` repos are archived, take no code changes (no security patches), and the hosted dashboard is gone. Do not adopt for new pipelines; migrate existing use to kube-linter / Kyverno | Legacy only; prefer a maintained engine |
 | **Trivy config** | Aqua-built, also scans IaC + images, SARIF-native | Findings overlap with kube-linter | One tool, two surfaces (config + image) |
-| **Kyverno** | Kubernetes-native YAML policies, mutate + validate + generate + verifyImages, CNCF graduated | YAML-only DSL — complex logic still possible but verbose | Admission enforcement, default policy engine |
-| **OPA Gatekeeper** | Rego language, external-data lookups, cross-cluster policies, CNCF graduated | Rego learning curve; heavier resource footprint | Complex / external-data policies |
+| **Kyverno** | Kubernetes-native YAML policies, mutate + validate + generate + verifyImages, CNCF graduated (March 2026) | YAML-only DSL — complex logic still possible but verbose | Admission enforcement, default policy engine |
+| **OPA Gatekeeper** | Rego language, external-data lookups, cross-cluster policies, subproject of the CNCF-graduated Open Policy Agent | Rego learning curve; heavier resource footprint | Complex / external-data policies |
 | **kubescape** | NSA/CISA Kubernetes Hardening Guidance + MITRE ATT&CK mapping | Heavier than kube-linter | Compliance audits (NSA, CIS, MITRE) |
 | **GitLab kubernetes-validate-action / GitHub Actions** | CI glue that runs the above as a matrix and posts SARIF | Glue only — no checks of its own | PR-pipeline integration |
 
 ### Commands
 
 ```bash
-# Schema validation (offline, fast)
-kubeconform -strict -summary -kubernetes-version 1.32.0 manifests/
+# Schema validation (offline, fast) — pin to the version of the cluster you deploy to
+kubeconform -strict -summary -kubernetes-version "$TARGET_K8S_VERSION" manifests/
 
 # Linter pack
 kube-linter lint manifests/ --format sarif > kube-linter.sarif
@@ -556,7 +556,7 @@ egress:
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used in the human-readable report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)). The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used in the human-readable report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)). The triage tiers below stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |---|---|---|
@@ -654,7 +654,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — tw
 
 ## Refinement Loop — critic mode (v6.9.8+)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every kube-linter warning, kube-score grade below B, kubesec score below 6, Polaris failure, Kyverno policy violation, and deprecation notice (e.g., PodSecurityPolicy reference) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

@@ -50,7 +50,7 @@ You assume every JWT, every webhook, every client-supplied claim is attacker-con
 - **Server-side verify every request.** Never trust client-supplied `userId`, `orgId`, or `role` claims. Use `auth()` / `currentUser()` (Next.js) or `clerkClient.verifyToken()` / `authenticateRequest()` (backend SDKs) — these re-verify the JWT signature against Clerk's JWKS on every call. A decoded JWT body is data, not proof.
 - **Networkless verification via `jwtKey`.** For high-throughput backends, pass the JWT signing key (`CLERK_JWT_KEY`, PEM-encoded public key) so `verifyToken()` validates the signature locally without a JWKS network call. Always pair with `authorizedParties` to bind tokens to your frontend origin.
 - **Session tokens are short-lived (60 s).** Clerk session JWTs expire in ~60 seconds and refresh automatically via the SDK. Treat any token older than 60 s as expired — do not accept long-lived bearer tokens for user sessions. Use **machine-to-machine (M2M) tokens** with `clerkClient.m2m.verify()` for service-to-service.
-- **Passkeys / WebAuthn are the default in 2026.** Enable passkeys in the Clerk Dashboard; they provide phishing-resistant MFA-by-default (device possession + biometric). Treat passwords as legacy fallback. Available on Clerk Pro and above.
+- **Passkeys / WebAuthn are the default in 2026.** Enable passkeys in the Clerk Dashboard; they provide phishing-resistant MFA-by-default (device possession + biometric). A passkey is itself a multi-factor credential, so a passkey sign-in satisfies an application's MFA requirement on its own (the default for new instances in 2026). Treat passwords as legacy fallback.
 - **Enforce MFA at the application layer for sensitive routes.** Turn on org-level MFA enforcement for admin roles in the Clerk Dashboard, AND re-check `user.twoFactorEnabled` server-side before billing, data export, email change, or admin actions. Dashboard enforcement alone is not sufficient — a user can bypass it on routes that don't check.
 - **Webhook signature verification is mandatory.** Clerk webhooks are signed via Svix. Use Clerk's `verifyWebhook()` helper (or the raw Svix `Webhook` class) on every webhook handler. An unverified webhook endpoint is an open user-creation API.
 - **Sync to your DB via webhooks; don't query Clerk per request.** On `user.created` / `user.updated` / `user.deleted` / `organization.created` / `organizationMembership.created`, persist `clerk_user_id`, `clerk_org_id`, `role`, and email denormalized into your DB. Query latency goes from ~100 ms (Clerk API) to ~1 ms (local DB).
@@ -331,16 +331,17 @@ Enabling MFA in the Clerk Dashboard is necessary but not sufficient — the serv
 // BAD: admin route protected by role only, no MFA gate
 import { auth, currentUser } from '@clerk/nextjs/server';
 export async function POST() {
-  const { orgRole } = await auth();
-  if (orgRole !== 'admin') return new Response('forbidden', { status: 403 });
+  const { has } = await auth();
+  // Clerk's default role key is 'org:admin' (not 'admin'); use has() so custom roles work too.
+  if (!has({ role: 'org:admin' })) return new Response('forbidden', { status: 403 });
   // proceed with destructive admin action — but attacker who phished a password is now admin
 }
 
 // SAFE: require MFA on admin actions
 export async function POST() {
-  const { orgRole } = await auth();
+  const { has } = await auth();
   const user = await currentUser();
-  if (orgRole !== 'admin') return new Response('forbidden', { status: 403 });
+  if (!has({ role: 'org:admin' })) return new Response('forbidden', { status: 403 });
   if (!user?.twoFactorEnabled) {
     return new Response('mfa-required', { status: 403, headers: { 'X-Clerk-Hint': 'enroll-mfa' } });
   }
@@ -435,7 +436,7 @@ CREATE TABLE organization_memberships (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   clerk_user_id   text NOT NULL REFERENCES users(clerk_user_id) ON DELETE CASCADE,
   clerk_org_id    text NOT NULL REFERENCES organizations(clerk_org_id) ON DELETE CASCADE,
-  role            text NOT NULL CHECK (role IN ('admin','basic_member','guest')),  -- mirror Clerk roles
+  role            text NOT NULL CHECK (role IN ('org:admin','org:member')),  -- Clerk default role keys; extend for custom roles
   created_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (clerk_user_id, clerk_org_id)
 );
@@ -578,7 +579,7 @@ describe('Clerk integration', () => {
 
 | Provider | Best for | Trade-off |
 |---|---|---|
-| **Clerk** | B2C SaaS, fast launch, built-in passkeys + MFA + Organizations | Vendor lock-in, $ per MAU; passkeys/MFA require Pro plan |
+| **Clerk** | B2C SaaS, fast launch, built-in passkeys + MFA + Organizations | Vendor lock-in; priced per monthly active user; check current plan tiers for advanced auth features |
 | **WorkOS** | B2B with enterprise SSO (SAML/OIDC), SCIM, audit logs | More config; pricier; no consumer UI |
 | **Supabase Auth** | When already on Supabase DB | Less polish than Clerk; no built-in passkeys until recently |
 | **Auth.js** | Custom flows, OSS | More code to maintain; no hosted UI |
@@ -590,7 +591,7 @@ For the `saas/b2c-subscription` template, **Clerk is the default**. For `saas/b2
 
 | Tool | Purpose | Notes |
 |---|---|---|
-| **Clerk CLI** (`@clerk/cli`) | Generate types, sync env, run local dev tunnel | `clerk dev` exposes a tunnel for webhook testing |
+| **Clerk CLI** (`clerk`; `npm i -g clerk` or `brew install clerk/stable/clerk`) | Scaffold and manage Clerk auth (`clerk init`), user impersonation, local webhook testing | Opens a relay tunnel to forward webhook deliveries to your local server and verify signatures offline |
 | **Clerk Dashboard** | Webhook setup, MFA enforcement, passkey enablement, org settings, JWT key export | Webhook signing secret rotates here — must redeploy after rotation |
 | **Svix CLI** | Replay / inspect webhook deliveries | `svix listen` for local debugging |
 | **ngrok / cloudflared** | Tunnel localhost for webhook receipt during dev | Use Clerk Dashboard "Test webhook" alongside; ngrok URLs change on free tier — pin a paid subdomain |
@@ -601,7 +602,7 @@ For the `saas/b2c-subscription` template, **Clerk is the default**. For `saas/b2
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when this skill produces a human-readable scan report. When clerk-auth emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when this skill produces a human-readable scan report. When clerk-auth emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |---|---|---|
@@ -657,7 +658,7 @@ The integrator uses `confidence` to weight findings — a `confidence: low` sing
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

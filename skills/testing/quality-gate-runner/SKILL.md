@@ -504,7 +504,7 @@ dotnet test --collect:"XPlat Code Coverage" /p:Threshold=$LINE
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable gate report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. Triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable gate report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. Triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 **Reconciliation with [[quality/quality-gate]] tier model.** The rules layer organizes checks into Tier 1 (sub-minute, every commit), Tier 2 (PR-blocking, 5–10 min), Tier 3 (nightly, mutation/full-E2E/deep-SAST). The runner maps its internal triage tiers onto the rules layer's gates: CRITICAL/HIGH findings fail the gate at any tier; MEDIUM/LOW are reported only and do not block unless the rules layer escalates them (e.g., via baseline-delta or expiry).
 
@@ -567,7 +567,7 @@ The integrator uses `confidence` to weight findings — a `confidence: low` sing
 
 ## Refinement Loop — critic mode (v6.9.16)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

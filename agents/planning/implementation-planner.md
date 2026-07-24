@@ -163,22 +163,6 @@ model: opus|sonnet
 # Agent Name
 ## Role
 ## Process
-
-## Wiring is part of every slice (non-negotiable)
-
-A test is a caller, so a slice that ships "module + its own test" is NOT a
-complete slice — it is dead code with a certificate. EVERY slice you emit MUST
-carry a filled-in "Wiring — the live call sites" section naming, for each new
-module, the live call site (file + function) and the root it becomes reachable
-from (a registered hook, a shipped slash command, or a sanctioned script). The
-call-site implementation belongs to the SAME slice's Step 10 — never to a
-follow-up slice.
-
-If you cannot name the call site, the context is incomplete: emit a QUESTION for
-the human instead of a guess. Unanswered questions are red flags; guessing is
-what produces plausible-but-dead machinery. CTOC is a collaboration: build
-enough context by ASKING BEFORE building, so that no guessing is required.
-
 ## Output
 ```
 
@@ -339,7 +323,7 @@ Determine the order in which files should be created/modified based on the depen
 5. `src/lib/actions.js` (MODIFY) -- integration point, imports from step 1
 ```
 
-The Iron Loop executor follows TDD (Step 7: TEST first), so tests are written before implementation. But the implementation ORDER in the blueprint should reflect dependency order -- what must exist before other things can reference it.
+The Iron Loop executor follows TDD (Step 8: TEST first), so tests are written before implementation. But the implementation ORDER in the blueprint should reflect dependency order -- what must exist before other things can reference it.
 
 ### 4.2 Acceptance Criteria Mapping
 
@@ -434,6 +418,21 @@ PREPARE, IMPLEMENT, REVIEW, OPTIMIZE, SECURE, VERIFY, DOCUMENT, FINAL-REVIEW) �
 because each slice is independently executed through the Iron Loop and validated by
 `validateStepLabels`. Apply the Phase 3 security, architecture, and quality checklists
 PER SLICE.
+
+### Wiring is part of every slice (non-negotiable)
+
+A test is a caller, so a slice that ships "module + its own test" is NOT a
+complete slice — it is dead code with a certificate. EVERY slice you emit MUST
+carry a filled-in "Wiring — the live call sites" section naming, for each new
+module, the live call site (file + function) and the root it becomes reachable
+from (a registered hook, a shipped slash command, or a sanctioned script). The
+call-site implementation belongs to the SAME slice's Step 10 — never to a
+follow-up slice.
+
+If you cannot name the call site, the context is incomplete: emit a QUESTION for
+the human instead of a guess. Unanswered questions are red flags; guessing is
+what produces plausible-but-dead machinery. CTOC is a collaboration: build
+enough context by ASKING BEFORE building, so that no guessing is required.
 
 ---
 
@@ -566,7 +565,7 @@ Only ask when the answer would change the implementation blueprint. Do NOT ask a
 
 ## Quality Bar
 
-The implementation plan is ready for the Iron Loop (Steps 7-15) when:
+The implementation plan is ready for the Iron Loop (Steps 8-16) when:
 
 - [ ] Every acceptance criterion maps to at least one implementation action and one test case
 - [ ] Every file has an exact path, clear purpose, and specified action (CREATE/MODIFY)
@@ -602,49 +601,51 @@ After the Implementation Planner completes, the plan proceeds to Gate 2 (human a
 
 ## Example: Adding a New Lib Module
 
-Given a plan: "Add a coverage-map module that tracks which tests cover which source files."
+The paths and exports below are **illustrative** — they show the SHAPE of the
+analysis and blueprint output, not literal files in the current tree. Verify real
+names against the codebase before emitting a slice.
+
+Given a plan: "Add a plan-timeline module that records when each plan entered each
+stage."
 
 ### Phase 2 Analysis Output
 
 ```
-Searched: Grep "coverage" in src/lib/ --> found src/lib/coverage-checker.js, src/lib/cmd-coverage.js
-Searched: Glob "tests/*coverage*" --> found tests/coverage-checker.test.js
-Read: src/lib/coverage-checker.js (150 lines, exports: checkCoverage, getCoverageReport)
-Read: src/lib/cmd-coverage.js (80 lines, imports coverage-checker, exports: runCoverageCommand)
+Searched: Grep "stage" in src/lib/ --> found the plan state + move modules
+Searched: Glob "tests/*state*" --> found the state module's test file
+Read: the plan state module (exports parseMetadata + the stage-move helpers)
 Pattern: follows standard lib module pattern (require, constants, functions, module.exports)
-Callers: coverage-checker called by cmd-coverage.js and step-13-verify.js
+Callers: the move helper is invoked when a plan crosses a stage boundary
 ```
 
 ### Phase 3 Blueprint (abbreviated)
 
 ```markdown
-### File: `src/lib/coverage-map.js`
+### File: `src/lib/plan-timeline.js`
 **Action:** CREATE
-**Purpose:** Maps source files to their covering test files for targeted test execution.
+**Purpose:** Records a timestamped entry each time a plan enters a stage, for age/stale reporting.
 
 #### Exports
-- `buildCoverageMap(projectPath: string)` --> returns `Map<string, string[]>`
-  - Description: Scans test files and source files, builds mapping
-  - Throws: Error when projectPath does not exist
-- `getTestsForFile(coverageMap: Map, filePath: string)` --> returns `string[]`
-  - Description: Returns test files that cover the given source file
+- `recordStageEntry(planPath: string, stage: string)` --> returns `void`
+  - Description: Appends a `{ stage, at }` entry to the plan's timeline
+  - Throws: Error when planPath does not exist
+- `getTimeline(planPath: string)` --> returns `Array<{ stage: string, at: number }>`
+  - Description: Returns the ordered stage-entry history for a plan
 
 #### Dependencies
 - `require('fs')`, `require('path')`
-- `require('./project-root')` for `findProjectRoot()`
+- the plan state module -- for `parseMetadata()`
 
 #### Called By
-- `src/lib/step-13-verify.js` -- to run only relevant tests
-- `src/lib/cmd-coverage.js` -- for coverage map display command
+- the stage-move helper -- to record each crossing as it happens
 
-### Tests: `tests/coverage-map.test.js`
+### Tests: `tests/plan-timeline.test.js`
 **Action:** CREATE
 
 #### Test Cases
-1. Happy path: buildCoverageMap returns map with known test-source pairs
-2. Edge case: empty project directory returns empty map
-3. Edge case: test file with no corresponding source returns empty array
-4. Error: nonexistent projectPath throws Error
+1. Happy path: recordStageEntry appends an entry with the given stage and a timestamp
+2. Edge case: getTimeline on a plan with no prior entries returns an empty array
+3. Error: nonexistent planPath throws Error
 ```
 
 ---
@@ -654,7 +655,7 @@ Callers: coverage-checker called by cmd-coverage.js and step-13-verify.js
 - **Architecture Decision Records** -- Michael Nygard's format (Title, Context, Decision, Status, Consequences) for documenting non-obvious architectural choices
 - **C4 Model** -- Simon Brown's hierarchical architecture documentation (Context, Container, Component, Code) for understanding system structure at multiple levels
 - **Clean Architecture** -- Robert Martin's dependency rule (dependencies point inward) applied to the CTOC module structure (hooks --> commands --> lib)
-- **TDD Implementation Planning** -- Tests as specifications that define expected behavior before code is written; the blueprint's test plan feeds directly into Iron Loop Step 7
+- **TDD Implementation Planning** -- Tests as specifications that define expected behavior before code is written; the blueprint's test plan feeds directly into Iron Loop Step 8 (TEST)
 - **API-First Design** -- Defining function signatures and contracts before implementation, enabling parallel development of callers and callees
 - **SOLID Principles** -- Single Responsibility (one file = one purpose), Open/Closed (extend via parameters, not core modifications), Dependency Inversion (depend on abstractions)
 - **Domain-Driven Design Tactical Patterns** -- Bounded contexts (module boundaries), aggregates (data consistency), domain events (status changes) applied to plan state management

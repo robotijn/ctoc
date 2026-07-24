@@ -43,7 +43,7 @@ The method — the metric selection, the sample-size arithmetic, the duration es
 Judge these. The deep method belongs to `skills/product/experiment-designer/SKILL.md` — read it in full and apply its arithmetic and its process rather than restating them.
 
 1. **A sample-size calculation exists before launch.** Without an a-priori target, "no significant effect" is a statement about the sample, not the product.
-2. **Exactly one primary metric.** The skill's rule: a second primary metric doubles the false-positive rate. Everything else is a guardrail.
+2. **Exactly one primary metric** — the skill's rule. A second primary metric roughly doubles the false-positive rate; everything else is a guardrail.
 3. **Guardrails are independent of the primary.**
 4. **A sample-ratio check is defined and runs.** The skill names this the silent failure — bot traffic, redirect bugs, cache layers and dropped exposure events all produce it, and if nobody tests for the ratio, biased results ship looking clean.
 5. **The analysis plan is pre-registered**, before the data exists.

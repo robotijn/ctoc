@@ -89,9 +89,21 @@ snapshot = tracemalloc.take_snapshot()
 top_stats = snapshot.statistics('lineno')
 ```
 
-### Go
+### C / C++ (the primary-risk languages)
 ```bash
-go tool pprof http://localhost:6060/debug/pprof/heap
+# AddressSanitizer + UndefinedBehaviorSanitizer at compile time.
+# LeakSanitizer is bundled with ASan and reports leaks at program exit on Linux.
+clang -fsanitize=address,undefined -g -o app app.c && ./app
+
+# Valgrind memcheck — no recompile needed; slower, catches leaks + invalid access.
+valgrind --leak-check=full --show-leak-kinds=all ./app
+```
+
+### Rust (FFI / `unsafe`)
+```bash
+# Miri interprets MIR and catches use-after-free, out-of-bounds, and other
+# undefined behavior reachable from `unsafe` blocks that the borrow checker cannot.
+cargo +nightly miri test
 ```
 
 ## Output Format

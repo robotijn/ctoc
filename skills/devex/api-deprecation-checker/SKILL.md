@@ -46,14 +46,14 @@ The 2026 deprecation playbook is built on two RFCs and one OpenAPI convention:
 
 - **RFC 8594 — `Sunset` header is mandatory on every deprecated endpoint**. The value is an HTTP-date indicating when the URI will stop responding. Without it, "deprecated" is a vibe, not a contract. After the sunset date, return **`410 Gone`** — not `404` — so confused clients see the difference between "wrong URL" and "this URL is intentionally retired." RFC 8594 also defines a `sunset` link relation type — pair `Sunset:` with a `Link: <…>; rel="sunset"` pointing to the deprecation/sunset policy page.
 - **RFC 9745 — the `Deprecation` HTTP response header field** (formerly an IETF draft, now an RFC) carries the deprecation timestamp itself as an HTTP-date. Use `Deprecation` to say *"this is deprecated as of X"* and `Sunset` to say *"it will stop working on Y"*. Pair both with `Link: <migration-guide-url>; rel="deprecation"` (per RFC 9745) and `Link: <successor-url>; rel="successor-version"`.
-- **OpenAPI `deprecated: true` on every retiring operation**, plus the proposed-in-3.3 / widely-used-by-convention `x-sunset` extension carrying the same date as the `Sunset` header. Tools like `oasdiff` and `openapi-generator` read these to produce migration reports.
+- **OpenAPI `deprecated: true` on every retiring operation**, plus the `x-sunset` extension — an oasdiff convention (an `x-` vendor extension, not part of the core spec) — carrying the same date as the `Sunset` header. Tools like `oasdiff` and `openapi-generator` read these to produce migration reports. (A live OpenAPI 3.3 proposal would fold this inline by making `deprecated` polymorphic — an object carrying `sunset`, `successor`, and documentation — rather than standardizing `x-sunset`.)
 
 Operationally that gives:
 
 - **Parallel `/v1` + `/v2` during the entire deprecation window**: never break callers without at least one major version of overlap. Route by URL path (`/v1/...`, `/v2/...`) or `Accept-Version` header — pick one strategy and stick to it.
 - **Minimum 6-month deprecation window for endpoints serving major customers / public APIs**. Shorter windows are acceptable only for internal services, pre-1.0 APIs, or security-driven removals (and even then, document the exception in the plan's `## Decisions Taken Under Ambiguity` section).
 - **Consumer-migration tracking via usage telemetry**: count requests per deprecated endpoint over a rolling 30-day window, broken down by client (API key, user-agent, OAuth client_id). Don't sunset until top-N consumers have migrated to zero traffic for two consecutive 30-day windows, or have been individually contacted with an extension. "We sent an email three months ago" is not tracking.
-- **Codemods where the migration is mechanical**: jscodeshift, lib2to3, `pyupgrade`, Roslyn analyzers with code-fix providers, Spring Boot `OpenRewrite` recipes. A skill that ships codemods migrates 10× faster than one that ships a doc.
+- **Codemods where the migration is mechanical**: jscodeshift, LibCST codemods (`lib2to3` was removed from the standard library in Python 3.13 — do not reach for it), `pyupgrade`, Roslyn analyzers with code-fix providers, OpenRewrite recipes (including its Spring Boot migration recipes). A skill that ships codemods migrates 10× faster than one that ships a doc.
 - **Cross-link with [[backwards-compatibility-checker]]**: removed-this-version + still-used = build break; that's their territory. Missing `Sunset` header on a deprecated endpoint = our territory.
 
 ## Deprecation Cycle Categories (what this skill flags)
@@ -125,9 +125,9 @@ public ResponseEntity<List<Order>> listOrdersV1() {
 public List<OrderV2> listOrdersV2() { return repo.findAll().stream().map(OrderV2::from).toList(); }
 ```
 
-For a project-wide implementation use a `OncePerRequestFilter` keyed on the `@Deprecated` annotation, or use the Zalando `problem-spring-web` deprecation helpers.
+For a project-wide implementation use a `OncePerRequestFilter` keyed on the `@Deprecated` annotation; Zalando's RESTful API Guidelines (the "Deprecation" chapter) specify the `Deprecation` / `Sunset` header contract to emit and the sunset-window expectations to enforce.
 
-### Python 3.12+ — PEP 702 `typing.deprecated` + FastAPI `deprecated=True`
+### Python 3.12+ — PEP 702 `warnings.deprecated` + FastAPI `deprecated=True`
 
 ```python
 # BAD: bare warnings, route not flagged in the OpenAPI doc
@@ -138,7 +138,7 @@ def list_items_v1():
     return db.items.all()
 
 # SAFE: PEP 702 deprecation marker + FastAPI deprecated=True + wire headers
-from typing import deprecated  # Python 3.13+; use typing_extensions.deprecated on 3.12
+from warnings import deprecated  # Python 3.13+; use typing_extensions.deprecated on 3.12 and earlier
 
 @deprecated("Use /v2/items. Sunset 2026-12-31.", category=DeprecationWarning)
 @app.get("/v1/items", deprecated=True,                                # surfaces in OpenAPI as deprecated: true
@@ -153,10 +153,10 @@ def list_items_v1(response: Response):
     return db.items.all()
 
 @app.get("/v2/items")
-def list_items_v2(): return [ItemV2.from_orm(i) for i in db.items.all()]
+def list_items_v2(): return [ItemV2.model_validate(i) for i in db.items.all()]  # Pydantic v2 (from_orm() is deprecated); needs model_config = ConfigDict(from_attributes=True)
 ```
 
-PEP 702's `@deprecated` (added to `typing` in Python 3.13, available via `typing_extensions` for 3.12) is the canonical static-checker-visible marker — Pyright/Pylance and mypy both honor it. Pair it with FastAPI's per-route `deprecated=True` so the OpenAPI schema reflects the same fact.
+PEP 702's `@deprecated` (added to the `warnings` module in Python 3.13, available via `typing_extensions` for 3.12 and earlier) is the canonical static-checker-visible marker — Pyright/Pylance and mypy both honor it. Pair it with FastAPI's per-route `deprecated=True` so the OpenAPI schema reflects the same fact.
 
 ### C (C17 / C23) — `[[deprecated]]` attribute in headers
 
@@ -190,7 +190,7 @@ namespace api {
 }
 ```
 
-`[[deprecated]]` is C++14, the string-reason form is C++17, and they compose with `[[nodiscard]]` and module exports cleanly in C++20/23. All major compilers (gcc, clang, MSVC) surface them through `-Wdeprecated-declarations` (clang/gcc) or C4996 (MSVC).
+Both `[[deprecated]]` and the string-reason form `[[deprecated("reason")]]` are C++14, and they compose with `[[nodiscard]]` and module exports cleanly in C++20/23. All major compilers (gcc, clang, MSVC) surface them through `-Wdeprecated-declarations` (clang/gcc) or C4996 (MSVC).
 
 ### TypeScript — OpenAPI `deprecated: true` + JSDoc `@deprecated`
 
@@ -252,7 +252,7 @@ Same pattern in MySQL (`CHANGE COLUMN`, `CREATE VIEW`), Snowflake (`COMMENT` + f
 ### Static analysis
 ```bash
 tsc --noEmit 2>&1 | grep -iE 'deprecated|@deprecated'
-npx eslint . --rule 'deprecation/deprecation: error'
+npx eslint . --rule '@typescript-eslint/no-deprecated: error'   # eslint-plugin-deprecation is archived; the rule moved into typescript-eslint v8+
 python -W error::DeprecationWarning -c "import mymodule"   # promote to error in CI
 javac -Xlint:deprecation -Werror Foo.java                  # Java: error on deprecation
 dotnet build /warnaserror /p:TreatWarningsAsErrors=true    # .NET: treat [Obsolete] use as error
@@ -261,8 +261,8 @@ clang -Wdeprecated-declarations -Werror foo.c              # C/C++
 
 ### OpenAPI / contract analysis
 ```bash
-# oasdiff: surfaces deprecated operations + missing sunset
-oasdiff diff openapi.v1.yaml openapi.v2.yaml --check-breaking --deprecated-from openapi.v1.yaml
+# oasdiff: a deprecation whose x-sunset is missing or < 180 days out counts as breaking
+oasdiff breaking openapi.v1.yaml openapi.v2.yaml --deprecation-days-stable=180
 
 # Validate Sunset header presence
 curl -sI https://api.example.com/v1/users | grep -iE '^(Sunset|Deprecation|Link):'
@@ -324,7 +324,7 @@ Aggregate findings into the same SARIF lane the security skills use, so the GitH
 - **Endpoint**: `GET /api/v1/users`
 - **Sunset declared**: `2026-04-30` (passed 19 days ago)
 - **Status**: still returning `200 OK` instead of `410 Gone`
-- **Fix**: replace handler body with `return Results.Gone()` and emit `Link: <…/v2/users>; rel="successor-version"`.
+- **Fix**: replace handler body with `return StatusCode(StatusCodes.Status410Gone)` (there is no `Results.Gone()` helper — controllers use `StatusCode`, minimal APIs use `Results.StatusCode(410)`) and emit `Link: <…/v2/users>; rel="successor-version"`.
 
 ### Finding 2 — Deprecated without Sunset header
 - **File**: `app/routes/items.py:11`
@@ -344,7 +344,7 @@ Aggregate findings into the same SARIF lane the security skills use, so the GitH
 | MEDIUM (triage) | Deprecated but no migration guide link · `@Deprecated` without `since` / `forRemoval` | Fix this sprint |
 | LOW (triage) | Internal-only API missing `Sunset` (still recommended) · advisory deprecation in a pre-1.0 library | Backlog |
 
-When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md). The triage tiers above stay in the human-readable report body for prioritization; the letter's `severity` field is always `critical`. A deprecation warning today is a customer-visible 410 (or worse, a silent 200 from a contract you've already declared dead) tomorrow.
+When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md). The triage tiers above stay in the human-readable report body for prioritization; the letter's `severity` field is always `critical`. A deprecation warning today is a customer-visible 410 (or worse, a silent 200 from a contract you've already declared dead) tomorrow.
 
 ## Letter schema (refinement-loop output contract)
 
@@ -391,7 +391,7 @@ The integrator uses `confidence`, `kind`, and `sunset_date` to prioritize: a `su
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

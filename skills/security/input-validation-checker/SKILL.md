@@ -43,7 +43,7 @@ Missing validation is the root cause of injection, deserialization, mass assignm
 - **Schema-driven, not handler-driven**. Validation lives in a declared schema (Pydantic / Zod / Bean Validation / DataAnnotations / JSON Schema / Protobuf), not in scattered `if (len(x) > 10) ...` lines. Schemas are reviewable, fuzzable, and reusable for OpenAPI generation.
 - **Validate every channel**. HTTP body, query, path, headers, cookies, form fields, file uploads, WebSocket frames, gRPC messages, message-queue payloads, webhook bodies, environment variables loaded at startup. Each is an input source.
 - **Unicode-aware**. Normalize to NFC before validation; reject mixed-script identifiers in security-sensitive fields (email, username, domain) to prevent IDN homograph attacks.
-- **OWASP mapping** — A03 (Injection), A04 (Insecure Design), A05 (Security Misconfiguration), A08 (Software & Data Integrity), A10 (SSRF). Tag every finding with the relevant OWASP code and a CWE id.
+- **OWASP mapping (Top 10 2025)** — A01 (Broken Access Control — now absorbs SSRF), A02 (Security Misconfiguration), A05 (Injection), A06 (Insecure Design), A08 (Software or Data Integrity Failures). Tag every finding with the relevant OWASP 2025 code and a CWE id. (The category numbers were reshuffled from the 2021 edition: Injection moved from A03 to A05, Insecure Design from A04 to A06, Security Misconfiguration from A05 to A02, and SSRF is no longer standalone.)
 - **Block deployments** if any public endpoint has *no* schema on a CRITICAL input (auth, file upload, payment, SQL-bound param, anything reaching `eval`/`exec`/`Process.Start`/template render).
 
 ### Validation vs. sanitization (distinct, not interchangeable)
@@ -119,7 +119,7 @@ app.post('/users', (req, res) => {
   db.insert(data);
 });
 
-// SAFE (edge / size-sensitive): Valibot, ~90% smaller bundle than Zod
+// SAFE (edge / size-sensitive): Valibot — tree-shakable, much smaller bundle than Zod
 import * as v from 'valibot';
 const UserCreateV = v.strictObject({
   email: v.pipe(v.string(), v.email()),
@@ -397,7 +397,7 @@ Business rules belong in a domain service, not in the controller. Schema validat
 | TypeScript / JS (edge) | **Valibot** | Tree-shakable; bundle is a large fraction smaller than Zod — choose for Cloudflare Workers, browser, React Native. |
 | TypeScript / JS (schema-first) | **TypeBox** | Outputs JSON Schema Draft 2020-12 directly; choose when OpenAPI generation matters; pairs with Ajv. |
 | TypeScript / JS (runtime alt) | **ArkType** | TS-syntax-as-schema; competitive speed; smaller ecosystem than Zod. |
-| C# / .NET 9 | **DataAnnotations** + **FluentValidation 11** | DataAnnotations for declarative; FluentValidation for complex/business rules. `System.ComponentModel.DataAnnotations` is built-in. |
+| C# / .NET | **DataAnnotations** + **FluentValidation 12** | DataAnnotations for declarative; FluentValidation for complex/business rules. `System.ComponentModel.DataAnnotations` is built-in. |
 | Java 21+ | **Jakarta Bean Validation 3.0** (Hibernate Validator) | `@Valid` on the controller arg + DTO constraints; Spring auto-binds 400 on failure. |
 | C / C++ | **JSON Schema Draft 2020-12** | Via `nlohmann/json-schema-validator` (C++) or `ajv-c` / hand-rolled checks (C). No "framework" — discipline-driven. |
 | Schema-first (cross-lang) | **Protobuf** + `protovalidate` | Wire-format + validation rules in `.proto`; one source of truth across services. |
@@ -410,16 +410,16 @@ Business rules belong in a domain service, not in the controller. Schema validat
 
 | Input | Gap | Risk | OWASP |
 |-------|-----|------|-------|
-| JSON body | No schema | Mass assignment, unexpected types | A04 |
-| File upload | Extension or `Content-Type` only | Polyglot RCE, malicious upload | A04 |
+| JSON body | No schema | Mass assignment, unexpected types | A06 |
+| File upload | Extension or `Content-Type` only | Polyglot RCE, malicious upload | A06 |
 | Path parameter | No format validation | Path traversal, IDOR | A01 |
-| Pagination | No bounds on `page` / `limit` | DoS via giant offset | A04 |
-| Search query | No length cap, no sanitization | ReDoS, XSS on reflection | A03 |
-| Header (`X-Forwarded-For`) | Trusted without validation | IP spoofing, rate-limit bypass | A04 |
-| Numeric string | `int(x)` with no range | Integer overflow, DoS | A04 |
+| Pagination | No bounds on `page` / `limit` | DoS via giant offset | A06 |
+| Search query | No length cap, no sanitization | ReDoS, XSS on reflection | A05 |
+| Header (`X-Forwarded-For`) | Trusted without validation | IP spoofing, rate-limit bypass | A06 |
+| Numeric string | `int(x)` with no range | Integer overflow, DoS | A06 |
 | Username / email | No NFC normalize | IDN homograph, comparison bypass | A07 |
 | Webhook body | Signature checked, schema not | Forged payloads w/ extra fields | A08 |
-| Env var | Loaded as string, no validation | Misconfig in prod | A05 |
+| Env var | Loaded as string, no validation | Misconfig in prod | A02 |
 
 ## Scan Methodology
 
@@ -459,7 +459,7 @@ Cross-check the route table (FastAPI `app.routes`, Express `_router.stack`, ASP.
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |---|---|---|
@@ -479,7 +479,7 @@ These tiers are the **internal triage view** used when you produce a human-reada
 - Unvalidated: 2
 
 ### CRITICAL
-1. **POST /api/users** (`routes/users.ts:23`) — OWASP A04, CWE-20
+1. **POST /api/users** (`routes/users.ts:23`) — OWASP A06, CWE-20
    - Source: `req.body`
    - Validator present: false
    - Strategy: none
@@ -493,7 +493,7 @@ These tiers are the **internal triage view** used when you produce a human-reada
    const data = UserCreate.parse(req.body);
    ```
 
-2. **POST /api/upload** (`routes/files.ts:45`) — OWASP A04, CWE-434
+2. **POST /api/upload** (`routes/files.ts:45`) — OWASP A06, CWE-434
    - Source: `request.files["file"]`
    - Strategy: extension allowlist only (no magic bytes, no size cap)
    - Risk: polyglot upload, RCE on misconfigured server
@@ -513,7 +513,7 @@ These tiers are the **internal triage view** used when you produce a human-reada
 |---|---|---|
 | Python | `bandit` (gaps in input handling) + `mypy --strict` (type-level checks) + Pydantic in app | Static + runtime |
 | TS / JS | `eslint-plugin-security`, `tsc --strict`, Zod / Valibot / TypeBox in app | Static + runtime |
-| C# / .NET 9 | Roslyn analyzers (`Microsoft.CodeAnalysis.NetAnalyzers` with `<AnalysisMode>All</AnalysisMode>`), Security Code Scan, DataAnnotations + FluentValidation in app | Static + runtime |
+| C# / .NET | Roslyn analyzers (`Microsoft.CodeAnalysis.NetAnalyzers` with `<AnalysisMode>All</AnalysisMode>`), Security Code Scan, DataAnnotations + FluentValidation in app | Static + runtime |
 | Java 21+ | SpotBugs + FindSecBugs, ErrorProne, Bean Validation in app | Static + runtime |
 | C / C++ | Clang-Tidy (`bugprone-*`, `cert-*`), Coverity / CodeQL, JSON Schema validator in app | Static + runtime |
 | Schema-first | **Ajv 8+** (JSON Schema 2020-12), **protovalidate** (Protobuf), OpenAPI 3.1 request validation at the gateway (Kong, Envoy, AWS API Gateway) | Wire-edge |
@@ -531,7 +531,7 @@ severity: critical                                   # ALWAYS critical (warnings
 confidence: high | medium | low                      # high = corroborated by sast-scanner; low = single-tool
 engine: input-validation-checker
 rule_id: ivc.no-schema | ivc.no-allowlist | ivc.no-bounds | ivc.upload-no-magic | ivc.no-nfc | ivc.denylist
-owasp: A03 | A04 | A05 | A07 | A08 | A10
+owasp: A01 | A02 | A05 | A06 | A07 | A08          # OWASP Top 10 2025 codes (A01 covers SSRF)
 cwe: CWE-20 | CWE-79 | CWE-89 | CWE-434 | CWE-502 | CWE-915 | CWE-918
 file: src/api/user.py
 line: 42
@@ -545,7 +545,7 @@ corroborated_by: [sast-scanner]                      # empty list if single-sour
 delta_to_baseline: new | unchanged | regressed
 message: "POST /api/users reads req.body with no schema; mass assignment possible."
 fix: "Define a Zod .strict() schema, parse req.body, then pass the typed result downstream."
-reference: https://owasp.org/Top10/A04_2021-Insecure_Design/
+reference: https://owasp.org/Top10/2025/A06_2025-Insecure_Design/
 ```
 
 The integrator uses `confidence` and `corroborated_by` to weight findings — an `ivc.no-schema` finding corroborated by a `sast-scanner` SQL-injection finding on the same line is the highest-priority bucket. `reachable: false` (handler exists but is unmounted / behind a feature flag) keeps the finding `severity: critical` on the wire but lets the integrator defer it.
@@ -554,7 +554,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — an
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

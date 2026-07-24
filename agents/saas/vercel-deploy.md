@@ -3,7 +3,7 @@ name: vercel-deploy
 description: Deploy Next.js to Vercel — custom domain, environment variables, preview deployments, edge functions, ISR, monitoring. Dispatch when the request mentions vercel deploy, vercel deployment, deploy to vercel, custom domain, preview deployment, edge function, ISR, fluid compute, or vercel env.
 tools: Read, Write, Bash
 model: sonnet
-effort: low
+effort: medium
 tier: 2
 reports_to: cto-chief
 dispatch_protocol: v1

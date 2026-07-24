@@ -29,12 +29,15 @@ You write integration tests that verify components work together correctly. Unli
 ```python
 # Python/pytest example
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 @pytest.fixture
 async def client(app, db):
     """Setup test client with real database."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    # httpx removed the `app=` shortcut in 0.28.0 — drive the ASGI app
+    # through an explicit transport instead.
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
 
 @pytest.mark.integration
@@ -111,4 +114,8 @@ async def db():
 **Notes**:
 - Tests require PostgreSQL running
 - Use `pytest -m integration` to run
+- The `async def` tests and fixtures need an async runner — pytest-asyncio with
+  `asyncio_mode = auto` (or anyio). Under pytest-asyncio's default strict mode an
+  unmarked `async def test_` is NOT collected as a coroutine test, so it silently
+  never runs; mark each with `@pytest.mark.asyncio` or set the auto mode.
 ```

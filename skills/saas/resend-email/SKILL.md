@@ -50,7 +50,7 @@ You are a deliverability-paranoid email engineer. You assume every send can boun
 - **Bounce + complaint webhooks → suppression list.** A hard bounce or complaint MUST suppress the address. Subsequent sends to a suppressed address must be blocked at your application layer, not Resend's — keep the check `O(1)` against your own table. Gmail/Yahoo enforce a complaint rate below 0.3%; one careless send loop can blow the budget.
 - **Verify webhook signatures.** Resend webhooks are signed via Svix (HMAC-SHA256 over `svix_id.svix_timestamp.body`). An unsigned bounce-webhook endpoint is an attacker's free suppression-list-poisoning tool. Verify every payload.
 - **React Email for templates.** Consistent rendering across Gmail, Outlook, Apple Mail, mobile. React Email's `<Container>`, `<Button>`, `<Img>` components handle the table-layout/MSO-conditional hell so you don't.
-- **Disable open/click tracking on sensitive flows.** Password reset, MFA codes, 2FA emails — tracking pixels and rewritten links leak metadata and can break the link in privacy-strict mail clients. Set `tracking: { open: false, click: false }` per send for these categories.
+- **Keep open/click tracking OFF on sensitive flows.** Password reset, MFA codes, verification links — tracking pixels and rewritten links leak metadata and can break the link in privacy-strict mail clients. In Resend, open/click tracking is a **domain-level** setting (`openTracking` / `clickTracking` with a `trackingSubdomain` on `domains.create`), **disabled by default** — there is no per-send tracking toggle. So the paranoid pattern is to leave tracking off on the transactional/auth sending domain entirely, or route auth mail through a dedicated subdomain that never enables it.
 - **Reply-to a real inbox.** `from: hello@send.yourapp.com`, `reply-to: support@yourapp.com`. `noreply@` kills user trust and the support flywheel.
 - **mail-tester.com >= 9/10 before production traffic.** Catches missing DKIM, broken DMARC alignment, content red-flags, blacklist hits. Re-run after any DNS change.
 
@@ -183,9 +183,12 @@ async function safeSend(opts) {
 ```
 1. Sign up at resend.com
 2. Add a SUBDOMAIN (e.g., send.yourapp.com) — not the apex
-3. Resend gives you SPF (TXT), DKIM (CNAME or TXT), and a DMARC starter record
-4. Add records to your DNS (Cloudflare, Route53, etc.)
-5. Set DMARC to p=quarantine after 1–2 weeks at p=none (monitor rua reports)
+3. Resend gives you SPF (an MX + a TXT on the `send` return-path subdomain) and DKIM
+   (three CNAMEs at randomized selectors, `<token>._domainkey` → `<token>.dkim.amazonses.com`).
+   Resend does NOT hand you a DMARC record — you add DMARC yourself (see the DMARC record below).
+4. Add records to your DNS (Cloudflare, Route53, etc.); if you enabled open/click tracking Resend
+   adds a Tracking CNAME too
+5. Add your own DMARC record, then raise it to p=quarantine after 1–2 weeks at p=none (monitor rua reports)
 6. Verify with mail-tester.com (target >= 9/10) and MXToolbox (no blacklist hits)
 7. Configure webhooks: bounce, complaint, delivered, opened, clicked → /api/resend/webhook
 ```
@@ -304,8 +307,10 @@ export async function POST(req: NextRequest) {
 
   switch (type) {
     case 'email.bounced':
-      // Only hard bounces go to suppression — soft bounces (mailbox full, greylisting) retry
-      if (data.bounce?.type === 'hard') {
+      // Resend classifies bounces as 'Permanent' or 'Temporary' (with a finer `subType`
+      // like 'Suppressed' or 'MessageRejected'). Only PERMANENT bounces go to suppression —
+      // Temporary bounces (mailbox full, greylisting) are retried, not suppressed.
+      if (data.bounce?.type === 'Permanent') {
         await db.insert(db.schema.suppressionList).values({
           email: recipient,
           reason: 'hard_bounce',
@@ -316,6 +321,7 @@ export async function POST(req: NextRequest) {
         provider_message_id: data.email_id,
         recipient,
         bounce_type: data.bounce?.type ?? 'unknown',
+        bounce_subtype: data.bounce?.subType ?? null,
         diagnostic: data.bounce?.message ?? null,
       });
       break;
@@ -346,7 +352,9 @@ type ResendWebhookEvent = {
   data: {
     email_id: string;
     to: string[];
-    bounce?: { type: 'hard' | 'soft'; message: string };
+    // Resend bounce object: `type` is 'Permanent' | 'Temporary'; `subType` is the finer
+    // reason ('Suppressed', 'MessageRejected', 'MailboxFull', ...); `message` is the SMTP text.
+    bounce?: { type: 'Permanent' | 'Temporary'; subType?: string; message?: string };
   };
 };
 ```
@@ -374,30 +382,20 @@ async def send_receipt_email(*, to: str, invoice_id: str, amount_cents: int, inv
     if await is_suppressed(to):
         return {"skipped": "suppressed"}
 
-    # BAD: resend.Emails.send(...) without idempotency on a webhook-driven path
-    # SAFE: pass idempotency_key so Stripe retries don't duplicate receipts.
-    # Resend's HTTP API documents an `Idempotency-Key` request header — if the
-    # SDK version in use doesn't expose it as a kwarg, fall back to a direct
-    # httpx POST with the header set (shown below).
-    import httpx
-    resp = httpx.post(
-        "https://api.resend.com/emails",
-        headers={
-            "Authorization": f"Bearer {os.environ['RESEND_API_KEY']}",
-            "Idempotency-Key": idem,
-        },
-        json={
-            "from": os.environ["RESEND_FROM_EMAIL"],
-            "reply_to": os.environ["RESEND_REPLY_TO"],
-            "to": to,
-            "subject": "Your receipt",                        # no PII in subject
-            "html": render_receipt_html(amount_cents, invoice_url),
-            "tags": [{"name": "category", "value": "receipt"}],
-        },
-        timeout=10.0,
-    )
-    resp.raise_for_status()
-    result = resp.json()
+    # BAD: resend.Emails.send(params) without idempotency on a webhook-driven path
+    # SAFE: resend-python takes a second `options` arg carrying idempotency_key, so
+    # Stripe retries don't duplicate receipts. The SDK maps it to the HTTP
+    # `Idempotency-Key` request header.
+    params: resend.Emails.SendParams = {
+        "from": os.environ["RESEND_FROM_EMAIL"],
+        "reply_to": os.environ["RESEND_REPLY_TO"],
+        "to": to,
+        "subject": "Your receipt",                        # no PII in subject
+        "html": render_receipt_html(amount_cents, invoice_url),
+        "tags": [{"name": "category", "value": "receipt"}],
+    }
+    options: resend.Emails.SendOptions = {"idempotency_key": idem}
+    result = resend.Emails.send(params, options)
 
     stmt = insert(EmailLog).values(
         idempotency_key=idem,
@@ -436,7 +434,7 @@ async def resend_webhook(req: Request):
         raise HTTPException(status_code=400, detail="invalid signature")
 
     recipient = (evt["data"]["to"][0] or "").lower()
-    if evt["type"] == "email.bounced" and evt["data"].get("bounce", {}).get("type") == "hard":
+    if evt["type"] == "email.bounced" and evt["data"].get("bounce", {}).get("type") == "Permanent":
         await suppress(recipient, reason="hard_bounce", message_id=evt["data"]["email_id"])
     elif evt["type"] == "email.complained":
         await suppress(recipient, reason="complaint", message_id=evt["data"]["email_id"])
@@ -601,7 +599,7 @@ app.MapPost("/api/resend/webhook", async (HttpRequest req, AppDb db, IConfigurat
 
     var evt = JsonSerializer.Deserialize<ResendEvent>(body)!;
     var recipient = evt.Data.To[0].ToLowerInvariant();
-    if (evt.Type == "email.bounced" && evt.Data.Bounce?.Type == "hard")
+    if (evt.Type == "email.bounced" && evt.Data.Bounce?.Type == "Permanent")
         await db.SuppressionList.Upsert(new() { Email = recipient, Reason = "hard_bounce" });
     else if (evt.Type == "email.complained")
         await db.SuppressionList.Upsert(new() { Email = recipient, Reason = "complaint" });
@@ -637,8 +635,9 @@ CREATE TABLE bounce_log (
   id                   BIGSERIAL PRIMARY KEY,
   provider_message_id  TEXT,
   recipient            TEXT NOT NULL,                  -- lowercased
-  bounce_type          TEXT NOT NULL,                  -- 'hard' | 'soft' | 'unknown'
-  diagnostic           TEXT,                           -- SMTP diagnostic code/message from provider
+  bounce_type          TEXT NOT NULL,                  -- Resend: 'Permanent' | 'Temporary' | 'unknown'
+  bounce_subtype       TEXT,                           -- Resend subType: 'Suppressed'|'MessageRejected'|'MailboxFull'|...
+  diagnostic           TEXT,                           -- SMTP diagnostic message from provider
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_bounce_log_recipient_created ON bounce_log (recipient, created_at DESC);
@@ -678,8 +677,18 @@ CREATE TRIGGER email_log_touch BEFORE UPDATE ON email_log
 # Verify SPF, DKIM, DMARC are configured before deploy. Fail closed.
 DOMAIN="${1:-send.yourapp.com}"
 dig +short TXT "$DOMAIN" | grep -q 'v=spf1' || { echo "missing SPF"; exit 1; }
-dig +short CNAME "resend._domainkey.$DOMAIN" || \
-  dig +short TXT "resend._domainkey.$DOMAIN" | grep -q 'v=DKIM1' || { echo "missing DKIM"; exit 1; }
+
+# DKIM: Resend issues THREE CNAMEs at RANDOMIZED selectors
+# (<token>._domainkey.$DOMAIN -> <token>.dkim.amazonses.com) — there is no fixed
+# 'resend._domainkey' selector to probe. Pin the exact selectors Resend gave you...
+for sel in "$DKIM_SELECTOR_1" "$DKIM_SELECTOR_2" "$DKIM_SELECTOR_3"; do
+  dig +short CNAME "${sel}._domainkey.$DOMAIN" | grep -q 'dkim.amazonses.com' \
+    || { echo "missing/incorrect DKIM CNAME: ${sel}._domainkey.$DOMAIN"; exit 1; }
+done
+# ...or, more robustly, assert the domain is 'verified' via the Resend API instead of DNS-guessing:
+#   curl -s -H "Authorization: Bearer $RESEND_API_KEY" \
+#        "https://api.resend.com/domains/$RESEND_DOMAIN_ID" | jq -e '.status=="verified"'
+
 dig +short TXT "_dmarc.$DOMAIN" | grep -E 'v=DMARC1.*p=(quarantine|reject)' || { echo "DMARC must be quarantine or reject"; exit 1; }
 echo "DNS OK for $DOMAIN"
 ```
@@ -745,7 +754,7 @@ The integrator uses `confidence` to weight findings — a high-confidence findin
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every missing-DKIM, missing-DMARC, unsigned-webhook, no-idempotency, suppression-bypass, or PII-leak finding emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

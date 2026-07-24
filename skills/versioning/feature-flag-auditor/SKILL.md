@@ -47,7 +47,7 @@ You are a hygiene-obsessed flag auditor. You assume every flag without an owner 
 - **Every flag has an owner AND a sunset date — no exceptions.** Flags without owners become orphans; orphaned flags become permanent; permanent flags become latent bugs. Bake `owner` and `sunset_date` into the flag-creation API so the platform refuses to create a flag without them.
 - **OpenFeature SDK > vendor-specific lock-in.** OpenFeature is a CNCF incubating project providing a vendor-agnostic API across LaunchDarkly, Statsig, PostHog, Flagsmith, Unleash, GrowthBook, ConfigCat, and self-hosted backends. Application code calls `OpenFeature.getClient()`; the provider plugin is swapped at boot. This decouples flag usage from billing/contract decisions and matters more in 2026 as vendor pricing models diverge sharply.
 - **Flag deletion via a cleanup CI job.** A scheduled job (nightly or weekly) does three things: (1) lists flags at 100% rollout for ≥ 30 days, (2) auto-opens a cleanup PR removing the flag check and the dead branch, (3) deletes the flag from the provider after the PR merges. Manual cleanup never happens at scale — automation is the only way.
-- **Kill-switch for every risky feature.** A kill-switch is a flag that defaults ON and can be flipped OFF in < 1 minute, no deploy required. Required for: payment paths, external API integrations, background jobs that can saturate a queue, anything that touches PII, anything that talks to an LLM. Pair the kill-switch with an alert that auto-flips it on error-rate spikes (LaunchDarkly Guarded Releases, Statsig Auto-Rollback).
+- **Kill-switch for every risky feature.** A kill-switch is a flag that defaults ON and can be flipped OFF in < 1 minute, no deploy required. Required for: payment paths, external API integrations, background jobs that can saturate a queue, anything that touches PII, anything that talks to an LLM. Pair the kill-switch with an alert that auto-flips it on error-rate spikes (LaunchDarkly Guarded rollouts, Statsig auto-rollback).
 - **Flag-as-test in dev/staging.** Both branches of every flag must be exercised by tests. CI runs the suite twice — once with the flag ON, once OFF — or uses a parameterized fixture. If a branch isn't tested, the flag is hiding untested code, not protecting you.
 - **Gradual rollout — 1% → 10% → 50% → 100%.** Each step requires a monitoring soak (typically minimum 24 h at low % so a daily-cycle bug shows up). Persistent assignment is mandatory: once a user is in the 10% cohort, they stay there as you ramp to 50% and 100%. Random reassignment on each evaluation destroys experiment validity and creates user-visible flicker.
 - **Naming convention is part of hygiene.** Pattern: `{type}-{team}-{feature}-{context}` e.g. `release-billing-annual-plans-2026q1`. Type one of: `release` (temporary deploy decoupling), `experiment` (A/B/n), `ops` (kill-switch / circuit breaker), `permission` (entitlement gating — these are legitimately long-lived).
@@ -101,13 +101,13 @@ const flagPatterns = [
   /OpenFeature\.getClient\(\)\.getBooleanValue\(['"]([^'"]+)['"]/gi,
   /openfeature\.get_client\(\)\.get_boolean_value\(['"]([^'"]+)['"]/gi,
 
-  // LaunchDarkly
+  // LaunchDarkly (flag key is the first string arg in every SDK)
   /ldClient\.(boolVariation|variation|stringVariation|jsonVariation)\(['"]([^'"]+)['"]/gi,
-  /LdClient\.Bool\(['"]([^'"]+)['"]/gi,
+  /\.BoolVariation\(['"]([^'"]+)['"]/gi,   // .NET server SDK: client.BoolVariation("key", context, default)
 
-  // Statsig
-  /Statsig\.checkGate\(['"]([^'"]+)['"]/gi,
-  /statsig_user\.get_config\(['"]([^'"]+)['"]/gi,
+  // Statsig — the user object is the FIRST arg, the gate/config name is the second
+  /Statsig\.checkGate\([^,]+,\s*['"]([^'"]+)['"]/gi,
+  /statsig\.(check_gate|get_config)\([^,]+,\s*['"]([^'"]+)['"]/gi,
 
   // PostHog
   /posthog\.isFeatureEnabled\(['"]([^'"]+)['"]/gi,
@@ -137,8 +137,8 @@ The auditor must recognize bad and good flag patterns in every language CTOC sup
 if (true) { await chargeCustomerAsync(invoice); }
 
 // BAD: vendor-locked direct LaunchDarkly call, flag name typed as string literal,
-// no fallback default if the SDK is offline
-if (ldClient.BoolVariation("new-checkout", userCtx)) { ... }
+// and the default is `true` — so if the SDK is offline the new path fails ON
+if (ldClient.BoolVariation("new-checkout", userCtx, true)) { ... }
 
 // SAFE: OpenFeature client; provider is configured once at startup so swapping
 // LaunchDarkly -> Statsig -> Flagsmith touches one file. Default is the OFF path,
@@ -207,7 +207,7 @@ boolean on = client.getBooleanValue(
 ```python
 # BAD: flag at 100% from creation, no rollout history, no owner tag, no sunset
 # This is a permission-gate disguised as a release flag.
-if flagsmith.has_feature("admin_panel"):
+if flagsmith.get_environment_flags().is_feature_enabled("admin_panel"):
     render_admin()
 
 # SAFE: explicit permission flag (long-lived by design), owner + entitlement check.
@@ -245,10 +245,10 @@ for row in rows:
 ### TypeScript (OpenFeature TS / LaunchDarkly Node + React SDK)
 
 ```typescript
-// BAD: vendor-locked import in every file, string-literal flag key,
-// no default value, no owner/sunset metadata in source.
-import { LDClient } from 'launchdarkly-node-server-sdk';
-const enabled = ldClient.variation('new-checkout', user);   // type: unknown
+// BAD: vendor-locked import in every file, string-literal flag key, untyped
+// `variation` (returns LDFlagValue), unsafe default `true`, no owner/sunset in source.
+import { LDClient } from '@launchdarkly/node-server-sdk';
+const enabled = await ldClient.variation('new-checkout', user, true);   // type: unknown
 
 // SAFE: OpenFeature client; the provider is registered once at bootstrap so
 // swapping vendors is a one-line change. Default value enforced.
@@ -264,7 +264,7 @@ const enabled = await client.getBooleanValue(
 ```typescript
 // BAD (React): flag read inside render with no memoization; flicker on re-render
 function Checkout() {
-  const enabled = client.getBooleanValueSync('release-checkout-new-2026q3', false);
+  const enabled = OpenFeature.getClient().getBooleanValue('release-checkout-new-2026q3', false);
   return enabled ? <NewCheckout /> : <OldCheckout />;
 }
 
@@ -380,8 +380,8 @@ The 2026 ecosystem split two ways: open-standard SDKs (OpenFeature, with provide
 
 | Tool | Strengths | Trade-offs | When |
 |------|-----------|-----------|------|
-| **OpenFeature SDK** | CNCF incubating; vendor-neutral API across LD/Statsig/PostHog/Flagsmith/Unleash/GrowthBook/ConfigCat; standard hooks for logging, tracing | Provider plugins vary in feature parity; some advanced provider features (LD guarded releases) are exposed via provider extension only | Always — application code calls OpenFeature, not the vendor SDK directly |
-| **LaunchDarkly** | Most complete platform; 25+ SDKs; guarded releases (auto-rollback on error spike); approval workflows; audit logs | Pricing scales with MAU and can climb steeply for mid-market deployments; verify current pricing tier before committing | Enterprise / regulated; teams that need approval workflows |
+| **OpenFeature SDK** | CNCF incubating; vendor-neutral API across LD/Statsig/PostHog/Flagsmith/Unleash/GrowthBook/ConfigCat; standard hooks for logging, tracing | Provider plugins vary in feature parity; some advanced provider features (LD guarded rollouts) are exposed via provider extension only | Always — application code calls OpenFeature, not the vendor SDK directly |
+| **LaunchDarkly** | Most complete platform; 25+ SDKs; guarded rollouts (auto-rollback on metric regression); approval workflows; audit logs | Pricing scales with MAU and can climb steeply for mid-market deployments; verify current pricing tier before committing | Enterprise / regulated; teams that need approval workflows |
 | **Statsig** | Built-in analytics + experimentation; auto-rollback on metric regression; generous free tier on flags | Less mature than LD on enterprise governance | Product-led teams running many experiments |
 | **PostHog Feature Flags** | Bundled with PostHog analytics, session replay, A/B testing; generous flag-request free tier | Best when you're already a PostHog analytics user | Startups that want one platform for analytics + flags |
 | **Flagsmith** | Open-source self-host or SaaS; low-latency edge API; clean OpenFeature provider | Smaller ecosystem than LD; advanced rules require the paid tier | Mobile / global apps where edge latency matters |
@@ -390,7 +390,7 @@ The 2026 ecosystem split two ways: open-standard SDKs (OpenFeature, with provide
 | **ConfigCat** | Flat-rate pricing (no MAU surprises); simple model | Smaller feature surface than LD/Statsig | Cost-conscious teams with predictable usage |
 
 Flag-cleanup automation:
-- **piranha** (Uber, OSS) — language-aware automated removal of stale flag branches; supports Java, Swift, Objective-C, Python, Kotlin, TS/JS.
+- **Piranha** (Uber, OSS) — language-aware automated removal of stale flag branches; its PolyglotPiranha engine targets the languages Uber uses, so check the repository for the current language list.
 - **flagd** — OpenFeature reference flag daemon; useful for self-hosted setups that want OpenFeature without a vendor.
 - **Custom CI cleanup job** — every 24 h, list flags at 100% for > 30 days from the provider API, open PRs that delete the flag check via codemod, merge after CI passes, then delete the flag from the provider via API.
 
@@ -399,21 +399,23 @@ OpenFeature pattern (apply once at boot, then never import a vendor SDK in app c
 ```typescript
 // bootstrap.ts — the ONLY file that imports a vendor SDK
 import { OpenFeature } from '@openfeature/server-sdk';
-import { LaunchDarklyProvider } from '@openfeature/launchdarkly-provider';
+import { LaunchDarklyProvider } from '@launchdarkly/openfeature-node-server';
 // To switch vendors later, change ONLY this file.
 await OpenFeature.setProviderAndWait(new LaunchDarklyProvider(process.env.LD_SDK_KEY!));
 ```
 
 ```python
-# bootstrap.py
+# bootstrap.py — app code never imports a vendor SDK; the provider is set here.
+# flagd is the OpenFeature reference daemon; swap it for any other provider's
+# constructor to change vendors without touching evaluation code.
 from openfeature import api
-from openfeature.contrib.provider.flagsmith import FlagsmithProvider
-api.set_provider(FlagsmithProvider(environment_key=os.environ["FLAGSMITH_ENV_KEY"]))
+from openfeature.contrib.provider.flagd import FlagdProvider
+api.set_provider(FlagdProvider())
 ```
 
 ## Severity (internal triage vs. refinement-loop output)
 
-The auditor's internal report uses triage tiers below to help humans prioritize. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. Triage tiers live in the report body only.
+The auditor's internal report uses triage tiers below to help humans prioritize. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. Triage tiers live in the report body only.
 
 Reconciliation rule: triage CRITICAL items (missing kill-switch on payment / PII / LLM paths, flag controlling auth with no rollout history) are surfaced in BOTH the triage report AND on the wire as `severity: critical`. Triage HIGH/MEDIUM/LOW items are surfaced in the triage report and still emitted to the wire as `severity: critical` — the on-wire field has only one tier. Only `confidence` (high / medium / low) differentiates urgency on the wire.
 
@@ -461,7 +463,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings — a 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every flag-hygiene finding (orphaned, missing sunset, missing owner, missing kill-switch, no rollout strategy, flag isolation missing) emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

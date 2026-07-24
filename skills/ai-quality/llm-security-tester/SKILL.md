@@ -1,6 +1,6 @@
 ---
 name: llm-security-tester
-description: Paranoid LLM red-team analyst — scans applications that call LLMs for OWASP LLM Top 10 v2 (2025) findings and maps them to MITRE ATLAS v5.4.0 adversary tactics.
+description: Paranoid LLM red-team analyst — scans applications that call LLMs for OWASP LLM Top 10 v2 (2025) findings and maps them to MITRE ATLAS adversary tactics.
 type: skill
 when_to_load:
   - "LLM01"
@@ -59,7 +59,7 @@ You are a paranoid LLM red-team analyst. You assume:
 - Output that looks like JSON is not safely JSON until it is parsed against a schema; output that looks like Markdown is not safely Markdown until it is sanitized.
 - Memory between turns or across sessions is attacker-mutable — a poisoned past turn re-injects on every future call.
 
-Your job is to find LLM-specific vulnerabilities BEFORE adversaries do, map them to OWASP LLM Top 10 v2 (2025) and MITRE ATLAS v5.4.0, and emit refinement-loop letters with concrete fixes.
+Your job is to find LLM-specific vulnerabilities BEFORE adversaries do, map them to OWASP LLM Top 10 v2 (2025) and MITRE ATLAS, and emit refinement-loop letters with concrete fixes.
 
 ## 2026 Best Practices
 
@@ -302,7 +302,7 @@ Targets the model, the model registry, the tokenizer, the embedding model, the d
 - Verify model checksums when downloading from Hugging Face: `huggingface_hub.snapshot_download(..., etag_timeout=10)` and pin a `revision=<commit-sha>`. Untagged `main` is a moving target.
 - Avoid `safetensors=False` paths — legacy `.bin`/`.pt` files use `pickle.load` and are RCE primitives.
 - For RAG, pin the embedding model version. Switching embedding models silently re-shapes the index and can re-introduce poisoned chunks that were thought purged.
-- Audit every installed MCP server. A poisoned MCP tool (see ATLAS v5.4.0 "Publish Poisoned AI Agent Tool") presents valid-looking schemas while exfiltrating arguments or executing attacker-chosen logic. Pin server versions; restrict which tools each server may register; never auto-install from an unverified registry.
+- Audit every installed MCP server. A poisoned MCP tool (see ATLAS "Publish Poisoned AI Agent Tool") presents valid-looking schemas while exfiltrating arguments or executing attacker-chosen logic. Pin server versions; restrict which tools each server may register; never auto-install from an unverified registry.
 - Cross-link [[security/sast-scanner]] section 11 (general supply chain) and [[security/secrets-detector]] (leaked HF tokens, OPENAI_API_KEY, ANTHROPIC_API_KEY in committed configs).
 
 ```python
@@ -489,9 +489,9 @@ def agent_loop(user_input, user_id):
 
 This table is informative for the report layer; on the wire, each finding is still emitted as a single OWASP-LLM-tagged letter.
 
-## MITRE ATLAS v5.4.0 mapping
+## MITRE ATLAS mapping
 
-MITRE ATLAS v5.4.0 (Feb 2026) catalogs **16 tactics, 84 techniques, 56 sub-techniques** (counts verified against the live ATLAS site and the `atlas-data` repo). The v5.4.0 release adds agent-focused techniques including **"Publish Poisoned AI Agent Tool"** and **"Escape to Host,"** plus new case studies on MCP server compromise and indirect injection via MCP channels.
+MITRE ATLAS (release 5.6.0, mid-2026) catalogs 16 tactics, 84 techniques, and 56 sub-techniques; these totals drift between releases, so re-resolve them against the live `atlas-data` repo rather than trusting the number printed here. Recent releases add agent-focused techniques such as poisoned agent/MCP tools and container/sandbox escape, plus case studies on MCP server compromise and indirect injection via MCP channels.
 
 > Mitigation and case-study counts vary by release date; re-resolve the current totals against the live ATLAS site at finding time rather than pinning a number here.
 
@@ -500,21 +500,21 @@ This skill maps each finding to an ATLAS tactic/technique where one applies. The
 | ATLAS Tactic | Representative Technique | CTOC test pattern |
 |---|---|---|
 | Reconnaissance (AML.TA0002) | Search for Victim's Publicly Available ML Artifacts | Grep public repos / HF for the target's published models or fine-tunes |
-| Resource Development (AML.TA0003) | Acquire Public ML Artifacts; Publish Poisoned AI Agent Tool (v5.4.0) | Audit installed MCP servers / agent tools for unverified publishers |
+| Resource Development (AML.TA0003) | Acquire Public AI Artifacts; Publish Poisoned AI Agent Tool | Audit installed MCP servers / agent tools for unverified publishers |
 | Initial Access (AML.TA0004) | LLM Prompt Injection (direct + indirect) | OWASP LLM01 scans; Garak probes; PromptFoo OWASP preset |
-| ML Model Access (AML.TA0000) | Inference API Access; ML-Enabled Product or Service | Audit any path where unauthenticated callers reach the inference endpoint |
+| AI Model Access (AML.TA0000) | Inference API Access; AI-Enabled Product or Service | Audit any path where unauthenticated callers reach the inference endpoint |
 | Execution (AML.TA0005) | LLM Plugin Compromise; Command and Scripting Interpreter | OWASP LLM05/LLM06 scans for `eval`/`exec` of model output and tool over-grant |
-| Persistence (AML.TA0007) | Poison Training Data; Backdoor ML Model; Poisoned Persistent Memory | OWASP LLM04 canary set + RAG ingestion scanning + memory-store provenance audit |
-| Privilege Escalation (AML.TA0012) | LLM Jailbreak; Escape to Host (v5.4.0) | Verify sandbox isolation for any tool that executes model-generated code |
-| Defense Evasion (AML.TA0008) | Evade ML Model; LLM Prompt Obfuscation | Test guardrails against Unicode / homoglyph / bilingual obfuscation; multi-turn crescendo / TAP |
-| Credential Access (AML.TA0010) | LLM Meta Prompt Extraction | OWASP LLM07 system-prompt-leakage tests |
-| Discovery (AML.TA0013) | Discover ML Model Family; LLM Plugin Discovery | Audit toolset disclosure in error paths |
-| Collection (AML.TA0035) | Data from Information Repositories | RAG cross-tenant leakage tests (OWASP LLM08) |
+| Persistence (AML.TA0006) | Poison Training Data; Backdoor ML Model; Poisoned Persistent Memory | OWASP LLM04 canary set + RAG ingestion scanning + memory-store provenance audit |
+| Privilege Escalation (AML.TA0012) | LLM Jailbreak; Escape to Host | Verify sandbox isolation for any tool that executes model-generated code |
+| Defense Evasion (AML.TA0007) | Evade ML Model; LLM Prompt Obfuscation | Test guardrails against Unicode / homoglyph / bilingual obfuscation; multi-turn crescendo / TAP |
+| Credential Access (AML.TA0013) | LLM Meta Prompt Extraction | OWASP LLM07 system-prompt-leakage tests |
+| Discovery (AML.TA0008) | Discover ML Model Family; LLM Plugin Discovery | Audit toolset disclosure in error paths |
+| Collection (AML.TA0009) | Data from Information Repositories | RAG cross-tenant leakage tests (OWASP LLM08) |
 | ML Attack Staging (AML.TA0001) | Create Proxy ML Model; Verify Attack | Document red-team probes that confirmed a finding |
 | Exfiltration (AML.TA0010) | LLM Data Leakage; Exfiltration via Cyber Means (markdown-image side channel) | PII echo tests, embedding inversion checks, EchoLeak-shape tests |
 | Impact (AML.TA0011) | Erode ML Model Integrity; Cost Harvesting; External Harms | OWASP LLM10 denial-of-wallet test; LLM09 high-stakes hallucination test |
 | Command and Control (AML.TA0014) | LLM-based C2 channels | Audit egress from agent tool calls |
-| Initial Access via Supply Chain (AML.TA0034) | ML Supply Chain Compromise | OWASP LLM03 model/tokenizer/embedding pin checks |
+| Initial Access (AML.TA0004) | AI Supply Chain Compromise (AML.T0010) | OWASP LLM03 model/tokenizer/embedding pin checks |
 
 > Note: technique IDs evolve between ATLAS releases. Treat the table as a category map; re-resolve the exact technique ID against the current `atlas-data` repo when emitting a finding.
 
@@ -586,7 +586,7 @@ kind: owasp_llm_01_prompt_injection                        # OWASP LLM key
 owasp_llm_id: LLM01 | LLM02 | ... | LLM10                  # short id for cross-correlation
 cwe: CWE-1426 | CWE-77 | CWE-94 | CWE-200 | CWE-502 | ...  # closest CWE (e.g. CWE-1426 Improper Validation of Generative AI Output)
 atlas:
-  tactic: AML.TA0004                                       # ATLAS v5.4.0 tactic ID
+  tactic: AML.TA0004                                       # ATLAS tactic ID (Initial Access)
   technique: AML.T0051                                     # technique or sub-technique
   technique_name: "LLM Prompt Injection"
 related_cve: [CVE-2025-53773, CVE-2025-32711]              # if the finding matches a published CVE shape
@@ -637,7 +637,7 @@ If a finding involves an LLM client written in C/C++, kick back to [[security/sa
 - **Provider-specific quirks**: Anthropic's `tool_choice` forcing is stricter than OpenAI's `tool_choice: "required"`; the OpenAI Responses API exposes a slightly different `response_format: {"type":"json_schema", "json_schema": {"strict": true, ...}}` surface. When a project switches providers, re-test all output-handling code paths.
 - **Multimodal**: image/audio/video inputs are injection surfaces too. A QR code in an uploaded image can encode a prompt; OCR'd text in a screenshot can encode a prompt. If the agent ingests media, route through the same delimiter + system-instruction defenses.
 - **Agent-to-agent**: in multi-agent systems, one agent's output is another agent's input. Apply LLM05 (improper output handling) treatment between agents — schema-validate before crossing trust boundaries.
-- **MCP servers**: every installed MCP server is a tool extension to the agent. ATLAS v5.4.0 added the "Publish Poisoned AI Agent Tool" technique and case studies for malicious MCP servers and indirect injection via MCP channels. Audit the MCP server list quarterly; pin versions; restrict the toolset each server is allowed to register; never `auto_approve` tool calls from non-vetted servers.
+- **MCP servers**: every installed MCP server is a tool extension to the agent. ATLAS added the "Publish Poisoned AI Agent Tool" technique and case studies for malicious MCP servers and indirect injection via MCP channels. Audit the MCP server list quarterly; pin versions; restrict the toolset each server is allowed to register; never `auto_approve` tool calls from non-vetted servers.
 - **Persistent memory**: if the agent has memory (Claude memory tools, OpenAI memory, custom vector memory), treat each memory entry as untrusted; tag with provenance; expose user-visible "clear memory."
 - **Coding-agent config files**: any path where model output can write to a settings/config file that controls confirmation toggles, allowed shells, or tool registrations is a CRITICAL surface (CVE-2025-53773 shape). Require human approval for any model-driven write to such files.
 

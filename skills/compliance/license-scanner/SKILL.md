@@ -41,7 +41,7 @@ You are a license-compliance analyst. You scan the dependency graph (direct + tr
 - **SBOM-driven license tracking.** License compliance and dependency-vulnerability auditing share one SBOM. Generate CycloneDX or SPDX SBOMs in CI; the license scanner reads the SBOM rather than re-resolving the graph. Cross-link with [[dependency-auditor]] — same input graph, two lenses: vulnerabilities (CVEs) live with the auditor; license obligations live here. Never duplicate findings across the two skills.
 - **Legal review gate on new dependencies.** Any new direct dep whose license is not on the cached allowlist halts the PR until legal/policy owner signs off. Cache the decision keyed on `(package, version, license_spdx)` so the second PR with the same dep passes silently.
 - **Track commercial licenses separately.** Paid/commercial deps (datasets, fonts, SDKs, BSL-licensed databases) belong in a `commercial-licenses.yaml` ledger with renewal date, scope, and contract reference — not in the OSS scanner output. Mixing them produces noise.
-- **License drift after upgrade is a finding, not a warning.** When a dep's license changes between versions (e.g. Elasticsearch 7→8 SSPL pivot, Redis 7→7.4 RSALv2/SSPL pivot, Terraform → BSL), the scanner emits a `critical` letter. License drift on a transitive dep can silently change the host product's obligations.
+- **License drift after upgrade is a finding, not a warning.** When a dep's license changes between versions (e.g. Elasticsearch 7.10→7.11 Apache-2.0→SSPL/Elastic-License pivot, Redis 7→7.4 RSALv2/SSPL pivot, Terraform → BSL), the scanner emits a `critical` letter. License drift on a transitive dep can silently change the host product's obligations.
 - **Continuous compliance over point-in-time audits.** Run on every PR with diff-mode (only new/changed deps). Full scans run nightly. Audit-grade scans (FOSSA/Black Duck) run pre-release.
 - **Attribution is not optional.** Apache-2.0 requires NOTICE preservation; MIT/BSD require copyright notice retention in distributed software. Generate the attribution bundle in CI and ship it with the release artifact. SBOM + LICENSE/NOTICE bundle = audit-ready.
 
@@ -136,9 +136,9 @@ pip install -r requirements.txt && pip-licenses --format=json
 ### Java / Kotlin (Maven / Gradle)
 ```bash
 # Maven — licensescan-maven-plugin asserts and fails the build
-mvn org.carlomorelli:licensescan-maven-plugin:audit -DfailBuildOnViolation=true
+mvn com.github.carlomorelli:licensescan-maven-plugin:audit -DfailBuildOnViolation=true
 # Alternative: license-maven-plugin (chonton) for compliance check + report
-mvn org.honton.chas:license-maven-plugin:check
+mvn org.honton.chas:license-maven-plugin:compliance
 # Gradle — com.github.jk1.dependency-license-report
 ./gradlew generateLicenseReport
 ```
@@ -169,8 +169,9 @@ cargo deny check licenses          # uses deny.toml allow/deny lists
 Example `deny.toml` skeleton:
 ```toml
 [licenses]
+# cargo-deny >= 0.16 is allow-only: the `deny` list was removed, and every license
+# absent from `allow` (GPL, AGPL, SSPL, BUSL, …) is denied implicitly.
 allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Apache-2.0 WITH LLVM-exception"]
-deny  = ["GPL-2.0", "GPL-3.0", "AGPL-3.0", "SSPL-1.0", "BUSL-1.1"]
 confidence-threshold = 0.93
 ```
 
@@ -301,7 +302,7 @@ Recommended baseline: per-ecosystem CLI on every PR (diff-mode, fast) + a SaaS o
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used in the human-readable report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule — see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md). The triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used in the human-readable report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule — see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md). The triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |---|---|---|
@@ -345,7 +346,7 @@ The integrator uses `confidence` to weight findings — a `confidence: low` infe
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every license-policy violation, missing-attribution gap, unknown-license dep, and license-drift event emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

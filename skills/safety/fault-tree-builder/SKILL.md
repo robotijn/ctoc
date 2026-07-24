@@ -34,7 +34,7 @@ effort_budget:
 # Fault Tree Builder (skill)
 
 > New in CTOC v6.9.27 — Cluster 3 (Risk Analysis Before Build). Activated when the `fault_tree_analysis` control is enabled (ISO 26262 ASIL D, RTCA DO-178C Level A, IEC 62304 Class C, IEC 61508 SIL 3) or when a plan declares `criticality: high`.
-> Fault Tree Analysis is the **top-down deductive** companion to the **bottom-up inductive** [[safety/fmeda-analyzer]]. The Creately reference at https://creately.com/guides/fmea-vs-fault-tree-analysis/ frames the distinction: Failure Modes Effects Analysis enumerates outward from each component, Fault Tree Analysis traces inward from a single undesired event.
+> Fault Tree Analysis is the **top-down deductive** companion to the **bottom-up inductive** [[safety/fmeda-analyzer]]: Failure Modes Effects Analysis enumerates outward from each component, Fault Tree Analysis traces inward from a single undesired event.
 
 ## Role
 
@@ -56,8 +56,8 @@ If none of those is true the skill is inert.
 
 - **Fault Tree Analysis is deductive.** Start at the undesired top event and ask "what events, in combination, could cause this?" Each layer answers that question for the layer above. Stop when the events are independent and quantifiable — those are the basic events. Compare to Failure Modes Effects Analysis (inductive: start at the component, ask "what failures of this part could cause harm?") and STRIDE / threat-modeling (also inductive: start at the data flow, ask "what threat applies here?"). The three views are complementary; the FTA view is what reveals minimal cut sets.
 - **The minimal cut set is the load-bearing artifact.** A minimal cut set is the smallest combination of basic events whose joint occurrence produces the top event. Cut sets of size one are single points of failure and demand redundancy. Cut sets of size two with high-probability or correlated basic events are the next priority. Cut sets of size three or larger with independent low-probability events are typically acceptable.
-- **Quantitative versus qualitative is a choice, not a default.** ISO 26262 Part 9 and IEC 61025 both permit qualitative Fault Tree Analysis when failure-rate data are unavailable or when the goal is structural rather than probabilistic. Quantitative analysis multiplies basic-event probabilities through the AND and OR gates and produces a top-event probability that can be compared against the safety goal's Tolerable Hazard Rate (per IEC 61508) or the Probabilistic Metric for Hardware Failures (per ISO 26262 Part 5).
-- **Common-cause basic events break independence.** The same warning that applies to Failure Modes Effects and Diagnostic Analysis applies here: two basic events that share a power rail, a clock, a temperature, an operating-system kernel, a third-party library, or a supplier lot are NOT independent. The cut-set probability for correlated basic events is dominated by the common-cause factor (the beta-factor in IEC 61508 Part 6), not by the product of independent rates. The 2024 Analog Devices application note "Mitigation of Common-Cause Failures in Safety-Critical Systems" is the authoritative reminder.
+- **Quantitative versus qualitative is a choice, not a default.** ISO 26262 Part 9 and IEC 61025 both permit qualitative Fault Tree Analysis when failure-rate data are unavailable or when the goal is structural rather than probabilistic. Quantitative analysis combines basic-event probabilities through the gate logic — a product at each AND gate, and one minus the product of the complements (approximated by the sum of cut-set probabilities for rare, independent events) at each OR gate — and produces a top-event probability that can be compared against the safety goal's Tolerable Hazard Rate (per IEC 61508) or the Probabilistic Metric for random Hardware Failures (per ISO 26262 Part 5).
+- **Common-cause basic events break independence.** The same warning that applies to Failure Modes Effects and Diagnostic Analysis applies here: two basic events that share a power rail, a clock, a temperature, an operating-system kernel, a third-party library, or a supplier lot are NOT independent. The cut-set probability for correlated basic events is dominated by the common-cause factor (the beta-factor in IEC 61508 Part 6), not by the product of independent rates. IEC 61508 Part 6 Annex D gives the scored beta-factor method for quantifying that dependence.
 - **Gates are documented, not assumed.** Every AND gate makes an independence assumption that must be defended in the tree. Every OR gate is generous to the attacker / failure (any single branch suffices); generosity is fine, but the analyst documents which independence assumption justifies the gate type.
 - **Tree must be re-run on architecture change.** ISO 26262 Part 8 Clause 7 (Change Management). A new component, a new safety mechanism, a removed redundancy, or a changed Fault Tolerant Time Interval all invalidate the tree. The artifact carries an `architecture_hash` so drift is detectable.
 
@@ -145,7 +145,7 @@ The skill is allowed to emit qualitative trees (no `failure_in_time` values, no 
 |---|---|---|---|
 | AND | flat-bottomed shield | All input events must occur for the output to occur | Redundancy is in place; both channels must fail |
 | OR | curved-bottomed shield | Any single input event suffices | The output has multiple independent failure paths |
-| VOTING (k-out-of-n) | diamond with k/n label | At least k of n inputs must occur | Two-out-of-three voting redundancy; majority-vote safety systems |
+| VOTING (k-out-of-n) | gate glyph carrying a k/n vote label | At least k of n inputs must occur | Two-out-of-three voting redundancy; majority-vote safety systems |
 | INHIBIT | hexagon | Output occurs when input occurs AND the inhibit condition is true | Demand-based events: hazard occurs only when a triggering condition is present |
 | PRIORITY-AND | flat-bottomed shield with arrow | All inputs must occur in a specified order | Sequence-dependent failures (event A must precede event B) |
 | EXCLUSIVE-OR | curved-bottomed shield with circle | Exactly one input occurs | Mutually-exclusive failure modes |
@@ -160,7 +160,7 @@ The minimal cut-set computation follows the standard recursive algorithm (Vesely
 2. Replace each AND with a Cartesian product of its children's cut sets.
 3. Eliminate non-minimal cut sets (any cut set that strictly contains another).
 
-The result is the set of minimal cut sets. For trees with more than approximately twenty basic events, the analyst SHOULD use a verified tool (Open-FTA, SAPHIRE, RiskSpectrum, Isograph FaultTree+) rather than computing by hand; the skill flags this as `open_items: tool_qualification_required` when the tree exceeds the manual-analysis threshold.
+The result is the set of minimal cut sets. For trees with more than approximately twenty basic events, the analyst SHOULD use a verified tool (OpenFTA, SAPHIRE, RiskSpectrum, Isograph FaultTree+) rather than computing by hand; the skill flags this as `open_items: tool_qualification_required` when the tree exceeds the manual-analysis threshold.
 
 ## BAD versus SAFE examples by language
 
@@ -338,10 +338,13 @@ from pathlib import Path
 
 def cut_sets(tree: Dict, node_id: str) -> Set[FrozenSet[str]]:
     """Return the set of cut sets that imply node_id."""
-    node = tree["gates"].get(node_id) or tree["basic_events"].get(node_id)
+    # The YAML lists gates and basic_events as sequences; index them by id.
+    gates = {g["id"]: g for g in tree["gates"]}
+    basics = {b["id"]: b for b in tree["basic_events"]}
+    node = gates.get(node_id) or basics.get(node_id)
     if node is None:
         raise KeyError(node_id)
-    if node_id in tree["basic_events"]:
+    if node_id in basics:
         return {frozenset({node_id})}
     kind = node["kind"]
     children = node["children"]
@@ -432,7 +435,6 @@ observed: <e.g., 4.2e-8 per hour>
 message: <one-sentence summary>
 suggested_fix: <concrete remediation>
 references:
-  - https://creately.com/guides/fmea-vs-fault-tree-analysis/                           # methodology comparison
   - https://www.nrc.gov/docs/ML1007/ML100780465.pdf                                    # NUREG-0492 Fault Tree Handbook
   - https://webstore.iec.ch/publication/4311                                           # IEC 61025 Fault tree analysis
   - https://www.iso.org/standard/68391.html                                            # ISO 26262 Part 9 (Automotive Safety Integrity Level oriented and safety oriented analyses)
@@ -441,8 +443,8 @@ references:
 ## Special Considerations
 
 - **Fault trees do not enumerate every conceivable failure.** They enumerate the failures that, by the design's own logic, reach the chosen top event. Failures that are out of scope of the safety goal are out of scope of the tree. Document the scope boundary explicitly so reviewers understand what the tree is silent about.
-- **The 2024 Analog Devices common-cause guidance is canon.** Two basic events that share a power rail, a clock, a supplier batch, a third-party library version, an algorithm, or an operator are NOT independent. The AND gate above them is misleading. The mitigation is either to break the shared boundary (segregation) or to apply a common-cause factor (beta-factor in IEC 61508 Part 6 Annex D, typically five to twenty-five percent).
-- **Tool qualification matters at scale.** Trees with more than approximately twenty basic events SHOULD use a tool-qualified Fault Tree Analysis package. Open-FTA, SAPHIRE, RiskSpectrum, and Isograph FaultTree+ are the common ones; the project's Tool Confidence Level record (controlled by `tool_qualification`) MUST list whichever is used.
+- **Common-cause dependence defeats the AND gate.** Two basic events that share a power rail, a clock, a supplier batch, a third-party library version, an algorithm, or an operator are NOT independent. The AND gate above them is misleading. The mitigation is either to break the shared boundary (segregation) or to apply a common-cause factor (beta-factor in IEC 61508 Part 6 Annex D, typically a few percent for well-separated, diverse channels rising toward the tens of percent as separation and diversity are lost).
+- **Tool qualification matters at scale.** Trees with more than approximately twenty basic events SHOULD use a tool-qualified Fault Tree Analysis package. OpenFTA, SAPHIRE, RiskSpectrum, and Isograph FaultTree+ are the common ones; the project's Tool Confidence Level record (controlled by `tool_qualification`) MUST list whichever is used.
 - **Reuse basic events across trees.** The same component-level basic event appears in multiple trees (one per top event). Keep the basic-event identifier stable and the failure-in-time values consistent with the FMEDA so that the two views never disagree about the same component.
 - **Quantitative is not always better.** A qualitative tree that exposes the structural single-point failure is more valuable than a quantitative tree that buries the same single-point in an averaged probability. Both views exist for a reason.
 
@@ -450,7 +452,7 @@ references:
 
 ## Refinement Loop — critic mode
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every missing tree, undefended single-point, missing independence argument, unanalysed common-cause, FTA / FMEDA inconsistency, Tolerable Hazard Rate miss, and stale tree emits as `severity: critical` in the letter to CTO Chief.
 - Findings block phase advancement until resolved or explicitly waived in the plan's `## Decisions Taken Under Ambiguity` section, with the IV and V signature attached.

@@ -126,7 +126,7 @@ await expect(page).toHaveScreenshot('checkout.png', {
 | **Chromatic (Storybook)** | Story-based VR; reviewer UI; per-component baselines; managed cloud storage; cross-browser | Storybook-tied; paid above free tier | Design systems · component libraries |
 | **Percy (BrowserStack)** | Cloud rendering; DOM-capture for determinism; AI diffing; integrates with Cypress/Playwright/Selenium | Paid above free tier (5k snapshots/mo on free) | Page-level VR with team review workflow |
 | **Lost Pixel** | Open-source; Docker-first; Storybook + page modes; self-hosted option | Smaller ecosystem; you operate the storage backend | OSS-only stacks; air-gapped projects |
-| **Applitools Eyes** | Visual AI (match levels: Strict/Layout/Content/Dynamic); Storybook addon (Eyes 10.22, Jan 2026); Figma plugin for design-vs-prod | Paid; learning curve for match-level tuning | Enterprise; design-system+brand QA; cross-device |
+| **Applitools Eyes** | Visual AI (match levels: Strict/Layout/Content/Dynamic); Storybook addon; Figma plugin for design-vs-prod | Paid; learning curve for match-level tuning | Enterprise; design-system+brand QA; cross-device |
 | **Cypress `cypress-image-snapshot` / `@percy/cypress`** | Native Cypress integration | Cypress single-browser-at-a-time model; baselines per browser must be wired manually | Existing Cypress test suites |
 | **BackstopJS** | Mature OSS; Docker-rendered references; HTML report | Older API surface; CSS selectors only; less momentum than Playwright/Chromatic in 2026 | Legacy projects already on Backstop |
 | **Storybook + Chromatic** | Component-first; auto-snapshots each story; built by the Storybook team | Storybook-required | Component-library-driven teams |
@@ -328,7 +328,7 @@ Then open the resulting PR — a human reviewer (not a bot) approves the new bas
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used for the human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see `agents/_shared/warnings-are-critical.md`) — there is no soft tier on the wire. Triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used for the human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. Triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |-------|----------|--------|
@@ -376,7 +376,7 @@ The integrator uses `confidence` and `delta_to_baseline` to weight findings — 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

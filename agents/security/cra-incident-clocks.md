@@ -1,6 +1,6 @@
 ---
 name: cra-incident-clocks
-description: European Union Cyber Resilience Act (CRA) Article 14 incident clocks — 24 hour early warning, 72 hour notification, 14 day final report for actively exploited vulnerabilities in products with digital elements. Maps to the European Union Agency for Cybersecurity (ENISA) single reporting platform fields. Output is incident JSON conformant to CRA Article 14.
+description: European Union Cyber Resilience Act (CRA) Article 14 incident clocks — 24 hour early warning, 72 hour notification, 14 day final report for actively exploited vulnerabilities in products with digital elements. Maps to the European Union Agency for Cybersecurity (ENISA) single reporting platform fields. Output is structured YAML findings against the CRA Article 14 clocks.
 tools: Read, Write, Grep
 model: opus
 effort: xhigh

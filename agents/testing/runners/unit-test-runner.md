@@ -15,7 +15,7 @@ target_skill: testing/runners/unit-test-runner
 
 ## Role
 
-You run the test suite and report results. This is part of Step 13 (VERIFY) - the quality gate that must pass before documentation and final review.
+You run the test suite and report results. This is part of Step 14 (VERIFY) - the quality gate that must pass before documentation and final review.
 
 ## Test Commands by Language
 
@@ -72,13 +72,22 @@ cargo test -- --nocapture
    - Total execution time
    - Slow tests (> 1s)
 
-## Coverage Thresholds
+## Coverage Threshold
 
-| Metric | Minimum | Target |
-|--------|---------|--------|
-| Line Coverage | 70% | 85% |
-| Branch Coverage | 60% | 75% |
-| New Code | 80% | 90% |
+There is no hardcoded coverage number. Read the enforced floor from
+`.ctoc/coverage-baseline.json` (`minPct`) and compare the measured line coverage
+against it. That file is the single source of truth and a ratchet — it may only be
+raised as coverage improves, never lowered to make a run pass.
+
+- **Project floor**: `.ctoc/coverage-baseline.json` `minPct`. When no baseline file
+  exists, and only then, `80` is the default.
+- **New code at review**: held to `>= 80%` (Iron Loop Step 14).
+- Scope coverage to the source tree the baseline was measured against (for this
+  project, `src/**`); an unscoped denominator inflated by every transitively loaded
+  file reports a meaningless number.
+
+Report the measured line coverage next to the floor you read, and BLOCK if it is
+below the floor.
 
 ## Output Format
 
@@ -97,11 +106,10 @@ cargo test -- --nocapture
 | Skipped | 0 |
 
 ### Coverage
-| Metric | Value | Threshold |
-|--------|-------|-----------|
-| Line | 87% | 70% ✅ |
-| Branch | 72% | 60% ✅ |
-| New Code | 94% | 80% ✅ |
+| Metric | Value | Floor (source) | Result |
+|--------|-------|----------------|--------|
+| Line | 99.4% | 99 (`.ctoc/coverage-baseline.json`) | ✅ |
+| New Code | 94% | 80 (review) | ✅ |
 
 ### Failed Tests (2)
 1. `test_user_authentication`
@@ -130,7 +138,7 @@ Fix the 2 failing tests before commit.
 
 ## Zero Tolerance: Skipped Tests
 
-**0 skipped tests allowed.** This is a BLOCKING rule at Step 13 (VERIFY).
+**0 skipped tests allowed.** This is a BLOCKING rule at Step 14 (VERIFY).
 
 | Situation | Action |
 |-----------|--------|
@@ -138,21 +146,24 @@ Fix the 2 failing tests before commit.
 | Test is obsolete | DELETE IT |
 | Platform-specific | Use conditional skip with explicit reason ONLY |
 
-Valid skip (the ONLY exception):
+Valid skip (the ONLY exception) — a conditional skip with an explicit reason.
+`test.skip`'s first argument is the test NAME, not a condition; the conditional
+form is `test.skipIf(condition)` in Vitest (Jest has no built-in conditional skip —
+guard with `(condition ? test.skip : test)(name, fn)`):
 ```javascript
-test.skip(os !== 'linux', 'Linux-only feature');
+// Vitest: skip only where the feature cannot run
+test.skipIf(process.platform !== 'linux')('Linux-only feature', () => { /* ... */ });
 ```
 
-Invalid skips (BLOCKING - Step 13 will fail):
+Invalid skips (BLOCKING - Step 14 will fail):
 ```javascript
-test.skip('TODO: fix later');       // NOT ALLOWED
-test.skip();                         // NOT ALLOWED
-it.skip('some test', () => { ... }); // NOT ALLOWED without platform reason
+test.skip('TODO: fix later', () => { ... }); // unconditional skip, no platform reason — NOT ALLOWED
+it.skip('some test', () => { ... });          // NOT ALLOWED without a platform condition + reason
 ```
 
 ## Zero Tolerance: Flaky Tests
 
-**0 flaky tests allowed.** This is a BLOCKING rule at Step 13 (VERIFY).
+**0 flaky tests allowed.** This is a BLOCKING rule at Step 14 (VERIFY).
 
 If a test fails intermittently:
 1. Retry up to 2 times automatically
@@ -188,8 +199,8 @@ If a test fails intermittently:
    // BAD
    if (!process.env.DB_URL) return;
 
-   // GOOD
-   test.skip(!process.env.DB_URL, 'Requires DB_URL environment variable');
+   // GOOD (Vitest): conditional skip with an explicit reason in the name
+   test.skipIf(!process.env.DB_URL)('requires DB_URL environment variable', () => { /* ... */ });
    ```
 
 3. **Fixtures must fail loudly**

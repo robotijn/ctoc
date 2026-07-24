@@ -43,11 +43,11 @@ You validate that health-check endpoints and orchestrator probes are correctly p
 - **Three distinct probes, three distinct semantics.** Kubernetes documents `livenessProbe` / `readinessProbe` / `startupProbe` as three independent controllers — Spring Boot 4 ships liveness and readiness enabled by default and exposes them at `/actuator/health/liveness` and `/actuator/health/readiness`; the same `/livez` and `/readyz` convention is now first-class via `management.endpoint.health.probes.add-additional-paths=true`. A single `/health` endpoint that conflates the three is an anti-pattern.
   - **/livez (liveness)** — "is the process alive enough to be worth keeping?" Shallow. No I/O, no DB, no downstream calls. Failure → kubelet restarts the container.
   - **/readyz (readiness)** — "can I serve a request right now?" Deeper. May check critical dependencies (DB, cache, queue) the request path requires. Failure → kubelet removes the pod from the Service endpoints; **no restart**.
-  - **/startupz (startup)** — "have I finished initializing?" Runs once at boot. Liveness and readiness do not execute until the startup probe succeeds, so slow-starting JVM / .NET apps are not killed mid-warmup. Required for any app whose cold-start exceeds `initialDelaySeconds` of the liveness probe.
+  - **/startupz (startup)** — "have I finished initializing?" Polls during the startup window (up to `failureThreshold` × `periodSeconds`) until it first succeeds, then stops running. Liveness and readiness do not execute until the startup probe succeeds, so slow-starting JVM / .NET apps are not killed mid-warmup. Required for any app whose cold-start exceeds `initialDelaySeconds` of the liveness probe.
 - **Never put a DB / external-service check in liveness.** This is the most common and most dangerous health-check bug. When the DB blips, every replica fails liveness simultaneously, kubelet restarts them all, the restart storm prevents recovery, and the outage extends. The DB check belongs in readiness — failed readiness pulls the pod from the LB but does not restart it; when the DB recovers, traffic resumes automatically. (Kubernetes docs explicitly warn: "Incorrect implementation of liveness probes can lead to cascading failures.")
 - **Graceful shutdown with `preStop` + `terminationGracePeriodSeconds`.** SIGTERM and endpoint deregistration are not synchronous — kube-proxy/iptables may still route traffic to a Pod for several seconds after termination begins. The fix: a `preStop` hook (`sleep 10` or a deregister script) so the Pod stops appearing in Service endpoints **before** the application starts shutting down. Set `terminationGracePeriodSeconds` ≥ (preStop sleep + max in-flight request duration + drain time). Default is 30s; raise it if your preStop sleep is long. JVM `server.shutdown=graceful` + `spring.lifecycle.timeout-per-shutdown-phase` must be **shorter than** `terminationGracePeriodSeconds`, or SIGKILL fires before drain completes.
 - **Idempotent and unauthenticated.** Probes are called every `periodSeconds` (default 10s) forever. The handler MUST be idempotent (no side effects), MUST NOT require auth (kubelet has no credentials), and MUST be cheap (< 100ms for liveness, < 500ms for readiness). Auth on a k8s probe endpoint is an anti-pattern — kubelet will receive 401, mark unhealthy, restart-loop. Use network policy / authorization webhooks to restrict probe paths, not in-app auth.
-- **RFC 9457 problem-detail body on unhealthy responses.** When the endpoint returns non-2xx, emit `Content-Type: application/problem+json` with `{type, title, status, detail, instance}` per RFC 9457 (successor to RFC 7807, backward compatible, mandated baseline in 2026). The kubelet only reads the status code, but humans, dashboards, and aggregators read the body — a structured problem-detail body is now the expected shape. **Never include stack traces, internal hostnames, or dependency credentials** in the `detail` field.
+- **RFC 9457 problem-detail body on unhealthy responses.** When the endpoint returns non-2xx, emit `Content-Type: application/problem+json` with `{type, title, status, detail, instance}` per RFC 9457 (obsoletes RFC 7807; same five members, backward compatible). The kubelet only reads the status code, but humans, dashboards, and aggregators read the body — a structured problem-detail body is now the expected shape. **Never include stack traces, internal hostnames, or dependency credentials** in the `detail` field.
 - **Circuit-break dependency checks.** Readiness probes that call dependencies must wrap them with a circuit breaker (Polly / Resilience4j / opossum) and a tight timeout (≤ 1s). A slow dependency must not make the probe time out — kubelet treats probe timeout as failure. When the breaker is open, return a documented `dependency_unavailable` problem-detail with `status: 503` rather than hanging.
 - **Independent dependency reporting.** Readiness should report **each** dependency's status (db, cache, queue, downstream APIs) — not collapse to a single boolean. Spring Boot Actuator's composite `HealthIndicator` model is the reference shape; FastAPI / Express implementations should mirror it.
 - **Block deployments on readiness regressions.** If a previous deploy's readiness validated db+cache+queue and the new deploy only validates db, that's a regression — gate the rollout.
@@ -58,7 +58,7 @@ You validate that health-check endpoints and orchestrator probes are correctly p
 |---|---|---|
 | **No health endpoint at all** | Kubelet has no signal — must rely on TCP probe, which only proves the socket is open, not that the app is functional. | Grep for `/health\|/livez\|/readyz\|HealthCheck\|actuator/health`. Zero hits in a containerized service = finding. |
 | **Single `/health` endpoint used for both liveness and readiness** | Either it's too deep (cascade restart on DB blip) or too shallow (LB never pulls a sick pod). Cannot be correct simultaneously. | One handler matched by both `livenessProbe.httpGet.path` and `readinessProbe.httpGet.path`. |
-| **DB / cache / downstream check inside liveness** | Cascade-restart on dependency blip. The reference example of this killed production for hours at multiple FAANG-scale orgs (see Kubernetes docs warning). | Trace handler → look for `db.ping`, `redis.PING`, `http.get(downstream)` reachable from the liveness path. |
+| **DB / cache / downstream check inside liveness** | Cascade-restart on dependency blip: a dependency wobble fails liveness on every replica at once, kubelet restarts them under load, and the restart storm extends the outage (see the Kubernetes "cascading failures" caution). | Trace handler → look for `db.ping`, `redis.PING`, `http.get(downstream)` reachable from the liveness path. |
 | **Missing startup probe on slow-starting app** | Cold-start > `initialDelaySeconds` of liveness → kubelet kills the pod mid-boot, infinite restart loop. | App with measured startup ≥ 30s and no `startupProbe`. |
 | **Returns 200 unconditionally** | Endpoint exists, kubelet always sees green, sick pods stay in rotation forever. | Handler with no conditional path producing non-200; only `return 200` / `return {"status":"ok"}`. |
 | **Internal info leaked in response body** | Stack traces, internal hostnames, connection strings, dependency credentials visible to anyone who can reach the probe URL — including unauthenticated traffic if the path leaks past ingress. | Response body contains `Exception`, `Traceback`, hostname patterns, `password=`, `Server=`, file paths. |
@@ -191,7 +191,7 @@ app.MapHealthChecks("/startupz").AllowAnonymous();
 
 ### Java — Spring Boot 4 (Actuator + composite indicators)
 
-**BAD** — legacy single `/actuator/health` is mapped for both liveness and readiness; a DB-down event triggers a cascade-restart. This was the default before Spring Boot 4 / when `management.health.probes.enabled` was off.
+**BAD** — legacy single `/actuator/health` is mapped for both liveness and readiness; a DB-down event triggers a cascade-restart. This is the shape you get when `management.endpoint.health.probes.enabled` is off (the liveness/readiness health groups are auto-enabled by default).
 
 **SAFE** — Spring Boot 4 ships liveness + readiness as Health Groups, enabled by default. Configure additional paths to expose the kube-native `/livez` and `/readyz`:
 
@@ -412,7 +412,7 @@ spec:
 
 ## Severity (internal triage vs. refinement-loop output)
 
-The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical` per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)). There is no soft tier on the wire.
+The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical` per the warnings-are-bugs rule (see the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md)). There is no soft tier on the wire.
 
 | Triage tier | Examples | Internal action |
 |---|---|---|
@@ -467,7 +467,7 @@ probe_type: live | ready | startup | conflated
 owasp_or_ref: K8s probes docs (kubernetes.io) | RFC 9457
 message: "DB SELECT 1 inside liveness handler — cascade-restart risk on DB blip"
 fix: "Move DB check to /readyz; keep /livez shallow (no I/O)"
-reference: https://kubernetes.io/docs/concepts/configuration/liveness-readiness-startup-probes/
+reference: https://kubernetes.io/docs/concepts/workloads/pods/probes/
 ```
 
 The integrator uses `confidence` to weight findings. A `kind: deep-in-liveness` finding is always `confidence: high` once the call path to a dependency is verified — there is no benign reading of "I put a DB query in the liveness handler."
@@ -476,7 +476,7 @@ The integrator uses `confidence` to weight findings. A `kind: deep-in-liveness` 
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every health-check anti-pattern, missing probe, missing graceful-shutdown hook, and probe-auth misconfiguration emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

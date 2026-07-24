@@ -274,10 +274,11 @@ function handleSamlResponse(samlResponseXml: string) {
 }
 
 // SAFE — let WorkOS validate, OR if you must DIY, verify XMLDSig against the pinned cert
-const { user, organizationId } = await workos.sso.getProfileAndToken({
+const { profile } = await workos.sso.getProfileAndToken({
   code: samlCode,
   clientId: process.env.WORKOS_CLIENT_ID!,
 });
+// profile.organizationId, profile.email, profile.connectionId, profile.rawAttributes are now trusted.
 // WorkOS verifies signature, audience, issuer, NotBefore/NotOnOrAfter, replay (InResponseTo + IDs)
 ```
 
@@ -470,7 +471,8 @@ app.MapPost("/api/workos/webhook", async (HttpRequest req, AppDb db) =>
     return Results.Ok();
 });
 
-// SAFE — verify HMAC signature (workos-node uses constant-time HMAC-SHA256 over timestamp + body)
+// SAFE — official WorkOS .NET SDK WebhookService verifies constant-time HMAC-SHA256 over timestamp + body,
+//        throwing WorkOSWebhookException on mismatch or a stale timestamp.
 app.MapPost("/api/workos/webhook", async (HttpRequest req, AppDb db, IConfiguration cfg) =>
 {
     if (!req.Headers.TryGetValue("WorkOS-Signature", out var sigHeader))
@@ -478,8 +480,14 @@ app.MapPost("/api/workos/webhook", async (HttpRequest req, AppDb db, IConfigurat
 
     using var reader = new StreamReader(req.Body);
     var body = await reader.ReadToEndAsync();
-    if (!WorkOSWebhook.VerifySignature(body, sigHeader!, cfg["WORKOS_WEBHOOK_SECRET"]!, toleranceSeconds: 300))
+    try
+    {
+        new WebhookService().VerifyHeader(body, sigHeader!, cfg["WORKOS_WEBHOOK_SECRET"]!, tolerance: 300);
+    }
+    catch (WorkOSWebhookException)
+    {
         return Results.Unauthorized();
+    }
 
     var evt = JsonSerializer.Deserialize<DSyncEvent>(body)!;
 
@@ -527,13 +535,13 @@ RelyingPartyRegistrationRepository repo() {
     RelyingPartyRegistration rp = RelyingPartyRegistration.withRegistrationId("workos")
         .entityId("https://yourapp.example.com/saml/sp")           // your audience
         .assertionConsumerServiceLocation("https://yourapp.example.com/login/saml2/sso/workos")
-        .assertingPartyDetails(party -> party
+        .assertingPartyMetadata(party -> party
             .entityId("https://idp.example.com")                    // expected issuer
             .verificationX509Credentials(c -> c.add(Saml2X509Credential.verification(idpCert)))
             .wantAuthnRequestsSigned(true))
         .build();
-    OpenSaml4AuthenticationProvider provider = new OpenSaml4AuthenticationProvider();
-    provider.setAssertionValidator(OpenSaml4AuthenticationProvider
+    OpenSaml5AuthenticationProvider provider = new OpenSaml5AuthenticationProvider();
+    provider.setAssertionValidator(OpenSaml5AuthenticationProvider
         .createDefaultAssertionValidatorWithParameters(p -> {
             p.put(SAML2AssertionValidationParameters.SIGNATURE_REQUIRED, true);
             p.put(SAML2AssertionValidationParameters.VALID_AUDIENCES, Set.of("https://yourapp.example.com/saml/sp"));
@@ -570,24 +578,23 @@ async def webhook(req: Request):
     return {"ok": True}
 
 # SAFE
-import workos
-from workos.exceptions import BadRequestException
+from workos import WorkOSClient
 
-client = workos.WorkOSClient(api_key=os.environ["WORKOS_API_KEY"],
-                             client_id=os.environ["WORKOS_CLIENT_ID"])
+client = WorkOSClient(api_key=os.environ["WORKOS_API_KEY"],
+                      client_id=os.environ["WORKOS_CLIENT_ID"])
 
 @app.post("/api/workos/webhook")
 async def webhook(req: Request):
     sig = req.headers.get("workos-signature")
     if not sig:
         raise HTTPException(401, "missing signature")
-    body = await req.body()
+    body = await req.body()   # raw bytes — verify_event hashes the exact payload
     try:
         evt = client.webhooks.verify_event(
-            payload=body.decode(), sig_header=sig,
+            event_body=body, event_signature=sig,
             secret=os.environ["WORKOS_WEBHOOK_SECRET"], tolerance=300,
         )
-    except BadRequestException:
+    except ValueError:   # verify_event raises ValueError on signature / timestamp failure
         raise HTTPException(401, "invalid signature")
     async with db.begin() as tx:
         inserted = await tx.execute(
@@ -677,8 +684,8 @@ CREATE POLICY org_isolation_audit ON audit_log
 | **WorkOS Dashboard** | Per-org SAML/SCIM config, IdP cert pinning, domain verification, webhook secret rotation, redirect URI allowlist | Configure every customer org here |
 | **SAML tracer** (browser ext) | Inspect raw SAMLRequest / SAMLResponse during dev; decode base64, view XML, verify signature element layout | Debugging IdP integrations |
 | **ngrok** (or Cloudflared Tunnel) | Expose local SCIM webhook endpoint to WorkOS during dev | Local SCIM development |
-| **JWT.io** | Decode WorkOS-issued access tokens / refresh tokens; verify `iss`, `aud`, `exp` | Debugging OIDC / token issues |
-| **WorkOS Vital (test IdP)** | Mock SAML IdP for end-to-end tests without standing up real Okta/Entra | CI / integration tests |
+| **JWT.io** | Decode WorkOS-issued access tokens (JWTs); verify `iss`, `aud`, `exp`. Refresh tokens are opaque — not decodable | Debugging OIDC / token issues |
+| **WorkOS Test Identity Provider** (Test IdP, on the Dashboard's Test SSO page) | Simulate SP-initiated / IdP-initiated login and error flows end-to-end without standing up real Okta/Entra | CI / integration tests |
 | **CodeQL `javascript-security-and-quality.qls`** | Catch missing signature checks, hardcoded secrets, IDOR patterns | PR gate |
 | **Semgrep `p/owasp-top-ten`** | Org-isolation regressions, open-redirect, weak crypto in custom SP code | Every PR |
 
@@ -699,7 +706,7 @@ codeql database analyze db --format=sarif-latest --output=codeql.sarif \
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** for your scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** for your scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action recommendation |
 |------|----------|--------|
@@ -745,7 +752,7 @@ reference: https://workos.com/docs/sso/saml-security
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

@@ -78,11 +78,21 @@ done
 # Build
 npm run build 2>&1 || echo "BUILD_FAILED"
 
-# Start dev server
-timeout 30 npm run dev 2>&1 || echo "DEV_FAILED"
+# Start the dev server in the background — it stays running, so never foreground it
+npm run dev > /tmp/dev-server.log 2>&1 &
+DEV_PID=$!
 
-# Health check
-curl -s http://localhost:3000/health || echo "HEALTH_FAILED"
+# Poll the health endpoint until it answers, or 30s elapse
+for _ in $(seq 1 30); do
+  curl -sf http://localhost:3000/health && break
+  sleep 1
+done
+
+# Final verdict (-f makes a 404/5xx a non-zero failure, not a silent pass)
+curl -sf http://localhost:3000/health || echo "HEALTH_FAILED"
+
+# Stop the dev server
+kill "$DEV_PID" 2>/dev/null
 ```
 
 ### 4. Test Suite

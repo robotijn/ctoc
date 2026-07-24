@@ -21,12 +21,16 @@ You validate CI/CD pipeline configurations (GitHub Actions, GitLab CI, CircleCI,
 
 ### GitHub Actions
 ```bash
+# Syntax + shellcheck + expression lint
 actionlint .github/workflows/*.yml
+# Supply-chain / action-security audit (template injection, unpinned actions, unsafe triggers)
+zizmor --format sarif .github/workflows/ > zizmor.sarif
 ```
 
 ### GitLab CI
 ```bash
-gitlab-ci-lint .gitlab-ci.yml
+# Official GitLab CLI (glab); validates against the project's CI config
+glab ci lint .gitlab-ci.yml
 ```
 
 ## Security Checks
@@ -37,6 +41,13 @@ gitlab-ci-lint .gitlab-ci.yml
 - Minimal permissions (least privilege)
 - No dangerous commands (eval, curl | bash)
 - Secrets not exposed in logs
+
+### Supply-Chain Security
+- **Pin every `uses:` to a 40-char commit SHA**, never a floating tag (`@v4`, `@main`, `@latest` are all mutation surfaces — the tj-actions/changed-files takeover simply rewrote the tags). Audit with `zizmor` / `octoscan` / `pinact`.
+- **Workflow-level `permissions:` default to read**, escalate per-job. A workflow with no top-level `permissions:` block inherits the repo default (often `write-all`).
+- **OIDC federation over stored long-lived cloud credentials.** `AWS_ACCESS_KEY_ID` / `GCP_SA_KEY` / `AZURE_CLIENT_SECRET` in repo secrets when OIDC is available → flag "migrate to OIDC". `id-token: write` mints a short-lived token and does NOT grant resource writes; lock the cloud trust policy to `repo:org/name:ref:refs/heads/main`, not wildcards.
+- **SLSA build provenance on release artifacts.** Emit an attestation with `actions/attest-build-provenance@<sha>` (v4+ wraps `actions/attest`); verify on consume with `gh attestation verify` or `slsa-verifier`.
+- **Runtime egress control.** `step-security/harden-runner@<sha>` as the first step gives egress filtering (domain allowlist) and tamper detection; start in `egress-policy: audit`, then move to `block`.
 
 ### Best Practices
 - Dependency caching configured
@@ -52,8 +63,8 @@ gitlab-ci-lint .gitlab-ci.yml
 # BAD - Tag can be modified
 - uses: actions/checkout@v4
 
-# GOOD - SHA is immutable
-- uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+# GOOD - Pin to a 40-char commit SHA (immutable); add a version comment so humans can read it
+- uses: actions/checkout@<sha>  # v4.2.2
 ```
 
 ### Overly Permissive Permissions
@@ -102,8 +113,8 @@ jobs:
 # BAD - Downloads dependencies every time
 - run: npm install
 
-# GOOD - Cached dependencies
-- uses: actions/cache@v4
+# GOOD - Cached dependencies (pin to SHA, per the rule above)
+- uses: actions/cache@<sha>  # v4.x
   with:
     path: ~/.npm
     key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -181,10 +192,10 @@ jobs:
      group: ${{ github.workflow }}-${{ github.ref }}
      cancel-in-progress: true
    ```
-5. Add matrix testing for Node.js versions:
+5. Add matrix testing across the supported (non-EOL) Node.js LTS lines:
    ```yaml
    strategy:
      matrix:
-       node: [18, 20, 22]
+       node: [22, 24]
    ```
 ```

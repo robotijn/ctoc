@@ -40,7 +40,7 @@ You detect code smells — symptoms that indicate deeper problems in the code. T
 
 ## 2026 Best Practices (Quality category)
 
-Five pillars served: **readability** + **maintainability** + **testability**.
+Three pillars served: **readability** + **maintainability** + **testability**.
 
 - **SRP red flags as concrete checks**: functions > 50 lines or > 4 levels of nesting are concrete checklist items, not vague "consider refactoring" notes. Tools like SonarQube enforce these as cognitive-complexity rules, not just cyclomatic complexity.
 - **Guard clauses & early returns**: any deeply-nested smell is reported with the guard-clause refactor inline.
@@ -48,7 +48,7 @@ Five pillars served: **readability** + **maintainability** + **testability**.
 - **Self-documenting names**: cryptic identifiers (`d`, `tmp`, `do_it`) are a smell on their own.
 - **Magic numbers/strings**: any unnamed numeric or string constant repeated > 1 time is a smell. Recommend a named constant.
 - **Manual + automated mix**: this skill is automated detection. Final triage requires human judgment — surface findings, don't auto-fix.
-- **ML pipelines are first-class**: 22 ML-specific smells now exist in the published catalog (Van Oort et al., 2022; extended to ~76 detectors by MLScent in 2025). Data leakage is the most-cited smell in ML repositories scanned to date. Treat any ML pipeline without an explicit `Pipeline()`/`make_pipeline()` train/test boundary as a smell.
+- **ML pipelines are first-class**: 22 ML-specific smells now exist in the published catalog (Zhang, Cruz & van Deursen, 2022; extended to 76 detectors by MLScent in 2025). Data leakage is the most-cited smell in ML repositories scanned to date. Treat any ML pipeline without an explicit `Pipeline()`/`make_pipeline()` train/test boundary as a smell.
 - **LLM-integrated apps add new smell families**: "god prompts" (one mega-prompt for every task), missing error-handling instructions ("what to do when you don't know"), generic role ("you are a helpful assistant"), and hallucination feedback loops (model output piped into the next prompt with no validation gate). See §"2026 additions" below.
 - **SonarQube ≠ Fowler**: SonarQube uses "code smell" as one of four issue types (Bug / Vulnerability / Code Smell / Security Hotspot). Its rule set partially overlaps Fowler's catalog but is not a one-to-one map. When integrating with SonarQube, treat the rule id as authoritative for tagging and reconcile manually with Fowler's category.
 
@@ -93,7 +93,7 @@ Five pillars served: **readability** + **maintainability** + **testability**.
 
 ### 2026 additions — ML pipeline smells
 
-Per Van Oort et al. (2022) "Code Smells for Machine Learning Applications" and MLScent (2025).
+Per Zhang, Cruz & van Deursen (2022) "Code Smells for Machine Learning Applications" and MLScent (2025).
 
 - **Data Leakage** (most-cited): preprocessing fit on the full dataset before train/test split, target encoding using future labels, time-series cross-validation without temporal ordering, scaler fit on test set. Detect: any `fit()` or `fit_transform()` call on data that has not already been split, OR any scaler/encoder/imputer used outside a `Pipeline`/`ColumnTransformer`.
 - **Threshold-dependent evaluation only**: relying solely on accuracy / F1 at default threshold without reporting AUC, PR-AUC, or calibration. Recommend threshold-independent metrics.
@@ -390,7 +390,7 @@ This skill uses an **internal triage view** for the human-readable report and a 
 | MEDIUM      | Long Parameter List 5–6; Data Clumps; Generic Role; Magic Numbers in hot paths                  | Fix this sprint       | `critical`               |
 | LOW         | Comments-as-explanation; Lazy Class; Speculative Generality                                     | Backlog               | `critical`               |
 
-Why: per [warnings-are-critical](../../../agents/_shared/warnings-are-critical.md), the refinement-loop schema rejects soft tiers. Triage labels stay in the report body so reviewers can prioritize; the wire is uniformly `critical`. The integrator then uses `confidence`, `corroborated_by`, and `refactor_effort` to weight findings within the critical bucket.
+Why: per [warnings-are-critical](../../agent-fragments/warnings-are-critical.md), the refinement-loop schema rejects soft tiers. Triage labels stay in the report body so reviewers can prioritize; the wire is uniformly `critical`. The integrator then uses `confidence`, `corroborated_by`, and `refactor_effort` to weight findings within the critical bucket.
 
 ## Tool Integration (2026 landscape)
 
@@ -400,9 +400,9 @@ Why: per [warnings-are-critical](../../../agents/_shared/warnings-are-critical.m
 | **jscpd**                    | Cross-language duplicate-code detector (JS, TS, Python, Java, C#, ...)      | Duplicates only, not other smell families           | Pair with this skill on every PR  |
 | **JDeodorant**               | Eclipse plugin: Long Method, Feature Envy, God Class — research-grade      | Java only; IDE plugin, not CI-friendly              | Java refactoring deep-dive        |
 | **PMD**                      | Java + Apex + Visualforce rules incl. design smells                         | Java family only                                    | Java/JVM projects                 |
-| **Designite / DesigniteJava**| Architectural + design + implementation smells                              | Commercial for non-academic use                     | Architecture review               |
-| **.NET CodeMaid / Roslyn**   | Roslyn analyzers (FxCop successors) cover ~150 design + maintainability rules | .NET only                                         | Every .NET PR                     |
-| **MLScent**                  | 76 ML-specific detectors across TF / PyTorch / sklearn / HF (2025)         | ML-only, AST-based, Python-only at v1               | Any repo with `requirements.txt` containing sklearn / torch / tensorflow |
+| **Designite / DesigniteJava**| Architectural + design + implementation smells                              | Free Community edition; Enterprise edition commercial | Architecture review               |
+| **Roslyn analyzers**         | The CAxxxx code-quality rule set (FxCop successors): design, maintainability, reliability, naming | .NET only                    | Every .NET PR                     |
+| **MLScent** (`ml-code-smell-detector`) | 76 ML-specific detectors across TensorFlow / PyTorch / scikit-learn / Hugging Face (2025) | ML-only, AST-based, Python-only | Any repo with `requirements.txt` containing sklearn / torch / tensorflow |
 | **great_expectations / Pandera** | Data-quality contracts at the DataFrame level — catches NaN-swallow, schema drift | Data smells, not code smells per se               | ML data ingest                    |
 | **promptfoo / DeepEval**     | LLM prompt eval suites; catch generic-role and missing-unknown-path drift  | LLM-only                                            | LLM apps and agents               |
 
@@ -419,8 +419,8 @@ npx jscpd --min-tokens 70 --reporters html,json --output ./jscpd-report .
 dotnet build /warnaserror /p:AnalysisMode=All
 
 # ML smells
-pip install mlscent
-mlscent --path ./training --out mlscent.json
+pip install ml-code-smell-detector
+ml_smell_detector analyze ./training --output-dir reports/
 
 # Data contracts
 pip install pandera great_expectations
@@ -453,7 +453,7 @@ cross_link:
   - quality/duplicate-code-detector                     # when smell is duplicate-code
   - quality/dead-code-detector                          # when smell is dead-code
 message: "Long Method: process_order is 187 lines (threshold 50)"
-reference: https://refactoring.guru/refactoring/smells/long-method
+reference: https://refactoring.guru/smells/long-method
 ```
 
 The integrator uses `confidence`, `corroborated_by`, and `refactor_effort` to weight findings within the `critical` bucket. A `confidence: low` single-source finding doesn't block phase advancement on its own; two engines agreeing escalates it. `refactor_effort: high` smells (e.g., God Class spanning 850 lines) may be deferred to the plan's `## Decisions Taken Under Ambiguity` with a documented migration window — never silently dropped.
@@ -462,7 +462,7 @@ The integrator uses `confidence`, `corroborated_by`, and `refactor_effort` to we
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every smell you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

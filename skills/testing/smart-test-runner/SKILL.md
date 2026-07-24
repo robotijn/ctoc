@@ -70,7 +70,7 @@ Five patterns load-bearing for a smart runner in 2026. Skipping any of these is 
    c. If different → "needs testing"
 4. For each file needing testing:
    a. Look up coverage-map.json
-   b. Walk the call graph one hop in (transitive callers)
+   b. Walk the call graph to the full transitive closure of callers
    c. Get list of tests covering it or its callers
    d. Add to "tests to run" set
 5. If coverage map missing for a file:
@@ -125,10 +125,11 @@ pytest -k "auth or user"                  # name-pattern selection (complements 
 # dotnet test filter — first-line tooling for selective test runs
 dotnet test --filter "FullyQualifiedName~Auth|FullyQualifiedName~User"
 dotnet test --filter "Category=Smoke"
-# Note: there is no officially shipped "dotnet test --impact-analysis" flag as of May 2026.
-# Microsoft Test Impact Analysis exists in Azure DevOps Test Plans / Visual Studio Enterprise,
-# triggered via the YAML task vstest@2 with publishRunAttachments + testImpactAnalysis: true.
-# Roslyn analyzers + CodeQL build the call graph for VS Enterprise TIA; verify your edition before pinning.
+# Note: there is no "dotnet test --impact-analysis" flag. Microsoft's Test Impact Analysis
+# is a build-pipeline feature of the Azure Pipelines VSTest task (VSTest@2 / VSTest@3),
+# enabled with the input runOnlyImpactedTests: true (regulate re-baselining via runAllTestsAfterXBuilds).
+# It builds test-to-source dependency maps from a runtime Test Impact data collector (not static analysis),
+# and is scoped to managed .NET Framework code — it is NOT supported for .NET Core / modern .NET.
 ```
 
 ### Java
@@ -159,14 +160,17 @@ go test -run "TestAuth|TestUser" ./...    # name-pattern selection
 ### Rust
 ```bash
 cargo test test_auth test_user
-# cargo-nextest is the 2026 default for large workspaces (faster, structured output):
-cargo nextest run --tests "test_auth"
+# cargo-nextest is the 2026 default for large workspaces (faster, structured output);
+# name filters are positional substring matches (NOT a --tests flag, which is a cargo target selector):
+cargo nextest run test_auth
+# For structured selection use a filterset expression: cargo nextest run -E 'test(test_auth)'
 ```
 
 ### SQL (database tests)
 ```bash
-# pgTAP — schema-scoped selection
-pg_prove --schema auth tests/             # only run tests in the auth schema directory
+# pgTAP — run the xUnit test functions found in a given schema (--schema forces --runtests):
+pg_prove --schema auth
+# Or run only the .sql test files under a changed-tests directory:
 pg_prove --recurse --ext .sql tests/changed/
 # tSQLt (MS SQL) — class-scoped:
 # EXEC tSQLt.RunTestClass 'AuthTests';
@@ -364,7 +368,7 @@ The integrator uses `confidence` to weight findings — `confidence: low` (singl
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every test failure, every flake detection, every stale-cache warning, and every coverage-map gap you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

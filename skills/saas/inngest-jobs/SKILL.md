@@ -37,10 +37,10 @@ You set up Inngest (or an equivalent durable-execution engine) as the background
 
 ## 2026 Best Practices
 
-These are the load-bearing rules for any durable-execution system in 2026. They apply whether the engine is Inngest, Temporal, Trigger.dev v3, QStash, AWS Step Functions, or Cloudflare Queues — the engine choices differ but the discipline does not.
+These are the load-bearing rules for any durable-execution system in 2026. They apply whether the engine is Inngest, Temporal, Trigger.dev v4, QStash, AWS Step Functions, or Cloudflare Queues — the engine choices differ but the discipline does not.
 
 - **Every side effect lives inside `step.run` (or the equivalent activity boundary).** A retry replays the function body from the top; only step results are memoised. Anything outside a step runs again on every retry — that is the single largest source of "duplicate email / duplicate charge / duplicate row" incidents.
-- **Idempotency at the step boundary, not at the function boundary.** Each step should carry an idempotency key derived from the event id + step name (e.g. `welcome-${event.id}-send`). Use it to dedupe at the external service (Stripe `Idempotency-Key`, Resend custom header) AND in your own DB via a `processed_events` table.
+- **Idempotency at the step boundary, not at the function boundary.** Each step should carry an idempotency key derived from the event id + step name (e.g. `welcome-${event.id}-send`). Use it to dedupe at the external service (Stripe `Idempotency-Key`, Resend custom header) AND in your own DB via a `processed_events` table. Inngest also ships two native dedupe layers that stack with this: the function-level `idempotency` config (a CEL expression over event data, e.g. `idempotency: "event.data.cartId"`) skips duplicate runs, and an event-level `id` on `inngest.send({ id, ... })` is an idempotency key over a 24-hour window. Neither replaces external-service keys — a run can still retry a step after the dedupe check passes.
 - **Compose long workflows from many small steps.** Each `step.run` is a checkpoint. A 7-step pipeline that fails at step 6 resumes at step 6 — not at step 1. Per Inngest docs every step is retried independently up to its own policy (default 4 retries → 5 total attempts).
 - **Filter errors before retrying.** Non-retryable errors (validation failures, 4xx other than 408/429) should throw `NonRetriableError`. Otherwise the engine wastes 5 attempts re-running deterministic failures and floods alert channels.
 - **Event-first, not cron-first.** Emit business events (`user/created`, `invoice/paid`); let functions subscribe. Cron is a degenerate event source — use it for true periodic jobs (weekly reports), not for "every 5 min check if X" polling that should be event-driven.
@@ -58,13 +58,13 @@ These are the load-bearing rules for any durable-execution system in 2026. They 
 | Engine | When to pick | Trade-off |
 |---|---|---|
 | **Inngest** | Typed events, serverless-first, Next.js/Hono/Bun SaaS, minimal ops | Proprietary control plane; SDK open-source, orchestrator hosted |
-| **Trigger.dev v3** | Long-running jobs (>15 min serverless cap), open-source self-host (Apache 2.0), TypeScript-first | Dedicated compute model — different mental model from event-driven |
+| **Trigger.dev v4** | Long-running jobs (>15 min serverless cap), open-source self-host (Apache 2.0), TypeScript-first | Dedicated compute model — different mental model from event-driven |
 | **Temporal** | Multi-language enterprise workflows (Java/Go/.NET/Python), strict exactly-once semantics, persistent workers | Steep learning curve (workflows / activities / task queues / signals); not native serverless |
 | **QStash** | Simple "post message, retry on failure" — no workflow graph | 60s endpoint timeout; no fan-out / no step memoisation |
 | **AWS Step Functions** | Already deep on AWS; visual state-machine flows | JSON ASL is verbose; debugging is rough vs. typed SDKs |
 | **Cloudflare Queues** | Already on Cloudflare Workers; tight Workers integration | At-least-once, no built-in step memoisation, you build idempotency yourself |
 
-Default recommendation for a typical Next.js / Hono / Bun B2C SaaS: **Inngest**. Default for compute-heavy AI agent pipelines that exceed serverless timeouts: **Trigger.dev v3**. Default for polyglot enterprise: **Temporal**.
+Default recommendation for a typical Next.js / Hono / Bun B2C SaaS: **Inngest**. Default for compute-heavy AI agent pipelines that exceed serverless timeouts: **Trigger.dev v4**. Default for polyglot enterprise: **Temporal**.
 
 ## Critical pitfalls (categories)
 
@@ -444,14 +444,14 @@ curl -X POST http://localhost:8288/e/test-event \
 | **Inngest Cloud Dashboard** | Function runs, step-level traces, replay, event browser | Production visibility |
 | **Inngest CLI** (`inngest dev`) | Local dev server, function discovery, replay UI on localhost:8288 | Every dev session |
 | **Temporal CLI** (`temporal server start-dev` + Temporal UI) | Alternative engine; visual workflow history, signal/query, replay | When choosing Temporal |
-| **Trigger.dev CLI** (`npx trigger.dev@latest dev`) | Alternative engine; dedicated-compute job runner | When choosing Trigger.dev v3 |
+| **Trigger.dev CLI** (`npx trigger.dev@latest dev`) | Alternative engine; dedicated-compute job runner | When choosing Trigger.dev v4 |
 | **BetterStack** (Logtail / Uptime) | Queue health, failed-job rate alerts, function latency SLOs | Production paging |
 | **Sentry** | Failed-job alerts via `onFailure` handler → `Sentry.captureException` | Production paging |
 | **PostHog** | Funnel analysis on event-driven flows (signup → activation) — see [[posthog-analytics]] | Product loop |
 
 ## Severity reconciliation
 
-These tiers are the **internal triage view** for the human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** for the human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers stay in the report body for prioritization; the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |---|---|---|
@@ -492,7 +492,7 @@ The integrator uses `confidence` to weight findings — a `confidence: low` sing
 - [Inngest — Durable workflows use case](https://www.inngest.com/uses/durable-workflows)
 - [Inngest — Concurrency](https://www.inngest.com/docs/functions/concurrency)
 - [Inngest vs Temporal comparison](https://www.inngest.com/compare-to-temporal)
-- [Trigger.dev v3 architecture overview](https://trigger.dev/docs)
+- [Trigger.dev v4 architecture overview](https://trigger.dev/docs)
 - [Temporal — Durable execution concepts](https://docs.temporal.io/concepts)
 - [Outbox pattern — practical at-least-once delivery](https://medium.com/@tpriyesh188/the-outbox-pattern-your-key-to-reliable-event-driven-systems-dd78a5c2690e)
 - [Fan-out / Fan-in patterns (Dapr docs)](https://docs.dapr.io/developing-applications/building-blocks/workflow/workflow-patterns/)
@@ -501,7 +501,7 @@ The integrator uses `confidence` to weight findings — a `confidence: low` sing
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

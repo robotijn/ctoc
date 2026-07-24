@@ -41,7 +41,7 @@ The error-handling discipline in 2026 has converged on a small set of load-beari
 - **Result<T, E> over exceptions for predictable failures.** Rust `Result`, Go `(T, error)`, Kotlin/Scala `Either`, TypeScript `neverthrow` / Effect, Swift `Result`, and C++23 `std::expected` all push the same shape: the type system carries the error channel so callers cannot accidentally ignore it. Exceptions remain valid for truly unexpected events, but expected/recoverable failures belong in the return type. Mid-2020s style guides (Google Go, Microsoft .NET, AWS SDK v3) treat unchecked exception propagation across module boundaries as a code smell.
 - **Never catch broad without re-raise or structured log + recovery.** `except Exception: pass`, `catch (Exception e) { }`, `catch (...) { }`, `catch { }` in C#, and bare `except:` in Python are the highest-density bug source in the exception-handling literature (multi-year studies of long-lived projects consistently rank "generic catch" as the most-violated anti-pattern). If you must catch broadly (top-level handlers, framework boundaries), you must (a) log with `exc_info` / stack, (b) emit an error-rate metric, and (c) either re-raise, return a sentinel error type, or transform into a typed business error. No exceptions.
 - **Errors carry context.** Wrap, don't replace. Go: `fmt.Errorf("loading user %d: %w", id, err)`. Python: `raise X from err`. Java: `new ServiceException("...", cause)`. C#: `throw new ServiceException("...", inner)`. Rust: `anyhow::Context::context(...)` / `thiserror` with `#[source]`. Losing the cause chain (`raise NewError()` without `from`, `throw new X()` without `inner`) destroys post-incident forensics.
-- **Use RFC 9457 (Problem Details for HTTP APIs) for HTTP error responses.** Published 2023, RFC 9457 obsoletes RFC 7807. Media type `application/problem+json`. Required fields: `type` (URI), `title`, `status`, `detail`, `instance`. Extensible. ASP.NET Core, Spring 6+, FastAPI, NestJS, and Express middleware ship first-class support. Ad-hoc `{ "error": "..." }` formats are now anti-pattern at the API boundary.
+- **Use RFC 9457 (Problem Details for HTTP APIs) for HTTP error responses.** Published 2023, RFC 9457 obsoletes RFC 7807. Media type `application/problem+json`. Standard members (all optional per the spec; `type` defaults to `about:blank` when absent): `type` (URI), `title`, `status`, `detail`, `instance`. Extensible with custom members. ASP.NET Core, Spring 6+, FastAPI, NestJS, and Express middleware ship first-class support. Ad-hoc `{ "error": "..." }` formats are now anti-pattern at the API boundary.
 - **Structured logging, never string concat.** Log frameworks parameterize: `logger.error("payment failed", user_id=uid, amount=amt, exc_info=True)`. String-concatenated log lines (`logger.error(f"payment failed: {user_input}")`) are vulnerable to log injection (CRLF, Log4Shell-class JNDI vectors) and unsearchable in production observability stacks.
 - **Distinguish business-rule errors from infrastructure errors.** A 400/422 (client error, business rule violated) is fundamentally different from a 500 (infrastructure failed). Returning 500 for "email already exists" hides real outages in alerting; returning 200 with `{"success": false}` for infra failures hides user-facing breakage. The HTTP status code is a primary observability signal.
 - **Async error propagation must be explicit.** Unhandled promise rejections (`process.on('unhandledRejection')`), Python `asyncio.exceptions.CancelledError` swallowing, .NET `async void` (fire-and-forget that swallows exceptions), Java `CompletableFuture` without `.exceptionally`, Rust `tokio::spawn` futures without `.await` or join-handle inspection — all silently lose errors. Python 3.11+ adds `ExceptionGroup` and `except*` syntax precisely so `asyncio.TaskGroup` errors can no longer be lost.
@@ -390,15 +390,16 @@ BEGIN CATCH
   THROW;   -- re-raise preserving original line / state (SQL Server 2012+)
 END CATCH;
 
--- SAFE (PL/pgSQL) — SAVEPOINT around the risky step; rollback to savepoint, not whole txn
+-- SAFE (PL/pgSQL) — a BEGIN...EXCEPTION block is itself a subtransaction (an implicit
+-- savepoint): on exception Postgres rolls the block's own statements back automatically.
+-- PL/pgSQL forbids explicit SAVEPOINT / ROLLBACK TO SAVEPOINT — the block IS the savepoint.
 BEGIN
-  SAVEPOINT before_transfer;
   UPDATE accounts SET balance = balance - 100 WHERE id = 1;
   UPDATE accounts SET balance = balance + 100 WHERE id = 2;
 EXCEPTION WHEN check_violation THEN
-  ROLLBACK TO SAVEPOINT before_transfer;
+  -- both UPDATEs above are already rolled back by the enclosing subtransaction
   RAISE WARNING 'transfer rejected by check constraint: %', SQLERRM;
-  RAISE;   -- propagate so caller knows
+  RAISE;   -- re-raise so the caller learns the transfer failed
 END;
 ```
 
@@ -455,10 +456,10 @@ For HTTP handlers, verify every error path returns an RFC 9457 `application/prob
 
 | Tool | Language | What it catches |
 |---|---|---|
-| **ESLint** + plugins | TS/JS | `no-empty`, `no-misleading-character-class`, `@typescript-eslint/no-floating-promises`, `no-throw-literal`, custom rules for `console.error` swallow |
-| **Ruff** | Python | `BLE001` blind except, `TRY002` create-your-own-exception, `TRY003` avoid long messages, `TRY200/201` use `raise from`, `TRY300/301` consider `else`, `S110/S112` try-except-pass/continue (bandit-equivalent) |
+| **ESLint** + plugins | TS/JS | `no-empty`, `no-unsafe-finally`, `@typescript-eslint/no-floating-promises`, `@typescript-eslint/only-throw-error` (replaces the deprecated `no-throw-literal` in typescript-eslint), custom rules for `console.error` swallow |
+| **Ruff** | Python | `BLE001` blind except, `TRY002` create-your-own-exception, `TRY003` avoid long messages, `B904` `raise ... from` inside except (Ruff removed `TRY200` in v0.2.0 — use `B904`), `TRY201` verbose bare-raise, `TRY300` consider `else`, `TRY301` raise-within-try, `S110/S112` try-except-pass/continue (bandit-equivalent) |
 | **mypy --strict** | Python | Catches `None` returns where caller expects non-Optional; forces error type discipline |
-| **Roslyn / .NET analyzers** | C# | `CA2200` rethrow correctly, `CA1031` do not catch general exception types, `CA2007` ConfigureAwait, `VSTHRD110` observe Task results, `VSTHRD200` use Task naming |
+| **Roslyn / .NET analyzers** | C# | `CA2200` rethrow correctly, `CA1031` do not catch general exception types, `CA2007` ConfigureAwait, `VSTHRD110` observe Task results, `VSTHRD200` use `Async` suffix for Task-returning methods |
 | **SonarQube / SonarCloud** | multi | S2221 broad catch, S108 empty block, S1166 log+rethrow, S1696 NullPointerException catch, S2139 log-and-throw same exception |
 | **SpotBugs / ErrorProne** | Java | `DE_MIGHT_IGNORE` empty catch, `REC_CATCH_EXCEPTION` broad catch, `RV_RETURN_VALUE_IGNORED` ignored return, `OS_OPEN_STREAM` resource leak |
 | **clang-tidy** | C/C++ | `bugprone-empty-catch`, `cert-err58-cpp` (init throw), `cppcoreguidelines-no-malloc`, `bugprone-throw-keyword-missing` |
@@ -554,7 +555,7 @@ The integrator uses `confidence` to weight findings: `confidence: high` (e.g. em
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

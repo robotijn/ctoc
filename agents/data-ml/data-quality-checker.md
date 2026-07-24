@@ -44,6 +44,10 @@ You validate data quality across pipelines, databases, and data warehouses, ensu
 - Proper formats (email, phone, date)
 - Enumerated values within allowed set
 
+### Uniqueness
+- Primary keys are unique
+- No accidental duplicates on natural keys
+
 ## Commands
 
 ### SQL-based Checks
@@ -70,23 +74,20 @@ FROM users;
 ### Great Expectations (Python)
 ```python
 import great_expectations as gx
+import great_expectations.expectations as gxe
 
-# Define expectations
-expectation_suite = gx.ExpectationSuite(
-    expectations=[
-        gx.ExpectColumnValuesToNotBeNull(column="email"),
-        gx.ExpectColumnValuesToMatchRegex(
-            column="email",
-            regex=r"^[\w.-]+@[\w.-]+\.\w+$"
-        ),
-        gx.ExpectColumnValuesToBeBetween(
-            column="age", min_value=0, max_value=150
-        ),
-        gx.ExpectTableRowCountToBeBetween(
-            min_value=1000, max_value=1000000
-        )
-    ]
-)
+context = gx.get_context()
+
+# Expectation classes live in great_expectations.expectations; add them
+# to a suite one at a time via suite.add_expectation.
+suite = context.suites.add(gx.ExpectationSuite(name="users_suite"))
+suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="email"))
+suite.add_expectation(gxe.ExpectColumnValuesToMatchRegex(
+    column="email", regex=r"^[\w.-]+@[\w.-]+\.\w+$"))
+suite.add_expectation(gxe.ExpectColumnValuesToBeBetween(
+    column="age", min_value=0, max_value=150))
+suite.add_expectation(gxe.ExpectTableRowCountToBeBetween(
+    min_value=1000, max_value=1000000))
 ```
 
 ### dbt Tests
@@ -96,11 +97,11 @@ models:
   - name: users
     columns:
       - name: email
-        tests:
+        data_tests:
           - not_null
           - unique
       - name: status
-        tests:
+        data_tests:
           - accepted_values:
               values: ['active', 'inactive', 'pending']
 ```

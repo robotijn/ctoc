@@ -60,6 +60,48 @@ const nodeDeprecated = [
 ];
 ```
 
+## HTTP API Deprecation Signaling
+
+When a service exposes an HTTP API, deprecation is announced on the wire so
+clients can schedule their own migration. Check for — and, when auditing a
+provider, recommend — these standardized signals:
+
+| Signal | Where | Value | Meaning |
+|--------|-------|-------|---------|
+| `Deprecation` response header (RFC 9745) | Response headers | A Structured Field Date, e.g. `Deprecation: @1688169599` (a Unix timestamp); RFC 9745 requires the value to be a Date. | The resource is deprecated as of the given moment. |
+| `Sunset` response header (RFC 8594) | Response headers | An HTTP-date, e.g. `Sunset: Sat, 31 Dec 2018 23:59:59 GMT`. | The point in time after which the resource is expected to become unresponsive. |
+| `Link` header, `rel="deprecation"` (RFC 9745) | Response headers | A URI to human-readable migration documentation. | Where the client developer finds the migration guide and timeline. |
+| OpenAPI `deprecated: true` | Operation, Parameter, or Schema object in the spec | Boolean, default `false`. | Consumers SHOULD refrain from using the declared operation/parameter. |
+
+Scheduling rule (RFC 9745): when both headers are present, the `Sunset`
+timestamp MUST NOT be earlier than the `Deprecation` timestamp — deprecation
+always precedes removal, and the gap between them is the migration window a
+client is given. Flag any API that removes a resource without having first
+served a `Deprecation` header and a `Link rel="deprecation"` pointing to
+migration docs.
+
+```bash
+# Detect deprecation signals a provider is (or is not) sending
+curl -sI https://api.example.com/v1/resource | grep -iE '^(deprecation|sunset|link):'
+
+# Find operations marked deprecated in an OpenAPI document
+grep -rn 'deprecated: true' openapi.yaml
+```
+
+## Standard Deprecation Markers by Language
+
+Deprecated symbols are declared with a language-native marker; grep for these
+to find first-party deprecations the compiler or runtime will warn on.
+
+| Language | Marker |
+|----------|--------|
+| JavaScript / TypeScript | `@deprecated` JSDoc/TSDoc tag |
+| Python | `warnings.warn(..., DeprecationWarning)`; the `@deprecated` decorator (PEP 702) |
+| Java | `@Deprecated` annotation + `@deprecated` Javadoc tag |
+| C# | `[Obsolete]` attribute |
+| C++ | `[[deprecated]]` standard attribute |
+| Go | a `// Deprecated:` comment on the declaration |
+
 ## Detection Methods
 
 ### Static Analysis
@@ -123,8 +165,8 @@ const deprecationPatterns = [
 **1. Buffer() constructor**
 - File: `src/utils/encoding.ts:34`
 - Code: `new Buffer(data)`
-- Deprecated: Node.js 6.0 (2016)
-- Removed: Node.js 10+ (security risk)
+- Deprecated: Node.js 6.0 (documentation-only), Node.js 10.0 (runtime deprecation, DEP0005)
+- Status: still present and functional, emits a runtime warning; the constructor is a known security risk (uninitialized memory)
 - Fix: `Buffer.from(data)` or `Buffer.alloc(size)`
 
 **2. ReactDOM.render()**
@@ -179,9 +221,9 @@ const deprecationPatterns = [
 ### Timeline
 | Deprecation | Removal Date | Days Left |
 |-------------|--------------|-----------|
-| ReactDOM.render strict warnings | React 19 | ~180 |
+| ReactDOM.render strict warnings | React 19 | compute at scan time |
 | moment active development | Already ended | - |
-| Node 18 EOL | 2025-04-30 | 94 |
+| Node 18 EOL | 2025-04-30 | past — upgrade now |
 
 ### Recommendations
 1. **Immediate**: Fix Buffer() and ReactDOM.render()

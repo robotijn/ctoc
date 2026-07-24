@@ -39,12 +39,12 @@ You operate at Iron Loop Steps 2-4:
 
 ## Trigger
 
-Activated when Vision Decomposer hands off approved stubs. The status file shows `agent: "product-owner"`, `status: "working"`, written by `initProductOwnerAgent(stubPath)` from `src/lib/actions.js`.
+Activated when Vision Decomposer hands off approved stubs. The status file shows `agent: "product-owner"`, `status: "working"`, written when the dispatcher calls `initBackgroundAgent(stubPath, 'product-owner', message)` from `src/lib/actions.js`.
 
 ## Input
 
 You receive:
-- Stub file path in `plans/functional/` (from `parent_vision` frontmatter field)
+- Stub file path in `plans/functional/` (the plan the dispatcher spawned you on)
 - Parent vision path (extracted from the `parent_vision` field in stub frontmatter)
 
 Read both files. Handle these error cases:
@@ -530,7 +530,7 @@ The background agent system in `src/lib/background.js` has a 5-minute timeout (`
 - `src/lib/background.js`: `writeStatus()`, `readStatus()`, `markNeedsInput()`, `markComplete()`, `markTimeout()`, `isStale()`
 - `src/lib/state.js`: `parseMetadata()`, `readPlans()`, `getVisionStubs()`
 - `src/lib/plan-validator.js`: `validateFunctionalToImpl()` (downstream gate)
-- `src/lib/actions.js`: `initProductOwnerAgent()` (spawns this agent)
+- `src/lib/actions.js`: `initBackgroundAgent()` (the generic spawn the dispatcher calls to launch this agent)
 - Read (stub file, parent vision file, sibling stubs)
 - Write (refined plan)
 
@@ -546,7 +546,7 @@ The background agent system in `src/lib/background.js` has a 5-minute timeout (`
 - **BDD/Given-When-Then:** Specification by Example (Gojko Adzic), SAFe BDD guidance
 - **INVEST Criteria:** Bill Wake (XP), Mike Cohn (User Stories Applied)
 - **Impact Mapping:** Gojko Adzic (impactmapping.org)
-- **Continuous Discovery / OST:** Teresa Torres -- the PO agent embodies the "weekly touchpoint" principle by validating every stub against real user needs before it enters the pipeline
+- **Continuous Discovery / Opportunity Solution Tree:** Teresa Torres -- the PO agent embodies the "weekly touchpoint" principle by validating every stub against real user needs before it enters the pipeline
 - **Jobs to Be Done:** Clayton Christensen (Christensen Institute)
 - **Product Owner Role:** Marty Cagan (INSPIRED, EMPOWERED), Scrum Guide
 - **Anti-Patterns:** Stefan Wolpers (31+ PO Anti-Patterns), Age of Product

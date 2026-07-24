@@ -45,9 +45,9 @@ You are a paranoid mobile platform reviewer for React Native apps. You validate 
 
 ## 2026 Best Practices (Mobile category)
 
-- **New Architecture is the default, not an opt-in**. React Native 0.76+ ships New Architecture (JSI + TurboModules + Fabric + Codegen) on by default. The legacy bridge is removed entirely in React Native 0.82 — new apps that still use `RCTBridgeModule` / `RCTViewManager` are shipping known-removed APIs.
-- **Hermes is the default JS engine and is required for New Architecture**. JSC is no longer the default; New Architecture is built on JSI which depends on Hermes capabilities and will not run reliably on JSC. Apps still on JSC should treat it as tech debt.
-- **Expo SDK 53+ for managed workflow**. SDK 53 enables New Architecture by default, ships background OTA download via `expo-background-task`, and extends EAS Update to DOM components. SDK ≤ 51 is past-of-life for new projects.
+- **New Architecture is the default, not an opt-in**. React Native 0.76+ ships New Architecture (JSI + TurboModules + Fabric + Codegen) on by default. React Native 0.82 (Oct 2025) goes further: the New Architecture is the *only* architecture — `newArchEnabled=false` (Android) and `RCT_NEW_ARCH_ENABLED=0` (iOS) are ignored, so an app can no longer opt out. The Legacy Architecture APIs are **not** deleted in 0.82 (backward compatibility), but their removal is scheduled to *start* from 0.83 onward. An interop layer is kept for the foreseeable future, so `RCTBridgeModule` / `RCTViewManager` modules still compile and run — via that interop shim — while being on a removal track. Treat every legacy-bridge module as migrate-now debt, not as already-broken.
+- **Hermes is the default JS engine and is strongly recommended under the New Architecture**. Hermes is enabled by default and needs no configuration. JavaScriptCore is still *supported* — the New Architecture's JSI runs on either engine — but JSC is no longer the default and opting out of Hermes now means following the community repository's instructions, so it is an explicit, self-maintained step. Apps still on JSC should treat it as tech debt.
+- **Track the current Expo SDK for managed workflow**. New Architecture has been the managed-workflow default since SDK 53, which also shipped background OTA download via `expo-background-task` and extended EAS Update to DOM components. Each SDK targets one React Native version (SDK 57 → RN 0.86, SDK 54 → RN 0.81), and Expo maintains roughly the latest few SDKs — an SDK more than about a year old is past end-of-life for new projects, so verify the current SDK at build time rather than pinning a number here.
 - **OTA updates MUST be code-signed end-to-end**. EAS Update supports end-to-end code signing — every JS bundle and asset is signed with a developer-held private key, and the native client verifies the signature before applying the update. Unsigned OTA channels are a supply-chain RCE primitive (anyone with publish credentials silently ships native-equivalent code to every device). Treat unsigned OTA channels as critical.
 - **JWT and credentials never go in AsyncStorage**. AsyncStorage stores data in plain text in an SQLite database (Android) or JSON file (iOS) with no encryption. Use `expo-secure-store` (iOS Keychain / Android Keystore, hardware-backed) for small secrets ≤ 2 KB. For larger sensitive blobs, use `react-native-mmkv` encrypted with a key held in SecureStore. `react-native-keychain` is the bare-workflow equivalent.
 - **Deep links and universal links must be verified**. iOS Universal Links require AASA (`apple-app-site-association`) hosted at `https://<domain>/.well-known/apple-app-site-association` and matching `applinks:` entitlement. Android App Links require Digital Asset Links (`assetlinks.json`) and `android:autoVerify="true"` on the intent filter. Unverified deep links allow intent-injection — a malicious app can register the same scheme and intercept tokens, OAuth callbacks, magic links.
@@ -99,7 +99,7 @@ You are a paranoid mobile platform reviewer for React Native apps. You validate 
 
 ### Legacy bridge instead of TurboModules
 ```typescript
-// BAD — legacy NativeModules API (removed in RN 0.82)
+// BAD — legacy NativeModules API (on the removal track from RN 0.83+; runs only via the interop shim)
 import { NativeModules } from 'react-native';
 const { LegacyPayment } = NativeModules;
 LegacyPayment.charge(amount, currency, (err, result) => { /* ... */ });
@@ -184,7 +184,7 @@ if (__DEV__) console.log('Auth response', { user });
 # BAD — bare-workflow Podfile not enabling Hermes
 :hermes_enabled => false
 
-# GOOD — Hermes on (default since RN 0.70; required for New Architecture)
+# GOOD — Hermes on (default since RN 0.70; strongly recommended under the New Architecture)
 :hermes_enabled => true
 ```
 
@@ -312,7 +312,8 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.Arguments;
 
 // BAD pattern still found in legacy bases — extends ReactContextBaseJavaModule.
-// This class will fail to compile on RN 0.82+ (bridge removed). Migrate to TurboModule.
+// On RN 0.82 this still runs via the interop layer, but Legacy Architecture code
+// removal starts at 0.83 and continues over later versions. Migrate to TurboModule.
 public class LegacyAuthModule extends ReactContextBaseJavaModule {
 
   public LegacyAuthModule(ReactApplicationContext ctx) { super(ctx); }
@@ -340,7 +341,8 @@ public class LegacyAuthModule extends ReactContextBaseJavaModule {
 ```objective-c
 // ios/Legacy/LegacyAuthModule.m
 #import <React/RCTBridgeModule.h>     // BAD — RCTBridgeModule is the legacy bridge API.
-                                       // Removed in RN 0.82; replace with a TurboModule spec.
+                                       // Still runs via the interop layer on RN 0.82, but on the
+                                       // removal track (0.83+); replace with a TurboModule spec.
 
 @interface LegacyAuthModule : NSObject <RCTBridgeModule>
 @end
@@ -459,9 +461,9 @@ export function assertSecureRuntime() {
 ### Architecture
 | Current | Target | Risk |
 |---------|--------|------|
-| Bridge (RCTBridgeModule) | TurboModules + Fabric | CRITICAL — bridge removed in RN 0.82 |
+| Bridge (RCTBridgeModule) | TurboModules + Fabric | CRITICAL — Legacy Architecture removal starts RN 0.83; interop-only on 0.82 |
 | JSC | Hermes | HIGH — JSC blocks New Architecture |
-| Expo SDK 50 | SDK 53+ | HIGH — past-of-life |
+| Expo SDK 51 | current SDK | HIGH — past end-of-life |
 
 ### Native Modules
 | Module | iOS | Android | Parity | Architecture |
@@ -504,7 +506,7 @@ export function assertSecureRuntime() {
 | SecureStore | `refresh_token` | OK |
 
 ### Recommendations (priority order)
-1. Migrate `PaymentModule` to TurboModule before RN 0.82 upgrade
+1. Migrate `PaymentModule` to TurboModule — Legacy Architecture code removal begins at RN 0.83, so do not stay on the interop shim
 2. Enable EAS Update code-signing in app.json + commit certificate (not key) to repo
 3. Move `jwt` from AsyncStorage to SecureStore with `WHEN_UNLOCKED_THIS_DEVICE_ONLY`
 4. Add `android:autoVerify="true"` to App Link intent filter; host `assetlinks.json`
@@ -547,8 +549,8 @@ These tiers are the **internal triage view** used when you produce a human-reada
 
 | Triage tier | Examples | Internal action recommendation |
 |-------------|----------|--------------------------------|
-| CRITICAL | Unsigned OTA update channel · JWT/refresh token in AsyncStorage · custom-scheme-only OAuth callback · legacy bridge on RN 0.82+ · prompt-injectable deep-link handler | BLOCK release |
-| HIGH | Missing Hermes on New Architecture path · `autoVerify="false"` or absent on App Link · console.log of token/PII · Expo SDK ≤ 51 on new app · binary payload >1MB across bridge | Fix before next release |
+| CRITICAL | Unsigned OTA update channel · JWT/refresh token in AsyncStorage · custom-scheme-only OAuth callback · legacy bridge on RN 0.82+ (interop-only, removal starts 0.83) · prompt-injectable deep-link handler | BLOCK release |
+| HIGH | Missing Hermes on New Architecture path · `autoVerify="false"` or absent on App Link · console.log of token/PII · Expo SDK past end-of-life on new app · binary payload >1MB across bridge | Fix before next release |
 | MEDIUM | Partial native-module parity (one platform missing a method) · unbatched bridge calls in hot loop · missing rollback OTA channel · Flipper still wired in CI | Fix soon |
 | LOW | Missing splash screen · `requiresMainQueueSetup` not declared · legacy NativeModules import alongside TurboModule version | Backlog |
 
@@ -590,11 +592,12 @@ All URLs verified reachable on the retrieval date shown. Living documentation pa
 
 **Release / New Architecture default (dated posts)**
 - [React Native 0.76 — New Architecture by default (React Native blog)](https://reactnative.dev/blog/2024/10/23/release-0.76-new-architecture) — published 2024-10-23
-- [React Native 0.81 release (React Native blog)](https://reactnative.dev/blog/2025/08/12/react-native-0.81) — published 2025-08-12
+- [React Native 0.82 — "A New Era": New Architecture is the only architecture; opt-out ignored; Legacy Architecture code removal scheduled from 0.83; interop layers retained (React Native blog)](https://reactnative.dev/blog/2025/10/08/react-native-0.82) — published 2025-10-08, retrieved 2026-07-23
 
 **OTA code-signing & secure storage (Expo)**
 - [Expo — EAS Update code signing](https://docs.expo.dev/eas-update/code-signing/) — retrieved 2026-07-08
 - [Expo — SecureStore (Keychain / Keystore) SDK reference](https://docs.expo.dev/versions/latest/sdk/securestore/) — retrieved 2026-07-08
+- [Expo — SDK versions (current SDK ↔ React Native version mapping)](https://docs.expo.dev/versions/latest/) — retrieved 2026-07-23 (SDK 57 → RN 0.86)
 
 **Deep-link / universal-link verification (platform docs)**
 - [Android Developers — Verify Android App Links (Digital Asset Links, autoVerify)](https://developer.android.com/training/app-links/verify-android-applinks) — retrieved 2026-07-08
@@ -607,10 +610,10 @@ All URLs verified reachable on the retrieval date shown. Living documentation pa
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
-- Every compiler warning, linter warning, deprecation notice (including RN 0.82 bridge-removal warnings), Expo SDK end-of-life notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
+- Every compiler warning, linter warning, deprecation notice (including RN 0.82+ Legacy Architecture removal notices), Expo SDK end-of-life notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
 - Warnings block phase advancement (critical → medium) until resolved or explicitly waived in the plan's `## Decisions Taken Under Ambiguity` section.
 
-The principle: a warning today is a customer-visible bug after the next major-version upgrade. A `RCTBridgeModule` that compiles green on RN 0.76 with a deprecation warning is a hard build failure on RN 0.82.
+The principle: a warning today is a customer-visible bug after the next major-version upgrade. A `RCTBridgeModule` that compiles green on RN 0.76 still runs on RN 0.82 only through the interop layer, and its underlying Legacy Architecture APIs are on a removal track that starts at RN 0.83 — a deferred hard build failure, not an avoided one.

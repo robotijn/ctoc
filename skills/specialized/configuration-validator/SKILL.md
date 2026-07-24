@@ -251,7 +251,7 @@ int main() {
 }
 ```
 
-### JavaScript / TypeScript — `envalid` and `zod-env`
+### JavaScript / TypeScript — `envalid` and `zod`
 
 ```typescript
 // BAD: process.env directly + manual fallbacks; "true" is truthy as a string, "false" is also truthy
@@ -273,16 +273,16 @@ export const env = cleanEnv(process.env, {
     TIMEOUT_MS:  num({ default: 30_000 }),
 });
 
-// SAFE option B — zod-env: zod schema as the canonical env contract
+// SAFE option B — zod: a zod schema as the canonical env contract
 import { z } from "zod";
 
 const EnvSchema = z.object({
     NODE_ENV:     z.enum(["development", "staging", "production"]),
     PORT:         z.coerce.number().int().min(1).max(65_535),
-    API_BASE_URL: z.string().url(),
+    API_BASE_URL: z.url(),
     DEBUG:        z.preprocess(v => v === "true" || v === "1", z.boolean()).default(false),
     SIGNING_KEY:  z.string().min(32),
-    DATABASE_URL: z.string().url(),
+    DATABASE_URL: z.url(),
     TIMEOUT_MS:   z.coerce.number().int().positive().lt(60_000).default(30_000),
 });
 export const env = EnvSchema.parse(process.env);    // throws at module load → fail-closed boot
@@ -424,7 +424,7 @@ The integrator uses `confidence` and `category` to weight findings. `actual_valu
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

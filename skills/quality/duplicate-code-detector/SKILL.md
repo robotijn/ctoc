@@ -50,7 +50,7 @@ Five pillars served: **maintainability** (primary) + **reliability** (bug propag
 - **WET beats wrong DRY**. The extracted helper must obey the Single Responsibility Principle. "DRY everything" produces god-functions with 12 parameters and conditional spaghetti — strictly worse than the duplication. If the extraction would require >4 parameters or >2 boolean flags, **don't extract** — name the duplication and move on.
 - **Self-documenting helper names**. Verb-noun, explains WHY it exists at the call site. `validateEntityFields()` not `helper2()`. The reader at the call site must understand intent without jumping to the definition.
 - **Cross-link smells**. A duplicate-code finding often pairs with a code smell ([[code-smell-detector]]), an architecture violation ([[architecture-checker]] — e.g., the same module being re-implemented in two bounded contexts), or a complexity hotspot ([[complexity-analyzer]]). Surface the cluster, not the isolated finding.
-- **Tool layering**. Token-based scanners (jscpd, PMD CPD, Simian) catch T1/T2 cheaply at PR time. AST-based (NiCad, deckard) catch T3. Semantic / ML-based (SourcererCC for T1–T3 at scale; ASTNN, Oreo, BiLSTM-on-IR, LLM-ensemble for T4) catch behavior clones — schedule them nightly, not per-PR. SourcererCC is the canonical baseline: scaled to 250M LOC with 100% T1 recall, 97–100% T2, 86–99% T3 (per the SourcererCC paper, arXiv:1603.01661).
+- **Tool layering**. Token-based scanners (jscpd, PMD CPD, Simian) catch T1/T2 cheaply at PR time. AST-based (NiCad, deckard) catch T3. Semantic / ML-based (SourcererCC for T1–T3 at scale; ASTNN, Oreo, BiLSTM-on-IR, LLM-ensemble for T4) catch behavior clones — schedule them nightly, not per-PR. SourcererCC is the canonical baseline: it scales to 250 MLOC on a standard workstation and detects Type-1 through Type-3 clones at ~86% precision with 86–100% recall (per the SourcererCC tools paper, arXiv:1603.01661).
 - **Differential scanning on PRs**. Scan the diff plus its callers, not the whole repo. Persist a baseline duplication report; emit `delta_to_baseline: new | unchanged | regressed` so the integrator can suppress already-accepted duplication.
 - **AI-generated code amplifies duplication**. LLM coding assistants regenerate boilerplate from training data, producing T1/T2 clones across files even when the developer didn't copy-paste. Treat AI-touched files (commit author = bot, or `git blame` containing `Copilot`/`Claude`/`Cursor`) with stricter thresholds.
 
@@ -301,8 +301,8 @@ SELECT region, COUNT(*) FROM active_users GROUP BY region;
 ```bash
 # jscpd — 223+ formats, Rabin-Karp tokenizer
 npx jscpd src/ --min-lines 5 --min-tokens 50 --reporters json,sarif --output reports/
-# PMD CPD — token-aware across 31 languages; reports N-way duplicates as one group
-pmd cpd --files src/ --minimum-tokens 50 --format sarif > reports/cpd.sarif
+# PMD CPD — token-aware across many languages; reports N-way duplicates as one group
+pmd cpd --dir src/ --minimum-tokens 50 --format xml > reports/cpd.xml
 # Simian — fast cross-language line-based detector
 simian -threshold=6 src/**/*
 ```
@@ -334,7 +334,7 @@ Baseline is regenerated when an extraction lands (the group should disappear, no
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used in human-readable reports. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see refinement-loop footer and [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used in human-readable reports. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see refinement-loop footer and [warnings-are-critical](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |-------|----------|--------|
@@ -389,14 +389,13 @@ These tiers are the **internal triage view** used in human-readable reports. Whe
 | Tool | Layer | Languages | Clone types | When |
 |------|-------|-----------|------------|------|
 | **jscpd** | Token (Rabin-Karp) | 223+ formats, ships with MCP server + AI agent skills | T1, T2 | Every PR; ships SARIF |
-| **PMD CPD** | Token | 31 (incl. Java, C#, C/C++, Python, JS, Apex, PL/SQL) | T1, T2; reports N-way groups (jscpd reports pairwise) | Every PR; SARIF and CSV |
-| **Simian** | Line-based | Java, C#, C++, Ruby, COBOL, HTML, XML, Groovy, and `.ini`/`.properties` | T1, light T2 | Fast cross-language scan; commercial license |
+| **PMD CPD** | Token | Many (Java, C#, C/C++, Python, JS, Apex, PL/SQL, Go, Kotlin, Swift, and more) | T1, T2; reports N-way groups (jscpd reports pairwise) | Every PR; XML and CSV |
+| **Simian** | Line-based | Java, C#, C/C++, JS/TS, Python, Ruby, PHP, COBOL, HTML, XML, and more | T1, light T2 | Fast cross-language scan; commercial license |
 | **NiCad** | AST-normalized | C, Java, C#, Python | T1, T2, T3 (very-strong / strong / moderate) | Nightly; deeper than token tools |
-| **SourcererCC** | Index + token; scales to 250M LOC | Java, C, C#, Python | T1 (100% recall), T2 (97–100%), T3 (86–99%) per arXiv:1603.01661 | Monorepo-scale scheduled scans |
+| **SourcererCC** | Index + token; scales to 250 MLOC | Java, C, C#, Python | T1–T3; ~86% precision, 86–100% recall (arXiv:1603.01661) | Monorepo-scale scheduled scans |
 | **Deckard** | AST + LSH | C, Java | T1, T2, light T3 | Research / one-off audits |
 | **ASTNN / Oreo / BiLSTM-on-IR / LLM-ensemble** | Semantic / ML | Java primarily | T3, T4 | Research signal on hot modules; not production-ready drop-in |
 | **SonarQube duplication rules** | Token + project policy | 30+ languages | T1, T2 | CI gate with team-wide duplication budget |
-| **Roslyn analyzers + dotnet-format** | Compiler-integrated, .NET | C#, F#, VB | T1, T2 within a project | IDE / build-time for .NET |
 
 ```bash
 # JS/TS — jscpd with SARIF for GitHub code-scanning aggregation
@@ -404,26 +403,26 @@ npx jscpd src/ --min-lines 5 --min-tokens 50 \
     --reporters json,sarif --ignore "**/*.test.ts,**/node_modules/**,**/generated/**" \
     --output reports/
 
-# Java — PMD CPD with SARIF
-pmd cpd --dir src/ --language java --minimum-tokens 75 --format sarif > reports/cpd-java.sarif
+# Java — PMD CPD (XML report; convert to SARIF downstream if needed)
+pmd cpd --dir src/ --language java --minimum-tokens 75 --format xml > reports/cpd-java.xml
 
 # Python — pylint duplicate-code check + jscpd cross-check
 pylint --disable=all --enable=duplicate-code src/
-npx jscpd src/ --languages python --min-lines 5
+npx jscpd src/ --format python --min-lines 5
 
-# C# / .NET — Roslyn analyzers via SDK + PMD CPD for cross-project clones
-dotnet build /p:AnalysisMode=All
-pmd cpd --dir src/ --language cs --minimum-tokens 75 --format sarif > reports/cpd-cs.sarif
+# C# / .NET — PMD CPD for cross-project clones (dotnet format/Roslyn analyzers
+# fix style and quality rules but do NOT detect clones)
+pmd cpd --dir src/ --language cs --minimum-tokens 75 --format xml > reports/cpd-cs.xml
 
-# C / C++ — PMD CPD (cpd_language=cpp) or NiCad for deeper T3
-pmd cpd --dir src/ --language cpp --minimum-tokens 75 --format sarif > reports/cpd-cpp.sarif
-nicad6 functions cpp src/ default-report
+# C / C++ — PMD CPD (--language cpp); NiCad handles the C portion (no distinct C++ front end)
+pmd cpd --dir src/ --language cpp --minimum-tokens 75 --format xml > reports/cpd-cpp.xml
+nicad6 functions c src/ default-report
 
 # SQL — jscpd treats SQL as a first-class language; also look for repeated CTEs by grep
 npx jscpd "**/*.sql" --min-lines 3 --min-tokens 30
 ```
 
-Aggregate SARIF into the GitHub code-scanning dashboard so duplicates collapse across tools. Pin a CI step that fails when this skill emits any letter — per warnings-are-bugs, every finding is `critical` on the wire.
+Feed jscpd's SARIF (and SonarQube's findings) into the GitHub code-scanning dashboard so duplicates collapse across tools; PMD CPD emits XML/CSV, so convert it before aggregating. Pin a CI step that fails when this skill emits any letter — per warnings-are-bugs, every finding is `critical` on the wire.
 
 ## Special Considerations
 
@@ -478,7 +477,7 @@ Waivers MUST be documented in the plan's `## Decisions Taken Under Ambiguity` wi
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

@@ -449,7 +449,7 @@ from statsmodels.stats.proportion import proportions_ztest, proportion_confint
 analysis = NormalIndPower()
 # Cohen's h for two proportions: h = 2*arcsin(sqrt(p2)) - 2*arcsin(sqrt(p1))
 import math
-h = 2*math.asin(math.sqrt(0.27)) - 2*math.asin(math.sqrt(0.22))  # ~ 0.1116
+h = 2*math.asin(math.sqrt(0.27)) - 2*math.asin(math.sqrt(0.22))  # ~ 0.116
 n_per_arm = analysis.solve_power(
     effect_size=h,
     alpha=0.05, power=0.80, alternative="two-sided",
@@ -620,7 +620,7 @@ Internal triage tiers (used in human-readable reports):
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every experiment-design gap (missing sample size, missing SRM check, naive peeking, two primaries, no segment audit, novelty ignored, no holdout, no A/A) emits as `severity: critical` in the letter to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

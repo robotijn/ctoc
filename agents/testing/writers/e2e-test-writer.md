@@ -33,23 +33,23 @@ test.describe('User Authentication', () => {
     // Navigate to signup
     await page.goto('/signup');
 
-    // Fill signup form
-    await page.fill('[data-testid="email"]', 'test@example.com');
-    await page.fill('[data-testid="password"]', 'SecurePass123!');
-    await page.click('[data-testid="submit"]');
+    // Fill signup form via locators (auto-waiting, retry-able)
+    await page.getByLabel('Email').fill('test@example.com');
+    await page.getByLabel('Password').fill('SecurePass123!');
+    await page.getByRole('button', { name: 'Sign up' }).click();
 
-    // Verify redirect to dashboard
+    // Verify redirect to dashboard with web-first assertions
     await expect(page).toHaveURL('/dashboard');
-    await expect(page.locator('h1')).toContainText('Welcome');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Welcome');
   });
 
   test('user sees error with invalid credentials', async ({ page }) => {
     await page.goto('/login');
-    await page.fill('[data-testid="email"]', 'wrong@example.com');
-    await page.fill('[data-testid="password"]', 'wrongpass');
-    await page.click('[data-testid="submit"]');
+    await page.getByLabel('Email').fill('wrong@example.com');
+    await page.getByLabel('Password').fill('wrongpass');
+    await page.getByRole('button', { name: 'Log in' }).click();
 
-    await expect(page.locator('[data-testid="error"]')).toBeVisible();
+    await expect(page.getByTestId('error')).toBeVisible();
   });
 });
 ```
@@ -73,10 +73,10 @@ test.describe('User Authentication', () => {
 
 ## Best Practices
 
-1. **Use data-testid** - Don't rely on CSS classes
-2. **Wait properly** - Use Playwright's auto-waiting
-3. **Isolate tests** - Each test should be independent
-4. **Seed data** - Don't depend on previous tests
+1. **Prefer user-facing locators** - `getByRole`/`getByLabel`/`getByText` first; fall back to `getByTestId` when no user-facing attribute fits. Avoid brittle CSS/XPath selectors.
+2. **Wait properly** - Rely on Playwright's auto-waiting and web-first assertions (`expect(locator).toBeVisible()`); never insert hard sleeps like `page.waitForTimeout`.
+3. **Isolate tests** - Each test runs independently with its own storage/cookies; set state in `beforeEach`, not via prior tests.
+4. **Seed data** - Don't depend on previous tests.
 
 ## Output Format
 

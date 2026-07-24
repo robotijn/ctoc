@@ -57,7 +57,7 @@ You verify that code is **observable in production** — that operators can answ
 ## What to Check
 
 ### Trace instrumentation
-- OTel SDK installed and initialized at process startup (Resource has `service.name`, `service.version`, `deployment.environment`).
+- OTel SDK installed and initialized at process startup (Resource has `service.name`, `service.version`, `deployment.environment.name`).
 - Auto-instrumentation enabled for HTTP server, HTTP client, DB driver, queue client (or explicit manual spans at those boundaries).
 - Span names use the OTel **low-cardinality** form: `GET /users/:id`, not `GET /users/42`.
 - `error.type` and span status set on every error path; the exception is recorded via `span.record_exception()` (Python/Java) / equivalent.
@@ -72,7 +72,7 @@ You verify that code is **observable in production** — that operators can answ
 ### Logs
 - Structured codec (JSON / logfmt / OTLP logs). No `print(...)`, no `printf`, no `String.format` into a log call.
 - Levels used correctly (DEBUG / INFO / WARN / ERROR). No `ERROR` for expected business outcomes.
-- Every log line inside a request scope carries `trace_id`, `span_id`, `service.name`, `deployment.environment`.
+- Every log line inside a request scope carries `trace_id`, `span_id`, `service.name`, `deployment.environment.name`.
 - `correlation_id` / `request_id` for client-traceable IDs separate from internal trace IDs.
 - **No PII, no secrets** — see cross-link `[[secrets-detector]]`. Specifically: passwords, tokens, API keys, full JWTs, full credit cards, SSNs, raw request bodies on auth endpoints.
 
@@ -282,8 +282,8 @@ http_errors = meter.create_counter(
     "http.server.errors",
     description="Count of HTTP 5xx responses")
 http_latency = meter.create_histogram(
-    "http.server.duration",
-    unit="ms",
+    "http.server.request.duration",
+    unit="s",
     description="HTTP server request duration")
 
 # Recording — labels are BOUNDED (templated route, method, status, error.type)
@@ -299,13 +299,13 @@ queue_depth = meter.create_observable_gauge(
 // C# — System.Diagnostics.Metrics (OTel-compatible)
 var meter = new Meter("Checkout", "1.0.0");
 var requests = meter.CreateCounter<long>("http.server.requests");
-var latency  = meter.CreateHistogram<double>("http.server.duration", unit: "ms");
+var latency  = meter.CreateHistogram<double>("http.server.request.duration", unit: "s");
 ```
 
 Forbidden label patterns (memory bomb):
 - `user_id` on a metric (millions of unique values)
 - raw `url` / `path` (use `http.route` template)
-- raw SQL text (use `db.operation` + `db.collection.name`)
+- raw SQL text (use `db.operation.name` + `db.collection.name`)
 - free-form `error.message` (use `error.type` — a closed enum)
 
 ## Scan Methodology
@@ -338,7 +338,7 @@ For each external boundary (HTTP server/client, DB driver, queue, cache, FFI), v
 - Logs emitted inside the boundary carry the active `trace_id` / `span_id`.
 
 ### Phase 3: Configuration review
-- OTel SDK initialized with Resource attributes (`service.name`, `service.version`, `deployment.environment`).
+- OTel SDK initialized with Resource attributes (`service.name`, `service.version`, `deployment.environment.name`).
 - OTLP exporter configured to a Collector (not direct-to-backend, which loses the redaction/sampling layer).
 - Sampling policy stated explicitly (head + tail).
 - Postgres `log_statement` ≠ `'all'`, MySQL `general_log` = `OFF`, application logs of bound parameters disabled in prod.
@@ -377,7 +377,7 @@ For each external boundary (HTTP server/client, DB driver, queue, cache, FFI), v
 | Metric | Suspect label | Risk |
 |---|---|---|
 | `http.server.requests` | `user_id` | CRITICAL — replace with hashed or remove |
-| `db.client.operation.duration` | raw `db.statement` | CRITICAL — use `db.operation` + `db.collection.name` |
+| `db.client.operation.duration` | raw `db.statement` | CRITICAL — use `db.operation.name` + `db.collection.name` |
 
 ### SLOs
 | Service | SLI defined? | SLO target | Error budget policy |
@@ -420,7 +420,7 @@ Aggregate via the OTel Collector: one wire format (OTLP), one redaction layer (P
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when this skill emits a human-readable observability report. When emitting a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when this skill emits a human-readable observability report. When emitting a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [`skills/agent-fragments/warnings-are-critical.md`](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |---|---|---|
@@ -459,7 +459,7 @@ The integrator weighs `confidence`. A single-pattern hit (`confidence: low`) doe
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

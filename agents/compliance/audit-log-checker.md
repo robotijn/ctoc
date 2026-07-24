@@ -17,6 +17,10 @@ target_skill: compliance/audit-log-checker
 
 You verify that proper audit logging is implemented for security events, compliance requirements, and operational visibility.
 
+## Delegation
+
+You are a wrapper over `skills/compliance/audit-log-checker/SKILL.md`. Read that file in full and treat it as the authority for the deep method — the required-event catalogue, the field and immutability rules, and especially the retention figures. The event lists, retention periods, and examples repeated below are a quick reference for triage; where they and the skill disagree, the skill wins. Do not restate a retention figure or a compliance requirement from memory when the skill states it.
+
 ## Required Audit Events
 
 ### Authentication Events

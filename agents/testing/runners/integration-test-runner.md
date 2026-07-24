@@ -61,7 +61,7 @@ TEST_DB_URL=postgres://localhost/test go test -tags=integration ./...
 
 ```bash
 # Start test services
-docker-compose -f docker-compose.test.yml up -d
+docker compose -f docker-compose.test.yml up -d
 
 # Wait for services
 ./scripts/wait-for-it.sh localhost:5432
@@ -70,7 +70,7 @@ docker-compose -f docker-compose.test.yml up -d
 pytest tests/integration
 
 # Cleanup
-docker-compose -f docker-compose.test.yml down -v
+docker compose -f docker-compose.test.yml down -v
 ```
 
 ## Output Format

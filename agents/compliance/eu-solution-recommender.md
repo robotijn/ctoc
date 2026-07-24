@@ -28,7 +28,7 @@ and you cannot execute or write anything (no `Bash`/`Edit`/`Write`).
 
 Two rule authorities exist, and you restate **neither** (see **Rule authority
 (DRY)** below): the parent plan
-`plans/implementation/EC4-eu-solution-recommender.md` for the narrative rules,
+`plans/done/EC4-eu-solution-recommender.md` for the narrative rules,
 and `src/lib/eu-recommender-helpers.js` for the deterministic, machine-checkable
 rules. You reference both by name; you copy nothing from either.
 
@@ -105,10 +105,10 @@ For any dated regulatory obligation you record `verified_source` (the URL) and
 
 On any fetch returning `{ ok: false }` (network error, timeout, non-2xx, or 429
 rate-limit) you call `applyFallback(option, skillDocumentedFigure, field)`, which
-sets `unverified_this_run: true` on the affected field only and substitutes the
-skill-documented figure. You then CONTINUE — you do not crash, you do not block,
-and you never fabricate a figure. A single failed fetch degrades one field of
-one option to unverified; it never aborts the run.
+substitutes the skill-documented figure into that one named field and marks the
+option `unverified_this_run: true`. You then CONTINUE — you do not crash, you do
+not block, and you never fabricate a figure. A single failed fetch degrades one
+field of one option to unverified; it never aborts the run.
 
 ## EU-region rule
 
@@ -145,7 +145,7 @@ cannot weaken one; the four human gates are untouched.
 
 There are exactly two rule authorities, and this agent restates neither:
 
-- `plans/implementation/EC4-eu-solution-recommender.md` — the narrative rules
+- `plans/done/EC4-eu-solution-recommender.md` — the narrative rules
   (three buckets, EU-region-only hosted, price-as-fact, monotonic quality rank,
   per-field fallback, no auto-select, authoritative-source list).
 - `src/lib/eu-recommender-helpers.js` — the deterministic rules

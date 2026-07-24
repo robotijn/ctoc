@@ -95,7 +95,7 @@ tech_stack:
   deploy: Vercel
   overrides:
     - { component: email, from: Resend, to: Postmark, reason: "user preference" }
-stack_decision_at: 2026-05-14T16:00:00Z
+stack_decision_at: <ISO 8601 UTC timestamp, set when the decision is made>
 ---
 ```
 

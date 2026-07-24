@@ -57,7 +57,7 @@ Smoke testing in 2026 is a strict, opinionated discipline. The pattern that surv
 
 ## Anti-patterns (severity reconciliation)
 
-These categories all emit `severity: critical` on the wire per the warnings-are-bugs rule (see footer + [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)). The triage tier in the report body is shown for prioritization.
+These categories all emit `severity: critical` on the wire per the warnings-are-bugs rule (see footer + [agent-fragments/warnings-are-critical.md](../../../agent-fragments/warnings-are-critical.md)). The triage tier in the report body is shown for prioritization.
 
 | Anti-pattern | Why it's critical | Triage tier |
 |---|---|---|
@@ -74,7 +74,7 @@ These categories all emit `severity: critical` on the wire per the warnings-are-
 
 ### Severity on the wire vs. in the report
 
-The triage tier column above is the **report view** — what a human reads in the markdown summary so they can prioritize fixes. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see footer + [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)). There is no soft tier on the wire. The triage tiers stay in the report for ordering; the letter's `severity` field is always `critical`. The integrator uses `confidence` and `kind` (e.g. `flake_suspected` vs `version_mismatch`) to weight findings — not severity.
+The triage tier column above is the **report view** — what a human reads in the markdown summary so they can prioritize fixes. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see footer + [agent-fragments/warnings-are-critical.md](../../../agent-fragments/warnings-are-critical.md)). There is no soft tier on the wire. The triage tiers stay in the report for ordering; the letter's `severity` field is always `critical`. The integrator uses `confidence` and `kind` (e.g. `flake_suspected` vs `version_mismatch`) to weight findings — not severity.
 
 ## What Smoke Tests Check (the canonical 5)
 
@@ -225,8 +225,9 @@ def test_auth_endpoint_exists(base_url):
 ```
 
 ```bash
-# Run only smoke, abort everything on first fail, 2-min wall-clock max
-pytest -m smoke --maxfail=1 --timeout=120 -x
+# Run only smoke, abort on first fail. --timeout is PER-TEST (30s hang guard);
+# --session-timeout caps the WHOLE run at the 2-min budget (pytest-timeout >= 2.3.0).
+pytest -m smoke --maxfail=1 --timeout=30 --session-timeout=120 -x
 ```
 
 ### C# / .NET — quick HTTP probe set
@@ -430,10 +431,10 @@ The integrator treats `kind: flake_suspected` as `confidence: low` and may reque
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
-- The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
+- The [letter schema](../../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.
 - Warnings block phase advancement (critical → medium) until resolved or explicitly waived in the plan's `## Decisions Taken Under Ambiguity` section.
 
 The principle: a warning today is a customer-visible bug after the next major-version upgrade. Code that ships green-with-warnings ships with known latent failures.

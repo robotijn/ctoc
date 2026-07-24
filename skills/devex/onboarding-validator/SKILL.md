@@ -42,7 +42,7 @@ You validate that new developers can successfully onboard to the project by audi
 
 - **One-command bootstrap is the bar**: README has Prerequisites + a single bootstrap command (`./scripts/bootstrap.sh`, `make bootstrap`, `mise install`, `devbox shell`, `nix develop`). Multi-step manual setup is a finding. The first 2 lines of README must answer "what is this?" and "why should I care?"
 - **Devcontainer / Codespaces ready**: `.devcontainer/devcontainer.json` checked in; project opens green in Codespaces. Prebuilds enabled on `main` so a new joiner gets a precomputed environment instead of waiting on container build (`Settings → Codespaces → Prebuilds`, trigger `every push` for main).
-- **Tool versions pinned, not assumed**: `.tool-versions` (asdf), `.mise.toml` (mise), `flake.nix` / `devbox.json` (nix/devbox), `.nvmrc` (Node), `.python-version` / `pyproject.toml` (Python), `global.json` (.NET), `.java-version` / `mise.toml` (Java), Maven/Gradle wrapper (`mvnw` / `gradlew`), `Dockerfile` base-image SHA pinning. Mise (Rust, ~10–30 ms activation) is the modern polyglot manager replacing asdf (~200–500 ms shell startup) per the mise project's benchmarks; treat either as acceptable, but at least one MUST be present in a polyglot repo.
+- **Tool versions pinned, not assumed**: `.tool-versions` (asdf), `.mise.toml` (mise), `flake.nix` / `devbox.json` (nix/devbox), `.nvmrc` (Node), `.python-version` / `pyproject.toml` (Python), `global.json` (.NET), `.java-version` / `mise.toml` (Java), Maven/Gradle wrapper (`mvnw` / `gradlew`), `Dockerfile` base-image SHA pinning. Mise (Rust, ~10 ms per-directory activation — 4 ms with no change, 14 ms on a full reload) is the modern polyglot manager replacing asdf (~120 ms of shim overhead per runtime call), per mise's own comparison page; treat either as acceptable, but at least one MUST be present in a polyglot repo.
 - **CONTRIBUTING.md is mandatory**: how to test (`make test`), how to lint, how to open a PR, how releases happen, code-of-conduct link, DCO (Developer Certificate of Origin) / CLA (Contributor License Agreement) policy if applicable. Without it, every new contributor re-asks the same questions.
 - **`.env.example` with comments, never real secrets**: every variable used by `process.env` / `os.environ` must have an entry; comment what it does and where to get the value (e.g. "Stripe test key — dashboard.stripe.com/test/apikeys"). Never commit real keys, even "dev only" — see [[secrets-detector]].
 - **Project structure documented**: a short `## Project Structure` section listing what lives where (one line per top-level dir). Stops the "where do I put X?" question.
@@ -330,7 +330,12 @@ pnpm = "9.12.0"
 
 ```bash
 # scripts/bootstrap.sh fragment for TS
-corepack enable                       # activates pnpm version pinned in package.json
+# corepack shipped with Node 14.19–24 and activates the pnpm version pinned in
+# `packageManager`. It was removed from the Node distribution in 25+, so prefer a
+# standalone pnpm (mise, the pnpm install script, or `npm i -g pnpm`) — pnpm's own
+# docs now recommend standalone install. This line uses corepack when present and
+# does not fail the bootstrap when it is absent.
+corepack enable 2>/dev/null || command -v pnpm >/dev/null || { echo "install pnpm: https://pnpm.io/installation"; exit 1; }
 pnpm install --frozen-lockfile        # fails if lockfile is stale
 pnpm run db:setup
 ```
@@ -349,7 +354,7 @@ Edge cases: mixing `npm`/`yarn`/`pnpm` in the same repo, missing `--frozen-lockf
 
 ```yaml
 # SAFE: docker-compose.yml — local services, pinned, seeded, with healthchecks
-version: "3.9"
+# (no top-level `version:` key — it is obsolete under Compose V2 and only emits a warning)
 
 services:
   db:
@@ -441,7 +446,12 @@ need README.md
 need CONTRIBUTING.md
 need .env.example
 need LICENSE
-need scripts/bootstrap.sh || need Makefile
+
+# one-command bootstrap: either scripts/bootstrap.sh OR a Makefile.
+# (`need x || need y` does NOT express this — need() always returns 0, so the
+#  `||` fallback never fires and a Makefile-only repo is falsely flagged.)
+[[ -f scripts/bootstrap.sh || -f Makefile ]] \
+  || echo "MISSING: scripts/bootstrap.sh (or a Makefile bootstrap target)"
 
 # at least one version-pin file
 pin_found=0
@@ -475,8 +485,11 @@ qs_steps=$(awk '/^## *Quick Start/{f=1;next} /^## /{f=0} f' README.md \
 ```bash
 [[ -f .env.example ]] || { echo "MISSING: .env.example"; exit 0; }
 
-# every env var referenced in source must appear in .env.example
-rg --no-filename -o '(process\.env|os\.environ\[|os\.getenv\()\.?[A-Z_]+' src \
+# every env var referenced in source must appear in .env.example.
+# The separator class [^A-Za-z0-9]? absorbs the `.` (process.env.FOO), the `[`/quote
+# (os.environ['FOO']), and the `(`/quote (os.getenv("FOO")) — a bare `\.?` matched
+# only the JS dot form and silently missed both Python forms.
+rg --no-filename -o '(process\.env|os\.environ\[|os\.getenv\()[^A-Za-z0-9]?[A-Z_]+' src \
   | rg -o '[A-Z][A-Z0-9_]+' | sort -u \
   | while read var; do
       grep -q "^${var}=" .env.example || echo "UNDOCUMENTED env var: $var"
@@ -500,19 +513,23 @@ docker run --rm -v "$PWD":/repo -w /repo \
 ### 5. Version-pin consistency
 
 ```bash
-# .nvmrc vs package.json engines.node must agree (if both exist)
+# .nvmrc vs package.json engines.node must agree (if both exist).
+# Compare on major.minor: .nvmrc pins a patch (20.18.0) but engines.node is a
+# range (">=20.18 <21"), so a full-version substring check would false-positive.
 if [[ -f .nvmrc && -f package.json ]]; then
-  nvmrc=$(tr -d 'v\n' < .nvmrc)
+  nvmrc=$(tr -d 'v \n' < .nvmrc)                 # e.g. 20.18.0
   engine=$(jq -r '.engines.node // empty' package.json)
-  [[ -n "$engine" && "$engine" != *"$nvmrc"* ]] \
+  mm="${nvmrc%.*}"                               # major.minor -> 20.18
+  [[ -n "$engine" && "$engine" != *"$mm"* ]] \
     && echo "VERSION-DRIFT: .nvmrc=$nvmrc vs package.json engines.node=$engine"
 fi
 
-# .python-version vs pyproject.toml requires-python
+# .python-version vs pyproject.toml requires-python (also compared on major.minor)
 if [[ -f .python-version && -f pyproject.toml ]]; then
-  pyver=$(cat .python-version)
+  pyver=$(cat .python-version)                   # e.g. 3.12.7
+  pymm=$(cut -d. -f1,2 <<< "$pyver")             # major.minor -> 3.12
   req=$(grep -E '^requires-python' pyproject.toml || true)
-  echo "$req" | grep -q "$pyver" || echo "VERSION-DRIFT: .python-version=$pyver vs $req"
+  echo "$req" | grep -qF "$pymm" || echo "VERSION-DRIFT: .python-version=$pyver vs $req"
 fi
 ```
 
@@ -520,10 +537,14 @@ fi
 
 ```bash
 if [[ -f .devcontainer/devcontainer.json ]]; then
-  jq -e '.postCreateCommand // .postCreate // empty' .devcontainer/devcontainer.json >/dev/null \
-    || echo "devcontainer: no postCreateCommand (bootstrap will not run on Codespace creation)"
-  jq -e '.image // .build // empty' .devcontainer/devcontainer.json >/dev/null \
-    || echo "devcontainer: no image or build field"
+  # devcontainer.json is JSONC (comments are legal, and appear in real files), so
+  # strip `//` line-comments before jq — bare jq errors out on a commented file.
+  # The [^"]*$ guard leaves a `//` that sits inside a quoted value (e.g. a URL) alone.
+  dc=$(sed 's://[^"]*$::' .devcontainer/devcontainer.json)
+  jq -e '.postCreateCommand // .onCreateCommand // empty' <<<"$dc" >/dev/null \
+    || echo "devcontainer: no postCreateCommand/onCreateCommand (bootstrap will not run on Codespace creation)"
+  jq -e '.image // .build // .dockerComposeFile // empty' <<<"$dc" >/dev/null \
+    || echo "devcontainer: no image, build, or dockerComposeFile field"
 fi
 ```
 
@@ -594,8 +615,8 @@ fi
 
 | Tool | Strengths | Trade-offs | When to use |
 |------|-----------|-----------|-------------|
-| **mise** | Polyglot (Node, Python, Go, Ruby, Terraform, …); Rust-based, ~10–30 ms shell activation per mise's own benchmarks; reads `.mise.toml` + `.tool-versions`; runs tasks too | Newer than asdf — smaller plugin ecosystem | Default polyglot pin manager in 2026 |
-| **asdf** | Mature plugin ecosystem; shell-script based | ~200–500 ms shell startup per mise's published comparison | Already-in-use repos; consider migration to mise |
+| **mise** | Polyglot (Node, Python, Go, Ruby, Terraform, …); Rust-based, ~10 ms per-directory activation per mise's own comparison; reads `.mise.toml` + `.tool-versions`; runs tasks too | Newer than asdf — smaller plugin ecosystem | Default polyglot pin manager in 2026 |
+| **asdf** | Mature plugin ecosystem; shell-script based | ~120 ms of shim overhead per runtime call per mise's published comparison | Already-in-use repos; consider migration to mise |
 | **devbox** | Wraps Nix without requiring users to learn Nix; `devbox.json` is JSON, not Nix-lang; per-project shells | Still pulls Nix as a runtime dep | Teams wanting Nix reproducibility without the language tax |
 | **nix-shell / flakes** | Full reproducibility; pinned to git revisions | Steep learning curve | Teams already invested in Nix |
 | **`.devcontainer/devcontainer.json`** | One config opens identically in VS Code Dev Containers and Codespaces; commit linters/formatters here | Personal theme/icon prefs must NOT be in this file | Always — even when local-only |
@@ -613,7 +634,7 @@ fi
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used when you produce a human-readable validation report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
+These tiers are the **internal triage view** used when you produce a human-readable validation report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
 | Triage tier | Examples | Internal action |
 |-------------|----------|-----------------|
@@ -658,7 +679,7 @@ The integrator uses `confidence` to weight findings — a `confidence: low` find
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every onboarding gap, missing pin file, multi-step bootstrap, undocumented env var, or broken README example emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

@@ -21,25 +21,33 @@ You validate feature store configurations, feature definitions, data quality, an
 
 ### Feature Definition
 ```python
-# Feast example
-from feast import Entity, Feature, FeatureView, FileSource
+# Feast example (current API: Entity objects, Field + schema, feast.types)
+from datetime import timedelta
+from feast import Entity, FeatureView, Field, FileSource
+from feast.types import Float32, Int64
 
-driver_entity = Entity(
-    name="driver_id",
-    value_type=ValueType.INT64,
-    description="Driver identifier"
+driver = Entity(
+    name="driver",
+    join_keys=["driver_id"],
+    description="Driver identifier",
+)
+
+driver_source = FileSource(
+    path="data/driver_stats.parquet",
+    timestamp_field="event_timestamp",
 )
 
 driver_stats = FeatureView(
     name="driver_stats",
-    entities=["driver_id"],
+    entities=[driver],
     ttl=timedelta(hours=24),
-    features=[
-        Feature(name="avg_rating", dtype=ValueType.FLOAT),
-        Feature(name="total_trips", dtype=ValueType.INT64),
-        Feature(name="acceptance_rate", dtype=ValueType.FLOAT),
+    schema=[
+        Field(name="avg_rating", dtype=Float32),
+        Field(name="total_trips", dtype=Int64),
+        Field(name="acceptance_rate", dtype=Float32),
     ],
-    source=driver_source
+    online=True,
+    source=driver_source,
 )
 ```
 
@@ -56,7 +64,7 @@ driver_stats = FeatureView(
 # Required metadata
 feature_requirements = {
     "name": str,           # Unique identifier
-    "dtype": ValueType,    # Data type
+    "dtype": type,         # feast.types type (Float32, Int64, String, ...)
     "description": str,    # What it represents
     "owner": str,          # Who maintains it
     "source": str,         # Where it comes from
@@ -128,7 +136,7 @@ lineage:
 | Property | Value |
 |----------|-------|
 | Provider | Feast |
-| Version | 0.35.0 |
+| Version | <detected> |
 | Online Store | Redis |
 | Offline Store | BigQuery |
 | Feature Views | 25 |

@@ -43,7 +43,7 @@ You help users choose and configure CI runners — primarily GitHub Actions, wit
 
 The runner is your CI's blast radius. Treat it like any production workload: ephemeral, least-privileged, network-isolated, image-pinned. The principles below are non-negotiable.
 
-- **Hosted runners for OSS, public repos, and PR-from-fork code paths**. GitHub explicitly states "self-hosted runners should almost never be used for public repositories" — any contributor can open a PR that lands code on your runner host. Hosted (GitHub-hosted, Depot, BuildJet successor, Namespace, RunsOn, Ubicloud, Blacksmith, Warpbuild) is the only safe answer when fork PRs run on your CI. Note: BuildJet shut down in January 2026 and Cirrus Runners stopped accepting customers in April 2026 — verify the provider is still operating before adopting.
+- **Hosted runners for OSS, public repos, and PR-from-fork code paths**. GitHub explicitly states "self-hosted runners should almost never be used for public repositories" — any contributor can open a PR that lands code on your runner host. Hosted (GitHub-hosted, Depot, Namespace, RunsOn, Ubicloud, Blacksmith, Warpbuild) is the only safe answer when fork PRs run on your CI. Note: BuildJet shut down in January 2026, and Cirrus Labs (Cirrus Runners) announced it is joining OpenAI — a continuity risk to weigh even though the runners service still appears to be operating. Verify any provider is still operating before adopting.
 - **Self-hosted via Actions Runner Controller (ARC) when org-wide perf needs justify it**. ARC is the GitHub-blessed Kubernetes controller for autoscaling self-hosted runners. It implements GitHub's runner scale set APIs and is the reference implementation for production self-hosted at scale. Persistent VMs as runners are a 2018 pattern — do not deploy them in 2026.
 - **Ephemeral-only — never reuse a runner**. Each job gets a fresh container/VM, destroyed after the job ends. This kills the entire class of "previous-job-leaked-state-into-mine" attacks (cache poisoning, dropped binaries in `$PATH`, lingering env vars, hijacked SSH agents). GitHub recommends autoscaling with ephemeral runners and explicitly says autoscaling with persistent self-hosted runners is not recommended.
 - **Least-privilege host access**. The runner host (or pod) should have no SSH-able human accounts, no production network egress beyond the registry+GitHub APIs allowlist, and no broad cloud IAM. Pod-level: no `hostNetwork`, no `privileged: true`, no `hostPath` mounts, dedicated namespace from operator pods.
@@ -55,7 +55,7 @@ The runner is your CI's blast radius. Treat it like any production workload: eph
   - **L (8 vCPU / 32 GB)** — integration tests with services, monorepo builds, Docker image builds. Example hosted SKUs: GitHub `ubuntu-latest-8core`, Depot/RunsOn 8-CPU profile.
   - **XL (16–32 vCPU / 64–128 GB)** — full-repo scans, large Rust/C++ compiles, native iOS/Android builds. Often the cost-justification line for an alternative provider. Example hosted SKUs: GitHub `ubuntu-latest-32core` (premium pricing), Depot/RunsOn/Namespace 16–32 vCPU tiers.
 - **Right-sizing + autoscale**: pair with `cloud-cost-analyzer`. Karpenter is the 2026 default for autoscaling the Kubernetes node pool that backs ARC runners — spot/burstable instances, scale-to-zero idle.
-- **GitHub charges $0.002/min for self-hosted runner minutes** as of March 2026 — self-hosted is no longer free for private-repo workflows. Factor this into the build-vs-buy decision against alternatives whose public list prices in May 2026 were: Namespace ~$0.0015/min (Developer plan PAYG), Ubicloud from $0.0008/min (2 vCPU standard), RunsOn €300/yr commercial license + your AWS spot bill. Depot, Blacksmith, Warpbuild publish per-tier pricing on their sites — verify before committing budget. Provider prices and tier names shift; check the vendor's pricing page on the day you decide.
+- **Self-hosted runners are FREE — you pay only for the infrastructure you run them on** (VMs, Kubernetes nodes, storage, egress). GitHub *proposed* a $0.002/min "Actions cloud platform" charge on self-hosted minutes in private/internal repos, to start March 1, 2026, but **postponed it indefinitely in December 2025 after community backlash, and it never took effect** — self-hosted remains free as of this writing. Treat a possible future self-hosted charge as a risk to watch (postponed, not formally cancelled), not a current cost. GitHub-hosted minutes are the only GitHub-side per-minute charge today: usage in public repos is free, and GitHub reduced its hosted-runner per-minute prices in early 2026 (the current published standard rates sit below the long-standing rate) — read the live pricing page for the number that applies on the day you decide, because these move. For hosted alternatives (Depot, Namespace, RunsOn, Ubicloud, Blacksmith, Warpbuild) the build-vs-buy math turns on their current per-tier prices — consult each vendor's pricing page on the day you decide, because these numbers move. Do not hardcode a per-minute rate you have not just checked against a live source.
 
 ## CRITICAL: Always Ask, Never Assume
 
@@ -95,7 +95,7 @@ How do you want to run GitHub Actions?
     [+] Often 3-7x cheaper than GitHub-hosted at L/XL tier
     [+] Pin OS images, run on your VPC, your IAM
     [-] You own patching, log forwarding, secret rotation
-    [-] $0.002/min self-hosted runner fee applies (March 2026+)
+    [-] You pay the infra bill (VMs/K8s nodes, storage, egress) — the runners themselves are free
     [-] DO NOT use for public repos / fork PRs
 
 [3] Hosted Alternative (Depot, Namespace, RunsOn, Ubicloud, Blacksmith)
@@ -156,7 +156,7 @@ Continue with self-hosted setup? [y/N]
 # ARC on Kubernetes (recommended for self-hosted at any scale)
 - [ ] Kubernetes 1.28+ cluster (EKS / GKE / AKS / vanilla)
 - [ ] kubectl + helm 3.x installed
-- [ ] cert-manager (ARC dependency)
+- [ ] cert-manager ONLY if you run the legacy community controller — the modern gha-runner-scale-set controller installed below does NOT require it
 - [ ] Dedicated namespace for runner pods (not the operator's)
 - [ ] NetworkPolicy + PodSecurityStandard restricted in the namespace
 - [ ] Karpenter or Cluster Autoscaler for node pool scale
@@ -186,10 +186,16 @@ gh api -X POST repos/{owner}/{repo}/actions/runners/registration-token | jq -r .
   --labels "self-hosted,linux,x64,ephemeral,tier-m" \
   --ephemeral --unattended
 
-# 4. Run as a service (re-registers via outer loop after each ephemeral exit)
+# 4. Run as a service
 sudo ./svc.sh install
 sudo ./svc.sh start
 sudo ./svc.sh status
+# NOTE: an --ephemeral runner deregisters itself after ONE job; svc.sh only
+# supervises the process, it does NOT fetch a fresh registration token or
+# re-register. A single host therefore serves one job and then goes idle. For
+# continuous ephemeral capacity you need an external re-registration wrapper
+# (fresh just-in-time token per job) — which is exactly what ARC provides, so
+# prefer Path B for anything beyond a one-off private-repo runner.
 ```
 
 ### Path B: ARC on Kubernetes (recommended for self-hosted at scale)
@@ -204,7 +210,9 @@ helm install arc \
   --version ${ARC_VERSION} \
   oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller
 
-# 2. Create a GitHub App (recommended over PAT) and store creds as a Kubernetes Secret
+# 2. Create the runners namespace first (the Secret below needs it to exist),
+#    then create a GitHub App (recommended over PAT) and store creds as a Kubernetes Secret
+kubectl create namespace ${NAMESPACE_RUNNERS}
 kubectl create secret generic arc-github-app \
   --namespace ${NAMESPACE_RUNNERS} \
   --from-literal=github_app_id="<APP_ID_PLACEHOLDER>" \
@@ -251,11 +259,11 @@ YAML
 # .github/workflows/ci.yml
 jobs:
   test:
-    runs-on: depot-ubuntu-24.04-4     # pin OS, pin tier
+    runs-on: depot-ubuntu-24.04-4     # pin OS, pin tier — this label is all you need to use a Depot runner
     steps:
-      - uses: depot/setup-action@v1
       - uses: actions/checkout@v4
       # rest of workflow unchanged
+      # (depot/setup-action is only needed for Depot's remote container builds/cache, not to use the runner)
 ```
 
 ### Workflow change — split fork PRs to hosted, push to self-hosted
@@ -481,9 +489,9 @@ The runner identity (instance profile / pod IRSA / workload identity) has `*` pe
 | **Actions Runner Controller (ARC)** | GitHub-blessed reference impl; scale sets API; ephemeral by design; Kubernetes-native | You own the cluster, log forwarding, networking | Org-wide self-hosted on K8s |
 | **Depot** | Faster boot than GitHub-hosted; M/L/XL tiers; remote cache for Docker builds | Third-party; tied to Depot's availability | Hosted alternative when GitHub-hosted is too slow/expensive |
 | **BuildJet** | Half-price GitHub-hosted (was) | **Shut down January 2026 — verify before adoption** | Do not use |
-| **RunsOn** | Runs in your AWS account; spot pricing 7-17x cheaper claim; GPU support; €300/yr license fee | Your AWS bill + license; you operate it | AWS shops with spot budget + need for GPU/large tiers |
-| **Namespace** | Pay-as-you-go ~$0.0015/min; managed; ARM tier leads benchmarks (per Better Stack/Namespace claims) | Third-party | Cost-sensitive teams; ARM workloads |
-| **Ubicloud** | Sub-$0.001/min starting tier; open-source provider | Smaller ecosystem; newer | Cost-floor builds; OSS preference |
+| **RunsOn** | Runs in your AWS account; spot pricing can be substantially cheaper (vendor claim); GPU support; commercial license fee (check current pricing) | Your AWS bill + license; you operate it | AWS shops with spot budget + need for GPU/large tiers |
+| **Namespace** | Managed pay-as-you-go pricing; ARM tier leads benchmarks (per Better Stack/Namespace claims); check current per-minute rate | Third-party | Cost-sensitive teams; ARM workloads |
+| **Ubicloud** | Low-cost starting tier; open-source provider; check current per-minute rate | Smaller ecosystem; newer | Cost-floor builds; OSS preference |
 | **Buildkite** | Hybrid agents (your hosts, their orchestration); polyglot pipeline DSL | Different mental model from Actions; separate billing | Multi-CI orgs; teams needing pipeline-as-data |
 | **GitLab Runner (Helm chart)** | GitLab's first-party; Kubernetes executor; autoscale via `kubernetes` executor | GitLab-only; not a GitHub Actions replacement | GitLab CI shops |
 | **Karpenter** | Just-in-time node provisioning for the K8s cluster backing ARC; spot-first | EKS-focused; learning curve | Backing pool for ARC at scale |
@@ -492,7 +500,7 @@ Pair this skill with `cloud-cost-analyzer` for tier-vs-cost analysis and `docker
 
 ## Severity (internal triage vs. refinement-loop output)
 
-These tiers are the **internal triage view** used in your human-readable runner config report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [agents/_shared/warnings-are-critical.md](../../../agents/_shared/warnings-are-critical.md)) — there is no soft tier on the wire.
+These tiers are the **internal triage view** used in your human-readable runner config report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [skills/agent-fragments/warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire.
 
 | Triage tier | Examples | Internal action |
 |---|---|---|
@@ -523,7 +531,7 @@ The integrator uses `confidence` and `runner_type` to weight findings — a `con
 
 ## Special Considerations
 
-- **Third-party runner providers**: verify operational status before adopting (BuildJet's January 2026 shutdown and Cirrus Runners' April 2026 acquisition both stranded customers mid-migration). Bake provider-failure scenarios into the decision.
+- **Third-party runner providers**: verify operational status before adopting — BuildJet's January 2026 shutdown stranded customers mid-migration, and Cirrus Labs' announced move to OpenAI puts its runner service's continuity in question. Bake provider-failure scenarios into the decision.
 - **Public repo + fork PRs**: there is no safe self-hosted answer. Route fork PRs to hosted via conditional `runs-on`. Period.
 - **Cost math at scale**: at >5000 build-minutes/month, alternatives typically beat GitHub-hosted on $/min for L+ tiers. Below that, GitHub-hosted's zero-ops wins. Pair with `cloud-cost-analyzer`.
 - **Legacy persistent runners**: document as tech debt with migration path to ARC + ephemeral. Don't gate the build, but track via `technical-debt-tracker`.
@@ -543,7 +551,7 @@ The integrator uses `confidence` and `runner_type` to weight findings — a `con
 
 ## Refinement Loop — critic mode (v6.9.15)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../../agents/_shared/warnings-are-critical.md):
+When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every misconfigured runner, missing pin, untrusted-fork-code path, and overly broad runner IAM emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

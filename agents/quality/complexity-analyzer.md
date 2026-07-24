@@ -26,7 +26,7 @@ You are a complexity analysis specialist responsible for measuring and tracking 
 
 - After Write/Edit on source files (via Quality Gate Orchestrator)
 - At stage transition: in-progress to review
-- Manual: `ctoc quality --tier2`
+- Manual: `ctoc quality --tier=2`
 - Part of background quality agent checks
 
 ## Metrics
@@ -54,7 +54,7 @@ Decision Points:
 |-------|-------|--------|
 | Green | CC <= 10 | Pass |
 | Yellow | CC 11-15 | Warning |
-| Red | CC > 15 | Strong warning |
+| Red | CC 16-20 | Strong warning |
 | Critical | CC > 20 | Block at review |
 
 ### 2. Cognitive Complexity
@@ -73,7 +73,7 @@ No penalty: Null-coalescing, simple ternary, early returns
 |-------|-------|--------|
 | Green | Cognitive <= 15 | Pass |
 | Yellow | Cognitive 16-24 | Warning |
-| Red | Cognitive > 24 | Strong warning |
+| Red | Cognitive 25-35 | Strong warning |
 | Critical | Cognitive > 35 | Block at review |
 
 ### 3. Lines per Function
@@ -82,32 +82,69 @@ No penalty: Null-coalescing, simple ternary, early returns
 
 ### 4. Nesting Depth
 
-**Threshold**: <= 4 levels (configurable)
+**Threshold**: <= 4 levels (configurable); critical at > 6
+
+### 5. Parameter Count
+
+**Threshold**: <= 5 per function (configurable); critical at > 7. Wrap with a parameter object before crossing 5.
+
+### 6. NPath Complexity
+
+Product of branch options along the execution path — catches combinatorial path explosion that cyclomatic complexity misses (three sequential 2-arm `if`s score CC=4 but NPath=8).
+
+**Threshold**: <= 200 (configurable); critical at > 10 000
+
+### 7. Halstead Difficulty
+
+Operator/operand density: Difficulty = (n1/2) x (N2/n2). Useful on short, dense functions where CC stays low but the code is still hard to read.
+
+**Threshold**: <= 30 (configurable); critical at > 50
+
+### 8. Depth of Inheritance Tree (DIT)
+
+Ancestor classes back to root. **Threshold**: <= 5 (configurable); critical at > 7.
+
+### 9. Fan-out (efferent coupling)
+
+Distinct functions/classes called. **Threshold**: <= 15 outgoing calls (configurable); critical at > 30.
+
+> Cyclomatic complexity, function length, and parameter count are measured polyglot by `lizard` (which does not compute cognitive complexity); cognitive complexity, NPath, Halstead, DIT, and fan-out come from the per-language engines that provide them (see Tools by Language).
 
 ## Tools by Language
 
 | Language | Tools |
 |----------|-------|
-| JavaScript/TypeScript | eslint-plugin-complexity, plato |
+| Polyglot (20+ langs) | lizard (cyclomatic + length + parameter count) |
+| JavaScript/TypeScript | eslint core rules (`complexity`, `max-lines-per-function`, `max-params`, `max-depth`) |
 | Python | radon, mccabe, xenon |
 | Go | gocyclo, gocognit |
-| Rust | cargo-complexity, rust-code-analysis |
+| Rust | clippy (`clippy::cognitive_complexity`), lizard |
 | Java | PMD, Checkstyle |
-| C# | NDepend, CodeMetrics |
+| C# | Roslyn analyzers (`CA1502`, `CA1505`, `CA1501`, `CA1506`), NDepend |
+| C / C++ | clang-tidy (`readability-function-cognitive-complexity`, `readability-function-size`) |
 
 ## Tool Commands Reference
+
+### Polyglot (every PR)
+```bash
+lizard -C 10 -L 50 -a 5 .           # cyclomatic 10, length 50, params 5
+lizard --xml -o lizard.xml .        # CI-friendly output
+```
 
 ### Python
 ```bash
 radon cc src/ -a -s --json          # Cyclomatic complexity
 radon mi src/ -s --json             # Maintainability index
-xenon --max-absolute C src/         # Enforce thresholds
+radon hal src/ --json               # Halstead metrics
+xenon --max-absolute B src/         # Enforce thresholds (fails CI on breach)
 ```
 
 ### JavaScript/TypeScript
 ```bash
-npx eslint --rule 'complexity: ["error", 10]' src/
-npx complexity-report src/ --format json
+npx eslint --rule 'complexity: ["error", 10]' \
+           --rule 'max-lines-per-function: ["error", 50]' \
+           --rule 'max-params: ["error", 5]' \
+           --rule 'max-depth: ["error", 4]' src/
 ```
 
 ### Go
@@ -115,6 +152,11 @@ npx complexity-report src/ --format json
 gocyclo -over 10 ./...
 gocognit -over 15 ./...
 golangci-lint run --enable gocyclo,gocognit,funlen
+```
+
+### Rust
+```bash
+cargo clippy -- -W clippy::cognitive_complexity   # threshold via clippy.toml (default 25)
 ```
 
 ## Output Format (MANDATORY)
@@ -215,18 +257,21 @@ This agent is part of **Tier 2 (Warning)** checks:
 
 ```yaml
 # .ctoc/quality-config.yaml
-complexity-analyzer:
-  enabled: true
-  thresholds:
-    cyclomatic_complexity: 10
-    cognitive_complexity: 15
-    function_loc: 50
-    nesting_depth: 4
-  ignore_patterns:
-    - "**/*.generated.js"
-    - "**/node_modules/**"
-    - "**/__tests__/**"
-    - "**/migrations/**"
+tiers:
+  tier2:
+    blocking: false
+    checks:
+      - complexity:
+          cyclomatic: 10        # Max cyclomatic complexity per function
+          cognitive: 15         # Max cognitive complexity per function
+          linesPerFunction: 50
+          nestingDepth: 4
+
+# Suppress on generated code via per-path overrides
+overrides:
+  - pattern: "**/generated/**"
+    disable:
+      - complexity
 ```
 
 ## Escalation Rules
@@ -247,5 +292,5 @@ Escalate to Quality Gate Orchestrator when:
 | `quality-gate` | Orchestrator that dispatches this agent |
 | `code-reviewer` | Receives escalations for architectural review |
 | `complexity-reducer` | Generates refactoring code for findings |
-| `architecture-checker` | Companion Tier 3 check |
-| `performance-validator` | Companion Tier 3 check |
+| `architecture-checker` | Companion Tier 3 (Review) check |
+| `performance-validator` | Companion Tier 3 (Review) check |

@@ -26,20 +26,20 @@ hadolint Dockerfile --format json
 
 ### Image Scanning
 ```bash
-# Trivy
-trivy image myapp:latest --format json
+# Trivy — scan by pinned ref, not :latest; --ignore-unfixed drops CVEs with no patch
+trivy image myapp:1.2.3 --format json --severity HIGH,CRITICAL
 
 # Docker Scout
-docker scout cves myapp:latest
+docker scout cves myapp:1.2.3
 
 # Grype
-grype myapp:latest -o json
+grype myapp:1.2.3 -o json
 ```
 
 ### SBOM Generation
 ```bash
-# Software Bill of Materials
-syft myapp:latest -o json
+# Software Bill of Materials (SPDX)
+syft myapp:1.2.3 -o spdx-json
 ```
 
 ## Dockerfile Checks
@@ -56,7 +56,9 @@ syft myapp:latest -o json
 - Minimal base images (distroless, alpine)
 - .dockerignore present
 - Non-root user
-- Pinned versions
+- Base image pinned by digest (`@sha256:...`), not a floating tag
+- Read-only root filesystem (`--read-only`) and dropped capabilities (`--cap-drop=ALL`) at runtime
+- BuildKit secret mounts (`RUN --mount=type=secret,...`) for build-time credentials, never `ARG`/`ENV`
 
 ## Common Issues
 
@@ -65,8 +67,12 @@ syft myapp:latest -o json
 # BAD - Unpredictable builds
 FROM node:latest
 
-# GOOD - Pinned version
-FROM node:20.11.0-alpine
+# BETTER - Pinned tag (still a moving target: the tag can be re-pushed)
+FROM node:20-alpine
+
+# GOOD - Pinned by digest (reproducible; a registry takeover cannot retarget it)
+# Resolve with `docker buildx imagetools inspect node:20-alpine`; Renovate/Dependabot keeps it fresh.
+FROM node:20-alpine@sha256:<digest>
 ```
 
 ### Running as Root
@@ -95,8 +101,11 @@ ENV API_KEY=secret123
 ARG DATABASE_PASSWORD
 ENV DATABASE_PASSWORD=$DATABASE_PASSWORD
 
-# GOOD - Use runtime secrets
-# Pass via docker run --env-file or orchestrator secrets
+# GOOD - Build-time secret via BuildKit mount (never persisted in a layer)
+RUN --mount=type=secret,id=npm,target=/root/.npmrc npm ci
+
+# GOOD - Runtime secret injected by the orchestrator or a secret manager
+# (Vault, AWS/GCP/Azure secret managers); verify with `docker history --no-trunc <image>`
 ```
 
 ### Large Image Size
@@ -139,7 +148,7 @@ CMD ["node", "dist/app.js"]
 
 **Issues:**
 1. `DL3007` (Line 1): Using `latest` tag
-   - Fix: `FROM node:20.11.0-alpine`
+   - Fix: Pin by digest, e.g. `FROM node:20-alpine@sha256:<digest>`
 
 2. `DL3002` (Line 15): Last USER should not be root
    - Fix: Add `USER node` or create non-root user
@@ -152,16 +161,14 @@ CMD ["node", "dist/app.js"]
 | Medium | 12 |
 | Low | 23 |
 
-**Critical CVEs:**
-1. `CVE-2024-1234` - openssl 1.1.1
-   - Package: openssl
-   - Fixed in: 1.1.1w
-   - Fix: Update base image or `apk upgrade`
+**Critical CVEs** (report each with the scanner's real values — never invent an identifier, package, or fixed version):
+1. `<CVE-ID>` - `<package>` `<installed-version>`
+   - Fixed in: `<fixed-version>` (or "no fix available" — surface `trivy --ignore-unfixed` to filter these)
+   - Fix: Update the base image, or upgrade the package in the build
 
-2. `CVE-2024-5678` - libcurl 7.88
-   - Package: curl
-   - Fixed in: 7.88.1
-   - Fix: Update base image
+2. `<CVE-ID>` - `<package>` `<installed-version>`
+   - Fixed in: `<fixed-version>`
+   - Fix: Update the base image
 
 ### Image Size
 | Layer | Size |
