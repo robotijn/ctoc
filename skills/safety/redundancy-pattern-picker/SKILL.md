@@ -34,7 +34,7 @@ effort_budget:
 # Redundancy Pattern Picker (skill)
 
 > New in CTOC v6.9.27 — Cluster 3 (Risk Analysis Before Build). Recommends one or more redundancy patterns based on the safety integrity level, the failure modes uncovered by [[safety/fmeda-analyzer]], and the minimal cut sets uncovered by [[safety/fault-tree-builder]].
-> Outputs a `redundancy_pattern.yaml` per plan with the recommendation, the rationale, the residual risks, and the explicit common-cause caveat the 2024 Analog Devices application note "Mitigation of Common-Cause Failures in Safety-Critical Systems" requires.
+> Outputs a `redundancy_pattern.yaml` per plan with the recommendation, the rationale, the residual risks, and an explicit common-cause caveat wherever the pattern relies on a diversity assumption.
 
 ## Role
 
@@ -55,7 +55,7 @@ If the system has no safety integrity level and no high-criticality flag, the sk
 
 - **Redundancy is the second answer, not the first.** The first answer is to reduce the failure rate of the single channel (better part, better cooling, lower de-rating, better diagnostic coverage). Add redundancy only when the single-channel design cannot meet the Single-Point Fault Metric, the Probabilistic Metric for Hardware Failures, or the Tolerable Hazard Rate threshold for the declared integrity level.
 - **Diversity is the load-bearing property.** Identical redundant channels share every failure mode the underlying technology has. Two identical microcontrollers running identical firmware will hit the same software bug at the same input. The diversity dimension that breaks the correlation must be named: independent supplier, independent toolchain, independent algorithm, independent power, independent clock, independent operating temperature. Without a named diversity dimension, the redundancy is documentary, not actual.
-- **N-version programming is NOT a universal answer.** The 2024 Analog Devices application note "Mitigation of Common-Cause Failures in Safety-Critical Systems" (https://www.analog.com/en/resources/app-notes/mitigation-of-common-cause-failures-in-safety-critical-systems.html) warns that correlated faults defeat the diversity assumption. Two independently-developed implementations of the same specification tend to share the same edge-case blind spots because the specification itself is the common cause. Knight and Leveson's classic 1986 experiment ("An Experimental Evaluation of the Assumption of Independence in Multiversion Programming") found correlations significantly above zero across twenty-seven independent implementations of the same problem. Treat N-version as a partial mitigation, not a guarantee.
+- **N-version programming is NOT a universal answer.** Correlated faults defeat the diversity assumption. Two independently-developed implementations of the same specification tend to share the same edge-case blind spots because the specification itself is the common cause. Knight and Leveson's classic 1986 experiment ("An Experimental Evaluation of the Assumption of Independence in Multiversion Programming", IEEE Transactions on Software Engineering) found correlations significantly above zero across twenty-seven independent implementations of the same problem. Treat N-version as a partial mitigation, not a guarantee.
 - **Lockstep is for transient faults, not for systematic faults.** Dual-core lockstep (the two cores execute the same instruction stream and a hardware comparator flags mismatches) protects against transient hardware faults (single-event upsets, supply glitches) extremely well. It does NOT protect against systematic faults (compiler bug, specification bug, common-mode software defect) because both cores execute identical code. The diversity dimension is hardware-only.
 - **Voting redundancy needs an odd number and a trusted voter.** Triple Modular Redundancy assumes that no more than one of three channels fails at a time AND that the voter itself does not fail. The voter is a hidden single point of failure unless it is itself redundant. For ASIL D and SIL 3, the voter typically uses a separate technology (a discrete logic comparator rather than a microcontroller) to break the dependency chain.
 - **Hot standby trades cost for transition time.** Hot standby (the secondary runs in parallel with the primary, synchronised state, instant takeover) costs roughly twice the primary in hardware and operating expense. Its takeover latency is in the order of milliseconds. Cold standby (secondary powered off, must boot to take over) costs roughly the same in capital but less in operating expense; its takeover latency is in the order of seconds to minutes. Use hot standby when the Fault Tolerant Time Interval is shorter than the cold-standby boot time.
@@ -147,7 +147,7 @@ Three identical channels feed a two-out-of-three voter. Used in aerospace flight
 
 ### 3. Dual-channel diverse
 
-Two channels of different design feed a comparator. The diversity dimension is named (different supplier, different toolchain, different algorithm). The 2024 Analog Devices guidance recommends naming and defending the diversity dimension explicitly.
+Two channels of different design feed a comparator. The diversity dimension is named (different supplier, different toolchain, different algorithm) and must be defended explicitly.
 
 | Property | Value |
 |---|---|
@@ -160,7 +160,7 @@ Two channels of different design feed a comparator. The diversity dimension is n
 
 ### 4. N-version programming
 
-N independent teams implement the same specification in different languages or toolchains. The runtime votes the outputs. Knight and Leveson 1986 found that independent implementations correlated significantly more than zero; Analog Devices 2024 confirms the finding in modern practice. Treat as a partial mitigation, not a guarantee.
+N independent teams implement the same specification in different languages or toolchains. The runtime votes the outputs. Knight and Leveson 1986 found that independent implementations correlated significantly more than zero. Treat as a partial mitigation, not a guarantee.
 
 | Property | Value |
 |---|---|
@@ -170,7 +170,7 @@ N independent teams implement the same specification in different languages or t
 | Software cost | N times the single-implementation equivalent |
 | Best for | Specific algorithm-level diversity where the specification itself has been hardened |
 | Common-cause factor | Higher than the literature claimed in the 1990s; expect five to fifteen percent residual correlation |
-| Warning | Not a universal answer; the 2024 Analog Devices note is explicit about this |
+| Warning | Not a universal answer; correlated faults through the shared specification remain |
 
 ### 5. Hot standby
 
@@ -329,9 +329,9 @@ The pattern requires a voter (triple modular, hot standby) and the voter is impl
 
 The recommended pattern fails to mitigate the size-one cut sets surfaced by the Fault Tree. Emit `kind: pattern_does_not_cover_cut_set`.
 
-### 6. N-version recommended without acknowledging the 2024 caveat
+### 6. N-version recommended without acknowledging the correlated-fault caveat
 
-The pattern is N-version programming with no `residual_risks` entry that names the Analog Devices 2024 caution about correlated faults. Emit `kind: n_version_without_caveat`.
+The pattern is N-version programming with no `residual_risks` entry that names the correlated-fault caution (the shared specification as common cause). Emit `kind: n_version_without_caveat`.
 
 ## Severity
 
@@ -357,10 +357,9 @@ cut_set: <list of basic-event ids that the pattern fails to cover, if applicable
 message: <one-sentence summary>
 suggested_fix: <concrete remediation>
 references:
-  - https://www.analog.com/en/resources/app-notes/mitigation-of-common-cause-failures-in-safety-critical-systems.html    # 2024 Analog Devices common-cause guidance
   - https://webstore.iec.ch/publication/22273                                                                              # IEC 61508:2010 Part 2 (hardware architectural constraints — hardware fault tolerance and safe failure fraction)
   - https://webstore.iec.ch/publication/22273                                                                              # IEC 61508:2010 Part 6 Annex D (beta-factor table)
-  - https://www.iso.org/standard/68389.html                                                                                # ISO 26262 Part 6 (Product development at the software level)
+  - ISO 26262-6 (Road vehicles — Functional safety — Product development at the software level)
 ```
 
 ## Special Considerations

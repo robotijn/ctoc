@@ -56,7 +56,7 @@ If none of the above is true, this skill is inert — the lean default per the r
 
 - **FMEDA quantifies, FMEA categorises, Fault Tree Analysis decomposes.** The three analyses are complementary and none substitutes for the others: FMEA produces a qualitative ranking of failure modes, FMEDA produces the numeric metrics that ISO 26262 and IEC 61508 require (Single-Point Fault Metric, Latent Fault Metric, diagnostic coverage), and Fault Tree Analysis traces a single undesired top event back to its basic events.
 - **Diagnostic coverage matters more than reliability.** A component with a high failure rate but ninety-nine percent diagnostic coverage is safer than a component with a low failure rate and zero diagnostics. ISO 26262 Part 5 Annex D defines diagnostic coverage as the fraction of dangerous failure modes that are detected by an on-line safety mechanism within the Fault Tolerant Time Interval. The Single-Point Fault Metric is one minus the ratio of the single-point and residual fault rates to the total safety-related failure rate, so a higher diagnostic coverage converts residual faults into detected faults and raises the metric.
-- **The Latent Fault Metric guards against the second failure.** Multi-point faults remain hidden until a second failure activates the dangerous condition. ISO 26262 requires the Latent Fault Metric — the proportion of latent multi-point faults that are detected by a proof test or by a periodic safety mechanism — to exceed ninety percent for ASIL D and eighty percent for ASIL C (per Part 5 Annex F).
+- **The Latent Fault Metric guards against the second failure.** Multi-point faults remain hidden until a second failure activates the dangerous condition. ISO 26262 requires the Latent Fault Metric — the proportion of latent multi-point faults that are detected by a proof test or by a periodic safety mechanism — to exceed ninety percent for ASIL D and eighty percent for ASIL C (per Part 5 Clause 8, Evaluation of the hardware architectural metrics).
 - **Failure-rate sources must be cited.** Use IEC TR 62380, FIDES (the Institut pour la Maîtrise des Risques reliability methodology), IEC 61709, MIL-HDBK-217F, or the device supplier's published failure-in-time number. Inventing a failure rate is grounds for IV and V rejection. When the device sheet does not publish a number, escalate to the supplier rather than guessing.
 - **De-rating is mandatory.** A semiconductor's published failure-in-time number assumes a specific junction temperature, voltage, and operating profile. Real-world conditions degrade the number. Apply the supplier's de-rating curve or fall back to the conservative bound from IEC 61709.
 - **Common-cause failures defeat redundancy.** When the FMEDA assumes redundancy, the common-cause failure fraction (the beta-factor in IEC 61508 Part 6) must be quantified separately. Correlated faults (shared power, shared clock, shared package, shared algorithm, shared supplier lot) can collapse a redundancy claim to no redundancy at all.
@@ -110,7 +110,7 @@ open_items:
   - <list of components missing failure-rate data, missing diagnostic coverage, awaiting supplier confirmation>
 ```
 
-The computed metrics use the ISO 26262 Part 5 Annex C and Annex F formulae. The skill is allowed to leave a metric as `null` only if the underlying inputs are incomplete; it MUST emit `verdict: fail` in that case rather than guessing.
+The computed metrics use the ISO 26262 Part 5 formulae — the hardware architectural metrics from Clause 8 (Single-Point Fault Metric, Latent Fault Metric) and the probabilistic metric from Clause 9 (Evaluation of safety goal violations due to random hardware failures). The skill is allowed to leave a metric as `null` only if the underlying inputs are incomplete; it MUST emit `verdict: fail` in that case rather than guessing.
 
 ## Failure-mode catalogue (starting points)
 
@@ -135,7 +135,7 @@ The catalogue is intentionally non-exhaustive. The point is that every component
 
 ### Software units
 
-ISO 26262 Part 6 Annex D enumerates the canonical failure modes:
+ISO 26262 Part 6 enumerates the canonical software-unit failure modes:
 
 | Mode | Common diagnostic |
 |---|---|
@@ -362,7 +362,7 @@ Python is unsuitable for safety-critical control because of the garbage collecto
 # Off-line metric computation. Reads .ctoc/safety/fmeda/<plan-id>.yaml,
 # computes Single-Point Fault Metric, Latent Fault Metric, and the
 # overall hardware probability. Emits pass / fail per ISO 26262 Part 5
-# Annex F thresholds.
+# Clause 8 and Clause 9 thresholds.
 
 from __future__ import annotations
 from pathlib import Path
@@ -473,9 +473,9 @@ references:
 ## Special Considerations
 
 - **Independence is non-negotiable for ASIL D and SIL 3.** The FMEDA analyst MUST be different from the design engineer. CTOC enforces this by routing the FMEDA dispatch through the `independent_verification_validation` control when present, which requires a separate audit root.
-- **Common-cause beta factors come from project-specific evidence.** IEC 61508 Part 6 Annex D provides a table for the beta-factor between zero point five and twenty-five percent depending on architecture, diversity, segregation, and operating environment. Take the conservative bound when the assessment is incomplete.
+- **Common-cause beta factors come from project-specific evidence.** IEC 61508 Part 6 Annex D provides a scoring table for the beta-factor depending on architecture, diversity, segregation, and operating environment. Take the conservative bound when the assessment is incomplete.
 - **The "no stub" rule applies here too.** When the supplier datasheet does not publish a failure-in-time number, the skill MUST emit `kind: missing_input` with the citation gap and the conservative fall-back from IEC 61709 — it does NOT make a number up.
-- **Software FMEDA is different from hardware FMEDA but uses the same vocabulary.** Resist the temptation to assign quantitative failure-in-time numbers to software units. Use the qualitative coverage tiers (low / medium / high) from ISO 26262 Part 6 Annex D and document the rationale for each diagnostic mechanism's tier.
+- **Software FMEDA is different from hardware FMEDA but uses the same vocabulary.** Resist the temptation to assign quantitative failure-in-time numbers to software units. Use the qualitative coverage tiers (low / medium / high) from ISO 26262 Part 6 and document the rationale for each diagnostic mechanism's tier.
 
 ---
 
