@@ -1,5 +1,13 @@
 ---
 approved_by: human
+approved_at: 2026-07-25T12:40:50.742Z
+gate_crossed: review → done
+override: true
+override_reason: Human signed off round-2 corpus sweep as done 2026-07-25 (chose "Finalize it"). Shipped v6.13.23 (4ff3912), pushed to origin/main; gate-green: npm test 0 failed, 0 skipped, coverage 99.04%. Continuation of approved program 00230.
+---
+
+---
+approved_by: human
 approved_at: 2026-07-24T15:44:03.653Z
 gate_crossed: implementation → todo
 override: true

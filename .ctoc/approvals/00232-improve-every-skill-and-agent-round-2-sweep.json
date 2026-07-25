@@ -1,11 +1,11 @@
 {
-  "content_sha256": "499e124810a50380faa577bbdd856074b08d7ce68cb6febd8a74ed153cb0571d",
+  "content_sha256": "206e1a61e3d27842b4378260e5e6b2beb13d5ccbc6ec390101f6240121ec9161",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-07-24T15:44:03.700Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-25T12:40:50.792Z",
   "approved_by": "human",
   "plan_basename": "00232-improve-every-skill-and-agent-round-2-sweep",
   "override": true,
-  "override_reason": "Human authorized round-2 corpus sweep via \"continue\" 2026-07-24; continuation of approved program 00230."
+  "override_reason": "Human signed off round-2 corpus sweep as done 2026-07-25 (chose \"Finalize it\"). Shipped v6.13.23 (4ff3912), pushed to origin/main; gate-green: npm test 0 failed, 0 skipped, coverage 99.04%. Continuation of approved program 00230."
 }
