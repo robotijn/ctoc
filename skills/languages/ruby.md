@@ -21,7 +21,7 @@
 # frozen_string_literal: true
 
 # YJIT-friendly patterns (avoid redefining core methods)
-# Ruby 3.4+ YJIT is ~92% faster than interpreter
+# Ruby 3.4+ YJIT delivers substantial speedups over the interpreter on real-world Rails workloads — enable it in production
 
 # Proper eager loading
 users = User.includes(:posts, :comments).where(active: true)
@@ -48,7 +48,7 @@ end
 - `eval` with user input — code injection
 
 ## Version Gotchas
-- **Ruby 3.4**: YJIT ~92% faster, `--yjit-mem-size` option
+- **Ruby 3.4**: YJIT substantially faster on real-world Rails workloads, `--yjit-mem-size` option
 - **Ruby 3.3**: YJIT default in Rails 7.2+ production
 - **YJIT memory**: ~3-4x of `--yjit-exec-mem-size` overhead
 - **Ruby 3.5 (Q4 2025)**: Cross-method inlining, ARM64 improvements

@@ -511,7 +511,7 @@ What if the agent references itself in its own evaluation criteria? Example: "Qu
 
 ## Bias Mitigation Protocol
 
-*Grounded in: LLM-as-judge research documents 12 bias types. Key biases for agent evaluation: position bias, verbosity bias, self-preference bias, and anchoring bias (Zheng et al., 2023; Wang et al., 2024).*
+*Grounded in LLM-as-judge research. Ye et al. (2024), "Justice or Prejudice? Quantifying Biases in LLM-as-a-Judge" (arXiv:2410.02736), identify 12 bias types via the CALM framework. The biases most relevant to agent evaluation — position bias, verbosity bias, and self-preference (self-enhancement) bias — are documented in Zheng et al. (2023), "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena" (NeurIPS 2023 Datasets and Benchmarks Track; arXiv:2306.05685).*
 
 ### 1. Anchoring Bias Mitigation
 Score bottom-up (start at 0, add points) instead of top-down (start at 10, deduct). This is enforced by the calibration anchors: you must identify which anchor level the agent matches, then score accordingly.
