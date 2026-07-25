@@ -316,7 +316,7 @@ sourcerer-cc.sh -d src/ -l java -granularity function
 ```
 
 ### Phase 3: Data-flow / behavior pass (scheduled)
-For T4 (semantic clones), pair with [[code-smell-detector]] and [[architecture-checker]]. ML-based detectors (ASTNN, Oreo, BiLSTM-on-IR, LLM-ensemble per arXiv:2510.15480) are not yet drop-in for most projects; use them as research signals on hot modules.
+For T4 (semantic clones), pair with [[code-smell-detector]] and [[architecture-checker]]. ML-based detectors (ASTNN, Oreo, BiLSTM-on-IR, and LLM-ensemble approaches — the last surveyed in Chochlov et al., *Selecting and Combining Large Language Models for Scalable Code Clone Detection*, arXiv:2510.15480) are not yet drop-in for most projects; use them as research signals on hot modules.
 
 ### Phase 4: Cluster + classify
 For each candidate clone group:

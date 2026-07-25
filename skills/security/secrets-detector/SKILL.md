@@ -42,11 +42,11 @@ You are a paranoid secrets hunter. You assume every file might contain leaked cr
 - **Shift everywhere.** Pre-commit hook → PR diff scan → full history scan on schedule → platform-side push protection → post-incident sweep. No single layer is sufficient; together they catch leaks at the earliest possible point in the developer-to-production path.
 - **OWASP A07 — Identification and Authentication Failures.** Tag every verified-live finding `A07` and emit a CWE-798 (Hardcoded Credentials) or CWE-321 (Hard-coded Cryptographic Key) reference depending on the secret type.
 - **Block deployments on verified live secrets — no exceptions.** A live AWS root key or `sk_live_` Stripe key in code is shipped-with-known-breach. The CI step that runs this skill MUST fail the build whenever it emits any letter (every letter is `severity: critical` on the wire per warnings-are-bugs).
-- **GitHub Secret Scanning + Push Protection is now baseline for any repo on github.com.** As of the March 2026 updates, push protection is enabled by default for 39 detectors including Airtable, Databricks, Heroku, PostHog, Shopify, Snowflake, Supabase, and Vercel, and base64-encoded secret detection was added in November 2025. Enable push protection on every repo; it is the cheapest layer.
-- **Validity checks are catching up across providers.** Recent GitHub Secret Scanning additions include validity checks for Airtable, DeepSeek, npm, Pinecone, and Sentry tokens (March 2026). The February 2026 extended-metadata release surfaces owner name, email, key identifier, creation date, and expiry date on detected leaks — use this to scope the blast radius before rotation.
+- **GitHub Secret Scanning + Push Protection is baseline for any repo on github.com.** Push protection can be enabled by default to block pushes containing detected secrets across a broad token-type list, and secret scanning supports base64-encoded secret detection. Enable push protection on every repo; it is the cheapest layer.
+- **Validity checks are catching up across providers.** GitHub Secret Scanning provides validity checks on supported providers (confirmed for Airtable, Pinecone, and Sentry tokens, among others) — use a live-validity result to scope the blast radius before rotation.
 - **Transitive surface is non-negotiable.** Scan vendor dirs, container images, infrastructure-as-code, lockfiles, build artifacts, and CI logs — not just the working tree. Container layer scanning (Trivy secrets, TruffleHog `docker://`) catches the case where a secret was baked into an image even though it never landed in git.
 - **SAST + SCA + DAST + secrets is the minimum quadrant.** You are the secrets layer. Coordinate with [[sast-scanner]] (code patterns), [[dependency-auditor]] (SCA), and DAST runners.
-- **Entropy detection has evolved.** Open research and benchmarks against the CredData corpus show BPE-tokenization-based detection outperforms Shannon entropy on recall (reported 98.6% vs 70.4% on CredData in 2026 benchmarks); treat this as directional — exact numbers depend on dataset, threshold tuning, and tokenizer vocabulary. If your team is rolling a custom detector, prefer modern tokenization over plain Shannon.
+- **Entropy detection has evolved.** BPE-tokenization-based detection can improve recall over plain Shannon entropy by flagging secret-like strings that a raw entropy threshold misses; treat this as directional and validate it on your own corpus — no benchmark figure is quoted here because none has been validated against a readable source. If your team is rolling a custom detector, prefer modern tokenization over plain Shannon.
 
 ## Pre-commit, CI, and historical scanning workflows (2026)
 
@@ -207,7 +207,7 @@ CREATE USER MAPPING FOR app_user SERVER remote_db OPTIONS (user 'admin', passwor
 | Anthropic OAuth token | `sk-ant-oat01-[A-Za-z0-9_-]+` | Billed against a Claude.ai subscription, distinct from API keys |
 | Google AI / Gemini | `AIza[0-9A-Za-z\-_]{35}` | Same prefix as GCP API keys — disambiguate by referer / restriction |
 | Cohere | high-entropy 40-char; sent as `Bearer ...` | Verify `POST https://api.cohere.com/v1/check-api-key` |
-| DeepSeek | high-entropy; GitHub Secret Scanning added validity checks March 2026 | Verify via `GET https://api.deepseek.com/user/balance` |
+| DeepSeek | high-entropy; detected by GitHub Secret Scanning | Verify via `GET https://api.deepseek.com/user/balance` |
 
 **Cost-of-leak note.** AI provider keys are uniquely costly to leak: an attacker can run usage up into thousands of dollars within hours before rotation completes. Treat verified-live AI keys as `CRITICAL` and rotate within minutes, not hours.
 
@@ -318,13 +318,13 @@ Beyond Stripe (`whsec_`), flag:
 These don't match known patterns — entropy-based detection is the only signal. Approaches:
 
 - **Shannon entropy threshold**: ~4.5 bits/char on strings ≥ 20 chars in `=` / `:` / `key:` assignment contexts.
-- **BPE-tokenization detection** (2026 research direction): segment candidate strings with a BPE tokenizer trained on natural-language text; high "subword surprisal" correlates with secret-like strings better than Shannon alone (CredData 2026 benchmark figures: ~98.6% vs ~70.4% recall — exact numbers depend on threshold tuning).
+- **BPE-tokenization detection** (research direction): segment candidate strings with a BPE tokenizer trained on natural-language text; high "subword surprisal" can flag secret-like strings that plain Shannon entropy misses. Treat this as a direction to evaluate on your own corpus — no benchmark figure is quoted here, because none has been validated against a readable source.
 - **Naming heuristics**: variables/keys named `secret`, `password`, `token`, `apikey`, `api_key`, `auth`, `credential` paired with a high-entropy string.
 - **Context tightening**: ignore matches inside test fixtures named like `*_test.py`, `*.spec.ts`, `__fixtures__/`, but only after explicit allowlist review — real test environments do leak real keys.
 
 ### 11. Secrets Embedded in Base64 / URL-Encoded Strings
 
-GitHub Secret Scanning added base64 detection in November 2025. Pattern: decode any base64-looking blob ≥ 40 chars and re-run pattern detection on the decoded payload. Catches: AWS keys wrapped in base64 in Kubernetes Secrets (`stringData` field), tokens encoded for transport in Bash heredocs, secrets passed through query strings.
+GitHub Secret Scanning supports base64-encoded secret detection for a range of provider patterns. Pattern: decode any base64-looking blob ≥ 40 chars and re-run pattern detection on the decoded payload. Catches: AWS keys wrapped in base64 in Kubernetes Secrets (`stringData` field), tokens encoded for transport in Bash heredocs, secrets passed through query strings.
 
 ### 12. Secrets in Git History (the deleted-but-not-gone class)
 
@@ -362,13 +362,13 @@ git push --force --tags
 | **TruffleHog v3** | 800+ detectors with live-verification on most major providers; scans filesystem, git, S3, GCS, Docker, GitHub/GitLab orgs, Postman, Jira, Slack, CircleCI artifacts | Slower than Gitleaks on git history; verification calls go to upstream APIs (rate-limit aware, but be mindful in air-gapped envs) | Scheduled deep scans; post-incident sweeps; ad-hoc org-wide audits |
 | **Gitleaks** | Fast, single-binary, regex-based; first-class pre-commit and CI integration; supports SARIF output and baseline files | Pure pattern + entropy; no live verification (Gitleaks does not call upstream APIs) | Pre-commit and PR-diff scans where latency matters |
 | **detect-secrets** | Baseline-driven (audit existing findings once, scan only deltas afterward); plugin architecture; widely used in regulated environments | Pattern + entropy only; baselines need active maintenance | Establishing a baseline on a legacy repo; teams that need an explicit allowlist workflow |
-| **GitHub Secret Scanning + Push Protection** | Free on public repos; GHAS on private; March 2026 ships push protection by default for 39 token types incl. Airtable/Databricks/Heroku/PostHog/Shopify/Snowflake/Supabase/Vercel; base64 detection (Nov 2025); validity checks for Airtable/DeepSeek/npm/Pinecone/Sentry (Mar 2026); extended metadata (owner, email, dates) Feb 2026 | GitHub-only; partner-driven pattern list (can't add custom patterns without GHAS custom patterns SKU); push protection bypass requires explicit reason | Always-on; every repo, public or private |
+| **GitHub Secret Scanning + Push Protection** | Free on public repos; GHAS on private; push protection can block pushes containing detected secrets across a broad token-type list; base64-encoded secret detection; validity checks on supported providers (e.g. Airtable, Pinecone, Sentry) | GitHub-only; partner-driven pattern list (can't add custom patterns without GHAS custom patterns SKU); push protection bypass requires explicit reason | Always-on; every repo, public or private |
 | **GitLab Secret Detection / Push Protection** | Built into GitLab CI; gitleaks under the hood; secret push protection blocks pushes containing detected secrets | GitLab-only | Always-on for GitLab repos |
 | **Trivy (secrets module)** | Container-image and IaC-aware; finds secrets baked into Docker layers, Helm charts, Kustomize, Terraform tfvars | Pattern-only; no live verification | Container/IaC pipelines |
 | **ggshield (GitGuardian CLI)** | Same engine as the GitGuardian platform; large detector catalog; live verification on supported providers | Commercial behind a free tier; cloud-side scanning sends content to GitGuardian (review data-handling for regulated repos) | Teams that have GitGuardian; pre-commit and CI |
 | **Microsoft Security DevOps (MSDO) action** | Bundles Microsoft + partner static-analysis tooling into one GitHub Action; normalizes results to SARIF for the Security tab; .NET-friendly | Heavyweight; pulls multiple analyzers; download size and runtime non-trivial | .NET / Azure DevOps shops that want one CI step covering SAST + secrets + IaC |
 | **git-secrets (AWS Labs)** | Lightweight, pre-commit-focused; bundled AWS patterns | Pattern-only; sparse upstream maintenance | Legacy / lightweight setups |
-| **Betterleaks** | Open-source 2026 project by the Gitleaks creator; positioned as a faster successor with refined rules | Very new (Feb 2026 launch) — evaluate maturity before depending on it for CI | Worth piloting; not yet a primary recommendation |
+| **Betterleaks** | Open-source project positioned as a faster Gitleaks successor with refined rules | Very new — evaluate maturity before depending on it for CI | Worth piloting; not yet a primary recommendation |
 | **Puaro, Rafter, Jit, etc.** | Newer commercial entrants offering managed scanning + remediation workflow | Commercial; data residency considerations | If team wants a managed product |
 
 ### Canonical command lines

@@ -12,7 +12,7 @@ cd myapp && npm run start:dev
 ## Claude's Common Mistakes
 1. **Circular dependencies** — Refactor modules or use `forwardRef()` sparingly
 2. **Creating instances with `new` instead of DI** — Let NestJS inject dependencies
-3. **CORS with wildcard origin** — 62% of apps expose data due to `origin: '*'`
+3. **CORS misconfiguration** — `origin: '*'` is over-broad; the real data-exposure bug is reflecting the request `Origin` header back (effectively allowing any site). Note browsers reject wildcard origin combined with credentials, so allowlist explicit origins when `credentials: true`
 4. **Missing ValidationPipe** — Always enable globally with `whitelist: true`
 5. **Business logic in controllers** — Controllers orchestrate; services contain logic
 

@@ -121,7 +121,7 @@ LINDDUN has a lightweight variant — **LINDDUN GO** — using a card deck for c
 
 Two LINDDUN categories — **Unawareness** and **Non-compliance** — map directly to GDPR Articles 13–14 (transparency) and Article 25 (privacy by design). If your product processes personal data of EU residents and you have no LINDDUN analysis on file, you have a documented design-time GDPR gap.
 
-A **GenAI extension to LINDDUN** was published in early 2026 (https://arxiv.org/abs/2603.06051) — it affects three of the seven privacy threat types (most notably Identifiability, Linkability, and Disclosure of Information) and adds ~100 GenAI-specific worked examples to the knowledge base, covering threats like training-data membership inference, prompt-history leakage across users, and embedding-inversion re-identification. If your system has any GenAI component, use the GenAI-extended categories rather than the base LINDDUN catalogue.
+A **GenAI extension to LINDDUN** was published in early 2026 — Liao et al., *A LINDDUN-based Privacy Threat Modeling Framework for GenAI* (arXiv:2603.06051, submitted 6 March 2026, https://arxiv.org/abs/2603.06051). Per the paper, it "affects three out of the seven privacy threat types of LINDDUN and introduces 100 new GenAI examples to the knowledge base": the three affected types are **Disclosure of information**, **Unawareness and Unintervenability**, and **Non-compliance**, with the 100 examples derived from chatbot and agentic-assistant case studies. If your system has any GenAI component, use the GenAI-extended categories rather than the base LINDDUN catalogue.
 
 ### Attack Trees
 
