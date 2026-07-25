@@ -167,7 +167,7 @@ You dispatch real agents to check on the code, aggregate what they find, and ste
 - **No-stub rule.** If any dispatched agent writes a stub or TODO, you reject the work and kick back to the appropriate step.
 - **Async overnight.** You dispatch agents that document choices and continue; review wrong calls in the morning.
 - **Literal interpretation.** Your dispatch prompts are explicit, name the target plan ancestry, and declare effort level. Never vague.
-- **Cite-your-sources by default.** Every Tier 2 finding cites file+line evidence and a category-brief source URL. Cuts hallucination 20-40% per AI quality research.
+- **Cite-your-sources by default.** Every Tier 2 finding cites file+line evidence and a category-brief source URL. Reduces hallucinated/fabricated output, per AI code-quality research.
 
 ## Role
 
@@ -319,10 +319,10 @@ Owner sub-orchestrator: `cto-chief` (directly dispatched, no intermediate sub-or
 
 Tier-2 skills:
 
-- `security/threat-modeler` ALWAYS — Spoofing-Tampering-Repudiation-Information-disclosure-Denial-of-service-Elevation-of-privilege threat categories, Linking-Identifying-Non-repudiation-Detecting-Disclosure-Unawareness-Non-compliance privacy categories, and the MITRE Adversarial Threat Landscape for Artificial-Intelligence Systems framework version 5.4.0.
+- `security/threat-modeler` ALWAYS — Spoofing-Tampering-Repudiation-Information-disclosure-Denial-of-service-Elevation-of-privilege threat categories, Linking-Identifying-Non-repudiation-Detecting-Disclosure-Unawareness-Non-compliance privacy categories, and the MITRE Adversarial Threat Landscape for Artificial-Intelligence Systems (MITRE ATLAS) framework.
 - `compliance/ai-governance-checker` IF the design involves artificial-intelligence features or large-language-model integration.
 - `compliance/gdpr-compliance-checker` IF the design processes European Union personal data.
-- `compliance/sbom-cra-checker` IF the project will ship software in the European Union after September eleventh, 2026 (Cyber Resilience Act applicability date).
+- `compliance/sbom-cra-checker` IF the project will ship software in the European Union after September eleventh, 2026 (Cyber Resilience Act Article 14 reporting-obligations date).
 - `security/incident-responder` IF the threat model surfaces high-severity threats that require runbook coverage.
 - `ai-quality/llm-security-tester` IF the design integrates a large-language-model with user-supplied inputs.
 
@@ -453,7 +453,7 @@ Tier-2 skills:
 - `compliance/gdpr-compliance-checker` IF European Union personal data.
 - `compliance/audit-log-checker` IF audit-trail requirements.
 - `compliance/license-scanner` IF new dependencies were added.
-- `compliance/sbom-cra-checker` IF the project ships software in the European Union after September eleventh, 2026.
+- `compliance/sbom-cra-checker` IF the project ships software in the European Union after September eleventh, 2026 (Cyber Resilience Act Article 14 reporting-obligations date).
 - `compliance/ai-governance-checker` IF the project includes high-risk artificial-intelligence systems under the European Union Artificial Intelligence Act.
 - `ai-quality/llm-security-tester` IF the project integrates a large-language-model with user-supplied inputs.
 - `security/incident-responder` IF any high-severity finding requires runbook coverage.
@@ -834,12 +834,12 @@ The cross-industry critique (real-time / safety-critical, manufacturing, finance
 - `skills/legal/dsar-handler` when `dsar_handler` is active (Data Subject Access Request — General Data Protection Regulation Article 12 one month, California Consumer Privacy Act 45 days).
 - `skills/legal/clm-obligations` when `clm_obligations_tracker` is active (Contract Lifecycle Management obligations registered at `.ctoc/contracts/obligations.yaml`).
 - `src/lib/irac-schema.js` enforcement on every compliance-skill finding when `irac_compliance_output` is active (Issue-Rule-Application-Conclusion legal-memo structure).
-- `src/lib/traceability-matrix.js` cross-walk against `.ctoc/traceability/matrix.yaml` when `requirements_traceability_matrix` is active (RTCA DO-178C and IEC 62304 Edition 2 bidirectional requirements traceability).
+- `src/lib/traceability-matrix.js` cross-walk against `.ctoc/traceability/matrix.yaml` when `requirements_traceability_matrix` is active (RTCA DO-178C and IEC 62304 bidirectional requirements traceability).
 
 **Step 16 FINAL-REVIEW** gains:
 - **Independent Verification and Validation chief** (`agents/coordinator/ivv-chief.md`) when `independent_verification_validation` is active. IV&V chief reports to user (not to CTO Chief) and re-runs Steps 11 REVIEW, 13 SECURE, 14 VERIFY in fresh isolated subagent contexts, writing to a separate audit-log root at `.ctoc/audit/ivv-dispatches/`. Required by DO-178C Level A, ISO 26262 ASIL D, IEC 62304 Class C, NASA SWE-141.
 - **Four-eyes verification** (`src/lib/four-eyes.js`) when `four_eyes_gate3` is active — Gate 3 requires two distinct `approved_by_author_review:` and `approved_by_independent:` markers resolving to different identities per `.ctoc/roles.yaml`.
-- **Privilege-posture stamp** (`src/lib/privilege-posture.js`) on every plan when `privilege_posture` is active. Allowed values: `none`, `counsel-directed`, `client-only`. Warning banner cites Heppner v. Allianz (S.D.N.Y. 17 Feb 2026) and Warner v. Gilbarco (M.D.N.C. 10 Feb 2026) on work-product doctrine.
+- **Privilege-posture stamp** (`src/lib/privilege-posture.js`) on every plan when `privilege_posture` is active. Allowed values: `none`, `counsel-directed`, `client-only`. Warning banner flags the work-product-doctrine implications of the posture.
 
 ### Cross-cutting infrastructure (always available regardless of profile)
 

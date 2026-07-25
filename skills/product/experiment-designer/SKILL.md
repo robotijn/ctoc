@@ -147,7 +147,7 @@ n_per_arm = (1.96+0.84)^2 * (0.22*0.78 + 0.27*0.73) / (0.05)^2
           ~= 1157 per arm  ->  2314 total
 ```
 
-If CUPED is enabled and pre-period covariate explains ~40% of metric variance, effective n drops ~40% (~700 per arm). Document the empirical variance-reduction factor measured on prior experiments, never the textbook claim.
+If CUPED is enabled and pre-period covariate explains ~35% of metric variance (0.35), effective n drops ~35% (~752 per arm). Document the empirical variance-reduction factor measured on prior experiments, never the textbook claim.
 
 For non-proportion metrics (revenue, time-on-task, engagement counts), use a t-test sample-size formula:
 

@@ -392,7 +392,7 @@ dotnet CycloneDX MyApp.sln -o ./sbom -j
 
 | Aspect | CycloneDX 1.6 | SPDX 3.0 |
 |---|---|---|
-| Origin | OWASP | Linux Foundation (ISO/IEC 5962) |
+| Origin | OWASP | Linux Foundation |
 | Strengths | Vulnerability + VEX integration, ML-BOM, SaaS-BOM, OBOM | Strongest license metadata; ISO standard for compliance |
 | Built into | Maven/Gradle plugins, npm tooling, .NET CLI tool, Trivy, Syft | Syft, FOSSology, government supply-chain mandates |
 | Pick when | You care about vuln/VEX/risk surface | You care about license/legal compliance |
