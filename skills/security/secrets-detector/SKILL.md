@@ -369,7 +369,7 @@ git push --force --tags
 | **Microsoft Security DevOps (MSDO) action** | Bundles Microsoft + partner static-analysis tooling into one GitHub Action; normalizes results to SARIF for the Security tab; .NET-friendly | Heavyweight; pulls multiple analyzers; download size and runtime non-trivial | .NET / Azure DevOps shops that want one CI step covering SAST + secrets + IaC |
 | **git-secrets (AWS Labs)** | Lightweight, pre-commit-focused; bundled AWS patterns | Pattern-only; sparse upstream maintenance | Legacy / lightweight setups |
 | **Betterleaks** | Open-source project positioned as a faster Gitleaks successor with refined rules | Very new — evaluate maturity before depending on it for CI | Worth piloting; not yet a primary recommendation |
-| **Puaro, Rafter, Jit, etc.** | Newer commercial entrants offering managed scanning + remediation workflow | Commercial; data residency considerations | If team wants a managed product |
+| **Jit, etc.** | Newer commercial entrants offering managed scanning + remediation workflow | Commercial; data residency considerations | If team wants a managed product |
 
 ### Canonical command lines
 
