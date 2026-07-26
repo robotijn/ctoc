@@ -710,9 +710,15 @@ describe('R3-D — every emitted claude: action key has a recipe in start.md', (
     assert.match(md, /EMPTY list/i, 'an EMPTY list means unavailable, not "nobody is alive" — stated honestly');
   });
 
-  it('start.md consumes the autoApprove signal (the one-turn approve is real, not a lie)', () => {
+  it('start.md never consumes an autoApprove signal — a human gate needs an explicit human click', () => {
     const md = fs.readFileSync(path.join(SRC, 'commands', 'start.md'), 'utf8');
-    assert.match(md, /autoApprove/, 'the driver instruction reads the autoApprove signal');
+    // The one-turn `autoApprove` signal was DELETED (human override, 2026-07):
+    // nothing may auto-run an approve in the same turn. The driver must not read
+    // or mention such a signal.
+    assert.ok(!/autoApprove/.test(md), 'the driver reads no autoApprove signal (it no longer exists)');
+    // And the recipe must state the gate requires an explicit human action.
+    assert.match(md, /explicit human (action|click)/i,
+      'the driver requires an explicit human action before any approve crosses');
   });
 });
 
