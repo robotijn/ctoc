@@ -1,11 +1,11 @@
 {
-  "content_sha256": "e3a5ad4d0737e03cc524119e090b05180c3867db9c10aa4ebc0ccef03d385897",
+  "content_sha256": "1f2ab0092f1bd7658361689d3f8ef8b284dbea592c817d5c9ccae617aa2b35b7",
   "hash_scope": "file",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-26T18:39:00.400Z",
+  "approved_at": "2026-07-26T20:43:41.581Z",
   "approved_by": "human",
   "backfilled": true,
-  "backfill_reason": "2026-07-26: human ruling — the review-stage hardening wave (00003/04/05/09/10) sent back to todo for rework, each rebuilt on a GREEN full npm test gate. Residency backfilled to match the human-ordered move; recorded as backfilled, not a live click.",
+  "backfill_reason": "2026-07-26: human ruling — review-stage hardening wave (00003/04/05/09/10) sent back to todo for rework, each rebuilt on a GREEN full npm test gate. Residency re-backfilled after the r2c2 rework edits (autoApprove one-turn signal deleted so the human gate needs an explicit click; files: corrected to disk; Decisions record reconciled with disk); recorded as backfilled, not a live click.",
   "plan_basename": "00010-r2c2-persisted-answers-unblocked"
 }

@@ -288,8 +288,8 @@ function listEscalations(root) {
 /**
  * R2-C2 item 6: the honest possibly-stale COUNT — cheap candidates filtered to the
  * stages the classifier can ACT on. A candidate at a NOT_STARTED stage
- * (vision/canvas/functional) whose only issue is unbuilt declared files is benign
- * (not-started, not abandoned) and the classifier downgrades it to inconclusive
+ * (vision/canvas/functional/implementation) whose only issue is unbuilt declared
+ * files is benign (not-started, not abandoned) and the classifier downgrades it to inconclusive
  * with a null action — so it must not inflate the "possibly-stale" nag. We count
  * `.candidates` (not `.count`) so the filter is authoritative; the drill-in list
  * (listStaleCandidates) stays UNFILTERED, showing everything the scan found.

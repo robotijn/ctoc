@@ -351,25 +351,30 @@ describe('Menu Screens Tests', () => {
     console.log('# validateScreen shows fix option on validation failure');
   });
 
-  // R2-C2 item 3 — one-turn approve (R6/W2). The approve→validate ROUTE stays
-  // (the planActions/reviewActions pins above survive), but the confirm screen's
-  // SHAPE changes: a clean validation carries an `autoApprove` signal and a single
-  // decisive approve action (no redundant "Proceed?" second ask, no Fix option —
-  // there is nothing to fix); a failed validation demotes "Approve anyway" to the
-  // LAST option and records that it is an override.
-  test('validateScreen (clean) signals one-turn approve: autoApprove + Confirm approve, no Fix', () => {
+  // R2-C2 item 3 — the human gate needs an EXPLICIT human click (human override,
+  // 2026-07). The one-turn `autoApprove` signal is DELETED: no screen field may
+  // let a driver run an approve in the same turn. The approve→validate ROUTE stays
+  // (the planActions/reviewActions pins above survive), and a clean validation
+  // still offers a single decisive `Confirm approve` action the human must click
+  // (no redundant "Proceed?" second ask, no Fix option — there is nothing to fix);
+  // a failed validation demotes "Approve anyway" to the LAST option and records
+  // that it is an override.
+  test('validateScreen (clean) requires an EXPLICIT Confirm approve click, carries NO autoApprove signal', () => {
     createPlan('functional', 'clean-plan',
       '---\ntitle: Clean\ntype: functional\nfiles:\n  - src/x.js\n---\n\n' +
       '# Clean\n\n## Problem Statement\nReal problem.\n\n## Scope\nThe thing.\n\n## Acceptance Criteria\n- It works.\n');
 
     const result = menuScreens.validateScreen('functional', 'clean-plan.md', testDir);
     assert.strictEqual(result.validation.valid, true, 'fixture passes validation');
-    assert.strictEqual(result.autoApprove, true, 'clean validation signals one-turn auto-approve');
-    // The approve action is present and unchanged (route pins survive).
+    // The one-turn signal is GONE — nothing can auto-run the approve.
+    assert.strictEqual(result.autoApprove, undefined, 'no autoApprove signal on any screen (human must click)');
+    // The approve action is present and unchanged (route pins survive) — the human
+    // clicks it deliberately.
     assert.strictEqual(result.actions['Confirm approve'], 'claude:approve functional/clean-plan.md');
     const labels = result.ask.questions[0].options.map(o => o.label);
+    assert.ok(labels.includes('Confirm approve'), 'clean validation offers an explicit Confirm approve click');
     assert.ok(!labels.includes('Fix issues'), 'no Fix option on a clean validation (nothing to fix)');
-    console.log('# validateScreen clean signals one-turn approve');
+    console.log('# validateScreen clean requires explicit Confirm approve, no autoApprove');
   });
 
   test('validateScreen (failed) demotes "Approve anyway" to the LAST option, records override', () => {
@@ -377,7 +382,7 @@ describe('Menu Screens Tests', () => {
 
     const result = menuScreens.validateScreen('functional', 'broken-plan.md', testDir);
     assert.strictEqual(result.validation.valid, false, 'fixture fails validation');
-    assert.strictEqual(result.autoApprove, false, 'failed validation never auto-approves');
+    assert.strictEqual(result.autoApprove, undefined, 'no autoApprove signal on any screen');
     const labels = result.ask.questions[0].options.map(o => o.label);
     // "Approve anyway" is the LAST option — never first, never recommended.
     assert.strictEqual(labels[labels.length - 1], 'Approve anyway', 'override is the last option');
@@ -398,7 +403,7 @@ describe('Menu Screens Tests', () => {
     createPlan('functional', 'override-plan', '# Just a Title\n\nNo structure.\n');
 
     const result = menuScreens.validateScreen('functional', 'override-plan.md', testDir);
-    assert.strictEqual(result.autoApprove, false, 'failed validation never auto-approves');
+    assert.strictEqual(result.autoApprove, undefined, 'no autoApprove signal on any screen');
     const anyway = result.actions['Approve anyway'];
     assert.strictEqual(anyway, 'claude:approve functional/override-plan.md --override',
       'forced crossing carries the --override token so it is auditable');
@@ -412,7 +417,7 @@ describe('Menu Screens Tests', () => {
       '# Clean\n\n## Problem Statement\nReal problem.\n\n## Scope\nThe thing.\n\n## Acceptance Criteria\n- It works.\n');
 
     const result = menuScreens.validateScreen('functional', 'clean-noverride.md', testDir);
-    assert.strictEqual(result.autoApprove, true, 'clean validation auto-approves');
+    assert.strictEqual(result.autoApprove, undefined, 'no autoApprove signal on any screen');
     const confirm = result.actions['Confirm approve'];
     assert.strictEqual(confirm, 'claude:approve functional/clean-noverride.md',
       'the clean approve path is unchanged — no override');
@@ -421,14 +426,15 @@ describe('Menu Screens Tests', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // HUMAN-GATE Approve affordance. The Approve option and the validateScreen
-  // autoApprove signal must be gated on the REAL crossable set (HUMAN_GATES:
-  // functional→implementation, implementation→todo, review→done), NOT on the
-  // full pipeline flow NEXT_STAGE. approvePlan throws "Unknown plan location"
-  // for any non-gate stage; offering Approve there (todo, canvas, in-progress)
-  // made validate return autoApprove:true and the driver auto-crashed on the
-  // clean path. Below: todo & canvas must NOT offer Approve / autoApprove;
-  // the three real gates MUST keep it (no regression).
+  // HUMAN-GATE Approve affordance. The Approve option must be gated on the REAL
+  // crossable set (HUMAN_GATES: functional→implementation, implementation→todo,
+  // review→done), NOT on the full pipeline flow NEXT_STAGE. approvePlan throws
+  // "Unknown plan location" for any non-gate stage; offering Approve there (todo,
+  // canvas, in-progress) is a bug. The `autoApprove` one-turn signal is DELETED
+  // everywhere (human override, 2026-07): no screen field may let a driver cross
+  // a gate in the same turn, so every screen's `autoApprove` is `undefined`.
+  // Below: todo & canvas must NOT offer a claude:approve action; the three real
+  // gates MUST keep an explicit Confirm approve click (no regression).
   // ─────────────────────────────────────────────────────────────────────────
 
   test('plan route (todo) does NOT offer an Approve-to-next-stage action', () => {
@@ -460,24 +466,24 @@ describe('Menu Screens Tests', () => {
       'no Approve action string for a canvas plan');
   });
 
-  test('validateScreen (todo) does NOT return autoApprove:true with a claude:approve action', () => {
+  test('validateScreen (todo) carries no autoApprove signal and no claude:approve action', () => {
     createPlan('todo', 'queued-plan');
 
     const result = menuScreens.validateScreen('todo', 'queued-plan.md', testDir);
-    assert.notStrictEqual(result.autoApprove, true,
-      'todo is not a human gate — must not signal one-turn auto-approve (would auto-crash approvePlan)');
+    assert.strictEqual(result.autoApprove, undefined,
+      'todo is not a human gate — the one-turn signal is deleted everywhere');
     assert.ok(!Object.values(result.actions).some(v => typeof v === 'string' && v.startsWith('claude:approve')),
       'no claude:approve action for a non-gate todo plan');
     console.log('# validateScreen todo no autoApprove');
   });
 
-  test('validateScreen (canvas) does NOT return autoApprove:true with a claude:approve action', () => {
+  test('validateScreen (canvas) carries no autoApprove signal and no claude:approve action', () => {
     fs.mkdirSync(path.join(plansDir, 'canvas'), { recursive: true });
     createPlan('canvas', 'canvas-plan');
 
     const result = menuScreens.validateScreen('canvas', 'canvas-plan.md', testDir);
-    assert.notStrictEqual(result.autoApprove, true,
-      'canvas is not a human gate — must not signal one-turn auto-approve');
+    assert.strictEqual(result.autoApprove, undefined,
+      'canvas is not a human gate — the one-turn signal is deleted everywhere');
     assert.ok(!Object.values(result.actions).some(v => typeof v === 'string' && v.startsWith('claude:approve')),
       'no claude:approve action for a non-gate canvas plan');
     console.log('# validateScreen canvas no autoApprove');
@@ -503,16 +509,18 @@ describe('Menu Screens Tests', () => {
       'the validation detail screen stays reachable at the real gate');
   });
 
-  test('validateScreen (implementation, clean) STILL autoApprove:true with claude:approve (real gate)', () => {
+  test('validateScreen (implementation, clean) STILL offers an explicit Confirm approve click (real gate), no autoApprove', () => {
     createPlan('implementation', 'impl-clean',
       '---\ntitle: Impl\ntype: implementation\nfiles:\n  - src/x.js\n---\n\n' +
       '# Impl\n\n## Implementation\nTechnical approach here.\n\n## Scope\nThe thing.\n');
 
     const result = menuScreens.validateScreen('implementation', 'impl-clean.md', testDir);
-    assert.strictEqual(result.autoApprove, true, 'clean implementation validation still auto-approves (real gate)');
+    assert.strictEqual(result.autoApprove, undefined, 'no one-turn signal even at a real gate — the human clicks');
     assert.strictEqual(result.actions['Confirm approve'], 'claude:approve implementation/impl-clean.md',
-      'real-gate approve action unchanged');
-    console.log('# validateScreen implementation clean still autoApprove');
+      'real-gate approve action unchanged — human clicks Confirm approve');
+    const labels = result.ask.questions[0].options.map(o => o.label);
+    assert.ok(labels.includes('Confirm approve'), 'the explicit Confirm approve click survives at a real gate');
+    console.log('# validateScreen implementation clean requires explicit Confirm approve');
   });
 
   test('all text fields end with triple newline', () => {

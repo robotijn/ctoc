@@ -1872,9 +1872,8 @@ function validateScreen(stage, file, projectPath) {
   const planPath = path.join(plansDir, folder, file);
   // Approval crosses only the three human-gate edges (HUMAN_GATES). For any
   // other stage (canvas, todo, in-progress) there is no gate to validate:
-  // running the transition-as-gate here returned autoApprove:true and the driver
-  // auto-ran claude:approve → approvePlan THROWS "Unknown plan location". Refuse
-  // with a non-approving screen (no autoApprove, no claude:approve) instead.
+  // approvePlan THROWS "Unknown plan location". Refuse with a non-approving
+  // screen (no claude:approve action) instead.
   const nextStage = HUMAN_GATES[stage];
   if (!nextStage) {
     return {
@@ -1886,9 +1885,7 @@ function validateScreen(stage, file, projectPath) {
           options: [{ label: 'Back', description: `Return to ${stage} list` }]
         }]
       },
-      actions: { 'Back': `browse ${stage}` },
-      // One-turn signal is OFF: there is nothing to auto-approve here.
-      autoApprove: false
+      actions: { 'Back': `browse ${stage}` }
     };
   }
 
@@ -1917,26 +1914,28 @@ function validateScreen(stage, file, projectPath) {
 
   text += '\n\n\n';
 
-  // R2-C2 item 3 — one-turn approve (R6/W2). The human already chose "Approve"
-  // in planActions/reviewActions; a clean validation must NOT demand a second
-  // "Proceed?" click. `autoApprove` is the one-turn SIGNAL: on a clean validation
-  // the driver runs `claude:approve` in the SAME turn (the auto-run half lands in
-  // the start.md instruction surface, R2-D, same wave). On a failed validation the
-  // override ("Approve anyway") is DEMOTED to the LAST option, never recommended,
-  // and labelled as recording an override. The approve→validate ROUTE and the
-  // approve ACTION strings are unchanged (their pins survive).
-  const autoApprove = validationResult.valid === true;
+  // R2-C2 item 3 — a human gate needs an EXPLICIT human click (human override,
+  // 2026-07). The one-turn `autoApprove` signal is DELETED: no field on this
+  // screen may let a driver run the approve in the same turn. `clean` here is a
+  // RENDERING flag only (clean vs error layout), never an auto-run licence. On a
+  // clean validation the screen offers a single decisive `Confirm approve` action
+  // that the human clicks deliberately (no redundant "Proceed?" second ask). On a
+  // failed validation the override ("Approve anyway") is DEMOTED to the LAST
+  // option, never recommended, and labelled as recording an override. The
+  // approve→validate ROUTE and the approve ACTION strings are unchanged (pins
+  // survive).
+  const clean = validationResult.valid === true;
 
   let question;
   const options = [];
   const actions = {};
 
-  if (autoApprove) {
-    // Clean: a single decisive approve, no redundant "Proceed?" and no Fix option
-    // (there is nothing to fix). The driver auto-runs this on a clean validation.
+  if (clean) {
+    // Clean: a single decisive approve the human clicks, no redundant "Proceed?"
+    // and no Fix option (there is nothing to fix).
     question = validationResult.warnings.length > 0
-      ? `All checks passed (${validationResult.warnings.length} warning(s)) — approving ${stage} → ${nextStage}.`
-      : `All checks passed — approving ${stage} → ${nextStage}.`;
+      ? `All checks passed (${validationResult.warnings.length} warning(s)) — approve ${stage} → ${nextStage}?`
+      : `All checks passed — approve ${stage} → ${nextStage}?`;
     options.push({ label: 'Confirm approve', description: `Approve now — move plan to ${nextStage}` });
     actions['Confirm approve'] = `claude:approve ${stage}/${file}`;
     options.push({ label: 'Back', description: `Return to ${stage} list` });
@@ -1968,8 +1967,6 @@ function validateScreen(stage, file, projectPath) {
       }]
     },
     actions,
-    // One-turn signal for the driver (R2-D reads it to skip the second ask).
-    autoApprove,
     validation: validationResult
   };
 }
