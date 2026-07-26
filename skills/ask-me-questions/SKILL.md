@@ -12,6 +12,39 @@ allowed-tools: [AskUserQuestion, Read, WebSearch]
 > matrix first, AskUserQuestion second. Once started, run both steps without
 > asking the user any intermediate clarification.
 
+## The paramount principle — maximize information gain, minimize user interactions
+
+**This is the most important rule of all, and it governs every other rule below.**
+The user's time and attention are the scarcest resource in the whole system, and
+every question spends them. So optimize the user's interaction time above all:
+**maximize the information you get from each question, and therefore minimize the
+total number of user interactions.** This is optimal-experiment-design / active
+learning applied to the human's attention — pick the query with the highest
+expected information gain (the greatest reduction in uncertainty), spend the fewest
+interactions, extract the most from each.
+
+Concretely:
+
+1. **Ask the highest-information question first.** Order the whole backlog by the
+   answer's value: **most CRITICAL issues first, then IMPORTANT, then work toward
+   the clearer and smaller ones.** Sort by severity ACROSS plans, not per-plan —
+   show-stoppers before cosmetics. A low-information question must never precede a
+   high-information one.
+2. **Pack each question to harvest the most.** A well-framed question with
+   precomputed options (pros, cons, one quality-only recommendation) and an "Other"
+   free-text path collects a decision AND its rationale in a single interaction. One
+   rich question beats three thin ones.
+3. **Never ask what can be inferred, defaulted, or read from the source.**
+   Precompute, make a documented reasonable choice (the no-stub rule), and surface
+   only a REAL fork. A question the model could answer itself is a wasted
+   interaction and a violation of this principle.
+4. **Minimize round-trips.** Batch genuinely independent decisions into one turn
+   where the tool allows (AskUserQuestion takes up to four); never trickle one
+   trivial confirmation at a time. Always leave an "Other" path so the user can add
+   open input without leaving the flow.
+
+Fewer, richer, criticality-ordered questions. Every rule that follows serves this one.
+
 ## When to use this format
 
 - The discussion phase surfaced one to four gaps or weak assumptions in a plan.
