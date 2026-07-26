@@ -405,3 +405,141 @@ test('getCurrentVersion returns "unknown" when neither a VERSION file nor any ca
     cleanup();
   }
 });
+
+// ── ORPHANED-COMMAND-FILE PRUNING (the mirror-with-delete bug) ────────────────
+// Seed a marketplace whose src/commands holds start/push/update (menu.md renamed
+// away upstream) plus the lib the post-mirror refresh needs to resolve.
+function seedMarketplaceWithCommands(home) {
+  const market = seedMarketplace(home, { withGit: true, withVersion: true, withLib: true });
+  const marketCmds = path.join(market, 'src', 'commands');
+  fs.mkdirSync(marketCmds, { recursive: true });
+  for (const c of ['start.md', 'push.md', 'update.md']) {
+    fs.writeFileSync(path.join(marketCmds, c), `# ${c}\n`);
+  }
+  return market;
+}
+
+// ── update() : up-to-date path must PURGE orphaned command files ──────────────
+// THE BUG: when currentVersion === newVersion the old code returned early WITHOUT
+// re-syncing the cache, so a stale menu.md left in the installed cache dir kept
+// showing users a dead renamed-away command forever. FIX: the up-to-date path
+// mirrors the marketplace into the cache dir, surgically pruning files-not-in-source.
+test('update purges an orphaned command file from the cache even when already up to date', () => {
+  try {
+    const home = mkTmp('ctoc-home-');
+    const proj = makeProject();
+    seedMarketplaceWithCommands(home);
+    // A pre-existing installed cache dir for the SAME (up-to-date) version, holding
+    // an ORPHANED menu.md alongside the current commands.
+    const cvd = path.join(cacheDir(home), NEW_VERSION);
+    const cacheCmds = path.join(cvd, 'src', 'commands');
+    fs.mkdirSync(cacheCmds, { recursive: true });
+    for (const c of ['start.md', 'push.md', 'update.md', 'menu.md']) {
+      fs.writeFileSync(path.join(cacheCmds, c), `# stale ${c}\n`);
+    }
+    const pluginRoot = pluginRootWithVersion(NEW_VERSION);   // already up to date
+
+    const r = runUpdateAsMain({ home, cwd: proj, pluginRoot });
+
+    assert.strictEqual(r.status, 0, `expected clean exit, got ${r.status}\n${r.stderr}`);
+    assert.match(r.stdout, new RegExp(`Already up to date \\(v${NEW_VERSION}\\)`));
+    assert.ok(!fs.existsSync(path.join(cacheCmds, 'menu.md')),
+      'the orphaned menu.md must be pruned from the cache on the up-to-date path');
+    assert.ok(fs.existsSync(path.join(cacheCmds, 'start.md')),
+      'the current start.md command must survive the mirror');
+  } finally {
+    cleanup();
+  }
+});
+
+// ── update() : version-change install mirrors the source EXACTLY ──────────────
+// A pre-existing dir for the NEW version carrying an orphan must not survive the
+// install: the new install is an exact mirror of the marketplace, orphan pruned.
+test('the version-change install mirrors the marketplace exactly, pruning a stale orphan', () => {
+  try {
+    const home = mkTmp('ctoc-home-');
+    const proj = makeProject();
+    seedMarketplaceWithCommands(home);
+    const cvd = path.join(cacheDir(home), NEW_VERSION);
+    const outCmds = path.join(cvd, 'src', 'commands');
+    fs.mkdirSync(outCmds, { recursive: true });
+    fs.writeFileSync(path.join(outCmds, 'menu.md'), '# stale menu\n');
+    const pluginRoot = pluginRootWithVersion(OLD_VERSION);   // version change
+
+    const r = runUpdateAsMain({ home, cwd: proj, pluginRoot });
+
+    assert.strictEqual(r.status, 0, `expected clean exit, got ${r.status}\n${r.stderr}`);
+    assert.ok(!fs.existsSync(path.join(outCmds, 'menu.md')),
+      'a stale menu.md must not survive a version-change install');
+    for (const c of ['start.md', 'push.md', 'update.md']) {
+      assert.ok(fs.existsSync(path.join(outCmds, c)), `${c} must be installed by the mirror`);
+    }
+  } finally {
+    cleanup();
+  }
+});
+
+// ── update() : "No old versions" prints ONLY when the list was truly empty ─────
+test('cleanup reports each removed old version and never masks with the empty-list line', () => {
+  try {
+    const home = mkTmp('ctoc-home-');
+    const proj = makeProject();
+    seedMarketplace(home, { withGit: true, withVersion: true, withLib: true });
+    // Two stale versions that must each be reported as removed.
+    fs.mkdirSync(path.join(cacheDir(home), '0.0.1'), { recursive: true });
+    fs.mkdirSync(path.join(cacheDir(home), '0.0.2'), { recursive: true });
+    const pluginRoot = pluginRootWithVersion(OLD_VERSION);
+
+    const r = runUpdateAsMain({ home, cwd: proj, pluginRoot });
+
+    assert.strictEqual(r.status, 0, `expected clean exit, got ${r.status}\n${r.stderr}`);
+    assert.match(r.stdout, /Removed: 0\.0\.1/, 'the first stale version must be reported removed');
+    assert.match(r.stdout, /Removed: 0\.0\.2/, 'the second stale version must be reported removed');
+    assert.ok(!/No old versions to remove/.test(r.stdout),
+      'the empty-list line must NOT print when there were old versions to remove');
+  } finally {
+    cleanup();
+  }
+});
+
+// ── update() : a FAILED old-version removal is surfaced LOUDLY, not masked ─────
+// THE BUG: the old cleanup wrapped the whole loop in one try/catch that, on ANY
+// removal error, printed "No old versions to remove" — masking a real failure.
+// Permission-gated: only POSIX non-root can revoke write via chmod. Skip LOUDLY
+// elsewhere (a silent no-op would itself be a check reporting a verdict it never
+// earned), while the reporting shape is still guarded by the test above.
+test('a failed old-version removal is surfaced loudly, not masked as "no old versions"', () => {
+  if (process.platform === 'win32' || (typeof process.getuid === 'function' && process.getuid() === 0)) {
+    console.error('[SKIP] loud-cleanup failure case needs POSIX non-root: chmod cannot revoke write for root/Windows');
+    return;
+  }
+  let lockedDir;
+  try {
+    const home = mkTmp('ctoc-home-');
+    const proj = makeProject();
+    seedMarketplace(home, { withGit: true, withVersion: true, withLib: true });
+    // A stale version dir with a child, made un-removable by revoking write on the
+    // dir itself: rmSync must unlink the child but cannot → EACCES → throws.
+    lockedDir = path.join(cacheDir(home), '0.0.1');
+    fs.mkdirSync(lockedDir, { recursive: true });
+    fs.writeFileSync(path.join(lockedDir, 'locked.txt'), 'cannot remove me\n');
+    fs.chmodSync(lockedDir, 0o500);
+    const pluginRoot = pluginRootWithVersion(OLD_VERSION);
+
+    const r = runUpdateAsMain({ home, cwd: proj, pluginRoot });
+
+    // The update itself still completes (best-effort housekeeping), but the failure
+    // is reported to stderr naming the specific dir — never masked as "no old versions".
+    assert.strictEqual(r.status, 0, `update should still complete, got ${r.status}\n${r.stderr}`);
+    assert.match(r.stderr, /0\.0\.1/, 'the failed removal must name the specific version dir on stderr');
+    assert.match(r.stderr, /[Ff]ailed to remove/, 'the failed removal must be surfaced, not swallowed');
+    assert.ok(!/No old versions to remove/.test(r.stdout),
+      'a real removal failure must NOT be masked as "No old versions to remove"');
+  } finally {
+    // Restore write so temp cleanup can delete the tree.
+    if (lockedDir && fs.existsSync(lockedDir)) {
+      try { fs.chmodSync(lockedDir, 0o700); } catch (_e) { /* best-effort restore for cleanup */ }
+    }
+    cleanup();
+  }
+});
