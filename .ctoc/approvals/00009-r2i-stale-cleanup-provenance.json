@@ -1,11 +1,11 @@
 {
-  "content_sha256": "47832e1173a6d9ff1741affbe079121c003b630210172220b9ef49e71ec5b857",
+  "content_sha256": "16d07750b745236567bed10d88f648d9ae81474279d9134f4ed757fe85985a51",
   "hash_scope": "file",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-26T18:39:00.400Z",
+  "approved_at": "2026-07-26T20:30:54.011Z",
   "approved_by": "human",
   "backfilled": true,
-  "backfill_reason": "2026-07-26: human ruling — the review-stage hardening wave (00003/04/05/09/10) sent back to todo for rework, each rebuilt on a GREEN full npm test gate. Residency backfilled to match the human-ordered move; recorded as backfilled, not a live click.",
+  "backfill_reason": "2026-07-26: human ruling — review-stage hardening wave (00003/04/05/09/10) sent back to todo for rework, each rebuilt on a GREEN full npm test gate. Residency re-backfilled after the r2i rework edits (revert invariant enforced, crash-consistent archive, false note removed); recorded as backfilled, not a live click.",
   "plan_basename": "00009-r2i-stale-cleanup-provenance"
 }

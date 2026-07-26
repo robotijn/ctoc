@@ -892,3 +892,147 @@ describe('T19 (contradiction 8) — review revert lands in todo/ (ledger-consist
     assert.equal(gateHook.checkFolder('todo', sb).length, 0, 'hook accepts the reverted todo/ resident (ledger-consistent revert)');
   });
 });
+
+// ===========================================================================
+// T20 (R2-I contradiction 8, no-entry) — the revert INVARIANT is ENFORCED, not
+// merely advertised. A dead review plan with NO vouching ledger entry (the
+// dead-on-arrival default revert case, and the legacy file-scope case) may NOT
+// land in the hook-swept todo/, because its ledger cannot vouch for that
+// residency. The static REVERT_MAP alone lands it in todo/ and the gate hook
+// then chain-reverts todo→implementation→functional with an alarming multi-hop
+// "HUMAN GATE VIOLATION" cascade. revertPlan now consults the ledger and walks
+// back past every unvouched gate-destination to the nearest stage the ledger CAN
+// vouch for — here a non-gate stage (functional) — so the promised one-move,
+// cascade-free revert is TRUE for the plans it will really run on, not only for
+// the pre-seeded happy path T19 covers.
+// ===========================================================================
+
+describe('T20 (contradiction 8, no-entry) — a review revert with NO vouching ledger entry does NOT land in the hook-swept todo/', () => {
+  it('a dead review plan with no ledger entry reverts to a non-gate stage; every hook-swept folder stays clean (no cascade)', () => {
+    const sb = makeSandbox();
+    writePlan(sb, 'review', 'noentry', { files: ['src/missing.js'] });
+    // NO ledger entry is seeded — this is the dead-on-arrival default revert case
+    // the plan advertised but never enforced.
+    assert.equal(ledger.readEntry('noentry', sb), null, 'precondition: no ledger entry vouches for this plan');
+
+    // Re-derive the stage from an injected scan (review); use the REAL mover so the
+    // plan physically lands wherever the invariant walk decides.
+    const injScan = () => [{ plan: 'noentry', stage: 'review' }];
+    const r = cleanup.executeCleanup({ plan: 'noentry', proposedAction: 'revert' }, sb, { listStaleCandidates: injScan });
+
+    assert.equal(r.from, 'review', 'reverted from review');
+    // THE INVARIANT: it must NOT land in todo/ — a hook-swept gate destination whose
+    // ledger cannot vouch for it. The walk skips todo/ AND implementation/ (both swept,
+    // both unvouched) and lands in functional/ (not a gate destination — always safe).
+    assert.notEqual(r.to, 'todo', 'must NOT land in the hook-swept todo/ with no vouching entry');
+    assert.equal(r.to, 'functional', 'lands in functional/ (the nearest stage the ledger walk can vouch for is a non-gate stage)');
+    assert.ok(fs.existsSync(path.join(sb, 'plans', 'functional', 'noentry.md')), 'plan physically lands in functional/');
+    assert.ok(!fs.existsSync(path.join(sb, 'plans', 'todo', 'noentry.md')), 'nothing landed in todo/');
+
+    // The whole point: no chain-revert cascade. Every hook-swept folder is clean, so a
+    // subsequent gate sweep posts no "HUMAN GATE VIOLATION" against this plan.
+    assert.equal(gateHook.checkFolder('todo', sb).length, 0, 'todo/ sweep clean');
+    assert.equal(gateHook.checkFolder('implementation', sb).length, 0, 'implementation/ sweep clean');
+    assert.equal(gateHook.checkFolder('done', sb).length, 0, 'done/ sweep clean');
+  });
+});
+
+// ===========================================================================
+// T21 (archive partial-failure window) — a rename failure during archive is
+// CRASH-CONSISTENT: the PIPELINE ledger entry is written only AFTER the rename
+// succeeds, so a rename failure can neither destroy the plan's prior approval
+// provenance (persistEntry overwrites the single per-slug entry) nor leave a
+// done-edge entry standing against a hook-swept SOURCE stage (implementation/
+// and todo/ ARE swept; an approved-but-stranded plan is routed here from exactly
+// those stages). The pre-rename write the plan's Decision 1 justified did both.
+// ===========================================================================
+
+describe('T21 (archive partial-failure) — a rename failure preserves prior provenance and writes NO done-edge entry', () => {
+  it('an implementation-source archive whose rename fails leaves the prior approval entry byte-identical and creates no done/ resident', () => {
+    const sb = makeSandbox();
+    const src = writePlan(sb, 'implementation', 'strandimpl', { files: ['src/missing.js'] });
+    const content0 = fs.readFileSync(src, 'utf8');
+    // The plan's genuine prior approval provenance: a HUMAN-kind Gate-2 (todo-edge)
+    // ledger entry from its real earlier crossing.
+    const priorEntry = ledger.writeEntry('strandimpl', {
+      content_sha256: ledger.computeContentHash(content0),
+      stage_from: 'implementation',
+      stage_to: 'todo',
+    }, sb);
+    assert.equal(ledger.entryKind(priorEntry), 'human', 'precondition: the prior entry is a human Gate-2 approval');
+
+    // Force the plan→done rename to FAIL (read-only done/, full disk, an AV lock, a
+    // Windows destination collision). safeFs.renameSync delegates to fs.renameSync, so
+    // overriding it here throws exactly on the archive rename.
+    const origRename = fs.renameSync;
+    fs.renameSync = (a, b, ...rest) => {
+      if (String(a).endsWith(path.join('plans', 'implementation', 'strandimpl.md'))) {
+        throw new Error('simulated rename failure (ENOSPC)');
+      }
+      return origRename(a, b, ...rest);
+    };
+    try {
+      assert.throws(() => cleanup.archivePlan(src, sb), /simulated rename failure/, 'the rename failure propagates');
+    } finally {
+      fs.renameSync = origRename;
+    }
+
+    // (1) prior provenance is INTACT — never overwritten by a done-edge pipeline entry.
+    const entryNow = ledger.readEntry('strandimpl', sb);
+    assert.deepEqual(entryNow, priorEntry, 'the prior todo-edge approval entry is preserved byte-for-byte');
+    assert.equal(entryNow.stage_to, 'todo', 'entry still records the todo edge, NOT done');
+    assert.equal(ledger.entryKind(entryNow), 'human', 'entry is still the human approval, not a pipeline overwrite');
+
+    // (2) no done/ resident exists — a rename failure created nothing to sweep.
+    assert.ok(!fs.existsSync(path.join(sb, 'plans', 'done', 'strandimpl.md')), 'nothing landed in done/');
+  });
+});
+
+// ===========================================================================
+// T22 (dual-marker archive) — a REAL approved-but-stranded plan carries
+// approved_by: human in its BODY from its genuine earlier gate crossing. The
+// archive prepends the machine's pipeline block and KEEPS the body, so the
+// archived file legitimately contains BOTH markers. This pins the real shape:
+// the machine's own block writes ONLY pipeline provenance (never the human
+// marker), the pre-existing human body marker is left intact, and the gate hook
+// accepts the resident via the agent-write-denied LEDGER (a pipeline entry) — NOT
+// via the forgeable body marker. (The production code is already correct; this
+// closes a test-realism gap left by Decision 5's marker-free fixture.)
+// ===========================================================================
+
+describe('T22 (dual-marker) — a real approved-but-stranded plan keeps its human body marker; the machine writes only pipeline provenance', () => {
+  it('archives a plan whose body carries approved_by: human; both markers coexist; ledger is pipeline-kind; hook accepts via the ledger', () => {
+    const sb = makeSandbox();
+    // A REAL approved-but-stranded plan: its BODY genuinely carries approved_by: human.
+    const src = writePlan(sb, 'implementation', 'dual', { files: ['src/missing.js'], approved: true });
+    const before = fs.readFileSync(src, 'utf8');
+    assert.match(before, /approved_by:\s*human/, 'precondition: the plan body carries the human marker');
+
+    const injScan = () => [{ plan: 'dual', stage: 'implementation' }];
+    cleanup.executeCleanup({ plan: 'dual', proposedAction: 'advance-via-reconciliation' }, sb, { listStaleCandidates: injScan });
+
+    const donePath = path.join(sb, 'plans', 'done', 'dual.md');
+    assert.ok(fs.existsSync(donePath), 'archived to done/');
+    const archived = fs.readFileSync(donePath, 'utf8');
+
+    // The machine's OWN leading block (everything before the body's title:) is pipeline
+    // provenance and NEVER the human marker.
+    const machineBlock = archived.slice(0, archived.indexOf('title:'));
+    assert.match(machineBlock, /advanced_by:\s*pipeline/, 'the machine block carries advanced_by: pipeline');
+    assert.ok(!/approved_by:\s*human/.test(machineBlock), 'the machine block never writes the human marker');
+
+    // BOTH markers coexist: the pre-existing human body marker is retained, not stripped.
+    assert.match(archived, /advanced_by:\s*pipeline/, 'pipeline marker present (machine block)');
+    assert.match(archived, /approved_by:\s*human/, 'the pre-existing human body marker is retained');
+
+    // The ledgered provenance is PIPELINE-kind — the machine advanced it; it did not
+    // forge a human approval to match the body marker.
+    const entry = ledger.readEntry('dual', sb);
+    assert.equal(ledger.entryKind(entry), 'pipeline', 'the ledgered provenance is pipeline, not human');
+    assert.equal(entry.stage_to, 'done', 'entry records the done/ edge');
+
+    // The gate hook ACCEPTS the dual-marker done/ resident via the LEDGER (pipeline
+    // entry), never via the forgeable body marker.
+    assert.equal(gateHook.checkFolder('done', sb).length, 0, 'hook accepts the dual-marker done/ resident on its pipeline ledger entry');
+  });
+});

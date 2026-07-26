@@ -17,19 +17,27 @@
  *     stale-reconciliation <ISO>` — never the human `approved_by` marker. The machine's actual
  *     authority to occupy done/ is a PIPELINE-kind approval-ledger entry
  *     (`writePipelineEntry`, `advanced_by: 'pipeline'` + a mandatory non-empty
- *     `evidence` string) written BEFORE the rename, with a `content_sha256` bound to
- *     the exact archived bytes. The revived gate hook (src/hooks/human-gate-check.js)
- *     reads that ledger — NOT the plan-body marker, which any agent can forge — and
- *     accepts a pipeline entry at done/ (never at the pre-done human-only gate). The
- *     stamp is still written to the source file BEFORE the rename (stamp-before-
- *     rename, M5) so the archived file carries legible provenance.
+ *     `evidence` string) written AFTER the rename SUCCEEDS, with a `content_sha256`
+ *     bound to the exact archived bytes. The revived gate hook
+ *     (src/hooks/human-gate-check.js) reads that ledger — NOT the plan-body marker,
+ *     which any agent can forge — and accepts a pipeline entry at done/ (never at the
+ *     pre-done human-only gate). The stamp (the legible in-file provenance block) is
+ *     still written to the source file BEFORE the rename (stamp-before-rename, M5); the
+ *     LEDGER entry is written strictly AFTER a successful rename (crash-consistency —
+ *     see `_stampAndArchive`), so a rename failure can neither destroy the plan's prior
+ *     approval provenance nor strand a done-edge entry against a hook-swept source.
  *   - revert → move the plan back ONE stage (reversible; the dead-on-arrival
  *     default). No marker is stamped — a revert is not a gate crossing.
  *
  *     REVERT INVARIANT (R2-I, contradiction 8). A revert may never land a plan in a
- *     gate-destination stage whose ledger entry cannot vouch for that residency —
- *     which is why `REVERT_MAP.review` is `todo` (the stage the Gate-2 entry vouches
- *     for), not `implementation`. See REVERT_MAP for the full rationale.
+ *     hook-swept gate-destination stage whose ledger entry cannot vouch for that
+ *     residency. `revertPlan` ENFORCES this by consulting the ledger (via the hook's
+ *     own `classifyResidency` predicate) and walking back along `GATE_SOURCE` past
+ *     every unvouched swept stage to the nearest stage the ledger can vouch for, or a
+ *     non-gate stage that is never swept — so a plan WITH a valid Gate-2 entry lands in
+ *     `todo/` (the entry vouches for it) while a dead, unvouched review plan walks past
+ *     `todo/` and `implementation/` to `functional/` instead of triggering a chain-
+ *     revert cascade. See REVERT_MAP for the full rationale.
  *   - delete → only when explicitlyRejected === true; refused by construction at
  *     two layers (M6/D4). Deletion is irreversible.
  *
@@ -63,19 +71,40 @@ const { listStaleCandidates } = require('./inbox');
 // module still cannot cross a live Gate 3 nor fire the deployment pipeline. It is a
 // leaf (crypto/path/safe-fs only) → no require cycle.
 const ledger = require('./approval-ledger');
+// R2-I (revert invariant ENFORCEMENT): the gate-edge encoding and the ONE approval-
+// residency predicate. `GATE_DESTINATIONS` names the hook-swept stages
+// (implementation, todo, done); `GATE_SOURCE` is the destination→source inverse used
+// to walk a revert backward one gate at a time; `classifyResidency` is the SAME
+// predicate the gate hook applies, so `revertPlan` asks the ledger the identical
+// question the hook will ask — never a second, divergable encoding of it. Both are
+// leaves for cycle purposes: gate-order requires nothing; approval-residency requires
+// only {gate-order, safe-fs, approval-ledger} and NEITHER re-enters this module nor
+// imports actions/approvePlan, so the structural gate-safety surface (D2) is
+// unchanged and no require cycle is introduced.
+const { GATE_DESTINATIONS, GATE_SOURCE } = require('./gate-order');
+const { classifyResidency } = require('./approval-residency');
 
 // Backward revert map (inverse of the forward gate flow). Only the three
-// gate-source stages the detector scans are valid inputs.
+// gate-source stages the detector scans are valid inputs. This is the STARTING
+// point of a revert; `revertPlan` then enforces the invariant below against the
+// ledger, so the map's target is where a revert lands ONLY when the ledger can
+// vouch for that residency (or the target is not a hook-swept stage).
 //
-// REVERT INVARIANT (R2-I, contradiction 8): a revert may NEVER move a plan to a
-// gate-destination stage whose ledger entry cannot vouch for that residency. A plan
-// that legitimately reached `review/` crossed Gate 2 (implementation→todo) and so
-// carries a ledger entry with `stage_to: 'todo'`. Reverting it review→`todo` leaves
-// it hook-consistent: the gate hook accepts `todo/` residency on that very entry (a
-// byte-identical rename preserves the hash it verifies). Reverting past the gate to
-// `implementation/` instead produced a plan the hook read as `wrong-edge` (its entry
-// says `todo`, not `implementation`) and chain-reverted a SECOND time. `todo` is the
-// ledger-vouched stage, so `todo` is where a review revert lands.
+// REVERT INVARIANT (R2-I, contradiction 8): a revert may NEVER leave a plan in a
+// hook-swept gate-destination stage (`GATE_DESTINATIONS` — implementation, todo,
+// done) whose ledger entry cannot vouch for that residency. A plan that legitimately
+// reached `review/` crossed Gate 2 (implementation→todo) and so carries a ledger
+// entry with `stage_to: 'todo'`; reverting it review→`todo` leaves it hook-consistent
+// (the gate hook accepts `todo/` on that very entry, and a byte-identical rename
+// preserves the hash it verifies). But a DEAD review plan (the dead-on-arrival default
+// revert case) has NO vouching entry, and a plan whose Gate-2 entry is legacy
+// file-scope no longer hashes clean — for either, landing in the swept `todo/` makes
+// the hook read `no-ledger-entry`/`hash-mismatch` and chain-revert it a SECOND (and
+// third) time, an alarming multi-hop "HUMAN GATE VIOLATION" cascade. So `revertPlan`
+// CONSULTS the ledger (via `classifyResidency`, the hook's own predicate) and walks
+// back along `GATE_SOURCE` past every unvouched swept stage until it reaches a stage
+// the ledger CAN vouch for, or a non-gate stage that is never swept. The static map is
+// merely the first candidate; the ledger decides the landing.
 const REVERT_MAP = Object.freeze({
   review: 'todo',
   implementation: 'functional',
@@ -204,13 +233,30 @@ function _stampAndArchive(planPath, root, action) {
   const from = _stageFromPath(planPath);
   const content = safeFs.readFileSync(planPath, 'utf8');
   const stamped = _stampMarker(content, 'stale-reconciliation ' + iso);
-  // R2-I: ledger the machine advance as a PIPELINE-kind entry BEFORE the plan
-  // appears in done/, so there is never a window where a done/ resident exists
-  // without provenance for the revived gate hook to accept. `content_sha256` binds
-  // to the EXACT bytes that will occupy done/ (`stamped`, byte-identical across the
-  // rename), so the hook's invalidate-on-edit hash check on done/ passes. The
-  // ledger slug is the canonical lowercase form `slugFromPlanPath` derives — the
-  // same key the hook reads. The evidence string is mandatory and non-empty.
+  // M5: stamp the legible in-file provenance block into the SOURCE file strictly
+  // BEFORE the rename, so the archived file carries readable provenance the instant it
+  // lands in done/. (This is the in-file block only — the ledger entry, the machine's
+  // ACTUAL authority, is written after the rename below.)
+  safeFs.writeFileSync(planPath, stamped);
+  safeFs.mkdirSync(doneDir, { recursive: true });
+  safeFs.renameSync(planPath, dest);
+  // R2-I (crash-consistency — the archive partial-failure window). The PIPELINE-kind
+  // ledger entry is written strictly AFTER the rename SUCCEEDS, never before. Writing
+  // it before (the discarded Decision 1 rationale) meant a rename failure left the plan
+  // in its SOURCE stage — which is hook-swept for an implementation/todo-source archive
+  // (approved-but-stranded routes exactly those stages here) — carrying a done-edge
+  // entry the hook reads as `wrong-edge`, so it reverted the plan and posted a false
+  // "human gate violation"; and because `persistEntry` overwrites the single per-slug
+  // entry, the plan's genuine prior approval provenance was already destroyed. Writing
+  // after the rename makes a rename failure incapable of touching the ledger at all
+  // (the prior entry survives byte-identical), and the only remaining partial failure —
+  // a crash between the rename and this write — leaves a done/ resident with no entry,
+  // which the hook resolves in the SAFE direction (a revert back OUT of done/, never a
+  // false acceptance and never lost provenance). `content_sha256` binds to the EXACT
+  // bytes now occupying done/ (`stamped`, byte-identical across the rename), so the
+  // hook's invalidate-on-edit hash check passes. The ledger slug is the canonical
+  // lowercase form `slugFromPlanPath` derives — the same key the hook reads. The
+  // evidence string is mandatory and non-empty.
   const ledgerSlug = ledger.slugFromPlanPath(planPath);
   ledger.writePipelineEntry(ledgerSlug, {
     content_sha256: ledger.computeContentHash(stamped),
@@ -218,9 +264,6 @@ function _stampAndArchive(planPath, root, action) {
     stage_to: 'done',
     evidence: 'stale-reconciliation: ' + action + ' ' + iso,
   }, root);
-  safeFs.writeFileSync(planPath, stamped); // WRITE strictly BEFORE rename (M5)
-  safeFs.mkdirSync(doneDir, { recursive: true });
-  safeFs.renameSync(planPath, dest);
   // CF1: the plan left its gate-source stage for done/ — bust the read cache
   // AFTER the successful rename. Strictly post-write; the stamp-before-rename
   // (M5) ordering above is untouched.
@@ -270,17 +313,36 @@ function revertPlan(planPath, root, deps = {}) {
   if (!prior) {
     throw new Error('stale-cleanup: cannot revert from stage ' + stage);
   }
+  // ENFORCE THE REVERT INVARIANT (contradiction 8): never leave the plan in a hook-
+  // swept gate-destination stage the ledger cannot vouch for. Starting from the mapped
+  // target, walk back along `GATE_SOURCE` while the target is a swept gate destination
+  // AND the ledger does NOT vouch for that residency; stop at the first stage that is
+  // either not swept (never a gate destination) or one the ledger DOES vouch for. The
+  // vouching question is asked with `classifyResidency` — the gate hook's OWN predicate
+  // — so the revert can never disagree with the sweep that follows it. Content is read
+  // LAZILY (only when a swept target must actually be checked), so a revert driven by an
+  // injected scan with no file on disk (the M8 seam) still works when the target is a
+  // non-swept stage. The walk terminates: every gate destination has a `GATE_SOURCE`,
+  // and the chain (todo→implementation→functional, done→review) always reaches a
+  // non-gate stage.
+  let target = prior;
+  let content = null;
+  while (GATE_DESTINATIONS.includes(target)) {
+    if (content === null) content = safeFs.readFileSync(planPath, 'utf8');
+    if (classifyResidency(planPath, target, root, content).accepted) break;
+    target = GATE_SOURCE[target];
+  }
   const move = deps.movePlan || movePlan;
-  const newPath = move(planPath, prior, root);
+  const newPath = move(planPath, target, root);
   _appendLog(root, {
     plan: path.basename(planPath, '.md'),
     from: stage,
-    to: prior,
+    to: target,
     action: 'revert',
     reason: 'stale-revert',
     at: new Date().toISOString(),
   });
-  return { from: stage, to: prior, path: newPath, reason: 'stale-revert' };
+  return { from: stage, to: target, path: newPath, reason: 'stale-revert' };
 }
 
 /**
