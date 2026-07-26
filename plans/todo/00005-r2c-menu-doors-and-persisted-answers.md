@@ -1,5 +1,5 @@
 ---
-title: "R2-C — Menu: a door for the inbox, persisted answers, one-turn approve, honest cancel route, review done-all"
+title: "R2-C — Menu: a read-only door for the inbox + an honest cancel route"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild
 depends_on: 00003-r2a-scheduler-lifecycle-honesty
@@ -8,22 +8,30 @@ program: ctoc-repair-loop
 iron_loop: true
 files:
   - "src/lib/menu-screens.js"
-  - "src/commands/menu.js"
   - "src/lib/inbox.js"
-  - "src/lib/compliance-regime.js"
+  - "src/lib/actions.js"
   - "tests/menu-task-wiring.test.js"
   - "tests/menu-protocol.test.js"
   - "tests/menu-inbox-routes.test.js"
-  - "tests/compliance-regime.test.js"
+  - "tests/actions-scheduler.test.js"
 ---
 
-# R2-C — The menu stops hiding and stops re-asking
+# R2-C — The menu grows a door for the inbox and an honest cancel route
 
-Fixes W1 (CRITICAL inbox counts with no door), R1 (CRITICAL compliance "None"
-discarded + unsaved choice confirmed), W3 (HIGH no Gate 3 batch on the shipped
-surface), R2 (HIGH no durable stop for environment "Decide later"), R6/W2
-(double-asked approvals; "Approve anyway" recommended on failure), C1-2 route
-side (menu cancel writes 'failed').
+Fixes exactly the two defects this slice actually shipped:
+
+- **W1 (CRITICAL) — inbox counts with no door.** The dashboard reported inbox
+  counts the human could not open. This slice adds the read-only doors
+  (`inbox questions|decisions|gates`) so a count is now something you can look at.
+- **C1-2 — the menu cancel route wrote `failed`.** Cancelling a task recorded it
+  as a failure with a flag. This slice routes the menu cancel through the ONE cancel
+  encoding (`actions.cancelTask`): a running task enters `cancelling` and keeps its
+  files locked; a queued task cancels immediately; nothing is ever written `failed`.
+
+The other four defect-groups the original slice header advertised (R1 compliance
+"None" persistence, W3 review `done-all`, R2 environment durable stop, R6/W2
+one-turn approve) were KICKED BACK at build time (they require files outside this
+slice — see D1) and are NOT claimed here.
 
 ## Implementation Details
 
@@ -65,14 +73,22 @@ side (menu cancel writes 'failed').
 
 ### Wiring — the live call sites (MANDATORY)
 
-| change | live call site | root |
+The command surface is `/ctoc:start` (`src/commands/start.js` → `src/commands/start.md`).
+There is no `src/commands/menu.js`; the router that dispatches these routes is
+`start.js`'s non-interactive JSON path (`start.js:939` calls `menu-screens.route`).
+Only the two DELIVERED items are wired here; the four blocked items are the
+follow-up's work and are noted, not claimed.
+
+| change (delivered) | live call site | root |
 |---|---|---|
-| inbox routes | menu router (this slice) | /ctoc:menu |
-| declined marker | needsComplianceRegimePrompt (menu.js, this slice) | /ctoc:menu |
-| env dismiss | menu.js ride-along predicate (this slice) | /ctoc:menu |
-| done-all | review stageBrowse → approveSubplans (exists) | /ctoc:menu |
-| one-turn approve | planActions approve path (this slice) | /ctoc:menu |
-| cancel route | taskTransition (this slice) | /ctoc:menu |
+| inbox doors (`inbox questions\|decisions\|gates`) | `menu-screens.route` case `'inbox'` (`menu-screens.js:2581`) → `inboxQuestionsScreen`/`inboxDecisionsScreen`/`inboxGatesScreen` | /ctoc:start |
+| honest cancel route | `menu-screens.route` case `'cancel'` (`menu-screens.js:2488`) → `taskTransition(...,'cancel')` → `actions.cancelTask` (the ONE cancel encoding) | /ctoc:start |
+
+Blocked items (NOT delivered by this slice — see D1): the compliance decline
+marker + `needsComplianceRegimePrompt`, and the environment durable-stop predicate,
+landed later in `src/commands/start.js` (`start.js:68` `needsComplianceRegimePrompt`,
+`start.js:37/50` the environment ride-along) as the follow-up's work, under labels
+`R2-C2 item 1/item 2`. Review `done-all` and one-turn approve were also blocked.
 
 ### Test Plan (TDD-Red first)
 New tests/menu-inbox-routes.test.js: each route lists seeded inbox files;
@@ -97,8 +113,8 @@ If R2-A's cancelling status is absent on disk, STOP and report.
 ### Step 12: OPTIMIZE — no extra registry/settings loads per render.
 ### Step 13: SECURE — stripCtl on everything rendered from inbox files (ANSI/
 newline injection — mirror the existing render guards); safe-fs.
-### Step 14: VERIFY — node --test on the four test files + eslint on changed
-files; no git; no full suite.
+### Step 14: VERIFY — the REAL gate: `npm test` (full suite + coverage floor 99 +
+zero-skipped) on the whole tree, not a per-file run. Green before the record stands.
 ### Step 15: DOCUMENT — JSDoc on new/changed exports.
 ### Step 16: FINAL-REVIEW — report files/tests/red-evidence/decisions.
 
@@ -129,18 +145,20 @@ BLOCKED — needs a file outside `files:` (STOP-and-report):
   (test 13b pins `Object.keys(compliance).sort() === ['shouldRunEuAiAct',
   'shouldRunGdpr','writeActiveProfiles']` — no new export allowed; test 10 pins
   `writeActiveProfiles([])` as a byte-identical NO-OP — cannot make "None" write);
-  and `src/commands/menu.md` line 58 binds `set-compliance-regime none`→"no write".
-  A declined marker + `needsComplianceRegimePrompt` honoring it cannot land without
-  editing those two out-of-scope files.
+  and the instruction surface `src/commands/start.md` binds `set-compliance-regime
+  none`→"no write" (there is no `src/commands/menu.js`/`menu.md`; the command was
+  renamed menu→start). A declined marker + `needsComplianceRegimePrompt` honoring it
+  cannot land without editing those out-of-scope files. (Subsequently delivered by the
+  follow-up in `src/commands/start.js:68` under label `R2-C2 item 1`, not by this slice.)
 - Change 3 (environment durable stop). Requires: `tests/menu-environment.test.js`
   (line 57 pins EXACTLY 2 dashboard questions when env is unset; line 79 pins every
   question ≤4 options). "Keep defaults, stop asking" is a 5th env option (breaks ≤4)
   or a 3rd question (breaks ==2). Also `src/lib/settings.js` owns the
   `needsEnvironmentPrompt` predicate that must honor the marker.
-- Change 4 (review `done-all`). The menu-side action key is clean, but the Gate-3
-  batch handler for `claude:done-all-*`→`approveSubplans(parent,'review')` lives in
-  `src/commands/menu.md` (out of scope). A dangling menu action with no handler is a
-  stub (no-stub rule), so this is blocked on menu.md.
+- Change 4 (review `done-all`). The menu-side action key is clean, but the batch
+  handler for `claude:done-all-*`→`approveSubplans(parent,'review')` lives in the
+  instruction surface `src/commands/start.md` (out of scope). A dangling menu action
+  with no handler is a stub (no-stub rule), so this is blocked on start.md.
 - Change 5 (one-turn approve). Requires: `tests/menu-screens.test.js` (line 260 pins
   `planActions` approve → `startsWith('validate')`; line 296 pins reviewActions
   `Approve → Done` → `startsWith('validate')`). Making the clean path go straight to
@@ -161,13 +179,20 @@ BLOCKED — needs a file outside `files:` (STOP-and-report):
   would have to mirror it — acceptable, but the count change itself is blocked by the
   out-of-scope test.
 
-### D2 — Cancel route implemented directly on the registry, not via actions.cancelTask
-Per the task brief's instruction and PREPARE-time check: `actions.cancelTask` on disk
-calls `updateTask(reg, id, {status:'cancelled'})` UNCONDITIONALLY. Under the R2-A
-transition table, `running → cancelled` is FORBIDDEN (running must go via
-`cancelling`), so `actions.cancelTask` THROWS for a running task. The menu cancel
-route therefore implements the honest semantics directly on the registry inside
-`taskTransition` (running→cancelling, queued→cancelled) WITHOUT touching actions.js.
+### D2 — Cancel route CONVERGED onto `actions.cancelTask` (the ONE cancel encoding)
+The original D2 justified a second cancel implementation inside `taskTransition` on
+the ground that `actions.cancelTask` did `running → cancelled` unconditionally and
+threw for a running task. On current disk that rationale is FALSE:
+`actions.cancelTask` already does `running → cancelling`, `queued → cancelled`, and
+refuses an already-`cancelling` task. Two encodings of one registry mutation is a
+divergence — and they DID diverge (the menu path silently re-stamped
+`ts.cancelRequested` on a repeat cancel, resetting reconcile's cancel-deadline clock
+and holding a stuck task's files longer). This rework deletes the second copy: the
+menu cancel route now delegates to `actions.cancelTask`, the single source. The
+`--force` one-call path the menu needs (running → cancelling → cancelled in one call,
+warn-logged) was ADDED to `actions.cancelTask` (an `opts.force` parameter), not
+duplicated in the menu. A repeat cancel on an already-`cancelling` task now fails
+soft (refused) instead of re-stamping the deadline.
 
 ### D3 — Inbox door screens render bullet rows + `◀ Back` (not numbered-selectable)
 The plan text says "numbered; [0] back", but menu-discipline reserves NUMBERS for
@@ -180,3 +205,54 @@ Every attacker-influenceable field (slug/plan/stage/path) passes through `stripC
 Hints (`· view: inbox questions|decisions|gates`) are appended AFTER the existing
 line substrings and only when that specific count is > 0, so no existing substring
 assertion (`includes('morning question')`, `includes('at gates')`) regresses.
+
+## Step 16 — FINAL-REVIEW report (rework, 2026-07-26)
+
+This slice was REWORKED on the human's send-back. The record above was brought back
+to what the code actually ships, and two code defects the review found were fixed via
+TDD on a GREEN full `npm test` gate.
+
+### Files changed (this rework)
+- `src/lib/menu-screens.js` — (1) the `task cancel` route now DELEGATES to
+  `actions.cancelTask` (the ONE cancel encoding); the second in-menu cancel
+  implementation and its now-dead terminal-set mirror (`TASK_TERMINAL`) / `nowIso`
+  helper are deleted. (2) `taskComplete` DERIVES the settled task result's `ok` from
+  the real verify outcome — a FAILED verify settles `ok:false` and is never
+  re-stamped `ok:true` by the caller's `{ok:!p.fail}` flag (mirrors the actions.js
+  coupling). The caller's `--summary` still round-trips intact; only `ok` is
+  verify-derived.
+- `src/lib/actions.js` — `cancelTask(projectPath, taskId, opts)` gains an
+  `opts.force` one-call path (running → cancelling → cancelled, warn-logged) so the
+  menu never mirrors the transition, and an explicit refusal for an already-`cancelled`
+  task (`cancelled → cancelled` is an idempotent no-op to `updateTask`, so it needed an
+  explicit throw to stay an honest refusal).
+- `tests/menu-task-wiring.test.js` — new describe blocks: honest task result on a
+  failed-verify complete; cancel delegates to `actions.cancelTask`; `--force` one-call
+  cancel; repeat non-force cancel refused.
+- `tests/actions-scheduler.test.js` — `cancelTask` force tests (running/cancelling →
+  cancelled in one call; repeat non-force refused).
+- `plans/todo/00005-…md` — header narrowed to the two shipped fixes; `files:`
+  corrected to the real change surface (phantom `src/commands/menu.js` removed,
+  `actions.js` + `tests/actions-scheduler.test.js` added, blocked-change files
+  dropped); wiring table + D1 pointed at the real `start.js`/`menu-screens.js` layout;
+  D2 rewritten as the convergence decision.
+
+### Red evidence (captured this rework, seen failing before the fix)
+- `actions.cancelTask` force: `force: a RUNNING task → cancelled in one call` failed
+  RED with `actual: 'cancelling', expected: 'cancelled'` (no force param yet); the
+  already-cancelling force case threw `already cancelling`.
+- Menu honest result: `a FAILED verify settles the registry task ok:false` failed RED
+  with `actual: true, expected: false` — the exact overwrite the finding names.
+- Menu cancel converge: `the menu cancel route delegates to actions.cancelTask` failed
+  RED (source did not call `cancelTask(`); `a repeat non-force cancel … is refused`
+  failed RED with `actual: true` (the old path silently re-stamped the deadline).
+
+### Verify
+Full `npm test` gate GREEN on the whole tree: 10492 tests, `# pass 10492`,
+`# fail 0`, `# skipped 0`, coverage 99.01% (floor 99). Not a per-file run.
+
+### Still NOT delivered by this slice (unchanged from D1)
+The four blocked defect-groups (compliance "None" persistence, review `done-all`,
+environment durable stop, one-turn approve) remain out of this slice's scope and are
+NOT claimed by this record. The compliance/environment wiring was subsequently landed
+by the follow-up in `src/commands/start.js` (labels `R2-C2 item 1/2`), not here.

@@ -348,6 +348,44 @@ describe('cancelTask (two-phase C1-2)', () => {
   it('cancelling an unknown id throws', () => {
     assert.throws(() => actions.cancelTask(root, 'tNOPE'), /unknown|not found/i);
   });
+
+  // R2-C rework: the menu's --force one-call path is the ONE cancel encoding's own
+  // parameter, not a second copy in the menu. Force walks the legal two-step path
+  // running → cancelling → cancelled in a single call, warn-logged, never silent.
+  it('force: a RUNNING task → cancelled in one call (two-step path), forced flag + agentTaskId', () => {
+    const reg = taskRegistry.emptyRegistry();
+    const t = taskRegistry.addTask(reg, { kind: 'implement', plan: 'live', touches: ['src/l.js'] });
+    taskRegistry.updateTask(reg, t.id, { status: 'running', agentTaskId: 'agent-xyz' });
+    taskRegistry.save(root, reg);
+
+    const res = actions.cancelTask(root, t.id, { force: true });
+    assert.equal(res.task.status, 'cancelled', 'force frees the running task straight to cancelled');
+    assert.equal(res.forced, true, 'the forced override is reported');
+    assert.equal(res.agentTaskId, 'agent-xyz', 'agentTaskId is still returned so the caller can kill the harness');
+    assert.equal(loadReg().tasks.find((x) => x.id === t.id).status, 'cancelled', 'persisted as cancelled');
+  });
+
+  it('force: an already-CANCELLING task → cancelled in one call', () => {
+    const reg = taskRegistry.emptyRegistry();
+    const t = taskRegistry.addTask(reg, { kind: 'implement', plan: 'live', touches: ['src/l.js'] });
+    taskRegistry.updateTask(reg, t.id, { status: 'running' });
+    taskRegistry.updateTask(reg, t.id, { status: 'cancelling', ts: { cancelRequested: new Date().toISOString() } });
+    taskRegistry.save(root, reg);
+
+    const res = actions.cancelTask(root, t.id, { force: true });
+    assert.equal(res.task.status, 'cancelled', 'force on a cancelling task completes the cancellation');
+    assert.equal(res.forced, true);
+  });
+
+  it('non-force: a repeat cancel on an already-CANCELLING task is refused (no deadline re-stamp)', () => {
+    const reg = taskRegistry.emptyRegistry();
+    const t = taskRegistry.addTask(reg, { kind: 'implement', plan: 'live', touches: ['src/l.js'] });
+    taskRegistry.updateTask(reg, t.id, { status: 'running' });
+    taskRegistry.save(root, reg);
+    actions.cancelTask(root, t.id); // running → cancelling (stamps the deadline once)
+    assert.throws(() => actions.cancelTask(root, t.id), /already cancelling/i,
+      'a second cancel does not reset reconcile’s cancel-deadline clock');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

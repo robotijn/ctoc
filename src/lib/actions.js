@@ -1641,15 +1641,25 @@ function advanceAgent(projectPath) {
  *   • A terminal task (done/failed/orphaned/cancelled) → the transition guard in
  *     `updateTask` throws (terminal is terminal).
  *
+ *   • `--force` (opts.force) — the human tie-breaker: free a RUNNING/`cancelling`
+ *     task NOW, in ONE call, by walking the LEGAL two-step path
+ *     running → cancelling → cancelled. The override is warn-logged
+ *     (`forced_cancel`), never silent. This is the menu's one-call path, encoded
+ *     ONCE here so the menu never mirrors the transition (R2-C convergence).
+ *
  * @param {string} projectPath - Project root
  * @param {string} taskId - the task id to cancel
- * @returns {{ task: object, agentTaskId: string|null }} the updated task (status
- *   `cancelling` for a running task, `cancelled` for a queued one) and its
- *   agentTaskId so the caller can stop the live harness agent.
- * @throws {Error} unknown id, an already-cancelling task, or a terminal task
+ * @param {{force?: boolean}} [opts] - `force:true` frees a running/cancelling task
+ *   in one call (the human override).
+ * @returns {{ task: object, agentTaskId: string|null, forced: boolean }} the
+ *   updated task (status `cancelling` for a two-phase running cancel, `cancelled`
+ *   for a queued or forced cancel), its agentTaskId so the caller can stop the live
+ *   harness agent, and whether the override was used.
+ * @throws {Error} unknown id, an already-cancelling task (non-force), or a terminal task
  */
-function cancelTask(projectPath, taskId) {
+function cancelTask(projectPath, taskId, opts = {}) {
   const root = projectPath || findProjectRoot();
+  const force = opts && opts.force === true;
   // R3-B item 7: the load→save cycle runs inside the compare-and-swap helper so a concurrent
   // writer cannot lose the cancel. A running-cancel stamps ts.cancelRequested so reconcile's
   // cancel deadline (item 10) has a clock.
@@ -1659,6 +1669,18 @@ function cancelTask(projectPath, taskId) {
       throw new Error(`cancelTask: unknown task id ${taskId}`);
     }
     const agentTaskId = existing.agentTaskId || null;
+
+    // --force: the human frees a live agent's files past the two-phase wait, in one
+    // call. Walk the legal path (running → cancelling → cancelled); an already-
+    // cancelling task skips straight to cancelled. Warn-logged, never silent.
+    if (force && (existing.status === 'running' || existing.status === 'cancelling')) {
+      if (existing.status === 'running') {
+        taskRegistry.updateTask(registry, taskId, { status: 'cancelling', ts: { cancelRequested: nowIsoActions() } });
+      }
+      const task = taskRegistry.updateTask(registry, taskId, { status: 'cancelled' });
+      taskRegistry.warnLog(root, 'forced_cancel', { id: taskId, from: existing.status });
+      return { task, agentTaskId, forced: true };
+    }
 
     let nextStatus;
     let patch;
@@ -1670,15 +1692,22 @@ function cancelTask(projectPath, taskId) {
       patch = { status: nextStatus };
     } else if (existing.status === 'cancelling') {
       throw new Error(`cancelTask: task ${taskId} is already cancelling`);
+    } else if (existing.status === 'cancelled') {
+      // Already terminal in the cancel target state — `cancelled → cancelled` is an
+      // idempotent no-op to `updateTask` (same-status is not a transition), so it would
+      // NOT throw on its own. Refuse it explicitly: re-cancelling a cancelled task is an
+      // honest error, not a silent success (menu delegates here and reports the refusal).
+      throw new Error(`cancelTask: task ${taskId} is already cancelled`);
     } else {
-      // Terminal (done/failed/orphaned/cancelled): updateTask's guard throws below.
+      // Terminal (done/failed/orphaned): a real target change → updateTask's guard throws
+      // `invalid transition <status> → cancelled` below (terminal is terminal).
       nextStatus = 'cancelled';
       patch = { status: nextStatus };
     }
 
     // updateTask enforces the transition guard (a terminal task throws).
     const task = taskRegistry.updateTask(registry, taskId, patch);
-    return { task, agentTaskId };
+    return { task, agentTaskId, forced: false };
   });
 }
 

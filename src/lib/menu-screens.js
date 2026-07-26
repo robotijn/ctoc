@@ -52,13 +52,9 @@ const gateMigration = require('./gate-migration');
 // gate number, which is an internal code a person cannot decode.
 const gateWords = require('./gate-words');
 
-// R3-B item 4: the terminal set is IMPORTED from the registry — there is exactly ONE
-// encoding. The former local mirror (`['done','failed','orphaned']`) was STALE in both
-// directions: it included `orphaned`, so `menu task complete` on an orphaned task threw
-// BEFORE updateTask and R2-A's orphaned→done late-completion contract was dead code; and
-// it omitted `cancelled`, so a cancelled task looked mutable at the CLI boundary. Legality
-// is now asked of the registry itself (`canTransition`), never re-encoded here.
-const TASK_TERMINAL = taskRegistry.TERMINAL;
+// Task lifecycle legality is asked of the registry's ONE encoding (`canTransition`
+// / `actions.cancelTask`), never re-encoded here — see `taskTransition`. The former
+// local terminal-set mirror (`TASK_TERMINAL`) is gone with the cancel convergence.
 
 // Security (S1): strip C0 (0x00-0x1F) and C1 (0x7F-0x9F) control chars before
 // rendering any attacker-influenceable string (e.g. a plan slug derived from a
@@ -66,9 +62,6 @@ const TASK_TERMINAL = taskRegistry.TERMINAL;
 // or forge menu rows (ANSI clear-screen, cursor moves, mid-row line breaks).
 // Defined once at module scope so any future slug renderer reuses one sanitizer.
 const stripCtl = (s) => String(s).replace(/[\x00-\x1f\x7f-\x9f]/g, '');
-
-/** Current instant as an ISO-8601 string (R3-B item 10: the cancel-deadline clock). */
-const nowIso = () => new Date().toISOString();
 
 // SP4 cleanup: single source of truth mapping a category to its execution action
 // and human-facing verb. Mirrors the stale-cleanup.js dispatcher action names.
@@ -2181,23 +2174,52 @@ function computePromote(reg) {
 function taskTransition(root, rest, kind) {
   const p = parseTaskArgs(rest);
   const id = p.positional[0];
+
+  // ── cancel: THE ONE cancel encoding (R2-C convergence) ───────────────────────
+  // The menu no longer mirrors the cancel transition; it DELEGATES to
+  // `actions.cancelTask`, the single source. A running task enters `cancelling`
+  // (files stay locked until reconcile confirms the agent is gone); a queued task
+  // cancels immediately; a terminal or already-`cancelling` task is REFUSED (the
+  // throw fails soft at the dispatcher). `--force` is the human tie-breaker
+  // (running → cancelled in one call), handled inside `cancelTask`, warn-logged.
+  // The former second copy re-stamped `ts.cancelRequested` on a repeat cancel,
+  // resetting reconcile's deadline clock and holding a stuck task's files longer —
+  // that divergence is deleted with this delegation.
+  if (kind === 'cancel') {
+    const { cancelTask } = require('./actions');
+    const { task, forced } = cancelTask(root, id, { force: p.force === true });
+    const reg = taskRegistry.load(root);
+    const res = {
+      ok: true,
+      taskId: id,
+      status: task.status,
+      cancelled: true,
+      text: forced
+        ? `Task ${id} → cancelled — ⚠ FORCED (the human freed a live agent's files past the ` +
+          `two-phase wait). Recorded in the task warn log.`
+        : task.status === 'cancelling'
+          ? `Task ${id} → cancelling (files stay locked until the agent is confirmed gone)`
+          : `Task ${id} → ${task.status}`,
+    };
+    if (forced) res.forced = true;
+    const cancelPromote = computePromote(reg);
+    res.promote = cancelPromote.promote;
+    if (cancelPromote.quarantined.length > 0) res.quarantined = cancelPromote.quarantined;
+    return res;
+  }
+
   return taskRegistry.withRegistry(root, (reg, ctx) => {
     const task = reg.tasks.find((t) => t.id === id);
     if (!task) throw new Error('task-registry: unknown task id ' + String(id));
 
     // Legality is asked of the registry's ONE lifecycle encoding (item 4) — no local
     // mirror. `start`/`fail` have a fixed target, so the guard is `canTransition`
-    // (which correctly PERMITS, e.g., orphaned → failed). `cancel`'s effective target
-    // varies with the current status (running → cancelling, queued → cancelled), so its
-    // guard is "not terminal" — a terminal task cannot be cancelled.
+    // (which correctly PERMITS, e.g., orphaned → failed).
     if (kind === 'start' && !taskRegistry.canTransition(task.status, 'running')) {
       throw new Error(`task-registry: invalid transition ${task.status} → running`);
     }
     if (kind === 'fail' && !taskRegistry.canTransition(task.status, 'failed')) {
       throw new Error(`task-registry: invalid transition ${task.status} → failed`);
-    }
-    if (kind === 'cancel' && TASK_TERMINAL.has(task.status)) {
-      throw new Error(`task-registry: invalid transition ${task.status} → cancelled`);
     }
 
     // ── item 1: guarded start ────────────────────────────────────────────────────
@@ -2254,48 +2276,10 @@ function taskTransition(root, rest, kind) {
       return failRes;
     }
 
-    // ── cancel (item 10: stamp the deadline clock; --force skips the two-phase wait) ─
-    // R2-C honest cancel (C1-2): a RUNNING/`cancelling` task enters `cancelling` and KEEPS
-    // its slot/touches/gitOp/sync barrier until the harness agent is confirmed gone — the
-    // registry must not free a live agent's files early. A QUEUED task cancels immediately.
-    // `--force` is the human tie-breaker: free a running task NOW (running→cancelling→
-    // cancelled in one call), logged + shouted.
-    const running = task.status === 'running' || task.status === 'cancelling';
-    let cancelling = false;
-    let forcedCancel = false;
-    if (running && p.force === true) {
-      // Two-step through the legal path: running → cancelling → cancelled.
-      if (task.status === 'running') {
-        taskRegistry.updateTask(reg, id, { status: 'cancelling', ts: { cancelRequested: nowIso() } });
-      }
-      taskRegistry.updateTask(reg, id, { status: 'cancelled' });
-      forcedCancel = true;
-      taskRegistry.warnLog(root, 'forced_cancel', { id, from: task.status });
-    } else if (running) {
-      // Stamp ts.cancelRequested so reconcile's cancel deadline (item 10) has a clock.
-      taskRegistry.updateTask(reg, id, { status: 'cancelling', ts: { cancelRequested: nowIso() } });
-      cancelling = true;
-    } else {
-      taskRegistry.updateTask(reg, id, { status: 'cancelled' });
-    }
-    const settled = reg.tasks.find((t) => t.id === id);
-    const res = {
-      ok: true,
-      taskId: id,
-      status: settled.status,
-      cancelled: true,
-      text: forcedCancel
-        ? `Task ${id} → cancelled — ⚠ FORCED (the human freed a live agent's files past the ` +
-          `two-phase wait). Recorded in the task warn log.`
-        : cancelling
-          ? `Task ${id} → cancelling (files stay locked until the agent is confirmed gone)`
-          : `Task ${id} → ${settled.status}`,
-    };
-    if (forcedCancel) res.forced = true;
-    const cancelPromote = computePromote(reg);
-    res.promote = cancelPromote.promote;
-    if (cancelPromote.quarantined.length > 0) res.quarantined = cancelPromote.quarantined;
-    return res;
+    // Only `start` and `fail` reach the registry mutator; `cancel` is delegated to
+    // actions.cancelTask at the top of this function. `taskCommand` never routes any
+    // other kind here, so there is no reachable tail.
+    return undefined;
   });
 }
 
@@ -2351,11 +2335,6 @@ function taskComplete(root, rest) {
     const g = parseInt(gRaw, 10);
     if (Number.isInteger(g)) gate = g;
   }
-  const result = { ok: !p.fail };
-  if (summary != null) result.summary = summary;
-  if (nextAction != null) result.nextAction = nextAction;
-  if (gate != null) result.gate = gate;
-
   // R3-D: run the REAL plan completion for an implement task BEFORE settling the
   // task, so a refusal (failed pre-review validation) can still stop the completion.
   // Lazy-required: actions.js is a heavier module and the NAV plane must stay thin.
@@ -2409,6 +2388,29 @@ function taskComplete(root, rest) {
     }
   }
 
+  // R2-C rework — the task result's `ok` is DERIVED from the real verify outcome
+  // when a completion ran, NEVER from the caller-supplied {ok:!p.fail}. A completion
+  // whose verify FAILED (ran, not blocked, verify.passed !== true) settles ok:false
+  // and must never be re-stamped ok:true on the menu path — the same honesty the
+  // actions.js task/plan coupling already enforces (completeExecution derives the
+  // running task's result from verifyPassed). Without this, the settle block below
+  // would OVERWRITE the coupling's verify-derived ok:false with the caller's ok:true.
+  const verifyRan = completion != null && completion.ran === true;
+  const resultOk = verifyRan
+    ? (completion.verify != null && completion.verify.passed === true)
+    : !p.fail;
+  const result = { ok: resultOk };
+  // The caller's summary (the executor's note) round-trips intact; only the OK flag
+  // is verify-derived. When no summary is supplied, a completed run records the honest
+  // verify verdict so the settled task carries a legible reason either way.
+  if (summary != null) {
+    result.summary = summary;
+  } else if (verifyRan) {
+    result.summary = resultOk ? 'plan reached review; verify passed' : 'plan reached review; verify did NOT pass';
+  }
+  if (nextAction != null) result.nextAction = nextAction;
+  if (gate != null) result.gate = gate;
+
   // Settle the task through the compare-and-swap helper on a FRESH load — the completion
   // above may have run its OWN registry write (the task/plan coupling in completeExecution,
   // which now bumps the generation), so the pre-completion `reg` snapshot is stale and a
@@ -2419,7 +2421,9 @@ function taskComplete(root, rest) {
     if (t && t.status !== 'done') {
       taskRegistry.updateTask(fresh, id, { status: 'done', result });
     } else if (t) {
-      // Already settled by the coupling — still record the caller's result payload.
+      // Already settled by the coupling with a VERIFY-DERIVED result. Re-recording the
+      // verify-derived `result` here is consistent (same ok the coupling wrote) and
+      // attaches any caller navigation metadata — it never flips a failed verify to ok:true.
       taskRegistry.updateTask(fresh, id, { result });
     }
     return fresh;

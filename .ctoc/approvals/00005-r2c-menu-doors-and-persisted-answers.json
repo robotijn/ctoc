@@ -1,11 +1,11 @@
 {
-  "content_sha256": "404e794cddb685ec3198cdd87397d6bba987be17708a55d340ffdf4d7a645f6d",
+  "content_sha256": "24bab4c91510a9f783ec011e2546855d5bf92fd816a5c9bb8e568227127f6f54",
   "hash_scope": "file",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-26T18:39:00.399Z",
+  "approved_at": "2026-07-26T20:16:07.244Z",
   "approved_by": "human",
   "backfilled": true,
-  "backfill_reason": "2026-07-26: human ruling — the review-stage hardening wave (00003/04/05/09/10) sent back to todo for rework, each rebuilt on a GREEN full npm test gate. Residency backfilled to match the human-ordered move; recorded as backfilled, not a live click.",
+  "backfill_reason": "2026-07-26: rework of r2c on the human SEND-BACK — record narrowed to the two shipped fixes (inbox doors + honest cancel), files: corrected to the real change surface, cancel converged onto actions.cancelTask, menu task result verify-derived. Residency backfilled to the reworked plan bytes on a green npm test gate (10492 pass, 0 fail, 0 skipped, coverage 99.01%); backfilled, not a live click.",
   "plan_basename": "00005-r2c-menu-doors-and-persisted-answers"
 }
