@@ -231,3 +231,26 @@ is CHECKED, not just defined) and the single-writer assumption's replacement.
   wave-level accounting), and the documented test-file counts (new test files added by multiple
   executors) are all outside my five source files — concurrent-executor / wave-level, to be
   reconciled by the integrator at commit.
+
+---
+
+## Note from 00003-r2a rework (human ruling 2026-07-26) — you own the longer-term home
+
+The human ordered the concurrent-edit quarantine be belt-and-suspenders: enforced inside
+the scheduler so it "cannot be bypassed by any caller", kept in the projection, and with
+THIS plan (which declares `task-registry.js`, `task-reconcile.js` AND `menu-screens.js`)
+owning the longer-term consolidation.
+
+00003-r2a landed the BELT at `task-registry.canRun` (refuses a candidate that would edit
+files still reserved by an age-only `staleness` orphan — `reason:
+'staleness-orphan-quarantine'`, via `overlapsStaleOrphanReservation`), because those are
+its declared files. It did NOT put the belt in `nextRunnable`: doing so there would strip
+the candidate before `applyQuarantine` sees it and silently kill the human-visible "held"
+report on the render and command paths (parity fence cases 1-6/11), and repairing that
+requires editing `menu-screens.js` — your file, not 00003's.
+
+Longer-term home for you: move/duplicate the belt into `nextRunnable` (or unify canRun +
+nextRunnable + `menu-screens.computePromote` behind the one predicate) so the projection
+still REPORTS what the scheduler HELD — one encoding, every promote path, reporter intact.
+The parity fence `tests/promote-quarantine-parity.test.js` case 9/9b now encodes the
+belt-and-suspenders contract 00003 shipped; tighten it as you consolidate.

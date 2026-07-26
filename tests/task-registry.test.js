@@ -920,6 +920,99 @@ describe('Scheduler — settled sync barrier deps (C1-1)', () => {
     const cand = C({ id: 't2', kind: 'review', touches: ['b.js'], blockedBy: ['t1'] });
     assert.equal(reg.canRun(cand, depsReg).reason, 'blocked-dep');
   });
+
+  it('C1-1e: an AGE-ONLY orphan dep does NOT settle a sync barrier (agent may still be editing)', () => {
+    // A dep orphaned on staleness ALONE carries result.orphanReason:'staleness' — it was
+    // never confirmed dead, so the wave has NOT settled and a sync integration barrier that
+    // committed now could snapshot a half-written tree. It counts as settled only once
+    // reconcile flips the marker (confirmed-/presumed-dead), which the across-passes release
+    // bounds, so this is time-bounded and cannot deadlock the barrier (C1-1f).
+    const depsReg = mkReg([
+      T({ id: 't1', kind: 'implement', status: 'done', touches: ['a.js'] }),
+      T({ id: 't2', kind: 'implement', status: 'orphaned', touches: ['b.js'],
+         result: { ok: false, orphanReason: 'staleness', summary: 'orphaned on staleness alone' } })
+    ]);
+    const cand = C({ id: 's', kind: 'sync', gitOp: true, touches: [], blockedBy: ['t1', 't2'] });
+    assert.equal(reg.canRun(cand, depsReg).reason, 'blocked-dep');
+  });
+
+  it('C1-1f: only a CONFIRMED-gone orphan settles a sync barrier — presumed-dead (age) does NOT', () => {
+    // Human ruling 2026-07-26: an irreversible wave-integration commit must not rest on an
+    // AGE heuristic. 'confirmed-dead' (agent confirmed gone by the live-agent list) settles;
+    // 'presumed-dead' (merely aged past a bound — still age) does NOT. The barrier waits for
+    // genuine liveness confirmation rather than committing over a possibly-live tree.
+    const confirmed = mkReg([
+      T({ id: 't1', kind: 'implement', status: 'orphaned', touches: ['b.js'],
+         result: { ok: false, orphanReason: 'confirmed-dead', summary: 'agent confirmed gone' } })
+    ]);
+    assert.equal(reg.canRun(C({ id: 's', kind: 'sync', gitOp: true, touches: [], blockedBy: ['t1'] }), confirmed).run,
+      true, 'confirmed-dead settles the barrier');
+
+    const presumed = mkReg([
+      T({ id: 't1', kind: 'implement', status: 'orphaned', touches: ['b.js'],
+         result: { ok: false, orphanReason: 'presumed-dead', summary: 'aged past the bound' } })
+    ]);
+    assert.equal(reg.canRun(C({ id: 's', kind: 'sync', gitOp: true, touches: [], blockedBy: ['t1'] }), presumed).reason,
+      'blocked-dep', 'presumed-dead is an age heuristic — it must NOT settle an irreversible commit');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Concurrent-edit BELT in canRun (human ruling 2026-07-26 — belt-and-suspenders)
+//
+// The file-conflict quarantine (a candidate that would edit files still reserved by an
+// age-only orphan whose agent may still be alive) is ALSO enforced at canRun — the single
+// oracle every status→running transition must consult — so no caller that computes its own
+// promote set can start a colliding task. The projection (task-reconcile.applyQuarantine)
+// remains the reporter/suspenders. The belt uses the SAME predicate the file quarantine
+// uses (orphanReason === 'staleness' only), so the two agree: once the reservation is
+// released (presumed-/confirmed-dead), both let the candidate run.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Scheduler — concurrent-edit belt in canRun (BELT)', () => {
+  const staleOrphan = (over = {}) => T({
+    id: 'o1', kind: 'implement', status: 'orphaned', touches: over.touches || ['src/x.js'],
+    result: { ok: false, orphanReason: over.orphanReason || 'staleness', summary: 'age-only' }
+  });
+
+  it('BELT-1: a candidate overlapping an age-only orphan\'s reserved files is REFUSED by canRun', () => {
+    const r = mkReg([staleOrphan({ touches: ['src/x.js'] })]);
+    const cand = C({ id: 't2', kind: 'implement', touches: ['src/x.js'] });
+    assert.equal(reg.canRun(cand, r).reason, 'staleness-orphan-quarantine');
+  });
+
+  it('BELT-1b: a glob-overlapping candidate is refused too (uses touchesOverlap, glob-aware)', () => {
+    const r = mkReg([staleOrphan({ touches: ['src/lib/*.js'] })]);
+    const cand = C({ id: 't2', kind: 'implement', touches: ['src/lib/actions.js'] });
+    assert.equal(reg.canRun(cand, r).reason, 'staleness-orphan-quarantine');
+  });
+
+  it('BELT-2: a DISJOINT candidate runs — the belt holds only genuine collisions', () => {
+    const r = mkReg([staleOrphan({ touches: ['src/x.js'] })]);
+    const cand = C({ id: 't2', kind: 'implement', touches: ['src/y.js'] });
+    assert.equal(reg.canRun(cand, r).run, true);
+  });
+
+  it('BELT-3: a RELEASED orphan (presumed-/confirmed-dead) no longer holds the candidate', () => {
+    for (const reason of ['presumed-dead', 'confirmed-dead']) {
+      const r = mkReg([staleOrphan({ touches: ['src/x.js'], orphanReason: reason })]);
+      const cand = C({ id: 't2', kind: 'implement', touches: ['src/x.js'] });
+      assert.equal(reg.canRun(cand, r).run, true, `${reason} released the reservation`);
+    }
+  });
+
+  it('BELT-4: an empty-touches candidate can never be held (Rule 4 fast path)', () => {
+    const r = mkReg([staleOrphan({ touches: ['src/x.js'] })]);
+    const cand = C({ id: 't2', kind: 'review', touches: [] });
+    assert.equal(reg.canRun(cand, r).run, true);
+  });
+
+  it('BELT-5: nextRunnable still OFFERS the colliding candidate — the projection reports/holds it', () => {
+    // Belt-and-suspenders: canRun is the hard belt, applyQuarantine the reporter. nextRunnable
+    // remains the raw projection so the projection can name what it held (see the parity fence).
+    const r = mkReg([staleOrphan({ touches: ['src/x.js'] }), C({ id: 't2', kind: 'implement', touches: ['src/x.js'] })]);
+    assert.ok(reg.nextRunnable(r).some(t => t.id === 't2'), 'nextRunnable offers t2; applyQuarantine holds+reports it');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1111,6 +1204,19 @@ describe('unsatisfiableTasks (C1-1/C1-7)', () => {
   it('U-5: a SYNC task with merely FAILED deps is NOT unsatisfiable (settled ≠ unsatisfiable)', () => {
     const r = mkReg([
       T({ id: 't1', kind: 'implement', status: 'failed', touches: ['a.js'] }),
+      C({ id: 's', kind: 'sync', gitOp: true, touches: [], blockedBy: ['t1'] })
+    ]);
+    assert.deepEqual(reg.unsatisfiableTasks(r), []);
+  });
+
+  it('U-5b: a SYNC task blocked by an AGE-ONLY orphan is NOT unsatisfiable (settles once released)', () => {
+    // The C1-1e exclusion makes such a sync BLOCKED, not permanently wedged: the reconcile
+    // across-passes release is guaranteed to flip the orphan off 'staleness' within a bounded
+    // window, after which the barrier settles. Reporting it unsatisfiable would falsely fail
+    // legal wave-integration work.
+    const r = mkReg([
+      T({ id: 't1', kind: 'implement', status: 'orphaned', touches: ['a.js'],
+         result: { ok: false, orphanReason: 'staleness', summary: 'age-only' } }),
       C({ id: 's', kind: 'sync', gitOp: true, touches: [], blockedBy: ['t1'] })
     ]);
     assert.deepEqual(reg.unsatisfiableTasks(r), []);

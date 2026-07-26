@@ -11,6 +11,7 @@ files:
   - "src/lib/task-reconcile.js"
   - "tests/task-registry.test.js"
   - "tests/task-reconcile.test.js"
+  - "tests/promote-quarantine-parity.test.js"
 ---
 
 # R2-A — Scheduler lifecycle honesty
@@ -227,51 +228,72 @@ a plausibly-alive agent for one more full staleness window and then always elaps
 task with an unparseable or absent `ts.started` is presumed dead at once, which is also
 the only release path available to an orphan that never recorded an agent id.
 
-**4. The concurrent-edit quarantine lives in the promote projection, not the
-scheduler.**
-(`src/lib/task-registry.js:773-916`, the scheduler section opening on the word `pure`;
-and the promote projection in `src/lib/task-reconcile.js`.) The file reservation is
-enforced in the promote projection, never in `canRun` or `nextRunnable`. The scheduler
-reads only `status`, `kind`, `touches` and `gitOp`; teaching it to read
-`result.orphanReason` would make the concurrency ladder's answer depend on *why* a task
-reached a status rather than on the status itself, and would couple the ladder to the
-reconcile pass's private marker encoding. The honest consequence: because the guard
-sits outside the scheduler it must be applied at every promote path, and as shipped it
-was applied at only one of four — repaired by
-`plans/implementation/00077-quarantine-on-every-promote-path.md`, with the guard's own
-fail-safe behaviour repaired by
-`plans/implementation/00076-quarantine-fault-fails-safe.md`.
+**4. The concurrent-edit guard is now BELT-AND-SUSPENDERS (human ruling 2026-07-26).**
+The human directed that the guard be enforced INSIDE the scheduler so it "cannot be
+bypassed by any caller", AND kept in the projection, AND that sibling `00013-r3b` (which
+declares all three files) own the longer-term home. This supersedes the earlier "scheduler
+stays pure" ruling that lived in `promote-quarantine-parity` case 9/9b, which is updated
+here to the new contract.
 
-**5. The sync-barrier hazard is RECORDED AS A PRECONDITION, not fixed.**
-(`src/lib/task-registry.js:804-825` for `depsSatisfied`, `:838-847` for Rule 2, whose
-refusal is at `:845`.) The hazard, precisely: for a `sync` candidate a dependency
-satisfies when its status is TERMINAL, and `orphaned` is in that terminal set — so a
-task orphaned on age alone, whose agent may still be alive and editing, counts as
-SETTLED and can let a wave-integration barrier through.
+- **Belt — `canRun` (`src/lib/task-registry.js`).** `canRun` — the single oracle every
+  `status → running` transition must consult — now refuses a candidate that would edit
+  files still reserved by an age-only `staleness` orphan (`reason: 'staleness-orphan-quarantine'`),
+  via `overlapsStaleOrphanReservation` / `staleOrphanReservedFiles`. No caller that computes
+  its own promote set can START a colliding task. The belt uses the SAME predicate as the
+  projection (`orphanReason === 'staleness'` only, never `presumed-dead`), so the two layers
+  agree: a released reservation lets the candidate run on both.
+- **Suspenders — `applyQuarantine` (`src/lib/task-reconcile.js:681`).** Unchanged. It stays
+  the REPORTER: it holds the candidate on the render (`reconcileState`) and command
+  (`menu-screens.computePromote`) paths and records `report.quarantined` (the human-visible
+  "held" signal). `nextRunnable` is deliberately left as the raw projection (it still OFFERS
+  the candidate) so the projection can name what it held — the parity fence cases 1-6/11
+  depend on this.
+- **Scope boundary.** This plan declares `task-registry.js`/`task-reconcile.js`, so the belt
+  lands here. Moving/duplicating the belt into `nextRunnable` and consolidating the reporter
+  across `menu-screens.js` is the LONGER-TERM HOME and belongs to `00013-r3b`
+  (see the note added to that plan). Verified during this rework: the projection already
+  covers all three promote paths via `applyQuarantine` (the earlier one-path gap the critique
+  flagged is closed in the current tree; `computePromote` calls `applyQuarantine`, and the
+  "re-run offer" at `menu-screens.js:616` is display only).
 
-It is not fixed because two facts both hold today:
+**5. The sync-barrier hazard is FIXED: an age-only orphan does not settle a barrier.**
+(`src/lib/task-registry.js` `depsSatisfied`.) The hazard, precisely: for a `sync`
+candidate a dependency satisfied when its status was TERMINAL, and `orphaned` is in that
+terminal set — so a task orphaned on AGE ALONE, whose agent may still be alive and
+editing its files, counted as SETTLED and could let a wave-integration barrier commit
+over a half-written tree.
 
-- `enqueueWaveSync` has **no JavaScript caller anywhere in `src/`** — the only
-  occurrences are its definition at `src/lib/actions.js:1679` and its export at
-  `:2123`. Nothing in shipped JavaScript creates a `sync` task through it.
-- Rule 2 at `src/lib/task-registry.js:845` refuses a `sync` candidate while **any**
-  task occupies a slot, so a barrier cannot start alongside the very work it would be
-  racing.
+The original slice RECORDED this as an unfixed precondition, resting on two facts that
+made the path hard to open (no JavaScript caller for `enqueueWaveSync`, and Rule 2
+refusing a sync while any slot is occupied). That was rejected on this rework: the menu
+instruction surface already tells the session model to call `enqueueWaveSync` at a wave
+boundary, so the path is reachable in practice, and a guard whose safety rests on "no
+code currently opens it" is exactly the deferral the rebuild exists to remove.
 
-**Qualification found while checking fact one, and recorded rather than smoothed
-over:** `src/commands/menu.md` instructs the session model to call `enqueueWaveSync`
-at a wave boundary, in the `claude:advance-all-implementation` and `claude:start-agent`
-recipes. That is not a JavaScript call site, so the fact as stated is true, but the
-function is NOT unreachable in practice — it is reachable through an instruction path
-whenever a human takes either menu route. The precondition therefore rests almost
-entirely on the second fact, Rule 2, and is weaker than "nothing calls it" would
-suggest.
+**The fix — CONFIRM LIVENESS, never settle on age (human ruling 2026-07-26).**
+`depsSatisfied` now settles an `orphaned` dep for a `sync` candidate ONLY when its agent is
+CONFIRMED gone — a confirmed-absent orphaning (no `result` reason marker; orphaned because
+the live-agent list showed it gone) or `orphanReason === 'confirmed-dead'`. An orphan
+carrying `orphanReason === 'staleness'` (age-only) OR `'presumed-dead'` (merely aged past a
+bound — still an age heuristic) does NOT settle; the barrier returns `blocked-dep`. The
+human chose the strongest-correctness option deliberately: an irreversible wave-integration
+commit must not rest on age while an agent may still be writing files.
 
-**This is a precondition with an explicit expiry.** If either fact stops being true — a
-JavaScript caller for `enqueueWaveSync` appears, or Rule 2 is relaxed — the hazard
-becomes live, and `depsSatisfied` must then distinguish a confirmed-dead orphan from an
-age-only one for `sync` candidates. This was a decision NOT to fix, taken with the
-hazard understood, and is not an oversight.
+**Not released by the age bound — deliberately.** Unlike the file quarantine (decision 4),
+which the across-passes release frees at `presumed-dead` so ordinary queued work can
+progress, the barrier is NOT freed by age. It waits for genuine liveness confirmation
+(`confirmed-dead`), which requires a live-agent list. On the default `/ctoc:start` path,
+which passes no live list, `confirmed-dead` never fires and such a barrier WAITS
+indefinitely rather than committing over a possibly-live tree. This is the accepted
+correctness-over-liveness trade-off, not an oversight; a barrier blocked this way is still
+never marked unsatisfiable (`sync` is excluded from the `dep-failed` class — guarded by
+`U-5b`), so it resumes the moment liveness is confirmed.
+
+**Purity superseded, not violated silently.** Reading `result.orphanReason` in the
+scheduler (here and in the `canRun` belt of decision 4) is the human's explicit new ruling,
+which updates the earlier "scheduler reads only status/kind/touches/gitOp" contract encoded
+in `promote-quarantine-parity` case 9/9b. That fence is rewritten to the belt-and-suspenders
+contract in the same commit.
 
 **6. This plan and the actions-layer sibling are ruled on together, as one gate
 decision.** `plans/review/00004-r2b-actions-drain-and-shipgate.md` declares
@@ -289,3 +311,54 @@ this record. On disk it spans `:117-130`; `:108-121` lands partly in
 `DEFAULT_CANCEL_DEADLINE_MS`. The citation above is corrected to `:117-130`. The
 across-passes release branch was cited as `:389-410` and is at `:404-429`; corrected.
 All other cited ranges were re-read and matched what the decisions claim.
+
+---
+
+## Rework (2026-07-26) — both scheduler fixes, rebuilt on a GREEN full gate
+
+The human sent this plan back from review to rework on the real gate (full `npm test`
+green — whole suite, coverage floor 99, zero skipped) and to make the record match the
+shipped code, then issued two explicit rulings for the two defects. Each was re-verified
+against the current source before acting.
+
+**Defect (a) — concurrent-edit quarantine covered only one promote path. Human ruling:
+belt-and-suspenders.** The projection guard (`applyQuarantine`) was ALREADY closed across
+all three promote paths in the current tree (siblings `00076`/`00077`) — verified, not
+re-implemented. Per the human's ruling, a scheduler-level BELT was ADDED: `canRun`
+(`src/lib/task-registry.js`) now refuses a candidate that would edit files still reserved
+by an age-only `staleness` orphan (`reason: 'staleness-orphan-quarantine'`), so the guard
+cannot be bypassed by any caller that computes its own promote set. The projection stays as
+the reporter (suspenders). Sibling `00013-r3b` (declares all three files, incl.
+`menu-screens.js`) is noted as the longer-term home for consolidating the belt across
+`nextRunnable` and the command paths. See decision 4.
+
+**Defect (b) — a wave sync barrier settled on an age-only orphan. Human ruling: confirm
+liveness, never settle on age.** `depsSatisfied` now settles an `orphaned` sync-dep ONLY
+when the agent is CONFIRMED gone (no reason marker / `confirmed-dead`), never on
+`staleness` or `presumed-dead` (both age heuristics). An irreversible commit must not rest
+on age; the barrier waits for genuine liveness confirmation. See decision 5.
+
+Both fixes read `result.orphanReason` in the scheduler, which the human's ruling knowingly
+permits — superseding the earlier "scheduler stays pure" fence. `promote-quarantine-parity`
+case 9/9b is rewritten to the belt-and-suspenders contract (added to this plan's declared
+`files:`).
+
+**Tests (TDD-Red first, recorded).** `tests/task-registry.test.js`:
+- `C1-1e` — an age-only (`staleness`) orphan dep does NOT settle a sync barrier
+  (`blocked-dep`). Written first and OBSERVED FAILING against the pre-fix code: it returned
+  `reason: 'ok'` where the test asserts `'blocked-dep'` (`AssertionError: + 'ok' - 'blocked-dep'`).
+- `C1-1f` — only `confirmed-dead` settles the barrier; `presumed-dead` (age) does NOT.
+- `BELT-1..5` — canRun refuses a candidate overlapping an age-only orphan's files
+  (glob-aware), lets a disjoint or released-orphan candidate run, never holds an
+  empty-touches candidate, and nextRunnable still offers the held candidate (projection
+  reports it).
+- `U-5b` — a sync task blocked by an age-only orphan is NOT reported unsatisfiable.
+`tests/promote-quarantine-parity.test.js`: case 9 now asserts canRun refuses while
+nextRunnable offers; case 9b asserts a released reservation passes the belt.
+
+**Ledger.** Moving this wave `review → todo` (a gate destination) required a
+`stage_to: todo` backfill entry per plan (`approval-ledger.backfillEntry`, reason: human
+rework ruling) so the residency ledger matches the human-ordered state; recorded as
+`backfilled`, never laundered as a live click.
+
+**Gate.** Full `npm test` to green — whole suite, coverage floor 99, zero skipped.

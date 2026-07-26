@@ -23,6 +23,19 @@
  *           failure it is meant to report; every OTHER kind keeps done-only. A missing
  *           dep never satisfies. `unsatisfiableTasks` surfaces the queued tasks a dead
  *           dep or a blockedBy cycle would otherwise wedge silently forever (C1-7).
+ *           CONFIRM-LIVENESS (human ruling 2026-07-26): an orphaned dep settles a `sync`
+ *           barrier ONLY when its agent is CONFIRMED gone (no reason marker, or
+ *           `confirmed-dead`) — never on age alone (`staleness` / `presumed-dead`),
+ *           because a wave commit is irreversible. See depsSatisfied.
+ *
+ *   NOTE — the scheduler is NO LONGER strictly reason-blind. Per the same ruling, the
+ *   concurrent-edit BELT (canRun refuses a candidate that would edit files still reserved
+ *   by an age-only `staleness` orphan) and the CONFIRM-LIVENESS barrier rule both read
+ *   `result.orphanReason` in this section. This intentionally supersedes the earlier
+ *   "scheduler reads only status/kind/touches/gitOp" ruling (promote-quarantine-parity
+ *   case 9/9b), which is updated to the belt-and-suspenders contract. The PROJECTION
+ *   (`task-reconcile.applyQuarantine`) remains the reporter/suspenders; sibling 00013-r3b
+ *   owns the longer-term cross-file consolidation.
  *   Rule 1  max-concurrent: at most MAX_CONCURRENT occupying a slot. `running` AND
  *           `cancelling` occupy (C1-2 — a cancelling task keeps its slot until gone).
  *   Rule 2  sync-barrier: a `sync` candidate waits while ANY task runs, and NO
@@ -807,6 +820,17 @@ function runningTasks(registry, excludeId) {
  *     i.e. its status is TERMINAL (done/failed/orphaned/cancelled). A barrier waits
  *     for the wave to SETTLE, not to succeed; reporting the failures is the sync run's
  *     own job, so a failed/cancelled dep must not deadlock the barrier forever.
+ *     ONE exception, the CONFIRM-LIVENESS rule (human ruling 2026-07-26): an `orphaned`
+ *     dep settles a barrier ONLY when its agent is CONFIRMED gone — never on AGE alone.
+ *     A wave-integration `sync` takes an IRREVERSIBLE commit of the whole tree, and that
+ *     commit must not rest on an age heuristic while an agent may still be writing files.
+ *     So an orphan carrying `result.orphanReason === 'staleness'` (age-only) OR
+ *     `'presumed-dead'` (merely aged past a bound — still age) does NOT settle; only a
+ *     confirmed-absent orphan (no reason marker — orphaned because the live-agent list
+ *     showed it gone) or `'confirmed-dead'` does. The barrier WAITS for genuine liveness
+ *     confirmation rather than committing over a possibly-live tree (the deliberate
+ *     correctness-over-liveness choice: unlike the file quarantine, this is NOT released
+ *     by the presumed-dead age bound).
  *   • the candidate is any OTHER kind and the dep is `done` (done-only, unchanged).
  * A MISSING dep id NEVER satisfies either kind (safety-first). An in-flight dep
  * (queued/running/cancelling) never satisfies — it has not settled.
@@ -820,8 +844,52 @@ function depsSatisfied(candidate, registry) {
   return deps.every(depId => {
     const dep = registry.tasks.find(t => t.id === depId);
     if (!dep) return false; // missing never satisfies
-    return isSync ? TERMINAL.has(dep.status) : dep.status === 'done';
+    if (!isSync) return dep.status === 'done';
+    if (!TERMINAL.has(dep.status)) return false; // not settled
+    if (dep.status === 'orphaned') {
+      // Confirm-liveness rule: an age-based orphaning does not settle an irreversible commit.
+      const reason = dep.result && dep.result.orphanReason;
+      if (reason === 'staleness' || reason === 'presumed-dead') return false;
+    }
+    return true;
   });
+}
+
+/**
+ * The files reserved by tasks orphaned on AGE ALONE (`result.orphanReason === 'staleness'`).
+ * Such an orphan was never confirmed dead — its agent may still be editing these files, so
+ * a queued candidate touching them must not START (the concurrent-edit BELT below). Uses
+ * ONLY the `staleness` marker (never `presumed-dead`), so it agrees exactly with the file
+ * quarantine in `task-reconcile.applyQuarantine`: once the reservation is released, both
+ * let the candidate run.
+ * @param {{tasks:Array<object>}} registry
+ * @returns {string[]}
+ */
+function staleOrphanReservedFiles(registry) {
+  const files = [];
+  for (const t of registry.tasks) {
+    if (t.status === 'orphaned' && t.result && t.result.orphanReason === 'staleness' &&
+        Array.isArray(t.touches)) {
+      for (const f of t.touches) files.push(f);
+    }
+  }
+  return files;
+}
+
+/**
+ * Whether a candidate would edit a file still reserved by an age-only orphan (glob-aware,
+ * via the same `touchesOverlap` Rule 4 uses). An empty candidate touch set can never
+ * conflict (Rule 4 fast path), so it is never held.
+ * @param {object} candidate
+ * @param {{tasks:Array<object>}} registry
+ * @returns {boolean}
+ */
+function overlapsStaleOrphanReservation(candidate, registry) {
+  const cand = Array.isArray(candidate.touches) ? candidate.touches : [];
+  if (cand.length === 0) return false;
+  const reserved = staleOrphanReservedFiles(registry);
+  if (reserved.length === 0) return false;
+  return touchesOverlap(cand, reserved);
 }
 
 /**
@@ -885,7 +953,19 @@ function canRun(candidate, registry) {
   assertTaskShape(candidate, 'canRun', { strictGitOp: true });
   assertImplementTouches(candidate, 'canRun');
   if (!depsSatisfied(candidate, registry)) return { run: false, reason: 'blocked-dep' };
-  return evaluateConcurrency(candidate, runningTasks(registry, candidate.id));
+  const decision = evaluateConcurrency(candidate, runningTasks(registry, candidate.id));
+  if (!decision.run) return decision;
+  // Concurrent-edit BELT (human ruling 2026-07-26 — belt-and-suspenders). A candidate that
+  // would edit files still reserved by an age-only orphan (never confirmed dead; its agent
+  // may still be editing) must not START. Enforced HERE — the single oracle every
+  // status→running transition consults — so it cannot be bypassed by a caller that computes
+  // its own promote set. The projection (`task-reconcile.applyQuarantine`) remains the
+  // reporter/suspenders on the render + command paths; sibling 00013-r3b (which declares
+  // menu-screens.js) owns the longer-term consolidation across every promote path.
+  if (overlapsStaleOrphanReservation(candidate, registry)) {
+    return { run: false, reason: 'staleness-orphan-quarantine' };
+  }
+  return decision;
 }
 
 /**
