@@ -101,9 +101,47 @@ describe('SaaS skills v8 conformance', () => {
     }
   });
 
-  it('every saas skill has a corresponding redirect stub at agents/saas/<name>.md', () => {
+  // Owner-removed from the agent menu (kept as a skill, no agent stub). The saas
+  // agent list is generated 1:1 from saas skills; removing a name here is the ONLY
+  // way to take that skill off the agent menu while keeping its capability. Adding a
+  // name is a menu-removal decision that belongs to the owner, never to a build fix.
+  const OFF_MENU_SAAS_SKILLS = new Set([
+    'workos-sso', // Removed from the menu 2026-07-24 at the owner's request; skill retained.
+  ]);
+
+  // The workos-sso SKILL.md lives under the ./skills/saas glob, so Claude Code
+  // auto-registers it as the /ctoc:workos-sso slash command. The native
+  // `user-invocable: false` frontmatter field is what keeps it OFF the slash
+  // autocomplete while leaving it invokable by Claude/agents via the Skill tool.
+  // This is the non-destructive menu-removal — the skill is KEPT, only the slash
+  // entry is hidden. If this field is dropped, /ctoc:workos-sso reappears.
+  it('workos-sso declares user-invocable: false to stay off the /ctoc slash menu', () => {
+    const skillPath = path.join(projectRoot, 'skills/saas/workos-sso/SKILL.md');
+    assert.ok(exists(skillPath), 'skills/saas/workos-sso/SKILL.md must exist (the skill is KEPT)');
+    const content = read(skillPath);
+    const fm = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    assert.ok(fm, 'workos-sso SKILL.md must have a YAML frontmatter block');
+    assert.match(
+      fm[1],
+      /^user-invocable:\s*false\s*$/m,
+      'workos-sso SKILL.md must declare `user-invocable: false` in its frontmatter — ' +
+        'this is the field that keeps /ctoc:workos-sso off the Claude Code slash-command ' +
+        'autocomplete while keeping the skill invokable by Claude and agents. Dropping it ' +
+        'silently puts the slash-menu entry back.'
+    );
+  });
+
+  it('every on-menu saas skill has a corresponding redirect stub at agents/saas/<name>.md', () => {
     for (const skill of listSaasSkills()) {
       const name = path.basename(path.dirname(skill));
+      if (OFF_MENU_SAAS_SKILLS.has(name)) {
+        // Intentionally agent-less: the skill exists but is off the agent menu.
+        assert.ok(
+          !exists(path.join(projectRoot, 'agents/saas', `${name}.md`)),
+          `${name} is marked off-menu but a stub still exists — remove it or un-mark it`
+        );
+        continue;
+      }
       const stubPath = path.join(projectRoot, 'agents/saas', `${name}.md`);
       assert.ok(exists(stubPath), `missing redirect stub agents/saas/${name}.md`);
       const stub = read(stubPath);

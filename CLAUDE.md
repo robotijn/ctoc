@@ -41,7 +41,7 @@ CTOC ships opinionated templates for common project types. `agents/planning/stac
 | Template | Status | Default stack |
 |---|---|---|
 | `saas/b2c-subscription` | ready | Next.js 15 · Supabase · Clerk · Stripe · Resend · PostHog · Sentry · Vercel |
-| `saas/b2b-sales-led` | ready | adds enterprise SSO (SAML/OIDC via the auth provider) · org-scoped data · audit log · MSA/DPA templates · SOC2 docs |
+| `saas/b2b-sales-led` | ready | adds WorkOS SSO · org-scoped data · audit log · MSA/DPA templates · SOC2 docs |
 | `saas/usage-based-api` | planned | metered billing · API keys · rate limiting · usage dashboard |
 | `app/expo-react-native` | planned | Expo SDK 52 · Clerk Expo · Supabase · RevenueCat · EAS |
 | `cli/bun-single-binary` | planned | Bun + cross-platform binary |
@@ -445,7 +445,7 @@ ctoc/
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                124 agent definitions across 24 categories
-  skills/                426 skill files (100 SKILL.md bodies = 98 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
+  skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
   tests/                 457 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)

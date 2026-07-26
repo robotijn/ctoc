@@ -37,6 +37,7 @@ const { spawnSync } = require('node:child_process');
 const REPO_ROOT = path.resolve(__dirname, '..');
 const UPDATE_JS = path.join(REPO_ROOT, 'src', 'commands', 'update.js');
 const SAFE_FS_JS = path.join(REPO_ROOT, 'src', 'lib', 'safe-fs.js');
+const REQUEST_EXIT_JS = path.join(REPO_ROOT, 'src', 'lib', 'request-exit.js');
 const { START_MARKER } = require('../src/lib/claude-md-lessons');
 const { BEGIN_MARKER } = require('../src/lib/operating-manual');
 
@@ -82,6 +83,17 @@ function installFakeGit() {
         fs.writeFileSync(path.join(dir, 'VERSION'), process.env.FAKE_GIT_CLONE_VERSION);
       }
       fs.writeFileSync(path.join(dir, 'README.md'), 'fake clone\\n');
+      // A real clone carries the plugin manifest + slash commands. Write them so the
+      // completeness guard in update() sees a valid source (unless the test opts out
+      // via FAKE_GIT_CLONE_THIN to simulate a broken/partial clone).
+      if (!process.env.FAKE_GIT_CLONE_THIN) {
+        fs.mkdirSync(path.join(dir, '.claude-plugin'), { recursive: true });
+        fs.writeFileSync(path.join(dir, '.claude-plugin', 'plugin.json'), '{"name":"ctoc"}\\n');
+        fs.mkdirSync(path.join(dir, 'src', 'commands'), { recursive: true });
+        for (const f of ['start.js', 'start.md', 'push.md', 'update.md']) {
+          fs.writeFileSync(path.join(dir, 'src', 'commands', f), '// ' + f + '\\n');
+        }
+      }
       process.exit(0);
     }
     if (sub === 'fetch') { process.exit(process.env.FAKE_GIT_FETCH_FAIL ? 1 : 0); }
@@ -102,14 +114,30 @@ function installFakeGit() {
   return binDir;
 }
 
+// The load-bearing entry points a COMPLETE checkout must contain (mirrors
+// REQUIRED_SOURCE_PATHS in update.js). update() now refuses to mirror-with-prune
+// from a source missing any of these, so a realistic fixture must write them.
+function writeRequiredSourceFiles(dir) {
+  fs.mkdirSync(path.join(dir, '.claude-plugin'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.claude-plugin', 'plugin.json'), '{"name":"ctoc"}\n');
+  const cmds = path.join(dir, 'src', 'commands');
+  fs.mkdirSync(cmds, { recursive: true });
+  for (const f of ['start.js', 'start.md', 'push.md', 'update.md']) {
+    fs.writeFileSync(path.join(cmds, f), `// ${f}\n`);
+  }
+}
+
 // A real MARKETPLACE dir. withGit → a `.git` marker so update() takes the
 // fetch/reset path; withVersion → a VERSION file; withLib → the three lib
-// modules + two templates the refreshers need (mirrors the self-delete test).
-function seedMarketplace(home, { withGit, withVersion, withLib }) {
+// modules + two templates the refreshers need (mirrors the self-delete test);
+// withCommands (default true) → the plugin.json + command files a complete
+// checkout carries. Set withCommands:false to simulate a thin/partial clone.
+function seedMarketplace(home, { withGit, withVersion, withLib, withCommands = true }) {
   const market = path.join(home, '.claude', 'plugins', 'marketplaces', 'robotijn');
   fs.mkdirSync(market, { recursive: true });
   if (withGit) fs.mkdirSync(path.join(market, '.git'), { recursive: true });
   if (withVersion) fs.writeFileSync(path.join(market, 'VERSION'), NEW_VERSION);
+  if (withCommands) writeRequiredSourceFiles(market);
   if (withLib) {
     const libDst = path.join(market, 'src', 'lib');
     const tplDst = path.join(market, '.ctoc', 'templates');
@@ -216,6 +244,39 @@ test('update fetches existing checkout, removes stale cache versions, and refres
       'the operating-manual block must be refreshed into CLAUDE.md after a successful update');
     assert.ok(claudeMd.includes('Existing prose.'),
       'existing user prose must be preserved through the refresh');
+  } finally {
+    cleanup();
+  }
+});
+
+// ── update() : REFUSES to mirror from a thin/partial checkout (prune-safety) ──
+// Regression for the v6.13.28 mirrorDir wipe: mirror-with-prune from an incomplete
+// source deletes files-not-in-source from the cache — including the slash commands,
+// leaving the user with no /ctoc:start. The completeness guard must make a broken
+// fetch a NO-OP that leaves the installed cache exactly as it was.
+test('update aborts on an incomplete checkout and leaves the cached commands intact', () => {
+  try {
+    const home = mkTmp('ctoc-home-');
+    const proj = makeProject();
+    // A marketplace with .git + VERSION but NO commands/plugin.json → a thin checkout.
+    seedMarketplace(home, { withGit: true, withVersion: true, withLib: true, withCommands: false });
+    // A WORKING pre-existing cache install whose commands must survive the aborted update.
+    const cache = path.join(cacheDir(home), NEW_VERSION);
+    const cacheCmds = path.join(cache, 'src', 'commands');
+    fs.mkdirSync(cacheCmds, { recursive: true });
+    fs.writeFileSync(path.join(cacheCmds, 'start.md'), 'WORKING START');
+    fs.writeFileSync(path.join(cacheCmds, 'push.md'), 'WORKING PUSH');
+    const pluginRoot = pluginRootWithVersion(OLD_VERSION);
+
+    const r = runUpdateAsMain({ home, cwd: proj, pluginRoot });
+
+    assert.strictEqual(r.status, 1, `must abort (exit 1) on an incomplete source, got ${r.status}\n${r.stdout}\n${r.stderr}`);
+    assert.match(r.stderr + r.stdout, /incomplete/i, 'must explain that the fetched copy is incomplete');
+    // The load-bearing assertion: the cache commands are UNTOUCHED, not pruned.
+    assert.ok(fs.existsSync(path.join(cacheCmds, 'start.md')), 'cached start.md must survive an aborted update');
+    assert.strictEqual(fs.readFileSync(path.join(cacheCmds, 'start.md'), 'utf8'), 'WORKING START',
+      'cached start.md content must be untouched');
+    assert.ok(fs.existsSync(path.join(cacheCmds, 'push.md')), 'cached push.md must survive an aborted update');
   } finally {
     cleanup();
   }
@@ -344,6 +405,9 @@ function buildVersionlessModule() {
   fs.mkdirSync(path.join(root, 'src', 'lib'), { recursive: true });
   fs.copyFileSync(UPDATE_JS, path.join(root, 'src', 'commands', 'update.js'));
   fs.copyFileSync(SAFE_FS_JS, path.join(root, 'src', 'lib', 'safe-fs.js'));
+  // update.js requires request-exit.js (the drain-safe exit primitive); the
+  // versionless fixture must carry it too or the copied module's require throws.
+  fs.copyFileSync(REQUEST_EXIT_JS, path.join(root, 'src', 'lib', 'request-exit.js'));
   // deliberately NO VERSION file at root
   return path.join(root, 'src', 'commands', 'update.js');
 }
@@ -540,6 +604,52 @@ test('a failed old-version removal is surfaced loudly, not masked as "no old ver
     if (lockedDir && fs.existsSync(lockedDir)) {
       try { fs.chmodSync(lockedDir, 0o700); } catch (_e) { /* best-effort restore for cleanup */ }
     }
+    cleanup();
+  }
+});
+
+// ── verifyCompleteSource + mirrorDir : the prune-safety primitives (pure) ──────
+// Direct unit coverage for the guard functions, imported in-process (update() is
+// gated behind require.main, so requiring the module does not run it).
+const updateMod = require(UPDATE_JS);
+
+test('verifyCompleteSource reports ok only for a complete checkout and names what is missing', () => {
+  try {
+    const dir = mkTmp('ctoc-src-');
+    // Empty dir → not ok, every required path missing.
+    const empty = updateMod.verifyCompleteSource(dir);
+    assert.strictEqual(empty.ok, false, 'an empty dir is not a complete source');
+    assert.ok(empty.missing.length > 0, 'missing paths must be listed');
+
+    // A complete tree → ok, nothing missing.
+    writeRequiredSourceFiles(dir);
+    fs.writeFileSync(path.join(dir, 'VERSION'), '1.2.3');
+    assert.deepStrictEqual(updateMod.verifyCompleteSource(dir), { ok: true, missing: [] });
+
+    // Remove a single command → not ok, and it is named.
+    fs.rmSync(path.join(dir, 'src', 'commands', 'start.md'));
+    const partial = updateMod.verifyCompleteSource(dir);
+    assert.strictEqual(partial.ok, false, 'a tree missing a command is not complete');
+    assert.ok(partial.missing.some(m => m.includes('start.md')),
+      'the missing command must be named so the abort message is actionable');
+  } finally {
+    cleanup();
+  }
+});
+
+test('mirrorDir throws on a missing source instead of pruning the destination to nothing', () => {
+  try {
+    const dst = mkTmp('ctoc-dst-');
+    fs.writeFileSync(path.join(dst, 'keep.txt'), 'must survive');
+    assert.throws(
+      () => updateMod.mirrorDir(path.join(dst, 'does-not-exist'), dst),
+      /source directory does not exist/,
+      'a missing source must throw, not be treated as an empty source that prunes everything'
+    );
+    assert.ok(fs.existsSync(path.join(dst, 'keep.txt')),
+      'the destination must be untouched when the source is missing');
+    assert.strictEqual(fs.readFileSync(path.join(dst, 'keep.txt'), 'utf8'), 'must survive');
+  } finally {
     cleanup();
   }
 });

@@ -10,6 +10,7 @@ const safeFs = require('../lib/safe-fs');
 const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
+const { requestExit } = require('../lib/request-exit');
 
 // os.homedir() always resolves the home directory (from the OS, not just env
 // vars), so `path.join(HOME, ...)` below can never receive undefined and throw at
@@ -103,6 +104,11 @@ function refreshLocalManual(ctocRoot = path.resolve(__dirname, '..', '..')) {
  */
 function mirrorDir(srcDir, dstDir, options = {}) {
   const exclude = new Set(options.exclude || []);
+  // A missing source must NEVER be treated as "an empty source" — mirroring from it
+  // would prune the destination to nothing. Fail loudly instead of silently wiping.
+  if (!safeFs.existsSync(srcDir)) {
+    throw new Error(`mirrorDir: source directory does not exist: ${srcDir}`);
+  }
   if (!safeFs.existsSync(dstDir)) {
     safeFs.mkdirSync(dstDir, { recursive: true });
   }
@@ -136,6 +142,39 @@ function mirrorDir(srcDir, dstDir, options = {}) {
       safeFs.copyFileSync(s, d);
     }
   }
+}
+
+/**
+ * The load-bearing entry points a COMPLETE CTOC plugin checkout must contain. If any
+ * is missing, the checkout is thin/partial (a failed clone, an interrupted reset) and
+ * mirroring-with-prune from it would DELETE live files — including the slash commands —
+ * out of the installed cache, leaving the user with no `/ctoc:start`. Relative paths,
+ * joined against the candidate source dir.
+ */
+const REQUIRED_SOURCE_PATHS = [
+  path.join('.claude-plugin', 'plugin.json'),
+  'VERSION',
+  path.join('src', 'commands', 'start.js'),
+  path.join('src', 'commands', 'start.md'),
+  path.join('src', 'commands', 'push.md'),
+  path.join('src', 'commands', 'update.md'),
+];
+
+/**
+ * Verify a candidate marketplace source is a COMPLETE plugin tree before it is used
+ * as the source of a mirror-with-prune. Returns `{ ok, missing }`; `ok` is true only
+ * when every REQUIRED_SOURCE_PATHS entry exists. This is the guard that makes a broken
+ * fetch a NO-OP that leaves the installed cache untouched, instead of a prune that
+ * wipes the user's working commands. Pure and side-effect-free — safe to unit-test.
+ *
+ * @param {string} dir - Absolute path to the candidate source (MARKETPLACE_DIR).
+ * @returns {{ ok: boolean, missing: string[] }}
+ */
+function verifyCompleteSource(dir) {
+  const missing = REQUIRED_SOURCE_PATHS.filter(
+    rel => !safeFs.existsSync(path.join(dir, rel))
+  );
+  return { ok: missing.length === 0, missing };
 }
 
 function run(cmd, opts = {}) {
@@ -285,6 +324,24 @@ function update() {
   }
   console.log(`   Latest version: ${newVersion}`);
 
+  // 2b. GUARD: never mirror-with-prune from a thin/partial checkout. Both sync paths
+  // below (up-to-date self-heal and version-change install) prune the cache to match
+  // this source; if a failed clone/reset left it missing the commands, that prune
+  // would wipe `/ctoc:start` out of the install. A broken fetch must be a NO-OP that
+  // leaves the working install exactly as it was, not a silent teardown.
+  const srcCheck = verifyCompleteSource(MARKETPLACE_DIR);
+  if (!srcCheck.ok) {
+    console.error(
+      `   Aborting: the fetched copy is incomplete (missing: ${srcCheck.missing.join(', ')}).`
+    );
+    console.error(
+      '   Your installed CTOC was left untouched. Re-run /ctoc:update; if it repeats, ' +
+      'reinstall from the marketplace.'
+    );
+    requestExit(1);
+    return;
+  }
+
   // 3. Check if already up to date
   if (currentVersion === newVersion) {
     console.log('\n' + '─'.repeat(40));
@@ -398,4 +455,4 @@ if (require.main === module) {
   update();
 }
 
-module.exports = { update, updateInstalledPlugins, refreshLocalLessons, refreshLocalManual, getCurrentVersion, getLatestVersion };
+module.exports = { update, updateInstalledPlugins, refreshLocalLessons, refreshLocalManual, getCurrentVersion, getLatestVersion, mirrorDir, verifyCompleteSource };
