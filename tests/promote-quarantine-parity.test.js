@@ -16,12 +16,17 @@
  * parity test proper: the same seed must produce the same promoted set through all
  * four routes.
  *
- * CASE 9 IS DELIBERATELY "BACKWARDS". It asserts that the SCHEDULER still returns the
- * conflicting candidate. `task-registry`'s scheduler section is pure and reads only
- * status/kind/touches/gitOp; the human ruled that it must not learn WHY a task reached
- * a status. The guard therefore lives in the promote PROJECTION, and case 9 is the
- * executable guard on that ruling — it fails if a future change "helpfully" moves the
- * filter into canRun/nextRunnable.
+ * CASE 9 — BELT-AND-SUSPENDERS (human ruling 2026-07-26, supersedes the earlier
+ * "scheduler stays pure" ruling). The human directed that the concurrent-edit guard ALSO
+ * be enforced inside the scheduler so it "cannot be bypassed by any caller". It is now a
+ * BELT at `canRun` — the single oracle every status→running transition consults, so no
+ * caller that computes its own promote set can START a colliding task. The PROJECTION
+ * (`task-reconcile.applyQuarantine`) remains the SUSPENDERS: it holds the candidate on the
+ * render + command paths and REPORTS it (the human-visible "held" signal). `nextRunnable`
+ * is left as the raw projection (it still OFFERS the candidate) so the projection can name
+ * what it held — see cases 1-6, 10b, 11. Case 9 now asserts canRun refuses while
+ * nextRunnable offers; the longer-term consolidation across all promote paths (including
+ * menu-screens.js) belongs to sibling 00013-r3b, which declares those files.
  *
  * FAULT INJECTION (case 11). `task-reconcile` destructures `touchesOverlap` from
  * `./plan-coverage` at module load, so a delegating stub is installed on the
@@ -301,32 +306,35 @@ describe('the promote projection keeps its injection defences', () => {
 // Case 9 — the scheduler stays pure (the human's ruling, made executable)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('the scheduler stays pure — the guard lives in the projection', () => {
-  it('case 9 — canRun and nextRunnable STILL return the conflicting candidate', () => {
+describe('the concurrent-edit belt lives in canRun; the projection reports it', () => {
+  it('case 9 — canRun REFUSES the conflicting candidate (belt); nextRunnable still OFFERS it', () => {
     seedConflict(root);
     const reg = taskRegistry.load(root);
     const t2 = reg.tasks.find((t) => t.id === 't2');
 
-    assert.equal(
-      taskRegistry.canRun(t2, reg).run, true,
-      'canRun must NOT read orphanReason — the scheduler section is pure and reads only ' +
-      'status/kind/touches/gitOp. If this fails, the guard was moved into the scheduler, ' +
-      'which the human explicitly rejected.'
-    );
+    // BELT: canRun is the single status→running oracle. It now refuses a candidate that
+    // would edit files still reserved by an age-only orphan, so the guard cannot be bypassed
+    // by any caller that computes its own promote set (human ruling 2026-07-26).
+    const decision = taskRegistry.canRun(t2, reg);
+    assert.equal(decision.run, false, 'canRun must refuse t2 — its file is reserved by an age-only orphan');
+    assert.equal(decision.reason, 'staleness-orphan-quarantine');
+
+    // SUSPENDERS: nextRunnable stays the raw projection so applyQuarantine can hold AND
+    // REPORT the candidate (the human-visible "held" signal). Cases 1-6/11 depend on this.
     assert.ok(
       taskRegistry.nextRunnable(reg).some((t) => t.id === 't2'),
-      'nextRunnable must still offer t2; holding it is the PROJECTION\'s job'
+      'nextRunnable must still offer t2 so the projection can name what it held'
     );
   });
 
-  it('case 9b — task-registry.js contains no lifecycle-reason read', () => {
-    const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'task-registry.js'), 'utf8');
-    const schedulerStart = src.indexOf('── scheduler (pure)');
-    assert.ok(schedulerStart > 0, 'the scheduler section header must still exist');
-    assert.ok(
-      !src.slice(schedulerStart).includes('orphanReason'),
-      'the scheduler section must not read orphanReason'
-    );
+  it('case 9b — a RELEASED reservation (confirmed-dead) passes the belt on every layer', () => {
+    // The belt uses the same predicate as the projection (orphanReason === "staleness" only),
+    // so once the reservation is released the belt no longer holds the candidate — the two
+    // layers agree, and nextRunnable + canRun + the routes all promote it (see case 6).
+    seedConflict(root, { orphanReason: 'confirmed-dead' });
+    const reg = taskRegistry.load(root);
+    const t2 = reg.tasks.find((t) => t.id === 't2');
+    assert.equal(taskRegistry.canRun(t2, reg).run, true, 'a released orphan does not hold the candidate');
   });
 });
 
