@@ -523,17 +523,23 @@ function approvePlan(planPath, projectPath, options = {}) {
           const { getDeploymentConfig, runDeploymentPipeline } = require('./deployment');
           const config = getDeploymentConfig(root);
           if (config.enabled) {
-            if (config.ship_gate_confirmed === true) {
-              // The human confirmed, per-project, that Gate 3 approval may cross into
-              // deploy. Only then does the pipeline fire. Run asynchronously — don't
+            // G4 (2026-07-14): deploy is a SEPARATE human ship gate, and it is a
+            // PER-CROSSING act. The authorization to deploy is a stamp carried on THIS
+            // approval call (`options.deploy === true`) — NEVER a persisted config flag.
+            // A standing setting would permanently disarm the gate: switched on once, it
+            // would auto-deploy on EVERY future Gate 3 approval with no human act at the
+            // deploy gate — that is a setting, not a gate. Absent the per-crossing stamp
+            // (the normal review approval), the plan is recorded deploy-ready and NOTHING
+            // deploys.
+            if (options.deploy === true) {
+              // The human stamped THIS crossing for deploy. Run asynchronously — don't
               // block the plan transition.
               runDeploymentPipeline(newPath, root).catch(err => {
                 console.error('Deployment pipeline failed:', err.message);
               });
             } else {
-              // G4 (2026-07-14): Gate 3 approval must NEVER auto-cross into a live
-              // deploy — deploy is a SEPARATE human ship gate. Record a deploy-ready
-              // notice for the human instead of triggering; do not deploy.
+              // Not stamped for deploy this crossing → record a deploy-ready notice for
+              // the human ship gate instead of triggering; do not deploy.
               recordDeployReadyNotice(newPath, root);
             }
           }
@@ -905,14 +911,40 @@ function completeExecution(planPath, projectPath, options = {}) {
   const newPath = movePlan(planPath, 'review', root);
   const planSlug = path.basename(newPath, '.md');
 
+  // PRODUCE the VERIFY evidence Gate 3 depends on, by actually RUNNING Step 14 —
+  // never by a human hand-fabricating the artifact (finding C9). Before this
+  // wiring `persistVerifyResult` had zero live callers: a live gate with a dead
+  // producer, which trained evidence fabrication. Now every in-progress→review
+  // completion runs the real quality gate and records the real result on disk at
+  // .ctoc/state/verify/<slug>.json. `validateReviewToDone` reads it at Gate 3.
+  //
+  // VERIFY RUNS BEFORE the task/plan coupling below (q13): the settled task result is
+  // DERIVED from this outcome, never pre-stamped ok:true before the gate that decides
+  // it has run. The durable registry record is read by the dashboard, the wave barrier
+  // and every later reader, so it must not assert an outcome it cannot yet know.
+  let verify = null;
+  try {
+    const { persistVerifyResult } = require('./step-13-verify');
+    verify = persistVerifyResult(root, planSlug);
+  } catch (err) {
+    // A verify RUN error must never be silently swallowed (that would let a plan
+    // reach review with no evidence and Gate 3 could not tell why). Surface it
+    // loudly; the absent artifact makes Gate 3 fail closed on its own.
+    console.error(`⚠️  Step 14 VERIFY failed to run for ${planSlug}: ${err.message}`);
+  }
+  // The single, honest fact the settled result derives from: did the gate that just ran
+  // pass? A null verify (the run threw) is NOT a pass — it reads falsy here, so a plan
+  // whose verify could not run never settles a success either.
+  const verifyPassed = verify != null && verify.passed === true;
+
   // Couple the TASK state machine to the PLAN state machine (C1-3). The same
   // completion that moves the plan in-progress → review settles the plan's
-  // non-terminal implement task in the registry, in ONE load→save:
-  //   • a RUNNING task → done (the plan reached review = the implement work
-  //     succeeded), recording result { ok: true, summary: 'plan reached review' };
-  //   • a CANCELLING task keeps its R2-A status path (reconcile confirms death) but
-  //     records a result so a cancelled plan's completion never reads as a clean
-  //     success.
+  // non-terminal implement task in the registry, in ONE transaction:
+  //   • a RUNNING task → done (its implement work reached review); its RESULT is
+  //     DERIVED from the verify outcome above — ok:true only when verify passed.
+  //   • a CANCELLING task keeps its R2-A status path (reconcile confirms death) and
+  //     records an ok:false result, because a plan completing during a cancellation
+  //     is NEVER a clean success (the plan's own charter, q13).
   // Fail-open: no registry, no matching task, or any registry error is logged and
   // NEVER breaks the transition (the plan has already moved to review).
   try {
@@ -937,11 +969,16 @@ function completeExecution(planPath, projectPath, options = {}) {
       if (taskForPlan.status === 'running') {
         taskRegistry.updateTask(registry, taskForPlan.id, {
           status: 'done',
-          result: { ok: true, summary: 'plan reached review' }
+          result: {
+            ok: verifyPassed,
+            summary: verifyPassed
+              ? 'plan reached review; verify passed'
+              : 'plan reached review; verify did NOT pass'
+          }
         });
       } else if (taskForPlan.status === 'cancelling') {
         taskRegistry.updateTask(registry, taskForPlan.id, {
-          result: { ok: true, summary: 'plan reached review during cancellation' }
+          result: { ok: false, summary: 'plan reached review during cancellation (not a clean success)' }
         });
       }
       // Item 2: retire any SHADOW duplicates for this plan so they cannot re-run a plan
@@ -960,23 +997,6 @@ function completeExecution(planPath, projectPath, options = {}) {
     });
   } catch (couplingErr) {
     console.error(`Task/plan coupling failed for ${planSlug}: ${couplingErr.message}`);
-  }
-
-  // PRODUCE the VERIFY evidence Gate 3 depends on, by actually RUNNING Step 14 —
-  // never by a human hand-fabricating the artifact (finding C9). Before this
-  // wiring `persistVerifyResult` had zero live callers: a live gate with a dead
-  // producer, which trained evidence fabrication. Now every in-progress→review
-  // completion runs the real quality gate and records the real result on disk at
-  // .ctoc/state/verify/<slug>.json. `validateReviewToDone` reads it at Gate 3.
-  let verify = null;
-  try {
-    const { persistVerifyResult } = require('./step-13-verify');
-    verify = persistVerifyResult(root, planSlug);
-  } catch (err) {
-    // A verify RUN error must never be silently swallowed (that would let a plan
-    // reach review with no evidence and Gate 3 could not tell why). Surface it
-    // loudly; the absent artifact makes Gate 3 fail closed on its own.
-    console.error(`⚠️  Step 14 VERIFY failed to run for ${planSlug}: ${err.message}`);
   }
 
   // Honesty: a failing VERIFY does NOT silently pass to review as if verified.
@@ -1202,11 +1222,11 @@ function surfaceEscalation(escalation, planName, root) {
  * Record a "deploy-ready" notice for the human ship gate (G4). Crossing Gate 3
  * (review → done) makes a plan DEPLOY-READY, but it must NEVER auto-cross into a
  * live deploy — the human decided push and deploy are the two separate ship gates
- * (2026-07-14). When deployment is enabled but `deployment.ship_gate_confirmed` is
- * not `true`, this writes a durable notice to `<root>/.ctoc/logs/deploy-ready.json`
- * (the same append+rotate pattern the other action logs use) INSTEAD of triggering
- * the pipeline. The menu/inbox surface reads this log to tell the human a plan is
- * awaiting the deploy ship gate.
+ * (2026-07-14). Deploy is authorized PER CROSSING: unless THIS approval carried the
+ * deploy stamp (`options.deploy === true`), this writes a durable notice to
+ * `<root>/.ctoc/logs/deploy-ready.json` (the same append+rotate pattern the other
+ * action logs use) INSTEAD of triggering the pipeline. The menu/inbox surface reads
+ * this log to tell the human a plan is awaiting the deploy ship gate.
  *
  * Fail-open: a notice-write error is logged and NEVER breaks the Gate 3 transition
  * (the plan has already crossed to done).
@@ -1230,8 +1250,8 @@ function recordDeployReadyNotice(planPath, root) {
       status: 'deploy-ready',
       message:
         'Plan approved at Gate 3 (review → done) and is DEPLOY-READY. Deploy is a ' +
-        'separate human ship gate; set deployment.ship_gate_confirmed: true to enable ' +
-        'auto-deploy on Gate 3, or deploy manually.'
+        'separate human ship gate, authorized per crossing: approve with the deploy ' +
+        'stamp to deploy this crossing, or deploy manually. No standing setting deploys.'
     });
     if (log.length > 500) log = log.slice(-500);
     // Handover (b): write ATOMICALLY (temp sibling + rename), mirroring stale-cleanup's
