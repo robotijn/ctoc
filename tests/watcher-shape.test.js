@@ -108,6 +108,21 @@ const MUTATION_CAPABLE = [...WRITE_TOOLS, 'Bash', 'Task'];
  */
 const READONLY_ALLOWED = ['Read', 'Grep', 'Glob', 'Skill'];
 
+/**
+ * WEB-ENABLED watchers — an explicit, reviewable allowlist (mirrors SONNET_EXEMPT
+ * in tests/agent-model-floor.test.js: membership is a reviewable act, not a
+ * pattern). A watcher that must validate a claim against a LIVE external source
+ * needs WebSearch/WebFetch. Both are READ-ONLY — they retrieve, they never mutate
+ * the observed — so they do NOT breach the "a watcher never writes" integrity rule
+ * (they are absent from MUTATION_CAPABLE). This relaxes ONLY the tool allowlist for
+ * the named agents; the mutation ban, the model floor, the heading shape and the
+ * schema-reference rule are unchanged.
+ */
+const WEB_TOOLS = ['WebSearch', 'WebFetch'];
+const WEB_ENABLED = new Set([
+  'agents/ai-quality/citation-validator.md',
+]);
+
 /** Fields the dispatch schema already defines. Restating them here would be the
  *  forty-sixth copy — the duplication that rots. */
 const SCHEMA_FIELDS = [
@@ -186,10 +201,11 @@ function shapeViolations(text, label) {
         v.push(`${label}: tools must include "${required}"`);
       }
     }
-    const extra = declared.filter((t) => !READONLY_ALLOWED.includes(t));
+    const allowed = WEB_ENABLED.has(label) ? [...READONLY_ALLOWED, ...WEB_TOOLS] : READONLY_ALLOWED;
+    const extra = declared.filter((t) => !allowed.includes(t));
     if (extra.length) {
       v.push(
-        `${label}: tools may only be ${READONLY_ALLOWED.join(', ')}; found: ${extra.join(', ')}`
+        `${label}: tools may only be ${allowed.join(', ')}; found: ${extra.join(', ')}`
       );
     }
   }
