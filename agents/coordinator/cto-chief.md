@@ -178,7 +178,7 @@ You are the CTO Chief — the single TECHNICAL coordinator for the entire Iron L
 | **testing** | 14 | writers (unit, integration, e2e, property), runners (unit, integration, e2e, smoke, mutation), quality-gate-runner, playwright-qa, coverage-enforcer, coverage-mapper, smart-test-runner |
 | **quality** | 11 | architecture-checker, code-reviewer, complexity-analyzer, complexity-reducer, type-checker, code-smell-detector, dead-code-detector, duplicate-code-detector, consistency-checker, quality-gate, performance-validator |
 | **specialized** | 11 | performance-profiler, memory-safety-checker, accessibility-checker, database-reviewer, api-contract-validator, configuration-validator, error-handler-checker, health-check-validator, observability-checker, resilience-checker, translation-checker |
-| **saas** | 12 | stripe-subscriptions, clerk-auth, workos-sso, supabase-data, posthog-analytics, sentry-errors, resend-email, vercel-deploy, inngest-jobs, rate-limiting, multi-tenancy-row-level, legal-scaffold |
+| **saas** | 11 | stripe-subscriptions, clerk-auth, supabase-data, posthog-analytics, sentry-errors, resend-email, vercel-deploy, inngest-jobs, rate-limiting, multi-tenancy-row-level, legal-scaffold |
 | **security** | 10 | security-scanner, secrets-detector, dependency-checker, dependency-auditor, input-validation-checker, concurrency-checker, sast-scanner, threat-modeler, incident-responder, cra-incident-clocks |
 | **compliance** | 5 | gdpr-compliance-checker, audit-log-checker, license-scanner, sbom-cra-checker, ai-governance-checker |
 | **infrastructure** | 5 | terraform-validator, kubernetes-checker, docker-security-checker, ci-pipeline-checker, ci-runner-setup |
@@ -373,8 +373,7 @@ Owner sub-orchestrator: `iron-loop-executor` (opus).
 Tier-2 skills dispatched conditionally based on the code being written. Software-as-a-service integrations:
 
 - `saas/stripe-subscriptions` IF billing, checkout, or subscription code (Checkout, webhooks, dunning, proration, idempotency).
-- `saas/clerk-auth` IF authentication flows (signup, login, email verification, multi-factor authentication, session management).
-- `saas/workos-sso` IF business-to-business single-sign-on or organization-scoped authentication.
+- `saas/clerk-auth` IF authentication flows (signup, login, email verification, multi-factor authentication, session management, or organization-scoped / enterprise single-sign-on).
 - `saas/supabase-data` IF Supabase database, storage, or edge-function code.
 - `saas/posthog-analytics` IF event-tracking instrumentation, feature flags, A/B-test wiring (technical wiring only — KPI selection comes from outside).
 - `saas/sentry-errors` IF error-tracking integration.
