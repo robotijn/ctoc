@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.13.28-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.13.29-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-124-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-426-blue">
@@ -448,7 +448,7 @@ CTOC ships opinionated templates for common project types. `agents/planning/stac
 | Template | Status | Default stack |
 |----------|--------|---------------|
 | `saas/b2c-subscription` | ready | Next.js 15 · Supabase · Clerk · Stripe · Resend · PostHog · Sentry · Vercel |
-| `saas/b2b-sales-led` | ready | adds WorkOS SSO · org-scoped data · audit log · MSA/DPA templates · SOC2 docs |
+| `saas/b2b-sales-led` | ready | adds enterprise SSO (SAML/OIDC via the auth provider) · org-scoped data · audit log · MSA/DPA templates · SOC2 docs |
 | `saas/usage-based-api` | planned | metered billing · API keys · rate limiting · usage dashboard |
 | `app/expo-react-native` | planned | Expo SDK 52 · Clerk Expo · Supabase · RevenueCat · EAS |
 | `cli/bun-single-binary` | planned | Bun + cross-platform binary |
@@ -467,9 +467,9 @@ Each ready template carries a **production-readiness checklist** enforced at Gat
 - **Backups** — DB backups enabled
 - **Code quality (v6.9.9+)** — **zero warnings across all toolchains**, **zero open CVEs** in production dependencies
 
-The B2B template adds enterprise-grade gates: TLS A-grade, WorkOS SSO end-to-end, SCIM provisioning/deprovisioning, organization RLS, RBAC at middleware and DB, audit log capturing every mutation + auth event, ACH/wire billing, DPA + MSA templates, public subprocessor list.
+The B2B template adds enterprise-grade gates: TLS A-grade, enterprise SSO end-to-end, SCIM provisioning/deprovisioning, organization RLS, RBAC at middleware and DB, audit log capturing every mutation + auth event, ACH/wire billing, DPA + MSA templates, public subprocessor list.
 
-SaaS skills under `skills/saas/` (12 skill bodies): stripe-subscriptions · clerk-auth · workos-sso · multi-tenancy-row-level · resend-email · posthog-analytics · sentry-errors · supabase-data · inngest-jobs · rate-limiting · vercel-deploy · legal-scaffold.
+SaaS skills under `skills/saas/` (11 skill bodies): stripe-subscriptions · clerk-auth · multi-tenancy-row-level · resend-email · posthog-analytics · sentry-errors · supabase-data · inngest-jobs · rate-limiting · vercel-deploy · legal-scaffold.
 
 ---
 
@@ -513,7 +513,7 @@ Embeddings are produced by a local model via `embedder.js` / `ollama-client.js` 
 
 | Category | # | Agents |
 |----------|---|--------|
-| [SaaS](agents/saas/) | 12 | [clerk-auth](agents/saas/clerk-auth.md), [stripe-subscriptions](agents/saas/stripe-subscriptions.md), [workos-sso](agents/saas/workos-sso.md), [multi-tenancy-row-level](agents/saas/multi-tenancy-row-level.md), [resend-email](agents/saas/resend-email.md), [posthog-analytics](agents/saas/posthog-analytics.md), [sentry-errors](agents/saas/sentry-errors.md), [supabase-data](agents/saas/supabase-data.md), [inngest-jobs](agents/saas/inngest-jobs.md), [rate-limiting](agents/saas/rate-limiting.md), [vercel-deploy](agents/saas/vercel-deploy.md), [legal-scaffold](agents/saas/legal-scaffold.md) |
+| [SaaS](agents/saas/) | 11 | [clerk-auth](agents/saas/clerk-auth.md), [stripe-subscriptions](agents/saas/stripe-subscriptions.md), [multi-tenancy-row-level](agents/saas/multi-tenancy-row-level.md), [resend-email](agents/saas/resend-email.md), [posthog-analytics](agents/saas/posthog-analytics.md), [sentry-errors](agents/saas/sentry-errors.md), [supabase-data](agents/saas/supabase-data.md), [inngest-jobs](agents/saas/inngest-jobs.md), [rate-limiting](agents/saas/rate-limiting.md), [vercel-deploy](agents/saas/vercel-deploy.md), [legal-scaffold](agents/saas/legal-scaffold.md) |
 | [Testing](agents/testing/) | 14 | [unit](agents/testing/runners/unit-test-runner.md), [integration](agents/testing/runners/integration-test-runner.md), [e2e](agents/testing/runners/e2e-test-runner.md), [mutation](agents/testing/runners/mutation-test-runner.md), [smoke](agents/testing/runners/smoke-test-runner.md), [quality-gate-runner](agents/testing/quality-gate-runner.md), [playwright-qa](agents/testing/playwright-qa.md), [coverage-enforcer](agents/testing/coverage-enforcer.md), [coverage-mapper](agents/testing/coverage-mapper.md), [smart-test-runner](agents/testing/smart-test-runner.md), [unit-writer](agents/testing/writers/unit-test-writer.md), [e2e-writer](agents/testing/writers/e2e-test-writer.md), [integration-writer](agents/testing/writers/integration-test-writer.md), [property-writer](agents/testing/writers/property-test-writer.md) |
 | [Quality](agents/quality/) | 11 | [architecture-checker](agents/quality/architecture-checker.md), [code-reviewer](agents/quality/code-reviewer.md), [complexity-analyzer](agents/quality/complexity-analyzer.md), [complexity-reducer](agents/quality/complexity-reducer.md), [type-checker](agents/quality/type-checker.md), [code-smell-detector](agents/quality/code-smell-detector.md), [dead-code-detector](agents/quality/dead-code-detector.md), [duplicate-code-detector](agents/quality/duplicate-code-detector.md), [consistency-checker](agents/quality/consistency-checker.md), [quality-gate](agents/quality/quality-gate.md), [performance-validator](agents/quality/performance-validator.md) |
 | [Specialized](agents/specialized/) | 11 | [performance-profiler](agents/specialized/performance-profiler.md), [memory-safety-checker](agents/specialized/memory-safety-checker.md), [accessibility-checker](agents/specialized/accessibility-checker.md), [database-reviewer](agents/specialized/database-reviewer.md), [api-contract-validator](agents/specialized/api-contract-validator.md), [configuration-validator](agents/specialized/configuration-validator.md), [error-handler-checker](agents/specialized/error-handler-checker.md), [health-check-validator](agents/specialized/health-check-validator.md), [observability-checker](agents/specialized/observability-checker.md), [resilience-checker](agents/specialized/resilience-checker.md), [translation-checker](agents/specialized/translation-checker.md) |
@@ -562,7 +562,7 @@ There are two kinds of skills:
 
 | Category | # | Skill bodies |
 |----------|---|--------------|
-| [SaaS](skills/saas/) | 12 | clerk-auth · stripe-subscriptions · workos-sso · multi-tenancy-row-level · resend-email · posthog-analytics · sentry-errors · supabase-data · inngest-jobs · rate-limiting · vercel-deploy · legal-scaffold |
+| [SaaS](skills/saas/) | 11 | clerk-auth · stripe-subscriptions · multi-tenancy-row-level · resend-email · posthog-analytics · sentry-errors · supabase-data · inngest-jobs · rate-limiting · vercel-deploy · legal-scaffold |
 | [Quality](skills/quality/) | 11 | architecture-checker · code-reviewer · complexity-analyzer · complexity-reducer · code-smell-detector · consistency-checker · dead-code-detector · duplicate-code-detector · performance-validator · quality-gate · type-checker |
 | [Specialized](skills/specialized/) | 11 | accessibility-checker · api-contract-validator · configuration-validator · database-reviewer · error-handler-checker · health-check-validator · memory-safety-checker · observability-checker · performance-profiler · resilience-checker · translation-checker |
 | [Security](skills/security/) | 10 | security-scanner · sast-scanner · secrets-detector · input-validation-checker · concurrency-checker · dependency-checker · dependency-auditor · **threat-modeler** *(new, v6.9.24)* · **incident-responder** *(new, v6.9.24)* · **cra-incident-clocks** *(new, v6.9.27)* |
@@ -821,7 +821,7 @@ node --test tests/*.test.js
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.13.28'
+getVersion()       // → '6.13.29'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -891,6 +891,6 @@ Use CTOC freely for any project. You may not offer CTOC itself or a derivative a
 
 ---
 
-**6.13.28** · Built by [@robotijn](https://github.com/robotijn)
+**6.13.29** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>
