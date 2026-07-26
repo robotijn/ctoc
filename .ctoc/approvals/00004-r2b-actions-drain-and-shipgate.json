@@ -1,11 +1,11 @@
 {
-  "content_sha256": "1d3cf2f3a1a729a202ff42a65ce8b07d904a2ae97222cae91a15fb00e6ead642",
+  "content_sha256": "aa347191c09bf910d318b25f7eb66391835bfbc7523b9dace4121df4922c3104",
   "hash_scope": "file",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-26T18:39:00.397Z",
+  "approved_at": "2026-07-26T19:46:30.162Z",
   "approved_by": "human",
   "backfilled": true,
-  "backfill_reason": "2026-07-26: human ruling — the review-stage hardening wave (00003/04/05/09/10) sent back to todo for rework, each rebuilt on a GREEN full npm test gate. Residency backfilled to match the human-ordered move; recorded as backfilled, not a live click.",
+  "backfill_reason": "2026-07-26: human ruling — r2b sent back to todo for rework (deploy=per-crossing stamp, verify=full gate, honest verify-derived task result). Rebuilt on a GREEN full npm test gate; residency backfilled to match the reworked plan bytes.",
   "plan_basename": "00004-r2b-actions-drain-and-shipgate"
 }

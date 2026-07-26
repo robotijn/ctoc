@@ -419,7 +419,7 @@ describe('getAgentStatus (registry liveness, agent-lock retired)', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('completeExecution — task/plan coupling (C1-3)', () => {
-  it('marks the matching running implement task done (disk-verified) when the plan reaches review', () => {
+  it('settles the running implement task done, DERIVING its result from the verify outcome (never a pre-stamped success)', () => {
     const planPath = writePlan('in-progress', 'couple-run', { files: ['src/cr.js'] });
     const claim = taskRegistry.addAndClaim(root, { kind: 'implement', plan: 'couple-run', touches: ['src/cr.js'] });
     assert.equal(claim.claimed, true, 'the implement task is running before completion');
@@ -429,11 +429,19 @@ describe('completeExecution — task/plan coupling (C1-3)', () => {
     assert.ok(fs.existsSync(path.join(root, 'plans', 'review', 'couple-run.md')), 'plan moved to review');
 
     const task = loadReg().tasks.find((t) => t.id === claim.task.id);
-    assert.equal(task.status, 'done', 'the running implement task is settled done on disk');
-    assert.ok(task.result && task.result.ok === true, 'the completion result is recorded honestly');
+    // The task STATUS records that the implement work reached review; the RESULT is a
+    // SEPARATE, honest signal DERIVED from the Step-14 verify that just ran — it is never
+    // stamped ok:true before/independent of verify. This bare temp root has no verifiable
+    // toolchain, so verify fails, and the result must track that.
+    assert.equal(task.status, 'done', 'the running implement task is settled done on disk (it reached review)');
+    assert.ok(res.verify, 'completeExecution ran verify and returned its evidence');
+    assert.equal(res.verify.passed, false, 'no toolchain in the temp root → verify does NOT pass');
+    assert.ok(task.result, 'the completion result is recorded');
+    assert.equal(task.result.ok, false, 'the result is NOT a pre-stamped success — it derives from the failed verify');
+    assert.equal(task.result.ok, res.verify.passed === true, 'the settled result tracks the verify outcome exactly');
   });
 
-  it('leaves a cancelling task\'s status alone but records its result (must not read as clean success)', () => {
+  it('leaves a cancelling task\'s status alone and records a NON-success result (a cancellation is never a clean success)', () => {
     const planPath = writePlan('in-progress', 'couple-cancel', { files: ['src/cc.js'] });
     const claim = taskRegistry.addAndClaim(root, { kind: 'implement', plan: 'couple-cancel', touches: ['src/cc.js'] });
     const reg = loadReg();
@@ -444,7 +452,8 @@ describe('completeExecution — task/plan coupling (C1-3)', () => {
 
     const task = loadReg().tasks.find((t) => t.id === claim.task.id);
     assert.equal(task.status, 'cancelling', 'a cancelling task keeps its R2-A status path for reconcile');
-    assert.ok(task.result, 'but the completion result is recorded, so it does not read as a clean success');
+    assert.ok(task.result, 'the completion result is recorded');
+    assert.equal(task.result.ok, false, 'a plan completing during cancellation must NEVER read as a clean success (q13)');
   });
 
   it('no registry / no matching task → completion does not throw and still reaches review (fail-open)', () => {
@@ -530,7 +539,7 @@ describe('startAgent drain-stop protection (C1-10)', () => {
 // R2-B / 6. deploy trigger behind the human ship gate (G4)
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('approvePlan review→done — deploy is behind the ship gate (G4)', () => {
+describe('approvePlan review→done — deploy is a PER-CROSSING human ship gate (G4)', () => {
   function writeDeploySettings(extra) {
     const settings = {
       deployment: Object.assign({
@@ -542,12 +551,25 @@ describe('approvePlan review→done — deploy is behind the ship gate (G4)', ()
     fs.writeFileSync(path.join(root, '.ctoc', 'settings.json'), JSON.stringify(settings, null, 2));
   }
 
-  it('deployment enabled but ship_gate_confirmed unset → NO deploy invocation; a deploy-ready notice is recorded', () => {
-    writeDeploySettings({}); // no ship_gate_confirmed
+  // The deploy pipeline is fired fire-and-forget (its rejection is swallowed at the
+  // trigger, per the async contract), so a test that drives the enabling branch must
+  // poll for the artifact it produces rather than await the call.
+  async function waitForFile(p, timeoutMs) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (fs.existsSync(p)) return true;
+      await new Promise((r) => setTimeout(r, 15));
+    }
+    return fs.existsSync(p);
+  }
+
+  it('NO per-crossing deploy stamp → the pipeline does NOT run; a deploy-ready notice is recorded instead', () => {
+    writeDeploySettings({}); // deployment enabled, but this crossing carries no deploy stamp
     const planPath = writePlan('review', 'ship-off', { files: ['src/ship1.js'] });
 
     // R5-B: approvePlan now VALIDATES review→done. The subject is deploy GATING (G4),
     // not the review validation, so the Gate-3 crossing is forced via an audited override.
+    // Crucially: NO `deploy: true` — the normal review approval must never deploy.
     actions.approvePlan(planPath, root, { override: { reason: 'G4 deploy-gate test — validation not under test' } });
 
     const noticePath = path.join(root, '.ctoc', 'logs', 'deploy-ready.json');
@@ -559,15 +581,24 @@ describe('approvePlan review→done — deploy is behind the ship gate (G4)', ()
     assert.ok(!fs.existsSync(path.join(root, '.ctoc', 'deployments', 'latest.json')), 'deploy pipeline never ran');
   });
 
-  it('ship_gate_confirmed:true → the trigger path is taken (no deploy-ready notice recorded)', () => {
-    writeDeploySettings({ ship_gate_confirmed: true, environments: [] }); // confirmed; no envs → pipeline no-ops
+  it('a per-crossing deploy stamp on THIS approval → the pipeline RUNS and writes its artifact (drives the enabling branch)', async () => {
+    writeDeploySettings({}); // enabled, staging enabled (dry-run) — NO standing flag anywhere
     const planPath = writePlan('review', 'ship-on', { files: ['src/ship2.js'] });
 
-    // R5-B: override past the review→done validation (deploy trigger path is the subject).
-    actions.approvePlan(planPath, root, { override: { reason: 'G4 deploy-gate test — validation not under test' } });
+    // The deploy authorization is a stamp carried on THIS approval call (`deploy: true`),
+    // never a persisted setting. Drive the enabling branch and assert the artifact it
+    // PRODUCES — the mirror of the sibling test that positively asserts the pipeline did
+    // NOT run. (override forces past the review-validation, which is not the subject here.)
+    actions.approvePlan(planPath, root, { deploy: true, override: { reason: 'G4 per-crossing deploy stamp under test' } });
 
-    const noticePath = path.join(root, '.ctoc', 'logs', 'deploy-ready.json');
-    assert.ok(!fs.existsSync(noticePath), 'with the ship gate confirmed, NO notice is recorded — the trigger path was taken');
-    assert.ok(fs.existsSync(path.join(root, 'plans', 'done', 'ship-on.md')), 'the plan crosses to done');
+    assert.ok(fs.existsSync(path.join(root, 'plans', 'done', 'ship-on.md')), 'the plan crosses Gate 3 to done');
+    const latest = path.join(root, '.ctoc', 'deployments', 'latest.json');
+    await waitForFile(latest, 4000);
+    assert.ok(fs.existsSync(latest), 'the deploy pipeline RAN and wrote its status artifact');
+    const status = JSON.parse(fs.readFileSync(latest, 'utf8'));
+    assert.equal(status.plan, 'ship-on.md', 'the artifact names the plan that was deployed');
+    assert.equal(status.status, 'success', 'the dry-run pipeline reports success');
+    // The stamp was present, so the deploy FIRED — no deferral notice was written.
+    assert.ok(!fs.existsSync(path.join(root, '.ctoc', 'logs', 'deploy-ready.json')), 'no deploy-ready deferral notice when the crossing is stamped');
   });
 });
