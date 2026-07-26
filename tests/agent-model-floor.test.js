@@ -128,6 +128,7 @@ const AGENTS = loadAgents();
  * do not follow the naming convention. Membership here is a reviewable act.
  */
 const WATCHERS = [
+  'ai-quality/citation-validator',
   'architecture/dependency-analyzer',
   'compliance/license-scanner',
   'devex/api-deprecation-checker',

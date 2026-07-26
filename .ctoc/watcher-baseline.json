@@ -6,7 +6,8 @@
   "w1_started": true,
   "maxLegacy": 122,
   "conforming": [
-    "agents/iron-loop/advocate-critic.md"
+    "agents/iron-loop/advocate-critic.md",
+    "agents/ai-quality/citation-validator.md"
   ],
   "legacy": [
     "agents/ai-quality/ai-code-quality-reviewer.md",

@@ -1,0 +1,11 @@
+{
+  "content_sha256": "03fd2fd0c115054f1f2f69efd7bcf3ba58fea6cc36228b2eb75b2325aa9acf0a",
+  "hash_scope": "specification",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-26T08:03:59.657Z",
+  "approved_by": "human",
+  "plan_basename": "00212-a-web-enabled-citation-validator-emits-verdicts-a-human-can-act-on",
+  "override": true,
+  "override_reason": "Human signed off the citation-validator agent as done 2026-07-26 (chose \"Finalize to done\" + \"Commit and push\"). Built via CTOC iron-loop-executor, TDD (18 tests red-first then green); gate-green: npm test 0 failed, 0 skipped, coverage 99.01%. Scoped WEB_ENABLED fence approach blessed by human; legacy/maxLegacy ratchet untouched."
+}
