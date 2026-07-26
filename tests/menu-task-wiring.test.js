@@ -830,6 +830,100 @@ describe('R3-D — isNavRoute allowlist covers every real NAV route', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// R2-C rework — the menu path settles an HONEST task result (derived from verify),
+// and the cancel route is the ONE cancel encoding (converged onto actions.cancelTask).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('R2-C rework — honest task result on the menu complete path', () => {
+  const STEPS = [
+    [8, 'TEST'], [9, 'PREPARE'], [10, 'IMPLEMENT'], [11, 'REVIEW'], [12, 'OPTIMIZE'],
+    [13, 'SECURE'], [14, 'VERIFY'], [15, 'DOCUMENT'], [16, 'FINAL-REVIEW']
+  ];
+  function execPlan() {
+    let out = '## Execution Plan\n\n';
+    for (const [n, name] of STEPS) out += `### Step ${n}: ${name}\n- [x] ${name.toLowerCase()} work performed\n\n`;
+    return out;
+  }
+  function writeCompletePlan(r, slug) {
+    const dir = path.join(r, 'plans', 'in-progress');
+    fs.mkdirSync(dir, { recursive: true });
+    const fm = ['---', 'title: "Fixture plan"', 'type: feature', '---', ''];
+    const body = `# Fixture plan\n\nSome descriptive prose.\n\n${execPlan()}`;
+    const p = path.join(dir, `${slug}.md`);
+    fs.writeFileSync(p, `${fm.join('\n')}\n${body}`);
+    return p;
+  }
+
+  it('a FAILED verify settles the registry task ok:false — never overwritten to ok:true by the caller flag', () => {
+    // A real project whose lint script really exits non-zero → runVerify fails for real.
+    for (const stage of ['in-progress', 'review', 'done']) {
+      fs.mkdirSync(path.join(root, 'plans', stage), { recursive: true });
+    }
+    fs.mkdirSync(path.join(root, '.ctoc'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({
+      name: 'failing-fixture', version: '1.0.0',
+      scripts: { lint: 'node -e "process.exit(1)"' }
+    }, null, 2));
+
+    const slug = 'r2c-fail-plan';
+    writeCompletePlan(root, slug);
+
+    // Seed a RUNNING implement task naming that plan.
+    const reg = taskRegistry.emptyRegistry();
+    const t = taskRegistry.addTask(reg, { kind: 'implement', plan: slug, touches: ['src/x.js'] });
+    taskRegistry.updateTask(reg, t.id, { status: 'running' });
+    taskRegistry.save(root, reg);
+
+    const res = ms.route(['menu', 'task', 'complete', t.id], root);
+
+    // The completion RAN and verify FAILED (not blocked — the plan validated).
+    assert.ok(res.completion && res.completion.ran === true, 'the real completion ran');
+    assert.equal(res.completion.verify && res.completion.verify.passed, false, 'verify honestly failed');
+
+    // THE REGRESSION: the durable task result must track the verify verdict, not the
+    // caller-supplied {ok:!p.fail}. A failed verify may never be re-stamped ok:true.
+    const settled = taskRegistry.load(root).tasks.find((x) => x.id === t.id);
+    assert.equal(settled.status, 'done', 'the coupling settled the task done');
+    assert.equal(settled.result.ok, false, 'a FAILED verify settles ok:false on the menu path');
+  });
+});
+
+describe('R2-C rework — cancel is the ONE encoding (converged onto actions.cancelTask)', () => {
+  function seedRunning(id, plan = 'p1', touches = ['src/a.js']) {
+    const reg = taskRegistry.emptyRegistry();
+    const t = taskRegistry.addTask(reg, { kind: 'implement', plan, touches });
+    // force the id to a known value for route() calls
+    t.id = id;
+    taskRegistry.updateTask(reg, id, { status: 'running', agentTaskId: 'agent-' + id });
+    taskRegistry.save(root, reg);
+    return id;
+  }
+
+  it('the menu cancel route delegates to actions.cancelTask (no second registry mutation in the menu)', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'menu-screens.js'), 'utf8');
+    // The cancel branch must call the single source, not re-implement running→cancelling.
+    assert.match(src, /cancelTask\(/, 'menu-screens delegates cancel to actions.cancelTask');
+  });
+
+  it('--force on a running task → cancelled in one call, forced flag surfaced', () => {
+    const id = seedRunning('t1');
+    const res = ms.route(['menu', 'task', 'cancel', id, '--force'], root);
+    assert.equal(res.status, 'cancelled', 'force frees the running task in one call');
+    assert.equal(res.forced, true, 'the forced override is surfaced');
+    assert.equal(taskRegistry.load(root).tasks.find((x) => x.id === id).status, 'cancelled');
+  });
+
+  it('a repeat non-force cancel on a cancelling task is refused (fail-soft, no deadline re-stamp)', () => {
+    const id = seedRunning('t1');
+    const first = ms.route(['menu', 'task', 'cancel', id], root);
+    assert.equal(first.status, 'cancelling', 'first cancel enters cancelling');
+    const second = ms.route(['menu', 'task', 'cancel', id], root);
+    assert.equal(second.ok, false, 'a second cancel is refused, not a silent deadline reset');
+    assert.match(second.error, /already cancelling/i);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // R3-D — the executor agent stops fighting the scheduler and never moves a plan.
 // ═══════════════════════════════════════════════════════════════════════════
 
