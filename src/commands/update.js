@@ -76,6 +76,68 @@ function refreshLocalManual(ctocRoot = path.resolve(__dirname, '..', '..')) {
   }
 }
 
+/**
+ * Mirror `srcDir` into `dstDir` (a sync-WITH-DELETE, like `rsync --delete`), so the
+ * destination becomes an EXACT copy of the source:
+ *   - every source file/dir is copied/overwritten into the destination, AND
+ *   - every destination file/dir that does NOT exist in the source is PRUNED.
+ *
+ * This is the fix for orphaned command files: when a slash command is renamed away
+ * upstream (e.g. `menu.md` → `start.md`), a plain add/overwrite copy (`cpSync`) leaves
+ * the stale `menu.md` behind in the installed cache forever. Mirroring deletes it.
+ *
+ * SURGICAL by design — it never `rmSync`s the whole destination tree, only the specific
+ * entries absent from the source. That is what makes it safe to run against the cache
+ * version dir this very process may be EXECUTING from (the up-to-date path): the running
+ * module's file survives (it exists in the source), and even an overwrite is harmless
+ * because Node has already loaded it into memory.
+ *
+ * Errors SURFACE — there is deliberately no try/catch swallowing a failed copy or prune,
+ * so a broken mirror is a loud failure, never a silent default-to-success (false-green).
+ *
+ * @param {string} srcDir - source directory (the freshly-fetched marketplace tree).
+ * @param {string} dstDir - destination directory (the installed cache version dir).
+ * @param {{ exclude?: string[] }} [options] - top-level entry names to leave untouched
+ *   in BOTH copy and prune (e.g. `.git`, which the cache must never carry). Applies only
+ *   at the top level; nested trees are mirrored in full.
+ */
+function mirrorDir(srcDir, dstDir, options = {}) {
+  const exclude = new Set(options.exclude || []);
+  if (!safeFs.existsSync(dstDir)) {
+    safeFs.mkdirSync(dstDir, { recursive: true });
+  }
+
+  const srcEntries = safeFs.readdirSync(srcDir).filter(name => !exclude.has(name));
+  const keep = new Set(srcEntries);
+
+  // PRUNE: delete anything in the destination that is not in the source (excluded
+  // names are left exactly as found — never copied, never pruned).
+  for (const name of safeFs.readdirSync(dstDir)) {
+    if (exclude.has(name)) continue;
+    if (!keep.has(name)) {
+      safeFs.rmSync(path.join(dstDir, name), { recursive: true, force: true });
+    }
+  }
+
+  // COPY/OVERWRITE: mirror each source entry into the destination.
+  for (const name of srcEntries) {
+    const s = path.join(srcDir, name);
+    const d = path.join(dstDir, name);
+    // lstat (not stat) so a symlink is treated as a leaf, never followed as a dir.
+    const st = safeFs.lstatSync(s);
+    if (st.isDirectory()) {
+      mirrorDir(s, d);   // recurse; exclude applies to the top level only
+    } else {
+      // If the destination has a directory where the source has a file, clear it first
+      // so copyFileSync cannot fail writing a file over a directory.
+      if (safeFs.existsSync(d) && safeFs.lstatSync(d).isDirectory()) {
+        safeFs.rmSync(d, { recursive: true, force: true });
+      }
+      safeFs.copyFileSync(s, d);
+    }
+  }
+}
+
 function run(cmd, opts = {}) {
   try {
     return execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], ...opts }).trim();
@@ -227,8 +289,28 @@ function update() {
   if (currentVersion === newVersion) {
     console.log('\n' + '─'.repeat(40));
     console.log(`✓ Already up to date (v${newVersion})`);
-    refreshLocalLessons();          // (a) refresh even when version unchanged
-    refreshLocalManual();           // (a) refresh the operating-manual block too
+
+    // Even when the version NUMBER is unchanged, the installed cache dir can still
+    // hold ORPHANED files from a prior release whose command was renamed/removed
+    // upstream (e.g. menu.md → start.md) — so a user keeps seeing a dead old command.
+    // Mirror the marketplace into the cache dir, SURGICALLY pruning files-not-in-source.
+    // CAUTION: this process is EXECUTING from cacheVersionDir on this path, so we must
+    // NOT rmSync the whole dir; mirrorDir deletes only the orphans and overwrites
+    // changed files, leaving the running module (and the lazy requires below) intact.
+    const cacheVersionDir = path.join(CACHE_DIR, newVersion);
+    if (safeFs.existsSync(cacheVersionDir)) {
+      mirrorDir(MARKETPLACE_DIR, cacheVersionDir, { exclude: ['.git'] });
+      console.log('   Synced cache with marketplace (pruned any orphaned files)');
+      // Pass the surviving, freshly-mirrored dir so the require/template reads resolve
+      // from it (mirrors the after-update self-delete-safety contract).
+      refreshLocalLessons(cacheVersionDir);
+      refreshLocalManual(cacheVersionDir);
+    } else {
+      // No installed cache dir for this version (unusual on the up-to-date path) —
+      // refresh from the default running install instead of a nonexistent dir.
+      refreshLocalLessons();
+      refreshLocalManual();
+    }
     return;
   }
 
@@ -241,20 +323,11 @@ function update() {
   const cacheVersionDir = path.join(CACHE_DIR, newVersion);
   console.log('\n2. Installing to cache...');
 
-  // Remove old version dir if exists
-  if (safeFs.existsSync(cacheVersionDir)) {
-    safeFs.rmSync(cacheVersionDir, { recursive: true });
-  }
-  safeFs.mkdirSync(cacheVersionDir, { recursive: true });
-
-  // Copy files (exclude .git)
-  const files = safeFs.readdirSync(MARKETPLACE_DIR);
-  for (const file of files) {
-    if (file === '.git') continue;
-    const src = path.join(MARKETPLACE_DIR, file);
-    const dst = path.join(cacheVersionDir, file);
-    safeFs.cpSync(src, dst, { recursive: true });
-  }
+  // Mirror the marketplace into the cache version dir: an EXACT copy, pruning any
+  // stale orphan left by a previous install of the same version (a plain cpSync only
+  // adds/overwrites and would carry a renamed-away file forward). `.git` is excluded —
+  // the cache must never carry the source's git history.
+  mirrorDir(MARKETPLACE_DIR, cacheVersionDir, { exclude: ['.git'] });
   console.log(`   Installed to: ${cacheVersionDir}`);
 
   // 6. Update installed_plugins.json
@@ -283,20 +356,30 @@ function update() {
   }
   console.log('   Registry updated');
 
-  // 7. Clean old versions
+  // 7. Clean old versions.
+  //
+  // CACHE_DIR provably exists here (we just installed newVersion into it), so the
+  // enumeration cannot fail — and it is NOT wrapped in a catch that would mask a real
+  // problem. Each removal is attempted individually: a failure is surfaced LOUDLY to
+  // stderr, naming the specific dir + error, and the loop continues (a stale old dir is
+  // best-effort housekeeping, never a reason to abort the completed install). The old
+  // code wrapped the whole loop in one try/catch that printed "No old versions to
+  // remove" on ANY failure — masking a real removal error as an empty list. That line
+  // now prints ONLY when the list is genuinely empty.
   console.log('\n4. Cleaning old versions...');
-  try {
-    const versions = safeFs.readdirSync(CACHE_DIR).filter(v => v !== newVersion);
-    for (const v of versions) {
-      safeFs.rmSync(path.join(CACHE_DIR, v), { recursive: true });
-      console.log(`   Removed: ${v}`);
-    }
-    if (versions.length === 0) {
-      console.log('   No old versions to remove');
-    }
-  } catch (e) {
-    // Cache dir might not exist yet
+  const oldVersions = safeFs.readdirSync(CACHE_DIR).filter(v => v !== newVersion);
+  if (oldVersions.length === 0) {
     console.log('   No old versions to remove');
+  } else {
+    for (const v of oldVersions) {
+      const dir = path.join(CACHE_DIR, v);
+      try {
+        safeFs.rmSync(dir, { recursive: true, force: true });
+        console.log(`   Removed: ${v}`);
+      } catch (err) {
+        console.error(`   Failed to remove old version ${v} (${dir}): ${err.message}`);
+      }
+    }
   }
 
   // 7b. Refresh local CLAUDE.md managed blocks after a successful upgrade.
