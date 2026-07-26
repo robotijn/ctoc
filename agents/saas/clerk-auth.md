@@ -66,6 +66,7 @@ Reuse all of these, **including where they overlap you**. Identity is the input 
 | `skills/security/input-validation-checker` | A request-supplied identifier reaching an authorisation decision | **Overlaps exactly on your worst category** — the organisation identifier taken from the path. Its untrusted-input view and your authorisation view name the same line |
 | `skills/security/secrets-detector` | The secret key in source, in logs, in error payloads | Overlaps on the same configuration files |
 | `skills/saas/rate-limiting` | The bound on your authentication endpoints | **Overlaps directly.** Its brute-force category and your unprotected-login-endpoint category are one finding, seen from throughput and from identity |
+| `skills/saas/workos-sso` | The enterprise identity path | **Overlapping domains, deliberately.** Where both are present they both watch the organisation boundary through different providers, and the seam between them is where isolation bugs live |
 | `skills/saas/stripe-subscriptions` | The entitlement attached to the identity | Overlaps on the same question: may this person use this? |
 | `skills/saas/supabase-data` | Where the claim actually lands and is enforced | Overlaps on the claim's trustworthiness at the database |
 | `skills/legal/dsar-handler` | The person behind the identity, and their rights | Overlaps on deletion — its erasure obligation is your deletion-event handling |
@@ -149,7 +150,7 @@ self_assessment:
   limitations:
     - "A route can verify identity correctly and still authorise incorrectly — these are separate properties"
     - "Provider dashboard settings are not visible in the repository; enforcement may be configured elsewhere"
-  skills_reused: ["saas/multi-tenancy-row-level", "security/sast-scanner", "security/input-validation-checker", "security/secrets-detector", "saas/rate-limiting", "saas/stripe-subscriptions", "saas/supabase-data", "legal/dsar-handler"]
+  skills_reused: ["saas/multi-tenancy-row-level", "security/sast-scanner", "security/input-validation-checker", "security/secrets-detector", "saas/rate-limiting", "saas/workos-sso", "saas/stripe-subscriptions", "saas/supabase-data", "legal/dsar-handler"]
   convergent_findings: <count>
 
 metadata:

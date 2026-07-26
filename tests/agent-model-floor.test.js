@@ -293,6 +293,9 @@ const EFFORT_EXEMPT = {
     'Scheduled for demotion to a skill by plan W2; raising a doomed file is waste.',
   'saas/supabase-data': 'Scheduled for demotion to a skill by plan W2; raising a doomed file is waste.',
   'saas/vercel-deploy': 'Scheduled for demotion to a skill by plan W2; raising a doomed file is waste.',
+  // saas/workos-sso: demoted to skill-only 2026-07-24 (removed from the agent menu at
+  // the owner's request). The agent file is gone; its skill (skills/saas/workos-sso)
+  // remains, so an exemption here would be a stale ghost.
 };
 
 /**

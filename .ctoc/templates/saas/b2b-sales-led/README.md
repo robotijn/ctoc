@@ -12,7 +12,7 @@
 
 **Differs from b2c-subscription in five structural ways**:
 
-1. **Auth**: enterprise SSO (SAML/OIDC + Directory Sync) via the org's auth provider (bring-your-own), instead of Clerk's email/social
+1. **Auth**: WorkOS for SSO (SAML/OIDC + Directory Sync) instead of Clerk's email/social
 2. **Data model**: every row scoped to `organization_id`, not just `user_id`
 3. **Audit log**: customer-facing audit log required for SOC2
 4. **Billing**: contract-based (Stripe invoices/checkout, not self-serve subscriptions)
@@ -22,6 +22,7 @@
 
 All in `skills/saas/` and `skills/security/` and `skills/compliance/`:
 
+- `workos-sso` — B2B authentication + Directory Sync
 - `multi-tenancy-row-level` — RLS by organization_id (NOT user_id)
 - `stripe-subscriptions` — used for invoice-based billing (one-off + scheduled)
 - `resend-email` — transactional email (invites, billing)
@@ -49,7 +50,7 @@ B2C (b2c-subscription)             B2B (this template)
 Email signup                        Email + corporate domain → IdP routing
 Self-serve checkout                 Sales-assisted → contract → invoice billing
 Per-user data                       Per-organization data (RLS by org_id)
-Email/social auth                   SAML/OIDC SSO via the auth provider
+Email/social auth                   SAML/OIDC SSO via WorkOS
 "Settings" page                     "Org Settings" + "User Settings" split
 Personal Stripe subscription        Org-level contract with seat-based pricing
 Standard Privacy + ToS              + DPA + MSA + InfoSec questionnaire
@@ -103,7 +104,7 @@ Building this template = on the path to SOC2 Type II if you:
 1. Run audit log on every sensitive action ✓ (template includes)
 2. Enforce RLS on every table ✓
 3. Have a Privacy Policy + DPA ✓ (legal-scaffold generates)
-4. Use SSO + MFA ✓ (auth provider handles)
+4. Use SSO + MFA ✓ (WorkOS handles)
 5. Monitor errors + alerting ✓ (Sentry)
 6. Encrypted at rest + in transit ✓ (Supabase + Vercel default)
 7. Backup + disaster recovery ✓ (Supabase Pro auto-backups)

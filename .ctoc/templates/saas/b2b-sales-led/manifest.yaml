@@ -75,6 +75,7 @@ default_tech_stack:
 # ===============================================================================
 
 required_skills:
+  - saas/workos-sso
   - saas/multi-tenancy-row-level     # organization-scoped, not user-scoped
   - saas/stripe-subscriptions        # used in invoice mode
   - saas/resend-email
@@ -280,7 +281,7 @@ first_week_milestones:
 # ===============================================================================
 
 minimum_viable_features:
-  - id: sso_login
+  - id: workos_sso_login
     description: "SAML/OIDC sign-in via WorkOS AuthKit, organization auto-created"
     required: true
 

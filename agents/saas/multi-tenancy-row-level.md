@@ -69,6 +69,7 @@ Reuse all of these, **including where they overlap you**. Isolation is the prope
 | `skills/specialized/database-reviewer` | Schema, indexes, and the cost of the policy predicate | **Overlaps on the policy column.** An unindexed predicate is its performance finding and your scalability cliff — the same column, two concerns |
 | `skills/security/sast-scanner` | Application-layer injection and authorisation bugs | **Overlaps on the second wall.** Its authorisation-bypass view and your application-scoping requirement examine the same handler |
 | `skills/saas/clerk-auth` | Where the tenant identity actually comes from | **Critical overlap on the claim source.** Its identity boundary is your policy's input; a forgeable identifier is its bug and your breach |
+| `skills/saas/workos-sso` | Organisation-scoped identity in the enterprise path | Overlaps on the same boundary through a different identity provider |
 | `skills/security/input-validation-checker` | A tenant identifier taken from a request rather than the session | Overlaps precisely on the forgeable-identifier failure |
 | `skills/ai-quality/llm-security-tester` | Retrieval that crosses the boundary | **Overlaps at the newest surface.** Its query-time filtering requirement and your row-level enforcement are two layers of one boundary — and a leak needs only one to be missing |
 | `skills/compliance/gdpr-compliance-checker` | What a cross-tenant read means once it happens | Overlaps on consequence — your technical finding is its notifiable event |
@@ -190,7 +191,7 @@ self_assessment:
   limitations:
     - "A policy can be correct and still bypassed by a role, a pool, or a definer function — coverage of the table is not coverage of the path"
     - "Absence of a leak in testing is not evidence of isolation unless the isolation test exists"
-  skills_reused: ["saas/supabase-data", "specialized/database-reviewer", "security/sast-scanner", "saas/clerk-auth", "security/input-validation-checker", "ai-quality/llm-security-tester", "compliance/gdpr-compliance-checker"]
+  skills_reused: ["saas/supabase-data", "specialized/database-reviewer", "security/sast-scanner", "saas/clerk-auth", "saas/workos-sso", "security/input-validation-checker", "ai-quality/llm-security-tester", "compliance/gdpr-compliance-checker"]
   convergent_findings: <count>
 
 metadata:
