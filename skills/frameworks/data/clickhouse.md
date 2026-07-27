@@ -1,6 +1,15 @@
 # ClickHouse CTO
 > Claude Code correction guide. Updated January 2026.
 
+<!-- ctoc:claims
+- id: clickhouse-connect-version
+  kind: registry-version
+  source: https://pypi.org/pypi/clickhouse-connect/json
+  select: info.version
+  expect: 1.4.2
+  retrieved: 2026-07-10
+-->
+
 ## Installation (CURRENT - January 2026)
 ```bash
 docker run -d --name clickhouse -p 8123:8123 -p 9000:9000 clickhouse/clickhouse-server

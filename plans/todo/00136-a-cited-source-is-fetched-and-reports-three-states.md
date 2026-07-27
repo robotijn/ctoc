@@ -245,6 +245,61 @@ Covered by `tests/claim-fetcher.test.js` above. The load-bearing cases are **3**
 possible outcome), **11** (a cache hit is not a verification), and **8**
 (source-shape change is not a refutation).
 
+## Build Record (executed 2026-07-27, worktree build to green gate)
+
+All of Steps 8-16 executed. Summary of evidence:
+
+- **Step 8 TEST (TDD-RED):** `tests/claim-fetcher.test.js` written in full first; run
+  before the module existed → `Cannot find module '../src/lib/claim-fetcher'`, all cases
+  red (the load-bearing case 3 could not even load). Then green. A batch to a dead port
+  (`verifyClaims` over 5 closed-port claims) yields **zero** VERIFIED — the network-down
+  proof.
+- **Step 10 IMPLEMENT:** `src/lib/claim-fetcher.js` (`verifyClaim`/`verifyClaims`, cache
+  with conditional requests + 304, closed-enum reasons, explicit `liveContact`);
+  `tests/claim-fetcher.test.js` (32 cases, all against 127.0.0.1); `src/scripts/verify-claims.js`
+  (`runVerification`, three counts always, ledger, `requestExit`). Two guides annotated
+  (`duckdb.md`, `clickhouse.md`); `.ctoc/claim-coverage-baseline.json` floor raised 0→2.
+- **Step 14 VERIFY:** `npm test` PASS — coverage **99.1%** (floor 99), **0 skipped, 0
+  failed**. `tsc --noEmit` clean. Reachability fence **26** (unchanged), verify-claims.js
+  reachable, no newly-dead file. False-green scan: **0** new findings. Export fence:
+  `verifyClaim`/`verifyClaims`/`runVerification` all live. The gated suite makes **no**
+  network call — every real socket targets loopback; external hosts appear only on
+  SSRF-blocked-before-connect or `noNetwork` paths.
+- **Live run** (`node src/scripts/verify-claims.js`, real pypi): `verified 1 refuted 2
+  unverifiable 0`, exit 1. Both version claims **REFUTED** — clickhouse-connect
+  1.4.2→**1.6.0**, duckdb 1.5.4→**1.5.5**. Per Decision 4 a refutation is a SUCCESS: the
+  guides are genuinely stale (verified against pypi directly). The guides were NOT edited
+  to force green. `npm test` never runs this script, so the exit-1 does not touch the gate.
+
+### Additional Decisions Taken Under Ambiguity (this build)
+
+9. **Body cap raised 1 MiB → 16 MiB (per-call overridable via `opts.maxBodyBytes`).**
+   The plan's Decision 4 REQUIRES pypi's full `/pypi/<pkg>/json` for drift detection
+   (its `info.version` is the LATEST release), but that endpoint is 3.44 MiB (duckdb) /
+   7.77 MiB (clickhouse-connect) — larger than the plan's own 1 MiB cap, an internal
+   contradiction. Resolved toward the STATED PURPOSE (drift detection): 16 MiB fits real
+   registry JSON with margin, peak memory bounded at cap × concurrency (≈64 MiB), and
+   `body-too-large` still fences a pathological body. **SURFACED FORK for the human:** no
+   fixed cap fits every package (a registry with tens of thousands of releases exceeds any
+   bound). The durable fix is a streaming extractor that pulls only `info.version` without
+   buffering the whole document — deferred to your scheduling, not decided here.
+10. **`verify-claims.js` wired as a DECLARED reachability root** in
+    `.ctoc/reachability-roots.json` (outside the plan's declared `files:`, but the
+    sanctioned escape hatch). The plan's wiring names `node src/scripts/verify-claims.js`
+    as the live call site; the menu surface that would also name it arrives in 00138, and
+    CLAUDE.md was out of scope for this build, so the declared root is the reviewable
+    wiring today. `.gitignore` gained `.ctoc/verification/` (cache + ledger, regenerable).
+11. **CLAUDE.md documentation (Step 15) deferred.** The build brief explicitly forbade
+    editing `CLAUDE.md` (other integrations touch it). The three states, the closed
+    reason enum, the cache-only anti-false-green property, the no-retry rule, and
+    "the gated suite makes no network call" are fully documented in the module header of
+    `src/lib/claim-fetcher.js` and `src/scripts/verify-claims.js`. The CLAUDE.md prose
+    update is a one-line follow-up for whoever holds that file.
+12. **Redirects are never followed → `blocked-host`.** `redirect: 'manual'` yields an
+    opaque redirect whose target the request cannot read; following one is an SSRF
+    primitive. Refusing ALL redirects is the strongest form of "re-validate, never follow
+    blindly" and satisfies case 16 (a redirect to a different host ⇒ blocked-host).
+
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST

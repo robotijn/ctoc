@@ -6,9 +6,11 @@
     "src/scripts/evidence-pack.js",
     "src/scripts/collapse-stacked-frontmatter.js",
     "src/lib/continuation.js",
-    "src/hooks/post-commit.js"
+    "src/hooks/post-commit.js",
+    "src/scripts/verify-claims.js"
   ],
   "reasons": {
+    "src/scripts/verify-claims.js": "Executed BY A HUMAN (and, from 00138, a scheduler): `node src/scripts/verify-claims.js` fetches every declared corpus citation and prints a three-state report, exiting non-zero on a refutation. It is the fetcher's (src/lib/claim-fetcher.js) live call site per plan 00136. The menu surface that also names it arrives in 00138; until then the declared-root escape hatch is the reviewable wiring, since the gated suite must never fetch and CLAUDE.md is out of scope for this slice.",
     "src/hooks/post-commit.js": "Executed BY GIT. src/lib/hooks-installer.js:631 resolves <pluginRoot>/src/hooks/post-commit.js and installPostCommitHook writes a .git/hooks/post-commit script whose body runs `node \"<that path>\" 2>/dev/null &`. Git runs it after every commit — real execution, not a citation.",
     "src/scripts/collapse-stacked-frontmatter.js": "Executed BY A HUMAN. A checked-in, reviewable, argv-driven one-time migration script (same shape as src/scripts/ledger-backfill.js) that a human runs by hand — `node src/scripts/collapse-stacked-frontmatter.js` — to collapse the stacked approval-marker frontmatter blocks on the already-corrupted review-stage plans. Not reached by any code edge; the analyzer cannot see the human running it."
   }
