@@ -2,21 +2,33 @@
 title: "R5-B — approvePlan validates; ONE gate-rule encoding; assignDirectly dies; enforcer trusts the ledger"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild
-depends_on: none
+depends_on:
+  - "00021-r5c-delete-dead-functional-tab"
+  - "00012-r3a-ledger-forgery-closed"
 priority: CRITICAL
 program: ctoc-repair-loop
 iron_loop: true
+# files: reconciled to the REAL change surface (rework 2026-07-27). The original
+# list named src/commands/menu.md (never existed — the approve recipe lives in
+# src/commands/start.md) and src/tabs/functional.js (deleted by the coupled plan
+# 00021-r5c-delete-dead-functional-tab), and omitted src/lib/tui.js (renderConfirm
+# deleted) plus the five rippled test files tightened to the validated contract.
 files:
   - "src/lib/actions.js"
   - "src/lib/gate-order.js"
   - "src/lib/iron-loop-enforcer.js"
-  - "src/tabs/functional.js"
-  - "src/commands/menu.md"
+  - "src/lib/tui.js"
+  - "src/commands/start.md"
   - "tests/gates.test.js"
   - "tests/gate-order.test.js"
   - "tests/approveplan-validates.test.js"
   - "tests/iron-loop-enforcer.test.js"
   - "tests/tab-modules.test.js"
+  - "tests/cache-freshness.test.js"
+  - "tests/ctoc-audit-w02-s5-atomic-stamp-merged-parse.test.js"
+  - "tests/actions-scheduler.test.js"
+  - "tests/scheduler-enforced.test.js"
+  - "tests/tui.test.js"
 ---
 
 # R5-B — A gate that validates nothing is a rubber stamp
@@ -24,7 +36,7 @@ files:
 Verified across two audits:
 - `approvePlan` (actions.js) matches `flowMap` by path prefix and crosses with
   ZERO validator call. Only `approveSubplans` (batch) and the menu `validate`
-  route validate. `menu.md`'s `claude:approve` is a raw crossing.
+  route validate. `start.md`'s `claude:approve` recipe is a raw crossing.
 - `HUMAN_GATES` (actions.js:191) and `flowMap` (actions.js:299) are the SAME
   three edges declared twice, 108 lines apart — a duplicate encoding that can
   silently diverge.
@@ -75,7 +87,7 @@ Verified across two audits:
 
 | change | live call site | root |
 |---|---|---|
-| approvePlan validation | menu approve recipe (menu.md, yours) + menu-screens Approve-anyway (report the call-site) | /ctoc:menu |
+| approvePlan validation | menu approve recipe (start.md, yours) + menu-screens Approve-anyway (report the call-site) | /ctoc:menu |
 | gate-order single encoding | actions.js + iron-loop-enforcer.js consumers (yours) | /ctoc:menu |
 | assignDirectly deletion | src/tabs/functional.js caller removed (yours) | /ctoc:menu |
 | enforcer ledger check | SessionStart self-check (exists) | SessionStart hook |
@@ -98,8 +110,8 @@ Completion record (all steps done):
 - [x] Step 11 REVIEW — grep-proved zero duplicate gate-edge encoding remains in owned files (only comments reference the gone literals); validator runs on every crossing, only the recorded override bypasses it.
 - [x] Step 12 OPTIMIZE — one validation per crossing (approveSubplans no longer double-validates; it reads approvePlan's refusal).
 - [x] Step 13 SECURE — override is recorded in BOTH the ledger entry and the marker; no path crosses without clean validation or a logged override.
-- [x] Step 14 VERIFY — 463 tests pass / 0 fail / 0 skipped across named + rippled files; eslint clean; no git.
-- [x] Step 15 DOCUMENT — actions.js header + menu.md approve recipe updated.
+- [x] Step 14 VERIFY — REWORK 2026-07-27: the REAL full gate ran (`npm test` → test-gate.js), enforcing the 99 coverage floor and the zero-skipped gate over the whole suite, not the named-file `node --test` the original record cited (which bypasses both — finding #1). Result recorded in the Step-16 rework report below; `npx tsc --noEmit` clean (exit 0).
+- [x] Step 15 DOCUMENT — actions.js header + `src/commands/start.md` approve recipe updated (the recipe lives in start.md; the original record's `menu.md` never existed — finding #2).
 - [x] Step 16 FINAL-REVIEW — report delivered (encodings converged, follow-ups named, override-provenance proof).
 
 ### Step 8: TEST — write the tests, run ONLY the named files, record red.
@@ -169,3 +181,68 @@ left for a follow-up, and the override-provenance proof.
    files: list (concurrent scheduler slice) is past (R2/R3/R4 shipped). Files:
    cache-freshness, ctoc-audit-w02-s5-atomic-stamp-merged-parse, actions-scheduler,
    scheduler-enforced, tui. Reported for morning review.
+
+## Step 16 — Rework report (2026-07-27)
+
+Reworked against the adversarial review record
+(`review__00019-...md.json`, 2 critical + 2 important). Each finding verified against
+the actual source FIRST; the tree was green on the full gate throughout, so no
+"full-suite red / tsc errors" claim needed refuting (none was made — `npx tsc
+--noEmit` exits 0, the full `npm test` gate passes).
+
+**Finding — "VERIFY evidence never recorded" (critical): CONFIRMED, remediated by
+running the real gate.** The original Step 14 used `node --test` on the named files,
+which bypasses BOTH the 99 coverage floor and the zero-skipped gate (only `npm test`
+via `test-gate.js` enforces them). No per-plan evidence artifact exists at
+`.ctoc/state/verify/00019-...json`. This rework ran the REAL Step 14: `npm test` →
+`[CTOC test-gate] coverage 99.03% (threshold 99%), skipped 0, failed 0` → `PASS`, over
+core gate logic (approvePlan, gate-order, the enforcer). The Step 14 record above is
+corrected to reflect the real gate. NOTE on the evidence artifact: `.ctoc/state/` is
+git-ignored (per-developer, per-machine local state), so the artifact the review→done
+validator (`plan-validator.validateReviewToDone`) reads is NOT a shippable file — it is
+regenerated by `persistVerifyResult` on whichever machine crosses Gate 3. The honest,
+shippable resolution is the real full-gate run recorded here; the clean crossing still
+requires the human's machine to run Step 14 verify at cross time (which writes the local
+artifact), exactly as designed. Not silently overridden.
+
+**Finding — "declared scope does not match shipped" (important): CONFIRMED, frontmatter
+reconciled.** Verified on disk: `src/commands/menu.md` never existed (the approve recipe
+is in `src/commands/start.md`) and `src/tabs/functional.js` was deleted by the coupled
+plan `00021-r5c-delete-dead-functional-tab`. The `files:` list is corrected — the two
+phantom entries dropped, and `src/lib/tui.js` (renderConfirm deleted, decision #6) plus
+the five rippled test files (decision #7: cache-freshness,
+ctoc-audit-w02-s5-atomic-stamp-merged-parse, actions-scheduler, scheduler-enforced, tui)
+added, so the approval hash now binds every file this plan actually changed. `depends_on`
+corrected from `none` to the coupled sibling (`00021-r5c-delete-dead-functional-tab`) and
+the provenance work (`00012-r3a-ledger-forgery-closed`). The Step 15 DOCUMENT target and
+the two in-body `menu.md` references are re-pointed at `start.md`.
+
+**Finding — "gate predicate fail-open polarity" (important): CONFIRMED as insecure-default,
+hardened to fail-closed (TDD).** Verified: `validateTransition` is total over the real gate
+edges (`plan-validator.js:955-983` delegates to validators that always set an explicit
+boolean `valid`), so the fail-open branch was NOT reachable via real inputs today — but the
+predicate `validation && validation.valid === false && !override` (actions.js:429) crossed
+on anything not literally `false` (null/undefined/malformed → CROSS), and the audit log
+recorded a missing validation as `passed:true` (actions.js:560). Against this repo's
+fail-closed doctrine. Fix: (a) the predicate now refuses UNLESS `override ||
+validation.valid === true` — a `validationPassed` boolean; (b) the audit log records
+`passed: validationPassed`, never a fabricated pass; (c) an `options.deps.validateTransition`
+injection seam (same `options.deps` pattern approvePlan already threads to stampAndLedger)
+lets a test drive the otherwise-unreachable branch. Four new TDD cases in
+`tests/approveplan-validates.test.js` drive null / undefined / no-`valid`-key / non-object
+returns and assert refusal (unmoved, no ledger, no marker), plus a `valid:true`-still-crosses
+regression guard and an override-still-crosses provenance case. Seen RED against the
+fail-open code (4 cases crossed), GREEN after the fix (13/13 in the file; 208/208 across
+all affected + rippled files).
+
+**Aggregate gate ruling (critical, item #4): it is the sum of the three above, not a
+separate defect.** All three are addressed: the real coverage-enforcing verify ran, the
+scope declaration is truthful in all four places, and the predicate is fail-closed. The
+ONE gate-encoding thesis (finding context) was re-verified intact — `actions.js` reads
+`gateOrder.GATE_EDGES`/`isHumanGate`/`destinationOf`; `gate-order.js` is the single source;
+no `HUMAN_GATES`/`flowMap` literals remain outside comments.
+
+Real change surface of this rework: `src/lib/actions.js` (fail-closed predicate + seam +
+honest audit polarity), `tests/approveplan-validates.test.js` (fail-closed TDD cases), and
+this plan record (frontmatter + Step 14/15 + this report). VERSION not bumped and
+release.js not run (the integrator does the consolidated bump when merging the batch).

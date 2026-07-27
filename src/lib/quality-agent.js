@@ -35,7 +35,6 @@
 
 const { execSync, execFileSync } = require('child_process');
 const path = require('path');
-const safeFs = require('./safe-fs');
 
 const qualityState = require('./quality-state');
 const toolDetector = require('./tool-detector');
@@ -725,44 +724,95 @@ async function runSmartTests(tools) {
 }
 
 /**
- * List the files THIS PUSH introduces, relative to the project root — the real
- * push delta, scoped to what has NOT yet reached the upstream branch.
+ * Enumerate the COMMITTED blobs THIS PUSH introduces: for every commit in the push
+ * delta, the `{ rev, path }` of each file that commit added or modified.
  *
- * R4-A finding: the old scope was `git diff HEAD~1` — the LAST COMMIT only. A
- * secret committed two commits back and not yet pushed was NEVER scanned, and the
- * gate was effectively blind to everything but the tip commit. The correct delta
- * is `@{upstream}..HEAD` (every commit on HEAD the remote does not yet have). When
- * there is no upstream (a brand-new branch with nothing to diff against), the
- * whole push is new, so ALL tracked files are the delta. Returns null only when
- * git itself is unavailable, so the caller falls back to a whole-project scan.
+ * Two R4-A findings shaped this:
+ *   1. The original scope was `git diff HEAD~1` — the LAST COMMIT only — so a
+ *      secret committed two commits back and not yet pushed was NEVER scanned. The
+ *      correct delta is `@{upstream}..HEAD` (every commit on HEAD the remote does
+ *      not yet have).
+ *   2. A `--name-only` net diff over that range plus a WORKING-TREE content scan
+ *      still MISSED a secret added in one pushed commit and removed in a later
+ *      pushed commit: the net diff shows no change (add-then-remove nets to zero)
+ *      and the working tree no longer holds it — yet the secret is in the pushed
+ *      history and recoverable from the remote. Only scanning the COMMITTED content
+ *      of EACH commit catches it. So this walks the delta COMMIT BY COMMIT and the
+ *      caller scans `git show <rev>:<path>` for each blob.
+ *
+ * When there is no upstream (a brand-new branch), the whole branch is unpushed, so
+ * every commit (`--root` includes the initial commit's tree) is in the delta.
+ * Deletions are excluded (`--diff-filter=d`): a file a commit only deletes has no
+ * blob to scan there (its content was scanned in the commit that introduced it).
+ * Returns null only when git itself is unavailable, so the caller falls back to a
+ * whole-project scan.
  *
  * @param {string} projectRoot
- * @returns {string[]|null}
+ * @returns {Array<{rev:string, path:string}>|null}
  */
-function getPushChangedFiles(projectRoot) {
-  const gitOut = (args) => execSync(args, { cwd: projectRoot, encoding: 'utf8', stdio: 'pipe' });
+function getPushDeltaBlobs(projectRoot) {
+  // argv array + shell:false — NO /bin/sh, so a repository file whose NAME carries
+  // shell metacharacters can never inject a command into this security scanner.
+  const gitOut = (args) => execFileSync('git', args, {
+    cwd: projectRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']
+  });
   try {
     // An upstream must exist for @{upstream} to resolve; probe it explicitly so
-    // "no upstream" is handled deterministically rather than via a diff error.
+    // "no upstream" is handled deterministically rather than via a rev-list error.
     let hasUpstream = false;
     try {
-      gitOut('git rev-parse --abbrev-ref --symbolic-full-name @{upstream}');
+      gitOut(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
       hasUpstream = true;
     } catch {
       hasUpstream = false;
     }
 
-    if (hasUpstream) {
-      const out = gitOut('git diff @{upstream}..HEAD --name-only');
-      return out.split('\n').map(f => f.trim()).filter(Boolean);
-    }
+    const revs = gitOut(
+      hasUpstream ? ['rev-list', '@{upstream}..HEAD'] : ['rev-list', 'HEAD']
+    ).split('\n').map(s => s.trim()).filter(Boolean);
 
-    // No upstream → the entire branch is unpushed; every tracked file is new to
-    // the remote. Scan them all rather than diffing against a nonexistent base.
-    const tracked = gitOut('git ls-files');
-    return tracked.split('\n').map(f => f.trim()).filter(Boolean);
+    const blobs = [];
+    const seen = new Set();
+    for (const rev of revs) {
+      // Files this commit ADDED or MODIFIED (deletions excluded). --root lets the
+      // initial commit report its whole tree instead of an empty diff.
+      const names = gitOut([
+        'diff-tree', '--no-commit-id', '--name-only', '-r', '--root', '--diff-filter=d', rev
+      ]).split('\n').map(s => s.trim()).filter(Boolean);
+      for (const p of names) {
+        const key = `${rev}:${p}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        blobs.push({ rev, path: p });
+      }
+    }
+    return blobs;
   } catch {
     return null; // no git at all → caller scans the whole project directory
+  }
+}
+
+/**
+ * Read the committed content of one blob (`git show <rev>:<path>`), or null if it
+ * cannot be read (a binary blob, or a path absent at that revision). No shell
+ * interpolation of untrusted input: rev/path come from git's own object listing.
+ * @param {string} projectRoot
+ * @param {string} rev
+ * @param {string} relPath
+ * @returns {string|null}
+ */
+function readCommittedBlob(projectRoot, rev, relPath) {
+  try {
+    // argv array + shell:false: `<rev>:<path>` is a single git argument, never a
+    // shell token, so a metacharacter-laden path cannot escape into a command.
+    return execFileSync('git', ['show', `${rev}:${relPath}`], {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      maxBuffer: 64 * 1024 * 1024
+    });
+  } catch {
+    return null;
   }
 }
 
@@ -844,22 +894,33 @@ async function runSecurityScan(_tools, opts = {}) {
   // 1. SECRETS — always runs (pure JS, no external dependency).
   try {
     const scanner = new SecretsScanner(projectRoot);
-    const changed = opts.allFiles ? null : getPushChangedFiles(projectRoot);
+    const maxBlobSize = scanner.options.maxFileSize;
+    const changed = opts.allFiles ? null : getPushDeltaBlobs(projectRoot);
 
     if (changed === null) {
       await scanner.run(); // whole project → populates scanner.findings
     } else {
-      for (const rel of changed) {
+      // Scan the COMMITTED content of each blob in the push delta — the bytes
+      // actually pushed to the remote — NOT the working-tree copy. A secret added
+      // in one pushed commit and removed in a later one is absent from disk but
+      // present in the pushed history; only this catches it.
+      for (const { rev, path: rel } of changed) {
         const abs = path.resolve(projectRoot, rel);
-        if (!safeFs.existsSync(abs)) continue; // deleted/renamed in the delta
-        if (!scanner.shouldScan(abs)) continue;
-        // F-4: scan each delta file in ITS OWN try/catch. A single unreadable/renamed
-        // file that throws must be recorded as a per-file skip and the rest of the delta
-        // must still be scanned — the old step-wide try/catch abandoned EVERY remaining
-        // file (and never ran deduplicateFindings, discarding already-found secrets) on
-        // the first throw, understating coverage loss and reading as a silent pass.
+        if (!scanner.shouldScanPath(abs)) continue; // type/extension gate (no disk stat)
+        // F-4: scan each delta blob in ITS OWN try/catch. A single blob that throws
+        // must be recorded as a per-file skip and the rest of the delta must still be
+        // scanned — never a step-wide abandon that reads as a silent pass.
         try {
-          scanner.findings.push(...scanner.scanFile(abs));
+          const content = readCommittedBlob(projectRoot, rev, rel);
+          if (content === null) continue; // binary blob or absent at that revision
+          if (Buffer.byteLength(content, 'utf8') > maxBlobSize) {
+            const loc = rel || abs;
+            const msg = `secrets scan skipped blob (size > ${maxBlobSize} bytes, NOT scanned): ${loc}@${rev.slice(0, 8)}`;
+            skipped.push(msg);
+            console.log(`   ${msg}`);
+            continue;
+          }
+          scanner.findings.push(...scanner.scanContent(content, abs));
           scanner.scannedFiles++;
         } catch (fileErr) {
           const loc = path.relative(projectRoot, abs) || abs;
@@ -868,6 +929,10 @@ async function runSecurityScan(_tools, opts = {}) {
           console.log(`   ${msg}`);
         }
       }
+      // NOTE: add-then-remove within the delta scans the SAME secret across
+      // several commits' blobs; the single deduplicateFindings() at the end of
+      // this scanner block (after external verification) collapses those to
+      // distinct findings, so no intermediate dedup is needed here.
     }
 
     // EXTERNAL VERIFICATION. The external scanners run ONLY when installed

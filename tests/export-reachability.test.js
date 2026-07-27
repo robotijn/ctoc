@@ -437,4 +437,39 @@ describe('dead-export fence — a surface CALL is a caller, a prose token is not
       'completeExecution must be LIVE via its intra-file code edge (completeTaskPlan → completeExecution).'
     );
   });
+
+  it('THE REAL-REPO RE-CATCH GUARD: completeExecution is credited ONLY by its code edge — no surface CALLS it', () => {
+    // The whole reason this fence exists is to RE-CATCH completeExecution going
+    // dead (cut the completeTaskPlan → completeExecution code edge → it must go
+    // DEAD) while the suite stays green. The "is LIVE" assertion above proves it is
+    // live TODAY, but NOT that it is live ONLY via its code edge. The surface
+    // predicate credits any name written as `name(` anywhere in a shipped surface.
+    // So the re-catch holds today only because no surface writes `completeExecution(`
+    // — a lexical accident. The day one doc/agent surface does, completeExecution
+    // becomes surface-credited, the re-catch silently disarms, and the "is LIVE"
+    // test above stays green over a now-defenceless fence. This turns that silent
+    // future disarm into a RED test, on the real object, not a synthetic fixture.
+    const result = analyzeExports(ROOT);
+    assert.ok(
+      Array.isArray(result.surfaceCalled),
+      'analyzeExports must expose the surface-called set so the re-catch invariant is checkable on the real repo.'
+    );
+    assert.ok(
+      !result.surfaceCalled.includes('completeExecution'),
+      'NO shipped surface may CALL completeExecution(...): it must stay credited by its ' +
+      'intra-file code edge alone, or the re-catch this fence exists for disarms SILENTLY. ' +
+      'If you just added a completeExecution( call to a doc/agent/skill surface, THAT is the regression — ' +
+      'the fence can no longer prove completeExecution dies when its code edge is cut.'
+    );
+    // The credit half: the recipe-invoked gate exports ARE surface-credited by a
+    // real `name(` / require('…').name in start.md / an agent surface. This is the
+    // positive twin of the invariant above — the same predicate that must NOT credit
+    // completeExecution MUST credit these, or R4-B's bury-the-Gate-3-gate bug is back.
+    for (const name of ['approveSubplans', 'declineComplianceRegime', 'dismissStale', 'completeVision', 'writeActiveProfiles']) {
+      assert.ok(
+        result.surfaceCalled.includes(name),
+        `${name} is invoked in a shipped recipe as name( (or require('…').name) — it must be surface-credited.`
+      );
+    }
+  });
 });

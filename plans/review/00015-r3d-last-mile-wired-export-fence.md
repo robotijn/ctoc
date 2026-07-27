@@ -11,7 +11,8 @@ files:
   - "src/lib/menu-screens.js"
   - "src/lib/task-view.js"
   - "src/lib/reachability.js"
-  - "src/commands/menu.md"
+  - "src/lib/iron-loop-enforcer.js"
+  - "src/commands/start.md"
   - "agents/iron-loop/iron-loop-executor.md"
   - "src/lib/init-project.js"
   - ".ctoc/export-reachability-baseline.json"
@@ -19,6 +20,7 @@ files:
   - "tests/last-mile-wired.test.js"
   - "tests/menu-task-wiring.test.js"
   - "tests/reachability.test.js"
+  - "tests/iron-loop-enforcer.test.js"
 ---
 
 # R3-D — The key for the lock, and a fence that sees exports
@@ -159,7 +161,10 @@ assert each appears in menu.md — a permanent key/recipe parity fence).
   the task. Idempotent when the plan already moved; refuses (kickback) when pre-review
   validation fails; reports (never throws) when the plan file is absent.
 - [x] (2) Export-level fence: `reachability.analyzeExports` + the named, ratcheted
-  baseline `.ctoc/export-reachability-baseline.json` (489 real dead exports seeded;
+  baseline `.ctoc/export-reachability-baseline.json` (102 real dead exports seeded on
+  2026-07-14 — the figure recorded in the baseline's own provenance comment as the
+  initial seed, 102 → later ratcheted to 68 by sibling slices; the earlier "489" here
+  was a wrong headline number, corrected at rework — see the Step-16 rework report;
   completeExecution is NOT among them — it is wired).
 - [x] (3) Escalations door: route `inbox escalations` + the dashboard line now names it.
 - [x] (4) Executor agent: sibling-count rule, FIFO self-selection, and the raw plan move
@@ -199,11 +204,17 @@ assert each appears in menu.md — a permanent key/recipe parity fence).
 - [x] node --test on the four owned test files: 73 pass, 0 fail, 0 skipped.
 - [x] Regression sweep over every adjacent test file (menu, scheduler, tasks, init,
   agents, validator, registry): 506 pass, 0 fail.
-- [x] Pre-existing, NOT-MINE failure recorded: tests/iron-loop-enforcer.test.js blocks
-  on `gate-destinations-approved` — the four R3 wave plans (00012–00015) carry
-  frontmatter approval markers but no approval-LEDGER entries, which slice R3-A made
-  authoritative. I did not stamp a ledger entry for my own plan: that is forging an
-  approval, the exact hole R3-A closed. Boundary/human call.
+- [x] RESOLVED at rework (was: "tests/iron-loop-enforcer.test.js blocks on
+  `gate-destinations-approved`"). That block was real when this record was first written
+  — the four R3 wave plans (00012–00015) carried frontmatter approval markers but no
+  approval-LEDGER entries, which slice R3-A made authoritative. It is now STALE: a
+  genuine ledger entry exists for this plan at
+  `.ctoc/approvals/00015-r3d-last-mile-wired-export-fence.json` (recorded 2026-07-14,
+  `backfilled: true`, whose reason preserves that the earlier frontmatter marker was
+  forged and the work human-ordered — deliberately distinguishable from a clicked
+  approval). With that ledger entry present, tests/iron-loop-enforcer.test.js PASSES and
+  the full `npm test` gate is green (verified at rework — see the Step-16 rework report).
+  Crossing review → done remains the human's gate decision; it is not self-crossed here.
 - [x] No git operations; everything left unstaged.
 
 ### Step 15: DOCUMENT
@@ -228,10 +239,15 @@ assert each appears in menu.md — a permanent key/recipe parity fence).
    task/plan lie this slice exists to end. The menu.md completion recipe now tells the
    driver to fix the named step and complete again, or `menu task fail` if abandoned.
 
-2. **An implement task whose plan file is NOT on disk still completes** (registry-only,
-   with `completion.ran:false` and a reason). Rejected the stricter "refuse unknown
-   plan" because a task's `plan` field is not always a plan file (review/decompose tasks
-   name a slug), and refusing would WEDGE the scheduler on a task nobody can complete.
+2. **An implement task whose plan file is NOT on disk is REFUSED** (corrected at rework;
+   the earlier text here said it "still completes", which is the opposite of what
+   shipped). The shipped route (`menu-screens.js` taskComplete, lines 2397–2409, the C7
+   fix) returns `{ ok:false, blocked:true }` when `completion.ran === false` for an
+   `implement` task: an implement task that names a real plan MUST produce Gate-3
+   evidence, so settling it done with `ran:false` would report a clean completion for a
+   plan the gate can never pass. The soft `ran:false` report survives ONLY for kinds
+   whose `plan` field names a NON-plan slug (review/decompose — excluded above), so the
+   scheduler is not wedged. This matches dependency 00013's C7 refusal.
 
 3. **An already-moved plan (in review/) is completed idempotently** — the completion
    runs against the review-stage path and still produces the evidence. This deliberately
@@ -242,15 +258,18 @@ assert each appears in menu.md — a permanent key/recipe parity fence).
    plan's Step 12). Both detection limits under-report rather than over-report, so the
    fence never cries wolf. Documented in the header rather than hidden.
 
-5. **`analyzeExports` is the ONE entry the fence added to its own baseline.** Its
-   intended live call site is a `checkDeadExportFence()` invariant in
-   `src/lib/iron-loop-enforcer.js` (mirroring `checkReachabilityFence`, which already
-   calls `analyze()`) — and that file is NOT in this plan's `files:` allowlist, so the
-   wiring could not land here without routing around the plan. I refused to fake a
-   caller (an instruction-surface mention purely to launder it would be exactly the
-   dishonesty the fence exists to catch). It is fenced with a `knownDebt` note naming
-   the one-line fix, and the ratchet forces its removal. **This is a plan defect I could
-   not close in scope — reported, not hidden.**
+5. **`analyzeExports` IS wired (corrected at rework).** Its live call site is the
+   `checkDeadExportFence()` invariant in `src/lib/iron-loop-enforcer.js` (mirroring
+   `checkReachabilityFence`, which calls `analyze()`): the function is defined at
+   `iron-loop-enforcer.js:657`, calls `analyzeExports`, and is registered as check id
+   `dead-export-fence` at line 638. It landed in the SAME R3-wave commit as this slice's
+   `reachability.js` change (commit 2e0bb35, v6.12.4). The earlier text here claimed the
+   wiring "could not land without routing around the plan" and was left as un-wired
+   `knownDebt` — that was WRONG about the shipped result: the fence is wired and
+   registered, and `analyzeExports` therefore has a real, non-test live caller. The
+   correction to this plan's `files:` at rework adds `src/lib/iron-loop-enforcer.js` and
+   `tests/iron-loop-enforcer.test.js`, which is the accurate change surface for that
+   wiring.
 
 6. **`inboxEscalationsScreen` is deliberately NOT exported** — it is reached through
    `route(['inbox','escalations'])`, the way a human reaches it, and tests drive it that
@@ -274,3 +293,68 @@ assert each appears in menu.md — a permanent key/recipe parity fence).
    popped it immediately; the pop was clean, no conflicts, nothing lost (73/73 tests
    still green, the sibling's files intact). Reporting it because hiding it would be
    worse than the mistake.
+
+## Step 16 — Rework Report (review-stage integrity pass)
+
+A review-stage rework verified every finding raised against this plan directly against
+the shipped source, then corrected the RECORD to match the tree. The shipped CODE was
+found correct and safe throughout — no code was changed; every fix is a record
+correction, plus one isolated-tree re-verification of the Gate-3 evidence. The full
+`npm test` gate was re-run in an isolated git worktree containing only this plan's
+committed changes: **coverage 99% (threshold 99%), skipped 0, failed 0 — PASS.**
+
+Disposition of each finding:
+
+1. **Approval provenance + "suite blocks on gate-destinations-approved" (critical) —
+   PARTIALLY REFUTED (stale) + corrected.** The block was real when first recorded but
+   is now stale: a genuine ledger entry exists at
+   `.ctoc/approvals/00015-r3d-last-mile-wired-export-fence.json` (2026-07-14,
+   `backfilled: true`, its reason preserving that the original frontmatter marker was
+   forged and the work human-ordered). With it present, `tests/iron-loop-enforcer.test.js`
+   passes and the whole gate is green. Step 14 record corrected. The backfilled-marker
+   provenance is a real fact and is left visible; crossing review → done is the human's
+   gate decision and is NOT self-crossed here, and the ledger hash was NOT re-stamped.
+
+2. **`files:` named a non-existent `src/commands/menu.md`; `iron-loop-enforcer.js`
+   undeclared (important) — CONFIRMED, fixed.** At ship time (commit 2e0bb35, v6.12.4)
+   the recipes DID land in `src/commands/menu.md`; that file was renamed to
+   `src/commands/start.md` by a later, unrelated commit (cb35197, v6.13.28), which is why
+   the declaration pointed at a file that no longer exists. `files:` corrected:
+   `menu.md → start.md`, and `src/lib/iron-loop-enforcer.js` + `tests/iron-loop-enforcer.js`
+   added — both were in this slice's real change surface (same R3-wave commit) but
+   undeclared. Body prose that names `menu.md` is historical (accurate when written) and
+   is left as written; the coverage contract in frontmatter is what governs review
+   mapping and write-enforcement, and that is now accurate.
+
+3. **Decision records contradict the tree (important) — CONFIRMED, corrected.**
+   Decision 5 (export fence "un-wired knownDebt") corrected — the fence IS wired and
+   registered (`iron-loop-enforcer.js:657`, id `dead-export-fence` line 638). Decision 2
+   (no-plan-file implement task "still completes") corrected — the shipped route refuses
+   it (`menu-screens.js:2397-2409`, the C7 fix). In both cases the shipped behaviour is
+   the safe one; only the prose was stale.
+
+4. **Wrong seed count 489 (important) — CONFIRMED, corrected.** The baseline's own
+   provenance records the initial 2026-07-14 seed at **102** (102 → 71 → 69 → 68 by
+   sibling slices); 489 appears nowhere. Step 10 corrected to 102, current fence
+   `maxDead` noted as 68.
+
+5. **Contaminated-tree evidence (important) — RESOLVED by the recommended fix.** The
+   full gate was re-run in an isolated worktree with only this plan's committed changes;
+   green (73 owned + full suite, skipped 0, failed 0). The Gate-3 evidence therefore does
+   not rest on a tree contaminated by a sibling's uncommitted work. Decision 9's honest
+   disclosure of the earlier `git stash` is retained.
+
+6. **Synchronous verify, no feedback (important) — REFUTED.** `menu task complete <id>`
+   is an argv-driven one-shot subcommand (route `['menu','task','complete', id]`,
+   dispatched by `taskCommand`), not an interactive dashboard action — the interactive
+   task surfaces (`tasks` board, `task <id>` detail) are read-only. The route returns a
+   single JSON screen object; there is no streaming channel, and a mid-function stdout
+   emit would corrupt the JSON contract automated callers parse. For a one-shot CLI
+   subcommand, blocking until the verify result prints is the correct, expected
+   behaviour (as with any build command). No code change; no human sits at a frozen
+   interactive menu.
+
+7. **Gate ruling (REJECT) — addressed.** The six sub-findings are record corrections and
+   one isolated re-verification, all applied above; the code was already correct. The one
+   genuinely-human item (crossing review → done on a backfilled-marker provenance) is
+   left to the human and not self-crossed.

@@ -1,5 +1,5 @@
 {
-  "maxFindings": 210,
+  "maxFindings": 209,
   "note": "DEBT, not blessing. These are pre-existing false-green sites — checks that can report a verdict on input they never received — tolerated so the fence could land. This list may only ever SHRINK. Never raise maxFindings to make a run pass; fix a site and lower it instead.",
   "whitelistNote": "SEPARATE from the debt list above. `whitelist` is a PERMANENT exemption for a construct that is genuinely correct, and every entry requires a written justification. It starts EMPTY. Adding to it is a reviewable act; adding to `findings` is forbidden.",
   "findings": [
@@ -150,7 +150,6 @@
     "src/lib/plan-index/sync-unit.js:silent-catch:logNote",
     "src/lib/product-loop.js:parse-default:parseLaunchKpis",
     "src/lib/product-loop.js:parse-default:parseLaunchKpis#2",
-    "src/lib/quality-agent.js:unbounded-capture:getPushChangedFiles",
     "src/lib/quality-agent.js:exit-with-pending-writes:main",
     "src/lib/quality-agent.js:exit-with-pending-writes:<module>",
     "src/lib/quality-state.js:unbounded-capture:getGitHead",

@@ -8,7 +8,6 @@ program: ctoc-repair-loop
 iron_loop: true
 files:
   - "tests/greenfield-journey.test.js"
-  - "src/lib/journey-harness.js"
 ---
 
 # R5-A — One test that walks init → build → done as a human does
@@ -92,6 +91,14 @@ because a check ran), never a structural "function exists".
   runner's `NODE_TEST_CONTEXT` and defers its exit code, masking the failure. The test
   caught it; the seeded project's test command was switched to a plain-node assertion
   script so the failing-suite signal is deterministic and honest.
+- [x] REWORK: added **control F** — a no-evidence `approvePlan(review→done)` crossing that
+  asserts `refused === true`, the reason names the missing evidence, the plan is left in
+  review/, and no ledger entry is written. This drives the Gate-3 refusal through the real
+  crossing ENTRY POINT (approvePlan), not just the validator directly (control A) — the
+  seam D4 wrongly claimed absent. Verified it catches the seam by reading approvePlan
+  (calls validateTransition before any mutation) + validateTransition (dispatches
+  review→done to validateReviewToDone): unwiring that validation leaves control A green
+  but turns control F red.
 ### Step 9: PREPARE
 - [x] Read IN FULL from disk before writing: `src/commands/menu.md` (recipe map),
   `init-project.js`, `actions.js` (approvePlan/stampAndLedger/completeExecution/
@@ -114,16 +121,61 @@ because a check ran), never a structural "function exists".
   only; no network; explicit `root` passed to every entry point so nothing resolves
   to the real repo.
 ### Step 14: VERIFY
-- [x] `node --test tests/greenfield-journey.test.js` → 5 pass, 0 fail, 0 skipped.
-- [x] `npx eslint tests/greenfield-journey.test.js` → clean (one unused-import error
-  found and fixed).
-- [x] Seam-catch confirmed empirically by the negative controls (see Step 16 report).
+- [x] `node --test tests/greenfield-journey.test.js` → 6 pass, 0 fail, 0 skipped
+  (5 original + control F).
+- [x] REWORK: ran the FULL gated suite `npm test` (src/scripts/test-gate.js — the same
+  gate CI runs: whole suite + coverage floor 99 + zero-skipped), `# fail 0`,
+  `# skipped 0`, coverage ≥ 99 — proving this git-and-subprocess-heavy test is
+  suite-stable inside the concurrent run it lives in, not only green in isolation. (This
+  refutes the review record's "isolated only, suite-stability unproven" concern.)
+- [x] `npx eslint tests/greenfield-journey.test.js` → clean.
+- [x] Seam-catch confirmed by the negative controls A/B/C/D/F (see Step 16 report).
 ### Step 15: DOCUMENT
 - [x] The file header enumerates every seam walked, every negative control, and every
   model boundary seeded.
 ### Step 16: FINAL-REVIEW
 - [x] Report delivered to the orchestrator (which seam each of the four named defects
   fails at). Ready for human review at Gate 3.
+
+#### Rework report (review-round findings addressed)
+Five findings were raised at review; each was verified against the live source first.
+
+- **Phantom declared file (important) — FIXED.** Confirmed `src/lib/journey-harness.js`
+  is absent on disk (D1 inlined the harness). Removed it from the frontmatter `files:`
+  list, which now names only the one file actually touched
+  (`tests/greenfield-journey.test.js`). Clears the stale-detector missing-files signal.
+
+- **D4 factually inverted + uncovered enforcement seam (important) — FIXED.** Confirmed
+  by reading the code: `approvePlan` (actions.js:428) calls `validateTransition` which
+  dispatches `review→done` to `validateReviewToDone` (plan-validator.js:972). The old D4
+  claimed the opposite. Corrected D4, and added **control F** driving a no-evidence
+  refusal THROUGH `approvePlan` (`refused===true`, plan stays in review/, no ledger
+  entry) — so unwiring approvePlan's validation now turns a test RED.
+
+- **First-gate crossing "vision→functional" (important) — REFUTED-against-source.** The
+  finding's premise (vision→functional is "pure code via approvePlan/stampAndLedger") is
+  false in this codebase. `gate-order.GATE_EDGES` is exactly the three edges
+  functional→implementation, implementation→todo, review→done; `approvePlan` on a
+  `plans/vision/` path throws `Unknown plan location` (reproduced — the attempted crossing
+  failed with that exact error). vision→functional is the DECOMPOSE model boundary the
+  vision-decomposer performs, which D2 legitimately seeds. Recorded as decision D5. Adding
+  a vision→functional gate edge to the engine is an architectural change out of scope for
+  a test-plan rework.
+
+- **Mint real VERIFY evidence vs override (critical) — ADDRESSED for suite-stability;
+  the evidence crossing belongs to the human gate.** The rework ran the FULL `npm test`
+  gate (not the isolated file), proving the subprocess-heavy test is green and stable
+  inside the concurrent suite — the substantive half of this finding. Minting the
+  ledger-keyed evidence artifact for THIS plan is what the real review→done crossing does;
+  the executor does not move the plan or re-stamp its hash, so that step is the integrator/
+  human's consolidated crossing, on a now-correct deliverable.
+
+- **Gate ruling: SEND BACK (critical) — HONORED.** This rework IS the send-back:
+  frontmatter corrected, D4 corrected + control F added, the first-gate finding verified
+  and refuted against source, and the full gate run to prove suite-stability.
+
+Net change surface: `tests/greenfield-journey.test.js` (control F + first-gate model-
+boundary documentation + seam-doc corrections) and this plan record. No `src/` change.
 
 ## Decisions Taken Under Ambiguity
 
@@ -161,8 +213,33 @@ because a check ran), never a structural "function exists".
   through `runVerify`'s fallback path — real evidence, not a stub. Real `git init`
   runs in the temp dir. No network, no git of our own, no full suite.
 
-- **D4 — Gate 3 is asserted then crossed.** `approvePlan(review→done)` does not itself
-  call `validateReviewToDone` (the menu's validate screen does, then approve). To
-  prove the gate PASSES on real evidence with no override, the journey asserts
-  `validateReviewToDone(...).valid === true` immediately BEFORE the real crossing,
-  then crosses via `approvePlan` and asserts the done/ residency + ledger entry.
+- **D4 — Gate 3 validation is wired INSIDE `approvePlan`; the journey asserts it,
+  crosses it, AND drives a refusal through it (corrected in rework).** The original D4
+  recorded the OPPOSITE of the code — it claimed `approvePlan(review→done)` does NOT
+  itself call `validateReviewToDone` and that only the menu's validate screen does. The
+  live code refutes that: `actions.approvePlan` (src/lib/actions.js:428) calls
+  `plan-validator.validateTransition(from, to, root)` BEFORE any mutation, and
+  `validateTransition` (src/lib/plan-validator.js:972) dispatches `review->done` to
+  `validateReviewToDone`, returning `{ ok:false, refused:true }` on an invalid crossing.
+  Because the old premise was false, the journey's Gate-3 assertion and control A both
+  called `validateReviewToDone` DIRECTLY and never drove a refusal THROUGH `approvePlan`
+  — so deleting the validation wiring inside `approvePlan` would have kept every journey
+  test green, the exact individually-green dead seam this plan hunts. The rework adds
+  **control F**: it drives a no-evidence `approvePlan(review→done)` and asserts
+  `refused === true`, the reason names the missing evidence, the plan is left in review/,
+  and no ledger entry is written — so unwiring `approvePlan`'s validation now turns
+  control F RED. The positive journey still asserts `validateReviewToDone(...).valid ===
+  true` immediately before the real crossing (proving the gate passes on real evidence
+  with no override), then crosses via `approvePlan` and asserts done/ residency + ledger.
+
+- **D5 — vision→functional is a MODEL boundary, not an approvePlan gate edge (rework
+  finding).** A review finding recommended driving `approvePlan(vision→functional)` as
+  "the first gate, pure code". Verified against the source: it is NOT. The single gate
+  encoding `gate-order.GATE_EDGES` is exactly `[functional→implementation,
+  implementation→todo, review→done]`; `approvePlan` on a `plans/vision/` path matches no
+  edge and throws `Unknown plan location`. The vision→functional step is the DECOMPOSE
+  operation the `vision-decomposer` agent performs (it reads a vision and EMITS functional
+  stubs) — a model boundary, which D2 legitimately SEEDS. The finding is therefore
+  refuted-against-source; the journey drives the three code gate crossings approvePlan
+  implements and seeds the vision plan. Adding a vision→functional human-gate edge to the
+  engine is an architectural change outside this test-plan's scope.

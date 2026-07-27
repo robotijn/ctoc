@@ -25,6 +25,17 @@
  * when measurable against the project's declared floor (.ctoc/coverage-baseline
  * .json `minPct`) — cleared it, and any app-shaped project launched and responded.
  *
+ * A RUN THAT DID NOT COMPLETE IS UNCERTIFIED, NOT A FAILURE. Two ways a check can
+ * fail to complete are given HONEST, DISTINCT verdicts rather than the mislabel
+ * "Tests failed": an output OVERFLOW past the capture buffer (ENOBUFS) and a
+ * TIMEOUT past the wall-clock budget (ETIMEDOUT/SIGTERM). Both fail CLOSED — the
+ * gate is refused — but each names its true reason, and the timeout budget is
+ * RAISABLE (per call via `opts.timeout`, per environment via
+ * `CTOC_VERIFY_TIMEOUT_MS`, default 120000ms) so a legitimately long-but-green
+ * suite can extend it instead of being refused on latency alone. A timeout is NOT
+ * flagged a launch failure: it RAN, so it can never be reclassified NOT-RUN and
+ * papered over by some other passing check.
+ *
  * X3 — IT ALSO FAILS CLOSED ON AN UNREADABLE INSTRUMENT. When a test runner emits a
  * node:test-shaped summary but its fail counter cannot be READ from it, that run is
  * UNCERTIFIED, not clean: "I could not read the fail count" and "there were zero
@@ -699,6 +710,28 @@ function runFallbackChecks(projectPath) {
 }
 
 /**
+ * Resolve the per-check wall-clock budget in milliseconds.
+ *
+ * Precedence: an explicit numeric `override` (opts.timeout) > the
+ * `CTOC_VERIFY_TIMEOUT_MS` environment variable (a positive finite integer) >
+ * the 120000ms default. A malformed env value is ignored (falls back to the
+ * default) rather than silently disabling the timeout — an unbounded run is the
+ * very failure the budget exists to prevent.
+ *
+ * @param {number} [override] - per-call override.
+ * @returns {number} the budget in milliseconds.
+ */
+function resolveVerifyTimeout(override) {
+  if (typeof override === 'number' && Number.isFinite(override) && override > 0) return override;
+  const raw = process.env.CTOC_VERIFY_TIMEOUT_MS;
+  if (raw != null) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 120000;
+}
+
+/**
  * Try running a single command, capturing its complete output.
  *
  * The command strings are FIXED candidates chosen upstream by
@@ -711,6 +744,8 @@ function runFallbackChecks(projectPath) {
  * @param {number} [options.maxBuffer=67108864] - Capture budget in bytes. Beyond it
  *   the run is reported as UNCERTIFIED with an overflow reason — never as a test
  *   failure, which it is not.
+ * @param {number} [options.timeout] - Per-check wall-clock budget in ms; see
+ *   `resolveVerifyTimeout`. A timeout is reported UNCERTIFIED, never a test failure.
  * @returns {Object} `{ success, output, error, spawnFailed }`.
  */
 function tryCommand(command, cwd, options = {}) {
@@ -724,16 +759,41 @@ function tryCommand(command, cwd, options = {}) {
   // reached 1MB. Fixing that unmasked this. 64MB matches the budget the gate script
   // already uses for its own spawn — the same number, for the same reason.
   const maxBuffer = typeof options.maxBuffer === 'number' ? options.maxBuffer : 64 * 1024 * 1024;
+  // The wall-clock budget for a single check. Hardcoding 120000 meant a
+  // legitimately long-but-green suite had NO exit: it was killed at 120s and the
+  // kill was reported as a test failure (see the ETIMEDOUT branch below). The
+  // budget is now RAISABLE — per call (`options.timeout`) and per environment
+  // (`CTOC_VERIFY_TIMEOUT_MS`) — so an operator whose suite genuinely runs longer
+  // can extend it rather than have a correct project refused by the gate.
+  const timeout = resolveVerifyTimeout(options.timeout);
   try {
     const output = execSync(command, {
       cwd,
       encoding: 'utf8',
-      timeout: 120000,
+      timeout,
       maxBuffer,
       stdio: ['pipe', 'pipe', 'pipe']
     });
     return { success: true, output: output.trim(), error: null, spawnFailed: false };
   } catch (e) {
+    // A TIMEOUT is not a failing suite, and must never be reported as one — the
+    // same dishonesty class as ENOBUFS below. execSync kills the process with
+    // SIGTERM on timeout and throws with `code === 'ETIMEDOUT'`. The run did not
+    // COMPLETE, so it is UNCERTIFIED — it fails CLOSED (the gate is refused) but
+    // with its TRUE reason and a pointer to the budget the operator can raise, and
+    // it is NOT flagged spawnFailed: a timeout RAN (it did not fail to launch), so
+    // it must never be reclassified as a NOT-RUN check that another passing check
+    // could paper over.
+    if (e && (e.code === 'ETIMEDOUT' || (e.killed === true && e.signal === 'SIGTERM'))) {
+      return {
+        success: false,
+        output: e.stdout ? e.stdout.toString().trim() : '',
+        error: `the run did not complete within the ${timeout}ms budget and was ` +
+          'terminated — UNCERTIFIED (this is NOT a test failure; raise the budget via ' +
+          'CTOC_VERIFY_TIMEOUT_MS or opts.timeout for a legitimately long suite)',
+        spawnFailed: false
+      };
+    }
     // An OVERFLOW is not a failing suite, and must never be reported as one. The run
     // is UNCERTIFIED — we could not read all of it — so it still fails closed, but
     // with the TRUE reason, which is the only one an operator can act on (raise the

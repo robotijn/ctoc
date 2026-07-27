@@ -660,8 +660,12 @@ function surfaceCalledNames(projectRoot) {
     while ((m = re.exec(text)) !== null) names.add(m[group]);
   };
   for (const surface of surfaceFiles) {
-    let text = '';
-    try { text = safeFs.readFileSync(surface, 'utf8'); } catch { continue; }
+    // Fail loud, exactly like the surface reader in `liveRoots` (readOrThrow) and
+    // the live-module reader in `analyzeExports`: an unreadable surface is a broken
+    // instrument, never "this surface calls nothing". Silently skipping it would
+    // under-credit — a name the skipped surface CALLS would be judged uncalled and
+    // could be nominated dead, the false-DEAD direction this fence forbids.
+    const text = readOrThrow(surface, projectRoot, 'instruction surface');
     scan(text, SURFACE_CALL_RE, 1);
     scan(text, SURFACE_REQUIRE_DOT_RE, 1);
     scan(text, SURFACE_REQUIRE_IDX_RE, 1);
@@ -752,8 +756,10 @@ function declaredExportRoots(projectRoot) {
  *
  * @param {string} projectRoot - absolute project root
  * @returns {{ totalModules: number, totalExports: number, live: string[],
- *   dead: string[], sources: string[] }} `live`/`dead` are `src/rel/path.js#name`
- *   keys (sorted); `sources` are the project-relative usage sources consulted.
+ *   dead: string[], surfaceCalled: string[], sources: string[] }} `live`/`dead`
+ *   are `src/rel/path.js#name` keys (sorted); `surfaceCalled` is the sorted set of
+ *   names a shipped instruction surface CALLS (the re-catch invariant is checkable
+ *   from it); `sources` are the project-relative usage sources consulted.
  */
 function analyzeExports(projectRoot) {
   const { reachable } = analyze(projectRoot);
@@ -817,8 +823,10 @@ function analyzeExports(projectRoot) {
 
   // 4. Classify. A name is LIVE iff any of: another LIVE module names it in code;
   //    it is called INSIDE its own live module (definition + ≥1 real call); a
-  //    FENCED instruction-surface recipe invokes it; or it is a declared export
-  //    root. Tests are not in `liveFiles` at all — a test is never a caller.
+  //    shipped instruction surface CALLS it (`name(` or require('…').name — a bare
+  //    prose token, backticks included, is a citation, not a call); or it is a
+  //    declared export root. Tests are not in `liveFiles` at all — a test is
+  //    never a caller.
   const live = [];
   const dead = [];
   let totalExports = 0;
@@ -842,6 +850,14 @@ function analyzeExports(projectRoot) {
     totalExports,
     live: live.sort(),
     dead: dead.sort(),
+    // The exact set of names a shipped instruction surface CALLS (`name(` or
+    // require('…').name). Exposed so the re-catch invariant is checkable on the
+    // real repo: the fence's motivating guarantee — completeExecution goes DEAD
+    // the instant its code edge is cut — holds ONLY while completeExecution is
+    // absent from this set. A guard test asserts that absence, turning a future
+    // `completeExecution(` written into any surface into a RED test instead of a
+    // silent disarm. It is the same signal the classifier reads at line 834.
+    surfaceCalled: [...surfaceTokens].sort(),
     sources: [...liveFiles.map(relOf), ...surfaceFiles.map(relOf)].sort()
   };
 }

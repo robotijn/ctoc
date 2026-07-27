@@ -32,8 +32,16 @@
  *   8. END STATE      plan in done/, ledger entry present, built file exists, evidence
  *                     real. A human who walked this has a verified, shipped change.
  *
+ * All THREE code gate crossings that approvePlan implements (functional→implementation,
+ * implementation→todo, review→done) are driven through the REAL approvePlan entry
+ * point. The vision→functional step is NOT an approvePlan gate edge in this codebase
+ * (gate-order.GATE_EDGES has exactly those three edges; a vision path throws "Unknown
+ * plan location"): vision→functional is the DECOMPOSE model boundary the vision-
+ * decomposer agent performs, so the vision plan is SEEDED per decision D2, never driven.
+ *
  * ── NEGATIVE CONTROLS (what makes the journey REAL, not a happy-path placebo) ──────
- *   A. no-evidence plan reaching review        → Gate 3 REFUSES ("no VERIFY evidence").
+ *   A. no-evidence plan reaching review        → validateReviewToDone REFUSES directly
+ *                                                 ("no VERIFY evidence").
  *   B. plan whose test FAILS                    → verify passed:false → Gate 3 refuses.
  *   C. forged approval marker with no ledger    → ledger.verify()===false (marker text
  *                                                 alone never counts as approval).
@@ -41,6 +49,11 @@
  *                                                 queued with reason 'file-conflict'.
  *   E. placebo assertion                        → a fresh init writes no `auto_push`,
  *                                                 no `autoMoveToReview`.
+ *   F. no-evidence crossing THROUGH approvePlan → approvePlan(review→done) itself
+ *                                                 returns refused:true (the Gate-3
+ *                                                 validation is wired INSIDE approvePlan,
+ *                                                 not only in the menu's validate screen;
+ *                                                 unwiring it would leave A green but F red).
  *
  * ── MODEL BOUNDARIES (seeded, never faked) ────────────────────────────────────────
  * The steps that genuinely require a model — vision authoring (vision-advisor),
@@ -256,6 +269,12 @@ test('greenfield journey: init → gates → build → verify → done (every se
   assert.doesNotMatch(settings, /autoMoveToReview/i, 'no autoMoveToReview placebo key in fresh settings');
 
   // ── MODEL BOUNDARY: seed the vision (vision-advisor) + the refined plan (planner). ─
+  // vision → functional is the DECOMPOSE model boundary (vision-decomposer reads the
+  // vision and EMITS functional stubs); it is NOT an approvePlan gate edge in this
+  // codebase — gate-order.GATE_EDGES is exactly [functional→implementation,
+  // implementation→todo, review→done], and approvePlan on a vision/ path throws
+  // "Unknown plan location". So the vision plan is SEEDED (its shape asserted), and the
+  // implementation-ready child the planner emits is seeded directly in functional/.
   const visionPath = writePlan(root, 'vision', 'demo-vision', visionPlanBody('demo-vision'));
   assert.ok(exists(visionPath) && visionPath.includes(path.join('plans', 'vision')),
     'seeded vision lands in plans/vision/ (the shape decompose consumes)');
@@ -333,8 +352,10 @@ test('greenfield journey: init → gates → build → verify → done (every se
 });
 
 // ────────────────────────────────────────────────────────────────────────────────
-// CONTROL A — a plan reaching review with NO verify evidence → Gate 3 REFUSES.
-// (Catches a dead completeExecution: no completion → no evidence → gate must refuse.)
+// CONTROL A — a plan reaching review with NO verify evidence → validateReviewToDone
+// REFUSES. (Catches a dead completeExecution: no completion → no evidence → refuse.)
+// This asserts the VALIDATOR directly; control F asserts the same refusal is wired
+// INSIDE approvePlan (the real crossing entry point), so neither can rot unseen.
 // ────────────────────────────────────────────────────────────────────────────────
 
 test('control A: no VERIFY evidence → Gate 3 refuses (not a vacuous pass)', () => {
@@ -430,4 +451,35 @@ test('control D: same-file plans serialize — second is queued with reason file
   assert.strictEqual(second.reason, 'file-conflict',
     `the scheduler ladder serializes same-file plans; reason was: ${second.reason}`);
   assert.notStrictEqual(firstName, undefined, 'a first plan name was recorded');
+});
+
+// ────────────────────────────────────────────────────────────────────────────────
+// CONTROL F — a no-evidence review→done crossing driven THROUGH approvePlan itself
+// returns refused:true. The Gate-3 validation is wired INSIDE approvePlan (it calls
+// plan-validator.validateTransition → validateReviewToDone before any mutation), NOT
+// only in the menu's validate screen. Control A drives the validator directly; this
+// drives the real crossing ENTRY POINT — so unwiring the validation from approvePlan
+// (the exact individually-green dead seam this journey hunts) leaves A green but F RED.
+// ────────────────────────────────────────────────────────────────────────────────
+
+test('control F: approvePlan(review→done) itself refuses a no-evidence crossing', () => {
+  const root = makeTempRoot('gate3refuse');
+  initProject(root);
+  const slug = 'demo-widget';
+  // A complete, human-marked plan sitting in review/, but NO evidence was ever minted.
+  const reviewPath = writePlan(root, 'review', slug,
+    implPlanBody(slug, { prepend: approvalMarker('implementation → todo') }));
+  assert.strictEqual(readVerifyEvidence(root, slug), null, 'precondition: no evidence artifact');
+
+  const res = actions.approvePlan(reviewPath, root);
+  assert.strictEqual(res.refused, true,
+    'approvePlan itself refuses review→done with no evidence (validation wired in approvePlan)');
+  assert.strictEqual(res.ok, false, 'a refused crossing is not ok');
+  assert.ok(/no VERIFY evidence/i.test(res.reason || ''),
+    `refusal reason names the missing evidence; got: ${res.reason}`);
+  // A refusal mutates NOTHING: the plan is left in review/, never reaches done/.
+  assert.ok(exists(reviewPath), 'refused plan is left in review/ (no move on refusal)');
+  assert.ok(!exists(planPathOf(root, 'done', slug)), 'plan did NOT reach done/');
+  assert.strictEqual(ledger.readEntry(slug, root), null,
+    'no ledger entry written for a refused crossing');
 });
