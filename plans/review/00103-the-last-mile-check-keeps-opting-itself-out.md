@@ -395,7 +395,12 @@ The concurrently-edited `src/lib/reachability.js` is not involved in this slice.
    reports 211 findings after the fix, and both
    `src/lib/app-runner.js:exit-with-pending-writes:<module>` entries are gone from
    the live scan. The number in this plan was not trusted. The `whitelist` structure
-   was not touched and no entry was added to it.
+   was not touched and no entry was added to it. **Review reconciliation:** the shared
+   baseline has since moved to `maxFindings: 209` via sibling review plans that pay
+   down the same file; the live scan measures 209 with zero remaining
+   `app-runner.js:exit-with-pending-writes` findings, so this slice's specific
+   contribution (removing both those entries) is intact — the 213 → 211 figures are
+   this slice's own historical delta, not a claim about the current shared floor.
 14. **EXECUTOR — the entry point was NOT declared, confirming the plan.** Left off
    deliberately; ladder case 8 records the undeclared state so throwing the switch
    turns exactly one case red and names itself.

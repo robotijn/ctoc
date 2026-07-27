@@ -86,6 +86,28 @@ test('runClaude parses the --output-format json object from the binary', () => {
   assert.equal(res.isError, false);
 });
 
+test('runClaude tolerates an EPIPE stdin-write when the child exited cleanly with valid output', () => {
+  // Real `claude -p` reads the prompt from stdin, but a child can produce its
+  // full stdout and exit BEFORE draining stdin (it had what it needed, or it
+  // aborted after a partial read). The parent's still-pending stdin write then
+  // fails with EPIPE. That is NOT a run failure: the child ran, exited 0, and
+  // returned valid JSON — the answer must survive. A large prompt makes the
+  // stdin-write / child-exit race deterministic (the parent cannot flush the
+  // whole prompt into the OS pipe buffer before the child closes it).
+  const EXIT_WITHOUT_DRAINING_STDIN = `'use strict';
+const args = process.argv.slice(2);
+if (args.includes('--version')) { process.stdout.write('1.2.3 (fixture)\\n'); process.exit(0); }
+process.stdout.write(${JSON.stringify(CANNED_RESULT)});
+process.exit(0);
+`;
+  const bin = writeFakeBinary(EXIT_WITHOUT_DRAINING_STDIN);
+  const bigPrompt = 'x'.repeat(5 * 1024 * 1024);
+  const res = runClaude(bigPrompt, { spawnImpl: nodeScriptSpawn(bin) });
+  assert.equal(res.text, 'CANNED MODEL TEXT');
+  assert.equal(res.isError, false);
+  assert.equal(res.exitStatus, 0);
+});
+
 test('runClaude argv carries flags only; the PROMPT travels on stdin (leading dashes safe)', () => {
   // Echo BOTH the argv and the full stdin back, so one real subprocess proves
   // (a) the prompt is not an argv element and (b) it arrives intact on stdin —
