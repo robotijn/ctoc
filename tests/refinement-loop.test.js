@@ -33,6 +33,12 @@ function setupTempProject() {
   process.chdir(tmpDir);
   fs.mkdirSync('.ctoc/config', { recursive: true });
   fs.mkdirSync('.claude-plugin', { recursive: true });
+  // A real CTOC project root, not a bare `.ctoc`: the shared resolver
+  // (src/lib/project-root.js) requires `.ctoc/settings.yaml` (or a `plans/`
+  // sibling) so the crypto home `~/.ctoc` — which holds only `.secret` — can no
+  // longer masquerade as a project. Without this the default-root write paths
+  // correctly refuse to write. See plan 00178.
+  fs.writeFileSync('.ctoc/settings.yaml', 'general: {}\n');
   // Copy the real triggers file so globMatch tests can exercise it
   fs.copyFileSync(
     path.join(originalCwd, '.ctoc/config/refinement-triggers.yaml'),

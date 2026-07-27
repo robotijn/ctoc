@@ -280,3 +280,41 @@ hardcoded separators, `os.homedir()` never written to.
     REPORT, not a reason to keep the private walk.** Preserving a behaviour by
     keeping the defect that provides it is how the copy justified itself for this
     long.
+
+### Decisions taken during implementation (Step 10)
+
+12. **`writeLetter` is guarded identically to `appendRound`.** Step 9's
+    classification found TWO writers reaching `ensureDir` in this module —
+    `appendRound` and `writeLetter` — and Change 2's own wording ("`appendRound`
+    and any other function reaching `ensureDir` gain a guard") mandates both.
+    A refused `writeLetter` returns `{ written: false, skipped: true, reason }`,
+    the same shape as `appendRound`. Step 9 confirmed no depended-upon
+    `.claude-plugin`-only caller: `findProjectRoot`'s only external importers are
+    the two refinement-loop test files; `actions.js` consumes `shouldRunLoop`,
+    not the resolver.
+13. **The single write-path resolver helper (`resolveWriteRoot`) returns the root
+    string or `null` + a reason** — a JSDoc boolean-discriminated union did not
+    narrow under `checkJs`, so the helper returns `{ root, reason }` with
+    `root === null` signalling refusal. An explicit `root` short-circuits with no
+    resolution at all (Decision 4), so resolution runs at most once per call
+    (Step 12 OPTIMIZE).
+14. **The two pre-existing refinement-loop test suites needed their fixtures
+    corrected — these files were NOT in the plan's declared `files:`.**
+    `tests/refinement-loop.test.js` and `tests/refinement-loop-coverage.test.js`
+    built a BARE `.ctoc` fixture (no `settings.yaml`, no `plans/` sibling) and
+    relied on default-root writes. That fixture is exactly the crypto-home shape
+    the fix now refuses, so all their write-path tests broke. The fix: each
+    `setupTempProject` now writes `.ctoc/settings.yaml` so the fixture is a REAL
+    project; and the two coverage cases that asserted the replaced contract
+    (a bare `.ctoc` capturing the root; the private walk returning its `start` on
+    fallback) were retargeted to assert the corrected behaviour (a bare `.ctoc`
+    does NOT capture; `findProjectRoot` returns a string and does not adopt a
+    marker-less start). This is test-tightening toward the real, fixed behaviour,
+    not weakening. The plan's `files:` under-declared these two suites — recorded
+    as a finding.
+15. **Slug path-traversal (Step 13 SECURE) is a pre-existing property unchanged
+    by this slice.** `loopDir` builds `path.join(root, '.ctoc', 'loops', planSlug)`
+    exactly as before; this slice touches resolution and the write guard, not slug
+    construction, and adds no new traversal surface. Real plan slugs are
+    controlled (`00178-...`). Sanitising the slug would be new behaviour outside
+    Changes 1 and 2; noted, not introduced here.
