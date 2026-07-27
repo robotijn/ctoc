@@ -281,9 +281,11 @@ function declineComplianceRegime(projectRoot) {
     } else {
       // Legacy project: no regulatory_regime block at all → create it. A decline is
       // an explicit human choice and MUST persist (not fail-open). PREPEND the block
-      // (rather than append) so the reader-of-record's block regex — which needs a
-      // following top-level key to anchor its non-greedy body — can always resolve
-      // it, even when the file had no trailing block after regulatory_regime.
+      // (rather than append) as defensive ordering: it keeps the block at a fixed,
+      // trivially-locatable position at the head of the file. The reader of record
+      // (regulatory-regime.js loadActiveProfiles) already anchors its non-greedy body
+      // on a following top-level key OR end of file, so it resolves a LAST block too —
+      // prepend is a robustness choice here, not a parsing requirement.
       const tail = content.length === 0 ? '' : (content.startsWith('\n') ? '' : '\n') + content;
       content = `regulatory_regime:\n  declined: true\n${tail}`;
     }
