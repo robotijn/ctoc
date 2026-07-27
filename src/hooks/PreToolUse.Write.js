@@ -266,6 +266,125 @@ async function run(payload, deps = {}) {
 }
 
 /**
+ * Strip control characters from agent-writable text before it reaches a terminal
+ * message — a conflicting slug is echoed into the refusal, and a crafted filename
+ * could otherwise inject an escape sequence. Mirrors the `stripCtl` treatment used
+ * elsewhere on agent-writable text.
+ *
+ * @param {*} s
+ * @returns {string}
+ */
+function stripCtl(s) {
+  return String(s).replace(/[\x00-\x1f\x7f]/g, '');
+}
+
+/**
+ * Build the immediately-actionable refusal message: the conflicting plan, its path,
+ * the next free number, and the two legitimate resolutions (use the next free
+ * number, or — if this is a rename — delete the old file first, since a rename IS a
+ * delete + create). A refusal that does not say what to do next is how a fence
+ * earns its reputation and gets switched off.
+ *
+ * @param {string} targetRel - repository-relative target path
+ * @param {{number:string, conflictingPlan:string, conflictingPath:string, nextFree:string}} check
+ * @returns {string}
+ */
+function buildCollisionMessage(targetRel, check) {
+  const plan = stripCtl(check.conflictingPlan);
+  const conflictPath = stripCtl(check.conflictingPath);
+  const number = stripCtl(check.number);
+  const nextFree = stripCtl(check.nextFree);
+  return [
+    `[CTOC] Plan number ${number} is already in use — this write is REFUSED.`,
+    `  Writing ${stripCtl(targetRel)} would give number ${number} a second meaning.`,
+    `  It is already held by "${plan}" (${conflictPath}).`,
+    '  A plan number must name exactly one plan: commit messages, depends_on links and',
+    '  the approval ledger all refer to it by number. To proceed, either:',
+    `    - use the next free number ${nextFree} for this plan, or`,
+    `    - if you are renaming/retitling an existing plan, delete ${conflictPath} first`,
+    '      (a rename is a delete + create).',
+  ].join('\n');
+}
+
+/**
+ * The escape phrase the USER themselves typed, or null. Reuses `escape-phrases.js`
+ * through the Edit hook's role-scoped `findEscapeInTranscript` (which reads only
+ * genuinely user-typed transcript text) — NO new bypass surface is invented.
+ * `deps.escapePhrase` is a test injection seam.
+ *
+ * @param {{ transcript_path?: string }} payload
+ * @param {{ escapePhrase?: string|null }} deps
+ * @returns {string|null}
+ */
+function detectEscape(payload, deps) {
+  if (typeof deps.escapePhrase === 'string' || deps.escapePhrase === null) return deps.escapePhrase;
+  try {
+    const tp = payload && payload.transcript_path;
+    if (!tp) return null;
+    const raw = safeFs.readFileSync(tp, 'utf8');
+    return require('./PreToolUse.Edit.js').findEscapeInTranscript(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decide whether a plan Write collides, computed ENTIRELY by the shared predicate
+ * `checkPlanWriteCollision` in `plan-numbering.js` (never reimplemented here — the
+ * numbering rule has one home). The hook contributes only the interception, the
+ * escape bypass, and the message.
+ *
+ * WHY THIS DIVERGES FROM THE DUPLICATE GUARD ABOVE (the human's ruling,
+ * 2026-07-19). The advisory duplicate guard in this file deliberately NEVER blocks:
+ * a duplicate plan is a judgment call a human should make. A number collision is
+ * DIFFERENT — it is a fact the machine can verify, and its harm is SILENT (nobody
+ * reads a warning until a human refers to a number that means two different things,
+ * which is exactly how the observed collision survived until it was found by
+ * accident). A rule that cannot be checked is a wish; a warning an agent can write
+ * straight past is that same shape. So this REFUSES.
+ *
+ * Fail-open on any internal fault: a numbering check must never be able to stop
+ * legitimate work because of its own bug (returns `allow`). An unreadable `plans/`
+ * is NOT a fault — it returns `unknown`, which the caller allows while saying
+ * loudly that it could not check (refusing on unseen input would be the false
+ * verdict this repository fences).
+ *
+ * @param {{ tool_input?: { file_path?: string }, transcript_path?: string }} payload
+ * @param {{ projectPath?: string, checkPlanWriteCollision?: Function, escapePhrase?: string|null }} [deps]
+ * @returns {{ decision:'allow'|'deny'|'unknown', message?:string, escape?:string, reason?:string, check?:object }}
+ */
+function evaluateCollision(payload, deps = {}) {
+  try {
+    const toolInput = (payload && payload.tool_input) || {};
+    const filePath = toolInput.file_path;
+    if (!filePath) return { decision: 'allow', reason: 'no-target' };
+    const projectPath = deps.projectPath || process.cwd();
+    // Relativize against the PROJECT ROOT (not process.cwd()): production passes no
+    // projectPath so this is process.cwd() as before, but a caller/test that names an
+    // explicit root must have the target resolved against THAT root.
+    let rel = filePath;
+    if (path.isAbsolute(rel)) rel = path.relative(projectPath, rel);
+    rel = rel.replace(/\\/g, '/').replace(/^\.\//, '');
+
+    const checkFn = typeof deps.checkPlanWriteCollision === 'function'
+      ? deps.checkPlanWriteCollision
+      : require('../lib/plan-numbering').checkPlanWriteCollision;
+    const check = checkFn(projectPath, rel);
+
+    if (check && check.unknown) return { decision: 'unknown', reason: check.reason };
+    if (!check || !check.collides) return { decision: 'allow' };
+
+    // A real collision — the escape phrase the human typed bypasses it.
+    const escape = detectEscape(payload, deps);
+    if (escape) return { decision: 'allow', escape };
+
+    return { decision: 'deny', message: buildCollisionMessage(rel, check), check };
+  } catch {
+    return { decision: 'allow', reason: 'internal-fault' }; // fail open — never block on our own bug
+  }
+}
+
+/**
  * Read the raw PreToolUse payload from stdin (fd 0) once, as a string. Returns '' on
  * any read failure (→ guard skips; enforcement still delegates and reads for itself).
  *
@@ -304,6 +423,37 @@ async function main() {
     } catch {
       /* advisory guard is fail-open; never let it suppress enforcement */
     }
+
+    // Plan-number collision refusal. Runs BEFORE the enforcement delegate because
+    // the delegate's `plans/**/*.md` whitelist would otherwise ALLOW a colliding
+    // plan write. A deny is emitted through the shared hook-deny protocol (JSON on
+    // stdout + hard-block exit) — the same signal the Edit hook uses. `unknown`
+    // (an unreadable plans/) allows the write and says loudly it could not check;
+    // any internal fault allows the write. This never suppresses enforcement on the
+    // allow path — it falls through to the delegate below.
+    try {
+      const verdict = evaluateCollision(parsed);
+      if (verdict.decision === 'deny') {
+        process.stderr.write(`\n${verdict.message}\n`);
+        appendLog([`✖ plan-number collision REFUSED: ${stripCtl((verdict.check && verdict.check.number) || '')} `
+          + `already held by ${stripCtl((verdict.check && verdict.check.conflictingPath) || '')}`],
+          (parsed.cwd) || process.cwd());
+        const { emitDeny } = require('../lib/hook-deny-signal');
+        emitDeny(verdict.message); // writes the deny decision + hard-block exit; never returns
+        return;
+      }
+      if (verdict.decision === 'unknown') {
+        process.stderr.write('[CTOC] plan-number collision check: could not read plans/ — '
+          + `write ALLOWED WITHOUT a collision check (this is not "no collision found"). ${stripCtl(verdict.reason || '')}\n`);
+      } else if (verdict.escape) {
+        appendLog([`plan-number collision bypassed by escape phrase "${stripCtl(verdict.escape)}"`],
+          (parsed.cwd) || process.cwd());
+      }
+    } catch (err) {
+      // Fail OPEN and say so: a numbering-check fault must never stop a write, but
+      // it is surfaced (not swallowed) so the degradation is visible, never silent.
+      process.stderr.write(`[CTOC] plan-number collision check faulted (failing open, write ALLOWED): ${stripCtl(err && err.message)}\n`);
+    }
   }
   // Delegate enforcement with the SAME parsed payload we already read (single
   // read, then hand off). Importing the delegate does NOT run its IIFE or read
@@ -329,7 +479,10 @@ async function main() {
   await enforce(parsed);
 }
 
-module.exports = { run, main, isPlanTarget, deriveSummary, normalizeRel, SUMMARY_CHAR_CAP };
+module.exports = {
+  run, main, isPlanTarget, deriveSummary, normalizeRel, SUMMARY_CHAR_CAP,
+  evaluateCollision, buildCollisionMessage,
+};
 
 // Hook entry: run only when executed directly, so importing the module in a test
 // never triggers stdin consumption / enforcement / process.exit.
