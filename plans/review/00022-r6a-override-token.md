@@ -43,9 +43,25 @@ NOT. "Approve anyway" is the LAST option, never recommended. If you add a
 reason-capture input mode, round-trip it.
 
 ## Execution Plan (Steps 8-16)
-Step 8 TEST red · Step 9 PREPARE (read menu-screens validateScreen + menu.md
+Step 8 TEST red · Step 9 PREPARE (read menu-screens validateScreen + start.md
 claude:approve recipe) · Step 10 IMPLEMENT · Step 11 REVIEW · Step 14 VERIFY
-(node --test the named file + eslint; no git; no full suite) · Step 16 REPORT.
+(the REAL gate — full `npm test`: suite + coverage floor + zero-skipped) · Step 16 REPORT.
+
+- [x] Step 8 TEST — the failed-validation "Approve anyway" action-string assertion
+  (`--override` present) written first; the clean-path "Confirm approve" NO-token
+  assertion; "Approve anyway" is the LAST option, never recommended.
+- [x] Step 9 PREPARE — read `validateScreen` and the `claude:approve` recipe in
+  `src/commands/start.md` (the recipe, not `menu.md`, carries the override contract
+  in this tree).
+- [x] Step 10 IMPLEMENT — `src/lib/menu-screens.js:1957` emits
+  `claude:approve <stage>/<file> --override` on the failed branch only; the clean
+  branch is byte-unchanged.
+- [x] Step 11 REVIEW — override token confined to the three human-gate edges
+  (non-gate stages emit no `claude:approve` action at all); traversal guarded by
+  `isUnsafePlanFile`.
+- [x] Step 14 VERIFY — full `npm test`: coverage 99.14% (threshold 99%), skipped 0,
+  failed 0, gate PASS; `npx tsc --noEmit` clean (exit 0).
+- [x] Step 16 REPORT — see the report section below.
 
 ## Decisions Taken Under Ambiguity
 
@@ -70,3 +86,71 @@ claude:approve recipe) · Step 10 IMPLEMENT · Step 11 REVIEW · Step 14 VERIFY
   `--override` token (the human-replaced contract per lesson 14), never loosened.
 - **"Approve anyway" stays LAST and never recommended** — position and demotion
   are unchanged; only the action string gains the token.
+
+### Rework (adversarial re-review, 2026-07-27)
+
+- **The REAL gate was run.** The original Step 14 scoped verification down to "node
+  --test the named file + eslint; no full suite" — a partial gate. Reworked: the
+  full `npm test` (suite + `src/**`-scoped coverage floor + zero-skipped gate) was
+  run and PASSES — coverage 99.14% (threshold 99), skipped 0, failed 0, `test-gate`
+  PASS; `npx tsc --noEmit` exits 0. The plan carried no "full-suite red" or
+  "tsc errors" claim, so there was nothing stale to refute — the tree was and is
+  green.
+- **`files:` verified against the diff — no change needed.** The shipped change
+  (committed in the R6 wave, `f153861`) touches exactly `src/lib/menu-screens.js`
+  and `tests/menu-screens.test.js`; both are declared. The declaration matches disk.
+- **Security bar re-audited: the override is auditable and not silently bypassable.**
+  (1) Distinguishability: the clean path emits `claude:approve <ref>` (no token), the
+  forced path emits `claude:approve <ref> --override` — a forced crossing is never
+  byte-indistinguishable from a clean one. (2) Confinement: `validateScreen` offers a
+  `claude:approve` action ONLY on the three human-gate edges (`HUMAN_GATES`); a
+  non-gate stage (todo/canvas/in-progress) returns a non-approving screen with no
+  approve action, so no override token can be minted off a gate. (3) Round-trip
+  recording: the `--override` token drives the `start.md` recipe to call
+  `approvePlan(path, root, { override: { reason } })`, which fails CLOSED
+  (`validationPassed = validation.valid === true`; a null/malformed validation does
+  NOT pass) and records `override: true` + `override_reason` in BOTH the ledger entry
+  and the plan marker (`actions.js:addApprovalMarker` / `stampAndLedger`); an
+  un-ledger-keyable slug is REFUSED up front so no override crosses marker-only. No
+  code defect found in scope; no assertion was weakened.
+- **Reason-capture deferral is a documented design choice, not a hole (unchanged).**
+  The render layer emits the flag without a free-text reason; the recipe prompts for
+  and threads the reason. The security property "not silently bypassable" is met by
+  `override: true` regardless of reason richness, so this is not a defect. Moving
+  reason-capture from the recipe into a render-layer input mode is a genuine
+  enhancement fork the plan deliberately excluded (constraint: touch only
+  `menu-screens.js` + its test) — surfaced for a possible follow-up, not built here,
+  because it expands the route contract without closing a security gap.
+- **Out-of-scope observation (NOT fixed here):** `isUnsafePlanFile` blocks path
+  separators, `..`, null bytes, and absolute paths, but not spaces — a plan filename
+  containing a space could inject an extra token into ANY `claude:*` action string
+  (e.g. `claude:approve functional/a b.md --override`). This is a pre-existing,
+  file-wide property shared by every `claude:` action in `menu-screens.js`, not a
+  regression introduced by this plan, and the surface is a model-interpreted recipe
+  (no code exec). Fixing it piecemeal on the override action alone would be
+  inconsistent; it belongs in a separate hardening plan covering all action strings.
+
+## Step 16 — Final Review Report
+
+**Status:** COMPLETE. The one place a human forces a failed gate now carries the
+`--override` token, so the forced crossing is auditable at the action-string surface
+and round-trips to a recorded `override: true` + reason in the ledger and marker.
+
+**What shipped (verified against disk, `src/lib/menu-screens.js`):**
+- Failed-validation branch: `actions['Approve anyway'] = claude:approve <stage>/<file> --override` (line 1957), demoted to the LAST option, labelled "records an override", never recommended.
+- Clean branch: `actions['Confirm approve'] = claude:approve <stage>/<file>` — byte-unchanged, no token.
+- Approve action is confined to the three human-gate edges; non-gate stages get a non-approving screen.
+
+**Tests (`tests/menu-screens.test.js`, all green):**
+- failed "Approve anyway" carries `--override` and is the LAST option; description names it an override.
+- clean "Confirm approve" carries NO `--override`.
+- todo/canvas emit no `claude:approve` action at all.
+
+**Verification (the REAL gate):**
+- `npm test` → `[CTOC test-gate] PASS` — coverage **99.14%** (threshold 99%), **skipped 0**, **failed 0**.
+- `node --test tests/menu-screens.test.js` → 38 pass, 0 fail, 0 skipped.
+- `npx tsc --noEmit` → exit 0 (no type errors).
+
+**Security disposition:** override auditable, fail-closed, gate-confined,
+ledger-recorded; no assertion weakened. No in-scope code defect found — the rework
+corrected the Step-14 verification scope and recorded honest evidence.

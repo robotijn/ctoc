@@ -182,6 +182,27 @@ function mockSync(mocks = {}) {
   };
 }
 
+// Mock task-reconcile module (the doctor "Repair state" action).
+// Default: a healthy reconcile that changed nothing.
+function mockReconcile(mocks = {}) {
+  return {
+    reconcileState: mocks.reconcileState || (() => ({
+      report: {
+        orphaned: [], swept: [], cancelled: [], unsatisfiable: [],
+        quarantineReleased: [], corrupt: null
+      },
+      promote: []
+    }))
+  };
+}
+
+// Mock enforcement-log module (the doctor "View logs" action).
+function mockEnforcementLog(mocks = {}) {
+  return {
+    readLog: mocks.readLog || (() => [])
+  };
+}
+
 // Mock tui module (returns real functions since they're pure)
 const realTui = require('../src/lib/tui');
 function mockTui() {
@@ -237,6 +258,12 @@ function loadTabWithMocks(tabName, mocks = {}) {
     }
     if (id === '../src/lib/sync' || id.endsWith('/lib/sync')) {
       return mockSync(mocks.sync);
+    }
+    if (id === '../src/lib/task-reconcile' || id.endsWith('/lib/task-reconcile')) {
+      return mockReconcile(mocks.reconcile);
+    }
+    if (id === '../src/lib/enforcement-log' || id.endsWith('/lib/enforcement-log')) {
+      return mockEnforcementLog(mocks.enforcementLog);
     }
     if (id === '../src/lib/tui' || id.endsWith('/lib/tui')) {
       return mockTui();
@@ -837,6 +864,128 @@ describe('Tab Modules - handleKey()', () => {
       tools.handleKey(createMockKey('backspace'), app);
 
       assert.strictEqual(app.doctorInput, 'tes', 'Should remove character');
+    });
+
+    test('1 re-runs the health checks and confirms', () => {
+      const tools = loadTabWithMocks('tools');
+
+      const app = createMockApp({ toolMode: '1' });
+      const handled = tools.handleKey(createMockKey('1', { sequence: '1' }), app);
+
+      assert.strictEqual(handled, true, 'Should handle the key');
+      assert.ok(/re-run/i.test(app.message), 'Should confirm checks were re-run');
+      assert.strictEqual(app.doctorInput, '', 'Must not type the digit into the question box');
+    });
+
+    test('2 repairs state via reconcileState and reports what it fixed', () => {
+      let repairPath = null;
+      const tools = loadTabWithMocks('tools', {
+        reconcile: {
+          reconcileState: (root) => {
+            repairPath = root;
+            return {
+              report: {
+                orphaned: [{ id: 't1' }, { id: 't2' }], swept: [{ id: 't3' }],
+                cancelled: [], unsatisfiable: [], quarantineReleased: [], corrupt: null
+              },
+              promote: []
+            };
+          }
+        }
+      });
+
+      const app = createMockApp({ toolMode: '1' });
+      const handled = tools.handleKey(createMockKey('2', { sequence: '2' }), app);
+
+      assert.strictEqual(handled, true, 'Should handle the key');
+      assert.strictEqual(repairPath, '/test/project', 'Should reconcile the project path');
+      assert.ok(app.message.includes('3'), 'Should report 3 repaired issues');
+      assert.ok(/repair/i.test(app.message), 'Should mention repair');
+      assert.strictEqual(app.doctorInput, '', 'Must not type the digit into the question box');
+    });
+
+    test('2 reports a single repaired issue in the singular', () => {
+      const tools = loadTabWithMocks('tools', {
+        reconcile: {
+          reconcileState: () => ({
+            report: {
+              orphaned: [{ id: 't1' }], swept: [], cancelled: [], unsatisfiable: [],
+              quarantineReleased: [], corrupt: null
+            },
+            promote: []
+          })
+        }
+      });
+
+      const app = createMockApp({ toolMode: '1' });
+      tools.handleKey(createMockKey('2', { sequence: '2' }), app);
+
+      assert.ok(app.message.includes('1 '), 'Should report exactly 1');
+      assert.ok(!/issues/.test(app.message), 'Should use the singular "issue"');
+    });
+
+    test('2 reports a healthy state when nothing needed repair', () => {
+      const tools = loadTabWithMocks('tools'); // default reconcile: all empty
+
+      const app = createMockApp({ toolMode: '1' });
+      tools.handleKey(createMockKey('2', { sequence: '2' }), app);
+
+      assert.ok(/healthy|nothing/i.test(app.message), 'Should say state is healthy');
+    });
+
+    test('2 surfaces a corrupt task registry legibly', () => {
+      const tools = loadTabWithMocks('tools', {
+        reconcile: {
+          reconcileState: () => ({
+            report: { orphaned: [], swept: [], cancelled: [], unsatisfiable: [],
+              quarantineReleased: [], corrupt: { reason: 'load-failed' } },
+            promote: []
+          })
+        }
+      });
+
+      const app = createMockApp({ toolMode: '1' });
+      tools.handleKey(createMockKey('2', { sequence: '2' }), app);
+
+      assert.ok(/load-failed/.test(app.message), 'Should name the corruption reason');
+    });
+
+    test('4 views the enforcement log (multiple entries)', () => {
+      let logPath = null;
+      const tools = loadTabWithMocks('tools', {
+        enforcementLog: {
+          readLog: (root) => { logPath = root; return [{ a: 1 }, { a: 2 }, { a: 3 }]; }
+        }
+      });
+
+      const app = createMockApp({ toolMode: '1' });
+      const handled = tools.handleKey(createMockKey('4', { sequence: '4' }), app);
+
+      assert.strictEqual(handled, true, 'Should handle the key');
+      assert.strictEqual(logPath, '/test/project', 'Should read the project log');
+      assert.ok(app.message.includes('3'), 'Should report the entry count');
+      assert.strictEqual(app.doctorInput, '', 'Must not type the digit into the question box');
+    });
+
+    test('4 reports a single log entry in the singular', () => {
+      const tools = loadTabWithMocks('tools', {
+        enforcementLog: { readLog: () => [{ a: 1 }] }
+      });
+
+      const app = createMockApp({ toolMode: '1' });
+      tools.handleKey(createMockKey('4', { sequence: '4' }), app);
+
+      assert.ok(app.message.includes('1 '), 'Should report exactly 1');
+      assert.ok(/entry/.test(app.message), 'Should use the singular "entry"');
+    });
+
+    test('4 reports an empty log clearly', () => {
+      const tools = loadTabWithMocks('tools'); // default readLog: []
+
+      const app = createMockApp({ toolMode: '1' });
+      tools.handleKey(createMockKey('4', { sequence: '4' }), app);
+
+      assert.ok(/no enforcement|no .*activity/i.test(app.message), 'Should say the log is empty');
     });
   });
 

@@ -14,6 +14,8 @@ const {
   getCategorySchema
 } = require('../lib/settings');
 const { getLastSync, manualSync } = require('../lib/sync');
+const { reconcileState } = require('../lib/task-reconcile');
+const { readLog } = require('../lib/enforcement-log');
 
 const TOOLS = [
   { key: '1', label: 'Doctor', description: 'Health check & troubleshooting' },
@@ -239,11 +241,34 @@ function handleKey(key, app) {
     }
   }
 
-  // Doctor mode
+  // Doctor mode. The screen advertises four numbered actions; every one must DO
+  // what it says — a menu item that silently no-ops (or types its digit into the
+  // question box) is a screen that lies to the person reading it.
   if (app.toolMode === '1') {
     if (key.name === 'escape' || key.name === 'b' || key.sequence === '0') {
       app.toolMode = null;
       app.doctorInput = '';
+      return true;
+    }
+    if (key.sequence === '1') {
+      // Run checks again — health checks are pure and recomputed on the next
+      // render(); confirm so the human sees a response rather than a still screen.
+      app.message = '✓ Health checks re-run';
+      return true;
+    }
+    if (key.sequence === '2') {
+      // Repair state — reconcile the task registry (the canonical, fail-open
+      // state-repair path also run on menu open). Report exactly what it fixed.
+      const { report } = reconcileState(app.projectPath);
+      if (report.corrupt) {
+        app.message = `Repair: could not read task state (${report.corrupt.reason})`;
+      } else {
+        const fixed = ['orphaned', 'swept', 'cancelled', 'unsatisfiable', 'quarantineReleased']
+          .reduce((n, k) => n + report[k].length, 0);
+        app.message = fixed > 0
+          ? `✓ Repaired ${fixed} task-state issue${fixed === 1 ? '' : 's'}`
+          : '✓ Task state healthy — nothing to repair';
+      }
       return true;
     }
     if (key.sequence === '3') {
@@ -252,11 +277,20 @@ function handleKey(key, app) {
       app.message = result.synced ? '✓ Synced successfully' : `Sync: ${result.reason || result.error}`;
       return true;
     }
+    if (key.sequence === '4') {
+      // View logs — surface the enforcement log so a human can see recent activity
+      // without leaving the doctor. The full stream lives in the named file.
+      const entries = readLog(app.projectPath);
+      app.message = entries.length
+        ? `Logs: ${entries.length} enforcement entr${entries.length === 1 ? 'y' : 'ies'} in .ctoc/logs/enforcement.json`
+        : 'Logs: no enforcement activity recorded yet';
+      return true;
+    }
     if (key.name === 'backspace') {
       app.doctorInput = (app.doctorInput || '').slice(0, -1);
       return true;
     }
-    if (key.sequence && key.sequence.length === 1 && !key.ctrl && !'123'.includes(key.sequence)) {
+    if (key.sequence && key.sequence.length === 1 && !key.ctrl && !'1234'.includes(key.sequence)) {
       app.doctorInput = (app.doctorInput || '') + key.sequence;
       return true;
     }
