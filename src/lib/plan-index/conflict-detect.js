@@ -63,6 +63,36 @@ const DEFAULT_CONFLICT_THRESHOLD = 0.78;
 const CANDIDATE_LIMIT = 20;
 
 /**
+ * The store key shape `plans/<stage>/<slug>.md` (the D9 normalized planPath). The
+ * stage is derivable from the key with no extra read — the cheap half of the
+ * landed-gate. A key that does NOT match is treated as "landed-check NOT
+ * APPLICABLE": the row keeps its original severity and is never dropped, which is
+ * exactly what preserves every existing detectConflicts test whose keys are opaque
+ * (`'target'`, `'cand'`).
+ * @type {RegExp}
+ */
+const PLAN_KEY_RE = /^plans\/([^/]+)\/(.+)\.md$/;
+
+/**
+ * Stages whose plans are FINISHED WORK by definition — a candidate resident here is
+ * not a live conflict, decided cheaply and certainly from the key alone (no git).
+ * This alone removes most already-landed false positives.
+ * @type {ReadonlySet<string>}
+ */
+const LANDED_STAGES = Object.freeze(new Set(['done', 'review']));
+
+/**
+ * Severity for a surviving row whose landed-check COULD NOT RUN (git unavailable,
+ * or the check errored). The row is passed through UNFILTERED and LABELLED — an
+ * unavailable landed-check must never read as "no conflict", which would be this
+ * slice's own defect turned inward. The existing severity enum is EXTENDED, not
+ * replaced; `renderConflictPanel` reads `severity` as an opaque label and renders
+ * any string, so an added value degrades gracefully (confirmed by reading it).
+ * @type {string}
+ */
+const SEVERITY_UNVERIFIED = 'potential conflict or dependency (landed-check unavailable)';
+
+/**
  * The DISTINCT overlap between two glob sets, bidirectional. For each pair
  * `(t, c)`, they overlap when `globToRegex(t).test(c)` OR `globToRegex(c).test(t)`
  * — a broad glob on either side that matches the other's (possibly literal) entry.
@@ -180,8 +210,11 @@ function resolveThreshold(getSettingFn, projectPath) {
  * @param {Function} [opts.embedder]     Injected async embedder (only the
  *   text-seeded `related` fallback uses it); else `getWiring`.
  * @param {Function} [opts.getSetting]   Injected getSetting (tests); else the real one.
- * @param {string} [opts.projectPath]    Passed to `getWiring` / `getSetting`.
- * @returns {Promise<Array<{ conflictingPlan: string, overlappingFiles: string[], score: number, severity: 'potential conflict or dependency' | 'broad overlap' }>>}
+ * @param {string} [opts.projectPath]    Passed to `getWiring` / `getSetting` and the landed-check.
+ * @param {Function} [opts.landedResolver] Injected git-backed landed-evidence
+ *   producer `(slug, stage) => StaleEvidence` (tests); else resolves through the
+ *   stale-detector's `verifyStaleCandidate` against `projectPath`.
+ * @returns {Promise<Array<{ conflictingPlan: string, overlappingFiles: string[], score: number, severity: string }>>}
  *   Cosine-descending. Empty on any data condition (fail-open).
  * @throws {TypeError} ONLY when `planSlug` is not a non-empty string (caller bug).
  */
@@ -248,6 +281,44 @@ async function detectConflicts(planSlug, opts = {}) {
     if (prev === undefined || s > prev) maxScore.set(h.planPath, s);
   }
 
+  // ── the LANDED term ──────────────────────────────────────────────────────────
+  // A plan describing a change is not evidence the change is pending. A conflict is
+  // only LIVE when the candidate's own work has not yet landed; finished work cannot
+  // collide with anything in the future. The git-backed check resolves through the
+  // stale-detector's derivation (via a lazy string-literal require, mirroring
+  // `related`/`getWiring` — no eager import, no cycle), sharing ONE full-history
+  // scan across every candidate via a single hoisted cache.
+  const projectRoot = opts.projectPath || process.cwd();
+  const slugHistoryCache = {};
+  const landedResolver = typeof opts.landedResolver === 'function'
+    ? opts.landedResolver
+    : (slug, stage) => {
+        const { verifyStaleCandidate } = require('../stale-detector'); // string-literal, no cycle
+        return verifyStaleCandidate({ plan: slug, stage }, projectRoot, { slugHistoryCache });
+      };
+  /**
+   * Resolve whether a store-keyed plan is FINISHED work.
+   * @returns {{landed:boolean, ran:boolean, applicable:boolean}}
+   *   - applicable:false — the key is not a plan path; the landed-check does not
+   *     apply (row keeps its original severity, never dropped).
+   *   - done/review stage — landed:true, decided cheaply from the key (no git).
+   *   - a parseable key whose git-backed check could not run (git unavailable or a
+   *     throw) — applicable:true, ran:false ⇒ the row SURVIVES, labelled unverified.
+   *   FAIL-OPEN: a landed-check that cannot run must NEVER remove a conflict.
+   */
+  const landedFor = (key) => {
+    const m = PLAN_KEY_RE.exec(typeof key === 'string' ? key : '');
+    if (!m) return { landed: false, ran: false, applicable: false };
+    if (LANDED_STAGES.has(m[1])) return { landed: true, ran: true, applicable: true };
+    try {
+      const ev = landedResolver(m[2], m[1]);
+      if (!ev || ev.gitAvailable !== true) return { landed: false, ran: false, applicable: true };
+      return { landed: ev.landedBySelf === true || ev.landedByOther === true, ran: true, applicable: true };
+    } catch {
+      return { landed: false, ran: false, applicable: true };
+    }
+  };
+
   // The index-wide file set backs the broad-glob downgrade. It is computed LAZILY —
   // only the first time a flagged candidate actually carries a glob — so the common
   // case (all-literal `files:`) never pays the O(plans) enumeration, keeping the
@@ -258,21 +329,28 @@ async function detectConflicts(planSlug, opts = {}) {
     return allIndexFiles;
   };
 
-  /** @type {Array<{ conflictingPlan: string, overlappingFiles: string[], score: number, severity: 'potential conflict or dependency' | 'broad overlap' }>} */
+  /** @type {Array<{ conflictingPlan: string, overlappingFiles: string[], score: number, severity: string }>} */
   const rows = [];
   for (const [candidate, score] of maxScore) {
     if (!(score >= threshold)) continue; // similarity half of the AND
     const candFiles = typeof store.getFilesForPlan === 'function' ? store.getFilesForPlan(candidate) : [];
     const overlap = filesOverlap(targetFiles, candFiles); // overlap half of the AND
     if (overlap.length === 0) continue;
+    // LANDED term: finished work is not a live conflict (the human's twelve, silenced).
+    const landed = landedFor(candidate);
+    if (landed.landed) continue;
     // Broad-overlap downgrade: any candidate glob that sweeps > 50% of the index.
     const broad = Array.isArray(candFiles)
       && candFiles.some((g) => typeof g === 'string' && (g.indexOf('*') !== -1 || g.indexOf('?') !== -1) && isBroadGlob(g, indexFiles()));
+    // A surviving row whose landed-check could not run is passed through, LABELLED.
+    const unverified = landed.applicable && landed.ran === false;
     rows.push({
       conflictingPlan: candidate,
       overlappingFiles: overlap,
       score,
-      severity: broad ? 'broad overlap' : 'potential conflict or dependency',
+      severity: broad
+        ? 'broad overlap'
+        : (unverified ? SEVERITY_UNVERIFIED : 'potential conflict or dependency'),
     });
   }
 
@@ -283,4 +361,5 @@ async function detectConflicts(planSlug, opts = {}) {
 module.exports = {
   detectConflicts,
   DEFAULT_CONFLICT_THRESHOLD,
+  SEVERITY_UNVERIFIED,
 };

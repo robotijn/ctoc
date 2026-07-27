@@ -361,3 +361,52 @@ dead code.
     the author's own assumptions. If it produces false positives on the real backlog, that
     is the finding and it goes to the human — shortening the list by adjusting the
     derivation would be fitting the instrument to the answer.
+
+--- Decisions taken DURING the build (execution) ---
+
+12. **The conflict landed-gate filters on the CANDIDATE having landed, not on
+    `bothAlreadyLanded` (AND).** The plan's predicate text said `AND NOT
+    bothAlreadyLanded`, but its own cheap half and test case 8 drop a candidate keyed
+    under `plans/done/` regardless of the seed's state — a strict AND would keep a
+    finished candidate contending with a live seed, which is the exact false signal
+    being removed. A live conflict requires the candidate to still be pending; a finished
+    candidate cannot collide in future. Filtering on candidate-landed is the sound reading
+    consistent with every test, and it strictly preserves every existing detectConflicts
+    test (whose keys are opaque, so `applicable:false` — never dropped, never relabelled).
+
+13. **`landedBySelf`/`landedByOther` are derived from the per-file last-modifying
+    commits, reusing the EXISTING per-file `git log` (one per declared file) with a
+    widened `--format` and the `-1` dropped — NOT a new git invocation.** The full-history
+    scan carries messages but not per-commit file lists, so only the per-file log ties a
+    commit to a declared file. Attribution reads plan-slug SHAPE (`\d{3,5}-kebab`) from
+    those commit subjects; self is matched with the existing `\bslug\b`. Blind spots
+    (unattributed commits, old non-numeric slugs, prose-only supersession) are documented
+    at `PLAN_SLUG_RE` in code, per Step 15's "its limits live next to it".
+
+14. **Git-absent handling is a LOUD FAILURE + unregistered git-suites, NOT a runtime
+    `t.skip`.** The plan's Step 8 said "skip loudly", but `tests/skip-visibility.test.js`
+    forbids an ungated runtime `t.skip()` (machine-nondeterministic for the zero-skipped
+    gate) and sanctions gating the REGISTRATION instead. So an absent binary registers one
+    failing environment test and does not register the git-backed suites (0 counter
+    contribution, deterministic). A missing required capability is a loud failure, never a
+    silent pass — the same discipline, honoured through the repo's own fence. THE CODE WON.
+
+15. **The CLAUDE.md documentation (Step 15) and the documented test-file count are
+    DEFERRED**, because the executor brief explicitly forbids editing `CLAUDE.md` while
+    concurrent builds hold that file. The operator instruction overrides the plan step.
+    The landed-check's own thorough documentation and its two blind spots ship IN THE CODE
+    (module headers + the `landed-candidate` classifier comment + `PLAN_SLUG_RE`), so the
+    limits are findable next to the check; the CLAUDE.md prose entry is a follow-up for the
+    human to place once the file is free.
+
+### Step 14 calibration — measured on this repository (verbatim)
+
+- Landed-check over 111 plans in functional/implementation/review: **0 landed-candidates,
+  0 false positives.** Case 2's guarantee (a pending plan is never flagged) holds outside
+  the fixtures. The derivation was NOT tuned to produce more.
+- `detectConflicts` over the live 379-plan index: **BEFORE the landed gate 136 conflict
+  rows** (83 of them with a candidate in `done`/`review` — finished-work false conflicts);
+  **AFTER 53 rows; 83 noise rows removed** — exactly the "twelve finished plans contending"
+  class the human named, at scale. The git-backed `landedByOther` term removed 0 additional
+  on the current backlog, consistent with the 0-landed-candidate calibration (the current
+  supersession is not numeric-slug-attributable — a known, documented blind spot).

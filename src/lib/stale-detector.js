@@ -183,6 +183,30 @@ const GATE_SOURCE_STAGES = Object.freeze(['functional', 'implementation', 'revie
 const NOT_STARTED_STAGES = Object.freeze(new Set(['vision', 'canvas', 'functional', 'implementation']));
 
 /**
+ * Upper bound on the two landing-evidence arrays (`landingCommits`,
+ * `landingAttributedTo`). A plan whose declared files sit on a long history could
+ * otherwise balloon the returned object; the cap makes the evidence a bounded
+ * human-followable sample, never an unbounded dump. 20 mirrors the candidate/limit
+ * ceilings used elsewhere.
+ * @type {number}
+ */
+const LANDING_CAP = 20;
+
+/**
+ * A plan slug as it appears NAMED in a commit message: a numeric prefix (3–5
+ * digits) then kebab words. Attribution runs on this SHAPE, accepting a known miss
+ * (an unattributed commit, or an old non-numeric slug) rather than a fuzzy match —
+ * the false accusation is the more expensive error, since it is what teaches a
+ * human to ignore the output. This is the honest mechanical shadow of "who did
+ * this?", never a verdict. The `g` flag is used ONLY with String.prototype.match
+ * (never `.test`), so there is no shared-lastIndex hazard.
+ * A single character class (`[a-z0-9-]+`) is used rather than a grouped repeat so
+ * there is no nested quantifier and therefore no backtracking hazard.
+ * @type {RegExp}
+ */
+const PLAN_SLUG_RE = /\b\d{3,5}-[a-z0-9-]+\b/g;
+
+/**
  * Concatenate the bodies of EVERY consecutive leading `---…---` frontmatter
  * block into one combined region string.
  *
@@ -401,10 +425,14 @@ function hasMissingFiles(root, declared) {
  * @property {Array<{shortHash:string, dateISO:string, subject:string}>} slugMatchCommits  commits whose message matches \bslug\b.
  * @property {boolean}  slugMatchAfterEntry   ≥1 slugMatch commit with %ct > stageEntryEpoch.
  * @property {boolean}  explicitlyRejected    positive death evidence; SP3 default false.
+ * @property {boolean}  landedBySelf          a commit NAMING this plan's slug touched its declared files AFTER stage entry — the plan's own work arrived. false whenever git could not be read.
+ * @property {boolean}  landedByOther         declared files modified AFTER stage entry by commits naming a DIFFERENT plan slug and NONE naming this one — someone else's work covered this plan's ground (a supersession CANDIDATE, never a verdict). UNREACHABLE-as-true from a degraded state, and false there too — but the classifier reads gitAvailable first so a degraded false is read as "could not look", never "nothing landed".
+ * @property {string[]} landingCommits        short hashes of the after-entry file-modifying commits, bounded by LANDING_CAP — the evidence a human follows.
+ * @property {string[]} landingAttributedTo   the OTHER plan slugs named in those commits, bounded by LANDING_CAP.
  *
  * @typedef {Object} StaleProposal
  * @property {string}  plan  candidate.plan (slug).
- * @property {('shipped-but-early'|'approved-but-stranded'|'dead-on-arrival'|'inconclusive')} category
+ * @property {('shipped-but-early'|'approved-but-stranded'|'dead-on-arrival'|'landed-candidate'|'inconclusive')} category
  * @property {('archive-to-done'|'advance-via-reconciliation'|'revert'|'delete'|null)} proposedAction
  * @property {string[]} evidence  human-readable evidence lines derived from StaleEvidence.
  */
@@ -494,6 +522,13 @@ function verifyStaleCandidate(candidate, root, opts = {}) {
     slugMatchCommits: [],
     slugMatchAfterEntry: false,
     explicitlyRejected: false,
+    // "I could not look" ⇒ every landing field is false/empty. The classifier
+    // reads gitAvailable FIRST and returns inconclusive, so this false is NEVER
+    // read as a confident "nothing landed" — the load-bearing honesty invariant.
+    landedBySelf: false,
+    landedByOther: false,
+    landingCommits: [],
+    landingAttributedTo: [],
   });
 
   // 4. Git availability probe (Risk R2). Any throw ⇒ degraded evidence, never rethrow.
@@ -518,16 +553,36 @@ function verifyStaleCandidate(candidate, root, opts = {}) {
     stageEntryEpoch = null;
   }
 
-  // 6. Files last-modified epoch = MAX %ct across declared files' last commits.
+  // 6. Files last-modified epoch = MAX %ct across declared files' commits, AND the
+  // after-entry file-modifying commits (deduped by short hash) that back the
+  // landed-check. This is the SAME per-file `git log` invocation as before (one per
+  // declared file) — only the `--format` widened (%ct+%h+%s) and the `-1` dropped so
+  // every modifying commit is seen, not just the newest. No NEW git invocation is
+  // added; the landed-check is one derivation away from evidence already gathered.
   let filesLastModifiedEpoch = null;
+  /** @type {Map<string, {ct:number, subject:string}>} short hash → after-entry mod. */
+  const afterEntryMods = new Map();
   for (const f of declaredFiles) {
     const decl = f.replace(/\\/g, '/');
     try {
-      const out = runGit(['log', '-1', '--format=%ct', '--', decl]);
-      const trimmed = out.trim();
-      const n = Number(trimmed);
-      if (trimmed.length > 0 && Number.isFinite(n)) {
-        if (filesLastModifiedEpoch === null || n > filesLastModifiedEpoch) filesLastModifiedEpoch = n;
+      const out = runGit(['log', '--format=%ct%x1f%h%x1f%s', '--', decl]);
+      for (const lineRec of out.split('\n')) {
+        const rec = lineRec.replace(/\r$/, '');
+        if (rec.trim().length === 0) continue;
+        const i1 = rec.indexOf('\x1f');
+        const i2 = rec.indexOf('\x1f', i1 + 1);
+        if (i1 === -1 || i2 === -1) continue;
+        const ct = Number(rec.slice(0, i1).trim());
+        if (!Number.isFinite(ct)) continue;
+        if (filesLastModifiedEpoch === null || ct > filesLastModifiedEpoch) filesLastModifiedEpoch = ct;
+        if (stageEntryEpoch != null && ct > stageEntryEpoch) {
+          const shortHash = rec.slice(i1 + 1, i2).trim();
+          if (!afterEntryMods.has(shortHash)) {
+            // Subject sanitized AT CAPTURE (twin of the slug-match capture below) so
+            // a hostile commit subject cannot inject escape sequences downstream.
+            afterEntryMods.set(shortHash, { ct, subject: stripCtlChars(rec.slice(i2 + 1)) });
+          }
+        }
       }
     } catch {
       // per-path failure ⇒ skip this datum
@@ -582,6 +637,28 @@ function verifyStaleCandidate(candidate, root, opts = {}) {
     }
   }
 
+  // 8. The landed-check — two derived questions, from the after-entry file
+  // modifiers already collected (no new git). `re` (\bslug\b) is reused for the
+  // self-name test; PLAN_SLUG_RE extracts OTHER named slugs for attribution.
+  let landedBySelf = false;
+  const landingCommits = [];
+  const attributed = new Set();
+  for (const [shortHash, mod] of afterEntryMods) {
+    if (landingCommits.length < LANDING_CAP) landingCommits.push(shortHash);
+    if (re.test(mod.subject)) landedBySelf = true;
+    for (const m of mod.subject.match(PLAN_SLUG_RE) || []) {
+      // `re.test(m)` excludes THIS plan's slug (self is landedBySelf, never
+      // "other"); everything else is a distinct plan attributed the landing.
+      if (!re.test(m) && attributed.size < LANDING_CAP) attributed.add(m);
+    }
+  }
+  landedBySelf = landedBySelf && filesModifiedAfterEntry;
+  const landingAttributedTo = [...attributed];
+  // Decision D4: a plan whose OWN work landed (self-named) is an ordinary completed
+  // plan, not a supersession candidate — so landedByOther REQUIRES the absence of a
+  // self-naming file-modifying commit.
+  const landedByOther = filesModifiedAfterEntry && !landedBySelf && landingAttributedTo.length > 0;
+
   return {
     gitAvailable: true,
     error: null,
@@ -595,6 +672,10 @@ function verifyStaleCandidate(candidate, root, opts = {}) {
     slugMatchCommits,
     slugMatchAfterEntry,
     explicitlyRejected: false,
+    landedBySelf,
+    landedByOther,
+    landingCommits,
+    landingAttributedTo,
   };
 }
 
@@ -663,6 +744,32 @@ function classifyStaleCandidate(candidate, evidence) {
   }
 
   const slugMatchCount = (evidence.slugMatchCommits || []).length;
+
+  // 0.5 LANDED-CANDIDATE — this plan's declared files were modified after its stage
+  //     entry by commits naming a DIFFERENT plan, none naming this one: the work
+  //     arrived under another name. This is the honest mechanical shadow of
+  //     supersession, and it is a CANDIDATE for a human/model to judge, NEVER a
+  //     verdict — so the action is null (the SAME null-action treatment as
+  //     `inconclusive`, absent from menu-screens.js CLEANUP_ORDER, so no cleanup
+  //     path ever acts on it). Placed first among the positive rules because it is
+  //     the most specific, highest-value signal and must win over the generic
+  //     approved-but-stranded / shipped-but-early categories. Only reachable when
+  //     gitAvailable (degraded evidence sets landedByOther false), so the honesty
+  //     contract holds: a plan whose git could not be read is inconclusive above,
+  //     never landed-candidate.
+  if (evidence.landedByOther === true) {
+    const who = (evidence.landingAttributedTo || []).join(', ');
+    return {
+      plan,
+      category: 'landed-candidate',
+      proposedAction: null,
+      evidence: [
+        'declared files modified after stage entry by other plan(s): ' +
+          (who || '(unattributed)') +
+          ' — supersession CANDIDATE for judgment, not a verdict',
+      ],
+    };
+  }
 
   // 1. NOT-STARTED (stage gate) — a pre-implementation-stage plan whose ONLY
   //    staleness signal is missing files has not begun work: benign, not stale.
