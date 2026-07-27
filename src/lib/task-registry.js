@@ -867,8 +867,9 @@ function depsSatisfied(candidate, registry) {
  */
 function staleOrphanReservedFiles(registry) {
   const files = [];
-  for (const t of registry.tasks) {
-    if (t.status === 'orphaned' && t.result && t.result.orphanReason === 'staleness' &&
+  const tasks = registry && Array.isArray(registry.tasks) ? registry.tasks : [];
+  for (const t of tasks) {
+    if (t && t.status === 'orphaned' && t.result && t.result.orphanReason === 'staleness' &&
         Array.isArray(t.touches)) {
       for (const f of t.touches) files.push(f);
     }
@@ -1146,12 +1147,21 @@ function unsatisfiableTasks(registry) {
  * @param {string} root  Project root.
  * @param {object} spec  Same shape as {@link addTask}'s spec (never spread — reused
  *   directly, so no prototype-pollution path).
- * @param {{agentTaskId?:string}} [opts]  R3-B item 5: record the harness agent id AT BIRTH
- *   when the caller knows it, so the on-open reconcile can match the task against the live
- *   agent list immediately — closing the window between the claim (which used to record
- *   `agentTaskId: null`) and the later `menu task start --agent-id` patch.
- * @returns {{task:object, claimed:boolean, reason:string}} the created task (running
- *   when claimed, else queued), whether it was claimed, and the scheduler reason.
+ * @param {{agentTaskId?:string, uniquePlan?:boolean}} [opts]  R3-B item 5: record the
+ *   harness agent id AT BIRTH when the caller knows it, so the on-open reconcile can match
+ *   the task against the live agent list immediately — closing the window between the claim
+ *   (which used to record `agentTaskId: null`) and the later `menu task start --agent-id`
+ *   patch. R3-B rework: `uniquePlan` makes the one-non-terminal-task-per-plan invariant
+ *   ATOMIC. When set, the pre-existing-task check runs INSIDE this mutator (on the same
+ *   snapshot the claim commits, re-run against the winner on a CAS conflict), so two
+ *   interleaved same-plan claims can never each add a duplicate — the invariant holds by
+ *   construction, not by a reactive mop-up in `completeExecution`. The caller previously did
+ *   this check on a SEPARATE standalone `load()`, which left a window between the check and
+ *   the claim; that window is now closed.
+ * @returns {{task:object, claimed:boolean, reason:string, existing?:boolean}} the created
+ *   task (running when claimed, else queued), whether it was claimed, and the scheduler
+ *   reason. With `uniquePlan` and a pre-existing non-terminal task, returns that task with
+ *   `existing:true, claimed:false` and adds NOTHING (the registry is byte-unchanged).
  * @throws {TypeError} root is not a non-empty string
  * @throws {Error} spec is rejected by addTask (nothing is persisted)
  */
@@ -1162,7 +1172,19 @@ function addAndClaim(root, spec, opts = {}) {
   const agentTaskId = typeof opts.agentTaskId === 'string' && opts.agentTaskId.length > 0
     ? opts.agentTaskId
     : null;
-  return withRegistry(root, (registry) => {
+  const uniquePlan = opts.uniquePlan === true;
+  return withRegistry(root, (registry, ctx) => {
+    // ATOMIC plan-uniqueness (R3-B rework). The lookup and the claim read ONE snapshot;
+    // on a CAS conflict withRegistry reloads and re-runs this whole mutator, so the check
+    // re-evaluates against the winner. A pre-existing non-terminal task means we abort with
+    // no write — the existing task stands, and no duplicate is ever persisted.
+    if (uniquePlan && spec && spec.plan != null) {
+      const existing = findActivePlanTask(registry, spec.plan, spec.kind || 'implement');
+      if (existing) {
+        ctx.abort(); // registry byte-unchanged — no generation bump
+        return { task: existing, claimed: false, reason: 'already-queued', existing: true };
+      }
+    }
     const task = addTask(registry, spec); // throws on a bad spec BEFORE any save
     const decision = canRun(task, registry);
     if (decision.run) {
@@ -1231,6 +1253,11 @@ module.exports = {
   canTransition,
   findActivePlanTask,
   nextRunnable,
+  // R3-B rework: the ONE encoding of the files reserved by age-only orphans. canRun's
+  // concurrent-edit belt (via overlapsStaleOrphanReservation) AND the projection reporter
+  // task-reconcile.applyQuarantine both derive the held-file set from THIS function — one
+  // predicate, so the scheduler and the "held" report can never disagree about what is held.
+  staleOrphanReservedFiles,
   unsatisfiableTasks,
   // atomic add-and-claim
   addAndClaim,

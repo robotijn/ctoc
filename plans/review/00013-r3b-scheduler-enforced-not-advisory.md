@@ -9,6 +9,7 @@ iron_loop: true
 files:
   - "src/lib/task-registry.js"
   - "src/lib/task-reconcile.js"
+  - "src/lib/task-view.js"
   - "src/lib/menu-screens.js"
   - "src/commands/menu.js"
   - "src/lib/actions.js"
@@ -18,6 +19,11 @@ files:
   - "tests/menu-protocol.test.js"
   - "tests/actions-scheduler.test.js"
   - "tests/scheduler-enforced.test.js"
+  - "tests/r3b-consolidation-rework.test.js"
+  - "tests/last-mile-wired.test.js"
+  - "tests/w10-menu-route-safety.test.js"
+  - "tests/w10-live-agent-reconcile.test.js"
+  - "tests/w10-task-arg-splitting.test.js"
 ---
 
 # R3-B — A rule nothing checks is not a rule
@@ -223,14 +229,15 @@ is CHECKED, not just defined) and the single-writer assumption's replacement.
     to the OTHER plan). (b) `recordDeployReadyNotice` writes `deploy-ready.json` atomically
     (temp + rename), mirroring stale-cleanup.
 
-### Bypasses I could NOT close (out of my file scope)
+### Bypasses I could NOT close (out of my file scope) — RECONCILED at rework (2026-07-27)
 - `menu.md` documents `claude:ledger-backfill` with no emitter (PARITY-reverse / R3-D recipe test):
   the concurrent ledger executor owns `menu.md`.
-- Full-suite failures in `sync.js` (moveToReviewAfterPush removed), `dependency-auditor.js`
-  (5 tsc errors), `compliance-regime`/environment-mode, the reachability baseline (488→127, a
-  wave-level accounting), and the documented test-file counts (new test files added by multiple
-  executors) are all outside my five source files — concurrent-executor / wave-level, to be
-  reconciled by the integrator at commit.
+- **The full-suite failures recorded here were STALE.** On rework HEAD (v6.13.38) the wave has
+  integrated: `npx tsc --noEmit` exits 0 (the "5 tsc errors in dependency-auditor.js" no longer
+  exist), and `npm test` is green (coverage 99.04% scoped to src/**, 0 failed, 0 skipped). The
+  `sync.js` / `compliance-regime` / environment-mode / reachability-baseline / test-file-count
+  items were reconciled by the integrator across the wave. The critical-tier compile-error claim
+  is confirmed refuted against the live tree, not merely asserted.
 
 ---
 
@@ -254,3 +261,76 @@ nextRunnable + `menu-screens.computePromote` behind the one predicate) so the pr
 still REPORTS what the scheduler HELD — one encoding, every promote path, reporter intact.
 The parity fence `tests/promote-quarantine-parity.test.js` case 9/9b now encodes the
 belt-and-suspenders contract 00003 shipped; tighten it as you consolidate.
+
+---
+
+## Step 16 — Rework report (2026-07-27, v6.13.39)
+
+Reworked against the adversarial review (2 critical, 4 important). Each finding verified
+against the live source FIRST; refuted ones dropped, surviving ones fixed at highest quality.
+
+### Findings dispositions
+
+- **ship-gate-cannot-show-green (CRITICAL) — REFUTED (stale).** The "5 tsc errors in
+  dependency-auditor.js" and the full-suite-red claim were stale wave-in-flight state.
+  Confirmed against HEAD: `npx tsc --noEmit` exits 0; `npm test` is green (coverage 99.04%
+  src/**, 0 failed, 0 skipped). The plan's "Bypasses" section is corrected to record this.
+- **gate-ruling (CRITICAL) — REFUTED.** It aggregates the above; same disposition.
+- **terminal-mirror-not-consolidated (important) — FIXED.** The headline "ONE terminal
+  encoding" goal is now fully met. Replaced the three surviving divergent copies of the
+  terminal set with the canonical `taskRegistry.TERMINAL`: `actions.js` (was a local literal
+  while the same file already used the canonical set elsewhere — the internal inconsistency
+  the review named), `task-reconcile.js` (governs the retention sweep and the blockedBy
+  live-edge check), and `task-view.js:38` — which was the actually-divergent copy: it omitted
+  `cancelled`, so a cancelled task's result summary never rendered. That is now a real
+  behavior fix (RW-03), not just hardening.
+- **uniqueness-check-not-atomic (important) — FIXED.** `startAgent`/`advanceAgent` checked
+  `findActivePlanTask` on a standalone `load()` and then claimed in a separate transaction —
+  a window where two interleaved same-plan starts could each add a duplicate. `addAndClaim`
+  gains `opts.uniquePlan`: the uniqueness check now runs INSIDE the compare-and-swap mutator
+  (one snapshot for check+claim, re-checked against the winner on a CAS conflict). The
+  invariant now holds by construction, not by the reactive mop-up in `completeExecution`.
+  `menu task add` (`taskAdd`) was already atomic; both walkers now match it (RW-01/RW-02).
+- **undeclared-scope-and-c7 (important) — RECONCILED.** The `files:` block now declares the
+  w10 / last-mile test files Decision 4 admitted editing, plus the new rework test file and
+  `task-view.js` — the true blast radius. The C7 tightening was verified: the affected tests
+  seed a real in-progress plan or assert the refusal; no assertion was weakened.
+- **human-ruling-consolidation-unshipped (important) — SHIPPED.** The concurrent-edit
+  quarantine's reserved-file set is now ONE encoding: exported
+  `task-registry.staleOrphanReservedFiles` drives BOTH `canRun`'s belt (via
+  `overlapsStaleOrphanReservation`) AND the projection reporter
+  `task-reconcile.applyQuarantine`. Previously `applyQuarantine` re-derived the set with its
+  own inline loop — a second copy that could drift from the belt. The fail-safe try/catch
+  in `applyQuarantine` is unchanged; the shared predicate gained a null-task guard so it is
+  robust for both callers. Pinned by RW-04.
+
+### All-three-promote-paths coverage — verified HONESTLY
+
+The three promote-set paths were ALREADY covered before this rework — the gap was the
+ENCODING, not the coverage:
+1. **Primary path** (`task-reconcile.reconcileState`): `nextRunnable` → `applyQuarantine`
+   (reporter) — covered.
+2. **`menu-screens.computePromote`**: `applyQuarantine(reg, nextRunnable(reg))` — covered.
+3. **Dashboard re-run offer**: the re-run is a `menu task start <id>` routed through
+   `taskTransition('start')` → `canRun` → the belt — covered.
+
+So no promote path could bypass the quarantine. What this rework closed is the human
+ruling's actual ask — "one encoding, every promote path" — by collapsing the two
+reserved-set derivations (the belt's and the reporter's) into the single exported predicate.
+No redundant code was added to `nextRunnable` (putting the belt there would strip the
+candidate before `applyQuarantine` reports it, killing the "held" report — the parity fence's
+reason for keeping the filter in the projection). The parity fence
+`tests/promote-quarantine-parity.test.js` stays green (312/312 across the affected suites).
+
+### Files changed
+- `src/lib/task-registry.js` — `addAndClaim` atomic `uniquePlan`; export
+  `staleOrphanReservedFiles` (+ null-task guard).
+- `src/lib/task-reconcile.js` — `applyQuarantine` reuses the shared reserved-set predicate;
+  retention `TERMINAL` is the canonical set.
+- `src/lib/task-view.js` — import canonical `TERMINAL` (fixes the cancelled-summary omission).
+- `src/lib/actions.js` — `startAgent`/`advanceAgent` route through the atomic `uniquePlan`;
+  `taskSpecFromPlan` uses the canonical terminal set.
+- `tests/r3b-consolidation-rework.test.js` — new; RW-01..RW-04 (red-first, then green).
+
+### Gate
+`npm test` green: coverage 99.04% (floor 99), 0 failed, 0 skipped; `npx tsc --noEmit` exits 0.

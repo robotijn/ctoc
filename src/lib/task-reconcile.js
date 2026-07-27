@@ -132,9 +132,11 @@ const DEFAULT_PRESUMED_DEAD_MULTIPLE = 2;
 /**
  * Terminal statuses for the RETENTION sweep — old ones leave the active view. Includes
  * `cancelled` (C1-2) so cancelled tasks age out like any other terminal. `cancelling` is
- * NOT terminal (it is a live, slot-occupying state) and is never swept.
+ * NOT terminal (it is a live, slot-occupying state) and is never swept. R3-B rework: the
+ * CANONICAL frozen set from task-registry, never a local literal — one encoding, so if a
+ * fifth terminal state is ever added the retention sweep cannot silently desync from it.
  */
-const TERMINAL = new Set(['done', 'failed', 'orphaned', 'cancelled']);
+const TERMINAL = taskRegistry.TERMINAL;
 
 /** The atomic-write temp prefix task-registry.save uses: `${target}.tmp-…`. */
 const TEMP_PREFIX = 'tasks.json.tmp-';
@@ -698,7 +700,7 @@ function applyQuarantine(registry, candidates) {
   // is how two agents end up on one file — and the failure looked exactly like the guard
   // running and finding nothing. Each phase now records its fault and DROPS what it could
   // not check.
-  const quarantinedTouches = [];
+  let quarantinedTouches = [];
   let collectFaulted = null;
   try {
     // PERSISTENT quarantine set (concurrent-edit defect). Reserve the files of EVERY task
@@ -708,12 +710,15 @@ function applyQuarantine(registry, candidates) {
     // `report.stalenessOrphaned`, is what makes the hold persist across passes: a still-alive
     // age-orphan keeps its files reserved until the across-passes branch flips its marker to
     // `confirmed-dead` (agent confirmed gone), at which point it drops out of this set.
-    for (const t of registry.tasks || []) {
-      if (t && t.status === 'orphaned' && t.result &&
-          t.result.orphanReason === 'staleness' && Array.isArray(t.touches)) {
-        quarantinedTouches.push(...t.touches);
-      }
-    }
+    //
+    // R3-B rework (human ruling 2026-07-26 — one predicate, every promote path): the
+    // reserved-set derivation is NO LONGER a second copy of the loop that lives in
+    // `task-registry.staleOrphanReservedFiles` (which canRun's belt already uses). Both the
+    // scheduler belt and this projection reporter now read the SAME function, so they can
+    // never silently disagree about which files are held — the exact drift class this whole
+    // program keeps removing. The try/catch fail-safe below is UNCHANGED: a throw here still
+    // drops every file-editing candidate.
+    quarantinedTouches = taskRegistry.staleOrphanReservedFiles(registry);
   } catch (err) {
     collectFaulted = msgOf(err);
   }

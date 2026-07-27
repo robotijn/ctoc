@@ -1370,10 +1370,11 @@ function taskSpecFromPlan(plan, projectPath) {
 
   // Resolve dependency slugs against the live registry.
   const registry = taskRegistry.load(root);
-  const TERMINAL = new Set(['done', 'failed', 'orphaned', 'cancelled']);
   const blockedBy = [];
   for (const slug of planDependsOn(plan)) {
-    const nonTerminal = registry.tasks.find((t) => t.plan === slug && !TERMINAL.has(t.status));
+    // ONE terminal encoding (R3-B rework): the registry's exported frozen set, never a
+    // local literal — this file already uses taskRegistry.TERMINAL elsewhere.
+    const nonTerminal = registry.tasks.find((t) => t.plan === slug && !taskRegistry.TERMINAL.has(t.status));
     if (nonTerminal) {
       blockedBy.push(nonTerminal.id);
       continue;
@@ -1477,13 +1478,17 @@ function startAgent(projectPath, options = {}) {
       skipped.push({ plan: plan.name, reason: err.message });
       continue;
     }
-    // item 2: do NOT enqueue a second implement task for a plan that already has a live one.
-    const existing = taskRegistry.findActivePlanTask(taskRegistry.load(root), plan.name, 'implement');
+    // item 2 (R3-B rework — now ATOMIC): do NOT enqueue a second implement task for a plan
+    // that already has a live one. The uniqueness check runs INSIDE addAndClaim's
+    // compare-and-swap mutator (one snapshot for check + claim, re-checked against the
+    // winner on a conflict), so two interleaved same-plan starts can never each add a
+    // duplicate — the former standalone `findActivePlanTask(load(root))` pre-check left a
+    // window between the check and the claim.
+    const { task, claimed, reason, existing } = taskRegistry.addAndClaim(root, spec, { uniquePlan: true });
     if (existing) {
-      queuedTasks.push({ plan: plan.name, taskId: existing.id, reason: 'already-queued' });
+      queuedTasks.push({ plan: plan.name, taskId: task.id, reason: 'already-queued' });
       continue;
     }
-    const { task, claimed, reason } = taskRegistry.addAndClaim(root, spec);
     if (!claimed) {
       // item 3: the ladder refused this head; keep its single queued task and try the next.
       queuedTasks.push({ plan: plan.name, taskId: task.id, reason });
@@ -1591,12 +1596,12 @@ function advanceAgent(projectPath) {
       skipped.push({ plan: plan.name, reason: err.message });
       continue;
     }
-    const existing = taskRegistry.findActivePlanTask(taskRegistry.load(root), plan.name, 'implement');
+    // R3-B rework — atomic plan-uniqueness (see startAgent for the rationale).
+    const { task, claimed, reason, existing } = taskRegistry.addAndClaim(root, spec, { uniquePlan: true });
     if (existing) {
-      queuedTasks.push({ plan: plan.name, taskId: existing.id, reason: 'already-queued' });
+      queuedTasks.push({ plan: plan.name, taskId: task.id, reason: 'already-queued' });
       continue;
     }
-    const { task, claimed, reason } = taskRegistry.addAndClaim(root, spec);
     if (!claimed) {
       queuedTasks.push({ plan: plan.name, taskId: task.id, reason });
       continue;
