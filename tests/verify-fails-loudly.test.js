@@ -144,3 +144,47 @@ describe('runVerify — app-shaped project whose app does not boot FAILS (sync p
     );
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V8 — a run that TIMES OUT is UNCERTIFIED, never mislabeled a test failure.
+//
+// Finding (review of R4-A): the ENOBUFS overflow was given its own UNCERTIFIED
+// branch, but a SIGTERM/ETIMEDOUT timeout fell through the generic catch — which
+// marks a launch failure only for ENOENT/exit-127 — so a long-but-green suite
+// minted `success:false` with the dishonest reason "Tests failed", and the 120s
+// budget was hardcoded so a legitimately long suite had no exit. This is the same
+// dishonesty class this plan abolishes, on the one axis it left open: a run that
+// did not COMPLETE is not a run that FAILED. It must fail CLOSED (refuse the gate)
+// but with its TRUE reason and a RAISABLE budget.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('tryCommand — a timeout is UNCERTIFIED with its true reason, not a test failure', () => {
+  it('V8: a command that exceeds the configured budget → success:false, spawnFailed:false, error names UNCERTIFIED + the budget', () => {
+    // A cross-platform 3s sleeper; the budget is 300ms, so it is guaranteed to
+    // be terminated by the timeout, not to exit on its own.
+    const r = verify.tryCommand('node -e "setTimeout(function(){}, 3000)"', dir, { timeout: 300 });
+    assert.equal(r.success, false, 'a run that did not complete fails CLOSED (never a false pass)');
+    assert.equal(r.spawnFailed, false, 'a timeout RAN — it is NOT a launch failure (NOT-RUN)');
+    assert.ok(/uncertified/i.test(r.error), `the timeout must be reported UNCERTIFIED; got: ${r.error}`);
+    assert.ok(
+      /budget|timed out|timeout|CTOC_VERIFY_TIMEOUT_MS/i.test(r.error),
+      `the reason must name the budget so an operator can raise it; got: ${r.error}`
+    );
+    assert.ok(
+      !/^tests failed/i.test(r.error) && !/^tests? failed/i.test(r.error),
+      `a timeout must NOT be mislabeled a test failure; got: ${r.error}`
+    );
+  });
+
+  it('V8b: the timeout budget is configurable via CTOC_VERIFY_TIMEOUT_MS', () => {
+    const prev = process.env.CTOC_VERIFY_TIMEOUT_MS;
+    process.env.CTOC_VERIFY_TIMEOUT_MS = '250';
+    try {
+      const r = verify.tryCommand('node -e "setTimeout(function(){}, 3000)"', dir);
+      assert.equal(r.success, false);
+      assert.ok(/uncertified/i.test(r.error), `env-configured budget must still fail UNCERTIFIED; got: ${r.error}`);
+    } finally {
+      if (prev === undefined) delete process.env.CTOC_VERIFY_TIMEOUT_MS;
+      else process.env.CTOC_VERIFY_TIMEOUT_MS = prev;
+    }
+  });
+});

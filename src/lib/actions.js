@@ -425,13 +425,25 @@ function approvePlan(planPath, projectPath, options = {}) {
       const override = options.override && typeof options.override === 'object'
         ? options.override
         : null;
-      const validation = validateTransition(planPath, from, to, root);
-      if (validation && validation.valid === false && !override) {
-        const failures = Array.isArray(validation.errors) ? validation.errors : [];
+      // Validator via a `deps` seam (same options.deps pattern threaded to
+      // stampAndLedger), defaulting to the real total validateTransition — so the
+      // otherwise-unreachable malformed-return branch below can be driven by a test.
+      const validate = (options.deps && typeof options.deps.validateTransition === 'function')
+        ? options.deps.validateTransition
+        : validateTransition;
+      const validation = validate(planPath, from, to, root);
+      // FAIL CLOSED (R5-B hardening): cross ONLY on an explicit `valid === true` or a
+      // recorded human override. A null / undefined / malformed validation return does
+      // NOT pass — the former `valid === false` check crossed on anything that was not
+      // literally false (fail-open), against this repo's fail-closed doctrine (a parser
+      // returns null not 0; the coverage floor refuses on an unreadable baseline).
+      const validationPassed = !!(validation && validation.valid === true);
+      if (!validationPassed && !override) {
+        const failures = (validation && Array.isArray(validation.errors)) ? validation.errors : [];
         return {
           ok: false,
           refused: true,
-          reason: `${from}→${to} refused: ${failures.join('; ') || 'failed validation'}`,
+          reason: `${from}→${to} refused: ${failures.join('; ') || 'validation did not pass'}`,
           failures,
           validation
         };
@@ -557,7 +569,10 @@ function approvePlan(planPath, projectPath, options = {}) {
           to,
           actor: 'human',
           validation: {
-            passed: validation ? validation.valid !== false : true,
+            // Honest polarity: passed ONLY on an explicit valid:true. A missing or
+            // malformed validation is recorded as NOT passed (it was crossed by
+            // override), never silently logged as passed (the fail-open defect).
+            passed: validationPassed,
             checks: 0,
             warnings: (validation && Array.isArray(validation.warnings)) ? validation.warnings.length : 0
           },

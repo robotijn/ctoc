@@ -456,6 +456,40 @@ class SecretsScanner {
    * @returns {boolean} True if file should be scanned
    */
   shouldScan(filePath) {
+    if (!this.shouldScanPath(filePath)) return false;
+
+    // Check file size. An oversized file is NOT silently dropped — record the
+    // skip in this.errors (mirroring the unreadable-file record) so a secret
+    // past maxFileSize is surfaced rather than invisibly unscanned. This is the
+    // ONE disk-touching step, kept out of shouldScanPath so a committed blob (not
+    // necessarily on disk) can be type-checked without a stat.
+    try {
+      const stats = safeFs.statSync(filePath);
+      if (stats.size > this.options.maxFileSize) {
+        this.errors.push({
+          file: filePath,
+          kind: 'skip',
+          error: `Skipped: file size ${stats.size} exceeds maxFileSize ${this.options.maxFileSize} bytes (unscanned)`
+        });
+        return false;
+      }
+    } catch (e) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Path/extension eligibility for scanning — the TYPE decision only, with NO
+   * disk stat. Split out of `shouldScan` so the push gate can decide whether a
+   * COMMITTED blob (which may not be present on disk) is a scannable type before
+   * pulling its content via `git show`. Records the secret-dense-unscanned skip
+   * ledger exactly as before.
+   * @param {string} filePath - Path to file
+   * @returns {boolean} True if the file's TYPE is in scope for scanning
+   */
+  shouldScanPath(filePath) {
     const relativePath = path.relative(this.projectRoot, filePath);
     const ext = path.extname(filePath).toLowerCase();
     const basename = path.basename(filePath);
@@ -522,23 +556,8 @@ class SecretsScanner {
       return false;
     }
 
-    // Check file size. An oversized file is NOT silently dropped — record the
-    // skip in this.errors (mirroring the unreadable-file record) so a secret
-    // past maxFileSize is surfaced rather than invisibly unscanned.
-    try {
-      const stats = safeFs.statSync(filePath);
-      if (stats.size > this.options.maxFileSize) {
-        this.errors.push({
-          file: filePath,
-          kind: 'skip',
-          error: `Skipped: file size ${stats.size} exceeds maxFileSize ${this.options.maxFileSize} bytes (unscanned)`
-        });
-        return false;
-      }
-    } catch (e) {
-      return false;
-    }
-
+    // The type is in scope. Size (the one disk-touching gate) is checked by the
+    // caller `shouldScan`, not here.
     return true;
   }
 
@@ -829,10 +848,34 @@ class SecretsScanner {
    * @returns {Array} Findings in this file
    */
   scanFile(filePath) {
-    const findings = [];
-
     try {
       const content = safeFs.readFileSync(filePath, 'utf8');
+      return this.scanContent(content, filePath);
+    } catch (e) {
+      this.errors.push({ file: filePath, kind: 'error', error: e.message });
+      return [];
+    }
+  }
+
+  /**
+   * Scan an in-memory content STRING for secrets, attributed to `filePath`.
+   *
+   * Split out of `scanFile` so a caller can scan bytes that are not (or are no
+   * longer) on disk — the push gate scans the COMMITTED content of each commit in
+   * the push delta (`git show <rev>:<path>`), which catches a secret added in one
+   * pushed commit and removed in a later one: present in the pushed history and
+   * recoverable from the remote, but absent from the working tree. `filePath` is
+   * used only for language/extension decisions and the reported relative path — it
+   * need not exist on disk. Callers own their try/catch; a throw here is the
+   * caller's to record (quality-agent scans each delta blob in its own try/catch).
+   *
+   * @param {string} content - the bytes to scan.
+   * @param {string} filePath - absolute path the content is attributed to.
+   * @returns {Array} findings.
+   */
+  scanContent(content, filePath) {
+    const findings = [];
+    {
       const lines = content.split('\n');
       const relativePath = path.relative(this.projectRoot, filePath);
 
@@ -911,9 +954,6 @@ class SecretsScanner {
         const highEntropyFindings = this.detectHighEntropyStrings(content, lines, relativePath);
         findings.push(...highEntropyFindings);
       }
-
-    } catch (e) {
-      this.errors.push({ file: filePath, kind: 'error', error: e.message });
     }
 
     return findings;

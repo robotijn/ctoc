@@ -26,6 +26,16 @@ files:
   # loud-failure contract, or the suite stays red and the fix is un-shippable.
   - "tests/verify-evidence-wiring.test.js"
   - "tests/ctoc-audit-w05-verify-evidence.test.js"
+  # Added in the REWORK (see "Rework Report", 2026-07-27) — the review flagged three
+  # code defects whose real change surface these files are:
+  #  * secrets-scanner.js — the committed-blob secrets scan (scanContent/shouldScanPath)
+  #    that catches a secret added-then-removed within the push delta.
+  #  * cvss.js + cvss.test.js — the CVSS base-score scorer item 10's severity fix
+  #    delegates to; declared so the push-blocking severity logic is under this plan's
+  #    coverage/review fence (it was already tested by tests/cvss.test.js).
+  - "src/lib/secrets-scanner.js"
+  - "src/lib/cvss.js"
+  - "tests/cvss.test.js"
 ---
 
 # R4-A — A gate that opens on nothing is not a gate
@@ -179,18 +189,23 @@ real, and name the test that proves it on a project WITH code.
 
 ## Decisions Taken Under Ambiguity
 
-1. **Coverage floor = the baseline file, and the 40-vs-80 discrepancy is REAL.**
-   `.ctoc/coverage-baseline.json` declares `minPct: 40` (a ratchet established
-   2026-07-13, measured 40.85%). CLAUDE.md's Step 14 text claims "coverage ≥ 80%".
-   These disagree. As instructed I implemented against the BASELINE FILE
-   (`readCoverageFloor` reads `minPct`), did NOT hardcode 80, and did NOT silently
-   pick one. FINDING for the human: the 40% ratchet is the *suite-wide* floor for a
-   codebase that predates coverage instrumentation; the 80% is the *new-code at
-   review* standard. They are two different gates, but the text does not say so and
-   reads as a contradiction. RECOMMENDATION: state both explicitly in CLAUDE.md, or
-   reconcile. When NO baseline file exists (a greenfield project), coverage is not
-   gated at all (I do not invent a floor) — coverage only gates when both a floor is
-   declared AND a percentage was actually parsed from real test output.
+1. **Coverage floor = the baseline file, read dynamically.** VERIFY reads the floor
+   from `.ctoc/coverage-baseline.json` (`readCoverageFloor` reads `minPct`); it does
+   NOT hardcode a number. That was the right call and it still is — the runtime tracks
+   whatever the baseline declares.
+   CORRECTED IN REWORK (2026-07-27): the original text of this decision reasoned at
+   length about a floor of 40 and a "40-vs-80 discrepancy" as a live finding. That is
+   now STALE and has been removed: the live baseline declares `minPct: 99` (a dated
+   40→88→…→99 ratchet), and CLAUDE.md documents the two gates plainly — the baseline
+   `minPct` is the suite-wide floor, and 80 is the aspirational new-code-at-review
+   target for a project with NO baseline at all. There is no unresolved contradiction.
+   FAIL-CLOSED BEHAVIOR, stated to match what shipped (step-13-verify.js:611-634):
+   when NO floor is declared, coverage is not gated (we do not invent a floor); when a
+   floor IS declared but coverage could NOT be measured, that is NOT a pass — it FAILS
+   CLOSED ("coverage floor declared but no coverage figure was produced — unmeasured is
+   NOT a pass"). The original final clause ("coverage only gates when a floor is
+   declared AND a percentage was actually parsed") read the opposite of the shipped
+   code and has been rewritten here to state the real fail-closed contract.
 
 2. **Two VERIFY test files OUTSIDE the `files:` list had to be rewritten.**
    `tests/verify-evidence-wiring.test.js` (line 88: "clean project passes VERIFY
@@ -268,3 +283,90 @@ real, and name the test that proves it on a project WITH code.
 - **Step 15 DOCUMENT:** step-13-verify.js header now states the fail-closed
   contract plainly ("a check that did not run is not a check that passed").
 - **Step 16 FINAL-REVIEW:** report delivered.
+
+## Rework Report (2026-07-27) — review findings resolved
+
+The review of this plan raised two critical and five important findings. Each was
+verified against source FIRST; surviving findings were fixed at the highest-quality
+option (no check or assertion weakened — this plan's own bar). TDD throughout: the
+failing test was written and seen RED before the fix.
+
+**Findings and disposition**
+
+1. **No fresh passing full-suite VERIFY artifact (CRITICAL) — RESOLVED.** The
+   original certification ran `node --test` on a subset while the shared tree was red
+   with SIX failures the plan attributed to other executors' in-flight files. That
+   attribution is now confirmed STALE: on a clean, serialized tree the full `npm test`
+   gate passes (`# fail 0`, `# skipped 0`, coverage ≥ 99) and `npx tsc --noEmit` exits
+   0. The plan is now held to the exact standard it imposes on every other — a real,
+   fresh, passing gate run. (The prior "6 unrelated failures" note in the Execution Log
+   above is preserved as historical narrative; it no longer describes the tree.)
+
+2. **Gate-ruling rollup (CRITICAL) — RESOLVED** by addressing every sub-finding below
+   plus the green gate in #1.
+
+3. **A VERIFY timeout was misclassified as a test failure (IMPORTANT) — FIXED.**
+   `tryCommand` gave ENOBUFS its own UNCERTIFIED branch but a SIGTERM/ETIMEDOUT timeout
+   fell through the generic catch (which flags a launch failure only for ENOENT/exit
+   127), so a long-but-green suite minted `success:false` with the dishonest reason
+   "Tests failed", and the 120s budget was hardcoded. FIX (step-13-verify.js): a
+   dedicated timeout branch returns UNCERTIFIED with its true reason (fails CLOSED, NOT
+   flagged a launch failure — it RAN), and the budget is now RAISABLE per call
+   (`opts.timeout`) and per environment (`CTOC_VERIFY_TIMEOUT_MS`, default 120000).
+   Proven by `verify-fails-loudly.test.js` V8/V8b.
+
+4. **The push secrets scan read the WORKING TREE, not the pushed history (IMPORTANT)
+   — FIXED.** The delta scoping fixed the file-NAME set (`@{upstream}..HEAD`) but scanned
+   the current on-disk content, so a secret added in one pushed commit and removed in a
+   later one — present in the pushed history, recoverable from the remote — was missed
+   (add-then-remove nets to no diff and leaves no working-tree copy). FIX: the scan now
+   walks the delta COMMIT BY COMMIT (`getPushDeltaBlobs`) and scans the COMMITTED content
+   of each blob (`readCommittedBlob` → `git show <rev>:<path>` → new
+   `SecretsScanner.scanContent`/`shouldScanPath`). All git invocations use `execFileSync`
+   with an argument array (no shell) so a metacharacter-laden filename in an arbitrary
+   scanned repo cannot inject a command. Proven by the new
+   `quality-fleet-wiring.test.js` case "BLOCKS on a secret ADDED then REMOVED within the
+   unpushed delta"; the F-4 continue-past-a-throw test was retargeted from `scanFile` to
+   `scanContent` (contract unchanged — one throw must not abandon the delta).
+
+5. **The CVSS scorer was outside the declared change set (IMPORTANT) — RESOLVED.**
+   Item 10's push-blocking severity fix delegates to `src/lib/cvss.js`
+   (`cvssVectorBaseScore`/`severityFromCvss`), which was not in `files:`. It is already
+   covered by `tests/cvss.test.js` (canonical 9.8 network-RCE vector → CRITICAL, 7.5
+   confidentiality-only → HIGH, incomplete vector → null → caller bands HIGH, scope-changed
+   boundary). Both are now declared in `files:`, bringing the security-critical scorer
+   under this plan's coverage/review fence. No code change was needed — the module is
+   correct and tested.
+
+6. **Stale done-record (IMPORTANT) — CORRECTED.** Decision #1 above was rewritten: the
+   "40-vs-80 discrepancy" is resolved (baseline `minPct` is 99, documented in CLAUDE.md)
+   and the final clause that read opposite to the shipped fail-closed-on-unmeasured
+   behavior now states the real contract (step-13-verify.js:611-634).
+
+7. **Reversal of a human-approved w05 assertion (IMPORTANT) — RATIFIED HERE.** Decision
+   #2 rewrote `tests/ctoc-audit-w05-verify-evidence.test.js` (a file of the
+   ctoc-audit-w05 workstream, human-approved to done 2026-07-13): its "empty project
+   should pass via fallback" assertion was reversed so an empty project now FAILS LOUDLY
+   (`passed:false`). The reversal is INTENTIONAL and correct — the old assertion pinned
+   the exact vacuous pass this plan exists to abolish, and CLAUDE.md's contract is "If a
+   test cannot run, it must FAIL LOUDLY." It is limited to removing that vacuous pass;
+   no other w05 behavior is touched. Recorded explicitly so the change to a
+   previously-approved assertion is owned at the gate, not absorbed silently, and so the
+   next reader of w05 can see the flip was deliberate.
+
+**Not changed (residual, deliberately out of scope):** the review's secrets-scan option
+also noted the general case is now covered; the committed-blob fix above closes the
+add-then-remove gap it flagged. No finding remains open.
+
+**Files changed in the rework:** `src/lib/step-13-verify.js` (timeout→UNCERTIFIED +
+raisable budget, header contract), `src/lib/quality-agent.js` (committed-blob delta
+secrets scan), `src/lib/secrets-scanner.js` (`scanContent`/`shouldScanPath` split),
+`tests/verify-fails-loudly.test.js` (V8/V8b), `tests/quality-fleet-wiring.test.js`
+(add-then-remove BLOCKED + F-4 retarget), plus `files:` now declaring `src/lib/cvss.js`
+and `tests/cvss.test.js`.
+
+**Gate 3 evidence is real.** VERIFY passes only when a substantive check actually RAN;
+the journey proof that a project WITH code crosses on real evidence is
+`last-mile-wired.test.js` (a real package.json + real passing test → verify RUNS and
+passes), complemented by the failing-tests and no-toolchain cases that make Gate 3
+REFUSE. The full `npm test` gate is green on a clean serialized tree.

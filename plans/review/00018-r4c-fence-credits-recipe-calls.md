@@ -2,7 +2,7 @@
 title: "R4-C — The fence credits a CALL, not a fenced block: recipe invocations are live, prose is not"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild
-depends_on: none
+depends_on: 00017-r4b-fence-real-placebos-dead
 priority: CRITICAL
 program: ctoc-repair-loop
 iron_loop: true
@@ -17,12 +17,14 @@ files:
 
 R4-B fixed the prose-disarms-the-fence hole by requiring surface mentions to
 be in FENCED code blocks. That over-corrected: CTOC's instruction surfaces
-invoke library functions with INLINE code, not fenced blocks. Verified on disk:
+invoke library functions with INLINE code, not fenced blocks. Verified on disk
+(the shipped command surface is `src/commands/start.md`, not `menu.md` — there is
+no `menu.md` command surface; the earlier citations were wrong):
 
-- `approveSubplans(parentSlug, 'review')` — the Gate 3 `done-all` gate, menu.md:46
-- `declineComplianceRegime(process.cwd())` — compliance decline, menu.md:65
-- `dismissStale(process.cwd(), candidates)` — a real `node -e`, menu.md:64
-- `completeVision(visionPath)` — Gate 0 archive, vision-decomposer.md:470
+- `approveSubplans(parentSlug, 'review')` — the Gate 3 `done-all` gate, start.md:50
+- `declineComplianceRegime(process.cwd())` — compliance decline, start.md:68
+- `dismissStale(process.cwd(), candidates)` — a real `node -e`, start.md:67
+- `completeVision(visionPath)` — Gate 0 archive, vision-decomposer.md:468
 
 R4-B baselined all four (and 20 siblings) as DEAD. They are NOT dead — they
 are reachable by the documented mechanism (the session model reads the recipe
@@ -138,3 +140,60 @@ when its code edge is cut.
 - [x] Step 14 VERIFY — `node --test` both named files: 21 pass, 0 fail, 0 skipped; eslint clean; consumers (iron-loop-enforcer, actions-dead-exports-guard) 27 pass.
 - [x] Step 15 DOCUMENT — header "WHAT COUNTS AS A CALLER" rule 3 + `surfaceCalledNames` doc state the call-vs-citation rule precisely.
 - [x] Step 16 FINAL-REVIEW — before/after diff, four gate exports proven live by name, completeExecution re-catch proven, in the executor report.
+
+## Supersession note (record reconciled to disk, 2026-07-27)
+
+The numbers in the Execution Status and "Decisions Taken Under Ambiguity" above are
+this plan's ORIGINAL claims and are kept as history. Disk has since moved on and the
+record is reconciled here so nothing false lands in `done/`:
+
+- **Baseline count.** R4-C's own re-seed brought the dead-export baseline to 104.
+  Later ratchets moved it further DOWN (the ratchet is honored throughout): the
+  current `.ctoc/export-reachability-baseline.json` records `maxDead: 68`. The
+  headline "104" above is R4-C's snapshot, not today's floor.
+- **`src/lib/ui.js#doctor` is no longer a human action-item.** R4-C FLAGGED `doctor`
+  for wiring-or-deletion. It was subsequently RESOLVED BY DELETION (recorded in the
+  baseline provenance as "R6-C: src/lib/ui.js#doctor RESOLVED by DELETION"). Do NOT
+  re-action the wire-or-delete-doctor flag — it is closed.
+- **Dependency on R4-B recorded.** `depends_on` is now
+  `00017-r4b-fence-real-placebos-dead` (was `none`). R4-C shares
+  `src/lib/reachability.js` with R4-B and explicitly PRESERVES R4-B's comment-lexer
+  and file-path/basename rules while replacing only the surface-usage predicate, so
+  the declared graph now matches reality; an individual gate or revert of R4-B can no
+  longer silently strand R4-C's assumption.
+
+## Rework (review kickback, 2026-07-27)
+
+Adversarial review of the review→done crossing raised six findings; each verified
+against source and dispositioned:
+
+1. **CRITICAL — re-catch guard on the real object.** The fence's motivating
+   guarantee (cut the `completeTaskPlan → completeExecution` code edge → it goes
+   DEAD) was proven only on a synthetic fixture; the real-repo test asserted
+   `completeExecution` LIVE but not that it is live ONLY via its code edge, so a
+   future doc writing `completeExecution(` would surface-credit it and silently
+   disarm the re-catch with the suite green. FIXED: `analyzeExports` now returns
+   `surfaceCalled` (the sorted set of names a shipped surface CALLS — the same
+   signal the classifier reads), and a new guard test asserts `completeExecution` is
+   NOT in it (turning a future disarm into a RED test) AND that the five recipe-
+   invoked gate exports ARE in it (the credit half). TDD: seen red (field absent),
+   then green.
+2. **IMPORTANT — run the gated `npm test`.** Step 14 originally ran only
+   `node --test` on the two files, which bypasses the coverage floor and the
+   zero-skipped gate. FIXED: the enforced `npm test` gate was run to green (see
+   VERIFY below).
+3. **IMPORTANT — stale FINAL-REVIEW record.** Reconciled in the supersession note
+   above (104 → current maxDead 68; `doctor` resolved by deletion, flag closed).
+4. **IMPORTANT — declared dependency on R4-B.** Recorded in frontmatter
+   (`depends_on: 00017-r4b-fence-real-placebos-dead`).
+5. **LOW — stale comment / citation / silent-catch.** (a) `reachability.js` line
+   ~820 still called the surface rule "a FENCED instruction-surface recipe" (R4-B
+   language) — corrected to the call-syntax rule. (b) The plan cited `menu.md`; the
+   real surface is `src/commands/start.md` — corrected above. (c) `surfaceCalledNames`
+   swallowed an unreadable surface with `catch { continue }`, against the module's
+   fail-loud discipline — replaced with `readOrThrow`, matching its twin in
+   `liveRoots`.
+6. **CRITICAL (gate ruling: SEND BACK).** The meta-verdict; all four constituent
+   gaps closed by items 1–5, so the object that lands in `done/` is a fence proven
+   on its own motivating object, verified by the enforced gate, with a record that
+   matches disk.

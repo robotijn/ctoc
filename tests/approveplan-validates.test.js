@@ -160,6 +160,73 @@ describe('approvePlan — validates every transition (R5-B)', () => {
   });
 });
 
+describe('approvePlan — the validation predicate FAILS CLOSED (R5-B hardening)', () => {
+  // The defect: the crossing refused ONLY on an explicit `validation.valid === false`
+  // and the audit log recorded a missing/malformed validation as passed — fail-OPEN
+  // polarity, against this repo's fail-closed doctrine (a parser returns null not 0; a
+  // coverage floor refuses on an unreadable baseline). `validateTransition` is total
+  // over the real gate edges today, so the branch is not reachable via real inputs —
+  // but a future refactor returning null/undefined/an object without an explicit
+  // `valid` would SILENTLY CROSS the gate. The predicate now refuses UNLESS
+  // `override || validation.valid === true`, removing the dependency on the validator
+  // staying total. `options.deps.validateTransition` is the injection seam (same
+  // `options.deps` pattern approvePlan already threads to stampAndLedger) so the
+  // otherwise-unreachable malformed-return branch is driven by a test.
+  const { approvePlan } = require('../src/lib/actions.js');
+
+  // A functional plan whose REAL validator PASSES, so the ONLY thing that can cause a
+  // refusal is the injected malformed validation return — the behavior under test.
+  for (const [label, stub] of [
+    ['null', () => null],
+    ['undefined', () => undefined],
+    ['an object with no `valid` key', () => ({ errors: [], warnings: [] })],
+    ['a non-object (string)', () => 'ok'],
+  ]) {
+    it(`REFUSES when validateTransition returns ${label}: plan unmoved, no ledger, no marker`, () => {
+      const root = makeSandbox();
+      const planPath = writePlan(root, 'functional', 'failclosed', validFunctionalBody('failclosed'));
+      const before = fs.readFileSync(planPath, 'utf8');
+
+      const res = approvePlan(planPath, root, { deps: { validateTransition: stub } });
+
+      assert.equal(res.ok, false, 'a non-passing validation returns ok:false');
+      assert.equal(res.refused, true, 'the crossing is refused (fail closed), not crossed');
+      assert.ok(/functional/i.test(res.reason), 'reason names the refused transition');
+
+      // Plan is UNMOVED and byte-identical; nothing crossed the gate.
+      assert.ok(fs.existsSync(planPath), 'plan still resident in functional/');
+      assert.equal(fs.readFileSync(planPath, 'utf8'), before, 'no marker prepended to the refused plan');
+      assert.ok(!fs.existsSync(path.join(root, 'plans', 'implementation', 'failclosed.md')), 'nothing landed in implementation/');
+      assert.ok(!fs.existsSync(ledgerFile(root, 'failclosed')), 'no ledger entry for a refused crossing');
+    });
+  }
+
+  it('an explicit `valid:true` still crosses (no regression from fail-closed polarity)', () => {
+    const root = makeSandbox();
+    const planPath = writePlan(root, 'functional', 'failclosed-ok', validFunctionalBody('failclosed-ok'));
+
+    const res = approvePlan(planPath, root, { deps: { validateTransition: () => ({ valid: true, errors: [], warnings: [] }) } });
+
+    assert.ok(!res.refused, 'an explicit valid:true is not refused');
+    assert.equal(res.newPath, path.join(root, 'plans', 'implementation', 'failclosed-ok.md'), 'crossed to implementation/');
+  });
+
+  it('a human override crosses even when validation does not pass, and records provenance', () => {
+    const root = makeSandbox();
+    const planPath = writePlan(root, 'functional', 'failclosed-override', validFunctionalBody('failclosed-override'));
+
+    const res = approvePlan(planPath, root, {
+      override: { reason: 'human ordered ship despite malformed validation' },
+      deps: { validateTransition: () => null },
+    });
+
+    assert.ok(!res.refused, 'an override crosses despite a non-passing validation');
+    assert.equal(res.overridden, true, 'the return flags the override');
+    const entry = JSON.parse(fs.readFileSync(ledgerFile(root, 'failclosed-override'), 'utf8'));
+    assert.equal(entry.override, true, 'the override is recorded in the ledger');
+  });
+});
+
 describe('approvePlan — an un-keyable (non [a-z0-9-]) slug is REFUSED, never crossed marker-only', () => {
   // The defect: the approval ledger keys a plan by a slug restricted to
   // /^[a-z0-9][a-z0-9-]*$/, so a basename with an underscore (or dot/space) is

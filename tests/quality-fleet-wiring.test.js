@@ -136,6 +136,45 @@ describe('the security fleet is wired into the LIVE push path (DEFAULT binding, 
       rm(upstream);
     }
   });
+
+  it('BLOCKS on a secret ADDED then REMOVED within the unpushed delta — the pushed history is scanned, not the working tree', async () => {
+    // Residual finding (review of R4-A): the delta scoping fixed the file-NAME set
+    // (@{upstream}..HEAD) but scanned the CURRENT working-tree CONTENT of each file.
+    // A secret added in one pushed commit and removed in a later pushed commit is
+    // present in the pushed history — recoverable by anyone with the remote — yet
+    // absent from the working tree, AND absent from the net `--name-only` diff
+    // (added-then-removed nets to no change). So the ONLY way to catch it is to scan
+    // the COMMITTED content of each commit in the delta. Fails today; must BLOCK.
+    const work = mkTmp('ctoc-addremove-');
+    const upstream = mkTmp('ctoc-addremove-up-');
+    try {
+      git(['init', '--bare'], upstream);
+      git(['init'], work);
+      git(['remote', 'add', 'origin', upstream], work);
+
+      // c1: benign, pushed → upstream baseline.
+      fs.writeFileSync(path.join(work, 'readme.md'), '# ok\n');
+      git(['add', '-A'], work); git(['commit', '-m', 'c1'], work); git(['push', '-u', 'origin', 'HEAD'], work);
+
+      // c2: ADD the secret, NOT yet pushed.
+      fs.writeFileSync(path.join(work, 'config.js'), `const awsKey = "${PLANTED_AWS_KEY}";\n`);
+      git(['add', '-A'], work); git(['commit', '-m', 'c2 add secret'], work);
+
+      // c3: REMOVE the file. Working tree is now clean; net diff shows nothing —
+      // but the secret is in the pushed history and recoverable from the remote.
+      git(['rm', 'config.js'], work); git(['commit', '-m', 'c3 remove config'], work);
+
+      // Sanity: the working tree really is clean of the secret.
+      assert.ok(!fs.existsSync(path.join(work, 'config.js')), 'precondition: the secret file is gone from the working tree');
+
+      const res = await qualityAgent.runSecurityScan(null, { projectRoot: work });
+      assert.ok(res.critical >= 1, `a secret in the pushed history must be caught even when removed from the working tree; got critical=${res.critical}`);
+      assert.equal(res.passed, false, 'a critical secret in the pushed history must fail the gate');
+    } finally {
+      rm(work);
+      rm(upstream);
+    }
+  });
 });
 
 describe('SECRETS: a real planted secret surfaces through the live path', () => {
@@ -1036,7 +1075,12 @@ describe('F-4 — delta secrets scan continues past a single unreadable file (on
     const KEY_C = 'AKIA5XYZ9WVUT2QRSMLK';
 
     const dir = mkTmp('ctoc-delta-throw-');
-    const orig = SecretsScanner.prototype.scanFile;
+    // The delta path now scans the COMMITTED content of each blob via scanContent
+    // (git show <rev>:<path>), not the working-tree file via scanFile — so the
+    // simulated mid-delta failure is injected on scanContent. The contract under
+    // test is unchanged: one throw must not abandon the rest of the delta, and the
+    // one failure must be recorded as a skip.
+    const orig = SecretsScanner.prototype.scanContent;
     try {
       git(['init'], dir);
       fs.writeFileSync(path.join(dir, '01_first.js'), `const a = "${KEY_A}";\n`);
@@ -1045,11 +1089,11 @@ describe('F-4 — delta secrets scan continues past a single unreadable file (on
       git(['add', '-A'], dir);
       git(['commit', '-m', 'c1'], dir);
 
-      // Simulate ONE unreadable/renamed file mid-delta (a real, hard-to-reproduce I/O
-      // failure). Only the middle file throws; the first and last scan normally.
-      SecretsScanner.prototype.scanFile = function (abs) {
-        if (/02_middle/.test(abs)) throw new Error('simulated unreadable/renamed file');
-        return orig.call(this, abs);
+      // Simulate ONE unreadable/undecodable blob mid-delta (a real, hard-to-reproduce
+      // failure). Only the middle blob throws; the first and last scan normally.
+      SecretsScanner.prototype.scanContent = function (content, abs) {
+        if (/02_middle/.test(abs)) throw new Error('simulated unreadable/undecodable blob');
+        return orig.call(this, content, abs);
       };
 
       // DELTA path (no allFiles): with no upstream the whole tracked set is the delta.
@@ -1070,7 +1114,7 @@ describe('F-4 — delta secrets scan continues past a single unreadable file (on
         `the ONE failing file must be recorded as a skip; got skipped=${JSON.stringify(res.skipped)}`
       );
     } finally {
-      SecretsScanner.prototype.scanFile = orig;
+      SecretsScanner.prototype.scanContent = orig;
       rm(dir);
     }
   });
