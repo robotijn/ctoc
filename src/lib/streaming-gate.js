@@ -209,6 +209,80 @@ function stripLeadingFrontmatter(content) {
 // the cut is DISCLOSED (never silently swallowed).
 const MAX_BODY_LINES = 120;
 
+// At most this many declared `files:` entries are printed at the gate; beyond it the
+// list is cut and the remainder DISCLOSED, mirroring MAX_BODY_LINES' honesty.
+const MAX_SCOPE_ENTRIES = 40;
+
+/** "1 file" / "N files" — singular is not a rounding error a human should read. */
+function fileWord(n) {
+  return n === 1 ? '1 file' : `${n} files`;
+}
+
+/**
+ * The SCOPE block — the files an approval grants write access to, rendered between
+ * the plan title and its body so a human sees WHAT they are consenting to before the
+ * prose. The `files:` list IS the write permission (plan-coverage.findCoveringPlan
+ * reads it; the enforcement hook allows/refuses every edit on it), and until this
+ * block existed the gate screen stripped it with the frontmatter — showing the human
+ * everything about the plan EXCEPT the one line that carries consequence.
+ *
+ * Follows renderPlanBody's conventions exactly: `stripCtl` on every emitted line (a
+ * hostile `files:` entry is author-controlled text arriving on a screen and must not
+ * forge rows or emit ANSI), two-space indentation, an HONEST disclosure whenever
+ * anything is cut, and — critically — a fault renders a LINE, never an empty string
+ * (empty is indistinguishable from "grants nothing", the most reassuring possible lie
+ * about a permission). TOTAL by contract: it never throws, so the gate screen's only
+ * approval surface can never be taken down by this display feature.
+ *
+ * The count is computed by declared-breadth.countMatching — the SAME glob matcher the
+ * enforcement hook uses, so the number shown is the number that will be granted. A
+ * count that cannot be computed prints as "not counted", NEVER as 0.
+ *
+ * @param {string} content raw plan file content (already read by the caller — no re-read)
+ * @param {string} projectRoot repository root the declaration is rooted at
+ * @param {{ maxEntries?: number }} [opts] forwarded to countMatching (walk cap; for tuning/tests)
+ * @returns {string}
+ */
+function renderDeclaredScope(content, projectRoot, opts) {
+  try {
+    const planCoverage = require('./plan-coverage');
+    const declaredBreadth = require('./declared-breadth');
+    const declared = planCoverage.readPlanFiles(null, content);
+    if (!Array.isArray(declared) || declared.length === 0) {
+      return '  Scope — this plan declares no files.\n';
+    }
+    const shown = declared.slice(0, MAX_SCOPE_ENTRIES);
+    const hidden = declared.length - shown.length;
+    const res = declaredBreadth.countMatching(shown, projectRoot, opts);
+
+    let out = '  Scope — what approving this grants write access to:\n';
+    for (const g of res.perGlob) {
+      const countText = g.count === null ? 'not counted' : fileWord(g.count);
+      const marker = g.anchored ? '' : '  ← rooted at the repository';
+      out += stripCtl(`    ${g.glob}  —  ${countText}${marker}`) + '\n';
+      if (!g.anchored) {
+        out += stripCtl(`    (this plan declares an unanchored scope: "${g.glob}")`) + '\n';
+      }
+    }
+    if (res.capped) {
+      const cap = opts && Number.isInteger(opts.maxEntries) && opts.maxEntries > 0 ? opts.maxEntries : 20000;
+      out += `    more than ${cap} entries — not counted\n`;
+    } else if (res.total === null) {
+      out += '    total — the scope size could not be counted\n';
+    } else {
+      out += `    ${fileWord(res.total)} total\n`;
+    }
+    if (hidden > 0) {
+      out += `    … ${hidden} more entries — open the file to read the rest.\n`;
+    }
+    return out;
+  } catch {
+    // TOTAL by contract: a fault renders a line, never an empty string, and never
+    // takes the gate screen down.
+    return '  Scope — the declared file list could not be read.\n';
+  }
+}
+
 /**
  * The plan's body, ready to render: frontmatter dropped, control characters
  * stripped (a hostile plan must not be able to forge screen rows or emit ANSI), and
@@ -900,6 +974,13 @@ function planDecisionScreen(ref, projectRoot) {
   let text = `Topic: ${name}${momentLabel}\n`;
   text += `${'─'.repeat(40)}\n\n`;
   text += `  ${title}\n\n`;
+  // Scope ABOVE the body: the `files:` list IS the write permission this approval
+  // grants, and below 120 lines of prose it would be functionally invisible — which
+  // is exactly the defect (the frontmatter, and the file list with it, was stripped
+  // before the human saw anything). renderDeclaredScope is TOTAL by contract, so a
+  // fault here renders a fallback line and NEVER takes the gate screen down.
+  text += renderDeclaredScope(content, projectRoot);
+  text += '\n';
   text += renderPlanBody(content);
   text += '\n\n';
 
@@ -1342,5 +1423,6 @@ module.exports = {
   streamComment,
   streamAnswer,
   planDecisionScreen,
+  renderDeclaredScope,
   humanPlanName,
 };

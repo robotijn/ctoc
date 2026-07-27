@@ -457,3 +457,32 @@ being acted under.
     crosses every sibling on one human decision. Whether it renders scope was not
     verified during planning, and if it does not, that is reported as a hole rather than
     quietly fixed inside a plan that did not declare it.
+
+### Decisions taken during implementation (Steps 8–16)
+
+12. **`total` is the UNION of distinct files matching any declared glob, not the sum of
+    per-glob counts.** Two overlapping globs (`src/**` and `**`) would double-count a
+    file under a naive sum; the union is what an approval actually grants. Each file is
+    tested against every glob (per-glob counts increment independently) but the total
+    increments once per file matched by at least one glob.
+13. **`renderDeclaredScope(content, projectRoot, opts)` gained an optional third `opts`
+    param, forwarded to `countMatching` (only `maxEntries` today).** The production call
+    at `planDecisionScreen` passes none, so behaviour is the default 20,000 cap; the
+    param exists so the capped-render path is drivable by a test with a small cap
+    (`maxEntries: 3`) over a real tree, rather than requiring a 20,000-file fixture.
+14. **Batch approval (`approveSubplans`) is the MEASURED HOLE this plan does not close.**
+    Confirmed at Step 9: `approveSubplans` (the `todo-all` / `done-all` word shortcuts)
+    crosses a whole sibling batch directly through `actions.js` and NEVER passes through
+    `planDecisionScreen`, so it renders no scope block. A human crossing a batch on one
+    decision still sees no file list. This is exactly the hole the plan said to report,
+    not fix: closing it means rendering scope on the batch-approval surface, which this
+    plan did not declare and must not self-grant.
+15. **Measured facts (Step 9), replacing the plan's illustrative `1,847`.** This
+    repository holds **2,213** real files under the walk's skip rules (`.git`,
+    `node_modules`, `.ctoc/state`); a full walk with `node_modules` present touched
+    ~2,491 entries in ~21 ms — far under both the 300 ms budget and the 20,000-entry
+    cap. The `1,847` in the plan body was an illustration and is not the real number.
+16. **The per-glob line renders as `    {glob}  —  {count}`**, the unanchored marker as
+    `  ← rooted at the repository` with a spelled-out follow-up note, and a
+    cannot-be-counted result as `not counted` (capped) or `the scope size could not be
+    counted` (walk fault) — never `0`. Every emitted line passes the module's `stripCtl`.
