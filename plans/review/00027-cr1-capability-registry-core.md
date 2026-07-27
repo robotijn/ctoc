@@ -135,12 +135,53 @@ UNVERIFIED entry).
 - **Steps 11–13 REVIEW/OPTIMIZE/SECURE:** safe-fs reads, no dynamic execution
   (asserted by test), fail-open per-entry, size/count caps, commands returned as
   inert strings, parity asserted.
-- **Step 14 VERIFY:** `tests/capability-registry.test.js` 29/29 pass; eslint clean
-  (0 warnings) on all changed files; typecheck 1/1; both reachability fences green
-  (file 5/5, export 16/16); app-runner 13/13, last-mile + verify-evidence suites
-  green (parity). Engine coverage 95.70% lines / 100% functions.
+- **Step 14 VERIFY:** *(original CR1 executor record — NARROWED to the named test)*
+  `tests/capability-registry.test.js` 29/29 pass; eslint clean (0 warnings) on all
+  changed files; typecheck 1/1; both reachability fences green (file 5/5, export
+  16/16); app-runner 13/13, last-mile + verify-evidence suites green (parity).
+  Engine coverage 95.70% lines / 100% functions. **This ran only the named test,
+  not the full gate — corrected in the Rework Verification below.**
 - **Step 15 DOCUMENT:** `.ctoc/capabilities/schema.md` is the contract.
 - **Step 16 REPORT:** delivered to CTO Chief.
+
+## Rework Verification (2026-07-27, isolated worktree, real full gate)
+
+Re-verified against disk after later slices (CR2–CR5 + adversarial repair rounds
+1/2/5) evolved the engine. Every check below was RUN and its output READ.
+
+- **Full gate — `npm test` (the gated entry point, not the named test):**
+  **10520 pass · 0 fail · 0 skipped**, coverage **99.15%** (threshold 99), gate
+  prints `PASS`. The original Step-14 record ran only the named test; the real
+  gate is green.
+- **Typecheck — `npx tsc --noEmit`:** clean, no errors.
+- **Registry's own test file:** 61/61 pass (was 29 at CR1; grew through the later
+  slices and repair rounds — the 29/29 figure is **REFUTED-as-stale**).
+- **Registry coverage:** `capability-registry.js` **100.00% line / 100.00%
+  function** (the 95.70% engine-coverage figure is **REFUTED-as-stale** — coverage
+  rose, not fell); `app-runner.js` 98.05% line.
+- **Reachability (not dead code):** `capability-registry.js` is ABSENT from
+  `.ctoc/reachability-baseline.json` (unreachable list) — it is LIVE, required by
+  7 shipped modules: `app-runner.js`, `stack-detector.js`, `tool-detector.js`,
+  `sast-runner.js`, `sca-runner.js`, `dependency-auditor.js`,
+  `framework-security-checker.js`. The CR1-era "file 5/5, export 16/16" fence
+  snapshot is superseded by the repo-wide ratchets, which are green in the full
+  gate. The core exists, is wired, and a human/agent reaches it through the live
+  Step-14 VERIFY path (app-runner) and the init/quality detection surfaces.
+- **eslint:** clean on `capability-registry.js`, `app-runner.js`,
+  `tests/capability-registry.test.js`.
+- **No fabricated commands:** the 6 CR1 seed languages (dart, kotlin, rust,
+  python, typescript, go) contain no `verified: guessed` marker; UNVERIFIED
+  flags (Dart SAST, Kotlin deps/coverage) are honest per the vision invariant.
+- **`files:` frontmatter:** VERIFIED ACCURATE — all 10 declared files exist on
+  disk and were exactly the set created by the CR1 commit (`a9d6a77`); no file
+  missing, none spurious. No correction required.
+- **Ledger:** `.ctoc/approvals/00027-cr1-capability-registry-core.json` left
+  untouched (a review-stage plan's ledger hash is not re-stamped by rework).
+
+**Disposition:** no code defect found — the engine is green at 100% registry
+coverage with adversarial rounds already applied; the only defects were
+record-vs-disk drift in this plan, corrected above. The narrowed Step-14 claim is
+replaced with real full-gate evidence.
 
 ## Decisions Taken Under Ambiguity
 

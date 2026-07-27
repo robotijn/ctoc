@@ -512,6 +512,13 @@ as required:
   skipped 0, failed 0` followed by `[CTOC test-gate] PASS`. The 99 floor was NOT
   touched. Lint clean (`eslint --max-warnings 0`) on all three changed source and
   test files. Reachability and export-reachability fences green. No git operations.
+  - **Re-verified in review (2026-07-27)** against the current, larger suite after
+    the sibling reworks landed: `npm test` gate line `[CTOC test-gate] coverage
+    99.13% (threshold 99%), skipped 0, failed 0` → `[CTOC test-gate] PASS`, and
+    `npx tsc --noEmit` clean. The original numbers above are the historical record
+    from the build run; the suite has grown since, and the wedge reader still passes
+    the full gate unchanged. No source or test edit was needed at review — the slice
+    is defect-free as shipped.
 - [x] **Step 15 DOCUMENT** — JavaScript doc on `renderWedgeReports` and
   `WEDGE_REASONS`; the block comment above the reconcile call now states the report
   is kept whole. No CHANGELOG exists in this repository.

@@ -240,6 +240,24 @@ contract, so the renamed command works for a human. Per the coordinator's instru
 the plan was NOT committed, pushed, or moved — it waits in in-progress for the
 coordinator to commit and push once the whole suite is confirmed green.
 
+### Step 14 VERIFY — RE-VERIFIED at review (2026-07-27)
+
+Re-ran the real gate on the review-stage tree to confirm the rename still holds against
+a repository that grew after the original snapshot above. `npx tsc --noEmit` exited `0`.
+`npm test` (the full gate via `test-gate.js` — whole suite + coverage floor + zero-skipped)
+printed `tests 10528`, `pass 10528`, `fail 0`, `skipped 0`, `coverage 99.15% (threshold 99%)`
+and `PASS`. The earlier snapshot (`10316` tests, `99.02%`) is not stale-wrong — the counts
+rose only because unrelated work landed in the tree between the original build and this
+review re-verification; the floor and the verdict are unchanged. A tree-wide grep confirms
+ZERO `ctoc:menu` in shipped `src/`, `docs/`, `README.md`, `CLAUDE.md`; `src/commands/menu.md`
+and `menu.js` are gone, `start.md`/`start.js` present; the false-green baseline carries the
+renamed key `src/commands/start.js:silent-catch:activateCurrentArea`. The mid-build "STOP AND
+ASK" grant-gap note below was RESOLVED before ship — the grant was expanded to every
+mechanically-forced file (see the `scope_extension` "GRANT COMPLETED" note) and no
+out-of-grant `menu` reference survives in shipped code. The two remaining `commands/menu`
+mentions are `tests/ctoc-start-command.test.js` asserting the old files are absent (correct)
+and the runtime `.ctoc/streaming/` cache (not shipped, not staged).
+
 ### The argv verb decision is FINAL (accepted)
 
 The coordinator accepted keeping the internal `menu` argv token (rename only the file

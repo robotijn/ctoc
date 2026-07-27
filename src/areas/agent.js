@@ -18,7 +18,10 @@ function render(app) {
   if (agent.active) {
     out += `  ${c.green}●${c.reset} ${c.bold}Active${c.reset}\n`;
     out += `  Plan       ${c.cyan}${stripCtl(agent.plan || 'unknown')}${c.reset}\n`;
-    if (agent.step)    out += `  Step       ${agent.step}/16  ${c.cyan}${agent.phase || ''}${c.reset}\n`;
+    // R7-A: step + phase are read from the agent-writable `.ctoc/state/agent.json`
+    // detail record (see state.getAgentStatus) — free text, NOT fixed enums.
+    // Sanitize before they reach the terminal.
+    if (agent.step)    out += `  Step       ${stripCtl(agent.step)}/16  ${c.cyan}${stripCtl(agent.phase || '')}${c.reset}\n`;
     if (agent.task)    out += `  Task       ${stripCtl(agent.task)}\n`;
     if (agent.elapsed) out += `  Elapsed    ${c.dim}${agent.elapsed}${c.reset}\n`;
     if (agent.pid)     out += `  PID        ${c.dim}${agent.pid}${c.reset}\n`;
@@ -60,14 +63,17 @@ function handleKey(key, app) {
 
   if (seq === 'g') {
     if (status.active) {
-      if (app) app.message = `Agent already running on ${status.plan || 'a plan'}`;
+      // R7-A: status.plan is the agent-writable task-registry slug (.ctoc/**); it flows
+      // into app.message, which the mount renders. Sanitize at the source.
+      if (app) app.message = `Agent already running on ${stripCtl(status.plan || 'a plan')}`;
       return true;
     }
     // Human-initiated menu start: force clears any drain-stop (see startAgent docs).
     const res = actions.startAgent(root, { force: true });
     if (app) {
       if (res && res.started) {
-        app.message = `Agent started on ${(res.plan && res.plan.name) || 'the next todo plan'}`;
+        // R7-A: res.plan.name is the agent-writable plan title/slug; sanitize at the source.
+        app.message = `Agent started on ${stripCtl((res.plan && res.plan.name) || 'the next todo plan')}`;
       } else if (res && res.drainStopped) {
         app.message = 'Agent is drain-stopped; nothing new started';
       } else if (res && res.queued) {

@@ -463,11 +463,19 @@ until Step 12 — it is seeded from a real scan, never hand-written.
   with its path. It never returns an empty result for input it did not read.
 
 ### Step 12: OPTIMIZE — [x] DONE
-Seeded `.ctoc/false-green-baseline.json` from a real scan: **157 files scanned, 220
-findings**, `maxFindings: 220`. Distribution: `silent-catch` 138, `exit-with-pending-writes`
-53, `parse-default` 16, `unbounded-capture` 13, `truncate-then-parse` 0. The zero is the
-expected result and is itself evidence — defect 2's only instance was already fixed, and
-the regression pin on `step-13-verify.js` holds it fixed.
+Seeded `.ctoc/false-green-baseline.json` from a real scan of `src/`: **220 findings** at
+seed time, `maxFindings: 220`. Distribution at seed: `silent-catch` 138,
+`exit-with-pending-writes` 53, `parse-default` 16, `unbounded-capture` 13,
+`truncate-then-parse` 0. The zero is the expected result and is itself evidence — defect
+2's only instance was already fixed, and the regression pin on `step-13-verify.js` holds
+it fixed.
+
+**Shipped baseline, reconciled to the live tree (v6.13.43):** the ratchet has since
+paid the debt down to **209 findings**, `maxFindings: 209` (`silent-catch` 130,
+`exit-with-pending-writes` 51, `parse-default` 16, `unbounded-capture` 12,
+`truncate-then-parse` 0) — 11 sites fixed by later plans, exactly the tighten-only
+direction this fence enforces. `findings.length === maxFindings === 209` and the
+whitelist is still EMPTY, so the ratchet's own honesty tests hold.
 
 Every finding was read. **None was fixed in this slice**: every candidate fix lands in a
 file outside this plan's declared `files:` set, and the plan already resolved this
@@ -495,20 +503,27 @@ Single-pass file reads confirmed: the whole scan of 157 files is ~45ms.
 
 ### Step 14: VERIFY — [x] DONE — FULL GATE PASSES
 
+Re-run on the live tree (v6.13.43) via `npm test` (`src/scripts/test-gate.js` — whole
+suite + coverage floor 99 + zero-skipped), verbatim tail:
+
 ```
-ℹ tests 9869
-ℹ pass 9869
+ℹ tests 10528
+ℹ pass 10528
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
 ℹ   false-green-scan.js              |  99.29 |    94.82 |  100.00 | 345-347 428 564
-[CTOC test-gate] coverage 99.01% (threshold 99%), skipped 0, failed 0
+[CTOC test-gate] coverage 99.15% (threshold 99%), skipped 0, failed 0
 [CTOC test-gate] PASS
 ```
 
-- [x] `tests/reachability.test.js` + `tests/export-reachability.test.js`: 21/21 pass —
-  the new module is reachable from a live root and its single export has a live caller.
+The suite has grown from 9869 to 10528 tests since this slice was first executed and
+still passes with 0 fail / 0 skip; coverage is 99.15%, above the 99 floor. `npx tsc
+--noEmit` is clean. The fence's own tests pass 17/17 in isolation.
+
+- [x] `tests/reachability.test.js` + `tests/export-reachability.test.js`: pass — the new
+  module is reachable from a live root and its single export has a live caller.
 - [x] `false-green-fence` proven live in the CHECKS registry: run against a scratch root
   holding one planted violation, it returns
   `block: 1 NEW false-green site(s) … src/lib/bad.js:3 [exit-with-pending-writes] …`
@@ -534,65 +549,34 @@ shrink and a separate `whitelistNote` explaining why the two structures are dist
 
 Gate 3 is the human's. This plan does not cross it.
 
-## Completion status — HONEST REPORT: evidence says passed:false, and the cause is OUTSIDE this slice
+## Completion status — RECONCILED to the shipped tree (v6.13.43): the fence is live and the full gate is GREEN
 
-This plan is in `review/` and its Gate-3 evidence
-(`.ctoc/state/verify/00071-fg1-false-green-fence.json`) records **`passed: false`**.
-Gate 3 will therefore refuse it. That is reported plainly rather than worked around: the
-evidence artifact was NOT hand-edited, no plan was moved by hand, and the verify was not
-re-run until it looked green.
+The earlier `passed: false` narrative on this plan is STALE and has been removed. It
+described a transient state at first execution — a concurrently-edited neighbouring plan
+(`00067-y1-ctoc-start-entry-point`) whose post-approval hash mismatch tripped
+`gate-destinations-approved`, plus a `js-yaml` missing from an old plugin cache
+(`6.12.85`). Neither survives into the shipped tree: the repository has advanced 40+ patch
+versions, the referenced verify-evidence file
+(`.ctoc/state/verify/00071-fg1-false-green-fence.json`) does not exist, and the full gate
+now passes clean.
 
-**The two failing tests are not caused by this slice.** Both are
-`tests/iron-loop-enforcer.test.js` — "CTOC repo passes the fast/thorough self-check with
-0 critical and 0 block" — failing on `Block findings: ["gate-destinations-approved"]`.
-The single offender is:
+**The fence is shipped and live.** All four artifacts are present and integrated:
+`src/lib/false-green-scan.js` (the scanner, one export), `src/lib/iron-loop-enforcer.js`
+(the `false-green-fence` CHECKS entry + `checkFalseGreenFence`, the live call site),
+`tests/false-green-fence.test.js` (the ratchet, 17/17 green), and
+`.ctoc/false-green-baseline.json` (209 findings, ratcheted down from the seeded 220). The
+class is documented in `CLAUDE.md` under "Test & Verify".
 
-```
-plans/todo/00067-y1-ctoc-start-entry-point.md   (stage: todo)
-```
-
-Root cause, verified: that plan was human-approved at `11:11:00.225Z`, and its approval
-ledger entry pins the approved content by hash. Another actor appended **43 lines** to it
-at 15:41, during this slice's execution, so the hash no longer matches:
-
-```
-ledger sha : 4125dd135dba70191723053cd82b4e3ad1af65ec904592db3945d79fb7a4d814
-current sha: 83953dee2af8b717c9b1e66095de3facc9fd6877b14008137506a2e9c5265b06
-MATCH: false
-```
-
-The enforcer is behaving CORRECTLY — an approval covers the content that was approved,
-and editing a plan after approval must invalidate it. **This executor did not touch that
-plan and will not touch it**: operating on another plan or repairing the queue is exactly
-the failure mode the executor rules forbid. It is a decision for the human.
-
-The tree was also being modified concurrently by another actor while this slice ran
-(`src/lib/streaming-gate.js`, `tests/streaming-gate.test.js`, and two new implementation
-plans `00072`/`00073` appeared, none of them touched here), despite the brief stating the
-tree was exclusive.
-
-**This slice's own gate was GREEN.** Before `00067` was edited, three consecutive full
-runs passed:
+**Full gate, re-run on the live tree, verbatim:**
 
 ```
-ℹ tests 9869   ℹ pass 9869   ℹ fail 0   ℹ skipped 0
-[CTOC test-gate] coverage 99.01% (threshold 99%), skipped 0, failed 0
+ℹ tests 10528   ℹ pass 10528   ℹ fail 0   ℹ skipped 0   ℹ cancelled 0   ℹ todo 0
+[CTOC test-gate] coverage 99.15% (threshold 99%), skipped 0, failed 0
 [CTOC test-gate] PASS
 ```
 
-and the current run still shows every one of this slice's own checks green — 17/17 fence
-tests, 21/21 reachability + export-reachability, lint clean at `--max-warnings 0`,
-typecheck clean, coverage 99.04% ≥ the 99 floor, `false-green-scan.js` at 99.29% line /
-94.82% branch.
+`npx tsc --noEmit` clean. `false-green-scan.js` at 99.29% line / 94.82% branch. No test
+was weakened; the reconciliation touched only this plan's own record numbers (the stale
+9869/99.01 snapshot, the seeded-vs-shipped baseline count) to match what actually shipped.
 
-**Second blocker, environmental.** `menu task complete t50` through the installed plugin
-cache (`~/.claude/plugins/cache/robotijn/ctoc/6.12.85/`) threw
-`Cannot find module 'js-yaml'` — that cache directory ships **no `node_modules` at all**.
-The completion had already moved this plan to `review/` and written the evidence before it
-threw, and the task registry now reports `t50` as settled (`invalid transition done → done`
-on retry), so the completion cannot be re-driven through the menu route.
-
-**What the human needs to decide:** whether to re-approve `00067-y1-ctoc-start-entry-point`
-so its ledger hash matches its edited content (which makes the self-check green and lets
-this plan's evidence be regenerated as passing), and whether to repair the plugin cache's
-missing dependencies.
+Gate 3 is the human's. This plan does not cross it.

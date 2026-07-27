@@ -169,7 +169,9 @@ function render(app) {
   output += `${c.bold}Agent Status${c.reset}\n`;
   if (agent.active) {
     output += `  ${c.green}●${c.reset} Running       ${c.bold}${stripCtl(agent.name)}${c.reset}\n`;
-    output += `                  Step ${agent.step}/16 ${c.cyan}${agent.phase}${c.reset}\n`;
+    // R7-A: step + phase come from the agent-writable `.ctoc/state/agent.json` detail
+    // record — free text, not fixed enums. Sanitize before they reach the terminal.
+    output += `                  Step ${stripCtl(agent.step)}/16 ${c.cyan}${stripCtl(agent.phase)}${c.reset}\n`;
     if (agent.task) {
       output += `                  Task: ${stripCtl(agent.task)}\n`;
     }

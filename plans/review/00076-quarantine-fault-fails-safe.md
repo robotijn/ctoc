@@ -56,6 +56,20 @@ This slice makes the guard fail **safe** and fail **loud**: the fault is recorde
 on the report, and the candidates that could not be checked are dropped rather
 than promoted.
 
+> **Where the shipped code now lives (record reconciliation).** The line
+> references above (`:620-653`, the empty catch at `:651-653`) and the inline
+> `reconcileState` changes below describe the form this slice shipped. The sibling
+> "quarantine on every promote path" work subsequently **relocated** the exact same
+> fail-safe logic — byte-for-byte behaviour, same fault phases, same reported
+> reasons — into the exported pure function `applyQuarantine` in the same file, so
+> that every promote path (the dashboard render AND `menu task
+> fail|cancel|complete` via `menu-screens.computePromote`) runs one predicate. On
+> disk today the empty catch is gone: `reconcileState` calls `applyQuarantine`
+> (`:648-651`) and the fail-safe collect/filter phases are `applyQuarantine`'s body
+> (`:698-788`). The behaviour this plan introduced is unchanged and live; the tests
+> in `tests/task-reconcile-quarantine-fault.test.js` drive it through
+> `reconcileState` exactly as written.
+
 ## Implementation Details
 
 ### Dependency graph
@@ -395,3 +409,21 @@ as required:
   old "promote stands" comment is replaced by prose describing what the code does.
   No CHANGELOG exists in this repository.
 - [x] **Step 16 FINAL-REVIEW** — complete; Gate 3 is the human's.
+
+### Review re-verification (current worktree)
+
+Re-ran the full gated entry point (`npm test`, whole suite + coverage floor +
+zero-skip gate) and `npx tsc --noEmit` on the current tree, after the sibling
+relocation into `applyQuarantine`:
+
+- `[CTOC test-gate] coverage 99.15% (threshold 99%), skipped 0, failed 0` → `PASS`.
+- `task-reconcile.js` line coverage 100.00%.
+- `npx tsc --noEmit` clean (exit 0).
+
+The Step 14 numbers above (99.03%, `tests 9892`) were true when first recorded;
+sibling plans have since added tests and moved two ratchets further
+(`.ctoc/false-green-baseline.json` `maxFindings` is 209 today, not the 219 decision 9
+recorded; the documented test-file count has moved past 421). Those are the
+expected historical drift of a plan sitting in review beneath later siblings — not
+regressions — and the gate above confirms the fail-safe guard's behaviour is green
+on current disk. No code change was needed at review; the fix is intact.

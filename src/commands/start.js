@@ -6,7 +6,7 @@
 
 const safeFs = require('../lib/safe-fs');
 const path = require('path');
-const { c, clear, line, renderTabs, renderTabIndicator, setupKeyboard, cleanup, renderBreadcrumb } = require('../lib/tui');
+const { c, clear, line, renderTabs, renderTabIndicator, setupKeyboard, cleanup, renderBreadcrumb, stripCtl } = require('../lib/tui');
 const { TABS, getTabNames, nextTab, prevTab } = require('../lib/tabs');
 const { NavStack } = require('../lib/state');
 const { startAutoSync, stopAutoSync } = require('../lib/sync');
@@ -371,7 +371,11 @@ function render() {
   // Status message (clear previous timer to prevent render races)
   if (messageTimer) clearTimeout(messageTimer);
   if (app.message) {
-    output += `\n${c.green}${app.message}${c.reset}\n`;
+    // R7-A: app.message is the single status-message chokepoint every writer flows
+    // through (agent area, tools sync, release). Its writers interpolate agent-writable
+    // fields (plan slug, plan name), so sanitize at this sink — output-encode where the
+    // string reaches the terminal, closing the whole writer class in one place.
+    output += `\n${c.green}${stripCtl(app.message)}${c.reset}\n`;
     messageTimer = setTimeout(() => {
       app.message = null;
       render();

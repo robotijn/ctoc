@@ -145,13 +145,71 @@ Step 16 REPORT (the 13 types, the live wiring edge, any UNVERIFIED scaffold tool
 - [x] **Step 13 SECURE:** engine only loads + looks up; no `eval`/`child_process`/
       spawn added (the RCE-guard test in capability-registry.test.js stays green);
       markers are exact-filename `existsSync`, no regex.
-- [x] **Step 14 VERIFY:** `capability-project-types.test.js` 14/14; parity
-      `capability-registry.test.js` + `app-runner.test.js` green (56/56 combined);
-      `export-reachability.test.js` 16/16 (new exports LIVE, baseline unchanged);
-      `reachability.test.js` 5/5; eslint clean on all touched files.
-      KNOWN PRE-EXISTING drift: `tests/doc-counts.test.js` (documented 273 vs live
-      test-file count) — CLAUDE.md is outside this plan's scope and CR2 is adding
-      files concurrently; not fixed here, reported to the human.
+- [x] **Step 14 VERIFY (re-run at review-time 2026-07-27 — real full gate):**
+      the ORIGINAL bullet recorded a NARROWED gate (`capability-project-types.test.js`
+      14/14; a `56/56 combined` parity subset) plus a "known drift" caveat. Both are
+      now STALE and have been re-verified against disk:
+      • The full `npm test` gate is GREEN: `[CTOC test-gate] coverage 99.12%
+        (threshold 99%), skipped 0, failed 0 → PASS`. This is the REAL gate
+        (`src/scripts/test-gate.js`), not a narrowed subset.
+      • `tests/capability-project-types.test.js` now runs **31/31 pass, 0 fail,
+        0 skipped** — the file grew from 14 to 31 cases as later adversarial repair
+        waves added the CR3-FIX detection/honesty suite and the fail-open suite. The
+        original "14/14" is stale evidence, corrected here.
+      • `npx tsc --noEmit` is clean (pure-JS repo).
+      • REFUTED-as-stale: the old "KNOWN PRE-EXISTING drift: `tests/doc-counts.test.js`
+        (documented 273 vs live test-file count)" caveat. `doc-counts.test.js` now runs
+        **6/6 pass, 0 fail** — CLAUDE.md's documented counts match disk. The tree is
+        green; there is no doc-count drift to report.
+      • New exports (`loadProjectTypes`/`projectTypeFor`/`pipelineFor`) confirmed LIVE:
+        `src/lib/app-runner.js:detectRunTarget` consults `projectTypeFor` +
+        `pipelineFor` (lines 326-347); export-reachability passes inside the full gate.
 - [x] **Step 15 DOCUMENT:** `schema.md` gained the project-type contract, the 13
       types, and the engine API + live-consumer note.
-- [ ] **Step 16 FINAL-REVIEW:** awaits the human Gate-3 review (review → done).
+- [x] **Step 16 FINAL-REVIEW (rework pass 2026-07-27):** see the rework report
+      below. Steps 8–15 complete; the code is verified sound against a green full
+      gate. Awaits the human's review decision (review → done) — NOT self-crossed.
+
+## Step 16 — Rework report (review-time adversarial re-verification, 2026-07-27)
+
+An independent adversarial rework re-read this plan in full plus its ancestry
+(`ctoc-capability-registry` → CR1 → CR2 → CR3), re-verified every Step-14 claim
+against disk, and hunted for a shipped code defect. Dispositions:
+
+**Code: SOUND — no remaining defect.** The CR3 engine (`loadProjectTypes`,
+`projectTypeFor`, `pipelineFor`) and its live consumer (`app-runner.detectRunTarget`)
+were re-examined after four prior adversarial repair rounds (v6.12.30–6.12.31). Checks
+run this pass, each verified against source:
+  - Full `npm test` gate GREEN: coverage 99.12% (floor 99), 0 failed, 0 skipped.
+  - `tests/capability-project-types.test.js`: 31/31 pass (zero doubles — every
+    filesystem case builds a real on-disk fixture and reads the real bundled YAML).
+  - Live-wiring edge confirmed: `detectRunTarget` (app-runner.js L326–347) consults
+    `projectTypeFor` + `pipelineFor`; the honest-flag preference (taxonomy over the
+    bare language shape) is correct and defensive; export-reachability green.
+  - `projectTypeFor` priority resolution: all 22 bundled types carry UNIQUE
+    priorities (10…90), so the strict-`>` tie-break is never exercised — no silent
+    detection ambiguity.
+  - Bounds safe: `MAX_FILES` 500 ≫ 22 bundled types, so no whole-directory drop
+    cliff; `MAX_FILE_BYTES` 64 KiB guards each entry.
+  - `pipelineFor` honest-run contract sound: `honest:true` degrades to `false` when
+    the language supplies no run command — never a false "it ran".
+
+**Record: CORRECTED (this was the real defect surface).**
+  1. Step-14 evidence was recorded off a NARROWED gate ("14/14", "56/56 combined")
+     and carried a stale "doc-counts drift" caveat. Rewritten above with the real
+     full-gate result. The doc-counts caveat is REFUTED-as-stale (6/6 green).
+  2. Body narrative drift: this plan AUTHORED 13 project-type YAMLs (correct as
+     historical record). Later expansion waves (v6.12.16–6.12.31) added 9 more —
+     serverless, static-site, llm-agent, browser-extension, game, embedded,
+     blockchain, data-pipeline, web-fullstack — bringing disk + test to 22. The
+     "13" throughout the design section is honest CR3 history; the shipped total is
+     22 and the test suite asserts 22 in lock-step. Recorded here so a reviewer is
+     not confused by the 13-vs-22 gap.
+  3. `files:` frontmatter VERIFIED ACCURATE — all 13 declared YAMLs plus `schema.md`,
+     the test file, `capability-registry.js` and `app-runner.js` exist on disk and
+     were authored/touched by CR3. The 9 later YAMLs are deliberately NOT added here:
+     they belong to the later expansion-wave plans, and claiming them would be false
+     authorship. No change to `files:`.
+
+No ledger hash was re-stamped (plan is in review). No test was weakened; no code was
+changed (none needed changing).

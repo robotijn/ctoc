@@ -83,6 +83,8 @@ const agentArea = require('../src/areas/agent');
 const inboxArea = require('../src/areas/inbox');
 const overview = require('../src/tabs/overview');
 const review = require('../src/tabs/review');
+const actions = require('../src/lib/actions');
+const start = require('../src/commands/start');
 
 /**
  * Strip legitimate SGR colour sequences (`\x1b[…m` — the palette's only escapes),
@@ -124,17 +126,21 @@ describe('R7-A pipeline conflict panel (files: headline case)', () => {
   });
 });
 
-describe('R7-A pipeline area render (agent.plan)', () => {
-  it('sanitizes the active agent plan slug', () => {
-    mAgent = { active: true, plan: PAYLOAD, step: 7 };
+describe('R7-A pipeline area render (agent.plan / agent.step)', () => {
+  it('sanitizes the active agent plan slug AND the agent-writable step field', () => {
+    // `step` is read from the agent-writable `.ctoc/state/agent.json` (detail.step)
+    // — NOT a fixed integer. A hostile step value must not reach the terminal raw.
+    mAgent = { active: true, plan: PAYLOAD, step: PAYLOAD };
     const out = pipeline.render({ projectPath: '/tmp/x' });
-    assertNoInjection(out, 'pipeline.render agent.plan');
+    assertNoInjection(out, 'pipeline.render agent.plan/step');
   });
 });
 
 describe('R7-A agent area render', () => {
-  it('sanitizes agent.plan and agent.task', () => {
-    mAgent = { active: true, plan: PAYLOAD, step: 5, task: PAYLOAD };
+  it('sanitizes agent.plan, agent.task, and the agent-writable step/phase', () => {
+    // step + phase both come from the agent-writable `.ctoc/state/agent.json` detail
+    // record — free text, not fixed enums. Feed the payload through both.
+    mAgent = { active: true, plan: PAYLOAD, step: PAYLOAD, phase: PAYLOAD, task: PAYLOAD };
     assertNoInjection(agentArea.render({ projectPath: '/tmp/x' }), 'agent.render active');
   });
 
@@ -155,9 +161,11 @@ describe('R7-A inbox area render', () => {
 });
 
 describe('R7-A overview tab render', () => {
-  it('sanitizes agent.name and agent.task', () => {
-    mAgent = { active: true, name: PAYLOAD, step: 5, phase: 'IMPLEMENT', task: PAYLOAD };
-    assertNoInjection(overview.render({ projectPath: '/tmp/x' }), 'overview.render agent.name/task');
+  it('sanitizes agent.name, agent.task, and the agent-writable step/phase', () => {
+    // `phase` and `step` are agent-writable (`.ctoc/state/agent.json`) — feed the
+    // payload through both, not benign placeholders, or the raw render is a false green.
+    mAgent = { active: true, name: PAYLOAD, step: PAYLOAD, phase: PAYLOAD, task: PAYLOAD };
+    assertNoInjection(overview.render({ projectPath: '/tmp/x' }), 'overview.render agent.name/task/step/phase');
   });
 
   it('sanitizes the related-plan id', () => {
@@ -176,5 +184,72 @@ describe('R7-A review tab renderRejectInput', () => {
   it('leaves a benign plan name visible', () => {
     const out = review.renderRejectInput({ selectedPlan: { name: 'checkout-flow' }, inputValue: '' });
     assert.ok(out.includes('checkout-flow'), 'benign plan name still renders');
+  });
+});
+
+describe('R7-A agent-area status message (app.message source)', () => {
+  it('sanitizes the agent-writable plan slug fed into the "already running" message', () => {
+    // status.plan comes from the agent-writable task registry (.ctoc/**). It is
+    // interpolated into app.message, which the mount renders. Sanitize at the source.
+    mAgent = { active: true, plan: PAYLOAD };
+    const app = { projectPath: '/tmp/x' };
+    agentArea.handleKey({ sequence: 'g' }, app);
+    assertNoInjection(app.message, 'agent.handleKey already-running app.message');
+  });
+
+  it('sanitizes the started-plan name (res.plan.name) fed into app.message', () => {
+    mAgent = { active: false };
+    const origStart = actions.startAgent;
+    actions.startAgent = () => ({ started: true, plan: { name: PAYLOAD } });
+    try {
+      const app = { projectPath: '/tmp/x' };
+      agentArea.handleKey({ sequence: 'g' }, app);
+      assertNoInjection(app.message, 'agent.handleKey started app.message');
+    } finally {
+      actions.startAgent = origStart;
+    }
+  });
+});
+
+describe('R7-A mount status-message render (app.message sink)', () => {
+  it('the mount strips control bytes from app.message before writing it to the terminal', () => {
+    // start.js renders app.message at its status-message sink — the single chokepoint
+    // every writer (agent area, tools, release) flows through. The whole-screen capture
+    // legitimately contains clear/cursor escapes (renderTabs, clear()), so we assert on
+    // the injection's UNIQUE signature instead of a blanket no-ESC scan: the payload's
+    // carriage-return-led spoof (`\rGate 3 approved`) must NOT survive, while the benign
+    // visible text is preserved (stripCtl removes only the control bytes).
+    const app = start.app;
+    const prevMessage = app.message;
+    const prevPath = app.projectPath;
+    app.message = PAYLOAD;
+    app.projectPath = '/tmp/x';
+    let captured = '';
+    const origWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = (s) => { captured += s; return true; };
+    try {
+      start.render();
+    } finally {
+      // Clear the pending 2s status timer: render() clears the prior timer and, with a
+      // null message, arms no new one — so a second render leaves no open handle.
+      app.message = null;
+      try { start.render(); } catch { /* cleanup render must not fail the test */ }
+      process.stdout.write = origWrite;
+      app.message = prevMessage;
+      app.projectPath = prevPath;
+    }
+    assert.ok(typeof captured === 'string' && captured.length > 0, 'render wrote output');
+    assert.ok(
+      !captured.includes('\rGate 3 approved'),
+      'app.message sink: the carriage-return-led spoof survived — app.message rendered raw',
+    );
+    assert.ok(
+      !captured.includes('\x1b[2J\x1b[H\rGate'),
+      'app.message sink: the raw clear-screen + CR injection payload survived',
+    );
+    assert.ok(
+      captured.includes('Gate 3 approved  press 1'),
+      'app.message sink: the benign visible text must still render after sanitization',
+    );
   });
 });

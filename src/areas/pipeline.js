@@ -146,7 +146,8 @@ function render(app) {
   out += line() + '\n';
   if (agent.active) {
     out += `${c.green}●${c.reset} Agent: ${c.bold}${stripCtl(agent.plan || 'unknown')}${c.reset}`;
-    if (agent.step) out += ` ${c.dim}(step ${agent.step})${c.reset}`;
+    // R7-A: agent.step is agent-writable (.ctoc/state/agent.json) — sanitize before render.
+    if (agent.step) out += ` ${c.dim}(step ${stripCtl(agent.step)})${c.reset}`;
     out += '\n';
   } else {
     out += `${c.dim}○ Agent idle${c.reset}\n`;
