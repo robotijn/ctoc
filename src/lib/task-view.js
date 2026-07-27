@@ -24,7 +24,7 @@
 'use strict';
 
 const path = require('path');
-const { canRun } = require('./task-registry');
+const { canRun, TERMINAL } = require('./task-registry');
 
 // ── module-local helpers (not exported) ─────────────────────────────────────
 
@@ -34,8 +34,9 @@ const { canRun } = require('./task-registry');
 // non-literal, not literal control-char classes).
 const stripCtl = (s) => String(s == null ? '' : s).replace(/[\x00-\x1f\x7f-\x9f]/g, '');
 
-// Terminal statuses (mirror of NB1's frozen set — NB1 does not export it).
-const TERMINAL = new Set(['done', 'failed', 'orphaned']);
+// Terminal statuses: the CANONICAL frozen set imported from task-registry (R3-B rework).
+// The former local mirror omitted `cancelled`, so a cancelled task's result summary was
+// never rendered — one encoding closes that divergence.
 
 // NAV-ROUTE allowlist (Decision 5, the feature's load-bearing safety invariant):
 // a task's next-action may ONLY be a navigation route — never a `claude:*`
