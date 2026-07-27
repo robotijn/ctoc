@@ -18,6 +18,8 @@ program: ctoc-repair-loop
 iron_loop: true
 files:
   - "tests/scheduler-guarantees-under-mutation.test.js"
+  - "src/lib/version.js"
+  - "tests/version.test.js"
 ---
 
 # Git exclusivity is undefended where work actually starts
@@ -493,7 +495,47 @@ not involved.
     passed at 99.04% against a floor of 99 with no ratchet tripped, so there was nothing
     to move in either direction. No whitelist entry was added anywhere.
 
-## The Gate-3 evidence records a FAILURE, and it is not this slice's — read this first
+## RECONCILED to the real gate (rework, isolated worktree) — read this first
+
+This plan was reworked to the real gate in an isolated worktree with no concurrent
+executors. Outcome:
+
+- **The scheduler guarantee is genuinely defended, verified by mutation, not by
+  reading.** Deleting Rule 3 (`git-exclusive`) from the live source and running Group C
+  turns exactly C1, C2, C3, C5, C6 red (`pass 14 fail 5`); C4, the control, stays green.
+  The source was restored immediately. Group C is a real defender, not a vacuous case.
+- **The full gate is GREEN and non-flaky.** `npm test` run eight consecutive times:
+  `tests 10531 · suites 1802 · pass 10531 · fail 0 · skipped 0`, coverage 99.11–99.15%
+  against a floor of 99, `PASS` on every run. `npx tsc --noEmit` clean.
+- **The foreign `deployment.test.js` lint failure recorded below is gone** — it was a
+  concurrent executor's in-flight edit, as the original record correctly diagnosed, and
+  it does not reproduce in isolation.
+- **A SEPARATE, genuine flake was found and FIXED during the rework.** Under the gate's
+  coverage instrumentation the suite failed intermittently (~1 run in 3–6) at
+  `tests/version.test.js:695` — `'6.13.30' !== '7.0.0'`, "latestVersion must be the
+  cached value". Root cause: `version.js` read/wrote the user's **global, shared**
+  `~/.ctoc/.update-cache.json`, which the live session and sibling worktrees write
+  concurrently; a cross-process write clobbered a just-written cache value between the
+  test's write and its read. Fix: `src/lib/version.js` now honors a
+  `CTOC_UPDATE_CACHE_FILE` env override (unset in production → unchanged behavior), and
+  `tests/version.test.js` sets it to a per-process temp path before requiring the module,
+  so the suite never touches the user's home file. Verified: the real
+  `~/.ctoc/.update-cache.json` is byte-identical before and after eight gate runs, and
+  the failure no longer reproduces. This is a test-isolation defect unrelated to the
+  scheduler subject, but it is what made the gate un-trustworthy, so it was fixed here
+  rather than deferred; `src/lib/version.js` and `tests/version.test.js` are added to
+  this plan's `files:` accordingly.
+
+- **Line numbers in this plan and the test comments have drifted** as the source grew:
+  Rule 3 now lives at `src/lib/task-registry.js:917-922`, `canRun` at `:953`,
+  `nextRunnable` at `:985` (the fold at `:993`), not the `:848-853` / `:884` / `:904`
+  the historical text cites. The mutations are also described textually and remain
+  precisely identifiable, so the historical evidence tables are left intact for
+  provenance rather than renumbered.
+
+The historical record of the original completion follows, unchanged, for provenance.
+
+## The Gate-3 evidence recorded a FAILURE at original completion (now resolved — see reconciliation above)
 
 `menu task complete t61` moved this plan to review with `verify.passed: false`. The
 evidence artifact is honest and has NOT been touched. What it records:

@@ -9,8 +9,12 @@ const path = require('path');
 const https = require('https');
 const { CTOC_HOME } = require('./crypto');
 
-// Cache update checks for 24 hours
-const UPDATE_CACHE_FILE = path.join(CTOC_HOME, '.update-cache.json');
+// Cache update checks for 24 hours. The cache path is the module's real input
+// boundary; tests set CTOC_UPDATE_CACHE_FILE to an isolated per-process path so a
+// suite never reads or mutates the user's shared ~/.ctoc/.update-cache.json (which
+// the live session and sibling worktrees write concurrently — a cross-process race
+// that intermittently reddened the gate). Unset in production → unchanged behavior.
+const UPDATE_CACHE_FILE = process.env.CTOC_UPDATE_CACHE_FILE || path.join(CTOC_HOME, '.update-cache.json');
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // GitHub raw URL for VERSION file

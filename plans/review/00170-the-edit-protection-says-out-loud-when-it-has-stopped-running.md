@@ -161,7 +161,7 @@ dead for three days — which is the project it is being rendered on right now. 
 is the "honest count shipped into a store nothing renders" failure in its other
 form: a number that reaches the human and carries no meaning.
 
-`src/areas/system.js` is a LIVE mount (`src/commands/menu.js:255` requires it) and
+`src/areas/system.js` is a LIVE mount (`src/commands/start.js:255` requires it) and
 it is the screen a human opens to ask whether CTOC itself is healthy. That makes it
 the correct home and not merely the convenient one. **It is also the only such
 surface currently unclaimed by an active plan** — see "File conflicts" below, which
@@ -430,11 +430,11 @@ against any input.
 
 | change | live call site | root |
 |---|---|---|
-| `protectionLiveness` | `src/areas/system.js:render` | `/ctoc:menu` → System area, a screen a human opens |
+| `protectionLiveness` | `src/areas/system.js:render` | `/ctoc:start` → System area, a screen a human opens |
 | `describeProtection` | that same render | the human's terminal |
 | the test file | the suite | `npm test` |
 
-`src/areas/system.js` is required by `src/commands/menu.js:255` and is a **mounted,
+`src/areas/system.js` is required by `src/commands/start.js:255` and is a **mounted,
 live** area. This matters and was checked: several done plans record that
 `src/tabs/overview.js` is an UNMOUNTED legacy tab and that features wired there are
 dead on arrival. Wiring this verdict into the overview tab would have produced
@@ -493,7 +493,7 @@ Read from disk, in full, and let the code win over this plan where they differ:
   file; it is declared by `00126` and `00129`.
 - `src/areas/system.js` — the render shape, the `c.*` colour conventions, and the
   `stripCtl` usage in sibling areas.
-- `src/commands/menu.js` around line 255 — **confirm `../areas/system` is really
+- `src/commands/start.js` around line 255 — **confirm `../areas/system` is really
   mounted and reachable**, and record how. If it is not, STOP: the surface is wrong
   and the human must choose another.
 
@@ -618,7 +618,7 @@ checked file by file across `plans/todo`, `plans/implementation` and
 | `src/lib/enforcement-log.js` | `00069` | the log format cannot be extended here — required, not edited |
 | `src/lib/iron-loop-enforcer.js` | `00165`, `00160`, `00154`, `00130`, … | no enforcer check registered here |
 | `src/tabs/overview.js` | `00086` | and it is an unmounted legacy tab regardless |
-| `src/commands/menu.js` | `00067`, `00156`, `00089` | no menu-level surface |
+| `src/commands/start.js` | `00067`, `00156`, `00089` | no menu-level surface |
 | `src/lib/menu-screens.js` | `00131`, `00152`, `00086` | — |
 | `docs/CRITICAL_CONTROL_POINTS.md` | `00089` | the ceiling note is handed to the human |
 | `CLAUDE.md` | eight active plans | no documentation change here |
@@ -791,7 +791,7 @@ file two plans claim.
   holds **24** lines, matching planning. (2) newest entry is a hand-fired probe;
   newest organic is 2026-07-17, matching planning. (4) `MAX_ENTRIES` is still
   **1000**, so the log has demonstrably never rotated. `src/areas/system.js` is
-  required at `src/commands/menu.js:255` and is a live mount; it remains declared
+  required at `src/commands/start.js:255` and is a live mount; it remains declared
   by no other active plan.
 - **Step 10 IMPLEMENT.** `src/lib/enforcement-liveness.js` (new),
   `src/areas/system.js` (Logs block only — the two sibling byte lines untouched),

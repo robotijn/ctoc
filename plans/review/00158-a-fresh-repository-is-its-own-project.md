@@ -436,59 +436,59 @@ two-pass priority and the boundary stop — and records the defect that motivate
 
 ## Verification Evidence
 
-`npm test`, verbatim:
+`npm test` (the full gated run via `src/scripts/test-gate.js` — whole suite +
+coverage floor + zero-skipped), verbatim tail:
 
 ```
-[CTOC test-gate] coverage 99.03% (threshold 99%), skipped 0, failed 6
+ℹ all files                          |  99.15 |    92.34 |   98.72 |
+[CTOC test-gate] coverage 99.15% (threshold 99%), skipped 0, failed 0
+[CTOC test-gate] PASS
 ```
 
-Coverage is above the floor of 99 and zero tests are skipped. Six assertions fail, in
-two groups.
+Coverage 99.15% is above the floor of 99, zero tests are skipped, zero fail.
+`npx tsc --noEmit` is clean. The gate is fully green.
 
-**Group A — pre-existing, not produced by this slice (3 failing tests).**
-`iron-loop-enforcer — live repo state` (fast and thorough self-check) and
-`iron-loop-enforcer — the verdict envelope`. Cause:
+An earlier execution record here reported `failed 6` in two groups; that reading was
+STALE and both groups have since resolved. It is corrected below rather than left to
+mislead a reviewer.
 
-```
-gate-destinations-approved: 4 plans in gate destinations are missing
-approved_by: human in the approval ledger
-  plans/todo/00126-one-character-separates-a-normal-declaration-from-the-whole-repository.md
-  plans/todo/00127-the-human-approving-a-plan-is-never-shown-the-files-it-grants.md
-  plans/todo/00129-the-permission-check-does-not-know-which-plan-is-being-built.md
-  plans/todo/00142-the-infrastructure-whitelist-reaches-outside-the-repository-through-a-link.md
-```
+**Group A — the four unapproved todo plans — resolved.** The earlier run recorded
+`iron-loop-enforcer` failing because four `plans/todo/*` files (00126, 00127, 00129,
+00142) lacked `approved_by: human`. Those plans were mid-flight edits by other agents,
+outside this slice's declared files and never touched by it; they have since been
+approved/reconciled, and the enforcer self-check now passes in the green run above.
 
-All four were already modified in the working tree when execution began, by planning
-agents. They are outside this slice's declared files and were not touched.
+**Group B — the behaviour collision — resolved by the owner's ruling.** The three
+assertions in `tests/project-root.test.js` and `tests/lib-cmd2-batch.test.js` that
+encoded "ancestor `.ctoc` outranks a nested `.git`" contradicted this slice's boundary
+rule. The owner ruled (2026-07-20) that a repository boundary wins; scope was extended
+through the approval path to declare both test files, and the three assertions were
+inverted with their rationale rewritten (the reversal comments are in both files). They
+are green in the run above. The fork that this collision surfaced is retained as a
+decision record in the FINAL-REVIEW section below.
 
-**Group B — the behaviour collision (3 failing assertions).** THIS SLICE CAUSED THESE
-AND THEY WERE NOT FIXED. They are the fork below.
+### FINDING (deferred, outside this slice's declared files): the project-root rule is still encoded in more than one place
 
-### FINDING (not fixed by this slice): six independent encodings of the project-root rule
-
-**This slice does NOT fix this, and the owner's bug may still be reachable through any
-of the six paths below.**
-
-`src/lib/project-root.js` is not the only implementation of "find the project root".
-Six modules define their OWN private copy and import nothing:
+**This slice does NOT consolidate this, and it needs its own slice.** `src/lib/project-root.js`
+is not the only implementation of "find the project root". As of this reconciliation,
+`src/hooks/SessionStart.js` — singled out in the original record as the most dangerous
+divergence because it runs FIRST on every session — HAS been migrated to the shared
+`describeProjectRoot` (it requires and calls it), so it now stops at the boundary. Five
+modules still define their OWN private copy and import nothing:
 
 | module | why it matters |
 |---|---|
-| `src/hooks/SessionStart.js` | runs on every session start, resolves the root for injected context |
 | `src/scripts/run-evals.js` | resolves the root for evaluation runs |
 | `src/lib/iron-loop-enforcer.js` | resolves the root it audits |
 | `src/lib/budget.js` | resolves the root for budget state |
 | `src/lib/refinement-loop.js` | resolves the root for loop journals and letters |
 | `src/lib/coverage-map.js` | resolves the root for coverage mapping |
 
-None of them stops at a repository boundary, because none of them shares the code that
-now does. A rule that exists in seven places is true in one of them. Concretely: a
-fresh repository nested under a CTOC project now resolves correctly through the menu
-and every caller of the shared module, but `SessionStart` — which runs FIRST, on every
-session — can still resolve to the ancestor and inject the ancestor's context.
-
-The fix is consolidation onto the shared module, which touches six files this plan does
-not declare and needs its own slice. Recorded here so it is not lost.
+None of the five stops at a repository boundary, because none shares the code that now
+does. The live-facing paths (the menu, every hook via SessionStart, and every caller of
+the shared module) resolve correctly; the remaining five are audit/eval/budget surfaces.
+The fix is consolidation onto the shared module, which touches files this plan does not
+declare and needs its own slice. Recorded here so it is not lost.
 
 ## Step 16 FINAL-REVIEW Report
 

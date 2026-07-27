@@ -11,6 +11,14 @@ const fs = require('node:fs');
 const https = require('node:https');
 const { EventEmitter } = require('node:events');
 
+// Isolate the on-disk update cache to a per-process temp file BEFORE requiring the
+// module (version.js reads CTOC_UPDATE_CACHE_FILE at load). Without this, every
+// cache test drives the user's shared ~/.ctoc/.update-cache.json, which the live
+// session and sibling worktrees write concurrently — a cross-process race that
+// clobbered a just-written value between write and read and intermittently
+// reddened the gate. A per-pid path is touched by no other process.
+process.env.CTOC_UPDATE_CACHE_FILE = path.join(os.tmpdir(), `ctoc-update-cache-test-${process.pid}.json`);
+
 // Import the module under test
 const version = require('../src/lib/version');
 
@@ -31,12 +39,11 @@ after(() => {
   } catch { /* best-effort restore */ }
 });
 
-// The module captures these constants at load time from ~/.ctoc.
-// Reconstruct the same on-disk cache path so failure-path tests can drive
-// loadUpdateCache / saveUpdateCache / checkForUpdates through the real seam
-// (the on-disk cache) rather than by mocking the module's own logic.
-const CTOC_HOME = path.join(os.homedir(), '.ctoc');
-const UPDATE_CACHE_FILE = path.join(CTOC_HOME, '.update-cache.json');
+// The failure-path tests drive loadUpdateCache / saveUpdateCache / checkForUpdates
+// through the real seam (the on-disk cache) rather than by mocking the module's own
+// logic. UPDATE_CACHE_FILE is the isolated per-process path set above — the test
+// helpers must drive the SAME file version.js reads at load.
+const UPDATE_CACHE_FILE = process.env.CTOC_UPDATE_CACHE_FILE;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 // --- Real external boundary: a fake https.get -------------------------------
@@ -111,7 +118,8 @@ function removeCache() {
 }
 
 function writeCache(obj) {
-  if (!fs.existsSync(CTOC_HOME)) fs.mkdirSync(CTOC_HOME, { recursive: true });
+  const cacheDir = path.dirname(UPDATE_CACHE_FILE);
+  if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
   fs.writeFileSync(UPDATE_CACHE_FILE, JSON.stringify(obj));
 }
 
@@ -936,7 +944,8 @@ describe('update cache and checkForUpdates', () => {
 
   test('a malformed cache file is swallowed and treated as no cache', () => {
     // Arrange — invalid JSON on disk triggers the JSON.parse catch branch
-    if (!fs.existsSync(CTOC_HOME)) fs.mkdirSync(CTOC_HOME, { recursive: true });
+    const cacheDir = path.dirname(UPDATE_CACHE_FILE);
+    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
     fs.writeFileSync(UPDATE_CACHE_FILE, '{ this is not valid json ');
 
     // Act
