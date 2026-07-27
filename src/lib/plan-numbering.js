@@ -56,20 +56,113 @@ function stageDir(root, stage) {
   return path.join(root, 'plans', stage);
 }
 
+/** Max exclusive-create claim attempts before a race is declared pathological. */
+const MAX_ALLOC_ATTEMPTS = 50;
+
+/** The advisory claim store — additive-only reservations, never pruned. */
+function claimsDir(root) {
+  return path.join(root, '.ctoc', 'state', 'plan-numbers');
+}
+
 /**
- * Highest numeric prefix among implementation plans, or 0 when none exist.
+ * Every NUMBERED plan across ALL seven stages. Plans keep their number when they
+ * move between stage directories, so a scan of one stage is blind to every number
+ * that has advanced past it (Defect A). Reads filenames only — the number lives in
+ * the name, never open a plan file to find it.
+ *
+ * ABSENT vs UNREADABLE are different facts (Defect B). An absent `plans/` is a
+ * legitimate fresh project (→ empty list → 00001). An absent stage directory is
+ * normal and contributes nothing. But a stage directory that EXISTS and cannot be
+ * read is a broken instrument: it is exactly where a higher number may live, so it
+ * THROWS naming the repository-relative directory rather than returning a number
+ * derived from the stages that did read. Never the success-value default.
+ *
+ * @param {string} root - project root
+ * @returns {Array<{number:number, slug:string, stage:string, path:string}>}
+ * @throws {Error} naming `plans/<stage>` when a present stage directory is unreadable
+ */
+function scanNumberedPlans(root) {
+  const plansDir = path.join(root, 'plans');
+  if (!safeFs.existsSync(plansDir)) return []; // fresh project — absent, not unreadable
+  const out = [];
+  for (const stage of STAGES) {
+    const dir = stageDir(root, stage);
+    if (!safeFs.existsSync(dir)) continue; // absent stage — normal, contributes nothing
+    let files;
+    try {
+      files = safeFs.readdirSync(dir);
+    } catch (err) {
+      const e = /** @type {NodeJS.ErrnoException} */ (err);
+      throw new Error(
+        `plan-numbering: cannot read stage directory plans/${stage} (${e.code || e.message}). ` +
+        'An unreadable stage is exactly where a higher plan number may live, so the allocator ' +
+        'REFUSES rather than returning a number that would collide the moment the premise is wrong.'
+      );
+    }
+    for (const f of files) {
+      if (!f.endsWith('.md')) continue;
+      const m = f.match(PREFIX_RE);
+      if (!m) continue;
+      out.push({ number: parseInt(m[1], 10), slug: f.replace(/\.md$/, ''), stage, path: `plans/${stage}/${f}` });
+    }
+  }
+  return out;
+}
+
+/**
+ * Highest numeric prefix across EVERY stage, or 0 when none exist. Global — the
+ * single monotonic order the module header describes. Throws on an unreadable
+ * present stage (see `scanNumberedPlans`).
+ *
+ * @param {string} root - project root
+ * @returns {number}
+ */
+function highestPlanNumber(root) {
+  let max = 0;
+  for (const p of scanNumberedPlans(root)) if (p.number > max) max = p.number;
+  return max;
+}
+
+/**
+ * Back-compat alias, KEPT: it is exported and exercised by two existing suites, so
+ * removing it would force unrelated churn. The scan is now GLOBAL, not
+ * implementation-only — the name is historical, the behaviour is corrected.
+ *
  * @param {string} root - project root
  * @returns {number}
  */
 function highestImplementationNumber(root) {
-  const dir = stageDir(root, 'implementation');
+  return highestPlanNumber(root);
+}
+
+/**
+ * Next global plan number as a five-digit string. "00001" when no numbered plans
+ * exist ANYWHERE. Pure / read-only. Throws on an unreadable present stage.
+ *
+ * This is a READ, not a claim — two agents that read before either writes both get
+ * the same answer (Defect C). For a race-safe number use `allocatePlanNumber`.
+ *
+ * @param {string} root - project root
+ * @returns {string} zero-padded next number, e.g. "00007"
+ */
+function nextImplementationPlanNumber(root) {
+  return pad5(highestImplementationNumber(root) + 1);
+}
+
+/**
+ * Highest number staked in the advisory claim store, or 0. Claim files are named
+ * with the bare zero-padded number and nothing else.
+ *
+ * @param {string} root - project root
+ * @returns {number}
+ */
+function highestClaimNumber(root) {
+  const dir = claimsDir(root);
   if (!safeFs.existsSync(dir)) return 0;
   let max = 0;
   for (const f of safeFs.readdirSync(dir)) {
-    if (!f.endsWith('.md')) continue;
-    const m = f.match(PREFIX_RE);
-    if (m) {
-      const n = parseInt(m[1], 10);
+    if (/^\d{5,}$/.test(f)) {
+      const n = parseInt(f, 10);
       if (n > max) max = n;
     }
   }
@@ -77,14 +170,139 @@ function highestImplementationNumber(root) {
 }
 
 /**
- * Next global implementation-plan number as a five-digit string.
- * "00001" when no numbered implementation plans exist. Pure / read-only.
+ * Atomically ALLOCATE the next plan number and stake a claim, so two agents that
+ * allocate without an intervening write get two DIFFERENT numbers (Defect C).
+ *
+ * The floor is always `max(filename scan, claim files) + 1` — filenames stay the
+ * single source of truth and claims are advisory: a lost or hand-deleted claims
+ * directory can only cause a number to be SKIPPED, never re-issued, because a
+ * number that ever named a real plan file is caught by the filename scan forever.
+ * The claim is staked with the exclusive-create flag (`wx`), atomic on Windows,
+ * macOS and Linux. On a lost race (EEXIST) it re-scans and retries — the retry's
+ * whole cost is the rescan, the work needed to re-decide anyway — bounded so a
+ * pathological perpetual race becomes a LOUD failure instead of an infinite loop.
+ *
+ * Claims are additive-only and NEVER pruned: any expiry could reclaim a number
+ * held by a plan not yet written to disk.
  *
  * @param {string} root - project root
- * @returns {string} zero-padded next number, e.g. "00007"
+ * @param {{ exclusiveCreate?: (claimPath: string) => void }} [opts] - `exclusiveCreate`
+ *   defaults to the real atomic `wx` write; it exists ONLY so a test can simulate
+ *   perpetual race contention, which a single process cannot produce. The
+ *   compute-next core always runs for real.
+ * @returns {string} the allocated zero-padded number
+ * @throws {Error} on an unreadable stage (via the scan) or when the bounded retry is exhausted
  */
-function nextImplementationPlanNumber(root) {
-  return pad5(highestImplementationNumber(root) + 1);
+function allocatePlanNumber(root, opts = {}) {
+  const dir = claimsDir(root);
+  safeFs.mkdirSync(dir, { recursive: true });
+  const stake = typeof opts.exclusiveCreate === 'function'
+    ? opts.exclusiveCreate
+    : (claimPath) => safeFs.writeFileSync(claimPath, '', { flag: 'wx' });
+
+  for (let attempt = 0; attempt < MAX_ALLOC_ATTEMPTS; attempt++) {
+    const next = Math.max(highestPlanNumber(root), highestClaimNumber(root)) + 1;
+    const claimPath = path.join(dir, pad5(next));
+    try {
+      stake(claimPath);
+      return pad5(next);
+    } catch (err) {
+      const e = /** @type {NodeJS.ErrnoException} */ (err);
+      if (e && e.code === 'EEXIST') continue; // lost the race — re-scan and retry
+      throw err;
+    }
+  }
+  throw new Error(
+    `plan-numbering: could not allocate a plan number after ${MAX_ALLOC_ATTEMPTS} attempts. ` +
+    'Every attempt lost the exclusive-create race — this is a pathological contention, not a slow one, ' +
+    'so it fails loudly rather than looping.'
+  );
+}
+
+/**
+ * Every number that names TWO OR MORE DIFFERENT plans (distinct slugs) across all
+ * stages — existing damage, made visible instead of waiting for someone to trip
+ * over it. The same slug present in two stages is ONE plan, not a collision.
+ * Throws on an unreadable present stage (see `scanNumberedPlans`) — a partial scan
+ * must never render as "no collisions".
+ *
+ * @param {string} root - project root
+ * @returns {Array<{number:string, plans:string[]}>} sorted by number
+ */
+function findNumberCollisions(root) {
+  const bySlug = new Map(); // number -> Set<slug>
+  for (const p of scanNumberedPlans(root)) {
+    if (!bySlug.has(p.number)) bySlug.set(p.number, new Set());
+    bySlug.get(p.number).add(p.slug);
+  }
+  const out = [];
+  for (const [number, slugs] of bySlug) {
+    if (slugs.size > 1) out.push({ number: pad5(number), plans: [...slugs].sort() });
+  }
+  return out.sort((a, b) => a.number.localeCompare(b.number));
+}
+
+/** A numbered plan target: `plans/<stage>/<NNNNN>-<slug>.md`. */
+const PLAN_TARGET_RE = /^plans\/([^/]+)\/(\d{5,})-(.+)\.md$/;
+
+/**
+ * The ONE encoding of the collision predicate the Write hook enforces:
+ *
+ *   REFUSE iff the target is `plans/<stage>/<NNNNN>-<slug>.md` AND some OTHER file
+ *   under `plans/` is named `<NNNNN>-<different-slug>.md`. Same number, DIFFERENT
+ *   slug, DIFFERENT path — all three.
+ *
+ * Cleanly separated, no heuristic:
+ *   - a MOVE (same number, same slug, different stage) → allow (slug match);
+ *   - a rewrite in place (target path equals the existing path) → allow (path match);
+ *   - the same plan in two stages → allow (slug match);
+ *   - an unnumbered or non-plan path → allow, reading NO directory (`scanned:false`);
+ *   - a retitle-in-place → REFUSE (indistinguishable from a collision at write time;
+ *     the accepted cost, with a delete-first remedy in the hook message);
+ *   - reuse of a number freed by deletion → allow (nothing holds the number);
+ *   - an unreadable `plans/` → `unknown` (never a false collision on unseen input).
+ *
+ * @param {string} root - project root
+ * @param {string} targetRelPath - repository-relative, forward-slash target path
+ * @returns {{collides:boolean, scanned:boolean, number?:string, conflictingPlan?:string,
+ *   conflictingPath?:string, nextFree?:string} | {unknown:true, scanned:boolean, reason:string}}
+ */
+function checkPlanWriteCollision(root, targetRelPath) {
+  const rel = String(targetRelPath || '').replace(/\\/g, '/').replace(/^\.\//, '');
+  const m = rel.match(PLAN_TARGET_RE);
+  if (!m) return { collides: false, scanned: false }; // not a numbered plan path — read nothing
+
+  const targetNumber = parseInt(m[2], 10);
+  const targetSlug = rel.slice(rel.lastIndexOf('/') + 1).replace(/\.md$/, '');
+
+  let entries;
+  try {
+    entries = scanNumberedPlans(root);
+  } catch (err) {
+    return { unknown: true, scanned: true, reason: err.message };
+  }
+
+  let conflict = null;
+  for (const e of entries) {
+    if (e.number !== targetNumber) continue;
+    if (e.path === rel) continue;        // rewrite in place
+    if (e.slug === targetSlug) continue; // move / same plan in two stages
+    conflict = e;                        // different slug at a different path
+    break;
+  }
+
+  const nextFree = nextImplementationPlanNumber(root);
+  if (conflict) {
+    return {
+      collides: true,
+      scanned: true,
+      number: pad5(targetNumber),
+      conflictingPlan: conflict.slug,
+      conflictingPath: conflict.path,
+      nextFree,
+    };
+  }
+  return { collides: false, scanned: true, nextFree };
 }
 
 /**
@@ -301,6 +519,10 @@ function renumberImplementationPlans(root) {
 
 module.exports = {
   nextImplementationPlanNumber,
+  allocatePlanNumber,
+  findNumberCollisions,
+  checkPlanWriteCollision,
+  highestPlanNumber,
   renumberImplementationPlans,
   // exported for focused unit reuse / testing
   highestImplementationNumber,

@@ -6,8 +6,9 @@
   "establishedAt": "2026-07-14",
   "establishedAtVersion": "6.12.0",
   "reseededAt": "2026-07-19",
+  "loweredNote": "RATCHET DOWN 26 -> 25 (2026-07-21, plan 00120, MEASURED live from analyze()): src/lib/plan-numbering.js is WIRED, not exempted — src/hooks/PreToolUse.Write.js now require()s it to enforce the plan-number collision refusal at plan-create time, so it is reachable from a registered hook root. Its exports are correspondingly live in the export fence (allocatePlanNumber via the start.md create-plan recipe; checkPlanWriteCollision via the Write hook; findNumberCollisions + renumberImplementationPlans via the start.md plan-numbers-check / plan-numbers-repair recipes; the rest via intra-file code edges).",
   "seedReadErrors": 0,
-  "maxUnreachable": 26,
+  "maxUnreachable": 25,
   "unreachable": [
     "src/hooks/validate-plan-steps.js",
     "src/lib/ai-provenance.js",
@@ -25,7 +26,6 @@
     "src/lib/irac-schema.js",
     "src/lib/iron-loop-compliance-trigger.js",
     "src/lib/legal-hold.js",
-    "src/lib/plan-numbering.js",
     "src/lib/privilege-posture.js",
     "src/lib/product-loop.js",
     "src/lib/proportionality.js",

@@ -547,3 +547,55 @@ number alone, this slice's severity changes and it must be reported before the f
 16. **The false-refusal test cases are written BEFORE the refusal exists.** A refusal
     implemented first and guarded second is tuned to its own implementation, and a fence
     that fires on ordinary work is a fence that gets disabled.
+
+### Decisions taken during execution (2026-07-21) — deviations for review
+
+17. **The `menu.md` → `start.md` correction was applied.** The plan's declared `files:`
+    named `src/commands/menu.md`, which no longer exists (renamed to `src/commands/start.md`).
+    The one-line repoint (`nextImplementationPlanNumber` → `allocatePlanNumber`) was applied
+    to `start.md`, the live file.
+
+18. **`findNumberCollisions` and `renumberImplementationPlans` were WIRED, not deleted or
+    whitelisted — a deviation from the plan's "do not delete this slice" for `renumber`.**
+    MEASURED (not predicted): once `plan-numbering.js` is wired live via the Write hook, the
+    EXPORT fence exposes BOTH `findNumberCollisions` (required by this plan, but with no
+    caller) AND `renumberImplementationPlans` (the migration the plan flagged) as dead
+    exports — total dead 68 → 70, which the ratchet fails. The plan named DELETE as the
+    correct answer for `renumber` but deferred it ("churn does not belong here"); the export
+    fence being a HARD gate makes deferral impossible. Of the four resolutions, deleting
+    `renumber` cascades to `topoOrder`/`remapReferences`/six internal helpers and forces
+    editing two existing test files NOT in this slice's declared `files:`; whitelisting is
+    forbidden by the plan; bumping the export baseline is forbidden by its ratchet. So both
+    were WIRED honestly as operator-invokable maintenance/diagnostic recipes in the declared
+    `start.md` ("Plan-number check" → `findNumberCollisions(`, "Plan-number repair" →
+    `renumberImplementationPlans(`). This is the Lesson-16 "wire OR delete" alternative,
+    stays in declared scope, respects "do not delete this slice", and drops the export count
+    back to exactly the baseline (68). `renumber` remains untouched and still passes its two
+    existing suites unmodified. **If review prefers deletion, that is a follow-up slice with
+    its own test churn.**
+
+19. **The one new false-green site (`silent-catch` in `main()`) was resolved by making the
+    fail-open catch non-silent, not by baselining it.** The collision `try/catch` in the
+    hook's `main()` must fail OPEN (a numbering-check fault must never stop a write — the
+    plan's own requirement, case 24), which read as an empty catch to the false-green fence
+    (+1 over baseline). It now writes a fail-open notice to stderr, so the degradation is
+    surfaced rather than swallowed — honest AND off the fence, with no baseline change.
+
+20. **The unreadable-stage tests use an ENOTDIR-via-file mechanism, not `chmod` + skip.**
+    Replacing a stage directory with a regular file makes `readdirSync` throw ENOTDIR on
+    EVERY platform (including Windows and as root), so cases 3, 22 and the unknown-state
+    predicate run everywhere with ZERO skips — satisfying the repository's skip-visibility
+    fence (which forbids ungated runtime `t.skip()`) while still driving the real fault. This
+    supersedes the plan's "skip with a stated reason" note, which would have tripped the
+    zero-skipped gate.
+
+21. **The approval-key claim was VERIFIED (Step 9), not assumed.** `streaming-gate.js:509`
+    derives the record key as `plan_basename: path.basename(planPath).replace(/\.md$/i, '')`
+    — the full slug, never the number. A number collision between two DIFFERENT slugs
+    therefore does not merge two approval records; the human's note holds and this slice's
+    severity is unchanged. `findNumberCollisions` on the real repository returns `[]` (no
+    existing collisions).
+
+22. **CLAUDE.md was NOT edited (Step 15 partially deferred).** The executor brief explicitly
+    forbids editing CLAUDE.md, so the "record global numbering + refusal in CLAUDE.md" and
+    the test-file-count bump were not applied. Flagged for a maintainer to fold into the docs.
