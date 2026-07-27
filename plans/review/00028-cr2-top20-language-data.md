@@ -86,18 +86,38 @@ CR3 owns engine changes, so every language needed a REAL exact-filename marker t
 current engine can match; extension globs are carried alongside for CR3.
 
 1. **Detection markers vs. the glob-only matrix.** The matrix detects several
-   languages by extension (`*.csproj`, `*.m`, `*.lua`, `*.sql`). The current engine
-   only matches exact filenames, so each such language also declares a real exact
-   marker the test fixture creates: csharp→`global.json`, cpp→`CMakeLists.txt`,
+   languages by extension (`*.csproj`, `*.m`, `*.lua`, `*.sql`). At CR2 authoring the
+   engine only matched exact filenames, so each such language ALSO declared a real
+   exact marker the test fixture created: csharp→`global.json`, cpp→`CMakeLists.txt`,
    c→`Makefile`, javascript→`package.json`, sql→`dbt_project.yml`, r→`DESCRIPTION`,
    lua→`.luacheckrc`, objectivec→`Podfile`, swift→`Package.swift`. The extension
-   globs (`*.csproj`, `*.m`, etc.) are ALSO listed so CR3's glob detector activates
-   them; the current engine harmlessly no-matches a literal `*.x`.
+   globs (`*.csproj`, `*.m`, etc.) were also listed so CR3's glob detector would
+   activate them.
+
+   **RECONCILED (review, 2026-07-27):** the engine is now glob-AWARE, and CR5-FIX
+   narrowed two languages away from the exact markers this decision originally
+   chose, because those markers mis-asserted the language. As SHIPPED on disk:
+   `c` is detected ONLY by `["*.c", "*.h"]` — `Makefile` was REMOVED (a generic build
+   tool that mis-asserted C on any Make-using repo); `objectivec` is detected ONLY by
+   `["*.m"]` — `Podfile`/`*.xcodeproj` were REMOVED (both shared with Swift, so
+   non-disambiguating). The other languages carry their extension globs directly
+   (`sql: *.sql`, `csharp: *.csproj/*.sln`, `swift: *.xcodeproj`, `r: *.Rproj`,
+   `lua: *.lua/*.rockspec`, `cpp: *.cpp/*.hpp`, `ruby: *.gemspec`) alongside a real
+   filename marker where one exists. The top-20 test's `DETECT_MARKER` matches this
+   shipped reality (`c: main.c`, `objectivec: foo.m`), and the six CR5-FIX
+   narrowed-marker cases assert the removals. This decision's original claim
+   ("current engine only matches exact filenames … c→Makefile … objectivec→Podfile")
+   no longer describes the shipped data and is superseded by this note.
 2. **Marker collision avoidance.** `build.gradle.kts` stays Kotlin's only (java uses
-   `pom.xml`/`build.gradle`). `Podfile` is assigned to Objective-C only and Swift is
-   detected via `Package.swift`, so the exact-match detector is unambiguous between
-   the two Apple languages (both really use CocoaPods; the split is a detection
-   choice, documented here).
+   `pom.xml`/`build.gradle`) — this half holds as shipped. The original plan also
+   assigned `Podfile` to Objective-C and detected Swift via `Package.swift` to keep
+   the two Apple languages unambiguous.
+
+   **RECONCILED (review, 2026-07-27):** CR5-FIX F2 superseded the Podfile assignment.
+   As shipped, `Podfile` is NOT a marker for Objective-C at all (it is shared with
+   Swift and does not disambiguate); Objective-C is detected only by `*.m` and Swift
+   only by `Package.swift`/`*.xcodeproj`. The languages remain unambiguous, but via
+   the source-extension split, not the Podfile assignment this decision described.
 3. **cpp build — no `&&`.** The matrix build is `cmake -S . -B build && cmake --build
    build`; `&&` chains two commands and is NOT argv-safe. The returned build cmd is
    the single `cmake --build build`; `cmake -S . -B build` is the configure
@@ -125,8 +145,83 @@ current engine can match; extension globs are carried alongside for CR3.
    standard). Swift/Obj-C/Scala/R/Lua UNVERIFIED security reuse the language's real
    linter, honestly flagged as not-a-SAST.
 
-### Executor verification (Step 14)
+### Executor verification (Step 14) — original run, superseded by the review re-run below
+The original executor verification ran only the three narrowed suites plus eslint
+(NOT the gated `npm test`), and recorded these numbers at CR2 authoring time:
 - `tests/capability-registry-top20.test.js`: 66 tests, 66 pass, 0 fail, 0 skipped.
 - `tests/capability-registry.test.js` (CR1): 29 tests, 29 pass, 0 fail (stayed green).
 - `tests/app-runner.test.js` (live consumer of `load()`): 13 pass, 0 fail.
 - `eslint tests/capability-registry-top20.test.js`: clean (exit 0, 0 warnings).
+
+**Those three counts are now STALE** — the shared test files grew after CR2 was
+authored (CR3/CR5-FIX added the six narrowed-marker cases to the top-20 file; CR3 and
+the frameworks/project-types waves grew the CR1 and app-runner files). The narrowed run
+was also NOT the real Step 14 gate: `npm test` (`src/scripts/test-gate.js`) is the gated
+entry point that enforces the coverage floor and the zero-skipped gate, and it was never
+run. The review re-run below runs it and records the real evidence.
+
+### Step 14 VERIFY — review re-run (the REAL gate), 2026-07-27
+- **`npm test` (full gate, the gated entry point):** `[CTOC test-gate] coverage 99.14%
+  (threshold 99%), skipped 0, failed 0` → **PASS**. The whole suite is green, coverage
+  is at/above the 99 floor, zero skipped, zero flaky. This is the evidence the narrowed
+  run omitted.
+- **`npx tsc --noEmit`:** clean, zero errors. (Any earlier "full-suite red / tsc errors"
+  concern is REFUTED as stale — the tree is green on both instruments.)
+- `tests/capability-registry-top20.test.js`: **73 tests, 73 pass, 0 fail, 0 skipped**
+  (was 66 — the six CR5-FIX narrowed-marker cases were added after authoring).
+- `tests/capability-registry.test.js` (CR1): **61 tests, 61 pass, 0 fail** (was 29 —
+  grew via CR3/framework/project-type overlay tests on the shared engine file).
+- `tests/app-runner.test.js` (live consumer of `load()`): **42 tests, 42 pass, 0 fail**
+  (was 13 — grew via CR3 taxonomy/pipeline wiring tests).
+- `eslint tests/capability-registry-top20.test.js`: clean (exit 0, 0 warnings).
+- Registry load of the shipped seed: `warnings: []`, 26 languages loaded, all 14 CR2
+  languages present and well-formed. Every claimed count above matches disk.
+
+## Step 16 — FINAL REVIEW report (review reconciliation, 2026-07-27)
+
+The 14 CR2 language files shipped correctly and are well-formed; the shipped DATA
+needed no changes. What was wrong was the plan RECORD — stale numbers and stale
+detection-marker claims that no longer matched the shipped data after later
+CR3/CR5-FIX/framework work touched the shared engine and test files. This review
+re-ran the real gate and reconciled the record to disk.
+
+**Shipped deliverable (verified on disk).** All 14 files exist and load with zero
+warnings: `java csharp cpp c javascript sql php ruby swift r scala elixir objectivec
+lua`. Every present toolchain phase has a non-empty `cmd`, a named `tool`, and a
+`verified` value of exactly `web-2026-07` or `UNVERIFIED` (never empty, never
+`guessed`). SQL is honestly partial (`run.honest: false`, no run shape). No command
+contains a shell control metacharacter. The `files:` frontmatter is accurate: all 14
+declared YAML files plus `tests/capability-registry-top20.test.js` exist, and nothing
+undeclared shipped.
+
+**UNVERIFIED entries (for boundary web-verification), as shipped.** These are the
+honestly-flagged slots where no CI-standard invocation could be confirmed:
+`java.security` (SpotBugs without find-sec-bugs is a bug-pattern finder, not a SAST);
+`csharp.security` (security-code-scan Roslyn analyzer, CLI integration varies);
+`cpp.lint` and `c.lint` (clang-tidy needs a compile database); `c.test` (ctest needs a
+pre-configured build dir); `c.depsAudit`/`cpp.depsAudit` (osv-scanner — real, but C/C++
+have no lockfile standard); `javascript.typecheck` (`tsc --checkJs` is an opt-in TS tool
+on JS); `sql.test` and `sql.security` (dbt/pgtap vary; SQL SAST is not standard);
+`ruby.typecheck` (Sorbet optional) and `ruby.coverage` (SimpleCov has no standalone CLI);
+`swift.security` (SwiftLint is style, not SAST); `scala.security` (no free canonical
+Scala SAST); `r.security`/`r.depsAudit` (no standard R SAST or audit);
+`objectivec.lint`/`objectivec.security` (OCLint needs a compile DB, not a confirmed
+SAST) and `objectivec.depsAudit` (CocoaPods/SwiftPM have no standard audit);
+`lua.security`/`lua.depsAudit` (no standard Lua SAST; LuaRocks has no audit command).
+
+**N/A phases OMITTED (honest partial), as shipped.** `sql` omits
+typecheck/coverage/depsAudit/build; `r` and `lua` omit typecheck; `lua` omits build.
+Absent phase = honest N/A, never a stub.
+
+**Defect dispositions (this review).**
+1. Step 14 never ran the real gate — FIXED: ran `npm test` → PASS (99.14% ≥ 99, 0
+   skipped, 0 fail) and `npx tsc --noEmit` → clean; recorded above.
+2. Stale test counts in the record (top-20 66→73, CR1 29→61, app-runner 13→42) —
+   FIXED: corrected to the real disk numbers with the reason each grew.
+3. Stale detection-marker claims (Decisions #1/#2: `c→Makefile`, `objectivec→Podfile`,
+   "engine matches only exact filenames") contradicted the shipped glob-aware data —
+   FIXED: reconciled both decisions to the shipped reality (c narrowed to `*.c/*.h`,
+   objectivec narrowed to `*.m`), preserving the original text plus a RECONCILED note.
+4. "full-suite red / tsc errors" concern — REFUTED as stale: both instruments are green.
+
+No shipped data or test was weakened. The record now matches disk.

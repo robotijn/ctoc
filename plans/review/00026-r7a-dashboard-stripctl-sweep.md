@@ -13,6 +13,7 @@ files:
   - "src/areas/inbox.js"
   - "src/tabs/overview.js"
   - "src/tabs/review.js"
+  - "src/commands/start.js"
   - "tests/dashboard-injection.test.js"
   - "tests/tui*.test.js"
 ---
@@ -65,8 +66,8 @@ clean. Assert a benign field still renders its visible text unchanged.
 - [x] Step 10 IMPLEMENT — `stripCtl` promoted to `src/lib/tui.js` + exported; every listed untrusted field wrapped.
 - [x] Step 11 REVIEW — grep of every untrusted-field interpolation across the 5 files; all wrapped or justified (see Decisions).
 - [x] Step 13 SECURE — re-attack: `node --test tests/dashboard-injection.test.js` → 10/10 pass; no untrusted field renders a raw control byte.
-- [x] Step 14 VERIFY — `tui`+`areas`+`area-modules`+2 security suites 77/77; typecheck baseline held; eslint exit 0. (No git; no full suite per orders.)
-- [x] Step 16 REPORT — see final message.
+- [x] Step 14 VERIFY — REAL gate re-run on rework (2026-07-27): `npx tsc --noEmit` clean (0 errors); `npm test` (full suite + coverage floor + zero-skipped) = **tests 10523, pass 10523, fail 0, skipped 0, coverage 99.12% (threshold 99%)** → `[CTOC test-gate] PASS`. The original "77/77 narrowed, no full suite" note was insufficient evidence for a security plan; the whole gate is now recorded. `tests/dashboard-injection.test.js` = 13/13.
+- [x] Step 16 REPORT — see rework report at end of file.
 
 ## Decisions Taken Under Ambiguity
 1. **Test-assertion shape.** The palette legitimately emits SGR colour escapes
@@ -86,13 +87,79 @@ clean. Assert a benign field still renders its visible text unchanged.
    (~:80) — same agent-writable slug/path trust class as overview's related id,
    which the plan lists; (b) `review.js` `renderActions` heading (~:46) and the
    two rejected-`app.message` builds (~:118,:148) — the same `selectedPlan.name`
-   the plan lists for `renderRejectInput`, reaching the terminal via
-   `renderActionMenu` and via `menu.js:353` which renders `app.message` raw. All
-   wrapped at the source. Left untouched: fixed enums / integers / constants
-   (`severity`, `agent.step`, `agent.phase`, `p.gate`) per "do not over-strip".
-4. **Out-of-scope defense-in-depth finding (NOT fixed — not a plan file).**
-   `src/commands/menu.js:353` renders `app.message` RAW (`${c.green}${app.message}`).
-   This plan closes every *source* that feeds a control byte into `app.message`
-   (the review rejects), so the live path is safe today, but a defense-in-depth
-   `stripCtl` at that render site would harden any future writer. Recommend a
-   follow-up plan adding `menu.js` to its `files:`.
+   the plan lists for `renderRejectInput`. All wrapped at the source. Left
+   untouched: genuinely fixed values (`severity` — a computed enum from
+   `conflict-detect.js`; `p.gate`; `agent.elapsed` — a `timeAgo`-formatted
+   derived string; `agent.pid` — an integer, and in fact never set by
+   `getAgentStatus`) per "do not over-strip".
+
+   **CORRECTION (rework 2026-07-27): `agent.step` and `agent.phase` were WRONGLY
+   listed as "fixed enums" here.** They are NOT. `state.getAgentStatus` reads both
+   from `.ctoc/state/agent.json` (`detail.step` / `detail.phase`) — a file under
+   `.ctoc/**`, which this plan's OWN threat model names Edit-whitelisted and
+   agent-writable. `phase` is free text; `step` is never coerced to an integer. A
+   hostile `agent.json` renders `\x1b[2J\x1b[H` through `phase`/`step` on the same
+   surfaces as `plan`/`task`. The original tests fed benign `step: 7` /
+   `phase: 'IMPLEMENT'`, so the raw renders passed VACUOUSLY (false green). Fixed:
+   `stripCtl(agent.step)` + `stripCtl(agent.phase)` at all three render sinks —
+   `agent.js:21`, `overview.js:172`, `pipeline.js:149` — and the tests now feed the
+   ESC/CR/C1 payload through both fields (seen red first).
+4. **`app.message` sink CLOSED (rework 2026-07-27), not deferred — and the stale
+   path corrected.** The original Decision 4 claimed the only sources feeding
+   `app.message` were the review rejects, so "the live path is safe today", and
+   deferred hardening. That was WRONG on two counts. (a) The render site is
+   `src/commands/start.js:374` (`${c.green}${app.message}${c.reset}`), NOT
+   `src/commands/menu.js:353` — no `menu.js` exists; that was a stale record-vs-disk
+   reference. (b) `src/areas/agent.js` (a file this plan already owns) writes
+   `app.message` from agent-writable inputs the plan MISSED: `status.plan` (the
+   task-registry slug, `.ctoc/**`, agent-writable) at `:63` and `res.plan.name`
+   (agent-writable plan title/slug) at `:70`. A probe confirmed a raw ESC + CR
+   reached the terminal through `app.message` today. Fixed at BOTH the source
+   (`stripCtl` on those two `agent.js` interpolations) AND the sink (`stripCtl(app.message)`
+   at `start.js:374` — the single chokepoint every writer flows through: `agent.js`,
+   `tools.js` sync, release). `src/commands/start.js` added to `files:`. Tests
+   (seen red first): an `agent.js` `handleKey` source test for each of the two
+   fields, and a `start.render()` sink test asserting the carriage-return-led spoof
+   never survives to the terminal while the benign visible text does. No follow-up
+   plan is needed; the class is closed.
+
+## Step 16 — Rework Report (2026-07-27)
+
+Adversarial security re-audit of the mounted dashboard's control-character sweep.
+Held to the bar: EVERY attacker-influenceable rendered field must pass `stripCtl`;
+an un-swept field is the bug this plan exists to kill.
+
+**Bypasses found and fixed (all agent-writable under the plan's own threat model,
+`.ctoc/**` / `plans/**`; each fixed test-first, payload seen red before the fix):**
+- `agent.phase` — free text from `.ctoc/state/agent.json`, rendered RAW at
+  `overview.js:172` and `agent.js:21`. The plan had mislabeled it a "fixed enum".
+- `agent.step` — from the same agent-writable file, never coerced to an integer,
+  rendered RAW at `overview.js:172`, `agent.js:21`, `pipeline.js:149`.
+- `app.message` — rendered RAW at `start.js:374` and fed the agent-writable
+  `status.plan` (`agent.js:63`) and `res.plan.name` (`agent.js:70`). Closed at both
+  the two missed sources and the render sink. `start.js` added to `files:`.
+
+**Verified safe to leave raw (not over-stripped):** `severity` (computed enum in
+`conflict-detect.js`), `agent.elapsed` (`timeAgo`-formatted derived string),
+`agent.pid` (integer; never set), `p.gate`. Every other untrusted interpolation
+across `pipeline.js` / `agent.js` / `inbox.js` / `overview.js` / `review.js` /
+`tui.js renderList` was already wrapped and re-confirmed by grep.
+
+**Record-vs-disk drift corrected:** the plan pointed the defense-in-depth finding at
+`src/commands/menu.js:353` — a file that does not exist; the real sink is
+`src/commands/start.js:374`. Decision 3's "fixed enums" claim for `step`/`phase` was
+refuted against `state.getAgentStatus` source and corrected. The original Step-14
+note ("77/77 narrowed suite, no full suite") was insufficient evidence for a security
+plan; the REAL gate is now recorded.
+
+**Real-gate evidence (this rework):** `npx tsc --noEmit` clean (0 errors). `npm test`
+(full suite + coverage floor + zero-skipped) → **tests 10523 · pass 10523 · fail 0 ·
+skipped 0 · coverage 99.12% (threshold 99%)** → `[CTOC test-gate] PASS`. Any prior
+"full-suite red / tsc errors" claim is REFUTED as stale — the tree is green. The
+injection suite is 13/13, and each new assertion was confirmed non-vacuous (reverting
+the sink fix reproduces exactly one failure). No security assertion was weakened to go
+green.
+
+**Files changed in rework:** `src/areas/agent.js`, `src/areas/pipeline.js`,
+`src/tabs/overview.js`, `src/commands/start.js`, `tests/dashboard-injection.test.js`,
+and this plan.

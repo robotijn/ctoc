@@ -19,7 +19,7 @@ files:
   - "tests/streaming-questions-sweeper.test.js"
   - "tests/cache-freshness.test.js"
   - "agents/iron-loop/gate-critic.md"
-  - "src/commands/menu.md"
+  - "src/commands/start.md"
 ---
 
 # X9 — the critic's questions reach disk without the human waiting
@@ -93,14 +93,14 @@ src/lib/streaming-questions-sweeper.js (NEW)
         │ requires (lazy, inside nextUnansweredQuestion)
 src/lib/streaming-gate.js  (MODIFY: ONE call site — the live entry point)
         ▲
-        │ menu.js (no args) → streamingGateScreen → gateScreenAt → richQuestionScreen
+        │ start.js (no args) → streamingGateScreen → gateScreenAt → richQuestionScreen
         │                                        → nextUnansweredQuestion  ← sweep here
-        │ menu.js plan <ref> → planDecisionScreen → nextUnansweredQuestion  ← same funnel
+        │ start.js plan <ref> → planDecisionScreen → nextUnansweredQuestion  ← same funnel
         ▼
 tests/streaming-questions-sweeper.test.js  (NEW — unit + the reachability proof)
 tests/cache-freshness.test.js              (MODIFY — one justified whitelist entry)
 agents/iron-loop/gate-critic.md            (MODIFY — the producer side of the contract)
-src/commands/menu.md                       (MODIFY — the documented contract that is now wrong)
+src/commands/start.md                       (MODIFY — the documented contract that is now wrong)
 ```
 
 No cycle: `streaming-precompute` already requires `streaming-gate` lazily at call
@@ -444,7 +444,7 @@ rule. This slice changes the critic's *transport*, nothing about its *judgement*
 
 ---
 
-### File 7: `src/commands/menu.md`
+### File 7: `src/commands/start.md`
 **Action:** MODIFY
 **Purpose:** the documented contract at "Streaming gate questions — background
 precompute (never-wait)" (line 206) currently states a dispatcher-writes model that
@@ -517,7 +517,7 @@ is no longer true.
   ships dead: the critic cannot write without its frontmatter and rules
   (`gate-critic.md`), `pendingQuestionsPath` must live beside `sanitizeRef` so the
   sanitiser is not duplicated (`streaming-precompute.js`), the CF1 guard fails on an
-  unlisted new writer (`cache-freshness.test.js`), and `menu.md` documents a contract
+  unlisted new writer (`cache-freshness.test.js`), and `start.md` documents a contract
   this change makes false. Operating Lesson 16 forbids deferring the wiring to a
   follow-up; splitting here would ship exactly the dead machinery the lesson names.
 - **D-8 (taken during Step 10) — `promotePendingFile` narrows its discriminated
@@ -644,7 +644,7 @@ One step, files as sub-items, in dependency order:
   `nextUnansweredQuestion`, with the rationale comment.
 - `tests/cache-freshness.test.js` — the justified whitelist entry.
 - `agents/iron-loop/gate-critic.md` — the eight edits listed in File 6.
-- `src/commands/menu.md` — the step-4 rewrite listed in File 7.
+- `src/commands/start.md` — the step-4 rewrite listed in File 7.
 No stubs, no TODOs. Any ambiguity met while building is resolved with a documented
 choice appended to `## Decisions Taken Under Ambiguity`.
 
@@ -694,7 +694,7 @@ Additionally confirm in the same run:
   whitelist-honesty test still passes (the entry is genuinely broad-flagged);
 - `tests/architecture-invariants.test.js` and `tests/no-tier-3.test.js` still pass
   after the `gate-critic.md` frontmatter change;
-- any test asserting agent `tools:` lines or the menu.md streaming section still
+- any test asserting agent `tools:` lines or the start.md streaming section still
   passes; if one fails because it pinned the old contract, fix the CODE first and
   change the test only if it pins a contract this plan deliberately replaced —
   tightening toward the new behaviour, never loosening (Operating Lesson 14).
@@ -704,7 +704,7 @@ Additionally confirm in the same run:
   contract stated.
 - The module header content required in File 2 (quarantine model, promoted path,
   `plans/<stage>/<file>.md`, non-counted write scope, named log reader).
-- `src/commands/menu.md` step 4 rewritten (File 7) — the user-facing contract.
+- `src/commands/start.md` step 4 rewritten (File 7) — the user-facing contract.
 - `agents/iron-loop/gate-critic.md` write-scope section (File 6) — the producer
   contract.
 - No `CLAUDE.md` change (D-7).
@@ -722,3 +722,56 @@ Confirm every line of the Quality Bar:
 - the two Open Questions are surfaced to the human, not silently decided.
 
 Then STOP at Gate 3. Do not cross it.
+
+---
+
+## Step 16 rework report (adversarial re-review, 2026-07-27)
+
+An independent gate-critique pass re-verified every load-bearing claim against disk and
+against a fresh full-gate run. Dispositions:
+
+- **`files:` drift — CORRECTED.** The plan declared `src/commands/menu.md`, which does
+  not exist. The slash command was renamed menu→start at v6.13.7 (commit 2776ae3), and
+  File 7's edits actually landed in `src/commands/start.md` — the streaming-gate
+  pending/sweep contract is present there (the "Streaming gate questions — background
+  precompute" section documents `streaming-questions-sweeper.sweepPendingQuestions`
+  reached from `streaming-gate.nextUnansweredQuestion`). The `files:` entry and every
+  body reference to `menu.md`/`menu.js` were corrected to `start.md`/`start.js` so the
+  record matches disk. All other declared files exist and carry the described changes.
+
+- **Step 14 full gate — RE-RUN, GREEN.** Ran the REAL gate (`npm test` →
+  `src/scripts/test-gate.js`, whole suite + coverage floor + zero-skipped), not a
+  file-scoped subset. Result: **coverage 99.13% (threshold 99%), skipped 0, failed 0,
+  PASS.** The sweeper module measures 100.00% line / 93.85% branch / 100.00% function.
+  The step's "green" claim is confirmed CURRENT, not stale.
+
+- **D-8 (tsc 0 errors) — CONFIRMED CURRENT.** `npx tsc --noEmit` is clean. The
+  discriminated-union narrowing (`written.ok === true` / `result.ok === true`) is in the
+  shipped code at `promotePendingFile` and `sweepPendingQuestions`. No stale
+  "full-suite red / tsc errors" claim exists in this plan.
+
+- **Wiring / Operating Lesson 16 — CONFIRMED LIVE.** `nextUnansweredQuestion`
+  (`streaming-gate.js:264`) sweeps the quarantine directory before reading the store,
+  inside a lazy-require try/catch. `agents/iron-loop/gate-critic.md` carries
+  `tools: Read, Grep, Write` plus the "Your ONE write — the quarantined pending file"
+  section and the rewritten trust-boundary rule 6. Test case 19 drives
+  `streamingGate.streamingGateScreen(root)` with no sweeper call in the test itself,
+  proving a human reaches the critic's question through the live entry point. The
+  sweeper is not in `.ctoc/reachability-baseline.json` (it is reachable).
+
+- **D-10 (documented-count drift in CLAUDE.md / README) — LEFT AS DECIDED.** Those
+  count sentences live in files outside this plan's `files:` set and shared with
+  concurrent sibling plans that increment the same numbers; editing them here would
+  widen scope and race another agent on the same file. The plan's decision to report
+  rather than edit stands.
+
+- **Minor claim nuance (NOT a defect, noted for honesty).** The Security Review row
+  "filesystem error messages go to `errors` (basename-scoped)" slightly overstates the
+  code: `sweepPendingQuestions` pushes the raw `err.message` (which may contain an
+  absolute path) into `report.errors`. The LOAD-BEARING security property is
+  nonetheless upheld — `err.message` is OS-generated, never payload-derived, so no
+  critic-authored (untrusted) string travels outward, and `errors` is read only by the
+  session model, never rendered to a gate screen. No code change made; flagged so the
+  record is complete.
+
+No genuine fork encountered. The plan remains in `review/`; Gate 3 is the human's.
