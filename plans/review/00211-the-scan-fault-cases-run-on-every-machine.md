@@ -267,3 +267,20 @@ cases run BESIDE them, not instead of them, so the stronger environment-dependen
 proof remains wherever the environment allows it. This slice closes the biggest of
 the three platform-varying branches, not all three; `read-failed` and `stat-failed`
 remain permission-gated by the filesystem limit described above.
+
+## Step 14 VERIFY — measured full-gate evidence (review rework, 2026-07-27)
+
+The record above documents what shipped in commit `8be1848`; this section records
+the REAL full-gate run that proves the review-stage tree is green, so the review
+record is self-contained rather than pointing at a commit message.
+
+- Command: `npm test` (`src/scripts/test-gate.js` — whole suite + coverage floor + zero-skipped gate), macOS, non-root.
+- Result: **`[CTOC test-gate] PASS`** — coverage **99.13%** (threshold 99%), skipped **0**, failed **0**.
+- Node test summary: tests **10532**, pass **10532**, fail **0**, skipped **0**, todo **0**, suites **1802**.
+- `npx tsc --noEmit`: clean, no output.
+- `src/lib/stale-detector.js` is byte-identical to `HEAD` (`git diff HEAD -- src/` empty) — this slice is test-only, as declared in `files:`.
+
+This is the full gate, not a narrowed one: the whole suite ran and the coverage
+floor and zero-skipped checks were enforced by `test-gate.js`. The mutation proof for
+case A (removing `markUnread(stage, 'stage-unreadable')` turns cases A and C red) is
+documented above and remains the evidence that the new cross-platform cases bite.

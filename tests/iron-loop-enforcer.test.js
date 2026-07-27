@@ -9,7 +9,7 @@
  *   - Format functions produce parseable output
  */
 
-const { describe, it, afterEach } = require('node:test');
+const { describe, it, afterEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -27,6 +27,50 @@ const {
   CHECKS,
 } = require('../src/lib/iron-loop-enforcer');
 
+// The live-repo clean-verdict assertions below run the THOROUGH fences
+// (reachability / dead-export / false-green), which walk `<root>/src` at
+// assertion time. Under `node --test` the suite runs test files in PARALLEL
+// worker processes; a sibling worker that transiently creates or removes a
+// `.js` under the live `src/` tree makes a real module momentarily unreachable,
+// so the fence reports a phantom `block: 1`. Run standalone the same assertion
+// is green — the flake only appears under concurrent load. "Is the tree clean?"
+// is only meaningful against a STABLE tree, so these cases scan a one-time
+// frozen snapshot of the repo instead of the mutable live checkout. The
+// snapshot is a faithful copy (it yields the identical clean verdict) but
+// nothing can churn it mid-scan.
+const _SNAPSHOT_EXCLUDE = new Set(['node_modules', '.git', '.claude', 'tests', 'coverage']);
+let _snapshotRoot = null;
+function stableRepoRoot() {
+  if (_snapshotRoot) return _snapshotRoot;
+  // Copying a live tree is itself racy: a concurrent worker that removes a file
+  // between cpSync's readdir and its lstat makes cpSync throw ENOENT. That is
+  // the same churn the snapshot exists to escape, so tolerate it — a clean copy
+  // window appears within a few attempts under realistic sporadic churn.
+  let lastErr;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-enforce-snap-'));
+    try {
+      fs.cpSync(projectRoot, tmp, {
+        recursive: true,
+        filter: (src) => src === projectRoot || !_SNAPSHOT_EXCLUDE.has(path.basename(src)),
+      });
+      _snapshotRoot = tmp;
+      return tmp;
+    } catch (err) {
+      fs.rmSync(tmp, { recursive: true, force: true });
+      if (err && err.code === 'ENOENT') { lastErr = err; continue; }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+after(() => {
+  if (_snapshotRoot) {
+    fs.rmSync(_snapshotRoot, { recursive: true, force: true });
+    _snapshotRoot = null;
+  }
+});
+
 describe('iron-loop-enforcer — live repo state', () => {
   it('CTOC repo passes the fast self-check with 0 critical and 0 block', () => {
     const result = checkAllInvariants({ root: projectRoot, mode: 'fast' });
@@ -37,7 +81,7 @@ describe('iron-loop-enforcer — live repo state', () => {
   });
 
   it('CTOC repo passes the thorough self-check with 0 critical and 0 block', () => {
-    const result = checkAllInvariants({ root: projectRoot, mode: 'thorough' });
+    const result = checkAllInvariants({ root: stableRepoRoot(), mode: 'thorough' });
     const critical = result.findings.filter(f => f.severity === 'critical');
     const block = result.findings.filter(f => f.severity === 'block');
     assert.equal(critical.length, 0, `Critical findings: ${JSON.stringify(critical.map(f => f.id))}`);
@@ -480,7 +524,7 @@ describe('iron-loop-enforcer — the verdict envelope', () => {
   // informational: its info finding must keep appearing in the report.
   it('(7) the summary counts are unchanged — plan-counts still reports exactly one info', () => {
     for (const mode of ['fast', 'thorough']) {
-      const r = checkAllInvariants({ root: projectRoot, mode });
+      const r = checkAllInvariants({ root: stableRepoRoot(), mode });
       assert.equal(r.summary.critical, 0, `${mode}: critical must stay 0`);
       assert.equal(r.summary.block, 0, `${mode}: block must stay 0`);
       assert.equal(r.summary.error, 0, `${mode}: error must stay 0`);

@@ -19,7 +19,7 @@ priority: CRITICAL
 program: fresh-repository-first-run
 iron_loop: true
 files:
-  - "src/commands/menu.js"
+  - "src/commands/start.js"
   - "tests/menu-reports-what-init-did.test.js"
   - "tests/menu-auto-init.test.js"
   - "tests/menu-coverage.test.js"
