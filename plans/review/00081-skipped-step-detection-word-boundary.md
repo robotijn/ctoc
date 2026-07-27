@@ -242,11 +242,11 @@ Cross-platform: `fs.promises`, `path.join`, `os.tmpdir()`; teardown with
 - [x] Backtracking probed against a 48010-character adversarial line: no match, 1ms. The construct is two fixed-width negative assertions plus one bounded negative lookbehind, with no quantified group.
 
 ### Step 14: VERIFY
-- [x] The new file plus both existing validator suites green.
-- [x] The full gated run `npm test`: `tests 9942 / pass 9942 / fail 0 / cancelled 0 / skipped 0 / todo 0`.
-- [x] `[CTOC test-gate] coverage 99.06% (threshold 99%), skipped 0, failed 0` — `PASS`. The floor was not touched.
-- [x] The documented-count ratchet in `CLAUDE.md` moved in the correct direction (424 to 425 test files) because this slice adds a test file.
-- [x] No git operations run.
+- [x] The new file plus both existing validator suites green; `escalation-word-boundary.test.js` runs 39 cases in isolation, 0 fail.
+- [x] The full gated run `npm test` (whole suite + coverage floor + zero-skipped + zero-flaky), re-verified at the review gate: `tests 10528 / suites 1800 / pass 10528 / fail 0 / cancelled 0 / skipped 0 / todo 0`.
+- [x] `[CTOC test-gate] coverage 99.14% (threshold 99%), skipped 0, failed 0` — `PASS`. `npx tsc --noEmit` clean. The floor was not touched.
+- [x] Original build-time run recorded `tests 9942 / coverage 99.06% / PASS`; the numbers above supersede it and the repository suite has since grown to 459 test files — the direction of every counter is unchanged (green, floor held).
+- [x] No git operations run inside the loop.
 
 ### Step 15: DOCUMENT
 - [x] The helper carries the full rationale: why a plain word boundary is insufficient, what each of the three rules excludes and the real prose each was derived from, and the one deliberate gap.
@@ -318,3 +318,35 @@ Cross-platform: `fs.promises`, `path.join`, `os.tmpdir()`; teardown with
     file trips the documented test-file-count ratchet. Per the standing rule that
     ratchets are in scope, it was moved in the correct direction (424 to 425) in
     this same unit of work rather than left failing.
+
+### Reconciled at the review gate
+
+13. **The shipped fix is LARGER than the Implementation Details above describe —
+    a second half was needed and is present in the code.** The three boundary
+    rules (`STATUS_BOUNDARY_BEFORE/AFTER` and `STATUS_NOT_QUANTIFIED`) handle only
+    the COMPOUND and QUANTIFIED forms (`zero-skipped`, `skipped[]`, `0 skipped`).
+    They cannot help a BARE standalone status word inside inline code or a
+    quotation — a plan whose subject IS the skip counter has to quote that
+    counter's label, and real builds were still refused for a backticked
+    ``ℹ skipped N`` line. So `src/lib/plan-validator.js` also ships
+    `maskQuotedSpans` (constants `MASKED_SPAN_PATTERNS`, `NON_NEWLINE_RE`), which
+    blanks the contents of fenced blocks, inline code and double/typographic
+    quotations before ANY status scan, length-preserving (so a reported step
+    number still names the right step) and forgery-safe (the approval probe reads
+    the SAME masked text, so an approval hidden in backticks cannot launder a bare
+    skip). Single quotes/apostrophes and unmatched delimiters mask nothing — a
+    lone delimiter must never switch the checker off. All three scan sites
+    (`validateStepsComplete`, `validateEscalations`, `validateNoContradictions`)
+    read this masked text. The rejected alternative ("require a declared marker
+    form") is recorded in the code: it would have freed a genuine mid-line
+    declaration in this repository's own corpus, converting a false red into a
+    false green. The authoritative record of this subsystem is the code comments
+    (lines ~98-181, 303-313, 380-406, 594-604) and the second `describe` block in
+    `tests/escalation-word-boundary.test.js`.
+14. **The test suite is 39 cases, not the 12/18 the plan text cites.** Step 8 and
+    the Test Plan above enumerate the boundary cases only; the shipped
+    `tests/escalation-word-boundary.test.js` runs 39 across two directions
+    (boundary detection + the masking subsystem), each pinning that a genuine
+    declaration is still caught and an approval cannot be laundered. The counts in
+    the plan prose are the build-time figures and were not updated as the masking
+    half was added; the file itself is authoritative.
