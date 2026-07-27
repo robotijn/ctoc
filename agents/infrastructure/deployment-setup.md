@@ -257,52 +257,27 @@ How should production deployments be approved?
 - When a gate fails, show WHY — link to failing tests, vulnerable packages, or metric graphs
 - Define clear approval matrix with RBAC (who can approve which environment)
 
-### Step 4b: The Deploy Ship Gate (`deployment.ship_gate_confirmed`)
+### Step 4b: The Deploy Ship Gate (per-crossing, not a standing flag)
 
 Deploy is one of the two human ship gates (the other is push). Approving a plan at
 Gate 3 (review → done) means *the code is good*; it does NOT mean *ship it to
-production*. Those are two decisions and CTOC keeps them apart: `src/lib/actions.js`
-fires the deployment pipeline on a Gate 3 approval **only** when
-`deployment.ship_gate_confirmed` is `true`. Until a human answers this question, the
-flag stays absent, the pipeline never fires, and CTOC records a deploy-ready notice
-instead. You are the ONLY supported way to set it — ask, then write it.
+production*. Those are two decisions and CTOC keeps them apart — but the deploy
+decision is **authorized per crossing, never by a standing config flag you set here.**
+`src/lib/actions.js` fires the deployment pipeline on a Gate 3 approval **only** when
+that specific approval carries the deploy stamp (`options.deploy === true`). Absent
+the stamp — the normal review approval — CTOC records a deploy-ready notice and
+deploys nothing. There is deliberately NO persisted "always deploy on approval" flag:
+one would permanently disarm the deploy gate (a setting, not a gate), so
+`actions.js` refuses to honor one. Deployment setup configures the *pipeline*
+(enabled, dry_run, environments, approval, rollback, notifications); it does not and
+cannot arm an auto-deploy toggle.
 
-Ask exactly once, after the approval strategy is known:
-
-```
-===============================================================
-                    THE DEPLOY SHIP GATE
-===============================================================
-
-When you approve a plan at Gate 3 (review → done), may CTOC run
-the deployment pipeline you just configured?
-
-[1] No — deploy stays a separate human act (Recommended)
-    [+] Two decisions stay two decisions: "the code is good" and
-        "ship it" are never collapsed into one keypress
-    [+] Gate 3 approval records a deploy-ready notice; you deploy
-        when you choose to
-    [-] Deploying is an extra, deliberate step
-
-[2] Yes — a Gate 3 approval triggers the deployment pipeline
-    [+] One keypress ships approved work
-    [-] Approving a plan LATE AT NIGHT now deploys to your
-        environments; the review gate becomes a ship gate
-    [-] Only sane with dry_run: false understood, staging first,
-        auto-rollback configured, and notifications on
-
-[0] Skip — leave the gate CLOSED (same effect as [1])
-===============================================================
-```
-
-Write the answer verbatim into `.ctoc/settings.json`:
-
-- `[1]`, `[0]`, or no answer → `"ship_gate_confirmed": false`
-- `[2]` → `"ship_gate_confirmed": true`
-
-Never infer, never default to `true`, and never set it because deployment is
-otherwise fully configured. If the user picked `[2]` while `dry_run` is still `true`,
-say so plainly: the pipeline will simulate, not ship, until `dry_run: false`.
+There is nothing to ask here and nothing to write: you configure the pipeline in the
+other steps, and the human authorizes each actual deploy at approval time. Make this
+plain to the user so they are not surprised that a Gate 3 approval alone never ships:
+to deploy, they approve WITH the deploy stamp for that crossing, or they run the
+deploy manually. If `dry_run` is still `true`, say so — even a stamped crossing will
+simulate, not ship, until `dry_run: false`.
 
 ### Step 5: Failure Handling & Rollback
 
@@ -510,7 +485,7 @@ Do you want to integrate feature flags with deployments?
 
 ## Configuration Output
 
-Write the deployment config to `.ctoc/settings.json` under the `deployment` key — this is the file `src/lib/deployment.js` actually reads (the documented, executed config home). Validate all fields before saving. Always include `dry_run`: leave it `true` (simulate — build commands, execute nothing) unless the user explicitly confirms they want real pushes/POSTs/ssh, then set `dry_run: false`. Always include `ship_gate_confirmed` — the Step 4b answer, `false` unless the user explicitly chose `[2]`; it is the flag `src/lib/actions.js` checks before a Gate 3 approval may trigger a deploy. Example shape: `{ "deployment": { "enabled": true, "dry_run": true, "ship_gate_confirmed": false, "remote": "origin", "environments": [...], "approval": {...}, "notifications": {...}, "rollback": {...} } }`.
+Write the deployment config to `.ctoc/settings.json` under the `deployment` key — this is the file `src/lib/deployment.js` actually reads (the documented, executed config home). Validate all fields before saving. Always include `dry_run`: leave it `true` (simulate — build commands, execute nothing) unless the user explicitly confirms they want real pushes/POSTs/ssh, then set `dry_run: false`. Do NOT write any standing "deploy on approval" flag — the deploy gate is the per-crossing `options.deploy === true` stamp on a Gate 3 approval, checked in `src/lib/actions.js`; no config field arms it (see Step 4b). Example shape: `{ "deployment": { "enabled": true, "dry_run": true, "remote": "origin", "environments": [...], "approval": {...}, "notifications": {...}, "rollback": {...} } }`.
 
 ## Security Considerations
 
