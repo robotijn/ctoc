@@ -28,6 +28,9 @@ module.exports = [
     ignores: [
       'node_modules/**',
       'examples/**', // gitignored Next.js/TS demo apps — not part of the plugin
+      '.claude/**',  // gitignored tooling state incl. agent git worktrees — full
+                     // repo COPIES whose real source is already linted at root;
+                     // never shipped as part of the plugin (same rule as examples/)
       'plans/**',
       '.ctoc/state/**',
       '.ctoc/quality-state/**',

@@ -338,48 +338,151 @@ test('ship-gate: CTOC_SKIP_QUALITY stays a SKIP — it can never enable a push',
   }
 });
 
-// R4-A item 11 — the fence must catch EVERY git-push idiom, not just the
-// `execSync('git push')` string form. This codebase prefers the argv-array idiom
-// (spawn('git', ['push', ...]) / execFile / runFile('git', ['push'])), which the
-// old shallow regex silently missed. `hasUngatedPush` is the widened matcher.
+// R3-C rework (finding 4) — the fence must protect the INVARIANT, not the
+// arrangement. The previous matcher decided a whole FILE was safe if the token
+// `isAutoPushEnabled` appeared ANYWHERE in it, so a SECOND ungated `git push`
+// added to sync.js / quality-agent.js / post-commit.js (all of which already
+// carry that token) sailed through with zero test failures — the same
+// "a citation is not an invocation" defect the reachability fence was bitten by.
+// It also whitelisted deployment.js and PreToolUse.Bash.js BY NAME with no
+// assertion that they gate anything.
 //
-// @param {string} text - file source
-// @returns {boolean} true iff the file reaches `git push` without consulting the gate
-function hasUngatedPush(text) {
-  // (a) the shell-string form: execSync('git push ...') / runCommand('git push')
-  const stringForm = /(?:execSync|execFileSync|exec|runCommand)\s*\(\s*[`'"]git\s+push/;
-  // (b) the argv-array form: <spawner>('git', [ ... 'push' ... ]) — any spawner,
-  //     any element order. Matches spawn/spawnSync/execFile/execFileSync/runFile/
-  //     runCommand where the command is 'git' and an argv element is 'push'.
-  const argvForm = /(?:spawn|spawnSync|execFile|execFileSync|runFile|runCommand)\s*\(\s*[`'"]git[`'"]\s*,\s*\[[^\]]*[`'"]push[`'"]/;
-  const reachesPush = stringForm.test(text) || argvForm.test(text);
-  return reachesPush && !/isAutoPushEnabled/.test(text);
+// The fence is now PER-CALL-SITE and scope-aware:
+//   1. Find every `git push` INVOCATION (three idioms: the shell-string form,
+//      the argv-array spawner form, and this codebase's local `git([...'push'])`
+//      wrapper — the wrapper idiom the old regex did not even recognise).
+//   2. For EACH site, extract its ENCLOSING FUNCTION and require that function's
+//      body to consult a real ship-gate signal — not merely somewhere in the file.
+//   3. A push primitive whose gating lives in its CALLERS (quality-agent's
+//      `pushToRemote`, reached only by the gated `maybePushOnSuccess` and by the
+//      human's own `/ctoc:push`) is exempt HERE and asserted by call-graph below,
+//      replacing the bare name-whitelist with a positive claim.
+//
+// Recognised in-scope gate signals, each a real gate in this repo:
+//   isAutoPushEnabled / autoPushEnabled — the canonical push key
+//   auto_push                           — sync's local `config.auto_push` alias, bound to it
+//   isLive                              — deployment.js's live/dry-run gate
+const GATE_SIGNAL = /isAutoPushEnabled|autoPushEnabled|auto_push|\bisLive\b/;
+const PUSH_PRIMITIVES = new Set(['pushToRemote']);
+
+// Balanced-delimiter match: index of the `close` that pairs the first `open` at/after `start`.
+function matchDelim(text, start, open, close) {
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (c === open) depth++;
+    else if (c === close) { depth--; if (depth === 0) return i; }
+  }
+  return -1;
 }
 
-test('ship-gate: hasUngatedPush catches the argv-array idiom the old fence missed', () => {
-  // The argv-array forms this codebase actually uses — all ungated, all must flag.
-  assert.ok(hasUngatedPush("spawn('git', ['push', 'origin', 'main'])"), 'spawn argv form');
-  assert.ok(hasUngatedPush("spawnSync('git', ['push'])"), 'spawnSync argv form');
-  assert.ok(hasUngatedPush("execFile('git', ['push', '--force'])"), 'execFile argv form');
-  assert.ok(hasUngatedPush("runFile('git', ['push', 'origin', 'HEAD'])"), 'runFile argv form');
-  // The old string form must still flag.
-  assert.ok(hasUngatedPush("execSync('git push origin main')"), 'legacy string form');
-  // Gated call sites (consult isAutoPushEnabled) do NOT flag.
-  assert.ok(!hasUngatedPush("if (isAutoPushEnabled(root)) spawn('git', ['push'])"), 'gated argv form is fine');
-  // Non-push git calls do NOT flag.
-  assert.ok(!hasUngatedPush("spawn('git', ['status'])"), 'a non-push git call is fine');
-  assert.ok(!hasUngatedPush("spawn('git', ['diff', '--name-only'])"), 'git diff is fine');
+// The three `git push` invocation idioms. Precise about INVOCATION: a string
+// comparison like `sub === 'push'` (PreToolUse.Bash.js detects pushes) or a bare
+// mention in a comment is NOT an invocation and must not match.
+function pushSiteIndices(text) {
+  const idxs = [];
+  const patterns = [
+    // (a) shell-string form: execSync('git push ...') / runCommand('git push')
+    /(?:execSync|execFileSync|exec|runCommand)\s*\(\s*[`'"]git\s+push/g,
+    // (b) argv-array spawner form: <spawner>('git', [ ... 'push' ... ])
+    /(?:spawn|spawnSync|execFile|execFileSync|runFile|runCommand)\s*\(\s*[`'"]git[`'"]\s*,\s*\[[^\]]*[`'"]push[`'"]/g,
+    // (c) local wrapper form: git([ ... 'push' ... ]) — the idiom sync.js uses
+    /\bgit\s*\(\s*\[[^\]]*[`'"]push[`'"]/g,
+  ];
+  for (const re of patterns) { let m; while ((m = re.exec(text))) idxs.push(m.index); }
+  return idxs;
+}
+
+// The innermost `function NAME(...) { ... }` whose body brace-range contains idx.
+// Skips the parameter list (so a default like `opts = {}` is not mistaken for the
+// body) before matching the body braces.
+function enclosingFunction(text, idx) {
+  const fnRe = /\bfunction\b/g;
+  let m, best = null;
+  while ((m = fnRe.exec(text)) && m.index < idx) {
+    const paren = text.indexOf('(', m.index);
+    if (paren === -1) continue;
+    const paramEnd = matchDelim(text, paren, '(', ')');
+    if (paramEnd === -1) continue;
+    const open = text.indexOf('{', paramEnd);
+    if (open === -1) continue;
+    const end = matchDelim(text, open, '{', '}');
+    if (end === -1) continue;
+    if (idx >= open && idx <= end) {
+      const nameM = text.slice(m.index, open).match(/function\s+([A-Za-z0-9_$]+)/);
+      best = { name: nameM ? nameM[1] : '(anonymous)', open, end };
+    }
+  }
+  return best;
+}
+
+// The per-call-site verdict: names every push whose enclosing function does not
+// consult a gate signal (and is not a caller-gated primitive). Empty === clean.
+function ungatedPushSites(text) {
+  const offenders = [];
+  for (const idx of pushSiteIndices(text)) {
+    const fn = enclosingFunction(text, idx);
+    if (!fn) { offenders.push('(top-level push — no enclosing function)'); continue; }
+    if (PUSH_PRIMITIVES.has(fn.name)) continue; // caller-gated; asserted by call-graph test
+    if (!GATE_SIGNAL.test(text.slice(fn.open, fn.end + 1))) offenders.push(fn.name);
+  }
+  return offenders;
+}
+
+test('ship-gate: the fence flags a SECOND ungated push even in an already-gated file', () => {
+  // The exact regression the old whole-file token check missed: one function gates,
+  // a second function in the SAME file pushes ungated. Per-scope catches it.
+  const twoFn =
+    "function gated(root){ if(!isAutoPushEnabled(root)) return; runCommand('git push origin main'); }\n" +
+    "function sneaky(root){ runCommand('git push origin main'); }";
+  assert.deepStrictEqual(ungatedPushSites(twoFn), ['sneaky'],
+    'a push in an ungated function must flag even when another function in the file gates');
+
+  // The local wrapper idiom git([...'push'...]) the old argv regex did not recognise.
+  assert.deepStrictEqual(ungatedPushSites("function foo(){ git(['push','origin','main'],{cwd}); }"), ['foo'],
+    'the git([...]) wrapper form must be recognised as a push');
+
+  // Every invocation idiom, ungated, must flag.
+  assert.deepStrictEqual(ungatedPushSites("function a(){ spawn('git', ['push', 'origin']); }"), ['a']);
+  assert.deepStrictEqual(ungatedPushSites("function b(){ execFile('git', ['push', '--force']); }"), ['b']);
+  assert.deepStrictEqual(ungatedPushSites("function c(){ execSync('git push origin main'); }"), ['c']);
+
+  // Gated forms (in-scope signal present) do NOT flag — including the default-param
+  // shape and each recognised gate signal.
+  assert.deepStrictEqual(ungatedPushSites("function d(root){ if(!isAutoPushEnabled(root)) return; git(['push']); }"), []);
+  assert.deepStrictEqual(ungatedPushSites("function e(opts = {}){ if(!isLive(opts)) return; runFile('git',['push','o','m'],opts); }"), []);
+  assert.deepStrictEqual(ungatedPushSites("function f(root){ const c=getSyncConfig(root); if(!c.auto_push) return; git(['push']); }"), []);
+
+  // A non-push git call and a mere string comparison never flag.
+  assert.deepStrictEqual(ungatedPushSites("function g(){ git(['status']); }"), []);
+  assert.deepStrictEqual(ungatedPushSites("function h(sub){ if (sub === 'push') return true; }"), []);
 });
 
-test('ship-gate: no source file hardcodes an ungated push', () => {
-  // Every `git push` in src/ must sit in a file that also consults the canonical
-  // gate — or be the human's own sanctioned command (/ctoc:push) or a deploy path
-  // (guarded by its own ship_gate_confirmed flag).
-  const SANCTIONED = new Set([
-    path.join('src', 'commands', 'push.js'),      // the human ship gate itself
-    path.join('src', 'lib', 'deployment.js'),     // deploy gate: ship_gate_confirmed
-    path.join('src', 'hooks', 'PreToolUse.Bash.js'), // detects pushes, never runs one
-  ]);
+test('ship-gate: no source file has an ungated push at ANY call site (per-scope)', () => {
+  // No name-whitelist: every push INVOCATION in src/ must sit in a function that
+  // consults a ship-gate signal, or be a caller-gated primitive. push.js and
+  // PreToolUse.Bash.js are not listed here — they simply contain no push INVOCATION
+  // (push.js routes through the primitive; PreToolUse only string-detects), so the
+  // scanner exempts them by fact, not by name.
+  const offenders = [];
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) { walk(p); continue; }
+      if (!e.name.endsWith('.js')) continue;
+      const sites = ungatedPushSites(fs.readFileSync(p, 'utf8'));
+      if (sites.length) offenders.push(`${path.relative(ROOT, p)}: ${sites.join(', ')}`);
+    }
+  };
+  walk(path.join(ROOT, 'src'));
+  assert.deepStrictEqual(offenders, [], 'every push call site must consult the ship gate in its own scope');
+});
+
+test('ship-gate: every caller of the pushToRemote primitive is gated or the human command', () => {
+  // Positive assertion replacing the old push.js name-whitelist: pushToRemote is a
+  // primitive (its own body holds the raw `git push`), safe ONLY because every
+  // caller gates it. Assert exactly that — a new ungated caller must break this.
+  const HUMAN_CMD = path.join('src', 'commands', 'push.js');
   const offenders = [];
   const walk = (d) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
@@ -387,15 +490,34 @@ test('ship-gate: no source file hardcodes an ungated push', () => {
       if (e.isDirectory()) { walk(p); continue; }
       if (!e.name.endsWith('.js')) continue;
       const rel = path.relative(ROOT, p);
-      if (SANCTIONED.has(rel)) continue;
-      const t = fs.readFileSync(p, 'utf8');
-      if (hasUngatedPush(t)) {
-        offenders.push(rel);
+      const text = fs.readFileSync(p, 'utf8');
+      const re = /\bpushToRemote\s*\(/g;
+      let m;
+      while ((m = re.exec(text))) {
+        if (/function\s+$/.test(text.slice(Math.max(0, m.index - 20), m.index))) continue; // the definition
+        if (rel === HUMAN_CMD) continue; // the human's keypress IS the gate
+        const fn = enclosingFunction(text, m.index);
+        const body = fn ? text.slice(fn.open, fn.end + 1) : '';
+        if (!/isAutoPushEnabled/.test(body)) offenders.push(`${rel}:${fn ? fn.name : '(top-level)'}`);
       }
     }
   };
   walk(path.join(ROOT, 'src'));
-  assert.deepStrictEqual(offenders, [], 'every push call site must consult the ship gate');
+  assert.deepStrictEqual(offenders, [], 'a machine caller of pushToRemote must consult isAutoPushEnabled');
+});
+
+test('ship-gate: the deploy trigger is a per-crossing human stamp, not a standing flag', () => {
+  // Positive assertion replacing the old deployment.js name-whitelist. deployment.js's
+  // push sites are gated in-scope by isLive() (covered by the per-scope scan above);
+  // the DEPLOY decision itself is gated in actions.js by the per-crossing
+  // `options.deploy === true` stamp — never a persisted config flag, which would
+  // permanently disarm the gate. (ship_gate_confirmed is a config readiness marker
+  // with NO code reader; it must never become the runtime trigger.)
+  const actions = fs.readFileSync(path.join(ROOT, 'src/lib/actions.js'), 'utf8');
+  assert.match(actions, /options\.deploy\s*===\s*true/,
+    'the deploy trigger must be a per-crossing stamp on the approval call');
+  assert.match(actions, /if\s*\(\s*options\.deploy\s*===\s*true\s*\)[\s\S]{0,400}runDeploymentPipeline/,
+    'runDeploymentPipeline must run ONLY under the per-crossing deploy stamp');
 });
 
 // ── 6. refineLoop stops self-approving (Goodhart) ────────────────────────────

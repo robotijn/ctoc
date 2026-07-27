@@ -1,31 +1,36 @@
 ---
-title: "R3-C — The push ship gate becomes real; approvePlan validates; assignDirectly dies"
+title: "R3-C — The push ship gate becomes real (no machine push without an explicit human opt-in)"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild
 depends_on: 00011-r2z-boundary-typecheck-zero
 priority: CRITICAL
 program: ctoc-repair-loop
 iron_loop: true
+# files: reconciled to this slice's REAL change surface (rework, finding 3).
+# REMOVED (declared but never touched by THIS slice): src/lib/init-project.js
+# (the placebo push: block was deleted by R4-B), src/lib/actions.js and
+# src/lib/gate-order.js (approvePlan-validation + single gate-order encoding were
+# delivered by sibling 00019-r5b), src/tabs/functional.js (deleted with
+# assignDirectly by R5-B — the file no longer exists), src/commands/menu.md and
+# CLAUDE.md (menu Approve-anyway wiring + doc-truth were re-scoped to siblings).
+# ADDED: src/lib/dependency-auditor.js + src/lib/cvss.js + their test (the CVSS
+# severity unification of Decision 6, previously undeclared).
 files:
   - "src/lib/sync.js"
   - "src/hooks/post-commit.js"
   - "src/lib/quality-agent.js"
-  - "src/lib/init-project.js"
   - "src/lib/settings.js"
-  - "src/lib/actions.js"
-  - "src/lib/gate-order.js"
-  - "src/tabs/functional.js"
   - "src/lib/iron-loop-enforcer.js"
   - "src/lib/iron-loop.js"
+  - "src/lib/dependency-auditor.js"
+  - "src/lib/cvss.js"
   - "agents/infrastructure/deployment-setup.md"
-  - "src/commands/menu.md"
   - "docs/IRON_LOOP.md"
-  - "CLAUDE.md"
   - "tests/ship-gate-real.test.js"
+  - "tests/dependency-auditor-severity.test.js"
+  - "tests/cvss.test.js"
   - "tests/sync*.test.js"
   - "tests/quality-agent*.test.js"
-  - "tests/init-project.test.js"
-  - "tests/gates.test.js"
   - "tests/environment-mode.test.js"
   - "tests/iron-loop.test.js"
 ---
@@ -209,3 +214,66 @@ report any key you deleted and any consumer you could not convert.
       `auto_approve_after_max` removed; deployment-setup agent gained Step 4b.
 - [x] Step 16 FINAL-REVIEW — reported to the coordinator, including the blocking
       live-repo finding the executor must NOT fix itself.
+
+## Rework Report (adversarial findings, 2026-07-27)
+
+Reworked against the five adversarial findings in
+`review__00014-r3c-ship-gates-real.md.json`. Each was verified against the actual
+source on HEAD before acting.
+
+- **Finding 1 — "cross with a red suite / ungated VERIFY" (critical): REFUTED AS
+  STALE.** The Step-14 record above ("420 pass, 2 fail") was captured during the
+  plan's original execution, mid-concurrent-edit. On HEAD today the FULL gated
+  `npm test` runs GREEN: **10499 pass, 0 fail, 0 skipped, coverage 99.04%**
+  (`tsc --noEmit` also clean). The two original failures were the enforcer/
+  residency parity self-checks firing on un-ledgered `plans/todo/` markers; those
+  plans were resolved by the ongoing repair loop, so the gate instrument this
+  plan itself created now passes. The premise of the finding no longer holds.
+- **Finding 5 — gate ruling REJECT (critical): REFUTED AS STALE.** Same root cause
+  as Finding 1 — its REJECT rested entirely on the red suite. With the gate green
+  on HEAD the ruling is moot; the load-bearing deliverable (no machine push
+  without an explicit human opt-in) was already verified sound by all three lenses.
+- **Finding 2 — title over-credits undelivered work (important): FIXED (record).**
+  The old title claimed "approvePlan validates; assignDirectly dies." Per Decision
+  7 those items (4/5/6/10) were re-scoped for file-disjointness and delivered by
+  siblings, which are confirmed present in the tree: `approvePlan` runs
+  `validateTransition` and the single gate-order encoding shipped in
+  **00019-r5b-approveplan-validates-one-gate-encoding** (in review/);
+  `assignDirectly` and `src/tabs/functional.js` were deleted by R5-B (verified
+  absent). Title rewritten to describe ONLY what this slice shipped: the real
+  push ship gate, the CVSS severity unification, the refineLoop status rename, and
+  the enforcer/ledger parity.
+- **Finding 3 — files: declaration mismatches what shipped (important): FIXED
+  (record).** Verified by grep: `mapCvssOrLabel`/`bandCvss` live only in
+  `src/lib/dependency-auditor.js` and `src/lib/cvss.js` (Decision 6), and
+  `src/tabs/functional.js` no longer exists. Declaration reconciled — dropped the
+  four untouched files and the dangling deleted-file reference, added the two
+  security files and their test. See the comment above the `files:` block.
+- **Finding 4 — the ship-gate fence has silent bypasses (important): FIXED
+  (code).** `tests/ship-gate-real.test.js` decided a file was safe by whole-file
+  token presence (`!/isAutoPushEnabled/.test(text)`), so a SECOND ungated
+  `git push` added to any already-gated file passed with zero failures, and the
+  local `git([...'push'])` wrapper idiom sync.js uses was not even recognised as a
+  push. The fence is now PER-CALL-SITE and scope-aware (`ungatedPushSites`): every
+  push invocation — three idioms including the wrapper — must be gated within its
+  own enclosing function, or be the caller-gated `pushToRemote` primitive. The
+  bare name-whitelist (deployment.js, PreToolUse.Bash.js) is GONE, replaced by two
+  positive assertions: every `pushToRemote` caller is either the human's
+  `/ctoc:push` or a function consulting `isAutoPushEnabled`; and the deploy trigger
+  in `actions.js` is the per-crossing `options.deploy === true` stamp (not a
+  standing flag). TDD-red was demonstrated: the old whole-file matcher returned
+  false for both the two-function case and the wrapper idiom; the tightened fence
+  flags both while staying clean across all of src/.
+
+### Surfaced observation (NOT one of the five findings — for scheduling)
+`deployment.ship_gate_confirmed` has ZERO code readers. `agents/infrastructure/
+deployment-setup.md` still claims it "is the flag `src/lib/actions.js` checks
+before a Gate 3 approval may trigger a deploy" — but actions.js gates the deploy
+trigger on the per-crossing `options.deploy === true` stamp (a comment there
+explicitly rejects a standing flag as one that would permanently disarm the gate).
+So item 7's setter now writes a config marker no runtime path consults — a placebo
+of the exact class this plan set out to kill, introduced downstream when the G4
+per-crossing-stamp change superseded the standing-flag design. Not fixed here
+because the resolution is a genuine decision (correct the doc claim vs. restore a
+code reader vs. drop the field), and the deploy gate is not actually open — the
+per-crossing stamp holds. Flagging for the human to schedule.
