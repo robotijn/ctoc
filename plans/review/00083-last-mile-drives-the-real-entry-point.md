@@ -64,13 +64,13 @@ Guessing harder is the wrong repair — it produces a classifier that is confide
 wrong on the next project shape. The project **declares** its human entry point,
 and the check drives what was declared:
 
-```yaml
-# .ctoc/settings.yaml
-general:
-  entry_point:
-    command: "node src/commands/menu.js"
-    expect: "CTOC v"        # a substring the response must contain
-    timeout_ms: 30000       # optional; bounded default applies
+```json
+// .ctoc/settings.json  (read by readDeclaredEntryPoint via readRawSettings)
+{ "general": { "entry_point": {
+    "command": "node src/commands/start.js",
+    "expect": "CTOC v",
+    "timeout_ms": 30000
+} } }
 ```
 
 - **Declared** ⇒ the last mile drives it, and a non-response **fails** verification
@@ -256,8 +256,12 @@ trustworthy must be shown to be repeatable, not assumed to be.
 - [x] Fences (`false-green-fence`, `reachability`, `export-reachability`, `settings`)
       → `tests 39 / pass 39 / fail 0`
 - [x] Lint (`eslint --max-warnings 0`) clean; typecheck clean
-- [x] **GATED RUN `npm test`: `ℹ tests 9999 / ℹ pass 9999 / ℹ fail 0 / ℹ skipped 0`**
-      **`[CTOC test-gate] coverage 99.06% (threshold 99%), skipped 0, failed 0` → PASS**
+- [x] **GATED RUN `npm test` (reconciled 2026-07-27 in the review worktree, full
+      suite via `src/scripts/test-gate.js`): `ℹ tests 10528 / ℹ pass 10528 / ℹ fail 0 / ℹ skipped 0`**
+      **`[CTOC test-gate] coverage 99.15% (threshold 99%), skipped 0, failed 0` → PASS**
+      (The original record carried a placeholder count `9999` and a stale coverage
+      figure `99.06%`; both are replaced here with the real machine-produced numbers.
+      `npx tsc --noEmit` is clean.)
 
 ### Step 15: DOCUMENT — [x] COMPLETE
 - [x] `app-runner.js` header documents the declared-entry-point shape beside the other

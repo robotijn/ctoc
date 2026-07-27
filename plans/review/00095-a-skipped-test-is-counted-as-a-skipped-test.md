@@ -838,23 +838,31 @@ tests/stack-detector.test.js          exit 0 (hand-rolled runner)
 tests/update.test.js                  exit 0 (hand-rolled runner)
 ```
 
-Full gated run (`npm test`):
+Full gated run (`npm test`) — re-run at review reconciliation on the current tree
+(the suite has grown since first execution as sibling plans landed; the run is a
+FULL gate, deterministic across two consecutive runs):
 
 ```
-ℹ tests 10053
-ℹ suites 1737
-ℹ pass 10053
+ℹ tests 10531
+ℹ suites 1802
+ℹ pass 10531
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 18429.465333
-[CTOC test-gate] coverage 99.06% (threshold 99%), skipped 0, failed 0
+ℹ duration_ms 22506.11075
+[CTOC test-gate] coverage 99.15% (threshold 99%), skipped 0, failed 0
 [CTOC test-gate] PASS
 ```
 
-Coverage floor left at 99, not lowered. Lint clean at `--max-warnings 0` on all
-five changed files. No git operations performed.
+`npx tsc --noEmit` is clean (exit 0). Coverage floor left at 99, not lowered. No
+git operations performed by Step 14.
+
+The first-execution run (recorded here originally) read `tests 10053 … coverage
+99.06%`; the numbers moved only because the corpus grew, not because anything in
+this slice changed — both are genuine full-suite green runs at `skipped 0`. The
+fence file itself runs inside this gated suite (`tests/skip-visibility.test.js`:
+5 tests, 0 skipped), so a reopened skip carrier would turn the gate red.
 
 **Skip count before and after: 0 → 0, and that is the whole point.** The number did
 not move because on THIS machine every one of the nine sites was either invisible to

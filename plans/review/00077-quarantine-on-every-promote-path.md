@@ -359,3 +359,50 @@ as required:
    moved in the correct direction; no threshold was lowered to make a run pass. The
    false-green baseline did NOT need to move: this slice adds no new silent-catch
    site, and the gated run confirmed it.
+
+## Reconciliation at review (2026-07-27)
+
+Re-verified in an isolated worktree. The plan's CODE deliverable — `applyQuarantine`
+applied on all four promote paths (`reconcileState` plus `menu task fail|cancel|
+complete` via `computePromote`) — is shipped, wired, and green. Four points where the
+plan's PROSE has since been overtaken by shipped reality are recorded here so a
+reviewer diffing the plan against the code does not read a false contradiction. No
+code was reverted and no test was weakened; the historical step text above is left as
+the honest record of 2026-07-18.
+
+1. **The re-run gate is green, at fresher numbers.** `npm test` (the full gated
+   entry point via `test-gate.js`): `coverage 99.15% (threshold 99%), skipped 0,
+   failed 0` → `PASS`; `task-reconcile.js` at 100.00% line coverage. `npx tsc
+   --noEmit` clean. The parity, `task-reconcile` and quarantine-fault files run
+   57 pass / 0 fail / 0 skip together. The Step-14 figure of 99.05% is superseded by
+   99.15%; both clear the floor. Step 14 recorded a REAL full-suite run (9906 tests),
+   not a narrowed single-file gate — that evidence stands.
+
+2. **The "scheduler stays pure — never reads `orphanReason`" invariant (Step 11
+   proof; decisions 1, 5, 9) was INTENTIONALLY SUPERSEDED by the human ruling of
+   2026-07-26 (belt-and-suspenders).** `grep -n "orphanReason" src/lib/task-registry.js`
+   now returns matches BY DESIGN: the scheduler's `canRun` runs a concurrent-edit BELT
+   (`overlapsStaleOrphanReservation` → `staleOrphanReservedFiles`, both reading
+   `result.orphanReason === 'staleness'`), documented at `task-registry.js:31-38`. The
+   parity test's case 9 was updated to the new contract — `canRun` REFUSES the
+   conflicting candidate while `nextRunnable` still OFFERS it and this plan's
+   `applyQuarantine` projection REPORTS what it held (the "suspenders"). So the Step 11
+   evidence "grep returns NOTHING" and the flat "scheduler must never learn WHY a task
+   reached a status" argument in decisions 1/5/9 describe the contract as it stood the
+   day this slice landed, not the contract that ships today. This plan's projection
+   guard is unchanged and remains the reporter/suspenders layer; the longer-term
+   cross-file consolidation is owned by sibling `00013-r3b`.
+
+3. **`applyQuarantine`'s reserved-set collect phase is no longer an inline loop** (as
+   line 122 describes) — the same R3-B ruling unified it onto the shared
+   `taskRegistry.staleOrphanReservedFiles(registry)` so the scheduler belt and this
+   projection can never disagree about which files are held. Externally observable
+   behaviour is unchanged and re-verified green; the fail-safe two-phase collect/filter
+   structure and `report.quarantineFaulted` shape are intact.
+
+4. **`src/commands/menu.md` is now `src/commands/start.md`** (CTOC standardised on the
+   `start`/`push`/`update` slash commands). Every `src/commands/menu.md:124` reference
+   above should be read as `src/commands/start.md:124`, and the reword recommended in
+   decision 9 has since LANDED there: the contract now reads "the scheduler's
+   newly-runnable `nextRunnable` set with the concurrent-edit guard applied — that set
+   MINUS the candidates the guard held, never the raw set." The handover is closed.

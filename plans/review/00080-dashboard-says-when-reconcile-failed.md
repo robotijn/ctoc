@@ -14,7 +14,7 @@ program: ctoc-repair-loop
 iron_loop: true
 files:
   - "src/lib/menu-screens.js"
-  - "src/commands/menu.md"
+  - "src/commands/start.md"
   - "tests/dashboard-reconcile-failure.test.js"
   - "CLAUDE.md"
   - ".ctoc/false-green-baseline.json"
@@ -181,7 +181,15 @@ emits appears **above** the orphan line and above the wedge block.
 
 ---
 
-### File: `src/commands/menu.md`
+### File: `src/commands/start.md`
+
+> Record reconciliation (review): this plan was authored against `src/commands/menu.md`.
+> After Gate 2 approval, that file was renamed `src/commands/menu.md` → `src/commands/start.md`
+> (the command is `/ctoc:start`, not `/ctoc:menu`). The one-line promote-contract correction
+> below landed in `src/commands/start.md:124`, and the test (case 13) reads `start.md`. The
+> `files:` declaration and this heading are corrected to the real path; the change itself is
+> unaffected.
+
 **Action:** MODIFY
 **Purpose:** One-line correction — the promote contract's description is now inaccurate on all four routes.
 **Change type:** documentation correction, one parenthetical

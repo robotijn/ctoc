@@ -343,6 +343,23 @@ under the zero-skipped rule.
 - Every TruffleHog finding still passes through `redactSecret` on the throw path — pinned
   by case 2.
 
+## Step 14 VERIFY — real full-gate evidence (recorded at review reconciliation)
+
+The full gated run is the whole suite plus the coverage floor plus the zero-skipped
+gate, via `npm test` (`src/scripts/test-gate.js`) — not a hand-picked subset:
+
+- `[CTOC test-gate] coverage 99.15% (threshold 99%), skipped 0, failed 0` → `[CTOC test-gate] PASS`
+- The plan's own new file `tests/secrets-scanner-external-tool-findings.test.js`: 13
+  cases, 2 suites, `pass 13 / fail 0 / skipped 0`.
+- `npx tsc --noEmit`: clean, no output.
+- `tests/false-green-fence.test.js` is inside the green suite: the three tracked
+  `silent-catch` sites (`runTruffleHog`, `runTruffleHog#2`, `runDetectSecrets`) are
+  no longer present in `.ctoc/false-green-baseline.json` — the ratchet SHRANK, with
+  zero whitelist entries added, exactly as Step 11 required.
+
+Working tree is otherwise clean; no VERSION, no `.ctoc/streaming/` and no
+`package-lock.json` change is part of this plan.
+
 ## Decisions Taken Under Ambiguity
 
 0. **The spawn-failure error message OMITS `e.message`, which the plan's sketch included.**
