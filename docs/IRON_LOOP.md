@@ -558,7 +558,7 @@ acts that leave the machine and are hard to take back:
 | Ship gate | Crossed by | Guard | Default |
 |---|---|---|---|
 | **push** | the human, via `/ctoc:push` | `git.autoPushEnabled` (settings.json) | **OFF** |
-| **deploy** | the human, via the deployment pipeline | `deployment.ship_gate_confirmed` | **OFF** |
+| **deploy** | the human, via the deployment pipeline | per-crossing `options.deploy === true` stamp on the Gate 3 approval | **OFF** |
 
 **CTOC never pushes on its own.** With `git.autoPushEnabled` false — the default, in
 every environment profile, including prod — no CTOC code path reaches `git push`:
@@ -571,9 +571,10 @@ and hands the branch back.
 
 **A Gate 3 approval is not a deploy.** "The code is good" and "ship it to production"
 are two decisions. `src/lib/actions.js` triggers the deployment pipeline on a Gate 3
-approval only when the human has answered the deploy ship-gate question
-(`deployment.ship_gate_confirmed: true`, written by the `deployment-setup` agent).
-Until then, Gate 3 records a deploy-ready notice and deploys nothing.
+approval only when that specific approval carries the per-crossing deploy stamp
+(`options.deploy === true`). There is deliberately no standing config flag that arms
+this — a persisted flag would permanently disarm the gate, so `actions.js` refuses to
+honor one. Absent the stamp, Gate 3 records a deploy-ready notice and deploys nothing.
 
 Both are fenced by `tests/ship-gate-real.test.js`: with default settings, ZERO push
 invocations across every automatic path.

@@ -511,13 +511,41 @@ test('ship-gate: the deploy trigger is a per-crossing human stamp, not a standin
   // push sites are gated in-scope by isLive() (covered by the per-scope scan above);
   // the DEPLOY decision itself is gated in actions.js by the per-crossing
   // `options.deploy === true` stamp — never a persisted config flag, which would
-  // permanently disarm the gate. (ship_gate_confirmed is a config readiness marker
-  // with NO code reader; it must never become the runtime trigger.)
+  // permanently disarm the gate. (The old ship_gate_confirmed config field was a
+  // standing flag with NO code reader; it was dropped in v6.13.42 — the next test
+  // fences it dead.)
   const actions = fs.readFileSync(path.join(ROOT, 'src/lib/actions.js'), 'utf8');
   assert.match(actions, /options\.deploy\s*===\s*true/,
     'the deploy trigger must be a per-crossing stamp on the approval call');
   assert.match(actions, /if\s*\(\s*options\.deploy\s*===\s*true\s*\)[\s\S]{0,400}runDeploymentPipeline/,
     'runDeploymentPipeline must run ONLY under the per-crossing deploy stamp');
+});
+
+test('ship-gate: the dead ship_gate_confirmed field stays dead — no src reader, no doc claim it is read', () => {
+  // deployment.ship_gate_confirmed was a STANDING config flag with ZERO code readers;
+  // the per-crossing `options.deploy === true` stamp in actions.js superseded it (a
+  // persisted flag would permanently disarm the deploy gate — a setting, not a gate).
+  // It was dropped in v6.13.42. This fence keeps it dropped: it must never reappear as
+  // a src reader, and no doc may reintroduce the false claim that src/lib/actions.js
+  // consults it before a deploy.
+  const srcHits = [];
+  const walkSrc = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walkSrc(p);
+      else if (e.name.endsWith('.js') && /ship_gate_confirmed/.test(fs.readFileSync(p, 'utf8'))) {
+        srcHits.push(path.relative(ROOT, p));
+      }
+    }
+  };
+  walkSrc(path.join(ROOT, 'src'));
+  assert.deepStrictEqual(srcHits, [], 'ship_gate_confirmed must have NO reader in src');
+
+  for (const rel of ['agents/infrastructure/deployment-setup.md', 'docs/IRON_LOOP.md']) {
+    const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    assert.ok(!/ship_gate_confirmed/.test(text),
+      `${rel} must not reference the dropped ship_gate_confirmed field`);
+  }
 });
 
 // ── 6. refineLoop stops self-approving (Goodhart) ────────────────────────────
