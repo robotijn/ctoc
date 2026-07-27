@@ -2,15 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T10:48:43.095Z
 gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-20T09:18:53.812Z
-gate_crossed: implementation → todo
----
-
----
 title: "The menu never claims it set up a project it did not — the claim is read back, not assumed"
 type: implementation
 parent_plan: none

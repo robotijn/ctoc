@@ -2,15 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T20:16:02.577Z
 gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-19T19:32:49.072Z
-gate_crossed: implementation → todo
----
-
----
 title: "A plan nobody approved grants no write access — an agent could author a plan file and thereby permit itself to edit the gate enforcement"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

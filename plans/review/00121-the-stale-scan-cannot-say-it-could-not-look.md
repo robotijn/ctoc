@@ -2,27 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T21:06:47.292Z
 gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-19T20:59:28.582Z
-gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-19T20:45:49.894Z
-gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-19T18:29:04.194Z
-gate_crossed: implementation → todo
----
-
----
 title: "The stale scan cannot say it could not look — four silent skips report an unread backlog as a clean one, and its loudest signal fires on every plan that has not been built yet"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

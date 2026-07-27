@@ -6,15 +6,6 @@ kickback_counts:
   by_step:
     '14': 1
   total: 1
----
-
----
-approved_by: human
-approved_at: 2026-07-20T09:18:53.756Z
-gate_crossed: implementation → todo
----
-
----
 title: "A fresh repository is its own project — and every screen says which project it opened"
 type: implementation
 parent_plan: none

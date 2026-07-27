@@ -2,15 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T16:47:51.605Z
 gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-19T15:21:52.039Z
-gate_crossed: implementation → todo
----
-
----
 title: "The reachability fence stops counting prose as a caller — a citation is not an invocation in the file fence either"
 type: implementation
 parent_plan: ctoc-honest-instruments
