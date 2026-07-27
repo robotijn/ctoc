@@ -41,6 +41,11 @@ function setupTempProject() {
   process.chdir(tmpDir);
   fs.mkdirSync(path.join(tmpDir, '.ctoc', 'config'), { recursive: true });
   fs.mkdirSync(path.join(tmpDir, '.claude-plugin'), { recursive: true });
+  // A real CTOC project root (see plan 00178): the shared resolver requires
+  // `.ctoc/settings.yaml` (or a `plans/` sibling), so a bare `.ctoc` — the shape
+  // of the crypto home `~/.ctoc` — no longer resolves as a project and the
+  // default-root write paths would otherwise refuse to write.
+  fs.writeFileSync(path.join(tmpDir, '.ctoc', 'settings.yaml'), 'general: {}\n');
 }
 
 function teardownTempProject() {
@@ -62,20 +67,23 @@ function validIssue(overrides = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-describe('refinement-loop — findProjectRoot upward walk', () => {
-  it('returns the start dir when NO marker exists anywhere up the tree', () => {
+describe('refinement-loop — findProjectRoot delegates to the shared resolver', () => {
+  it('does NOT over-root: a marker-free start yields a string root, never the bare start dir', () => {
     setupTempProject();
     try {
       const { findProjectRoot } = load();
-      // A deep, marker-free directory under the OS temp root. No .ctoc /
-      // .claude-plugin exists on any ancestor, so the loop walks up until
-      // parent === dir (filesystem root) and falls through to `return start`.
+      // A deep, marker-free directory. The private walk used to `return start`
+      // here; findProjectRoot now delegates to describeProjectRoot, whose
+      // documented fallback is the working directory (a STRING), not the
+      // marker-less start. The contract callers depend on is "always a string".
       const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-noroot-'));
       const deep = path.join(bare, 'a', 'b', 'c');
       fs.mkdirSync(deep, { recursive: true });
       try {
         const resolved = findProjectRoot(deep);
-        assert.equal(resolved, deep, 'with no markers, findProjectRoot returns its start');
+        assert.equal(typeof resolved, 'string', 'findProjectRoot always returns a string');
+        assert.notEqual(fs.realpathSync(resolved), fs.realpathSync(deep),
+          'a marker-less start is not adopted as the root');
       } finally {
         fs.rmSync(bare, { recursive: true, force: true });
       }
@@ -84,17 +92,21 @@ describe('refinement-loop — findProjectRoot upward walk', () => {
     }
   });
 
-  it('matches on a .ctoc marker alone when .claude-plugin is absent', () => {
+  it('a BARE .ctoc (crypto-home shape) does NOT capture the root — plan 00178 fix', () => {
     setupTempProject();
     try {
       const { findProjectRoot } = load();
-      // A directory with ONLY .ctoc (no .claude-plugin) forces the second
-      // operand of the `existsSync(.claude-plugin) || existsSync(.ctoc)` OR.
+      // A directory with ONLY a bare `.ctoc` (no settings.yaml, no plans/) is the
+      // shape of the global crypto home `~/.ctoc`. The old private resolver
+      // accepted it and over-rooted; the shared resolver must NOT. Resolution
+      // falls through to the working directory, so the bare-.ctoc dir is not
+      // adopted as the project root.
       const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-only-'));
       fs.mkdirSync(path.join(bare, '.ctoc'), { recursive: true });
       try {
         const resolved = findProjectRoot(bare);
-        assert.equal(fs.realpathSync(resolved), fs.realpathSync(bare));
+        assert.notEqual(fs.realpathSync(resolved), fs.realpathSync(bare),
+          'a bare .ctoc must not be treated as a project root');
       } finally {
         fs.rmSync(bare, { recursive: true, force: true });
       }

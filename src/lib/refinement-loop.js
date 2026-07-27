@@ -15,6 +15,7 @@
 
 const safeFs = require('./safe-fs');
 const { safeRegExp } = require('./regex-utils');
+const { describeProjectRoot } = require('./project-root');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -100,17 +101,55 @@ const DYNAMIC_CRITICS_BY_PATTERN = [
 //  Filesystem helpers
 // ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Resolve the project root for this module.
+ *
+ * DELEGATES to the shared resolver (`src/lib/project-root.js` → `describeProjectRoot`)
+ * and MUST NOT be re-implemented here. This function once carried a PRIVATE copy of the
+ * walk that accepted a BARE `.ctoc` as a project marker and climbed ten levels before
+ * returning the working directory. On any machine that has used CTOC's crypto path,
+ * `src/lib/crypto.js` (see :13-37) creates the global crypto home `~/.ctoc` holding only
+ * `.secret`; the bare-marker acceptance then climbed from a project under $HOME up to
+ * `~/.ctoc` and over-rooted to $HOME, so a project's refinement journals were written to
+ * `~/.ctoc/loops/<plan>/` — invisible to the project and colliding across projects. The
+ * shared resolver fixed exactly this (see the comment at `src/lib/project-root.js:87-94`,
+ * plan 00178, 2026-07); a private copy is a defect precisely because it never learns the
+ * next fix. Keep this a one-line delegation.
+ *
+ * The exported contract is preserved: same name, arity and a STRING return. On fallback
+ * the shared resolver returns a path (the working directory), so path builders keep
+ * working; the WRITE paths in this module (`appendRound`, `writeLetter`) additionally
+ * REFUSE to write when resolution falls back — see there.
+ *
+ * @param {string} [start=process.cwd()] - Directory to start searching from
+ * @returns {string} Project root path (never null, never an object)
+ */
 function findProjectRoot(start = process.cwd()) {
-  let dir = start;
-  for (let i = 0; i < 10; i++) {
-    if (safeFs.existsSync(path.join(dir, '.claude-plugin')) || safeFs.existsSync(path.join(dir, '.ctoc'))) {
-      return dir;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
+  return describeProjectRoot(start).root;
+}
+
+/**
+ * Resolve the root for a WRITE path, refusing when resolution falls back.
+ *
+ * An explicitly supplied `root` is honoured unconditionally and NO resolution is
+ * performed — the caller has asserted it, and second-guessing an explicit argument is a
+ * different defect (Decision 4). Only the DEFAULT is narrowed, because the default is
+ * where the guess lives. Resolution runs at most once per call (Step 12).
+ *
+ * Returns the resolved root string, or `null` when resolution fell back (no project
+ * identified) with the reason in `reason` — the caller turns that into a skipped result
+ * rather than a guessed write location.
+ *
+ * @param {string} [root] - Caller-supplied root; when omitted, resolve from cwd.
+ * @returns {{ root: string|null, reason: string|null }}
+ */
+function resolveWriteRoot(root) {
+  if (root !== undefined) return { root, reason: null };
+  const resolved = describeProjectRoot();
+  if (resolved.marker === 'fallback') {
+    return { root: null, reason: `no project identified: ${resolved.fallbackReason}` };
   }
-  return start;
+  return { root: resolved.root, reason: null };
 }
 
 function loopDir(planSlug, root = findProjectRoot()) {
@@ -158,13 +197,17 @@ function loadJournal(planSlug, root) {
  *   convergence_delta }
  * @returns {Object} the updated journal
  */
-function appendRound(planSlug, roundEntry, root = findProjectRoot()) {
-  ensureDir(loopDir(planSlug, root));
-  const journal = loadJournal(planSlug, root);
+function appendRound(planSlug, roundEntry, root) {
+  const { root: r, reason } = resolveWriteRoot(root);
+  if (r === null) {
+    return { written: false, skipped: true, reason };
+  }
+  ensureDir(loopDir(planSlug, r));
+  const journal = loadJournal(planSlug, r);
   if (!journal.started_at) journal.started_at = isoNow();
   if (!journal.phase) journal.phase = roundEntry.phase;
   journal.rounds.push({ ...roundEntry, timestamp: roundEntry.timestamp || isoNow() });
-  safeFs.writeFileSync(journalPath(planSlug, root), serializeJournalYaml(journal));
+  safeFs.writeFileSync(journalPath(planSlug, r), serializeJournalYaml(journal));
   return journal;
 }
 
@@ -555,9 +598,13 @@ function buildLetter({ planSlug, round, phase, summary, issues }) {
   };
 }
 
-function writeLetter(planSlug, letter, root = findProjectRoot()) {
-  ensureDir(letterDir(planSlug, root));
-  const p = path.join(letterDir(planSlug, root), `${letter.letter_id}.json`);
+function writeLetter(planSlug, letter, root) {
+  const { root: r, reason } = resolveWriteRoot(root);
+  if (r === null) {
+    return { written: false, skipped: true, reason };
+  }
+  ensureDir(letterDir(planSlug, r));
+  const p = path.join(letterDir(planSlug, r), `${letter.letter_id}.json`);
   safeFs.writeFileSync(p, JSON.stringify(letter, null, 2) + '\n');
   return p;
 }
