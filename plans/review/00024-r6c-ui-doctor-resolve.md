@@ -9,10 +9,9 @@ iron_loop: true
 files:
   - "src/lib/ui.js"
   - "src/tabs/tools.js"
-  - "tests/ui*.test.js"
+  - "tests/ui.test.js"
   - "tests/tab-modules.test.js"
   - ".ctoc/export-reachability-baseline.json"
-  - "tests/export-reachability.test.js"
 ---
 
 # R6-C — ui.js#doctor: rewire or delete, no third state
@@ -118,3 +117,67 @@ directly (a test is never a caller) — removed, along with its now-orphaned
 require-time guard: `ui.doctor` is `undefined`. Removed `'doctor'` from the two
 module-export list assertions. No behavior lost: the live doctor screen is
 covered by `tests/tab-modules.test.js` (renderDoctor + doctor-mode key dispatch).
+
+## Step 16 Rework — REVIEW pass (2026-07-27)
+
+Adversarial re-review of this plan in `review/`, verified against disk and the
+FULL gate.
+
+### Defect 1 — Step 14 never ran the real gate (CONFIRMED, fixed)
+The original Step 14 ran only the three named test files plus a scoped eslint and
+explicitly recorded "No git, no staging, **no full-suite run**." That is not the
+Step 14 quality gate — the gate is `npm test` (the whole suite + the coverage floor
++ the zero-skipped gate via `src/scripts/test-gate.js`). Re-ran it in full:
+`# tests 10528 · # pass 10528 · # fail 0 · # skipped 0`, coverage **99.12%**
+(threshold 99%) → `[CTOC test-gate] PASS`. `npx tsc --noEmit` clean.
+
+### Defect 2 — record-vs-disk drift on the baseline number (CONFIRMED, corrected)
+The Execution Log above states the baseline was "lowered … to 103" and
+`maxDead = 103`. On disk `.ctoc/export-reachability-baseline.json` now reads
+`maxDead: 68`. The R6-C change itself DID land and is intact — `src/lib/ui.js`
+has no `doctor` export in HEAD, and the baseline comment records
+"R6-C: src/lib/ui.js#doctor RESOLVED by DELETION". The 103 figure is simply
+stale: R6-C moved the fence 104 → 103, and LATER unrelated plans re-seeded it
+further (71 → 69 → 68 per the baseline comment). The R6-C log is left as the
+honest record of what R6-C did at the time; the live count is 68 and the export
+`ui.js#doctor` is absent from both `analyzeExports().dead` and the baseline —
+export fence green. No "full-suite red / tsc errors" claim exists in this plan to
+refute; had one existed it would be REFUTED-as-stale, since the tree is green.
+
+### Defect 3 — the live Doctor screen lied to the human (CONFIRMED, fixed, TDD)
+`src/tabs/tools.js#renderDoctor` advertises four numbered actions — "1. Run checks
+again", "2. Repair state", "3. Sync now", "4. View logs" — but `handleKey`'s doctor
+mode implemented **only #3**. Pressing 1 or 2 was a silent no-op (the person clicks
+"Repair state" and nothing happens — "grinding with no feedback IS broken"), and
+pressing 4 fell through to the free-text branch and **typed the digit "4" into the
+"Ask a question" box**. A "doctor/resolve" screen that cannot resolve what it renders
+is exactly the human-facing failure this repository fences.
+
+Fix (TDD-Red first, 8 new tests in `tests/tab-modules.test.js`): every advertised
+action now DOES what it says, wired to the repository's own canonical functions —
+no invented product semantics:
+- **1 Run checks again** → the health checks are pure and recomputed on the next
+  `render()`; the key now confirms with a message so the human sees a response.
+- **2 Repair state** → `task-reconcile.reconcileState(projectPath)`, the canonical
+  fail-open state-repair path (also run on menu open), reporting exactly how many
+  task-state issues it fixed, "healthy — nothing to repair", or the corruption
+  reason on a load failure.
+- **4 View logs** → `enforcement-log.readLog(projectPath)`, surfacing the recent
+  enforcement-log entry count and the file that holds the full stream.
+- The free-text exclusion widened `'123'` → `'1234'` so no action digit can ever
+  land in the question box again.
+
+Both new call sites (`reconcileState`, `readLog`) are reached from `handleKey`,
+which `src/commands/start.js` dispatches — live, not dead code. Coverage of
+`src/tabs/tools.js` is 100% lines after the change.
+
+### files: corrected
+Trimmed to what this plan actually WRITES: `tests/ui*.test.js` → `tests/ui.test.js`
+(precise), and `tests/export-reachability.test.js` removed (the plan runs the export
+fence but never edits that test). `src/tabs/tools.js` and `tests/tab-modules.test.js`
+are now genuinely written by this rework and remain declared.
+
+### Verdict
+Steps 8–16 complete. Full gate green (10528/10528, 0 skipped, coverage 99.12%).
+The dead `ui.js#doctor` export is gone AND the live doctor a human actually reaches
+now honours every action it advertises.

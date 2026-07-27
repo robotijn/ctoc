@@ -11,10 +11,10 @@ files:
   - "src/lib/hooks-installer.js"
   - "src/lib/quality-agent.js"
   - "src/commands/update.js"
-  - "tests/sast-runner*.test.js"
-  - "tests/hooks-installer*.test.js"
-  - "tests/quality-agent*.test.js"
-  - "tests/lib-quality*.test.js"
+  - "tests/sast-runner-failclosed.test.js"
+  - "tests/hooks-installer-hascommand.test.js"
+  - "tests/quality-agent-crossplatform.test.js"
+  - "tests/lib-quality-update-home.test.js"
 ---
 
 # R6-D — Fail-closed security, cross-platform quality gate
@@ -143,3 +143,51 @@ REPORT (each fail-open closed, with the test that proves the crash now surfaces)
   fail; eslint --max-warnings 0 exit 0 on all 8 touched files. (Full suite skipped
   per coordinator constraint — a concurrent executor owns adjacent files.)
 - Step 16 REPORT: delivered to the coordinator.
+
+## Rework — adversarial re-verification (Step 16, 2026-07-27)
+
+Re-audited every claimed fix against source, ran the REAL gate, corrected drift.
+Isolated worktree (`agent-a5ddeed41d6b1f23d`), fresh `npm install`.
+
+**Full gate now run — the "Full suite skipped" note above is REFUTED-as-stale.**
+The original Step-14 ran only the impacted subset under a concurrency constraint. In
+an isolated worktree the whole gate runs clean:
+- `npm test` (src/scripts/test-gate.js): **tests 10520 · pass 10520 · fail 0 ·
+  skipped 0 · coverage 99.15% (threshold 99%) → PASS**.
+- `npx tsc --noEmit`: clean, exit 0. Any "full-suite red / tsc errors" concern is
+  stale — the tree is green.
+
+**Each fix verified SHIPPED and CORRECT against disk (fail-closed security bar):**
+1. Fail-closed scanners — `runBandit` (sast-runner.js:612), `runGosec` (:646),
+   `runESLintSecurity` (:683) each record an unparseable/empty stdout to
+   `this.errors`, mirroring `runSemgrep`. A crashed scanner can no longer read clean.
+   Proven by `tests/sast-runner-failclosed.test.js` (crash→error for all three;
+   contrast test confirms a valid-findings non-zero exit still parses).
+2. `run()` honest — returns `{ success:false, scanned:false, reason }` when zero
+   scanners ran (:457) or no analyzable source (:413); `runLanguageScanner` counts a
+   scanner only when it added no error (:585); `runSemgrep` returns false on crash
+   (:524-538). quality-agent surfaces `res.scanned === false` as a loud skip (:1090).
+3. `hasCommand` cross-platform — `where` on win32, `command -v` elsewhere, token-validated
+   (hooks-installer.js:59-72). Proven by `tests/hooks-installer-hascommand.test.js`.
+4. `runCommand` timeout — bounded 300000ms; timeout surfaced as
+   `{ success:false, timedOut:true }` on allowFail, re-thrown loudly for non-allowFail
+   (quality-agent.js:96-123). Proven with a real sleepy subprocess.
+5. Go package paths — normalize both separators to `/` then `path.posix.dirname`
+   (quality-agent.js:513-516); deterministic on every platform. Proven with backslash
+   input asserting forward-slash argv.
+6. `update.js` HOME — `os.homedir()` (update.js:18); loads with HOME/USERPROFILE unset.
+   Proven by `tests/lib-quality-update-home.test.js`.
+
+**Residual re-attack:** a scanner that runs and returns a valid empty result is a
+genuine no-findings pass (correct, not a crash); `success:true` alongside recorded
+`errors` is safe because consumers read `.findings`/`.errors`/`.scanned`, never
+`.success`, and every error is surfaced as a loud skip. No path reads a crashed
+scanner as clean.
+
+**`files:` corrected** — the four test-file globs (`tests/quality-agent*.test.js`
+etc.) over-claimed write coverage over ~8 pre-existing test files this plan never
+authored; replaced with the four exact filenames it created. Source files were
+already exact.
+
+**Disposition:** all six defects CLOSED and verified; stale "full-suite skipped"
+note REFUTED-as-stale with the real green gate; `files:` tightened. No genuine fork.

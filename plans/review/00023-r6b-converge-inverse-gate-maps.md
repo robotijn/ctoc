@@ -11,7 +11,6 @@ files:
   - "src/hooks/human-gate-check.js"
   - "src/lib/approval-ledger.js"
   - "tests/gate-order.test.js"
-  - "tests/gate-hook-revival.test.js"
   - "tests/approval-ledger-provenance.test.js"
 ---
 
@@ -62,11 +61,20 @@ gate-order.js in src/.
   HUMAN_GATES = gate-order.GATE_SOURCE; approval-ledger backfill stage_from = sourceOf(stage_to).
 - [x] Step 11 REVIEW — grep-proved the inverse gate-edge literal exists in NO src file
   outside gate-order.js (only a JSDoc example there); forward GATE_EDGES tuple sole-homed.
+- [x] Step 12 OPTIMIZE — nothing to optimize: the change is a literal→derived swap
+  (`Object.fromEntries` at module load) plus two `require`s of an already-loaded pure
+  leaf; no hot-path cost added (verified gate-order requires nothing).
 - [x] Step 13 SECURE — no circular require (gate-order requires nothing; approval-ledger →
   gate-order is one-directional); hook path stays a pure synchronous constant load.
-- [x] Step 14 VERIFY — `node --test` on the 3 named files: 24 pass / 0 fail / 0 skipped;
-  dependent gate/ledger/actions/stale tests 64/64; eslint exit 0. No git, unstaged.
-- [x] Step 16 REPORT — returned to the orchestrator.
+- [x] Step 14 VERIFY — REWORK (2026-07-27): the original record ran only `node --test`
+  on 3 files + eslint, NOT the gated entry point. Re-ran the REAL gate on the worktree:
+  `npx tsc --noEmit` exit 0 (clean typecheck), and `npm test` → `[CTOC test-gate] PASS`,
+  coverage 99.12% (threshold 99%), skipped 0, failed 0. Full suite GREEN.
+- [x] Step 15 DOCUMENT — the derivation is documented in-code: gate-order.js lines
+  119–146 (the R6-B inverse-encoding block, `GATE_SOURCE` + `sourceOf` JSDoc) and the
+  consumer comments in human-gate-check.js and approval-ledger.js name gate-order as the
+  single source. No external doc change needed (internal library invariant).
+- [x] Step 16 REPORT — returned to the orchestrator (see Rework Report below).
 
 ## Decisions Taken Under Ambiguity
 1. **`sourceOf` is wired into approval-ledger's live backfill path, not just exported.**
@@ -106,3 +114,52 @@ gate-order.js in src/.
   `gate-destinations-approved` (block) — the plans currently sitting in `plans/todo/`
   (00021–00024, including this one) have no ledger entry. Verified identical on the
   clean v6.12.6 baseline with these changes stashed. Not caused by R6-B.
+  **REFUTED-as-stale (rework 2026-07-27):** this note describes a snapshot that no longer
+  holds — this plan is now resident in `plans/review/`, not `plans/todo/`, and the tree
+  is at v6.13.7+, not v6.12.6. The observation was environmental (a queue-state
+  self-check), never a defect in R6-B's code. Left for provenance; not actionable.
+
+## Rework Report (2026-07-27, review-stage adversarial pass)
+
+Adversarial critique of R6-B against live source (each claim verified before acting).
+No code change was required — the convergence is correct. Corrections were to the
+plan's own record and its `files:` declaration.
+
+**Convergence VERIFIED shipped, ONE encoding — the core claim holds.** The inverse gate
+map is derived exactly once: `gate-order.js:133` `GATE_SOURCE =
+Object.fromEntries(GATE_EDGES.map(([from,to])=>[to,from]))` plus `sourceOf(to)`.
+Both former literals are gone and now derive from it — `human-gate-check.js:141`
+`const { GATE_SOURCE: HUMAN_GATES } = require('../lib/gate-order')` and
+`approval-ledger.js:898` `stage_from: sourceOf(stage_to) || 'backfill'`. A grep of the
+whole `src/` tree for the two inverse pairs (`todo:'implementation'`, `done:'review'`)
+finds them only in gate-order.js (its JSDoc). No divergent second copy exists — the bug
+this plan exists to kill is dead, and a ratcheting fence
+(`tests/approval-ledger-provenance.test.js` `no inverse gate-edge literal … survives
+outside gate-order.js`) keeps it dead. `stale-cleanup.js` REVERT_MAP is confirmed a
+genuinely different map (review→todo, functional→vision are not gate edges); it also
+CONSUMES `GATE_SOURCE` (line 333) for its dynamic ledger walk, reinforcing the single
+encoding rather than duplicating it. R6-B shipped in commit f153861 (v6.12.7).
+
+**Defect dispositions:**
+1. **Step 14 never ran the real gate — FIXED.** Original record ran only `node --test`
+   on 3 files + eslint. Re-ran the gated entry point on this worktree: `npx tsc
+   --noEmit` exit 0, and `npm test` → `[CTOC test-gate] PASS`, coverage 99.12%
+   (threshold 99%), skipped 0, failed 0. Full suite GREEN. Step 14 record replaced with
+   this real evidence.
+2. **`files:` listed `tests/gate-hook-revival.test.js`, never touched — FIXED.** Commit
+   f153861 modified exactly 5 files (gate-order.js, human-gate-check.js,
+   approval-ledger.js, gate-order.test.js, approval-ledger-provenance.test.js); the
+   revival test was not among them (behavior was byte-identical, so it needed no edit).
+   Removed the phantom entry so `files:` matches the actual change set.
+3. **Straggler note about `plans/todo/` + v6.12.6 baseline — REFUTED-as-stale.** Marked
+   in the Straggler Report; environmental snapshot, not an R6-B defect.
+4. **Execution Plan was missing Steps 12 and 15 — FIXED.** Added the OPTIMIZE and
+   DOCUMENT records (no optimization needed for a literal→derived swap; derivation is
+   documented in-code at gate-order.js:119–146).
+
+**"Full-suite red / tsc errors" claims:** none were present in this plan; independently
+confirmed the tree is GREEN (`tsc --noEmit` exit 0, `npm test` PASS), so any such claim
+would be REFUTED-as-stale.
+
+**No genuine fork.** Every defect had a single defensible resolution; the code the plan
+delivered is correct as shipped.

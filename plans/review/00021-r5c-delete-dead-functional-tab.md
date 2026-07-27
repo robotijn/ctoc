@@ -172,3 +172,43 @@ from disk rather than inheriting the notes above.
     residue is stale historical text in `.ctoc/index/plan-index.json` and
     `.ctoc/state/tasks.json`, which are generated data, not call sites.
 - **Steps 15–16** — test-file header already lists only the surviving tabs. Gate 3 ready.
+
+## Step 16 Rework Re-Verification (adversarial rework pass, 2026-07-27)
+
+Independent adversarial pass in an isolated worktree. Every claim below re-derived
+from disk and from a fresh FULL gate run — nothing inherited from the notes above.
+
+- **Step 14 VERIFY re-run with the REAL gate, not a subset.** `npm test` (exit 0):
+  `[CTOC test-gate] coverage 99.15% (threshold 99%), skipped 0, failed 0` →
+  `[CTOC test-gate] PASS`. The whole suite ran; the coverage floor (99) and the
+  zero-skipped gate both held. The prior record's `tests 9774 · coverage 99.04%`
+  (task t46, 2026-07-18) is superseded — re-measured 99.15% on the current tree, all
+  green. NOT a regression; the tree grew and coverage rose.
+- **`npx tsc --noEmit` → exit 0, clean.** Any "full-suite red / tsc errors" concern is
+  REFUTED-as-stale: the tree is green under the real typecheck.
+- **Deletion confirmed on disk.** `src/tabs/` contains only `overview.js`, `review.js`,
+  `tools.js`, `vision.js` — `functional.js` is gone. The gate's own coverage report
+  `src/tabs` section lists exactly those four, an independent confirmation.
+- **File fence intact.** `functional.js` does NOT appear in
+  `.ctoc/reachability-baseline.json` `unreachable` (grep count 0); `reachability.test.js`
+  is green inside the full gate. NOTE — stale narrative, not a defect: the plan body
+  says the fence "ratchet at 0". That baseline was RE-SEEDED to 26 on 2026-07-19 (v6.12.x)
+  for an unrelated methodology change ("count rose 0→26 and NOT ONE FILE DIED"), AFTER
+  this plan shipped. The plan's ACTION is unaffected — the delete added no unreachable
+  file and functional.js is correctly absent from the list. The "0" referred to this
+  plan's delta, which still holds.
+- **No false-green in the carve.** No live `require('../src/tabs/functional')` /
+  `loadTabWithMocks('functional')` remains; the 14 residual `functional` tokens are all
+  the plan-STAGE name (`plans/functional/`, `getPlanCounts({ functional })`,
+  `'View functional'`) or removal comments — intentional residue, correctly kept. The
+  relocated `actions.assignDirectly is GONE (require-time)` guard runs and asserts
+  `actions.assignDirectly === undefined` (a real require-time assertion, not vacuous).
+  The Decision-4 "unconditional assertion" (`empty list returns false`) asserts
+  `handled === false` unconditionally for `review` — equivalent behaviour, not weakened.
+- **`files:` accurate.** The declared surface `[src/tabs/functional.js,
+  tests/tab-modules.test.js]` matches this plan's real change surface. The shipping
+  commit `a854872` was a multi-plan R5 wave; the other files in that commit belong to
+  sibling plans R5-A/R5-B, not to this one.
+- **Disposition:** no code defects found. The plan's work is correct and the tree is
+  green. Rework limited to this re-verification record; no source or test change was
+  required.
