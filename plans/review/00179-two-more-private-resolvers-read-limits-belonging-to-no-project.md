@@ -262,3 +262,28 @@ identically on Windows.
    scanning tests would produce false positives that erode the fence until someone
    disables it.
 10. **No test touches the real home directory**, in any case, for any reason.
+11. **Scope expanded to a THIRD carrier — `src/lib/four-eyes.js` (human-authorized,
+    2026-07-27).** The plan claimed "the last two" over-rooting carriers, but a third
+    live carrier existed: `four-eyes.js:inferProjectRoot` (a bare-`.ctoc` while-loop,
+    called inside `verifyFourEyes`). It is GOVERNANCE-LOAD-BEARING — a wrong root reads
+    the wrong `.ctoc/roles.yaml` and returns the wrong four-eyes verdict. The human
+    chose to FIX ALL THREE in this slice. `inferProjectRoot(planPath)` now delegates:
+    `describeProjectRoot(path.dirname(path.resolve(planPath))).root`. The contract is
+    preserved EXACTLY — the walk starts from the plan file's directory, and
+    `describeProjectRoot` returns `process.cwd()` on fallback, which is the same
+    single-project-workspace fallback `inferProjectRoot` always used. WHAT four-eyes
+    decides is unchanged; only WHERE it roots.
+12. **Delegation-only, per the executing brief.** The brief scoped this build to the
+    delegation + the fence, NOT the plan's Change 2 (budget "defaulted" marking) or
+    Change 4 (enforcer "not-applicable" result). Those result-contract additions are
+    NOT implemented here; the over-rooting defect itself is closed by the delegation.
+13. **Two additional coverage tests corrected toward the fixed behaviour, justified.**
+    `tests/budget-coverage.test.js` and `tests/iron-loop-enforcer-coverage.test.js`
+    each had a `findProjectRoot` block that pinned the DELETED private resolver's
+    contract (a standalone `.claude-plugin` marker, a bare `.ctoc` root, and
+    `return start` on total fallback). Those assertions asserted the over-rooting bug.
+    Each was rewritten to pin the delegated contract (a genuine `.ctoc`+settings or
+    `.git` root; `process.cwd()` on fallback) — tightening toward real behaviour, never
+    weakening. The four-eyes fixtures needed NO change: Cluster 2 already carries a
+    `plans/` sibling (a real project shape the shared resolver recognises) and Cluster 3
+    relies on the cwd fallback the shared resolver preserves.

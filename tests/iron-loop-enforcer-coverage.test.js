@@ -64,26 +64,37 @@ afterEach(() => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe('iron-loop-enforcer — findProjectRoot upward walk', () => {
-  it('walks up to a .ctoc-marked ancestor from a nested start dir', () => {
-    // Arrange — marker two levels above the start dir (exercises the loop body,
-    // not just an immediate hit).
+// findProjectRoot is now a one-line delegation to the shared describeProjectRoot
+// (plan 00179). The private bare-marker ancestry walk was DELETED: it accepted a bare
+// `.ctoc` and over-rooted from any project beneath $HOME to the crypto home `~/.ctoc`,
+// so enforcement scanned the wrong tree — and a gate that scans nothing reports clean.
+// These tests were rewritten toward the FIXED contract, which the human explicitly
+// ordered (delegate to describeProjectRoot): the old assertions (a standalone
+// `.claude-plugin` marker, a bare `.ctoc` root, and `return start` on fallback) pinned
+// the removed bug. The shared resolver identifies a project by a genuine `.ctoc`
+// (settings/plans) or `.git`, and returns process.cwd() on fallback.
+describe('iron-loop-enforcer — findProjectRoot (delegates to describeProjectRoot)', () => {
+  it('walks up to a genuine project root (.ctoc carrying settings.yaml) from a nested start dir', () => {
+    // Arrange — a real project marker two levels above the start dir.
     const root = mkTmp();
     fs.mkdirSync(path.join(root, '.ctoc'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.ctoc', 'settings.yaml'), 'general: {}\n');
     const start = path.join(root, 'a', 'b');
     fs.mkdirSync(start, { recursive: true });
 
     // Act
     const found = findProjectRoot(start);
 
-    // Assert — the walk must climb to the marked root, not stop at `start`.
-    assert.equal(found, root);
+    // Assert — the walk climbs to the project root, not the nested start.
+    assert.equal(fs.realpathSync(found), fs.realpathSync(root));
   });
 
-  it('recognizes a .claude-plugin-only marker (first operand of the OR)', () => {
-    // Arrange — ONLY .claude-plugin present, no .ctoc: pins the first ||-operand.
+  it('recognizes a git repository root as the project when no .ctoc is present', () => {
+    // Arrange — a `.git` repo, no `.ctoc`: the shared resolver roots at the repo.
+    // (A standalone `.claude-plugin` marker is no longer recognised; that check was
+    // deleted with the private resolver.)
     const root = mkTmp();
-    fs.mkdirSync(path.join(root, '.claude-plugin'), { recursive: true });
+    fs.mkdirSync(path.join(root, '.git'), { recursive: true });
     const start = path.join(root, 'nested');
     fs.mkdirSync(start, { recursive: true });
 
@@ -91,11 +102,11 @@ describe('iron-loop-enforcer — findProjectRoot upward walk', () => {
     const found = findProjectRoot(start);
 
     // Assert
-    assert.equal(found, root);
+    assert.equal(fs.realpathSync(found), fs.realpathSync(root));
   });
 
-  it('returns the start dir unchanged when no marker exists up to the fs root', () => {
-    // Arrange — a temp tree with NO .ctoc / .claude-plugin anywhere upward.
+  it('falls back to the working directory when no marker exists up to the fs root', () => {
+    // Arrange — a temp tree with NO project marker anywhere upward.
     const root = mkTmp();
     const start = path.join(root, 'x', 'y', 'z');
     fs.mkdirSync(start, { recursive: true });
@@ -103,8 +114,8 @@ describe('iron-loop-enforcer — findProjectRoot upward walk', () => {
     // Act
     const found = findProjectRoot(start);
 
-    // Assert — the terminus branch returns `start`, never a climbed dir.
-    assert.equal(found, start);
+    // Assert — the shared resolver's documented fallback is cwd, not the start dir.
+    assert.equal(fs.realpathSync(found), fs.realpathSync(process.cwd()));
   });
 });
 

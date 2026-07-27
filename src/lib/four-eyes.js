@@ -33,6 +33,7 @@
 
 const safeFs = require('./safe-fs');
 const path = require('path');
+const { describeProjectRoot } = require('./project-root');
 
 const ROLES_PATH = path.join('.ctoc', 'roles.yaml');
 
@@ -279,23 +280,26 @@ function verifyFourEyes(plan, projectRoot) {
 }
 
 /**
- * Walk upward from a plan path to find the nearest project root, defined as
- * the closest ancestor containing a `.ctoc/` directory. Falls back to
- * `process.cwd()` if none is found (single-project workspaces).
+ * Infer the project root that governs a plan by delegating to the ONE shared
+ * resolver. This decides WHICH `.ctoc/roles.yaml` a plan is judged against, so it is
+ * governance-load-bearing: a wrong root reads a foreign project's role table and
+ * returns the wrong four-eyes verdict.
+ *
+ * This MUST NOT be re-implemented as a private ancestry walk. The former private copy
+ * accepted a BARE `.ctoc` and therefore climbed from any project beneath $HOME up to
+ * the crypto home `~/.ctoc` (created by src/lib/crypto.js), governing the plan by a
+ * role table belonging to no project. The shared resolver requires a genuine PROJECT
+ * `.ctoc` and fixed exactly this — see src/lib/project-root.js:87-94 (plan 00178).
+ *
+ * The contract is preserved EXACTLY: the walk starts from the plan file's DIRECTORY,
+ * and `describeProjectRoot` returns `process.cwd()` on fallback — the same
+ * single-project-workspace fallback this function has always used.
  *
  * @param {string} planPath - Absolute or relative path to the plan file.
  * @returns {string} The inferred project root.
  */
 function inferProjectRoot(planPath) {
-  let dir = path.dirname(path.resolve(planPath));
-  const root = path.parse(dir).root;
-  while (dir !== root) {
-    if (safeFs.existsSync(path.join(dir, '.ctoc'))) return dir;
-    const next = path.dirname(dir);
-    if (next === dir) break;
-    dir = next;
-  }
-  return process.cwd();
+  return describeProjectRoot(path.dirname(path.resolve(planPath))).root;
 }
 
 module.exports = {

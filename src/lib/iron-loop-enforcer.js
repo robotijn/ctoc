@@ -27,6 +27,7 @@
 
 const safeFs = require('./safe-fs');
 const path = require('path');
+const { describeProjectRoot } = require('./project-root');
 // W07-s4 (finding H1): shared CRLF-safe frontmatter reader — a plan checked out
 // on Windows (CRLF) must self-check identically to its LF twin.
 const { parseFrontmatter } = require('./frontmatter');
@@ -133,17 +134,21 @@ function finding(payload) {
 //  Helpers
 // ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Resolve the project root by delegating to the ONE shared resolver.
+ *
+ * This MUST NOT be re-implemented as a private ancestry walk. A private copy that
+ * accepts a BARE `.ctoc` over-roots from any project beneath $HOME to the crypto home
+ * `~/.ctoc`, so enforcement scans run against the wrong tree — and a gate that scans
+ * nothing reports clean, the false-green shape this repository fences by name. The
+ * shared resolver requires a genuine PROJECT `.ctoc` and fixed exactly this — see
+ * src/lib/project-root.js:87-94 (plan 00178). Same name, arity, and STRING return.
+ *
+ * @param {string} [start=process.cwd()] - Directory to start searching from
+ * @returns {string} Project root path (never null, never an object)
+ */
 function findProjectRoot(start = process.cwd()) {
-  let dir = start;
-  for (let i = 0; i < 10; i++) {
-    if (safeFs.existsSync(path.join(dir, '.claude-plugin')) || safeFs.existsSync(path.join(dir, '.ctoc'))) {
-      return dir;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return start;
+  return describeProjectRoot(start).root;
 }
 
 // W07-s4 (finding H1): CRLF-safe. Line-1 frontmatter goes through the shared

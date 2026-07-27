@@ -297,54 +297,59 @@ describe('budget-coverage — currentUsage coerces a sparse usage file', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  findProjectRoot — the upward walk, both marker directories, and the
-//  filesystem-root break.
-//  KILLS: line 40 second operand (`|| .claude-plugin`), line 45 (`dir = parent`
-//  walk), lines 43-44 (`parent === dir` break) and line 47 (`return start`).
+//  findProjectRoot — now a one-line delegation to the shared describeProjectRoot
+//  (plan 00179). The private bare-marker ancestry walk was DELETED: it accepted a
+//  bare `.ctoc` and over-rooted from any project beneath $HOME to the crypto home
+//  `~/.ctoc`. These tests were rewritten toward the FIXED contract — the human
+//  explicitly replaced the resolver (delegate to describeProjectRoot), so the old
+//  assertions (a standalone `.claude-plugin` marker, a bare `.ctoc` root, and
+//  `return start` on total fallback) pinned the removed bug, not a behaviour to keep.
+//  The shared resolver identifies a project by a genuine `.ctoc` (carrying settings or
+//  beside a `plans/` sibling) or `.git`, and returns process.cwd() on fallback.
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('budget-coverage — findProjectRoot', () => {
-  it('detects a project by .claude-plugin alone (second operand of the || marker check)', () => {
-    // Arrange
+describe('budget-coverage — findProjectRoot (delegates to describeProjectRoot)', () => {
+  it('detects a genuine project root (.ctoc carrying settings.yaml)', () => {
+    // Arrange — a real CTOC project root, not the crypto-home shape.
     const dir = makeProject();
-    fs.rmSync(path.join(dir, '.ctoc'), { recursive: true, force: true }); // remove first marker
-    fs.mkdirSync(path.join(dir, '.claude-plugin'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.ctoc', 'settings.yaml'), 'general: {}\n');
     try {
       // Act
       const found = budget.findProjectRoot(dir);
 
-      // Assert — resolved via .claude-plugin even though .ctoc was removed
+      // Assert — the shared resolver recognises the project `.ctoc`.
       assert.equal(fs.realpathSync(found), fs.realpathSync(dir));
     } finally {
       cleanup(dir);
     }
   });
 
-  it('walks UP from a nested subdirectory to the marked root', () => {
-    // Arrange
-    const dir = makeProject(); // has .ctoc
+  it('walks UP from a nested subdirectory to the project root', () => {
+    // Arrange — genuine project marker, deep start.
+    const dir = makeProject();
+    fs.writeFileSync(path.join(dir, '.ctoc', 'settings.yaml'), 'general: {}\n');
     const nested = path.join(dir, 'a', 'b', 'c');
     fs.mkdirSync(nested, { recursive: true });
     try {
       // Act
       const found = budget.findProjectRoot(nested);
 
-      // Assert
+      // Assert — the walk climbs to the project root, not the nested start.
       assert.equal(fs.realpathSync(found), fs.realpathSync(dir));
     } finally {
       cleanup(dir);
     }
   });
 
-  it('returns the start path when no marker exists up to the filesystem root', () => {
-    // Arrange — the filesystem root has no .ctoc/.claude-plugin; dirname(root)===root
+  it('falls back to the working directory when no project marker exists up to the filesystem root', () => {
+    // Arrange — the filesystem root carries no project marker.
     const root = path.parse(process.cwd()).root;
 
     // Act
     const found = budget.findProjectRoot(root);
 
-    // Assert — hit the `parent === dir` break and `return start`
-    assert.equal(found, root);
+    // Assert — the shared resolver's documented fallback is cwd, NOT the start dir.
+    assert.equal(fs.realpathSync(found), fs.realpathSync(process.cwd()));
   });
 });
 
