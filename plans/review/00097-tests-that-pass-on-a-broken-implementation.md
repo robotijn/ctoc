@@ -6,15 +6,6 @@ kickback_counts:
   by_step:
     '14': 1
   total: 1
----
-
----
-approved_by: human
-approved_at: 2026-07-19T15:29:41.454Z
-gate_crossed: implementation → todo
----
-
----
 title: "Tests that pass on a broken implementation get an assertion — this exact shape already let a real bug ship once"
 type: implementation
 parent_plan: ctoc-audit-w06-truthful-tests

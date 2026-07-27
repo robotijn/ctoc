@@ -2,15 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T16:43:31.685Z
 gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-19T11:58:15.071Z
-gate_crossed: implementation → todo
----
-
----
 title: "The coverage floor stops silently dropping to 80 — an unreadable floor refuses instead of guessing, and the stale number stops healing itself"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

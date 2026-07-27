@@ -4,10 +4,12 @@
     "src/scripts/run-self-check.js",
     "src/scripts/build-coverage-map.js",
     "src/scripts/evidence-pack.js",
+    "src/scripts/collapse-stacked-frontmatter.js",
     "src/lib/continuation.js",
     "src/hooks/post-commit.js"
   ],
   "reasons": {
-    "src/hooks/post-commit.js": "Executed BY GIT. src/lib/hooks-installer.js:631 resolves <pluginRoot>/src/hooks/post-commit.js and installPostCommitHook writes a .git/hooks/post-commit script whose body runs `node \"<that path>\" 2>/dev/null &`. Git runs it after every commit — real execution, not a citation."
+    "src/hooks/post-commit.js": "Executed BY GIT. src/lib/hooks-installer.js:631 resolves <pluginRoot>/src/hooks/post-commit.js and installPostCommitHook writes a .git/hooks/post-commit script whose body runs `node \"<that path>\" 2>/dev/null &`. Git runs it after every commit — real execution, not a citation.",
+    "src/scripts/collapse-stacked-frontmatter.js": "Executed BY A HUMAN. A checked-in, reviewable, argv-driven one-time migration script (same shape as src/scripts/ledger-backfill.js) that a human runs by hand — `node src/scripts/collapse-stacked-frontmatter.js` — to collapse the stacked approval-marker frontmatter blocks on the already-corrupted review-stage plans. Not reached by any code edge; the analyzer cannot see the human running it."
   }
 }

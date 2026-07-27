@@ -2,21 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T21:28:21.097Z
 gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-19T16:47:51.634Z
-gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-19T15:21:52.067Z
-gate_crossed: implementation → todo
----
-
----
 title: "The plan critic stops reporting a score it did not earn — an unevaluated plan says so instead of scoring 4.6"
 type: implementation
 parent_plan: ctoc-honest-instruments

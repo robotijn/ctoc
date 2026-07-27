@@ -29,6 +29,7 @@ const gateOrder = require('./gate-order');
 const { logTransition } = require('./transition-log');
 const { invalidate } = require('./cache');
 const taskRegistry = require('./task-registry');
+const { upsertMarkerFields } = require('./frontmatter-merge');
 
 /**
  * Commit `data` to `target` ATOMICALLY (temp sibling + rename), mirroring the
@@ -260,14 +261,25 @@ function logPlanIndexError(root, source, err) {
 // present (the human's "Approve anyway" past a failing validation), the marker also
 // records `override: true` and the reason, so a forced crossing is auditable in the
 // plan body itself — never silently indistinguishable from a clean one (R5-B).
+//
+// FR-1/FR-2: the marker is MERGED into the plan's single existing frontmatter block
+// (via frontmatter-merge.upsertMarkerFields) rather than PREPENDED as a new block.
+// Prepending stacked 2-4 blocks over a plan's lifetime and hid its own title/type/
+// files/depends_on from the shared primitive parseFrontmatter (which reads only the
+// first block). The upsert removes the OWNED marker keys and re-appends the current
+// crossing's values, so re-approving updates in place (idempotent) and a clean
+// re-crossing clears a stale override — never a second block, whatever the history.
 function addApprovalMarker(content, from, to, override = null) {
-  let marker = `---\napproved_by: human\napproved_at: ${new Date().toISOString()}\ngate_crossed: ${from} → ${to}\n`;
+  const fields = [
+    ['approved_by', 'human'],
+    ['approved_at', new Date().toISOString()],
+    ['gate_crossed', `${from} → ${to}`],
+  ];
   if (override) {
     const reason = String((override && override.reason) || '').replace(/[\r\n]+/g, ' ').trim();
-    marker += `override: true\noverride_reason: ${reason}\n`;
+    fields.push(['override', 'true'], ['override_reason', reason]);
   }
-  marker += `---\n\n`;
-  return marker + content;
+  return upsertMarkerFields(content, fields);
 }
 
 /**
