@@ -356,15 +356,17 @@ describe('the honest verdict reaches the plan file', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('the reach of the verdict on plans as they are actually authored', () => {
-  it('CASE 15 — a plan carrying iron_loop: true AS AUTHORED receives NO verdict: applyIronLoop returns at its early guard', () => {
-    // Every plan in this repository's queue is authored with `iron_loop: true` in
-    // its frontmatter — including the plan that specified this slice. applyIronLoop
-    // returns immediately on that flag (src/lib/actions.js), so refineLoop never
-    // runs and NO verdict is written. This case pins that reach so the fork about
-    // the early return is decided by the human against evidence rather than
-    // assumption. It deliberately does NOT pre-strip the flag: a fixture shaped to
-    // make the test pass on a path production never takes is the exact defect this
-    // slice exists to delete.
+  it('CASE 15 — a plan carrying iron_loop: true AS AUTHORED NOW receives the verdict: the split guard reaches it', () => {
+    // FORK RESOLVED (human Gate-1 decision on
+    // plans/functional/honest-plan-verdict-reaches-every-plan.md): reading (c) — split
+    // the overloaded flag. `iron_loop` now gates ONLY the Steps 8-16 section; a NEW
+    // `iron_loop_verdict` gates the verdict independently. Every plan in this
+    // repository's queue is authored with `iron_loop: true` but no `iron_loop_verdict`
+    // — exactly the pre-fix state that used to hit the single early guard and receive
+    // NO verdict. This case is the REAL path, and it now pins the resolved behavior:
+    // the honest verdict reaches the plan the human reads, the existing section is left
+    // untouched, and `iron_loop_verdict` is stamped so it is written exactly once. It
+    // deliberately does NOT pre-strip the flag: the fixture is the plan as authored.
     const authored = `---
 title: "A plan as authored"
 type: implementation
@@ -374,19 +376,35 @@ iron_loop: true
 # A plan as authored
 
 This plan says nothing. It has no design, no tests, no acceptance criteria.
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] PRE-EXISTING-SECTION-MARKER write tests
+
+### Step 16: FINAL-REVIEW
+- [ ] Final review before merge
 `;
     const p = stagePlan('implementation', 'as-authored', authored);
-    const before = fs.readFileSync(p, 'utf8');
 
     actions.applyIronLoop(p);
 
     const after = fs.readFileSync(p, 'utf8');
-    assert.equal(after, before,
-      'the early return leaves the file byte-identical — no execution section, no verdict');
-    assert.equal(after.includes('## Deferred Questions'), false);
-    assert.equal(after.includes('NOT EVALUATED'), false,
-      'THE OPEN FORK: the honest verdict does not reach a plan authored with the flag. ' +
-      'Changing the guard to make it reach is the human decision, not the executor\'s.');
+    // The verdict now reaches a plan authored with the flag — the fork's resolution.
+    assert.ok(after.includes('## Deferred Questions'),
+      'the honest verdict now reaches a plan authored with iron_loop: true');
+    assert.ok(after.includes('NOT EVALUATED'),
+      'the human reads the blindness rather than inferring a check that never ran');
+    assert.equal(after.split('## Deferred Questions').length - 1, 1,
+      'the verdict is written exactly once');
+    // The existing section is left untouched, guarded independently by iron_loop.
+    assert.ok(after.includes('PRE-EXISTING-SECTION-MARKER'),
+      'the pre-existing Steps 8-16 section is preserved, not regenerated');
+    assert.equal(after.split('## Execution Plan (Steps 8-16)').length - 1, 1,
+      'the section is not duplicated');
+    // The verdict flag is now stamped so a later pass writes no second verdict.
+    assert.match(after, /iron_loop_verdict:\s*true/,
+      'iron_loop_verdict is stamped after the verdict is written');
   });
 });
 

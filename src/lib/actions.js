@@ -21,7 +21,7 @@
 const safeFs = require('./safe-fs');
 const path = require('path');
 const { parseMetadata, readPlans, getPlansDir, readTodoQueueOrder } = require('./state');
-const { refineLoop, appendDeferredQuestions } = require('./iron-loop');
+const { refineLoop, appendDeferredQuestions, integrate } = require('./iron-loop');
 const { writeStatus, clearStatus } = require('./background');
 const { findProjectRoot } = require('./project-root');
 const { validateForReview, validateTransition } = require('./plan-validator');
@@ -594,41 +594,70 @@ function approvePlan(planPath, projectPath, options = {}) {
   throw new Error(`Unknown plan location: ${relativePath}`);
 }
 
+// Stamp a boolean frontmatter flag on a plan file: inject it into an existing
+// frontmatter block, or prepend a fresh block when the plan has none. Shared by the
+// two INDEPENDENT idempotency flags applyIronLoop stamps (iron_loop, iron_loop_verdict).
+function stampFrontmatterFlag(planPath, flag) {
+  let content = safeFs.readFileSync(planPath, 'utf8');
+  if (content.match(/^---\n/)) {
+    content = content.replace(/^---\n/, `---\n${flag}: true\n`);
+  } else {
+    content = `---\n${flag}: true\n---\n\n${content}`;
+  }
+  safeFs.writeFileSync(planPath, content);
+}
+
 // Apply Iron Loop automation to plan
 // Runs Integrator + Critic refinement loop to generate detailed execution steps
 function applyIronLoop(planPath) {
-  let content = safeFs.readFileSync(planPath, 'utf8');
+  const content = safeFs.readFileSync(planPath, 'utf8');
   const metadata = parseMetadata(content);
 
-  if (metadata.iron_loop) {
-    return; // Already has Iron Loop
+  // TWO INDEPENDENT idempotency facts — deliberately split, and NEVER to be
+  // recombined into one condition (human's Gate-1 decision on
+  // plans/functional/honest-plan-verdict-reaches-every-plan.md, reading (c)):
+  //   iron_loop:true         → the Steps 8-16 section has been generated (integrate())
+  //   iron_loop_verdict:true → the not-evaluated verdict has been written (refineLoop
+  //                            + appendDeferredQuestions)
+  // A plan touched by PRE-FIX code carries iron_loop:true but no iron_loop_verdict —
+  // it has the section but never received the honest verdict, a state the single
+  // `iron_loop` boolean could not express. The old single guard `if (metadata.iron_loop)
+  // return;` therefore swallowed the verdict on exactly the plans that most needed it.
+  // Recombining these two guards silently reintroduces that bug — do not.
+  const needsSection = !metadata.iron_loop;
+  const needsVerdict = !metadata.iron_loop_verdict;
+
+  if (!needsSection && !needsVerdict) {
+    return; // Fully processed: section present AND verdict written.
   }
 
-  // Run the refinement loop to generate detailed Steps 8-16
   try {
-    const result = refineLoop(planPath);
-
-    // The refinement loop performs NO quality evaluation (see iron-loop.js). Its
-    // verdict is written into the plan so the human at Gate 2 reads "not evaluated"
-    // instead of inferring that something checked this plan.
-    //
-    // VOLUME CHANGE, INTENDED: the old condition was `status === 'max-rounds'`, a
-    // branch that essentially never fired because the loop early-accepted on round
-    // one. So this section landed in almost no plan. It now lands in every plan that
-    // reaches this function. A verdict that appears on almost no plan is a verdict
-    // nobody reads — the volume is the deliverable, not a side effect.
-    if (result.deferredQuestions && result.deferredQuestions.length > 0) {
-      appendDeferredQuestions(planPath, result.deferredQuestions);
+    // GUARD 1 — Steps 8-16 section generation, gated ONLY by iron_loop. An
+    // already-sectioned plan is not re-sectioned; the content check keeps a second
+    // generation from ever duplicating the section.
+    if (needsSection) {
+      const current = safeFs.readFileSync(planPath, 'utf8');
+      if (!current.includes('## Execution Plan (Steps 8-16)')) {
+        safeFs.writeFileSync(planPath, current + integrate(planPath));
+      }
+      stampFrontmatterFlag(planPath, 'iron_loop');
     }
 
-    // Update metadata to mark iron_loop as applied
-    content = safeFs.readFileSync(planPath, 'utf8');
-    if (content.match(/^---\n/)) {
-      content = content.replace(/^---\n/, '---\niron_loop: true\n');
-    } else {
-      content = `---\niron_loop: true\n---\n\n${content}`;
+    // GUARD 2 — verdict writing, gated ONLY by iron_loop_verdict, checked
+    // INDEPENDENTLY of GUARD 1. The refinement loop performs NO quality evaluation
+    // (see iron-loop.js); its honest "not evaluated" verdict is written into the plan
+    // so the human at Gate 2 reads that nothing checked it instead of inferring that
+    // something did. This now reaches EVERY plan — including one already carrying
+    // iron_loop:true — because it no longer shares a guard with section generation.
+    // appendDeferredQuestions is NOT idempotent, so iron_loop_verdict is what keeps a
+    // second verdict from being appended on a later pass.
+    if (needsVerdict) {
+      const result = refineLoop(planPath);
+      if (result.deferredQuestions && result.deferredQuestions.length > 0) {
+        appendDeferredQuestions(planPath, result.deferredQuestions);
+      }
+      stampFrontmatterFlag(planPath, 'iron_loop_verdict');
     }
-    safeFs.writeFileSync(planPath, content);
 
     // Decision 7 (docs/REFINEMENT_LOOP.md): compute whether the multi-agent
     // refinement loop is indicated for THIS plan, at the exact moment it enters
