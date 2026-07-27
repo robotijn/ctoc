@@ -9,6 +9,7 @@
 const path = require('path');
 
 const safeFs = require('../lib/safe-fs');
+const version = require('../lib/version');
 
 const PLANS_DIR = path.join(process.cwd(), 'plans');
 
@@ -23,6 +24,65 @@ const AGENT_DEFINITIONS = {
   'iron-loop-integrator': 'agents/planning/iron-loop-integrator.md',
   'critic': 'agents/planning/critic.md'
 };
+
+/**
+ * THE LIVENESS BEACON (plan 00171).
+ *
+ * WHAT IT IS FOR. A second, INDEPENDENT witness to `.ctoc/logs/enforcement.json`.
+ * The enforcement log answers "did the edit-protection hook record a decision?";
+ * this beacon answers the strictly different question "did the hook system run in
+ * this session AT ALL?". They diverge exactly when the enforcement hook is alive
+ * but silent, which is the case plan 00170 could not tell apart from a dead hook
+ * system. This hook is on the `PostToolUse` `*` matcher, so it fires on EVERY tool
+ * call (Read, Bash, Grep, …) and cannot be starved by a session that is not
+ * editing; it is outside every deny path, so a bug here can waste time but can
+ * never forge a permission or drop a gate.
+ *
+ * WHY IT OVERWRITES rather than appends. Only the MOST RECENT beacon carries
+ * information — it is a liveness stamp, not a log. An append on every tool call
+ * would grow without bound for no benefit. `enforcement.json` remains the
+ * append-only DECISION record; these are different artifacts with different jobs
+ * and must never be merged.
+ *
+ * WHY IT IS SYNCHRONOUS. This file ends in `process.exit(0)`, which discards
+ * pending ASYNCHRONOUS writes — a false-green defect class this repository fences
+ * by name. An async beacon would be lost precisely often enough to look like an
+ * outage, which is the very false alarm this programme exists to avoid.
+ *
+ * WHY NO VERSION COMPARISON IS PERFORMED HERE, and why the reader must not add
+ * one. The beacon records `version` so the build is AVAILABLE to a future check,
+ * but nothing compares it: detecting a stale session needs the INSTALLED plugin
+ * version as a reference, and inside a development checkout `getVersion()` reads
+ * the repository's own `VERSION` — legitimately AHEAD of the installed build while
+ * anyone is developing (measured 6.13.54 in-tree against 6.13.30 installed). A
+ * comparison against the repository's `VERSION` would therefore raise a false
+ * alarm on every developer's machine, every day. The trustworthy installed-version
+ * reference is the open question this slice deliberately leaves for the human to
+ * schedule.
+ *
+ * FAIL-OPEN BY CONSTRUCTION. The write is wrapped in its own guard and swallows
+ * any fault (an unwritable `.ctoc/state`, a full disk) so a beacon fault can never
+ * suppress the pending-agent or quality-gate output that main() produces, nor stop
+ * the hook exiting 0 — a PostToolUse hook must never block a tool call. This is the
+ * same fail-open shape the rest of this hook already uses; it is a deliberate,
+ * permanent exemption recorded in `.ctoc/false-green-baseline.json` (whitelist).
+ *
+ * @param {string} root - project root under which to write `.ctoc/state/hook-beacon.json`
+ * @returns {void}
+ */
+function writeBeacon(root) {
+  try {
+    const stateDir = path.join(root, '.ctoc', 'state');
+    if (!safeFs.existsSync(stateDir)) {
+      safeFs.mkdirSync(stateDir, { recursive: true });
+    }
+    const record = { version: version.getVersion(), at: new Date().toISOString(), pid: process.pid };
+    safeFs.writeFileSync(path.join(stateDir, 'hook-beacon.json'), JSON.stringify(record));
+  } catch {
+    // Fail open: a beacon fault must never break a tool call or suppress the
+    // pending-agent / quality-gate output. Whitelisted in the false-green baseline.
+  }
+}
 
 function findPendingAgents() {
   const pending = [];
@@ -130,6 +190,13 @@ function checkQualityState() {
 }
 
 function main() {
+  // The liveness beacon runs FIRST, before findPendingAgents() — which walks plans/
+  // and can throw or be slow. The beacon's whole purpose is to record that the hook
+  // ran, so it must not sit behind work that can fail. writeBeacon is self-guarded
+  // (fail-open), so this call is strictly additive: it can never suppress the
+  // pending-agent or quality-gate output below, nor stop the hook exiting 0.
+  writeBeacon(process.cwd());
+
   try {
     // Check for pending plan agents
     const pending = findPendingAgents();
@@ -158,4 +225,12 @@ function main() {
   process.exit(0);
 }
 
-main();
+module.exports = { writeBeacon };
+
+// Direct invocation: this file run as the PostToolUse `*` hook. Guarded so merely
+// importing the module (e.g. from a test that mints beacon fixtures) never runs
+// main() nor calls process.exit — mirroring src/hooks/PreToolUse.Edit.js. This
+// changes NO behaviour when the file is run as a hook.
+if (require.main === module) {
+  main();
+}

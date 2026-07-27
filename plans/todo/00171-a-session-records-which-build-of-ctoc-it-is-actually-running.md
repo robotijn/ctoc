@@ -493,3 +493,39 @@ STOP and ask** rather than editing a file two plans claim.
     is reported and NOT fixed.** It is outside this slice's finding, the beacon
     sidesteps it by writing synchronously, and repairing it would widen a hook change
     beyond what was measured. The human schedules it.
+
+### Added during implementation (Steps 10–14)
+
+12. **Beacon freshness compares the beacon FILE's modification time, not the JSON
+    `at` field.** The file mtime is filesystem truth about when the hook last wrote,
+    it needs no trust in the record's contents, and it is the exact measure
+    `countUnrecorded` already uses for edits — an apples-to-apples comparison against
+    the same `GRANULARITY_MS`. The `at`/`version`/`pid` fields are still recorded for
+    the human and for a future check; freshness simply does not depend on parsing
+    them. This also makes the freshness testable with `fs.utimesSync` and no sleep,
+    exactly as the plan's Step 8 mandates.
+13. **`writeBeacon` self-guards (fail-open inside the function); `main()` calls it
+    bare.** The plan asked for "its own try/catch"; putting that guard INSIDE
+    `writeBeacon` keeps `main()`'s single pre-existing catch key stable in the
+    false-green scanner. A guard added AT the call site created a second catch in
+    `main()`, which the signature scanner disambiguates as `main` + `main#2` and
+    re-keys the ORIGINAL catch — a spurious "new" finding on unchanged code. The
+    self-guard yields exactly one clean new key attributable to genuinely new code.
+14. **The beacon's fail-open catch is recorded in the false-green WHITELIST, and
+    `maxFindings` rises 209 → 210. The plan did not anticipate this.** An honest
+    fail-open beacon write must swallow its fault (a PostToolUse hook may never block
+    a tool call), and an honest swallow is a comment-only catch, which the scanner
+    flags. Faking a statement to dodge the scanner would be gaming the fence and is
+    forbidden. The sanctioned mechanism is a whitelist entry with a written
+    justification (the whitelist is "a PERMANENT exemption for a construct that is
+    genuinely correct"); `.ctoc/*` is edit-whitelisted and this is a data/baseline
+    file, not core logic. Reported to the human as a deviation the plan did not foresee.
+15. **Case 4 forces the write fault by making `.ctoc/state` a FILE (ENOTDIR), not by
+    `chmod`.** A permission-based fault no-ops as root and on Windows; a stat-shape
+    fault throws on every platform, so the "a beacon fault cannot break the hook"
+    assertion runs everywhere the suite runs, per the repository's loud-skip rule.
+16. **Case 11 rewrites ONLY the `version` field of a minted beacon** to a build that
+    is not this one. The exported function cannot mint a foreign version (it always
+    records `getVersion()` of the executing build), and the whole point of the case is
+    that a version MISMATCH changes nothing — so a minimal content edit of one field
+    on an otherwise function-minted record is the honest way to pin that restraint.

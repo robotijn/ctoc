@@ -278,13 +278,20 @@ function collectDeclaredPaths(root) {
  * paths (149 on this repository), never a tree walk, so this is a fixed handful
  * of `lstat` calls rather than a scan whose size grows with the repository.
  *
+ * `newestMs` is the NEWEST such edit, used only by the beacon-freshness check in
+ * `protectionLiveness`: a beacon written before the newest unrecorded edit cannot
+ * have been produced by the tool call that made that edit, so the hook that writes
+ * it had already gone quiet — that is what "stale" means here. It reuses this same
+ * witness and the same `GRANULARITY_MS`; it introduces no new time constant.
+ *
  * @param {Set<string>} paths - distinct absolute declared paths
  * @param {number} cutoffMs - the last recorded decision, in milliseconds
- * @returns {{ count: number, oldestMs: number|null }}
+ * @returns {{ count: number, oldestMs: number|null, newestMs: number|null }}
  */
 function countUnrecorded(paths, cutoffMs) {
   let count = 0;
   let oldestMs = null;
+  let newestMs = null;
   for (const abs of paths) {
     let stat;
     try {
@@ -296,9 +303,65 @@ function countUnrecorded(paths, cutoffMs) {
     if (stat.mtimeMs > cutoffMs + GRANULARITY_MS) {
       count += 1;
       if (oldestMs === null || stat.mtimeMs < oldestMs) oldestMs = stat.mtimeMs;
+      if (newestMs === null || stat.mtimeMs > newestMs) newestMs = stat.mtimeMs;
     }
   }
-  return { count, oldestMs };
+  return { count, oldestMs, newestMs };
+}
+
+/**
+ * Classify the hook-liveness beacon (plan 00171) — the SECOND, independent witness
+ * to the enforcement log. It answers "did the hook system run in this session at
+ * all?", which the enforcement log alone cannot separate from "the hooks ran but
+ * enforcement specifically did not record".
+ *
+ * WHY `'absent'` AND `'stale'` MUST STAY DISTINCT. For an unbounded period after
+ * this feature ships, EVERY already-running session has no beacon — the beacon did
+ * not exist when those sessions started. Folding absence into staleness would tell
+ * a large population of perfectly healthy sessions "your hooks are dead". More
+ * sharply: if absence were treated as `'fresh'` instead, it would soften the
+ * `not-recording` wording and DROP the restart advice 00170 earns — a missing new
+ * instrument silencing a working old one, this defect class reproducing inside its
+ * own fix. So `'absent'` is neither `'stale'` nor `'fresh'`; it is its own state.
+ *
+ * FRESHNESS IS A TIME QUESTION, NEVER A VERSION QUESTION. The recorded `version`
+ * is read and reported so a future check can use it, but it does not touch the
+ * verdict here — this slice draws no conclusion from a version mismatch. Freshness
+ * is decided against the SAME edit witness 00170 computes: a beacon older than the
+ * newest unrecorded edit (beyond `GRANULARITY_MS`) is stale, because the tool call
+ * that changed that file should itself have produced a newer beacon.
+ *
+ * The beacon's own MODIFICATION TIME is the liveness signal, not the `at` field:
+ * the file's mtime is filesystem truth about when the hook last wrote, it needs no
+ * trust in the record's contents, and it is the same measure `countUnrecorded`
+ * uses for edits — an apples-to-apples comparison.
+ *
+ * @param {string} root - project root
+ * @param {number|null} newestUnrecordedMs - newest unrecorded edit time, or null
+ * @returns {{ source: 'fresh'|'stale'|'absent'|'unreadable', version: string|null }}
+ */
+function classifyBeacon(root, newestUnrecordedMs) {
+  const beaconPath = path.join(root, '.ctoc', 'state', 'hook-beacon.json');
+
+  let stat;
+  try {
+    stat = safeFs.lstatSync(beaconPath);
+  } catch {
+    return { source: 'absent', version: null }; // no beacon file: not stale, not fresh
+  }
+  if (!stat.isFile()) return { source: 'unreadable', version: null }; // a directory, a link, …
+
+  let record;
+  try {
+    record = JSON.parse(safeFs.readFileSync(beaconPath, 'utf8'));
+  } catch {
+    return { source: 'unreadable', version: null }; // bytes that are not JSON
+  }
+  if (!record || typeof record !== 'object') return { source: 'unreadable', version: null };
+
+  const beaconVersion = typeof record.version === 'string' ? record.version : null;
+  const stale = newestUnrecordedMs !== null && stat.mtimeMs + GRANULARITY_MS < newestUnrecordedMs;
+  return { source: stale ? 'stale' : 'fresh', version: beaconVersion };
 }
 
 /**
@@ -315,8 +378,13 @@ function countUnrecorded(paths, cutoffMs) {
  *   lastDecisionAt: string|null,
  *   unrecordedCount: number,
  *   unrecordedSince: string|null,
- *   sources: { log: 'has-entries'|'empty'|'absent'|'unreadable', edits: 'observed'|'none'|'unreadable' },
+ *   sources: {
+ *     log: 'has-entries'|'empty'|'absent'|'unreadable',
+ *     edits: 'observed'|'none'|'unreadable',
+ *     beacon: 'fresh'|'stale'|'absent'|'unreadable'
+ *   },
  *   reason: string,
+ *   beaconVersion: string|null,
  *   asOf: number
  * }}
  */
@@ -338,8 +406,9 @@ function protectionLiveness(root, opts) {
     lastDecisionAt: null,
     unrecordedCount: 0,
     unrecordedSince: null,
-    sources: { log: 'unreadable', edits: 'unreadable' },
+    sources: { log: 'unreadable', edits: 'unreadable', beacon: 'unreadable' },
     reason: 'unknown',
+    beaconVersion: null,
     asOf: now
   }, fields);
 
@@ -355,24 +424,30 @@ function protectionLiveness(root, opts) {
 
     const decision = readLastDecision(root);
 
-    // Without a cutoff there is no comparison to make. Report which way the log
-    // failed and stop — `unknown`, never `recording`.
+    // Without a cutoff there is no edit comparison to make. The beacon can still be
+    // read on its own — with no unrecorded edit to be older than, a present beacon
+    // is `fresh` and an absent one is `absent`. Report which way the log failed and
+    // stop — `unknown`, never `recording`.
     if (decision.source !== 'has-entries') {
+      const beacon = classifyBeacon(root, null);
       return verdict({
-        sources: { log: decision.source, edits: 'none' },
+        sources: { log: decision.source, edits: 'none', beacon: beacon.source },
+        beaconVersion: beacon.version,
         reason: decision.source === 'unreadable' ? 'instrument-unreadable' : 'never-recorded'
       });
     }
 
     const declared = collectDeclaredPaths(root);
-    const { count, oldestMs } = countUnrecorded(declared.paths, decision.lastMs);
+    const { count, oldestMs, newestMs } = countUnrecorded(declared.paths, decision.lastMs);
+    const beacon = classifyBeacon(root, newestMs);
 
     const editsSource = declared.unreadable
       ? 'unreadable'
       : (count > 0 ? 'observed' : 'none');
-    const sources = { log: 'has-entries', edits: editsSource };
+    const sources = { log: 'has-entries', edits: editsSource, beacon: beacon.source };
     const base = {
       sources,
+      beaconVersion: beacon.version,
       lastDecisionAt: decision.lastIso,
       unrecordedCount: count,
       unrecordedSince: oldestMs === null ? null : new Date(oldestMs).toISOString()
@@ -477,6 +552,28 @@ function describeProtection(result) {
   if (r.state === 'not-recording') {
     const count = Number.isFinite(r.unrecordedCount) ? r.unrecordedCount : 0;
     const noun = count === 1 ? 'file has' : 'files have';
+    const beacon = r.sources && r.sources.beacon;
+
+    // The beacon REFINES the words in this case; it adds no new state and never
+    // changes the verdict. A FRESH beacon proves the hook system IS running, so the
+    // silence must be enforcement SPECIFICALLY not recording — a fault to report,
+    // for which a restart may not help. `'stale'`, `'absent'`, and an unreadable
+    // beacon all keep 00170's original wording, so a MISSING new instrument can
+    // never silence the working old one (the regression plan 00171 must not
+    // introduce). `'absent'` alone additionally notes that the session may predate
+    // this feature, so absence is never over-read as proof the hooks are dead.
+    if (beacon === 'fresh') {
+      return {
+        heading,
+        lines: [
+          `${count} ${noun} changed since CTOC last checked one, at ${momentPhrase(r.lastDecisionAt)}.`,
+          "CTOC's hooks are running, but your edits are not being checked against your plans.",
+          'A restart may not fix this on its own — this looks like a fault to report.'
+        ],
+        severity: 'alarm'
+      };
+    }
+
     const lines = [
       `NOT RUNNING — ${count} ${noun} changed since CTOC last checked one, at ${momentPhrase(r.lastDecisionAt)}.`,
       'Edits are not being checked against your plans right now.'
@@ -486,6 +583,9 @@ function describeProtection(result) {
     // Advising a restart on a project that never had it would be a guess
     // presented as a diagnosis.
     if (r.confidence === 'high') lines.push('Restart this session to load it again.');
+    if (beacon === 'absent') {
+      lines.push('This CTOC build records when its hooks run, but this session recorded none — it may predate that check.');
+    }
     return { heading, lines, severity: r.confidence === 'high' ? 'alarm' : 'warn' };
   }
 
