@@ -8,7 +8,7 @@ program: ctoc-repair-loop
 iron_loop: true
 files:
   - "src/areas/inbox.js"
-  - "src/commands/menu.js"
+  - "src/commands/start.js"
   - "src/hooks/SessionStart.js"
   - "src/hooks/human-gate-check.js"
   - "src/lib/actions.js"
@@ -64,7 +64,10 @@ a vector). Target: **zero errors**, baseline file set to the achieved count
    and call it out prominently in the report.
 2. `.ctoc/typecheck-baseline.json` → the achieved count (0). Never above 64.
 3. `CLAUDE.md`: the two "256 test files" counts → the live disk count
-   (`ls tests/*.test.js | wc -l`, currently 257) — re-count at execution time.
+   (`ls tests/*.test.js | wc -l`) — re-count at execution time. At the ship date
+   this was 257; the tree has since grown to **457** and CLAUDE.md now reads 457
+   in both places (verified on disk during the 2026-07-27 record reconciliation),
+   so `tests/doc-counts.test.js` is green against the live count.
 4. `tests/w10-live-agent-reconcile.test.js` scenario 8 ("a true session
    restart still orphans a stale task"): the fixture predates R2-A's
    kind-aware staleness (implement/sync floor is now 120 min). Tighten the
@@ -95,7 +98,8 @@ as a real-bug fix.
 ### Step 12: OPTIMIZE — n/a.
 ### Step 13: SECURE — no `@ts-ignore`/`@ts-nocheck` anywhere (forbidden — they
 hide, not fix).
-### Step 14: VERIFY — the Test Plan above; no git; no full suite.
+### Step 14: VERIFY — the Test Plan above, AND (added at the 2026-07-27 record
+reconciliation) the full `npm test` gate on HEAD, which the original run skipped.
 ### Step 15: DOCUMENT — n/a (annotations ARE documentation).
 ### Step 16: FINAL-REVIEW — report error count before/after per file, casts
 used with reasons, any real bugs found.
@@ -135,19 +139,33 @@ used with reasons, any real bugs found.
    ToNumber coercion internally).
 
 5. **ONE non-annotation source hunk, reported rather than hidden.**
-   `src/commands/menu.js` had two `const { route } = require('../lib/menu-screens')`
-   destructures in disjoint branches, which checkJs reports as TS2300 duplicate
-   identifier. No annotation can resolve a duplicate binding, so the second was
-   aliased to `routeDashboard` — a local variable rename, provably
-   behavior-identical (same module, same function, same arguments). Proven live:
-   spawning the non-interactive dashboard still renders and still attaches the
-   compliance ride-along.
+   At ship time `src/commands/menu.js` had two
+   `const { route } = require('../lib/menu-screens')` destructures in disjoint
+   branches, which checkJs reports as TS2300 duplicate identifier. No annotation
+   can resolve a duplicate binding, so the second was aliased to `routeDashboard`
+   — a local variable rename, provably behavior-identical (same module, same
+   function, same arguments). **RECONCILED 2026-07-27:** `src/commands/menu.js`
+   was renamed to `src/commands/start.js` at v6.13.7 (commit 2776ae3, "the command
+   is /ctoc:start, not /ctoc:menu"); that reorganization collapsed the two disjoint
+   branches into a single code path, so on disk today `start.js` carries exactly
+   ONE un-aliased `const { route } = require('../lib/menu-screens')` (line 939) and
+   the `routeDashboard` alias no longer exists — nor is it needed, because there is
+   no longer a duplicate binding. `tsc --noEmit` is still 0 on this file, so the
+   invariant this hunk defended holds independently of the alias. The `files:`
+   entry above is repointed from the renamed-away `menu.js` to `start.js`.
 
 6. **Two documentation defects were real and are fixed** (see report headline):
    `checkFolder`'s `@returns` in `human-gate-check.js` omitted the `reason` field
    it actually returns, and `mapPipSeverity` in `dependency-auditor.js` was
    documented `@param {string}` while comparing its argument numerically against
    the 9/7/4 CVSS bands. Neither is a runtime bug — both are contracts that lied.
+   **RECONCILED 2026-07-27:** the `mapPipSeverity` fix has since been superseded by
+   a refactor — on disk today `mapPipSeverity(severity)` is a one-line delegation
+   to a shared `mapCvssOrLabel(severity)` helper (dependency-auditor.js lines
+   1013/1034-1035), which is the single place that maps either a numeric CVSS score
+   or a textual label. The band-vs-`@param {string}` contradiction this plan
+   corrected no longer lives in `mapPipSeverity` itself; the shared helper carries
+   the annotation. The type checker is still 0 on this file.
 
 7. **The w10 fixture was TIGHTENED, never weakened.** Scenario 8's intent (the
    no-live-ids age backstop still orphans a stale task) is preserved by aging the
@@ -164,6 +182,12 @@ used with reasons, any real bugs found.
 8. **CLAUDE.md test count re-counted at execution time: 257** (`ls tests/*.test.js
    | wc -l`), not the 256 the document claimed. Both occurrences corrected;
    `tests/doc-counts.test.js` verifies doc against live disk and passes.
+   **RECONCILED 2026-07-27:** the suite has since grown to **457** test files and
+   CLAUDE.md reads 457 in both places on disk today (lines 265 and 449);
+   `tests/doc-counts.test.js` is green against that live count in the full gate run
+   recorded in Step 14 below. Crossing this plan review→done moves the plan file
+   and runs VERIFY — it does not re-apply the original v6.12.2 diff — so there is no
+   path by which completing this plan could regress the count back to 257.
 
 ## Execution Record (Steps 8-16)
 - [x] **Step 8 TEST** — red captured: `tsc --noEmit` = **94 errors** across 32
@@ -176,8 +200,50 @@ used with reasons, any real bugs found.
 - [x] **Step 13 SECURE** — zero `@ts-ignore`, zero `@ts-nocheck`, zero
       `@ts-expect-error` in `src/` and `tests/`.
 - [x] **Step 14 VERIFY** — `typecheck:raw` = **0 errors** (exit 0); ratchet test
-      green at baseline 0; 782 spot-run tests pass, 0 fail, 0 skipped; eslint
-      clean on all 34 touched files.
+      green at baseline 0; eslint clean on all touched files. The original run
+      recorded only a 782-test spot subset and explicitly skipped the full suite
+      and coverage floor. **RE-RUN 2026-07-27 (record reconciliation):** the full
+      `npm test` gate ran on HEAD — **10495 tests, pass 10495, fail 0, skipped 0,
+      1795 suites**, coverage **99%** (threshold 99%), zero-skipped gate satisfied,
+      `[CTOC test-gate] PASS`. The coverage floor and zero-skipped gate the spot-run
+      never measured are now measured and green on the tree being shipped.
 - [x] **Step 15 DOCUMENT** — the annotations ARE the documentation; baseline
       notes rewritten to record the 64 → 0 ratchet.
-- [x] **Step 16 FINAL-REVIEW** — complete. Awaiting Gate 3 (human).
+- [x] **Step 16 FINAL-REVIEW** — complete. Awaiting human sign-off (review → done).
+
+## Record Reconciliation (2026-07-27, human-ordered rework)
+
+This slice's deliverable — `tsc --checkJs` held at zero forever by the committed
+ratchet (`.ctoc/typecheck-baseline.json` `maxErrors: 0`) — was re-verified sound on
+HEAD: `tsc --noEmit` = 0 errors, `tests/typecheck.test.js` green. The rework did NOT
+touch source; it corrected the completion record where the tree moved after the plan
+ran at v6.12.2, and closed the ship-gate evidence the original Step 14 skipped. Every
+adversarial finding is addressed:
+
+1. **Stale completion record (critical) — reconciled against disk:**
+   - `files:` `src/commands/menu.js` → `src/commands/start.js`. `menu.js` was renamed
+     to `start.js` at v6.13.7 (commit 2776ae3); it is the only declared file that no
+     longer existed on disk. All 33 other declared files still exist.
+   - Decision 5 (`routeDashboard` alias): the rename collapsed the two disjoint
+     `const { route }` branches into one, so `start.js` now carries a single
+     un-aliased destructure (line 939) and no `routeDashboard`. `tsc` still 0 on it.
+   - Decision 6 (`mapPipSeverity`): on disk it now delegates to a shared
+     `mapCvssOrLabel` helper; the annotation-only description was superseded by that
+     refactor. Noted in Decision 6.
+   - CLAUDE.md count: the plan claimed 257; disk reads **457** in both places
+     (lines 265, 449). Corrected in item 3 and Decision 8. Completing review → done
+     moves the plan and runs VERIFY, not the original diff, so no count regression is
+     possible.
+2. **Step 14 narrowed to a spot-run (critical) — closed:** full `npm test` ran on
+   HEAD, green (10495/0/0, coverage 99%). Recorded in Step 14 above.
+3. **Shipped ahead of pipeline (important) — accepted as a scheduling call:** 00010
+   and 00005 remain unbuilt in `plans/todo/` and the parent vision is still
+   exploring. typecheck-at-zero is enforced by the committed ratchet on every future
+   commit, so when 00010's new exports land they will red the ratchet and be
+   re-annotated then — the designed mechanism. These annotations are type-only and do
+   not consume 00010's behavior, so nothing here is wrong on today's tree, only to be
+   extended when the later slice builds. The shared file declarations with 00010
+   (`menu-screens.js`, `inbox.js`, `stale-detector.js`) are a stage-separation matter
+   (00010 is in todo, this is in review), not a conflict.
+4. **Gate ruling (critical) — resolved:** both distinct defects (stale record,
+   skipped full gate) are closed in this pass; the core deliverable is verified sound.
