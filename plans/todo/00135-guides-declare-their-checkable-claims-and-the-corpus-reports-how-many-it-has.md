@@ -326,54 +326,54 @@ clean).
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
-- [ ] Write `tests/claim-census.test.js` in FULL and run ONLY that file, before `src/lib/claim-extractor.js` exists.
-- [ ] TDD-RED observed and recorded verbatim: every case fails on the missing module.
-- [ ] Prove the ratchet bites (case 15): raise `minDeclaredFiles` above the live count, watch case 14 fail with its full never-lower message, restore. **A ratchet never seen failing is indistinguishable from an assertion-free test.**
+- [x] Write `tests/claim-census.test.js` in FULL and run ONLY that file, before `src/lib/claim-extractor.js` exists.
+- [x] TDD-RED observed and recorded verbatim: every case fails on the missing module.
+- [x] Prove the ratchet bites (case 15): raise `minDeclaredFiles` above the live count, watch case 14 fail with its full never-lower message, restore. **A ratchet never seen failing is indistinguishable from an assertion-free test.**
 
 ### Step 9: PREPARE
-- [ ] Read from disk, not from this plan: `src/lib/stale-detector.js:104-124` (the `unread`/`unreadCount` contract to COPY), `:316-358` (`parseFilesField`, the dependency-free parser precedent), `:880-1028` (the walk and its four skip points).
-- [ ] Read `src/lib/false-green-scan.js` and `tests/false-green-fence.test.js` for the ratchet shape.
-- [ ] Read `src/lib/safe-fs.js` — use it for every read; do not call `fs` directly.
-- [ ] Re-measure the citation numbers in this plan's table against disk. **Where the corpus disagrees with this plan, THE CORPUS WINS — record the correction.**
+- [x] Read from disk, not from this plan: `src/lib/stale-detector.js:104-124` (the `unread`/`unreadCount` contract to COPY), `:316-358` (`parseFilesField`, the dependency-free parser precedent), `:880-1028` (the walk and its four skip points).
+- [x] Read `src/lib/false-green-scan.js` and `tests/false-green-fence.test.js` for the ratchet shape.
+- [x] Read `src/lib/safe-fs.js` — use it for every read; do not call `fs` directly.
+- [x] Re-measure the citation numbers in this plan's table against disk. **Where the corpus disagrees with this plan, THE CORPUS WINS — record the correction.**
 
 ### Step 10: IMPLEMENT
-- [ ] `src/lib/claim-extractor.js` — `parseClaimBlocks`, `extractClaims`, `censusCorpus`; malformed records returned, never dropped; `unreadable`/`unreadableCount` per the copied contract.
-- [ ] `tests/claim-census.test.js` — the sixteen cases.
-- [ ] `.ctoc/claim-coverage-baseline.json` — seeded at the LIVE measured `declaredFiles`.
+- [x] `src/lib/claim-extractor.js` — `parseClaimBlocks`, `extractClaims`, `censusCorpus`; malformed records returned, never dropped; `unreadable`/`unreadableCount` per the copied contract.
+- [x] `tests/claim-census.test.js` — the sixteen cases.
+- [x] `.ctoc/claim-coverage-baseline.json` — seeded at the LIVE measured `declaredFiles`.
 
 ### Step 11: REVIEW
-- [ ] No code path drops a malformed claim silently; every skip has a closed-enum reason and a returned entry.
-- [ ] `declared: false` and `declared: true, claims: []` are genuinely distinct in the return value and in the census totals.
-- [ ] No path returns `unreadableCount: 0` except a completed walk (the single assertion the honesty contract rests on — `stale-detector.js:1024-1027`).
-- [ ] Confirm no `catch {}` was introduced that `src/lib/false-green-scan.js` would flag; run the scanner and report its live count before and after.
+- [x] No code path drops a malformed claim silently; every skip has a closed-enum reason and a returned entry.
+- [x] `declared: false` and `declared: true, claims: []` are genuinely distinct in the return value and in the census totals.
+- [x] No path returns `unreadableCount: 0` except a completed walk (the single assertion the honesty contract rests on — `stale-detector.js:1024-1027`).
+- [x] Confirm no `catch {}` was introduced that `src/lib/false-green-scan.js` would flag; run the scanner and report its live count before and after.
 
 ### Step 12: OPTIMIZE
-- [ ] One `readdir` per directory, one `lstat` + one `readFile` per guide; no double reads, no globbing library.
-- [ ] Size-gate BEFORE the read, so an oversized file never enters memory.
+- [x] One `readdir` per directory, one `lstat` + one `readFile` per guide; no double reads, no globbing library.
+- [x] Size-gate BEFORE the read, so an oversized file never enters memory.
 
 ### Step 13: SECURE
-- [ ] `select` rejects `__proto__` / `constructor` / `prototype` segments at parse time (case 9).
-- [ ] `source` restricted to `https://`, no userinfo, no explicit port (cases 7, 8).
-- [ ] `unreadable[].path` repository-relative and POSIX, never absolute (case 13).
-- [ ] Malformed block CONTENT is never echoed into a returned reason — reason is a closed enum plus at most the offending field NAME, capped, mirroring `plans/review/00098-…` Step 13.
-- [ ] All fixtures under `os.tmpdir()`; the real `skills/` tree is never written.
+- [x] `select` rejects `__proto__` / `constructor` / `prototype` segments at parse time (case 9).
+- [x] `source` restricted to `https://`, no userinfo, no explicit port (cases 7, 8).
+- [x] `unreadable[].path` repository-relative and POSIX, never absolute (case 13).
+- [x] Malformed block CONTENT is never echoed into a returned reason — reason is a closed enum plus at most the offending field NAME, capped, mirroring `plans/review/00098-…` Step 13.
+- [x] All fixtures under `os.tmpdir()`; the real `skills/` tree is never written.
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/claim-census.test.js` green.
-- [ ] Full gated run `npm test` — report the verbatim `tests / pass / fail / skipped` line and the coverage line.
-- [ ] Lint `--max-warnings 0` on the new JavaScript. Typecheck clean.
-- [ ] Coverage floor at or above `.ctoc/coverage-baseline.json` `minPct`. **This slice adds a source module, so it must be covered — a new file that drags the floor is a finding, not a reason to lower the floor.**
-- [ ] Reachability and export-reachability fences green.
-- [ ] **Report the LIVE census numbers verbatim** — total files, declared, undeclared, unreadable. These supersede the table in this plan.
+- [x] `node --test tests/claim-census.test.js` green.
+- [x] Full gated run `npm test` — report the verbatim `tests / pass / fail / skipped` line and the coverage line.
+- [x] Lint `--max-warnings 0` on the new JavaScript. Typecheck clean.
+- [x] Coverage floor at or above `.ctoc/coverage-baseline.json` `minPct`. **This slice adds a source module, so it must be covered — a new file that drags the floor is a finding, not a reason to lower the floor.**
+- [x] Reachability and export-reachability fences green.
+- [x] **Report the LIVE census numbers verbatim** — total files, declared, undeclared, unreadable. These supersede the table in this plan.
 
 ### Step 15: DOCUMENT
-- [ ] Record the claim-block format in `CLAUDE.md` (short — the format, and that an undeclared guide is counted, not assumed fine).
-- [ ] Update the documented test-file count in **both** places `tests/doc-counts.test.js` checks, reading the live count from disk first.
-- [ ] Update the documented module count if `CLAUDE.md` states one.
+- [x] Record the claim-block format in `CLAUDE.md` (short — the format, and that an undeclared guide is counted, not assumed fine).
+- [x] Update the documented test-file count in **both** places `tests/doc-counts.test.js` checks, reading the live count from disk first.
+- [x] Update the documented module count if `CLAUDE.md` states one.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Report: files, tests, the Step 8 red output verbatim, the deliberately-failed ratchet run, the live census, the false-green scanner count before/after, and every decision taken under ambiguity.
-- [ ] Ready for human review at Gate 3.
+- [x] Report: files, tests, the Step 8 red output verbatim, the deliberately-failed ratchet run, the live census, the false-green scanner count before/after, and every decision taken under ambiguity.
+- [x] Ready for human review at Gate 3.
 
 ---
 
@@ -450,5 +450,46 @@ slice here touches it.
    dependencies; a hand-rolled line parser follows the existing
    `parseFilesField` precedent. A YAML library for a six-field record would be
    attack surface bought for nothing.
+
+### Decisions taken during the build (Steps 8–16)
+
+10. **The plan's wiring claim was FALSE for the reachability FILE fence, and the
+    census is wired into `src/lib/iron-loop-enforcer.js` instead.** The Wiring table
+    asserts "a ratchet test reached by `npm test` is a genuine root." It is not:
+    `src/lib/reachability.js` excludes `tests/` from BOTH fences by design — "a test
+    is never a caller." The cited precedent `false-green-scan.js` is reachable NOT
+    because its test calls it, but because `iron-loop-enforcer.js` and
+    `streaming-precompute.js` `require` it. So `claim-extractor.js`, if called only by
+    its test, would have joined the dead-code baseline (27 > 26 → RED). Per Lesson 16
+    it is wired NOW, in the same slice, as a fence-style enforcer check `claim-census`
+    (scope `architecture`, thorough), mirroring `checkFalseGreenFence`/`checkReachabilityFence`
+    exactly. This is the plan's own cited precedent (the enforcer surfacing
+    false-green-scan) applied to the census. **One file beyond the declared set was
+    touched — `src/lib/iron-loop-enforcer.js` — and only for wiring.** Verified: the
+    file fence stays at 26 unreachable, and no new dead export.
+
+11. **The `unreadable` reason enum is THREE, not four: `stat-failed` and `read-failed`
+    are merged into `read-failed`.** The size gate needs one `stat` immediately before
+    the `read`, both under a single try whose only failure exit is "could not read this
+    file." A separate `stat-failed` branch would be reachable by no portable test — an
+    uncoverable line pretending to be a distinct fact, which is itself the false-green
+    shape. `stage-unreadable` maps to `dir-unreadable` (a skills/ subdirectory whose
+    `readdir` failed, standing for its whole subtree). `oversized` is kept, and is the
+    PORTABLE trigger the test uses on every platform (a >1 MiB guide), so no case
+    silently no-ops on Windows or as root (Decision 7 honored). The permission-denied
+    directory case runs additively where `chmod 000` actually denies (POSIX non-root).
+
+12. **A malformed or unreadable `claim-coverage-baseline.json` BLOCKS; it never
+    silently defaults to floor 0.** An unreadable ratchet reading as "all clear" is
+    the exact false-green defect the repository fences (and a commented-empty catch is
+    flagged by `false-green-scan`). The `claim-census` check treats an ABSENT baseline
+    as the legitimate 0 default, but an EXISTING-yet-unreadable one (or one lacking a
+    numeric `minDeclaredFiles`) as a broken instrument that blocks — mirroring
+    `checkReachabilityFence`.
+
+13. **Re-measured against disk (Step 9), the corpus AGREES with the plan and the
+    corpus wins where it would not.** Live census: `total=427 declared=0 undeclared=427
+    registry-version=0 url-live=0 malformed=0 unreadable=0`. Baseline seeded at the
+    live `minDeclaredFiles=0`, exactly as the plan specifies.
 </content>
 </invoke>

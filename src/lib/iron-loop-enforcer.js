@@ -638,6 +638,7 @@ const CHECKS = [
   { id: 'dead-export-fence',           scope: 'architecture', mode: 'thorough', fn: checkDeadExportFence },
   { id: 'false-green-fence',           scope: 'architecture', mode: 'thorough', fn: checkFalseGreenFence },
   { id: 'gate-words-fence',            scope: 'architecture', mode: 'thorough', fn: checkGateWordsFence },
+  { id: 'claim-census',                scope: 'architecture', mode: 'thorough', fn: checkClaimCensus },
 ];
 
 /**
@@ -793,6 +794,81 @@ function checkFalseGreenFence(root) {
     message: `${fresh.length} NEW false-green site(s) — a check that can report a verdict on input it never received: ` +
       `${shown.join(' | ')}${fresh.length > 5 ? ` (+${fresh.length - 5} more)` : ''}`
   });
+}
+
+/**
+ * Corpus claim-census fence (plan 00135). The corpus verifies its own skill/guide
+ * files with ~61 STRUCTURAL tests (line counts, section counts, fence counts) that
+ * guard against a future edit THINNING a guide — a real and different property — but
+ * never check whether a guide is TRUE. This fence adds the orthogonal axis: it walks
+ * the DECLARED `<!-- ctoc:claims … -->` blocks via `src/lib/claim-extractor.js` and
+ * holds citation coverage to a one-directional floor (`.ctoc/claim-coverage-baseline.json`
+ * `minDeclaredFiles`). It is this slice's LIVE call site — the census is reachable
+ * from the enforcer a human runs, not merely from its own test (a test is never a
+ * caller; see src/lib/reachability.js). Slice 00136 fetches; 00138 surfaces the
+ * census to the menu.
+ *
+ * It BLOCKS on exactly two facts, and is otherwise silent (so it contributes no
+ * finding on a healthy corpus, leaving the enforcer summary counts unmoved):
+ *   1. the walk was PARTIAL (`unreadableCount > 0`) — a corpus that could not be
+ *      fully read must never read as complete, the same could-not-look contract the
+ *      stale detector enforces; or
+ *   2. declared coverage REGRESSED below the committed floor — a guide's claim block
+ *      was removed. The floor may only rise; the ratchet lives in
+ *      tests/claim-census.test.js and this surfaces the same truth on demand.
+ * Thorough mode only (walks the whole skills/ tree).
+ *
+ * @param {string} root - Project root
+ * @returns {{clean: boolean, severity?: string, message?: string, details?: Object}}
+ */
+function checkClaimCensus(root) {
+  const { censusCorpus } = require('./claim-extractor');
+  const path = require('path');
+  const safeFs = require('./safe-fs');
+
+  const census = censusCorpus(root);
+  if (census.totalFiles === 0) return CLEAN(); // not a corpus tree — nothing to check
+
+  if (census.unreadableCount > 0) {
+    return finding({
+      severity: 'block',
+      message: `claim census could not read ${census.unreadableCount} corpus input(s) — a PARTIAL walk must never read as complete; repair the read before trusting the coverage count`,
+      details: { unreadable: census.unreadable },
+    });
+  }
+
+  // ABSENT and UNREADABLE are different facts (mirroring checkReachabilityFence). No
+  // baseline at all is a legitimate "no measured floor yet" and keeps the 0 default;
+  // a baseline that EXISTS but cannot be read or lacks a numeric minDeclaredFiles is a
+  // broken instrument, and an unreadable ratchet must never read as "all clear".
+  const baselineFile = path.join(root, '.ctoc', 'claim-coverage-baseline.json');
+  let minDeclared = 0;
+  if (safeFs.existsSync(baselineFile)) {
+    let brokenBaseline = false;
+    try {
+      const parsed = JSON.parse(safeFs.readFileSync(baselineFile, 'utf8'));
+      if (parsed && Number.isFinite(parsed.minDeclaredFiles)) minDeclared = parsed.minDeclaredFiles;
+      else brokenBaseline = true;
+    } catch (err) {
+      void err; // a parse failure is a broken instrument, handled by the block below
+      brokenBaseline = true;
+    }
+    if (brokenBaseline) {
+      return finding({
+        severity: 'block',
+        message: '.ctoc/claim-coverage-baseline.json exists but is unreadable or has no numeric minDeclaredFiles — the citation-coverage ratchet cannot be evaluated, and an unreadable ratchet must never read as "all clear"; repair the file',
+      });
+    }
+  }
+
+  if (census.declaredFiles < minDeclared) {
+    return finding({
+      severity: 'block',
+      message: `claim coverage REGRESSED: ${census.declaredFiles} guide(s) declare claims, below the floor of ${minDeclared} — a guide's claim block was removed; restore it (the floor may only rise, never be lowered)`,
+    });
+  }
+
+  return CLEAN();
 }
 
 /**
