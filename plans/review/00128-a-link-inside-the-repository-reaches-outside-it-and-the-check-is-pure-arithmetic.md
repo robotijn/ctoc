@@ -624,6 +624,11 @@ faked.
 clean — `resolveExisting` returns a UNIFORM `{ok, real, reason}` shape rather than a discriminated
 union, because `checkJs` would not narrow the union across the `!ok` guard (TS2339).
 
+**Re-verified at review reconciliation** (shared-repo counters have since grown; direction is up,
+floor held): `npm test` → `[CTOC test-gate] coverage 99.14% (threshold 99%), skipped 0, failed 0`
+→ `PASS`; `tsc --noEmit -p .` exit 0; the link-confinement test file runs `tests 16 · pass 16 ·
+fail 0 · skipped 0`. Nothing weakened.
+
 **The pipeline still runs.** All **74** declared globs across every plan in `todo/` and
 `in-progress/` still resolve to an approved covering plan through `findCoveringPlan`. A root
 resolution done wrong would have denied all 74; none were denied.
@@ -666,3 +671,12 @@ granting; and no link in this repository was removed, there being none.
     shape by relying on macOS's own tmpdir link, which would make the case vacuous on Linux. The
     test instead creates an explicit link pointing AT the fixture root and passes that as the
     root, so the trap is exercised deterministically on every platform.
+
+**Record note (review reconciliation, 2026-07-27):** `src/lib/real-path-confinement.js` on disk
+now contains hardening that this slice did NOT ship — the strict comparison-basis resolver
+(`resolveBasis`, unresolvable-root DENY) and the dangling-symbolic-link refusal (`reason:
+'dangling'` via `lstat`). Those belong to the sibling slice
+`00140-a-link-that-points-at-nothing-yet-is-reported-as-a-path-inside-the-tree`, which also
+declares this file and builds on top of it; they are recorded in THAT plan, not here. This record
+describes exactly what this slice created — `escapesRoot`, `resolvesUnder`, `resolveExisting`,
+`isWithin`, the one coverage check, and the two additive hook guards — and remains faithful to it.

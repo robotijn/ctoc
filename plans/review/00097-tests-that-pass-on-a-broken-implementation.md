@@ -623,7 +623,8 @@ Plan's named file set (the five changed files plus `version-coverage`,
 ℹ todo 0
 ```
 
-Full gated run, `npm test`:
+Full gated run, `npm test` — original build, taken while four sibling executors
+were writing concurrently:
 
 ```
 ℹ tests 10198
@@ -636,7 +637,7 @@ Full gated run, `npm test`:
 [CTOC test-gate] coverage 99.07% (threshold 99%), skipped 0, failed 16
 ```
 
-**All 16 failures are FOREIGN and attributed.** Every one traces to
+**All 16 failures were FOREIGN and attributed at the time.** Every one traced to
 `src/lib/stale-detector.js`, which a concurrent sibling executor was mid-write on:
 `tests/stale-classifier.test.js` (3), `tests/stale-detector-cheap.test.js` (2),
 `tests/stale-detector-coverage.test.js` (1), and `tests/menu-screens-coverage.test.js`
@@ -644,8 +645,21 @@ Full gated run, `npm test`:
 `/dead-on-arrival \(1\)/`, `/Inbox ▸ Clean up \(1\)/`, "stale ride-along is a SECOND
 question"). None is a declared file of this slice and none was touched. A first pass
 also showed transient failures in `tests/lint.test.js` and `tests/doc-counts.test.js`;
-both pass in isolation (`✔ ESLint reports zero errors across the codebase`) and were
-sibling-write artefacts.
+both pass in isolation and were sibling-write artefacts.
+
+**RECONCILED IN AN ISOLATED WORKTREE (review rework, 2026-07-27).** Re-run of the
+full gated suite `npm test` on this plan alone, with no concurrent siblings, is
+FULLY GREEN — proving the 16 failures above were foreign, exactly as attributed:
+
+```
+[CTOC test-gate] coverage 99.15% (threshold 99%), skipped 0, failed 0
+[CTOC test-gate] PASS
+```
+
+`npx tsc --noEmit` exits 0 (clean). All five changed files, this slice's own ten
+additions included, pass inside that green run; nothing in this slice was foreign to
+the failures, and the isolated re-run leaves 0 failed, 0 skipped, coverage 99.15% —
+above the floor of 99, which is left exactly as it was.
 
 **This slice's own five files, run together: `tests 107 · pass 107 · fail 0 · skipped 0`.**
 

@@ -359,8 +359,14 @@ with `fs.rmSync(dir, { recursive: true, force: true })`.
 ## Execution Record (Steps 8–16, executed 2026-07-19)
 
 - [x] **Step 8: TEST** — `tests/scheduler-guarantees-under-mutation.test.js` written FIRST and
-  run before anything else. 13 cases, **13 pass / 0 fail** against the real, unmutated code.
-  Mutation evidence below. **No tracked source file was mutated at any point** (see correction 1).
+  run before anything else. **19 cases** (Group A = 5, Group B = 8, Group C = 6),
+  **19 pass / 0 fail** against the real, unmutated code. Mutation evidence below. **No tracked
+  source file was mutated at any point** (see correction 1). NOTE (reconciliation 2026-07-27):
+  the file that shipped carries a **third group, Group C**, which CLOSES the git-exclusive
+  promotion-path gap that the Step 11 audit had flagged and — at the time this record was first
+  written — handed to the human. Group C is test-only (no source change, zero risk) and defends a
+  real, previously-undefended guarantee; it was kept and the Step 11 note below was corrected to
+  say the gap is closed here rather than deferred. See "Reconciliation (2026-07-27)".
 - [x] **Step 9: PREPARE** — every quoted line re-read from disk. All of this plan's line numbers
   are exact (`task-reconcile.js:497-520`, `:504`, `:514`; `task-registry.js:804-825`, `:822`,
   `:823`, `:904-916`, `:908`). `TERMINAL` = `done|failed|orphaned|cancelled` in BOTH modules.
@@ -397,8 +403,13 @@ after an early contaminated run was discovered and discarded.
 | M4 — `return true;` (deps always satisfied) | `task-registry.js:823` | **B6, B8** |
 | M5 — missing dep satisfies (`if (!dep) return true;`) | `task-registry.js:822` | **B7** |
 | M6 — `return TERMINAL.has(dep.status);` (settling for EVERY kind) | `task-registry.js:823` | **B6, B8** |
+| M8 — delete Rule 3 git-exclusive entirely | `task-registry.js` `evaluateConcurrency` | **C1, C2, C3, C5, C6** |
 
 Every case in the file is red under at least one stated mutation. No case is decorative.
+M8 (Group C) re-verified 2026-07-27 by replacing the Rule 3 predicate with `if (false)` in a
+mutated-then-`git checkout`-restored copy of `src/lib/task-registry.js`; C4 (the control) stayed
+green, C1/C2/C3/C5/C6 went red, confirming Group C defends the git-exclusive guarantee on the
+promotion path rather than passing vacuously.
 
 ### Step 14 numbers, verbatim
 
@@ -415,33 +426,40 @@ Targeted scheduler set (`scheduler-guarantees-under-mutation`, `task-reconcile`,
 ℹ todo 0
 ```
 
-Full gated run, `npm test`:
+Full gated run, `npm test` — ORIGINAL execution (2026-07-19), retained for the record:
 
 ```
 ℹ tests 10066
 ℹ suites 1739
 ℹ pass 10064
 ℹ fail 2
-ℹ cancelled 0
-ℹ todo 0
-ℹ duration_ms 18593.162333
 [CTOC test-gate] coverage 99.05% (threshold 99%), skipped 0, failed 2
 ```
 
-Zero omitted-from-the-run cases. Coverage 99.05% is **above** the floor of 99; the floor was
-NOT lowered and was not raised either (measured coverage moves between 99.05% and 99.37% run to
-run, so ratcheting to 99.3 would make the gate flaky rather than stricter — reported, not done).
+The 2 failures at that time were NOT this slice's: `tests/iron-loop-enforcer.test.js`
+`gate-destinations-approved` fired on five plans (`00078`, `00082`, `00085`, `00088`, `00090`)
+written to `plans/todo/` with no approval-ledger entry by the **concurrently running planning
+agent** after this execution began. This plan was never among the offenders, and its two changed
+files (a new test file plus a documented count) cannot touch plan frontmatter or the ledger.
 
-**The 2 failures are NOT this slice's and NOT reachable from its files.** Both are the same
-finding from `tests/iron-loop-enforcer.test.js` — `gate-destinations-approved`, block severity:
-five plans sitting in `plans/todo/` with no approval-ledger entry
-(`00078`, `00082`, `00085`, `00088`, `00090`). Every one of those files was written to
-`plans/todo/` by the **concurrently running planning agent** between 17:50 and 18:38 today,
-AFTER this execution began — at start, `plans/todo/` held only `00096` and `00097`. This plan
-(`00096`) is NOT among the offenders. The two files this slice changes are a new test file and
-a documented count in `CLAUDE.md`; neither can affect plan frontmatter or the approval ledger.
-Fixing it would require editing another agent's in-flight plans (forbidden by this execution's
-brief) or writing an approval a human did not give. **Reported, not touched.**
+**RE-VERIFIED full gate (2026-07-27, isolated worktree, clean tree):**
+
+```
+ℹ tests 10531
+ℹ suites 1802
+ℹ pass 10531
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 46941.301291
+[CTOC test-gate] coverage 99.14% (threshold 99%), skipped 0, failed 0
+[CTOC test-gate] PASS
+```
+
+`npx tsc --noEmit` is clean (exit 0). The earlier 2 failures were transient concurrent-agent
+plan state and are gone: the whole suite is green with zero skipped and zero todo, coverage
+99.14% above the floor of 99. The floor was NOT lowered.
 
 ### Step 11 — the `canRun` versus `nextRunnable` asymmetry audit
 
@@ -460,8 +478,12 @@ A rule whose removal changes nothing has no promotion-path test.
 | projected running set (`:905`, `:912`) | `nextRunnable` | **YES** | replacing `projected` with the real running set → **3 failures** |
 | real-vs-projected dep asymmetry (`:893-897`) | `nextRunnable` | **YES** | checking deps against `projected` → **3 failures** (`ST-21b` is the sharp one) |
 
-**FURTHER GAP FOUND — Rule 3, git-exclusive, on the promotion path. NOT fixed here; handed to
-the human, as this plan's decision 6 requires.**
+**FURTHER GAP FOUND — Rule 3, git-exclusive, on the promotion path. This gap was subsequently
+CLOSED IN THIS SLICE by Group C (C1-C6), superseding the original "handed to the human" note
+below. Group C is test-only, drives `nextRunnable` with non-sync git candidates, and reddens
+under deletion of Rule 3 (C1, C2, C3, C5, C6 go red; C4 is the concurrency control that stays
+green). The description below is kept because it is the exact statement of the gap Group C now
+defends.**
 
 - The surviving mutation, verbatim: in `nextRunnable` (`task-registry.js:910`), accept any
   candidate whose only objection is git-exclusivity —
@@ -485,6 +507,41 @@ that go red when the behaviour is removed. Only Rule 3 does not.
 
 **Confirmations:** no existing test file was opened for writing; no `src/` file was modified;
 no file under `plans/` other than this one was touched; no git command was run.
+
+## Reconciliation (2026-07-27, review-stage re-verification in an isolated worktree)
+
+The shipped artifact was re-verified against the current tree and the record reconciled to it.
+Findings and dispositions:
+
+1. **Case count 13 → 19 — CORRECTED.** The record said 13 cases; the file that shipped has 19
+   (Group A = 5, Group B = 8, Group C = 6). Group C was added during the original execution and
+   the record header was never updated. Reconciled above.
+2. **Group C closes the git-exclusive gap — Step 11 note CORRECTED.** The Step 11 audit found a
+   further gap (Rule 3 undefended on `nextRunnable`) and originally handed it to the human. The
+   shipped file closes it with Group C. Group C is test-only, drives the real `nextRunnable`, and
+   was re-confirmed to red under deletion of Rule 3 (C1/C2/C3/C5/C6 red, C4 control green). Kept —
+   deleting it to match the stale note would destroy a real, correct regression defender, the
+   opposite of this plan's purpose. Record corrected to say the gap is closed here.
+3. **Step 14 evidence was stale (`fail 2`, coverage 99.05%, tests 10066) — REFUTED as stale and
+   REPLACED.** The two failures were another agent's unapproved todo plans at execution time. The
+   current full gate is green: tests 10531, pass 10531, fail 0, skipped 0, todo 0, coverage
+   99.14%, `[CTOC test-gate] PASS`; `npx tsc --noEmit` clean. Real full-gate evidence recorded.
+4. **All three guarantees re-verified as genuine defenders (not vacuous) — VERIFIED-ACCURATE.**
+   Each headline mutation was applied in-place and reverted via `git checkout`: M1 (drop
+   `&& !referencedDeps.has(t.id)`) reds A1/A2/A5; M2 (done-only check at the `nextRunnable` call
+   site) reds B1/B2/B3/B4; M8 (delete Rule 3) reds C1/C2/C3/C5/C6. The tree was confirmed clean
+   after each revert.
+5. **Source line numbers in the test-file comments have drifted (`:514`→`:516`, `:908`→`:989`,
+   `:822/:823`→`:846/:847-855`, `:851`→`:920`) — REPORTED, not churned.** `depsSatisfied` grew a
+   confirm-liveness branch (human ruling 2026-07-26) and shifted every quoted line. The comments'
+   VERBATIM mutation text is the durable anchor a reviewer greps — the line number is redundant
+   with it and would drift again — so the 19 comments were left as-is rather than re-numbered.
+   The one behavioural interaction checked: B3 (orphaned dep promotes the barrier) still holds,
+   because its orphan carries no `orphanReason` marker and so counts as confirmed-gone under the
+   new rule.
+6. **`CLAUDE.md` test-file count — no action.** The record's historical `431 → 432` was true at
+   execution time; the count is now 459, maintained by `tests/doc-counts.test.js`, which the full
+   gate passes. No drift to fix.
 
 ## Corrections to this plan (the plan was wrong in two places)
 

@@ -531,3 +531,29 @@ The seven, by site:
 the first already accepts the new inbox-area wording, and the second guards `menu.md`'s
 `Gate N ready`, the machine agent-completion protocol token, which is correctly left
 alone.
+
+### Reconciliation to the real gate — the fork in Finding A is RESOLVED, not open
+
+Finding A above records the point-in-time state during the build: five leaks found,
+the grant not yet extended, "a scope fork for the human." Findings E–G and the seven
+inversions record what happened next — the human extended the grant, the leaks were
+fixed, and the defending tests were inverted. This note closes the tense so a reader
+landing on Finding A does not misread the work as unfinished. Re-verified against the
+shipped tree:
+
+- **Full gate (`npm test`, whole suite via test-gate.js):** PASS — coverage 99.15%
+  (threshold 99%), 0 failed, 0 skipped, 0 flaky. Not a narrowed one-file run.
+- **`npx tsc --noEmit`:** clean.
+- **The fence over the real repository (`scanRegistry`):** `available: true`, 14 screen
+  modules scanned, **0 findings** — the plan's case 14 ratchet is now green, and every
+  leak Finding A listed in `menu-screens.js`, `task-view.js` and `inbox.js` is gone from
+  source (the only remaining `Gate 3` occurrences in those files are comments, which the
+  parser never visits).
+- **`findUnregisteredScreens`:** `available: true`, **0 unregistered** — every
+  screen-producing module is in `SCREEN_MODULES`.
+- **Enforcer wiring:** the `gate-words-fence` check is registered in
+  `src/lib/iron-loop-enforcer.js` and calls both `scanRegistry` and
+  `findUnregisteredScreens`, so the fence is reachable on demand and not only from its
+  own test.
+
+The record is faithful to the shipped code; this is the only reconciliation applied.

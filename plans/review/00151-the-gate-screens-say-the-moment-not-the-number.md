@@ -540,22 +540,29 @@ the repair.)
    Decision 9 above; no export was added.
 2. **The line numbers all held.** Every site named in Step 9 was where the plan said
    it was. `humanPlanName` still exists and still returns the title.
-3. **BLOCKER — the plan's `files:` grant is one file short of its own change, and
-   two short of a green suite.** Deleting `gateName` and re-wording the screens breaks
-   **12 existing assertions in three test files the plan does not declare**, and
-   adding one module plus one test file breaks **1 documented-count assertion** that
-   reads a fourth file:
+3. **RESOLVED — the `files:` grant was extended by human authorization and the
+   thirteen assertions were inverted.** The earlier round reported this as a BLOCKER:
+   deleting `gateName` and re-wording the screens broke 12 existing assertions in
+   three test files the original `files:` list did not declare, and adding one module
+   plus one test file broke 1 documented-count assertion in a fourth. The human then
+   authorized the scope extension recorded in this plan's frontmatter
+   (`scope_extension`, `authorized_by: human`, `2026-07-20`), which added
+   `tests/streaming-gate.test.js`, `tests/menu-screens.test.js`,
+   `tests/plan-question-screen.test.js`, `CLAUDE.md` and `tests/readme-numbers.test.js`
+   to the grant — so correcting the tests that guard the wording was done inside the
+   approved permission, not around it.
 
-   | file | failing cases | what they assert |
+   | file | cases | disposition |
    |---|---|---|
-   | `tests/streaming-gate.test.js` | 6 | `gateName === 'Gate 1'`, `Gate 1 (functional → implementation)` in the header, `Approve <slug> across Gate 1?`, `header === 'Gate 1'`, and `actions['Approve']` keyed by the old label |
-   | `tests/menu-screens.test.js` | 4 | the routed screen "names the gate"; `Should have Approve` |
-   | `tests/plan-question-screen.test.js` | 2 | `Approve no-questions across Gate 3?`; `/Approve .* across Gate/` |
-   | `CLAUDE.md` (read by `tests/readme-numbers.test.js` and `tests/doc-counts.test.js`) | 3 | `src/lib/: 107 JS modules` (now 108) and `442 test files` twice (now 443) |
+   | `tests/streaming-gate.test.js` | 6 | INVERTED to assert against `gate-words` plus a negative fence; markers dated 2026-07-20 in the file |
+   | `tests/menu-screens.test.js` | 4 | INVERTED; the two reject ACTION strings pinned byte-identical |
+   | `tests/plan-question-screen.test.js` | 2 | INVERTED; the vacuous `/Approve .* across Gate/` pattern kept beside the real assertion so the dead wording cannot return |
+   | `CLAUDE.md` / `tests/readme-numbers.test.js` | 1 | counts moved 107→108 modules, test count re-measured |
 
-   Every one of these asserts the EXACT STRINGS this plan exists to delete. They are
-   not wrong tests being softened; they pin the old contract and must be re-pointed at
-   the new one (invert, not loosen). **They were NOT touched**, because `files:` is the
-   permission grant and editing it would invalidate the approval this plan acts under.
-   The declared work is complete and green; the suite is red on these 13 cases until
-   the grant is extended.
+   Every one was INVERTED, not softened — each now asserts against the single
+   `gate-words` vocabulary encoding plus a negative fence that fails if a gate number,
+   a raw stage name or a slug reaches a human-readable string again (the per-row
+   justification is in Decision 13 above). **The declared work is complete and the
+   full gated suite is green** (`npm test`: coverage 99.14% ≥ 99, 0 failed, 0 skipped;
+   `npx tsc --noEmit` clean). The earlier "the suite is red on these 13 cases" note
+   described the state BEFORE the authorized scope extension; it no longer holds.

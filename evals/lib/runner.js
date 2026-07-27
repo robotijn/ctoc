@@ -163,7 +163,18 @@ function runClaude(prompt, opts = {}) {
     maxBuffer: MAX_BUFFER_BYTES
   });
 
-  if (!result || result.error) {
+  // A genuine failure to RUN the process (for example the binary is missing:
+  // ENOENT, status null, no output) is fatal and throws. But a broken-pipe
+  // (EPIPE) on the parent's stdin WRITE is NOT a run failure: the child read
+  // what it needed, produced its stdout, and EXITED before draining the rest
+  // of the prompt — so `spawnSync` reports EPIPE while `status`, `stdout` and
+  // `stderr` are all fully captured. Throwing there would discard a completed,
+  // valid run (the intermittent EPIPE flake under heavy parallel load). A
+  // completed child (numeric status) whose only error is a stdin-write EPIPE
+  // falls through to the normal loud-error contract below.
+  const isStdinWriteEpipe =
+    result && result.error && result.error.code === 'EPIPE' && typeof result.status === 'number';
+  if (!result || (result.error && !isStdinWriteEpipe)) {
     const detail = result && result.error ? result.error.message : 'no result from spawn';
     throw new Error(`Failed to run the claude binary "${bin}": ${detail}`);
   }
