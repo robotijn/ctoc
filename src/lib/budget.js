@@ -33,18 +33,25 @@
 
 const safeFs = require('./safe-fs');
 const path = require('path');
+const { describeProjectRoot } = require('./project-root');
 
+/**
+ * Resolve the project root by delegating to the ONE shared resolver.
+ *
+ * This MUST NOT be re-implemented as a private ancestry walk. A private copy that
+ * accepts a BARE `.ctoc` climbs from any project beneath $HOME up to the crypto home
+ * `~/.ctoc` (created by src/lib/crypto.js) and over-roots to $HOME, so session budgets
+ * belong to no project. The shared resolver requires a genuine PROJECT `.ctoc` and
+ * fixed exactly this — see the comment at src/lib/project-root.js:87-94 (plan 00178).
+ * The exported contract is preserved: same name, arity, and a STRING return; on
+ * fallback the shared resolver returns the working directory, so path builders keep
+ * working.
+ *
+ * @param {string} [start=process.cwd()] - Directory to start searching from
+ * @returns {string} Project root path (never null, never an object)
+ */
 function findProjectRoot(start = process.cwd()) {
-  let dir = start;
-  for (let i = 0; i < 12; i++) {
-    if (safeFs.existsSync(path.join(dir, '.ctoc')) || safeFs.existsSync(path.join(dir, '.claude-plugin'))) {
-      return dir;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return start;
+  return describeProjectRoot(start).root;
 }
 
 // ─────────────────────────────────────────────────────────────────────
