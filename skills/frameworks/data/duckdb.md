@@ -1,6 +1,19 @@
 # DuckDB CTO
 > Claude Code correction guide. Updated January 2026.
 
+<!-- ctoc:claims
+- id: duckdb-python-version
+  kind: registry-version
+  source: https://pypi.org/pypi/duckdb/json
+  select: info.version
+  expect: 1.5.4
+  retrieved: 2026-07-10
+- id: duckdb-concurrency-doc
+  kind: url-live
+  source: https://duckdb.org/docs/stable/connect/concurrency
+  retrieved: 2026-07-10
+-->
+
 ## Installation (CURRENT - January 2026)
 ```bash
 pip install duckdb>=1.0

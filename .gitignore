@@ -17,6 +17,9 @@ coverage/
 # Plan-index cache (local-only, rebuildable from plans; pure-JS JSON store — PI1)
 .ctoc/index/
 
+# Claim-verification cache + ledger (local-only, regenerable by verify-claims.js — 00136)
+.ctoc/verification/
+
 # OS files
 .DS_Store
 Thumbs.db
