@@ -1,0 +1,6 @@
+{
+  "minDeclaredFiles": 0,
+  "note": "Files under skills/ carrying a ctoc:claims block. RAISE as guides are annotated; never lower. This is a one-directional FLOOR, not a whitelist, and must never grow one. Measured LIVE by tests/claim-census.test.js and by the iron-loop-enforcer claim-census check — read the real number, do not trust this comment. Seeded at the live measured value (0) at build time because no guide carries a block yet; slice 00136 annotates the first handful and raises it.",
+  "seededAt": "2026-07-21",
+  "seededAtVersion": "6.13.8"
+}

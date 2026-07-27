@@ -262,7 +262,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 462 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 463 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -394,6 +394,37 @@ read, parsed, or trusted is a broken instrument, and the gate exits non-zero bef
 runs the suite rather than enforcing a weaker floor it never read. Same discipline as
 the parsers above it in that file: never return a number you did not read.
 
+**Guides DECLARE their checkable claims, and the corpus reports how many it has.**
+The ~61 structural corpus tests guard against a future edit THINNING a guide; they
+never check whether a guide is TRUE. `src/lib/claim-extractor.js` adds that orthogonal
+axis. A guide declares its version/link claims in an HTML comment block — invisible to
+a markdown renderer and to an agent reading the guide as context:
+```
+<!-- ctoc:claims
+- id: duckdb-python-version
+  kind: registry-version            # registry-version | url-live (closed enum)
+  source: https://pypi.org/pypi/duckdb/json   # https only, no userinfo, no port
+  select: info.version              # registry-version only; rejects __proto__/constructor/prototype
+  expect: 1.5.4                     # registry-version only
+  retrieved: 2026-07-10             # YYYY-MM-DD
+-->
+```
+Claims are DECLARED, never inferred from prose — a mis-parsed claim is a FALSE
+refutation, worse than no check. A malformed record is NEVER dropped: it is returned
+with a closed-enum reason (`unknown-kind` · `missing-field` · `duplicate-id` ·
+`insecure-source` · `unsafe-source` · `unsafe-selector` · `bad-date`). A guide with NO
+block is `declared: false` (nobody looked) — distinct from an EMPTY block
+(`declared: true`, an author looked and found nothing checkable). `censusCorpus` walks
+`skills/**/*.md` and, like the stale detector, reports `unreadableCount` — `undeclaredFiles
+=== 0` means "the whole corpus declares claims" ONLY when `unreadableCount === 0`. The
+declared-file count is a one-directional floor in `.ctoc/claim-coverage-baseline.json`
+(`minDeclaredFiles`, ratchet-up only, an unreadable baseline BLOCKS), enforced live by
+`tests/claim-census.test.js` and the `iron-loop-enforcer` `claim-census` check. Slice
+00136 fetches; 00138 surfaces the census to the menu. **No network fetch happens here,
+and this does not verify prose, recommendations, or code-example correctness — the great
+majority of the corpus by volume stays unverified, and the census reports the uncovered
+remainder as a number so nobody mistakes partial coverage for coverage.**
+
 ---
 
 ## Release
@@ -440,13 +471,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (start, push, update)
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use, subagent stop)
-    lib/                 115 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 116 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 462 test files
+  tests/                 463 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
