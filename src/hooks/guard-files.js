@@ -9,7 +9,10 @@
  * tool call and cannot be.
  *
  * I/O convention (matches src/hooks/PreToolUse.Edit.js / PreToolUse.Bash.js):
- *   - reads BOTH the env var CLAUDE_TOOL_INPUT (JSON string) AND stdin JSON.
+ *   - reads the PreToolUse payload from STDIN only. The env var CLAUDE_TOOL_INPUT
+ *     is NOT read (the harness never sets it; reading it first let any process
+ *     substitute a decoy target — see getTarget). Single source of truth is
+ *     fenced by tests/hook-payload-single-source.test.js.
  *   - BLOCK is signalled through the shared `hook-deny-signal` emitter
  *     (`permissionDecision:"deny"` JSON on stdout + exit 0) — the ONLY signal the
  *     Claude Code harness actually treats as blocking. A bare `process.exit(1)` is
@@ -59,6 +62,10 @@ const PROTECTED_PATTERNS = [
   // auth_token) so camelCase `refreshToken` does not match; plus `.token` and
   // `token(s).<secret-ext>` file forms (access_token.json, api_token.txt, …).
   /(^|[/_.-])((access|refresh|auth)[_-]token|\.token|tokens?\.(json|ya?ml|txt|env))\b/i,
+  // The Iron Loop signing key (src/lib/crypto.js:14 → ~/.ctoc/.secret). With it, any
+  // state file can be signed by hand, and state drives the Bash hook's write and commit
+  // gates. Anchored to a path-segment start so `mysecret.js` / `secretly.js` do not match.
+  /(^|[/\\])\.secret\b/i,
 ];
 
 /**
@@ -82,30 +89,21 @@ function readStdinJson() {
 }
 
 /**
- * Extract the secret-guard target = "<file_path> <command>" from BOTH the env
- * var CLAUDE_TOOL_INPUT and stdin JSON (mirrors PreToolUse.Edit.js). Either
- * source may carry the payload depending on how Claude Code invokes the hook.
+ * Extract the secret-guard target = "<file_path> <command>" from stdin JSON only.
+ *
+ * STDIN IS THE ONLY SOURCE. The env var CLAUDE_TOOL_INPUT is NOT read: the harness
+ * never sets it, and the old form consulted stdin ONLY when the environment
+ * produced neither a path nor a command, so a single non-empty env field discarded
+ * the real payload — `{"command":"echo safe"}` in the env masked a `Read` of `.env`
+ * on stdin. An absent payload returns `''` and isSecretTarget('') is false → allow;
+ * that pre-existing fail-open on a missing payload is unchanged by this slice.
  * @param {object|null} stdinJson
  * @returns {string}
  */
 function getTarget(stdinJson) {
-  let filePath = '';
-  let command = '';
-
-  const fromEnv = process.env.CLAUDE_TOOL_INPUT || '';
-  try {
-    const parsed = JSON.parse(fromEnv);
-    filePath = parsed.file_path || parsed.path || parsed.notebook_path || '';
-    command = parsed.command || '';
-  } catch { /* fall through to stdin */ }
-
-  if ((!filePath && !command) && stdinJson && stdinJson.tool_input) {
-    const ti = stdinJson.tool_input;
-    filePath = ti.file_path || ti.path || ti.notebook_path || '';
-    command = ti.command || '';
-  }
-
-  return `${filePath || ''} ${command || ''}`;
+  const ti = (stdinJson && stdinJson.tool_input) || null;
+  if (!ti) return '';
+  return `${ti.file_path || ti.path || ti.notebook_path || ''} ${ti.command || ''}`;
 }
 
 function main() {
@@ -135,8 +133,10 @@ function main() {
   }
 }
 
-// Export the pure matcher for testing; run main() only as a script.
-module.exports = { isSecretTarget, PROTECTED_PATTERNS };
+// Export the pure matcher + target extractor for testing; run main() only as a
+// script. getTarget is a second view of the function main() already calls at :114
+// — no new live surface, just testable.
+module.exports = { isSecretTarget, PROTECTED_PATTERNS, getTarget };
 
 if (require.main === module) {
   main();

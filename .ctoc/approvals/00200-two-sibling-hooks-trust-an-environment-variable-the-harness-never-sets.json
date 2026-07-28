@@ -1,0 +1,9 @@
+{
+  "content_sha256": "868ae0f68c77b83cc8103239b14a0d896723c704f3e327f465dce8ffd12ecc7e",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-28T23:27:26.006Z",
+  "approved_by": "human",
+  "plan_basename": "00200-two-sibling-hooks-trust-an-environment-variable-the-harness-never-sets"
+}

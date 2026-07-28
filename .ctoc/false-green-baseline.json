@@ -1,5 +1,5 @@
 {
-  "maxFindings": 209,
+  "maxFindings": 207,
   "note": "DEBT, not blessing. These are pre-existing false-green sites — checks that can report a verdict on input they never received — tolerated so the fence could land. This list may only ever SHRINK. Never raise maxFindings to make a run pass; fix a site and lower it instead.",
   "whitelistNote": "SEPARATE from the debt list above. `whitelist` is a PERMANENT exemption for a construct that is genuinely correct, and every entry requires a written justification. It starts EMPTY. Adding to it is a reviewable act; adding to `findings` is forbidden.",
   "findings": [
@@ -9,7 +9,6 @@
     "src/commands/update.js:exit-with-pending-writes:update",
     "src/commands/update.js:exit-with-pending-writes:update#2",
     "src/commands/update.js:exit-with-pending-writes:update#3",
-    "src/hooks/guard-files.js:silent-catch:getTarget",
     "src/hooks/guard-files.js:exit-with-pending-writes:main",
     "src/hooks/guard-files.js:silent-catch:main",
     "src/hooks/guard-files.js:exit-with-pending-writes:main#2",
@@ -22,7 +21,6 @@
     "src/hooks/PostToolUse.status-check.js:silent-catch:main",
     "src/hooks/PostToolUse.status-check.js:exit-with-pending-writes:main",
     "src/hooks/PreToolUse.Bash.js:exit-with-pending-writes:<module>",
-    "src/hooks/PreToolUse.Edit.js:silent-catch:getTargetFile",
     "src/hooks/PreToolUse.Edit.js:silent-catch:block",
     "src/hooks/PreToolUse.Edit.js:silent-catch:allow",
     "src/hooks/PreToolUse.Edit.js:exit-with-pending-writes:enforce",

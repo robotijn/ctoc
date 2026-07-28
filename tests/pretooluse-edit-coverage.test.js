@@ -9,8 +9,8 @@
  *   • isWhitelisted            — absolute-relativize, traversal rejection, the
  *                                 basename SECOND-operand of the string match.
  *   • isProtectedLedgerPath    — the `.ctoc/approvals/` `/`-boundary and traversal.
- *   • getTargetFile            — env-JSON precedence, the file_path||path||notebook_path
- *                                 fallback chain, the `|| null` default, regex fallback.
+ *   • getTargetFile            — stdin-only (CLAUDE_TOOL_INPUT ignored, plan 00200); the
+ *                                 file_path||path||notebook_path chain, the `|| null` default.
  *   • enforce()                — every ALLOW and every BLOCK exit, driven end-to-end
  *                                 against REAL os.tmpdir() project fixtures with the
  *                                 REAL detector / plan-coverage / escape-phrase libs.
@@ -275,7 +275,7 @@ describe('isProtectedLedgerPath', () => {
 });
 
 // ===========================================================================
-// getTargetFile — env-JSON precedence, fallback chain, regex fallback
+// getTargetFile — stdin-only (CLAUDE_TOOL_INPUT is not read, plan 00200)
 // ===========================================================================
 
 describe('getTargetFile', () => {
@@ -290,26 +290,30 @@ describe('getTargetFile', () => {
     }
   }
 
-  it('reads file_path from CLAUDE_TOOL_INPUT JSON first', () => {
+  // CONTRACT CHANGE (plan 00200): CLAUDE_TOOL_INPUT is no longer an input channel.
+  // The harness never sets it, and reading it first let any process substitute a
+  // decoy target. These cases assert the env var is now IGNORED — stdin is the only
+  // source. They previously asserted env-first precedence, which was the defect.
+  it('ignores a file_path in CLAUDE_TOOL_INPUT (env is not an input channel)', () => {
     withEnv(JSON.stringify({ file_path: 'env/a.js' }), () => {
-      assert.equal(getTargetFile(null), 'env/a.js');
+      assert.equal(getTargetFile(null), null, 'env-only + null stdin → null; the env is never read');
     });
   });
 
-  it('falls to .path then .notebook_path in the env JSON', () => {
+  it('ignores .path / .notebook_path in the env JSON', () => {
     withEnv(JSON.stringify({ path: 'env/b.js' }), () => {
-      assert.equal(getTargetFile(null), 'env/b.js', 'env .path is the second env branch');
+      assert.equal(getTargetFile(null), null, 'env .path is ignored');
     });
     withEnv(JSON.stringify({ notebook_path: 'env/c.ipynb' }), () => {
-      assert.equal(getTargetFile(null), 'env/c.ipynb', 'env .notebook_path is the third env branch');
+      assert.equal(getTargetFile(null), null, 'env .notebook_path is ignored');
     });
   });
 
-  it('env JSON wins over stdin tool_input (precedence)', () => {
-    withEnv(JSON.stringify({ file_path: 'ENV_WINS' }), () => {
-      const stdin = { tool_input: { file_path: 'STDIN_LOSES' } };
-      assert.equal(getTargetFile(stdin), 'ENV_WINS',
-        'a present env file_path must take precedence over the stdin payload');
+  it('stdin tool_input wins; a decoy in the env cannot substitute the target', () => {
+    withEnv(JSON.stringify({ file_path: 'ENV_DECOY' }), () => {
+      const stdin = { tool_input: { file_path: 'STDIN_WINS' } };
+      assert.equal(getTargetFile(stdin), 'STDIN_WINS',
+        'the stdin payload is the only source; a present env file_path must be ignored');
     });
   });
 
@@ -329,10 +333,10 @@ describe('getTargetFile', () => {
     });
   });
 
-  it('best-effort regex-extracts file_path from a non-JSON env string', () => {
+  it('does NOT regex-extract file_path from a non-JSON env string (fallback deleted)', () => {
     withEnv('some prefix file_path: "regex/target.js" trailing', () => {
-      assert.equal(getTargetFile(null), 'regex/target.js',
-        'the regex fallback recovers file_path from an unparseable env blob');
+      assert.equal(getTargetFile(null), null,
+        'the best-effort regex over the env string is gone; it matched file_path out of arbitrary prose');
     });
   });
 

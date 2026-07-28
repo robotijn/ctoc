@@ -243,22 +243,31 @@ function readStdinJson() {
   } catch { return null; }
 }
 
+/**
+ * Extract the tool-call target from the PreToolUse payload.
+ *
+ * STDIN IS THE ONLY SOURCE. `process.env.CLAUDE_TOOL_INPUT` is NOT read: the
+ * harness never sets it, and reading it first let any process in the session
+ * substitute a decoy path — `{"file_path":"VERSION"}` resolved to the whitelist
+ * allow at :519 while the real Edit landed elsewhere, defeating the ledger guard,
+ * the verify-evidence guard and plan coverage in one line. The trailing best-effort
+ * regex over the same untrusted string went with it (it matched `file_path` out of
+ * arbitrary prose). PreToolUse.Bash.js records the same lesson; this is the second
+ * of the three siblings to apply it, and tests/hook-payload-single-source.test.js
+ * fences a fourth from ever reappearing.
+ *
+ * A null target (no payload, or no recognized key) is fail-closed today: enforce()
+ * skips the two protected-path guards and the whitelist, reaches the coverage check
+ * with `coverage && targetFile` false, and falls through to block() at :559.
+ */
 function getTargetFile(stdinJson) {
-  const fromEnv = process.env.CLAUDE_TOOL_INPUT || '';
-  try {
-    const parsed = JSON.parse(fromEnv);
-    if (parsed.file_path) return parsed.file_path;
-    if (parsed.path) return parsed.path;
-    if (parsed.notebook_path) return parsed.notebook_path;
-  } catch { /* fall through */ }
-
   if (stdinJson && stdinJson.tool_input) {
-    return stdinJson.tool_input.file_path || stdinJson.tool_input.path || stdinJson.tool_input.notebook_path || null;
+    return stdinJson.tool_input.file_path
+      || stdinJson.tool_input.path
+      || stdinJson.tool_input.notebook_path
+      || null;
   }
-
-  // Best-effort regex
-  const m = fromEnv.match(/file_path['":\s]+["']?([^"'\s,}]+)/);
-  return m ? m[1] : null;
+  return null;
 }
 
 function readTranscript(stdinJson) {
