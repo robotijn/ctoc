@@ -46,6 +46,27 @@
  * are reviewable artifacts (a checked-in file, a stale-cleanup log entry), which is
  * exactly the difference from the un-auditable one-liner this deny closes.
  *
+ * THIS GUARD NOW TOUCHES THE FILESYSTEM (slice 00141), and the "pure string check,
+ * no filesystem walk" property above was GIVEN UP DELIBERATELY. The arithmetic
+ * tests in `isLedgerWrite` reason about NAMES; a symbolic link is a fact about the
+ * filesystem, not about a name, so `ln -s .ctoc src/link && echo x > src/link/approvals/f.json`
+ * spelled no protected path and forged the ledger. The chosen control is NOT a
+ * longer blocklist of link-creating commands: adding `ln` to WRITE_PATTERNS buys
+ * NOTHING (its only consequence is a Step-8 gate the attacker is already past, and
+ * `ALWAYS_ALLOWED` routes every interpreter around it) and COSTS the install step
+ * (`npm install` legitimately creates symbolic links in node_modules). The control
+ * goes at RESOLUTION: a third, independent test asks the ONE encoding of real-path
+ * confinement (`src/lib/real-path-confinement.js`, `resolvesUnder`) whether an
+ * operand REALLY lands under `.ctoc/approvals`, whatever links it passes through.
+ * It runs LAST — only when the two arithmetic tests both missed — and only on
+ * operands, so a command already matching pays no syscall. A THROW out of this
+ * guard is an ALLOW (see the fail-open note at its call site), so `resolvesUnder`
+ * is wired for its fault-is-`true`, never-throw contract and nothing may wrap it in
+ * anything that converts a fault into a permit. If the module fails to LOAD, the
+ * guard degrades to arithmetic-only and the link path into the ledger is open again
+ * — a real degradation, recorded here rather than silent, and still better than
+ * crashing (a crash exits 1, which the harness treats as NON-blocking = allow).
+ *
  * INPUT (W01-s2, finding C2): the PreToolUse payload arrives on STDIN (fd 0) as
  * JSON ({ tool_name, tool_input: { command } }) — the same transport
  * PreToolUse.Edit.js reads. The hook does NOT read process.env.CLAUDE_TOOL_INPUT
@@ -65,6 +86,19 @@ const path = require('path');
 const { loadState, STEP_NAMES } = require('../lib/state-manager');
 const { writeToTerminal, colors } = require('../lib/ui');
 const { emitDeny } = require('../lib/hook-deny-signal');
+
+// FAIL-SOFT require of the ONE real-path-confinement encoding (matching the shape
+// PreToolUse.Edit.js uses). If it cannot load, `realPathConfinement` stays null and
+// the ledger guard degrades to its two ARITHMETIC tests — the link path into the
+// ledger is open again. That is a real degradation, recorded rather than silent:
+// crashing instead would be WORSE, because this file's error handler exits 1, which
+// the harness treats as non-blocking (an allow). See the header paragraph.
+let realPathConfinement = null;
+try {
+  realPathConfinement = require('../lib/real-path-confinement');
+} catch {
+  realPathConfinement = null;
+}
 
 const MINIMUM_STEP_FOR_WRITE = 8;
 const MINIMUM_STEP_FOR_COMMIT = 15;
@@ -165,6 +199,82 @@ function resolveTokenPath(prefix, token) {
   return path.posix.normalize((prefix ? prefix + '/' : '') + t);
 }
 
+/** The protected directory, relative to the project root, for real-path resolution. */
+const LEDGER_DIR_RELATIVE = '.ctoc/approvals';
+
+/**
+ * The single-quoted and double-quoted string literals inside a segment, contents
+ * only. An interpreter forgery hides the path INSIDE eval code
+ * (`node -e "require('fs').writeFileSync('src/link/approvals/f.json','x')"`), where
+ * whitespace tokenization mashes the whole code into one garbage operand and the
+ * embedded path never appears as a resolvable token. The clean path IS a quoted
+ * literal, so those are resolved too — the arithmetic adjacency test already scans
+ * the whole segment, but it cannot see a path that reaches the ledger ONLY through a
+ * link. Measured false-deny over every real start.md `node -e` recipe (56 candidates)
+ * plus the dev corpus: zero (Decision 4's gate). Contents only, so a literal that is
+ * a real ledger path is still bounded by the same resolution as a shell operand.
+ * @param {string} seg
+ * @returns {string[]}
+ */
+function quotedLiterals(seg) {
+  const out = [];
+  let m;
+  const single = /'([^']*)'/g;
+  while ((m = single.exec(seg)) !== null) out.push(m[1]);
+  const dbl = /"([^"]*)"/g;
+  while ((m = dbl.exec(seg)) !== null) out.push(m[1]);
+  return out;
+}
+
+/**
+ * A bounded number of operands per segment get the real-path resolution. Beyond the
+ * cap the two ARITHMETIC tests alone stand — a STATED ceiling (Decision 3), never a
+ * silent one: denying a long command outright would deny real work (`git add` with
+ * many files). Measured: 51 operands resolve in ~3.3ms, so 128 bounds the worst case
+ * well under the per-command budget while never clipping a realistic `git add`.
+ */
+const OPERAND_RESOLUTION_CAP = 128;
+
+/**
+ * A candidate longer than this is NOT resolved. `PATH_MAX` is 4096 on Linux/macOS,
+ * `NAME_MAX` 255 per component; a token above that cannot name a real filesystem
+ * entry, so `realpathSync`/`lstat` answer `ENAMETOOLONG` — a fault the confinement
+ * module (correctly, for a genuine operand) fails CLOSED on, which would turn a
+ * harmless `echo <20k chars>` into a false deny. Skipping is SOUND, not a weakening:
+ * a path too long to stat is too long to WRITE (the forgery itself would
+ * `ENAMETOOLONG`), so no real ledger entry is reachable through such a token, and the
+ * arithmetic adjacency test still scans the full string regardless. A real ledger
+ * path (`.ctoc/approvals/<slug>.json`) is well under this bound.
+ */
+const MAX_CANDIDATE_LEN = 4096;
+
+/**
+ * Does a single shell operand REALLY resolve under `<cwd>/.ctoc/approvals`, whatever
+ * symbolic links it passes through? This is the third, filesystem-aware ledger test
+ * — WIRING the one real-path-confinement encoding, never a second copy of it.
+ *
+ * Applies the SAME accumulated `cd` prefix `resolveTokenPath` builds, so
+ * `cd .ctoc && echo > link/approvals/x` is resolved from the ledger-adjacent cwd and
+ * cannot slip past. Returns `resolvesUnder`'s verdict UNWRAPPED — including its
+ * fault-is-`true` inversion (every resolution fault DENIES) — because a confinement
+ * check that permits when it could not look is the whole defect. Returns `false`
+ * only when the module is ABSENT (degraded: arithmetic-only) or the token is not a
+ * path at all — never converting a fault into a permit.
+ *
+ * @param {string} prefix - accumulated cwd from prior `cd`/`pushd` segments
+ * @param {string} token
+ * @returns {boolean} true iff the operand really lands in the ledger (or a fault said so)
+ */
+function operandResolvesIntoLedger(prefix, token) {
+  if (!realPathConfinement) return false; // degraded — the header records this
+  const rel = resolveTokenPath(prefix, token);
+  if (!rel) return false;
+  // A token longer than any real path cannot name a ledger entry; resolving it only
+  // manufactures an ENAMETOOLONG fault that fail-closes to a false deny. See the const.
+  if (rel.length > MAX_CANDIDATE_LEN) return false;
+  return realPathConfinement.resolvesUnder(rel, LEDGER_DIR_RELATIVE, process.cwd());
+}
+
 /**
  * Does a command make a NON-READ touch of the ledger directory — in ANY form:
  * literal-adjacent (`cp x .ctoc/approvals/y`), quote-split (`.ctoc"/"approvals`),
@@ -252,12 +362,26 @@ function isLedgerWrite(command) {
     }
     // (a) adjacent path anywhere in the normalized segment (literal / quote-split
     //     / inline-code); OR (b) an operand resolving under the ledger via the cd
-    //     prefix. Redirect operators become separators so `echo x>approvals/y` splits.
+    //     prefix; OR (c) an operand that REALLY resolves into the ledger through a
+    //     symbolic link. (a) and (b) are ARITHMETIC and run FIRST — a segment they
+    //     already match pays no syscall — and (c) touches the filesystem only on the
+    //     operands of a segment neither arithmetic test caught.
+    //     Redirect operators become separators so `echo x>approvals/y` splits.
     let touches = LEDGER_SEGMENT_RE.test(normalizeForMatch(seg));
+    const tokens = seg.replace(/[<>]+/g, ' ').split(/\s+/).filter(Boolean);
+    const operands = tokens.slice(1).filter((t) => !t.startsWith('-'));
     if (!touches) {
-      const tokens = seg.replace(/[<>]+/g, ' ').split(/\s+/).filter(Boolean);
-      const operands = tokens.slice(1).filter((t) => !t.startsWith('-'));
       touches = operands.some((t) => LEDGER_RESOLVED_RE.test(resolveTokenPath(prefix, t)));
+    }
+    if (!touches) {
+      // (c) The filesystem-aware test — the link-through-the-ledger close. Candidates
+      // are the shell operands PLUS the segment's quoted string literals, so a path
+      // embedded in `node -e "…'link/approvals/x'…"` is resolved as well. Bounded by
+      // OPERAND_RESOLUTION_CAP (Decision 3, a stated ceiling); beyond the cap the
+      // arithmetic verdict above stands.
+      const candidates = operands.concat(quotedLiterals(seg));
+      touches = candidates.slice(0, OPERAND_RESOLUTION_CAP)
+        .some((t) => operandResolvesIntoLedger(prefix, t));
     }
     if (touches && !isReadOnlyLedgerCommand(seg)) return true;
   }
@@ -772,6 +896,14 @@ async function main() {
 // through the real spawned process — the strongest possible test — so there is no
 // live in-process caller for a module export, and adding one would be a dead export
 // (the reachability fence's "a test is not a caller" rule).
+// FAIL-OPEN CATCH — and this is why the real-path-confinement wiring above must
+// RETURN a refusing value and NEVER throw. `process.exit(1)` is the legacy cosmetic
+// code this file's header records the harness treating as NON-blocking: it is NOT a
+// deny (the real deny is `emitDeny`'s decision JSON + exit 0). So a throw out of the
+// ledger guard reaches here and becomes an ALLOW — the exact defect the guard exists
+// to prevent. This reaches the same conclusion as the editing hook's fail-open catch
+// by a DIFFERENT route (there, `catch → exit(0)`; here, `catch → exit(1)` = harness
+// non-block); both must be preserved as-is, never "unified" into consistency.
 main().catch(err => {
   console.error('[CTOC] Bash gate error:', err.message);
   process.exit(1);
