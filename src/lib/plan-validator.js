@@ -11,6 +11,7 @@ const { parseMetadata } = require('./state');
 const { findProjectRoot } = require('./project-root');
 const { extractFrontmatterRegion, parseFilesField } = require('./stale-detector');
 const { readVerifyEvidence } = require('./step-13-verify');
+const { checkPlanDeclaresCountMovers } = require('./documented-counts');
 
 /**
  * Validation result structure
@@ -1044,6 +1045,30 @@ function validateForQueue(planPath, projectPath) {
     result.errors.push('Plan missing title (# heading)');
     result.valid = false;
   }
+
+  // Count-mover declaration gate (00082): a plan that will CREATE a documented-count
+  // artifact (a new tests/*.test.js, src/lib/*.js, src/hooks/*.js, src/tabs/*.js,
+  // agents/**/*.md, or skills/**/*.md) MUST declare CLAUDE.md, so the build that
+  // moves the count has permission to update it — CLAUDE.md is the ONE ratchet the
+  // PreToolUse hook withholds without a declaration. Read the declared files with
+  // the MULTI-BLOCK reader (a gate-stamped plan prepends an approval block, so the
+  // single-block reader returns [] for every plan already in todo/). A hard ERROR
+  // (a warning would be ignored) — this is the Gate-2 crossing, the moment the
+  // declaration must be right, before a build is committed to the plan.
+  const declaredFiles = parseFilesField(extractFrontmatterRegion(content));
+  const countCheck = checkPlanDeclaresCountMovers(declaredFiles, projectPath);
+  if (!countCheck.ok) {
+    for (const off of countCheck.offenders) {
+      const countPhrase = off.currentCount != null ? `, currently ${off.currentCount}` : '';
+      result.errors.push(
+        `Plan will create "${off.path}" (moves the ${off.countClass} count${countPhrase}) but ` +
+        `does not declare "CLAUDE.md" in its files:. Add "CLAUDE.md" so the build can update the ` +
+        `documented count.`
+      );
+    }
+    result.valid = false;
+  }
+  result.checklist.countMovers = { ok: countCheck.ok, offenders: countCheck.offenders };
 
   // SIP1: a dangling parent_plan reference is a WARNING (never blocks the queue
   // gate) — merge only warnings, never flip `valid`.

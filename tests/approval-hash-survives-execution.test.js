@@ -72,6 +72,11 @@ const SPEC_PLAN = [
   'files:',
   '  - "src/lib/x.js"',
   '  - "tests/x.test.js"',
+  // This slice CREATES src/lib/x.js + tests/x.test.js — two documented-count
+  // artifacts — so the Gate-2 count-mover fence (src/lib/documented-counts.js,
+  // plan 00082) requires it to declare CLAUDE.md, the ratchet whose write the hook
+  // withholds. A count-mover that omits this is refused at implementation→todo.
+  '  - "CLAUDE.md"',
   '---',
   '',
   '# A slice',
