@@ -1,0 +1,9 @@
+{
+  "content_sha256": "df63e80ee2fc94bcfbdba5ef5f91dafb1306fa629b7d540ce07e1cc60e84a653",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-28T21:47:51.024Z",
+  "approved_by": "human",
+  "plan_basename": "00165-nothing-proves-the-dispatch-hook-ever-runs"
+}

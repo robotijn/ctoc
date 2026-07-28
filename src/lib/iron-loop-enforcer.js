@@ -706,7 +706,55 @@ const CHECKS = [
   { id: 'false-green-fence',           scope: 'architecture', mode: 'thorough', fn: checkFalseGreenFence },
   { id: 'gate-words-fence',            scope: 'architecture', mode: 'thorough', fn: checkGateWordsFence },
   { id: 'claim-census',                scope: 'architecture', mode: 'thorough', fn: checkClaimCensus },
+  { id: 'dispatch-seat-liveness',      scope: 'system',       mode: 'thorough', fn: checkDispatchSeatLiveness },
 ];
+
+/**
+ * Dispatch-seat liveness fence (plan 00165). Has CTOC's dispatch-path hook
+ * (`src/hooks/PreToolUse.Task.js`) produced evidence of running in this project? The
+ * seat's job is to record what a background dispatch is building; a claim mechanism
+ * built into a hook that never fires would leave the registry exactly as empty as it
+ * is now while the suite stayed green — this repository's false-green defect wearing
+ * the shape of an enforcement fence. `src/lib/dispatch-seat-liveness.js` answers the
+ * question at runtime and is reached HERE, from the enforcer a human runs; it is not
+ * reachable only from a test (a test is not a caller — see src/lib/reachability.js).
+ *
+ * The verdict mapping, and WHY it is not the plan's guessed block/block:
+ *   • `live`     → CLEAN (silent pass). The seat runs; a claim can be relied on. The
+ *                  evidence age lives on the module's return for any caller; a clean
+ *                  check emits no finding, exactly like every other healthy check, so
+ *                  the informational `plan-counts` stays the ONLY info finding.
+ *   • `not-live` → WARN. The instruments were read and hold no evidence the seat ever
+ *                  ran. This is a RUNTIME observation (`.ctoc/state`, `.ctoc/logs` are
+ *                  gitignored and environment-specific), not a defect in the committed
+ *                  source tree — so it is surfaced as drift a human reads, not as a
+ *                  `block` that would make CTOC's own clean-tree self-check permanently
+ *                  red on every fresh checkout until plan 00166 lands. The human still
+ *                  meets the verdict in the WARN section of the self-check report.
+ *   • `unknown`  → BLOCK. The instruments could not be READ, so nothing is known. This
+ *                  is the whole discipline: a check that cannot read its own instrument
+ *                  must NOT return the success value (mirroring test-gate.js's `null`).
+ *                  `unknown` is louder than `not-live` — "I could not look" is a worse
+ *                  position than "I looked and it is dead" (the plan's own ordering).
+ *                  It arises only when an instrument is unreadable, which never happens
+ *                  on a healthy checkout, so it never fires against the clean tree.
+ *
+ * Thorough mode only (it reads runtime state, off the SessionStart fast path).
+ *
+ * @param {string} root - Project root
+ * @returns {{clean: boolean, severity?: string, message?: string, details?: Object}}
+ */
+function checkDispatchSeatLiveness(root) {
+  const { seatLiveness, describeLiveness } = require('./dispatch-seat-liveness');
+  const result = seatLiveness(root);
+  if (result.state === 'live') return CLEAN();
+  const severity = result.state === 'unknown' ? 'block' : 'warn';
+  return finding({
+    severity,
+    message: describeLiveness(result),
+    details: { state: result.state, reason: result.reason, sources: result.sources },
+  });
+}
 
 /**
  * Dead-EXPORT fence invariant (2026-07-14, the deeper root cause). The file-level

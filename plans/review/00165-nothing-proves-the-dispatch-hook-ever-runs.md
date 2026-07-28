@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "Nothing proves the dispatch hook ever runs"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild
@@ -10,6 +11,9 @@ files:
   - "src/lib/dispatch-seat-liveness.js"
   - "tests/the-dispatch-seat-says-whether-it-is-live.test.js"
   - "src/lib/iron-loop-enforcer.js"
+approved_by: human
+approved_at: 2026-07-28T21:47:50.976Z
+gate_crossed: implementation → todo
 ---
 
 # Nothing proves the dispatch hook ever runs
@@ -362,6 +366,58 @@ Report, in this order:
 this set. If Step 9 finds another active plan declaring it, **stop and ask** rather
 than editing a file two plans claim.
 
+## Decisions Taken During Implementation
+
+1. **Severity mapping: `not-live` → WARN, `unknown` → BLOCK (a deliberate departure from
+   the plan's guessed block/block table, resolved by the code, which the plan said
+   wins).** Step 9 read `iron-loop-enforcer.js` in full, as Decision #6 instructed. Its
+   load-bearing contract is `tests/iron-loop-enforcer.test.js`: the live repo and a
+   frozen snapshot of it must self-check with **0 critical and 0 block** (lines 74-89),
+   and case 7 pins that "the summary counts do not move" (block 0, error 0, info 1).
+   The dispatch seat is genuinely `not-live` on this repository (re-measured — see the
+   Step 9 table), so mapping `not-live` to `block` would make CTOC's own clean-tree
+   self-check permanently red on every fresh checkout until 00166 lands, contradicting
+   the plan's own end-state (Step 14 requires a green `npm test` AND the enforcer
+   reporting `not-live`). A dead seat is a RUNTIME observation (`.ctoc/state`,
+   `.ctoc/logs` are gitignored and environment-specific), not a defect in the committed
+   source tree the clean-tree fences guard — so it is surfaced as WARN (drift the human
+   reads in the self-check report) rather than a source-tree BLOCK. `unknown` stays a
+   hard BLOCK: it means an instrument could not be READ, the whole discipline of this
+   plan, and it never fires on a healthy checkout (instruments are readable there), so
+   it never touches the clean-tree assertions. This also honours the plan's OWN stated
+   ordering (Decision #2): `unknown` is louder than `not-live`, "I could not look" worse
+   than "I looked and it is dead." Net result: the module's three-state logic is
+   implemented EXACTLY as specified; only the enforcer's presentation severity differs
+   from the guessed table, with ZERO existing-test changes and no false-green guard
+   weakened. Flagged for review as the one genuine design call.
+
+2. **An ABSENT enforcement log reads `no-task`, not `unreadable`.** The `sources`
+   enum for the log is `has-task | no-task | unreadable` — there is no `absent`. A log
+   file that does not exist is a SUCCESSFUL observation of "no Task evidence here"
+   (readable absence), the same verdict as a present log with no Task line; only a read
+   ERROR (a directory in its place, oversized, or every line unparseable) is
+   `unreadable`. This keeps a pristine project (no seat activity yet) reading `not-live`
+   rather than `unknown`, which matches the measured reality this plan models.
+
+3. **An oversized log is `unreadable`, bounded at 5 MiB (`MAX_LOG_BYTES`).** The log is
+   rotation-capped at 1000 compact entries (~250 KB); 5 MiB is ample headroom. A log
+   larger than the bound cannot be fully scanned, and a partial scan reporting `no-task`
+   would be a verdict on input never read — so it is reported `unreadable`, honouring
+   the "bounded read, no truncate-then-parse" requirement without an unbounded read.
+
+4. **On the `live` path the enforcer check emits NO finding (a silent CLEAN pass).** The
+   plan says live should "report the evidence age," but making live an `info` finding
+   would break case 7's `info === 1` invariant on any machine where the seat happens to
+   be live (agent-slots.json present). The evidence and its age remain on the module's
+   return value for any caller; the enforcer simply passes silently, exactly like every
+   other healthy check. `describeLiveness` still renders the age when asked.
+
+5. **`node_modules` was absent in this fresh worktree; `npm ci` installed it (Step 9
+   PREPARE).** The lint and typecheck gate tests assert their binaries exist at the
+   worktree-local `node_modules/...` paths. `npm ci` restored them faithfully from the
+   lockfile — `package-lock.json` was not modified and `node_modules` is gitignored, so
+   no dependency change is committed.
+
 ## Decisions Taken Under Ambiguity
 
 1. **The precondition is shipped as a runtime check, not settled as a one-off
@@ -398,3 +454,12 @@ than editing a file two plans claim.
    the real path, not a fixture that was always going to be well-formed.
 </content>
 </invoke>
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
