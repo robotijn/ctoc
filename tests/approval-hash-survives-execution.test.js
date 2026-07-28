@@ -237,7 +237,13 @@ test('content with NO frontmatter delimiters FAILS to hash and FAILS verificatio
   assert.equal(ledger.verify(slug, bad, 'todo', projectDir), false);
   const verdict = gateHook.classifyResidency(writePlan('todo', slug, bad), 'todo', projectDir);
   assert.equal(verdict.accepted, false);
-  assert.equal(verdict.reason, 'hash-mismatch');
+  // CONTRACT TIGHTENED by plan 00130 (approved at Gate 2): an unlocatable specification
+  // boundary now reports `spec-boundary-unlocatable` — "the check could not look" —
+  // instead of `hash-mismatch`, which meant "the specification changed" and sent the
+  // reader to the wrong diagnosis. Acceptance is UNCHANGED (still false — a check that
+  // cannot look must deny); only the reason became more precise. This is a
+  // tighten-toward-truth, never a loosening.
+  assert.equal(verdict.reason, 'spec-boundary-unlocatable');
 });
 
 test('empty content FAILS to hash and FAILS verification', () => {

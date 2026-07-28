@@ -240,6 +240,20 @@ function computeContentHash(content) {
  * The only silent-exemption route is a deliberate edit to a frozen constant in a
  * reviewed source file. Nothing an executor can do at runtime is silent.
  *
+ * NARROW, NOT WIDENED — the ruling, stated so it can be attacked. Every widening
+ * proposal (a marker, a delimiter convention, an executor-owned region) moves the
+ * boundary from a frozen constant in reviewed source to a boundary CHOSEN AT RUNTIME by
+ * the executor — the party whose writes the boundary exists to contain. That is not a
+ * smaller version of today's disclosed loss; it deletes the whole safety argument (the
+ * only silent exemption is a reviewed source diff). The narrow list keeps failing NOISY
+ * (recoverable by re-approval); a runtime boundary fails SILENT (not recoverable). So
+ * the list stays frozen, and the ONE reviewed way to exempt content is
+ * {@link EXECUTION_SECTION_PRODUCERS} — a table that forces every exemption to name its
+ * PRODUCER in the same diff, the only brake available inside a frozen-constant design.
+ * When the hash still moves, {@link diagnoseSpecMismatch} makes the failure LEGIBLE (it
+ * names the appended section instead of alleging a forged approval) WITHOUT moving the
+ * boundary or granting acceptance.
+ *
  * IT FAILS CLOSED. When the boundary cannot be established at all — no frontmatter
  * delimiters, an unterminated block, empty content — `computeSpecHash` returns
  * `ok: false` and EVERY caller must treat that as a FAILED verification. Not being
@@ -260,27 +274,47 @@ function computeContentHash(content) {
  * ------------------------------------------------------------------------- */
 
 /**
- * Headings whose sections are EXCLUDED from the specification hash, normalised
- * (marker stripped, trimmed, lowercased). Matched by PREFIX, because the real
- * headings on disk carry suffixes: `## Execution Record (Steps 8–16)`,
- * `## Execution Record (Steps 8-16)`, `## Execution Log (Steps 8–16)`. An exact
- * match would have recognised NONE of them, and the fix would have been inert on
- * every real plan in this repository.
+ * THE EXCLUSION LIST NAMES ITS PRODUCERS. Each excluded heading is paired with the
+ * producer that writes that section — the executor step, the rule, or the agent
+ * contract. `heading` is the normalised prefix (trimmed, lowercase, marker stripped)
+ * exactly as {@link isExecutionHeading} matches; `producer` is a non-empty string.
  *
- * Every entry here is a section written BY THE EXECUTOR, AFTER the approval.
- * Adding an entry is the one and only way to exempt content silently, which is
- * why this list is frozen, exported, and reviewed as source.
+ * WHY A TABLE, NOT A BARE LIST. Adding an exemption is the one and only way to exempt
+ * content silently (the deny-list's sanctioned, reviewed route — see the block comment
+ * above). A bare list let the set grow by convenience with nobody able to tell who
+ * writes each section. Forcing every row to name its producer makes an unjustifiable
+ * addition visible in the SAME reviewed diff — the only brake available inside a
+ * frozen-constant design. The rows are UNCHANGED in value and order from the six bare
+ * strings this replaced, so {@link EXECUTION_SECTIONS} (derived below), every consumer,
+ * and the pinned source digest are untouched.
+ *
+ * The scope-stop rule (plan 00123) records what landed under `## Execution Record`,
+ * which is ALREADY the first row — so the sanctioned, enumerable producer needs NO new
+ * exempting heading. A genuinely novel heading nobody has named still breaks the hash,
+ * which is the deny-list failing NOISY (recoverable), the correct direction, unchanged.
+ *
+ * @type {ReadonlyArray<{heading: string, producer: string}>}
+ */
+const EXECUTION_SECTION_PRODUCERS = Object.freeze([
+  Object.freeze({ heading: 'execution record', producer: 'iron-loop-executor — Steps 8–16 execution record; scope-stop rule (plan 00123)' }),
+  Object.freeze({ heading: 'execution log', producer: 'iron-loop-executor — Steps 8–16 execution log' }),
+  Object.freeze({ heading: 'step 16 final-review report', producer: 'iron-loop-executor — Step 16 FINAL-REVIEW report' }),
+  Object.freeze({ heading: 'decisions taken during execution', producer: 'iron-loop-executor — decisions recorded while building' }),
+  Object.freeze({ heading: 'verification evidence', producer: 'iron-loop-executor — Step 14 VERIFY evidence' }),
+  Object.freeze({ heading: 'decisions taken under ambiguity', producer: 'implementation-planner / iron-loop-executor — documented choices under ambiguity' }),
+]);
+
+/**
+ * Headings whose sections are EXCLUDED from the specification hash, normalised
+ * (marker stripped, trimmed, lowercased). DERIVED from {@link EXECUTION_SECTION_PRODUCERS}
+ * so the table is the single source of truth; identical in type, value and order to the
+ * six bare strings it replaced. Matched by PREFIX, because the real headings on disk
+ * carry suffixes: `## Execution Record (Steps 8–16)`, `## Execution Log (Steps 8–16)`.
+ * An exact match would have recognised NONE of them.
  *
  * @type {ReadonlyArray<string>}
  */
-const EXECUTION_SECTIONS = Object.freeze([
-  'execution record',
-  'execution log',
-  'step 16 final-review report',
-  'decisions taken during execution',
-  'verification evidence',
-  'decisions taken under ambiguity',
-]);
+const EXECUTION_SECTIONS = Object.freeze(EXECUTION_SECTION_PRODUCERS.map((e) => e.heading));
 
 /**
  * Is a normalised heading title the start of an excluded execution section?
@@ -362,6 +396,23 @@ function isCheckboxLine(trimmed) {
  *   EVERY caller must treat as a FAILED verification, never as a pass.
  */
 function computeSpecHash(content) {
+  return computeSpecHashWith(content, null);
+}
+
+/**
+ * {@link computeSpecHash} with an OPTIONAL set of additionally-excluded heading titles.
+ * The two share ONE walk so their exclusion semantics can never diverge — the whole
+ * point of {@link diagnoseSpecMismatch}'s proof (removing exactly those sections must
+ * restore the approved specification byte-for-byte). With `extraExcluded === null` the
+ * output is byte-identical to the pre-existing computeSpecHash and the pinned GOLDEN
+ * digest is unmoved.
+ *
+ * @param {string} content - the plan's full file content
+ * @param {(Set<string>|null)} extraExcluded - normalised titles to additionally exclude,
+ *   or `null` for the plain specification hash
+ * @returns {{hash: (string|null), ok: boolean, reason: (string|null), frontmatter: (string|null)}}
+ */
+function computeSpecHashWith(content, extraExcluded) {
   if (typeof content !== 'string' || content === '') {
     return { hash: null, ok: false, reason: 'empty-content', frontmatter: null };
   }
@@ -404,7 +455,8 @@ function computeSpecHash(content) {
       // An excluded section runs to the next heading of the SAME OR HIGHER level;
       // a deeper heading inside it (e.g. `### Step 14 numbers`) stays excluded.
       if (excluding && level <= excludeLevel) excluding = false;
-      if (!excluding && isExecutionHeading(trimmed.slice(level).trim().toLowerCase())) {
+      const norm = trimmed.slice(level).trim().toLowerCase();
+      if (!excluding && (isExecutionHeading(norm) || (extraExcluded !== null && extraExcluded.has(norm)))) {
         excluding = true;
         excludeLevel = level;
         continue;
@@ -440,6 +492,81 @@ function computeSpecHash(content) {
 }
 
 /**
+ * Diagnose WHY a specification-scoped comparison failed — as a PROOF, never a guess.
+ * Runs ONLY after a `contentMatches` mismatch and only ever returns a reason + section
+ * titles; it NEVER changes acceptance and NEVER writes anything. Pure, and never throws.
+ *
+ * THREE DISTINCT ANSWERS, because a diagnostic that lies is worse than none:
+ *   - `spec-boundary-unlocatable` — the specification boundary cannot be established at
+ *     all (no frontmatter, unterminated block, empty/non-string content). "I could not
+ *     look." Never folded into a mismatch, never a pass. A permission decision that
+ *     cannot look must deny — the caller keeps `accepted: false`.
+ *   - `hash-mismatch-new-section` — removing the named appended sections restores the
+ *     recorded digest BYTE-FOR-BYTE, which is a demonstration (not an inference) that
+ *     those sections are the entire difference. "I looked, and here is the proof."
+ *   - `hash-mismatch` — either there were no candidate sections to remove ("I looked and
+ *     found none"), or removing them did NOT restore the digest ("I looked, the
+ *     specification genuinely changed"). No speculation beyond that.
+ *
+ * WHICH SECTIONS ARE CANDIDATES — line 126 of the plan, not line 228. The candidate set
+ * is the non-execution top-level (`##`) sections positioned AFTER the last execution
+ * section, i.e. where an executor APPENDS its invented sections (a scope-stop record, a
+ * final-state record). Excluding ALL non-execution top-level sections would over-exclude
+ * legitimate specification sections (`## Implementation Details`) that the recorded
+ * digest INCLUDED, so the proof could never restore it on a real plan. Positional
+ * selection identifies the appended block without a second read or a per-line regex.
+ * SOUNDNESS DOES NOT DEPEND ON THE HEURISTIC: an exact match against the recorded digest
+ * is a byte-for-byte demonstration regardless of how the candidates were chosen, so a
+ * poor choice only lowers diagnostic RECALL (falls back to plain `hash-mismatch`), never
+ * fails closed the wrong way.
+ *
+ * AT MOST ONE EXTRA HASH PASS. Beyond establishing the boundary, exactly one recompute
+ * (`computeSpecHashWith`) — over content already in memory, independent of the number of
+ * sections. No I/O, no second read, no regular expression compiled per line.
+ *
+ * @param {string} content - the plan's current full file content
+ * @param {string} expectedHash - the recorded specification digest to prove against
+ * @returns {{reason: ('spec-boundary-unlocatable'|'hash-mismatch'|'hash-mismatch-new-section'), sections: string[]}}
+ */
+function diagnoseSpecMismatch(content, expectedHash) {
+  const base = computeSpecHash(content);
+  if (!base.ok) return { reason: 'spec-boundary-unlocatable', sections: [] };
+
+  // Enumerate top-level (##) headings in order, flagging the execution ones.
+  const lines = content.split(/\r?\n/);
+  const tops = [];
+  for (const raw of lines) {
+    const trimmed = raw.trim();
+    if (headingLevel(trimmed) !== 2) continue;
+    const title = trimmed.slice(2).trim();
+    tops.push({ title, norm: title.toLowerCase(), isExec: isExecutionHeading(title.toLowerCase()) });
+  }
+  let lastExec = -1;
+  for (let k = 0; k < tops.length; k++) if (tops[k].isExec) lastExec = k;
+
+  const candidateNorms = new Set();
+  const candidates = [];
+  for (let k = lastExec + 1; k < tops.length; k++) {
+    const h = tops[k];
+    if (h.isExec || candidateNorms.has(h.norm)) continue;
+    candidateNorms.add(h.norm);
+    candidates.push(h.title);
+  }
+  // "I looked and found no candidate" — distinct from "I could not look".
+  if (candidates.length === 0) return { reason: 'hash-mismatch', sections: [] };
+
+  const retry = computeSpecHashWith(content, candidateNorms);
+  if (retry.ok && retry.hash === expectedHash) {
+    return {
+      reason: 'hash-mismatch-new-section',
+      sections: candidates.slice(0, 5).map((t) => (t.length > 80 ? t.slice(0, 80) : t)),
+    };
+  }
+  // The specification genuinely changed; do not speculate further.
+  return { reason: 'hash-mismatch', sections: [] };
+}
+
+/**
  * THE SINGLE ENCODING of "does this content match this entry", branching on the
  * entry's recorded `hash_scope` and failing CLOSED.
  *
@@ -456,18 +583,29 @@ function computeSpecHash(content) {
  *
  * @param {object|null} entry - a parsed ledger entry
  * @param {string} content - the plan's current full file content
- * @returns {{match: boolean, scope: ('specification'|'file'), reason: (string|null)}}
+ * @returns {{match: boolean, scope: ('specification'|'file'), reason: (string|null), sections?: string[]}}
  *   `scope` is the semantics the comparison was made UNDER, so a caller can report
- *   a legacy mismatch distinctly from a real specification change. Both still reject.
+ *   a legacy mismatch distinctly from a real specification change. On a specification
+ *   mismatch, `reason` carries the proof-carrying diagnosis
+ *   ({@link diagnoseSpecMismatch}: `hash-mismatch` | `hash-mismatch-new-section` |
+ *   `spec-boundary-unlocatable`) and `sections` names the offending headings. `match`
+ *   is computed EXACTLY as before and is never touched by the diagnosis — all reasons
+ *   still reject.
  */
 function contentMatches(entry, content) {
   const scope = entry && entry.hash_scope === 'specification' ? 'specification' : 'file';
   if (scope === 'specification') {
     const res = computeSpecHash(content);
-    // FAIL CLOSED: an unlocatable boundary is not a match. Never trust a plan INTO
-    // an approval.
-    if (!res.ok) return { match: false, scope, reason: res.reason };
-    return { match: entry.content_sha256 === res.hash, scope, reason: null };
+    // The MATCH decision is unchanged: a locatable boundary whose digest equals the
+    // recorded one, and nothing else. An unlocatable boundary is NOT a match — fail
+    // closed, never trust a plan INTO an approval.
+    if (res.ok && entry.content_sha256 === res.hash) {
+      return { match: true, scope, reason: null, sections: [] };
+    }
+    // Mismatch only: attach the proof-carrying diagnosis so the message can be legible.
+    // This runs strictly AFTER match === false and only ever produces strings.
+    const diag = diagnoseSpecMismatch(content, entry && entry.content_sha256);
+    return { match: false, scope, reason: diag.reason, sections: diag.sections };
   }
   return { match: entry.content_sha256 === computeContentHash(content), scope, reason: null };
 }
@@ -972,7 +1110,9 @@ module.exports = {
   computeContentHash,
   computeSpecHash,
   contentMatches,
+  diagnoseSpecMismatch,
   EXECUTION_SECTIONS,
+  EXECUTION_SECTION_PRODUCERS,
   writeEntry,
   writePipelineEntry,
   writeSufficiencyEntry,
