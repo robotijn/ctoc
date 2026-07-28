@@ -16,6 +16,11 @@ const {
 const { getLastSync, manualSync } = require('../lib/sync');
 const { reconcileState } = require('../lib/task-reconcile');
 const { readLog } = require('../lib/enforcement-log');
+const claimLedger = require('../lib/claim-ledger');
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** The Doctor action number that runs the verifier — referenced by the row itself. */
+const VERIFY_ACTION = '5';
 
 const TOOLS = [
   { key: '1', label: 'Doctor', description: 'Health check & troubleshooting' },
@@ -53,6 +58,13 @@ function renderDoctor(app) {
   const allPass = checks.every(c => c.pass);
   output += `\n${allPass ? c.green + 'All checks passed.' + c.reset : c.red + 'Some checks failed.' + c.reset}\n\n`;
 
+  // Corpus claim-verification verdict — read off disk, no network. The honest
+  // signal lands WITH its display (unlike stale-detector.js's unreadCount, which
+  // is produced but not yet rendered; this slice does not repeat that debt).
+  output += `${c.bold}Corpus claims${c.reset}\n`;
+  output += renderClaimVerdict(app.projectPath);
+  output += '\n';
+
   // Last sync info
   const lastSync = getLastSync();
   if (lastSync) {
@@ -63,7 +75,8 @@ function renderDoctor(app) {
   output += `1. Run checks again\n`;
   output += `2. Repair state\n`;
   output += `3. Sync now\n`;
-  output += `4. View logs\n\n`;
+  output += `4. View logs\n`;
+  output += `5. Verify corpus claims\n\n`;
   output += `Ask a question: ${app.doctorInput || ''}_\n\n`;
   output += renderFooter(['b back', 'q quit']);
 
@@ -212,6 +225,112 @@ function getVersion() {
   }
 }
 
+/** Strip C0/C1 control characters (incl. ESC) from ledger-derived text before it
+ *  reaches the terminal — twin of stale-detector.js `stripCtlChars`, so a hostile
+ *  guide path cannot carry escape sequences into the dashboard. */
+function stripCtl(s) {
+  return String(s).replace(/[\x00-\x1f\x7f-\x9f]/g, '');
+}
+
+/**
+ * Render the corpus claim-verification verdict as one or more menu rows. TOTAL by
+ * contract: a fault renders a line, never a blank and never a throw. Reads the
+ * ledger OFF DISK via claim-ledger.readLedger — NO network, one read, no corpus
+ * walk on the menu hot path. ABSENT, CORRUPT and CLEAN are three distinct strings.
+ *
+ * @param {string} projectPath absolute project root
+ * @param {{nowMs?: number}} [opts]
+ * @returns {string}
+ */
+function renderClaimVerdict(projectPath, opts = {}) {
+  const now = typeof opts.nowMs === 'number' ? opts.nowMs : Date.now();
+
+  let read;
+  try {
+    read = claimLedger.readLedger(projectPath);
+  } catch {
+    // A throw out of the reader is itself an unreadable state, never a blank.
+    return `  ${c.red}corpus claims${c.reset}   unreadable — see [${VERIFY_ACTION}]\n`;
+  }
+
+  if (!read || !read.ok) {
+    if (read && read.problem === 'absent') {
+      return `  ${c.dim}corpus claims${c.reset}   never verified — run [${VERIFY_ACTION}]\n`;
+    }
+    return `  ${c.red}corpus claims${c.reset}   unreadable — see [${VERIFY_ACTION}]\n`;
+  }
+
+  const claims = read.ledger && read.ledger.claims && typeof read.ledger.claims === 'object'
+    ? read.ledger.claims
+    : {};
+  let verified = 0;
+  let refuted = 0;
+  let unverifiable = 0;
+  let stalest = null; // oldest verification age in ms — the staleness the gate fails on
+  const refutedKeys = [];
+  for (const key of Object.keys(claims)) {
+    const e = claims[key];
+    const state = e && typeof e === 'object' ? e.state : undefined;
+    if (state === 'VERIFIED') verified += 1;
+    else if (state === 'REFUTED') { refuted += 1; refutedKeys.push(key); }
+    else unverifiable += 1;
+
+    const t = e && typeof e === 'object' ? Date.parse(e.lastVerifiedAt) : NaN;
+    if (Number.isFinite(t)) {
+      const age = now - t;
+      if (stalest === null || age > stalest) stalest = age;
+    }
+  }
+
+  const horizonDays = read.ledger && Number.isFinite(read.ledger.horizonDays) && read.ledger.horizonDays > 0
+    ? read.ledger.horizonDays
+    : 7;
+  const horizonMs = horizonDays * DAY_MS;
+
+  let ageStr;
+  if (stalest === null) {
+    ageStr = `age unknown (horizon ${horizonDays}d)`;
+  } else {
+    const days = Math.floor(stalest / DAY_MS);
+    if (stalest > horizonMs) {
+      ageStr = `last verified ${days}d ago — ${c.yellow}STALE${c.reset} (horizon ${horizonDays}d)`;
+    } else {
+      ageStr = `last verified ${days}d ago (horizon ${horizonDays}d)`;
+    }
+  }
+
+  const refutedColor = refuted > 0 ? c.red : c.dim;
+  let out = `  ${c.bold}corpus claims${c.reset}   verified ${verified}  `
+    + `${refutedColor}refuted ${refuted}${c.reset}  unverifiable ${unverifiable}   ${ageStr}\n`;
+  // A refutation is a finding a human must act on: name each refuted guide path,
+  // control-stripped and repository-relative (the ledger keys already are).
+  for (const key of refutedKeys) {
+    out += `    ${c.red}⚠ refuted${c.reset} ${stripCtl(key)}\n`;
+  }
+  return out;
+}
+
+/**
+ * Dispatch `node src/scripts/verify-claims.js` in the BACKGROUND and return
+ * immediately — the terminal never blocks on it (CLAUDE.md: updates run in the
+ * background; the human never watches a spinner). Spawned with an argument ARRAY
+ * and no shell (Step 13). `spawnFn` is injectable for tests.
+ *
+ * @param {string} projectPath absolute project root (cwd for the run)
+ * @param {Function} [spawnFn] defaults to child_process.spawn
+ */
+function dispatchClaimVerification(projectPath, spawnFn) {
+  const spawn = spawnFn || require('child_process').spawn;
+  const scriptPath = path.join(__dirname, '..', 'scripts', 'verify-claims.js');
+  const child = spawn(process.execPath, [scriptPath], {
+    cwd: projectPath,
+    detached: true,
+    stdio: 'ignore',
+  });
+  if (child && typeof child.unref === 'function') child.unref();
+  return child;
+}
+
 function handleKey(key, app) {
   if (!app.toolIndex) app.toolIndex = 0;
   if (!app.settingIndex) app.settingIndex = 0;
@@ -286,11 +405,18 @@ function handleKey(key, app) {
         : 'Logs: no enforcement activity recorded yet';
       return true;
     }
+    if (key.sequence === '5') {
+      // Verify corpus claims — runs verify-claims.js in the BACKGROUND (the only
+      // network path in the repo); the render/terminal never blocks on it.
+      dispatchClaimVerification(app.projectPath);
+      app.message = 'Verifying corpus claims in the background — re-open Doctor to see the updated verdict';
+      return true;
+    }
     if (key.name === 'backspace') {
       app.doctorInput = (app.doctorInput || '').slice(0, -1);
       return true;
     }
-    if (key.sequence && key.sequence.length === 1 && !key.ctrl && !'1234'.includes(key.sequence)) {
+    if (key.sequence && key.sequence.length === 1 && !key.ctrl && !'12345'.includes(key.sequence)) {
       app.doctorInput = (app.doctorInput || '') + key.sequence;
       return true;
     }
@@ -373,4 +499,4 @@ function handleKey(key, app) {
   return false;
 }
 
-module.exports = { render, renderDoctor, renderUpdate, renderSettings, handleKey };
+module.exports = { render, renderDoctor, renderUpdate, renderSettings, handleKey, renderClaimVerdict, dispatchClaimVerification };

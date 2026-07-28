@@ -262,7 +262,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 471 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 473 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -425,6 +425,26 @@ and this does not verify prose, recommendations, or code-example correctness —
 majority of the corpus by volume stays unverified, and the census reports the uncovered
 remainder as a number so nobody mistakes partial coverage for coverage.**
 
+**The verdict reaches a human on the Doctor screen, and the check has a documented
+command to run.** `src/tabs/tools.js` (reached from `/ctoc:start` → Tools → Doctor)
+renders one row off the ledger — `verified N  refuted N  unverifiable N   last verified
+Nd ago (horizon Nd)` — reading `.ctoc/verification/claims-ledger.json` OFF DISK with **no
+network**. All three counts always render, zeros included; a refutation names its guide
+path. ABSENT (`never verified — run [5]`), CORRUPT (`unreadable — see [5]`) and CLEAN are
+three DISTINCT strings — a display that collapses them is the false-green shape
+`stale-detector.js` documents against its own still-unrendered `unreadCount`, and this
+slice does not repeat it. Doctor action `[5]` runs the verifier in the BACKGROUND.
+
+The scheduled half is **`node src/scripts/verify-claims.js`** — cross-platform, no shell,
+the only network path in the repository. Exit codes: **`0` clean, non-zero when any claim
+is `REFUTED`**. The staleness horizon defaults to **7 days**, so a **weekly run with
+margin** keeps the ledger fresh. **`npm test` performs NO network access** — it reads and
+enforces the committed ledger only. **A stale ledger is a build failure BY DESIGN; you
+clear it by RUNNING the command, NEVER by widening the horizon** — widening it is the
+cheapest way to turn red green and silently destroys the one property that makes a
+scheduled check trustworthy (Operating Lesson 14). **Which scheduler runs it is the
+human's decision and is deliberately not made here.**
+
 ---
 
 ## Release
@@ -477,7 +497,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 471 test files
+  tests/                 473 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

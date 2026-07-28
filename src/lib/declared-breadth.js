@@ -22,10 +22,30 @@
  * an edit. Do not move I/O into `isAnchored`, and do not put `countMatching` on any
  * hot path.
  *
- * Deliberately NOT here yet: `hasUnanchoredAcknowledgement` / `REFUSAL_REASON`. Those
- * are the ENFORCEMENT half and belong to 00126 (which declares `depends_on: 00127`
- * and adds them to THIS module). A module carrying an unused refusal token invites
- * the next reader to wire it up without the human's decision — so it is left out.
+ * ── THE ENFORCEMENT HALF (00126) ───────────────────────────────────────────────
+ *   REFUSAL_REASON                     the fixed denial token, ONE spelling.
+ *   hasUnanchoredAcknowledgement(...)  PURE — reads the plan's frontmatter, no I/O
+ *                                      on the tree, never throws.
+ *
+ * ANCHORING, NOT A COUNT, IS THE ENFORCEMENT RULE. A share-of-repository threshold
+ * would have to walk the tree on the every-edit hook path (a per-edit latency
+ * defect) and its verdict would drift as unrelated files appear (a permission whose
+ * answer changes with an unrelated `git pull` cannot be reasoned about). `isAnchored`
+ * is a deterministic string scan of the first path segment — that is why the guard
+ * `00126` adds to `plan-coverage.scanForCoverage` calls THIS half and never
+ * `countMatching`, which reads the tree and must stay off the hook path.
+ *
+ * WHY THE ACKNOWLEDGEMENT IS UNFORGEABLE. `approval-ledger.computeSpecHash` digests
+ * the FULL leading frontmatter, so adding `unanchored_scope` after approval breaks
+ * the specification hash and the plan grants nothing at all — an agent cannot mint
+ * the acknowledgement for itself. It is meaningful only because `00127` renders the
+ * declared scope at the gate and marks an unanchored entry in words, so the human
+ * consenting has actually SEEN what they consent to (the reason `00126` depends on
+ * `00127`).
+ *
+ * FAIL-CLOSED INVERSION: this module must NEVER throw, because the hook's catch
+ * (`PreToolUse.Edit.js`) fails OPEN — a throw there becomes an ALLOW. So an absent
+ * or unreadable acknowledgement is `false` (the refusing direction), never a crash.
  *
  * ── The walk's rules (each a documented constant, not a scattered condition) ────
  *   - SKIPS `.git`, `node_modules` (by name) and `.ctoc/state` (by relative path):
@@ -82,6 +102,64 @@ function isAnchored(glob) {
   const first = norm.split('/')[0];
   if (first === '') return false;
   return !first.includes('*') && !first.includes('?');
+}
+
+/**
+ * The ONE spelling of the denial reason recorded when an unanchored declaration is
+ * refused. Exported so the coverage guard, the severity table and the tests all
+ * share it and can never drift apart.
+ * @type {string}
+ */
+const REFUSAL_REASON = 'unanchored-declaration';
+
+/**
+ * Whether a plan's own frontmatter carries a non-empty `unanchored_scope`
+ * acknowledgement — the human's out-loud statement that this plan's file list is
+ * rooted at the repository.
+ *
+ * Reads the SAME multi-block leading-frontmatter union that `plan-coverage`'s
+ * `parsePlanFiles` reads `files:` from — `stale-detector.extractFrontmatterRegion`,
+ * falling back to `frontmatter.parseFrontmatter` — so a prepended approval-marker
+ * block cannot hide the key and a CRLF plan reads identically. The key must be a
+ * TOP-LEVEL frontmatter key (column 0) with a non-empty value.
+ *
+ * PURE. NO tree I/O. NEVER THROWS. Any fault → `false` (an absent acknowledgement is
+ * the refusing direction; a throw here would reach the hook's fail-OPEN catch and
+ * become an ALLOW).
+ *
+ * @param {*} content the plan's full file text
+ * @returns {boolean}
+ */
+function hasUnanchoredAcknowledgement(content) {
+  try {
+    if (typeof content !== 'string' || content.length === 0) return false;
+    let region = '';
+    try {
+      // Lazy-require mirrors parsePlanFiles: no cycle today, and the lazy edge keeps
+      // this module loadable on the hook path even if stale-detector's deps grow.
+      const { extractFrontmatterRegion } = require('./stale-detector');
+      const r = extractFrontmatterRegion(content);
+      if (typeof r === 'string' && r.length > 0) region = r;
+    } catch {
+      region = '';
+    }
+    if (region === '') {
+      const { parseFrontmatter } = require('./frontmatter');
+      const pf = parseFrontmatter(content);
+      if (!pf.hasFrontmatter) return false;
+      region = pf.raw;
+    }
+    for (const line of region.split('\n')) {
+      const m = line.match(/^unanchored_scope:\s*(.*)$/);
+      if (m) {
+        const value = m[1].trim().replace(/^["']|["']$/g, '').trim();
+        if (value.length > 0) return true;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -175,4 +253,4 @@ function countMatching(globs, root, opts) {
   };
 }
 
-module.exports = { isAnchored, countMatching };
+module.exports = { isAnchored, countMatching, hasUnanchoredAcknowledgement, REFUSAL_REASON };

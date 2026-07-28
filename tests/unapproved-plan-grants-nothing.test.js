@@ -10,8 +10,10 @@
  * granted the whole repository.
  *
  * BOTH DIRECTIONS ARE ASSERTED. A fix that denied everything would pass half of
- * these; cases 2, 5, 7, 9, 13 and 17 are the other half, and case 17 exists so a
- * scan that never matched ANYTHING cannot masquerade as a fence.
+ * these; cases 2, 5, 7b, 9, 13 and 17 are the other half, and case 17 exists so a
+ * scan that never matched ANYTHING cannot masquerade as a fence. (Case 7 flipped
+ * with slice 00126: an approved unanchored `**` now grants nothing WITHOUT an
+ * `unanchored_scope` acknowledgement, and 7b carries the grant direction.)
  *
  * Fixtures are real `os.tmpdir()` directories and approvals are minted with the
  * REAL `approval-ledger` (it hashes the fixture's actual bytes) — never a
@@ -211,18 +213,43 @@ test('6: an unapproved plan declaring files: ["**"] grants NOTHING anywhere', ()
 });
 
 // ---------------------------------------------------------------------------
-// 7 — AND ITS APPROVED COUNTERPART STILL GRANTS EVERYTHING. Documented consent,
-//     pinned so nobody "discovers" it later. Capping glob breadth is the human's
-//     to schedule; this test states the residual truthfully.
+// 7 — AN APPROVED `**` GRANTS NOTHING UNLESS THE PLAN SAYS IT IS UNANCHORED.
+//     `**` is one character wider than `src/**` and reads almost identically at a
+//     glance, and the gate screen used to strip the frontmatter the file list lives
+//     in — so a blanket grant could be approved without noticing. An unanchored
+//     declaration is therefore refused UNLESS the plan's own approved frontmatter
+//     carries a non-empty `unanchored_scope` acknowledgement (which is inside the
+//     hashed specification, so it cannot be minted after approval). BOTH directions
+//     are asserted: without the acknowledgement grants nothing, with it grants
+//     everything (documented, informed consent preserved).
 // ---------------------------------------------------------------------------
-test('7: an APPROVED files: ["**"] still grants everything (documented, uncapped residual)', () => {
+test('7: an APPROVED files: ["**"] without an unanchored_scope acknowledgement grants NOTHING', () => {
   const root = makeRoot();
   try {
     const p = writePlan(root, 'todo', 'zz-glob-ok', ['**']);
     approve(root, p, 'todo');
 
-    assert.ok(coverage.findCoveringPlan(GATE_HOOK, root), 'approved globstar grants the gate hook');
-    assert.ok(coverage.findCoveringPlan('package.json', root), 'approved globstar grants package.json');
+    assert.equal(coverage.findCoveringPlan(GATE_HOOK, root), null, 'an unanchored declaration does not grant the gate hook');
+    assert.equal(coverage.findCoveringPlan('package.json', root), null, 'nor package.json');
+
+    const why = coverage.explainDenial('package.json', root);
+    assert.ok(why, 'the refusal explains itself');
+    assert.equal(why.reason, 'unanchored-declaration', 'the reason names the unbounded declaration');
+    assert.equal(why.plan, 'todo/zz-glob-ok');
+  } finally { rm(root); }
+});
+
+test('7b: an APPROVED files: ["**"] WITH an unanchored_scope acknowledgement grants everything', () => {
+  const root = makeRoot();
+  try {
+    const yaml = '  - "**"';
+    const content = `---\ntitle: "zz-glob-ack"\nprogram: ctoc-v7\nunanchored_scope: "this plan's file list is rooted at the repository"\nfiles:\n${yaml}\n---\n\n# zz-glob-ack\n\nbody\n`;
+    const p = path.join(root, 'plans', 'todo', 'zz-glob-ack.md');
+    fs.writeFileSync(p, content);
+    approve(root, p, 'todo');
+
+    assert.ok(coverage.findCoveringPlan(GATE_HOOK, root), 'documented consent still grants the gate hook');
+    assert.ok(coverage.findCoveringPlan('package.json', root), 'and package.json');
   } finally { rm(root); }
 });
 

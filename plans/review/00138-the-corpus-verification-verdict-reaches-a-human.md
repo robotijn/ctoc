@@ -178,51 +178,51 @@ and the exact debt `stale-detector.js` documents against itself.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
-- [ ] Write `tests/claim-verdict-surface.test.js` in FULL and run ONLY that file first. Record TDD-RED verbatim.
-- [ ] **Case 4 must be red for the right reason** — confirm that before the change the corrupt-ledger path renders identically to one of the other states, and record that output. That is the defect being fixed, and it must be observed rather than assumed.
+- [x] Write `tests/claim-verdict-surface.test.js` in FULL and run ONLY that file first. Record TDD-RED verbatim.
+- [x] **Case 4 must be red for the right reason** — confirm that before the change the corrupt-ledger path renders identically to one of the other states, and record that output. That is the defect being fixed, and it must be observed rather than assumed.
 
 ### Step 9: PREPARE
-- [ ] Read `src/tabs/tools.js` in full — the real row shape, the real action-dispatch convention. **The code wins over this plan.**
-- [ ] Read `src/lib/stale-detector.js:68-73` — the self-documented display debt this slice must not reproduce.
-- [ ] Read `src/commands/menu.js` and `src/lib/menu-screens.js` for the background-dispatch convention, and follow it rather than inventing one.
-- [ ] Read `CLAUDE.md`'s Release section on background execution before wiring the action.
+- [x] Read `src/tabs/tools.js` in full — the real row shape, the real action-dispatch convention. **The code wins over this plan.**
+- [x] Read `src/lib/stale-detector.js:68-73` — the self-documented display debt this slice must not reproduce.
+- [x] Read `src/commands/menu.js` and `src/lib/menu-screens.js` for the background-dispatch convention, and follow it rather than inventing one.
+- [x] Read `CLAUDE.md`'s Release section on background execution before wiring the action.
 
 ### Step 10: IMPLEMENT
-- [ ] `src/tabs/tools.js` — the summary row (three states rendered distinctly, all counts including zeros, age against the horizon) and the background run action.
-- [ ] `tests/claim-verdict-surface.test.js` — the ten cases.
-- [ ] `CLAUDE.md` — the command, exit codes, cadence, and the "clear it by running it, never by widening the horizon" rule.
+- [x] `src/tabs/tools.js` — the summary row (three states rendered distinctly, all counts including zeros, age against the horizon) and the background run action.
+- [x] `tests/claim-verdict-surface.test.js` — the ten cases.
+- [x] `CLAUDE.md` — the command, exit codes, cadence, and the "clear it by running it, never by widening the horizon" rule.
 
 ### Step 11: REVIEW
-- [ ] Clean, absent and corrupt render as three genuinely distinct strings — read the rendered output, do not infer from the branch.
-- [ ] `unverifiable` cannot be omitted from the row by any code path.
-- [ ] The action does not block the render; the terminal stays free.
-- [ ] Nothing added declares a `model:`.
-- [ ] **Report whether any OTHER dashboard row renders a degraded signal as a clean one** — `stale-detector.js`'s `unreadCount` is the known instance and is out of scope here, but the inventory is this slice's finding to produce.
+- [x] Clean, absent and corrupt render as three genuinely distinct strings — read the rendered output, do not infer from the branch.
+- [x] `unverifiable` cannot be omitted from the row by any code path.
+- [x] The action does not block the render; the terminal stays free.
+- [x] Nothing added declares a `model:`.
+- [x] **Report whether any OTHER dashboard row renders a degraded signal as a clean one** — `stale-detector.js`'s `unreadCount` is the known instance and is out of scope here, but the inventory is this slice's finding to produce.
 
 ### Step 12: OPTIMIZE
-- [ ] The row costs one ledger read; no corpus walk on the menu hot path. Report the measured render time.
-- [ ] Reuse the existing cache/memoization convention in the tools tab rather than adding one.
+- [x] The row costs one ledger read; no corpus walk on the menu hot path. Report the measured render time.
+- [x] Reuse the existing cache/memoization convention in the tools tab rather than adding one.
 
 ### Step 13: SECURE
-- [ ] No absolute path in any rendered string (case 10) — an absolute path carries a user name onto a screen.
-- [ ] Control characters stripped from anything ledger-derived before rendering, mirroring `stripCtlChars` at `src/lib/stale-detector.js:270` — a hostile guide path must not carry escape sequences into the terminal.
-- [ ] The background action spawns with an argument array, **never a shell string**.
-- [ ] Ledger read is size-gated; a corrupt ledger degrades the row and never crashes the dashboard (case 9).
+- [x] No absolute path in any rendered string (case 10) — an absolute path carries a user name onto a screen.
+- [x] Control characters stripped from anything ledger-derived before rendering, mirroring `stripCtlChars` at `src/lib/stale-detector.js:270` — a hostile guide path must not carry escape sequences into the terminal.
+- [x] The background action spawns with an argument array, **never a shell string**.
+- [x] Ledger read is size-gated; a corrupt ledger degrades the row and never crashes the dashboard (case 9).
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/claim-verdict-surface.test.js` green.
-- [ ] Full gated run `npm test`; report verbatim counts and coverage.
-- [ ] **Open the real menu and paste the real row, verbatim, for each of the three ledger states** (clean, absent, corrupt — using temporary copies, restoring after). A rendering test is not proof a human sees it; Operating Lesson 6 requires driving the real flow.
-- [ ] Confirm the declared entry-point check still passes (`.ctoc/settings.json` `entry_point`, `node src/commands/menu.js`, expecting `CTOC v`).
-- [ ] Lint `--max-warnings 0`; typecheck clean.
+- [x] `node --test tests/claim-verdict-surface.test.js` green.
+- [x] Full gated run `npm test`; report verbatim counts and coverage.
+- [x] **Open the real menu and paste the real row, verbatim, for each of the three ledger states** (clean, absent, corrupt — using temporary copies, restoring after). A rendering test is not proof a human sees it; Operating Lesson 6 requires driving the real flow.
+- [x] Confirm the declared entry-point check still passes (`.ctoc/settings.json` `entry_point`, `node src/commands/menu.js`, expecting `CTOC v`).
+- [x] Lint `--max-warnings 0`; typecheck clean.
 
 ### Step 15: DOCUMENT
-- [ ] `CLAUDE.md` — the command, cadence, exit codes, the no-network-in-`npm test` statement, and the horizon rule.
-- [ ] Update documented test-file count in both places, read live from disk.
+- [x] `CLAUDE.md` — the command, cadence, exit codes, the no-network-in-`npm test` statement, and the horizon rule.
+- [x] Update documented test-file count in both places, read live from disk.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Report: files, tests, Step 8 red verbatim, **the three real rendered rows**, the Step 11 inventory of other degraded-signal displays, and every decision taken under ambiguity.
-- [ ] Ready for human review at Gate 3.
+- [x] Report: files, tests, Step 8 red verbatim, **the three real rendered rows**, the Step 11 inventory of other degraded-signal displays, and every decision taken under ambiguity.
+- [x] Ready for human review at Gate 3.
 
 ---
 
@@ -281,4 +281,34 @@ them because the horizon enforces the cadence regardless of who runs it.
    possible way to turn red green, it looks reasonable in a diff, and it silently
    destroys the one property that makes a scheduled check trustworthy. Writing the
    rule next to the number is the only place a person will actually meet it.
+
+## Decisions Taken Under Ambiguity (build, 00138)
+
+8. **"last verified" age is the OLDEST (stalest) `lastVerifiedAt` across ledger
+   entries, not `generatedAt`.** This is the exact age `gateLedger` measures staleness
+   against — the age that actually fails the build — so the row shows the human the
+   same number the gate enforces. `generatedAt` (when the run happened) could read
+   fresh while an individual claim's verification is stale.
+9. **Counts are read straight from `ledger.claims` states via `readLedger` — a single
+   read, no corpus walk.** `gateLedger` would give the same summary but requires the
+   extracted corpus claims, i.e. a `skills/**` walk on the menu hot path, which Step 12
+   forbids. The row therefore counts `VERIFIED`/`REFUTED`/(everything else →
+   `UNVERIFIABLE`) directly and defensively (a null/non-object entry counts as
+   unverifiable, never throws).
+10. **The Doctor verifier action is `[5]`, and the row references `[5]` literally**
+    (`never verified — run [5]`, `unreadable — see [5]`) so the pointer in the row
+    matches the action a human presses. The action spawns `verify-claims.js` detached
+    with an argv array and `stdio:'ignore'`, unref'd, returning immediately.
+
+## Step 11 finding — other dashboard rows that could render a degraded signal as clean
+
+Requested inventory. The one KNOWN unrendered degraded signal remains
+`src/lib/stale-detector.js`'s `unreadCount` (a partial plan scan still displays as a
+clean one until `inbox.js`/`menu-screens.js` render it) — named by this plan as OUT OF
+SCOPE and unchanged here. Beyond it: the background-task plane in
+`src/lib/menu-screens.js` already surfaces its own blind spot ("the background task
+check DID NOT RUN — the task counts above are unchecked"), so it does NOT render a
+degraded signal as clean. The other tabs (`overview.js`, `review.js`, `vision.js`)
+render committed plan/state data, not a scan with a partial-read failure mode, so they
+have no equivalent silent-degrade path. No NEW instance of the debt was found.
 </content>
