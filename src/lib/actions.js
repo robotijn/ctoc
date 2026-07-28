@@ -1191,10 +1191,20 @@ function completeExecution(planPath, projectPath, options = {}) {
  * value with a separator, a `..`, a NUL, or an extension is REFUSED before any
  * filesystem access, so a crafted `plan` field can never escape `plans/`.
  *
+ * TWO KINDS OF NEGATIVE ANSWER (plan 00131), carried on `fault` so a machine consumer
+ * never renders one as the other. `fault:'caller'` is a PROGRAMMING ERROR in the call
+ * (the arguments were swapped — an absolute path handed to `planSlug`) and is NEVER a
+ * verdict about the plan; a consumer must report it as a bug in the call with no
+ * remediation advice about the plan. `fault:null` is a genuine report about the plan
+ * ("this task names no plan", or "I looked in in-progress/ and review/ and found
+ * none"). The field is present on EVERY return, so absent and null are never confused.
+ * The never-throws contract is preserved: every outcome is REPORTED, so a completion
+ * can never wedge.
+ *
  * @param {string} projectPath - project root
  * @param {string} planSlug - the task's `plan` field (a bare plan slug)
- * @returns {{ran: boolean, reason?: string, blocked?: boolean, stage?: string,
- *   newPath?: (string|null), verify?: Object|null, errors?: string[]}}
+ * @returns {{ran: boolean, fault: (null|'caller'), reason?: string, blocked?: boolean,
+ *   stage?: string, newPath?: (string|null), verify?: Object|null, errors?: string[]}}
  */
 /**
  * A plan slug is a bare filename token — the ONLY shape that may be joined into a
@@ -1211,17 +1221,69 @@ function isSafePlanSlug(slug) {
     && slug !== '.' && slug !== '..' && !slug.includes('..');
 }
 
+/**
+ * Discriminate a `completeTaskPlan` guard failure into a REPORT about the plan vs a
+ * FAULT in the CALL, so a mistaken call never reads as a security-flavoured verdict
+ * about the plan (plan 00131). Two argument-order families live in this file — plan-
+ * file operations take `planPath` first (`completeExecution(planPath, projectPath)`),
+ * scheduler operations take `projectPath` first (`completeTaskPlan(projectPath,
+ * planSlug)`) — and they are trivially swapped. When they are, an absolute path lands
+ * in `planSlug`, the traversal guard refuses it, and the refusal used to be reported
+ * with the same shape a genuine "no plan file" report uses.
+ *
+ * Returns:
+ *   • `{ fault: null, reason: 'task carries no plan' }` — a legitimate report: the
+ *     task names no plan. Meaning unchanged.
+ *   • `{ fault: 'caller', reason }` — the CALL was wrong: `planSlug` is not a bare
+ *     slug. When it looks like a path (a separator or `path.isAbsolute`) the reason
+ *     names both parameters and the correct order; when `projectPath` is ITSELF a
+ *     bare token, it names that other half of the swap too.
+ *   • `null` — the slug is safe; the caller proceeds.
+ *
+ * Pure, never throws, no filesystem access. Cross-platform: both `/` and `\\`
+ * separators are tested and absoluteness goes through `path.isAbsolute`, never a
+ * hardcoded prefix.
+ *
+ * @param {*} projectPath - what the caller passed as the project root
+ * @param {*} planSlug - what the caller passed as the plan slug
+ * @returns {{fault: (null|'caller'), reason: string}|null}
+ */
+function classifyCompletionFault(projectPath, planSlug) {
+  if (typeof planSlug !== 'string' || planSlug.length === 0) {
+    return { fault: null, reason: 'task carries no plan' };
+  }
+  const slug = planSlug.replace(/\.md$/i, '');
+  if (isSafePlanSlug(slug)) {
+    return null; // safe — proceed
+  }
+  // A caller fault: the value in planSlug is not a bare slug. Announce it as such.
+  let reason = `unsafe plan slug refused: ${slug.slice(0, 40)}`;
+  const looksLikePath = planSlug.includes('/') || planSlug.includes('\\') || path.isAbsolute(planSlug);
+  if (looksLikePath) {
+    reason += ' — the planSlug argument looks like a path, not a bare plan slug. '
+      + 'The correct order is completeTaskPlan(projectPath, planSlug); it is easily '
+      + 'swapped with completeExecution(planPath, projectPath).';
+    // The other half of the swap: a bare token sitting where the project root belongs.
+    if (typeof projectPath === 'string' && isSafePlanSlug(projectPath.replace(/\.md$/i, ''))) {
+      reason += ` The projectPath argument ("${projectPath.slice(0, 40)}") is itself a `
+        + 'bare slug — the other half of a swapped call.';
+    }
+  }
+  return { fault: 'caller', reason };
+}
+
 function completeTaskPlan(projectPath, planSlug) {
   const root = projectPath || findProjectRoot();
 
-  if (typeof planSlug !== 'string' || planSlug.length === 0) {
-    return { ran: false, reason: 'task carries no plan' };
+  // Discriminate a guard failure into a report about the plan vs a fault in the CALL
+  // (plan 00131). Both still REFUSE — no path becomes more permissive; the only change
+  // is that the misuse announces itself as misuse and a machine consumer can tell.
+  const fault = classifyCompletionFault(root, planSlug);
+  if (fault) {
+    return { ran: false, fault: fault.fault, reason: fault.reason };
   }
-  // A plan slug is a bare filename token. Anything else is refused BEFORE path.join.
+  // Safe from here: a bare, path-safe slug (fault === null means proceed).
   const slug = planSlug.replace(/\.md$/i, '');
-  if (!isSafePlanSlug(slug)) {
-    return { ran: false, reason: `unsafe plan slug refused: ${slug.slice(0, 40)}` };
-  }
 
   // Resolve the plan: in-progress is the expected home; review means it already moved.
   const plansDir = getPlansDir(root);
@@ -1236,13 +1298,16 @@ function completeTaskPlan(projectPath, planSlug) {
     planPath = inReview;
     stage = 'review';
   } else {
-    return { ran: false, reason: `no plan file for "${slug}" in in-progress/ or review/` };
+    // A real report about the plan (I looked in both folders and found none), NOT a
+    // caller fault — fault:null keeps the two answers distinct.
+    return { ran: false, fault: null, reason: `no plan file for "${slug}" in in-progress/ or review/` };
   }
 
   const result = completeExecution(planPath, root);
   if (result.blocked) {
     return {
       ran: true,
+      fault: null,
       blocked: true,
       stage,
       newPath: null,
@@ -1252,6 +1317,7 @@ function completeTaskPlan(projectPath, planSlug) {
   }
   return {
     ran: true,
+    fault: null,
     blocked: false,
     stage,
     newPath: result.newPath,
@@ -1462,6 +1528,16 @@ function planDependsOn(plan) {
   // to escape plans/ as an existence oracle (documented choice: an unsafe depends_on
   // entry is ignored, not fatal — one malformed dependency must not throw the whole
   // scheduler).
+  //
+  // KNOWN, UNFIXED LOSS (plan 00131, "What this plan does NOT fix", finding 3): a plan
+  // whose `depends_on` is ENTIRELY unsafe tokens returns [] — byte-indistinguishable
+  // from a plan with NO dependencies — so the scheduler treats it as ready and runs
+  // it. "I refused to read the dependencies" and "there are no dependencies" collapse
+  // to the same value. Making the scheduler REFUSE a plan whose declared dependencies
+  // were unreadable is a scheduling decision with its own blast radius and is the
+  // human's to schedule; it is deliberately NOT done here. The loss is pinned by
+  // tests/caller-error-is-not-a-verdict.test.js (case 15) so it is recorded, not
+  // rediscovered.
   return parts.filter((s) => s.toLowerCase() !== 'none' && isSafePlanSlug(s));
 }
 
