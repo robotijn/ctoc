@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "An unflagged question blocks a gate instead of waving it through — the missing importance flag stops defaulting to the permissive value"
 type: implementation
 parent_plan: none
@@ -9,6 +10,9 @@ iron_loop: true
 files:
   - "src/lib/streaming-precompute.js"
   - "tests/question-blocking-default.test.js"
+approved_by: human
+approved_at: 2026-07-28T21:11:44.433Z
+gate_crossed: implementation → todo
 ---
 
 # An unflagged question blocks a gate instead of waving it through
@@ -281,3 +285,67 @@ ambiguity.
    comment that says `critical?` above code that requires `critical` is how the next
    producer gets written wrong, and this repair set already contains one instance of a
    comment outliving its code.
+
+## Decisions Taken During Implementation
+
+1. **Case 9 as planned is unreachable; the real end-to-end behaviour is `invalid`, and
+   it is a STRONGER fail-closed (FINDING).** The plan predicted that a directly-written
+   flagless questions file reaches `isBlockingQuestion` through `hasEnoughInformation`
+   with `blocking.length === 12` / reason `open-forks`. It does NOT. `planQuestionsStatus`
+   RE-VALIDATES the questions on read (`streaming-precompute.js` ~line 430), so after
+   the tightening the flagless file classifies as `invalid` FIRST and the gate predicate
+   fails closed there — `enough: false`, reason `invalid`, `blocking: []` — never reaching
+   the predicate. The security outcome the plan wanted (the gate never crosses on a
+   flagless file) is achieved one layer earlier and more strongly (a malformed file is
+   invalid, not merely full of forks). Case 9 was split: **9a** asserts the true end-to-end
+   fix (`enough:false`, reason `invalid`) and RECORDS that BEFORE the fix this exact file
+   yielded `enough: true` (the captured RED); **9b** proves `isBlockingQuestion` IS reached
+   end-to-end for WELL-DECLARED forks (twelve valid `critical:true` questions →
+   `blocking.length === 12`, reason `open-forks`), which is the Lesson-16 wiring proof.
+
+2. **`isBlockingQuestion` is exported for the unit tests, and the export is genuinely
+   live (not a dead test-only export).** The export-reachability fence credits it via its
+   internal call in `hasEnoughInformation` (definition + one real internal call ≥ 2), so
+   `tests/export-reachability.test.js` stays green with no baseline change. Verified.
+
+3. **Large existing-test blast radius, corrected toward the new contract — NOT loosened.**
+   The mandated both-flags-mandatory validator rejects every existing fixture that used
+   the OLD single-flag shape. Suite-wide this turned **68 tests red across 7 files**
+   (`streaming-precompute`, `streaming-gate`, `answers-bind-to-plan-revision`,
+   `streaming-questions-sweeper`, `streaming-human-loop-e2e`, `plan-question-screen`,
+   `menu-critique-first`). Every one was a fixture encoding the permissive contract this
+   plan explicitly replaces (Operating Lesson 14: correct the fixture toward the real
+   behaviour). The fix was mechanical and intent-preserving: a fork question keeps its
+   `true` flag and gains the missing `false` one (`critical:true` → `critical:true,
+   important:false`); a question a test treats as non-blocking (a `normal`/detail question,
+   previously unflagged) gains `critical:false, important:false`. No behavioural assertion
+   was weakened, no case deleted, no range widened. The plan declared only two files; this
+   blast radius is beyond the declared scope and is reported as a finding — the plan
+   under-budgeted the test-suite churn of tightening the validator.
+
+4. **CLAUDE.md was NOT edited (deviation from the plan's Step 15, per the build brief).**
+   The plan's Step 15 asks to record the mandatory-flags contract and update a test-file
+   count in `CLAUDE.md`. The executor brief explicitly forbids editing `CLAUDE.md` (its
+   counts are auto-generated later). The contract is instead documented where it is
+   enforced: in the three corrected doc comments and the `isBlockingQuestion` /
+   `validatePlanQuestions` comments in `streaming-precompute.js`.
+
+5. **Validator error messages name the id and are injection-safe.** The id is
+   producer-authored and echoed into an error that can reach a gate screen, so it passes
+   through a local `safeQuestionId` (control characters stripped, length capped at 80);
+   the whole rejected question object is never echoed (Step 13 SECURE).
+
+6. **Live-plan blast radius measured, not assumed: ZERO.** The only stored questions
+   files on disk are for two `review/` plans (`00003`, `00004`); both already carry both
+   flags on every question, so both remain valid and neither changes its sufficiency
+   verdict. No plan in `plans/functional/` or `plans/implementation/` has a questions
+   file, so none can flip.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

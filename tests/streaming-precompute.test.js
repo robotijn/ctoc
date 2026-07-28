@@ -61,6 +61,7 @@ function sampleQuestions() {
       id: 'db',
       prompt: 'Which database engine?',
       critical: true,
+      important: false,
       options: [
         { key: 'pg', label: 'Postgres', recommended: true, pros: 'Row-level security, mature', cons: 'More ops' },
         { key: 'sqlite', label: 'SQLite', pros: 'Zero-config', cons: 'No real concurrency' },
@@ -69,6 +70,7 @@ function sampleQuestions() {
     {
       id: 'auth',
       prompt: 'Which auth provider?',
+      critical: false,
       important: true,
       options: [
         { key: 'clerk', label: 'Clerk', recommended: true, description: 'Managed auth with MFA' },
@@ -377,15 +379,15 @@ describe('plansNeedingQuestions — the set the background dispatcher must (re)g
 function tieredQuestions() {
   return [
     {
-      id: 'crit', prompt: 'Which datastore? (load-bearing)', critical: true,
+      id: 'crit', prompt: 'Which datastore? (load-bearing)', critical: true, important: false,
       options: [{ key: 'pg', label: 'Postgres', recommended: true }, { key: 'sqlite', label: 'SQLite' }],
     },
     {
-      id: 'imp', prompt: 'Which auth provider? (load-bearing)', important: true,
+      id: 'imp', prompt: 'Which auth provider? (load-bearing)', critical: false, important: true,
       options: [{ key: 'clerk', label: 'Clerk', recommended: true }, { key: 'roll', label: 'Roll your own' }],
     },
     {
-      id: 'norm', prompt: 'Which date format in the footer?',
+      id: 'norm', prompt: 'Which date format in the footer?', critical: false, important: false,
       options: [{ key: 'iso', label: 'ISO 8601', recommended: true }, { key: 'us', label: 'US' }],
     },
   ];
@@ -394,7 +396,7 @@ function tieredQuestions() {
 /** Only questions that are explicitly NOT forks — small implementation details. */
 function normalOnlyQuestions() {
   return [
-    { id: 'n1', prompt: 'Footer date format?', options: [{ key: 'iso', label: 'ISO 8601' }] },
+    { id: 'n1', prompt: 'Footer date format?', critical: false, important: false, options: [{ key: 'iso', label: 'ISO 8601' }] },
     { id: 'n2', prompt: 'Button corner radius?', critical: false, important: false, options: [{ key: 'sm', label: 'Small' }] },
   ];
 }

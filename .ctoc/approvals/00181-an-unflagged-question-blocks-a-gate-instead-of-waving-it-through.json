@@ -1,0 +1,9 @@
+{
+  "content_sha256": "b3d16a0be1ab3b7a142018d59e2e38f2821bece82b420689186687346df3141e",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-28T21:11:44.483Z",
+  "approved_by": "human",
+  "plan_basename": "00181-an-unflagged-question-blocks-a-gate-instead-of-waving-it-through"
+}

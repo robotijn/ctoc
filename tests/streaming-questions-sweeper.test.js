@@ -59,7 +59,7 @@ function validQuestions() {
     {
       id: 'store',
       prompt: 'Which store backs the fixture?',
-      critical: true,
+      critical: true, important: false,
       options: [
         { key: 'pg', label: 'Postgres', recommended: true, pros: 'Row level security' },
         { key: 'sqlite', label: 'SQLite', cons: 'Single writer' },
@@ -68,7 +68,7 @@ function validQuestions() {
     {
       id: 'expiry',
       prompt: 'How long does the fixture token live?',
-      important: true,
+      critical: false, important: true,
       options: [
         { key: '15m', label: '15 minutes', recommended: true },
         { key: '1h', label: '1 hour' },

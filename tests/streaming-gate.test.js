@@ -447,7 +447,7 @@ function precomputedQuestions() {
     {
       id: 'db',
       prompt: 'Which database engine?',
-      critical: true,
+      critical: true, important: false,
       options: [
         { key: 'pg', label: 'Postgres', recommended: true, pros: 'RLS, mature', cons: 'More ops' },
         { key: 'sqlite', label: 'SQLite', pros: 'Zero-config', cons: 'No concurrency' },
@@ -456,6 +456,7 @@ function precomputedQuestions() {
     {
       id: 'auth',
       prompt: 'Which auth provider?',
+      critical: false, important: false,
       options: [
         { key: 'clerk', label: 'Clerk', recommended: true, description: 'Managed auth' },
         { key: 'roll', label: 'Roll your own', description: 'Full control' },
@@ -512,7 +513,7 @@ describe('streamingGateScreen — precomputed questions vs simple-Approve fallba
     const oneFork = [{
       id: 'db',
       prompt: 'Which database engine?',
-      critical: true,
+      critical: true, important: false,
       options: [
         { key: 'pg', label: 'Postgres', recommended: true, pros: 'RLS' },
         { key: 'sqlite', label: 'SQLite', cons: 'No concurrency' },
@@ -539,9 +540,9 @@ describe('streamingGateScreen — precomputed questions vs simple-Approve fallba
     writePlan(root, 'functional', 'multi', validFunctionalBody('multi'));
     // TWO FORKS: answering the first leaves a fork open, so the human steps to the second.
     const twoForks = [
-      { id: 'db', prompt: 'Which database engine?', critical: true,
+      { id: 'db', prompt: 'Which database engine?', critical: true, important: false,
         options: [{ key: 'pg', label: 'Postgres', recommended: true }, { key: 'sqlite', label: 'SQLite' }] },
-      { id: 'auth', prompt: 'Which auth provider?', critical: true,
+      { id: 'auth', prompt: 'Which auth provider?', critical: true, important: false,
         options: [{ key: 'clerk', label: 'Clerk', recommended: true }, { key: 'roll', label: 'Roll your own' }] },
     ];
     precompute.writePlanQuestions(root, 'functional/multi.md', twoForks, planMtimeMs(root, 'functional', 'multi'));
@@ -568,9 +569,9 @@ describe('route wiring — `stream answer` records the answer, never crosses a g
     const before = fs.readFileSync(planPath, 'utf8');
     // TWO FORKS; answer only one, so the plan is NOT yet sufficient and must not cross.
     const twoForks = [
-      { id: 'db', prompt: 'db?', critical: true,
+      { id: 'db', prompt: 'db?', critical: true, important: false,
         options: [{ key: 'pg', label: 'Postgres', recommended: true }, { key: 'sqlite', label: 'SQLite' }] },
-      { id: 'auth', prompt: 'auth?', critical: true,
+      { id: 'auth', prompt: 'auth?', critical: true, important: false,
         options: [{ key: 'clerk', label: 'Clerk', recommended: true }, { key: 'roll', label: 'Roll' }] },
     ];
     precompute.writePlanQuestions(root, 'functional/ans.md', twoForks, planMtimeMs(root, 'functional', 'ans'));
@@ -626,7 +627,7 @@ function forkQuestion(id) {
   return {
     id,
     prompt: `Which store backs ${id}?`,
-    critical: true,
+    critical: true, important: false,
     options: [
       { key: 'pg', label: 'Postgres', recommended: true, pros: 'Relational.', cons: 'Ops cost.' },
       { key: 'sqlite', label: 'SQLite', pros: 'Zero ops.', cons: 'Single writer.' },
@@ -639,6 +640,7 @@ function detailQuestion(id) {
   return {
     id,
     prompt: `What should ${id} be called?`,
+    critical: false, important: false,
     options: [{ key: 'a', label: 'Option A', recommended: true }],
   };
 }
@@ -925,7 +927,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
     precompute.writePlanQuestions(root, 'functional/matrix.md', [{
       id: 'db',
       prompt: 'Which database engine should the project use?',
-      critical: true,
+      critical: true, important: false,
       options: [
         { key: 'pg', label: 'Postgres', recommended: true,
           description: 'A managed relational database engine.',
@@ -992,7 +994,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
       + 'run far past the width of a narrow terminal window if the renderer widened '
       + 'the column instead of wrapping the text inside the cell as it must.';
     precompute.writePlanQuestions(root, 'functional/wide.md', [{
-      id: 'w', prompt: 'Which approach?', critical: true,
+      id: 'w', prompt: 'Which approach?', critical: true, important: false,
       options: [
         { key: 'a', label: 'The first approach with a long name', recommended: true,
           description: long, pros: long, cons: long },
@@ -1018,7 +1020,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
     const root = makeSandbox();
     writePlan(root, 'functional', 'forge', validFunctionalBody('forge'));
     precompute.writePlanQuestions(root, 'functional/forge.md', [{
-      id: 'f', prompt: 'Which approach?', critical: true,
+      id: 'f', prompt: 'Which approach?', critical: true, important: false,
       options: [
         { key: 'a', label: 'Honest', recommended: true, pros: 'Real pros.', cons: 'Real cons.' },
         { key: 'b', label: 'Hostile',
@@ -1047,7 +1049,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
       + 'the promote array, and src/lib/task-registry.js:780 defines the occupying set as '
       + 'running and cancelling only, so an orphaned task reads as free to both callers.';
     precompute.writePlanQuestions(root, 'functional/labelonly.md', [{
-      id: 'q', prompt: 'Which way?', critical: true,
+      id: 'q', prompt: 'Which way?', critical: true, important: false,
       options: [
         { key: '1', label: 'Send back', recommended: true, description: evidence,
           pros: 'The rule is enforced in one place.', cons: 'Costs one round.' },
@@ -1077,7 +1079,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
     // Longer than any column; may break, but must break at a path separator.
     const oversize = 'plans/vision/ctoc-background-engine-rebuild.md:227';
     precompute.writePlanQuestions(root, 'functional/paths.md', [{
-      id: 'q', prompt: 'Which way?', critical: true,
+      id: 'q', prompt: 'Which way?', critical: true, important: false,
       options: [
         { key: '1', label: 'Send back', recommended: true,
           pros: `The standing value ships at ${fits} and the vision says otherwise.`,
@@ -1107,7 +1109,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
       + 'read and confirmed. The vision asks for a per-crossing stamp and this ships a permanent '
       + 'setting; a gate that one boolean disarms forever is a setting, not a gate.';
     precompute.writePlanQuestions(root, 'functional/rec.md', [{
-      id: 'q', prompt: 'Which way?', critical: true,
+      id: 'q', prompt: 'Which way?', critical: true, important: false,
       options: [
         { key: '1', label: 'Send back', recommended: true, pros, cons: 'Costs one round.' },
         { key: '2', label: 'Approve anyway', pros: 'No further work.', cons: 'The defect ships.' },
@@ -1150,7 +1152,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
       prompt: 'The human decided on 2026-07-14 that deploy stays a human gate. This plan satisfies '
         + 'that with one standing per-project flag that permanently authorizes every future '
         + 'auto-deploy. Approve 00004-r2b-actions-drain-and-shipgate across Gate 3?',
-      critical: true,
+      critical: true, important: false,
       options: [
         {
           key: '1',
@@ -1220,7 +1222,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
     const root = makeSandbox();
     writePlan(root, 'functional', 'openme', validFunctionalBody('openme'));
     precompute.writePlanQuestions(root, 'functional/openme.md', [{
-      id: 'db', prompt: 'Which database engine should the project use?', critical: true,
+      id: 'db', prompt: 'Which database engine should the project use?', critical: true, important: false,
       options: [
         { key: 'pg', label: 'Postgres', recommended: true, pros: 'Row level security.', cons: 'More operations work.' },
         { key: 'sqlite', label: 'SQLite', pros: 'Zero configuration.', cons: 'No concurrent writers.' },

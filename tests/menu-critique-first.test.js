@@ -85,6 +85,7 @@ describe('Menu Critique First', () => {
     precompute.writePlanQuestions(testDir, 'review/reviewed-plan.md', [{
       id: 'q01-retention-window',
       prompt: 'How long should an exported report stay downloadable?',
+      critical: false, important: false,
       options: [{ key: '1', label: 'Seven days', recommended: true, pros: 'Covers a working week.', cons: 'Storage grows.' }],
     }], fs.statSync(p).mtimeMs);
 

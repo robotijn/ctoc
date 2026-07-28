@@ -63,13 +63,13 @@ function magicLinkPlan(slug) {
 // Every fork must be answered for the plan to be sufficient.
 function magicLinkQuestions() {
   return [
-    { id: 'store', prompt: 'Which store backs sessions?', critical: true,
+    { id: 'store', prompt: 'Which store backs sessions?', critical: true, important: false,
       options: [{ key: 'pg', label: 'Postgres', recommended: true, pros: 'RLS' }, { key: 'sqlite', label: 'SQLite', cons: 'Single writer' }] },
-    { id: 'expiry', prompt: 'How long is a magic link valid?', important: true,
+    { id: 'expiry', prompt: 'How long is a magic link valid?', critical: false, important: true,
       options: [{ key: '15m', label: '15 minutes', recommended: true }, { key: '1h', label: '1 hour' }] },
-    { id: 'transport', prompt: 'Which email transport?', critical: true,
+    { id: 'transport', prompt: 'Which email transport?', critical: true, important: false,
       options: [{ key: 'resend', label: 'Resend', recommended: true }, { key: 'ses', label: 'Amazon SES' }] },
-    { id: 'copy', prompt: 'What does the sign-in button say?',
+    { id: 'copy', prompt: 'What does the sign-in button say?', critical: false, important: false,
       options: [{ key: 'signin', label: 'Sign in', recommended: true }, { key: 'continue', label: 'Continue' }] },
   ];
 }

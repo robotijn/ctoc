@@ -37,8 +37,10 @@
  *   - `planMtimeMs` the plan file's mtime (ms) AT THE MOMENT the questions were
  *                   generated. This is the freshness stamp (see STALENESS below).
  *   - `questions`   the decision questions, in the streaming Question contract:
- *                     Question = { id, prompt, critical?, important?, options:[Option] }
+ *                     Question = { id, prompt, critical, important, options:[Option] }
  *                     Option   = { key, label, recommended?, pros?, cons?, description? }
+ *                   `critical` and `important` are MANDATORY booleans — an undeclared
+ *                   importance is treated as a fork (see isBlockingQuestion).
  *
  * ── STALENESS rule ─────────────────────────────────────────────────────────────
  * Questions are generated from a SNAPSHOT of the plan. If the plan file changes
@@ -80,6 +82,15 @@ const { getPlansDir } = require('./state');
 /** A non-empty string. */
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.length > 0;
+}
+
+/**
+ * A producer-authored question id, made SAFE to echo into a validator error that
+ * reaches a gate screen: control characters stripped (a hostile id must not inject
+ * them into the screen) and length capped. Never echo an entire rejected question.
+ */
+function safeQuestionId(id) {
+  return String(id).replace(/[\u0000-\u001f\u007f-\u009f]/g, '').slice(0, 80);
 }
 
 /**
@@ -200,13 +211,14 @@ function refToPlanPath(root, ref) {
  * optional per-option `pros` / `cons` / `description` strings the streaming screen
  * surfaces.
  *
- *   Question = { id, prompt, critical?, important?, options: [Option] }
+ *   Question = { id, prompt, critical, important, options: [Option] }
  *   Option   = { key, label, recommended?, pros?, cons?, description? }
  *
  * Rules: `id`/`prompt`/`key`/`label` are REQUIRED non-empty strings; question ids
  * are UNIQUE across the array; `options` is REQUIRED with AT LEAST ONE option;
- * `critical`/`important`/`recommended` are optional booleans; `pros`/`cons`/
- * `description` are optional strings.
+ * `critical` and `important` are REQUIRED booleans on every question (a missing
+ * flag is an undeclared fork, refused at the write); `recommended` is an optional
+ * boolean; `pros`/`cons`/`description` are optional strings.
  *
  * @param {*} raw
  * @returns {{ valid: boolean, errors: string[] }}
@@ -237,11 +249,21 @@ function validatePlanQuestions(raw) {
     if (!isNonEmptyString(question.prompt)) {
       errors.push(`${where} is missing a non-empty string prompt`);
     }
-    if (question.critical !== undefined && typeof question.critical !== 'boolean') {
-      errors.push(`${where}.critical must be a boolean when present`);
+    // Both importance flags are MANDATORY booleans, not optional. A missing flag is
+    // NOT a statement that the question is unimportant — it is the absence of a
+    // statement, and `isBlockingQuestion` fails closed on it (the question BLOCKS).
+    // Refusing a flagless payload HERE, at the write, surfaces the producer's defect
+    // loudly at the producer instead of manifesting as an unexplained stuck gate
+    // three layers downstream. The error names the question id so a payload holding
+    // twelve is diagnosable; the id is sanitized (it is producer-authored).
+    const idLabel = isNonEmptyString(question.id)
+      ? `question ${JSON.stringify(safeQuestionId(question.id))}`
+      : where;
+    if (typeof question.critical !== 'boolean') {
+      errors.push(`${idLabel} must declare a boolean "critical" flag (got ${question.critical === undefined ? 'no value' : typeof question.critical}); an undeclared importance is treated as a fork`);
     }
-    if (question.important !== undefined && typeof question.important !== 'boolean') {
-      errors.push(`${where}.important must be a boolean when present`);
+    if (typeof question.important !== 'boolean') {
+      errors.push(`${idLabel} must declare a boolean "important" flag (got ${question.important === undefined ? 'no value' : typeof question.important}); an undeclared importance is treated as a fork`);
     }
     if (!Array.isArray(question.options)) {
       errors.push(`${where}.options must be an array`);
@@ -510,23 +532,32 @@ function plansNeedingQuestions(root) {
 
 /**
  * A question is BLOCKING when it is a real FORK — a load-bearing decision that is
- * the human's to make and that the implementer must never guess. That is exactly
- * the `critical` and `important` tiers. A `normal` question is a small detail that
- * can be resolved while building, so it never blocks.
+ * the human's to make and that the implementer must never guess.
  *
- * This rule lives HERE, in one place, on purpose: a caller that re-derives
- * "critical or important" from a question list is where drift gets in (forget
- * `important` and half the forks silently stop blocking). `hasEnoughInformation`
- * returns the blocking set so nobody has to.
+ * THE ABSENCE OF A DECLARATION IS NOT A DECLARATION OF UNIMPORTANCE. A question is
+ * non-blocking ONLY when BOTH importance flags are present, boolean, and both
+ * `false` — a producer positively stating "this is a resolvable detail I have
+ * judged". EVERY other shape fails CLOSED and blocks: a missing flag (nobody
+ * stated the importance), a half-stated pair (only one flag set), a non-boolean
+ * flag (a contract violation), or a non-object (a truncated/garbage payload). A
+ * flagless question that read as non-blocking is exactly how twelve real,
+ * unanswered forks produced `enough: true` and crossed a gate the human never saw;
+ * the safe default for an undeclared fork is to ask, per Operating Lesson 15.
  *
- * Strict `=== true` matches validatePlanQuestions, which requires a boolean when
- * the flag is present — a truthy non-boolean is a contract violation, not a fork.
+ * This rule lives HERE, in one place, on purpose: a caller that re-derives the tiers
+ * from a question list is where drift gets in. `hasEnoughInformation` returns the
+ * blocking set so nobody has to. `validatePlanQuestions` now requires both flags as
+ * booleans at the write, so the only way a flagless question reaches this predicate
+ * is a file written BEFORE the tightening (or one that bypassed the writer) — and
+ * for those, blocking is the correct, fail-secure verdict.
  *
- * @param {object} question
+ * @param {*} question
  * @returns {boolean}
  */
 function isBlockingQuestion(question) {
-  return !!question && (question.critical === true || question.important === true);
+  if (!question || typeof question !== 'object' || Array.isArray(question)) return true;
+  const declaredNonBlocking = question.critical === false && question.important === false;
+  return !declaredNonBlocking;
 }
 
 /**
@@ -772,6 +803,7 @@ module.exports = {
   loadPlanQuestions,
   readAnsweredQuestionIds,
   hasEnoughInformation,
+  isBlockingQuestion,
   isFresh,
   plansNeedingQuestions,
 };

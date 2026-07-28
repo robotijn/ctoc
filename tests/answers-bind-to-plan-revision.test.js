@@ -112,7 +112,7 @@ function fork(id, prompt) {
   return {
     id,
     prompt: prompt || `${id}?`,
-    critical: true,
+    critical: true, important: false,
     options: [
       { key: 'a', label: 'Option A', recommended: true, pros: 'Simple', cons: 'Narrow' },
       { key: 'b', label: 'Option B', pros: 'Broad', cons: 'Costly' },
@@ -125,6 +125,7 @@ function detail(id) {
   return {
     id,
     prompt: `${id}?`,
+    critical: false, important: false,
     options: [{ key: 'a', label: 'Option A', recommended: true }, { key: 'b', label: 'Option B' }],
   };
 }
