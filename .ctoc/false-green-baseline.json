@@ -1,5 +1,5 @@
 {
-  "maxFindings": 210,
+  "maxFindings": 209,
   "note": "DEBT, not blessing. These are pre-existing false-green sites — checks that can report a verdict on input they never received — tolerated so the fence could land. This list may only ever SHRINK. Never raise maxFindings to make a run pass; fix a site and lower it instead.",
   "whitelistNote": "SEPARATE from the debt list above. `whitelist` is a PERMANENT exemption for a construct that is genuinely correct, and every entry requires a written justification. It starts EMPTY. Adding to it is a reviewable act; adding to `findings` is forbidden.",
   "findings": [
@@ -168,7 +168,6 @@
     "src/lib/stale-detector.js:parse-default:parseFilesField",
     "src/lib/stale-detector.js:parse-default:parseFilesField#2",
     "src/lib/stale-detector.js:silent-catch:verifyStaleCandidate",
-    "src/lib/state.js:silent-catch:getAgentStatus",
     "src/lib/step-13-verify.js:silent-catch:runVerify",
     "src/lib/step-13-verify.js:unbounded-capture:r",
     "src/lib/step-13-verify.js:unbounded-capture:output",

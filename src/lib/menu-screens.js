@@ -593,6 +593,13 @@ function buildDashboardTable(projectPath, opts = {}) {
   } catch (err) {
     recoveryThrew = (err && err.message) ? String(err.message) : String(err);
   }
+  // Second registry read (the TASKS block source). It keeps its empty-registry fallback
+  // because the dashboard MUST still render — but an empty registry here is NOT an
+  // observed zero, it is a read that FAILED. What stops the human reading it as a checked
+  // zero is `renderReconcileHealth` above: on this exact path the reconcile pass's load
+  // ALSO failed and its `⛔ … could not be read (load-failed) … a floor, not the truth`
+  // line already sits directly beneath the TASKS counts. The coexistence is pinned by test
+  // (dashboard-survives-unreadable-registry, case 4), not left to the ordering argument.
   let taskReg;
   try { taskReg = taskRegistry.load(root); } catch { taskReg = taskRegistry.emptyRegistry(); }
   let tasksBlock = '';
@@ -681,7 +688,17 @@ function buildDashboardTable(projectPath, opts = {}) {
   // Agent status (lock-aware)
   const isAgentActive = agent.active;
   out += `AGENT\n`;
-  if (isAgentActive) {
+  if (agent.unreadable) {
+    // The registry could not be READ (an OS-level error out of state.getAgentStatus).
+    // Liveness is UNKNOWN — an agent may be running right now — so this must NOT sit
+    // beside `○ Idle`; it replaces it. It says "UNKNOWN, not idle" (rather than repeating
+    // "could not be read" as its subject) because on this path the reconcile corrupt line
+    // above the TASKS block ALSO renders "could not be read" — that line reports the CHECK;
+    // this line reports the AGENT. `agent.unreadable` is already stripped + bounded at the
+    // source (state.msgOf), so a crafted message cannot forge an extra row here.
+    out += `  ⛔ the agent status is UNKNOWN, not idle — the task registry could not be read, ` +
+      `so an agent may be running right now: ${agent.unreadable} · view: tasks\n`;
+  } else if (isAgentActive) {
     out += `  ● Active: ${agent.plan || 'unknown'}`;
     if (agent.pid) out += ` (PID ${agent.pid})`;
     out += '\n';
@@ -1596,9 +1613,15 @@ function dashboardCommands(projectPath) {
 
   const text = buildDashboardTable(root) + '\n\n\n';
 
+  // The option LABEL is a KEY into the `actions` map below and must NOT change on an
+  // unreadable registry — renaming it silently breaks its `claude:start-agent` route.
+  // The DESCRIPTION is the honest place to name the unknown status.
+  const agentDescription = agent.unreadable
+    ? 'Agent status could not be read — an agent may already be running'
+    : (isAgentActive ? 'Stop after current task' : 'Execute next plan from todo queue');
   const options = [
     { label: `Vision (${visionCounts.total})`, description: 'Explore new ideas before formal planning' },
-    { label: isAgentActive ? 'Stop agent' : 'Start agent', description: isAgentActive ? 'Stop after current task' : 'Execute next plan from todo queue' },
+    { label: isAgentActive ? 'Stop agent' : 'Start agent', description: agentDescription },
     { label: 'Sync plans', description: 'Pull, commit, and push plan changes' },
     { label: '◀ Pipeline', description: 'Return to pipeline view' }
   ];

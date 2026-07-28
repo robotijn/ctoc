@@ -167,7 +167,12 @@ function render(app) {
   output += line() + '\n\n';
 
   output += `${c.bold}Agent Status${c.reset}\n`;
-  if (agent.active) {
+  if (agent.unreadable) {
+    // The registry could not be read (an OS-level error out of state.getAgentStatus).
+    // This is NOT idle — an agent may be running — so it replaces the idle line in the
+    // block's two-column shape. The message is already stripped + bounded (state.msgOf).
+    output += `  ${c.red}⛔${c.reset} Unknown        the task registry could not be read — this is not "idle"\n`;
+  } else if (agent.active) {
     output += `  ${c.green}●${c.reset} Running       ${c.bold}${stripCtl(agent.name)}${c.reset}\n`;
     // R7-A: step + phase come from the agent-writable `.ctoc/state/agent.json` detail
     // record — free text, not fixed enums. Sanitize before they reach the terminal.

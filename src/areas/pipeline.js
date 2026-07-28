@@ -144,7 +144,12 @@ function render(app) {
   out += renderConflictPanel(app);
 
   out += line() + '\n';
-  if (agent.active) {
+  if (agent.unreadable) {
+    // The registry could not be read (an OS-level error out of state.getAgentStatus).
+    // This is NOT idle — an agent may be running — so it replaces the idle line, never sits
+    // beside it. The message is already stripped + bounded at the source (state.msgOf).
+    out += `${c.red}⛔${c.reset} Agent: ${c.bold}UNKNOWN${c.reset} — the task registry could not be read; this is not idle\n`;
+  } else if (agent.active) {
     out += `${c.green}●${c.reset} Agent: ${c.bold}${stripCtl(agent.plan || 'unknown')}${c.reset}`;
     // R7-A: agent.step is agent-writable (.ctoc/state/agent.json) — sanitize before render.
     if (agent.step) out += ` ${c.dim}(step ${stripCtl(agent.step)})${c.reset}`;
