@@ -89,9 +89,35 @@ function isWhitelisted(filePath) {
   norm = path.posix.normalize(norm);
   if (norm.startsWith('../')) return false;
   for (const pattern of WHITELIST) {
-    if (typeof pattern === 'string') {
-      if (norm === pattern || path.basename(norm) === pattern) return true;
-    } else if (pattern.test(norm)) return true;
+    const matched = typeof pattern === 'string'
+      ? (norm === pattern || path.basename(norm) === pattern)
+      : pattern.test(norm);
+    if (!matched) continue;
+    // The arithmetic above proves the NAME is a whitelisted infrastructure path. It
+    // cannot prove the path LEADS there: `plans/out → /somewhere/else` produces the
+    // clean, traversal-free name `plans/out/evil.md`, matches /^plans\/.*\.md$/, and
+    // grants a write OUTSIDE the repository with no covering plan at all. Ask the
+    // filesystem before granting.
+    //
+    // FAILING DIRECTION — `escapes: true` DENIES here, so return `false`. NOTE THE
+    // INVERSION relative to the two protected-path guards above, where `resolvesUnder`
+    // returning TRUE denies: both mean DENY, they answer opposite questions, and anyone
+    // unifying them will invert one and reopen the hole. `escapesRoot` NEVER throws
+    // (it returns escapes:true on every fault); the `&&` must not wrap it in anything
+    // that turns a fault into a permit, because a throw would reach enforce()'s
+    // fail-OPEN catch and become an ALLOW.
+    //
+    // A `false` here is NOT a hard denial: it FALLS THROUGH to enforce()'s coverage,
+    // escape-phrase and block steps and lands on the ordinary uncovered-file denial —
+    // no new message shape, no fifth outcome.
+    //
+    // Runs ONLY after a pattern matched, so an ordinary source edit (which matches
+    // nothing) costs ZERO syscalls — the hot path is untouched. If the confinement
+    // module failed to load this degrades to arithmetic alone: the hole is open again,
+    // documented at the fail-soft require (:57-64), never silent.
+    if (realPathConfinement !== null
+      && realPathConfinement.escapesRoot(filePath, process.cwd()).escapes) return false;
+    return true;
   }
   return false;
 }

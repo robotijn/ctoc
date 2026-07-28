@@ -535,3 +535,18 @@ and the exact change, and ask.
     assumption, the loop behaviour and the concatenation evasion are all marked MEASURE
     or PROBE, and the central finding is **required to be confirmed or refuted at Step
     8**, with refutation reported plainly rather than defended.
+11. **The resolution candidates are the shell operands PLUS the segment's quoted string
+    literals — a correction to the plan's implementation detail, made at Step 8.** The
+    plan's described set (`operands = tokens.slice(1)`) was insufficient for its OWN
+    case 7 (an interpreter through a link,
+    `node -e "require('fs').writeFileSync('src/link/approvals/f.json','x')"`):
+    whitespace tokenization mashes the whole eval body into one token and
+    `resolveTokenPath` strips quotes, so the embedded path resolves to the garbage
+    `requirefs.writeFileSyncsrc/link/approvals/f.json,x` and never reaches the ledger.
+    Case 7 stayed RED after the operand-only fix. The clean path IS a quoted literal,
+    so `quotedLiterals(seg)` (single- and double-quoted contents) are resolved too.
+    Measured false-deny over every real start.md `node -e` recipe (56 candidates) plus
+    the dev corpus against the real repo root: **zero**, so Decision 4's gate holds.
+    This closes the interpreter shape; it does NOT close the write-a-file-then-run-it
+    shape (residual 2, unchanged) or the string-concatenation eval evasion (residual 3,
+    reported not fixed).
