@@ -7,8 +7,9 @@
   "establishedAtVersion": "6.12.0",
   "reseededAt": "2026-07-19",
   "loweredNote": "RATCHET DOWN 26 -> 25 (2026-07-21, plan 00120, MEASURED live from analyze()): src/lib/plan-numbering.js is WIRED, not exempted — src/hooks/PreToolUse.Write.js now require()s it to enforce the plan-number collision refusal at plan-create time, so it is reachable from a registered hook root. Its exports are correspondingly live in the export fence (allocatePlanNumber via the start.md create-plan recipe; checkPlanWriteCollision via the Write hook; findNumberCollisions + renumberImplementationPlans via the start.md plan-numbers-check / plan-numbers-repair recipes; the rest via intra-file code edges).",
+  "loweredNote2": "RATCHET DOWN 25 -> 24 (2026-07-28, plan 00187, MEASURED live from analyze()): src/lib/stale-cleanup.js is WIRED, not exempted — it left the list because the surface-require pattern could not see a require WITHOUT a file extension. src/commands/start.md's cleanup-exec recipe RUNS it via require('{{CTOC_ROOT}}/src/lib/stale-cleanup').executeCleanup(process.cwd(), ...), and Node resolves require('./x') to ./x.js as it always has. The pattern now captures the path with an OPTIONAL extension and credits it to <path>.js only when that file exists in the scanned set, so no edge is invented to a file that is not there. The file was always actively wired; the fence's under-crediting listed it as dead. The skills walk was widened in the same change to collect every .md (not only SKILL.md), making the agent-fragments visible; that credited no currently-unreachable file, because the one citation there (createQuestion in async-choice-protocol.md) is prose, and a citation is not an invocation.",
   "seedReadErrors": 0,
-  "maxUnreachable": 25,
+  "maxUnreachable": 24,
   "unreachable": [
     "src/hooks/validate-plan-steps.js",
     "src/lib/ai-provenance.js",
@@ -32,7 +33,6 @@
     "src/lib/quality-gate.js",
     "src/lib/retention.js",
     "src/lib/spoliation-safe.js",
-    "src/lib/stale-cleanup.js",
     "src/lib/traceability-matrix.js",
     "src/lib/v8-dispatcher.js"
   ],

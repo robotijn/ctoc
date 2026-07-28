@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "The dead-code fence cannot see a require without a file extension — two live files were seeded into the deletion list, and the surface walk's other blind spots are named"
 type: implementation
 parent_plan: none
@@ -10,6 +11,9 @@ files:
   - "src/lib/reachability.js"
   - "tests/reachability.test.js"
   - ".ctoc/reachability-baseline.json"
+approved_by: human
+approved_at: 2026-07-28T20:33:08.565Z
+gate_crossed: implementation → todo
 ---
 
 # The dead-code fence cannot see a require without a file extension
@@ -296,3 +300,12 @@ lists, the blind-spot-5 finding, and every decision taken under ambiguity.
 6. **Blind spots are enumerated in the plan even where no fix is proposed.** A fence whose
    limits are undocumented gets trusted past them. Three of the five listed here get no
    code change, and saying so plainly is the point.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

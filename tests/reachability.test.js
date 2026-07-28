@@ -382,6 +382,151 @@ describe('dead-code fence — a citation is not an invocation (planted fixtures)
   });
 });
 
+// ─── the surface walk sees an extensionless require, and every .md surface ───
+
+describe('dead-code fence — an extensionless require is a real edge (planted fixtures)', () => {
+  it('1 · an extensionless require CREDITS the resolved <path>.js when it exists', () => {
+    withProject({
+      [MENU]: 'module.exports = {};\n',
+      'agents/planner.md': 'Then: node -e "require(\'./src/lib/extless\').go()"\n',
+      'src/lib/extless.js': 'module.exports = { go() {} };\n'
+    }, (root) => {
+      const r = analyze(root);
+      assert.ok(
+        r.roots.includes('src/lib/extless.js'),
+        'Node resolves require(\'./x\') to ./x.js and always has — the fence must credit it. ' +
+        `roots = ${JSON.stringify(r.roots)}`
+      );
+      assert.ok(!r.unreachable.includes('src/lib/extless.js'));
+    });
+  });
+
+  it('2 · the .js form still credits (regression guard on the shape that works today)', () => {
+    withProject({
+      [MENU]: 'module.exports = {};\n',
+      'agents/planner.md': 'Then: node -e "require(\'./src/lib/withext.js\').go()"\n',
+      'src/lib/withext.js': 'module.exports = { go() {} };\n'
+    }, (root) => {
+      const r = analyze(root);
+      assert.ok(
+        r.roots.includes('src/lib/withext.js'),
+        `the explicit .js form must keep working. roots = ${JSON.stringify(r.roots)}`
+      );
+    });
+  });
+
+  it('3 · an extensionless require to a NONEXISTENT file invents no edge', () => {
+    withProject({
+      [MENU]: 'module.exports = {};\n',
+      'agents/planner.md': 'node -e "require(\'./src/lib/ghostreq\').go()"\n',
+      'src/lib/present.js': 'module.exports = {};\n'
+    }, (root) => {
+      const r = analyze(root);
+      assert.ok(
+        !r.roots.some((f) => f.includes('ghostreq')) && !r.reachable.some((f) => f.includes('ghostreq')),
+        'a path resolving to no file must credit NOTHING — inventing an edge is the over-crediting ' +
+        `failure the re-seed removed. roots = ${JSON.stringify(r.roots)}`
+      );
+      assert.ok(
+        r.unreachable.includes('src/lib/present.js'),
+        'the analyzer must still run and report the genuinely-unreferenced file'
+      );
+    });
+  });
+
+  it('4 · a directory-style require does NOT resolve to index.js (narrower than Node, deliberately)', () => {
+    withProject({
+      [MENU]: 'module.exports = {};\n',
+      'agents/planner.md': 'node -e "require(\'./src/lib/dir\').go()"\n',
+      'src/lib/dir/index.js': 'module.exports = {};\n'
+    }, (root) => {
+      const r = analyze(root);
+      assert.ok(
+        r.unreachable.includes('src/lib/dir/index.js'),
+        'require(\'./dir\') resolves ./dir.js, not ./dir/index.js — the fence does not embed a ' +
+        `module resolver, and no shipped recipe uses that form. unreachable = ${JSON.stringify(r.unreachable)}`
+      );
+    });
+  });
+
+  it('5 · a non-SKILL.md .md under skills/ IS an instruction surface', () => {
+    withProject({
+      [MENU]: 'module.exports = {};\n',
+      'skills/agent-fragments/frag.md': 'Run the self-check:\n\n    node src/scripts/fragcheck.js\n',
+      'src/scripts/fragcheck.js': 'module.exports = {};\n'
+    }, (root) => {
+      const r = analyze(root);
+      assert.ok(
+        r.roots.includes('src/scripts/fragcheck.js'),
+        'every .md under skills/ is a surface, not only SKILL.md — the agent-fragments are binding ' +
+        `operating instructions the session runs. roots = ${JSON.stringify(r.roots)}`
+      );
+    });
+  });
+
+  it('6 · a PROSE mention in a fragment is NOT a root (a citation is not an invocation)', () => {
+    withProject({
+      [MENU]: 'module.exports = {};\n',
+      'skills/agent-fragments/frag.md': 'Write the question via `createQuestion()` from `src/lib/prose.js`.\n',
+      'src/lib/prose.js': 'module.exports = { createQuestion() {} };\n'
+    }, (root) => {
+      const r = analyze(root);
+      assert.ok(
+        r.unreachable.includes('src/lib/prose.js'),
+        'scanning the fragment makes the file VISIBLE; the citation there is prose and prose is ' +
+        `correctly not an invocation. roots = ${JSON.stringify(r.roots)}`
+      );
+    });
+  });
+
+  it('7 · the shipped-recipe file is NOT dead — the fence sees its extensionless require', () => {
+    const r = analyze(ROOT);
+    assert.ok(
+      !r.unreachable.includes('src/lib/stale-cleanup.js'),
+      'src/lib/stale-cleanup.js is RUN by the cleanup-exec recipe in src/commands/start.md via ' +
+      "require('{{CTOC_ROOT}}/src/lib/stale-cleanup').executeCleanup(...) — an extensionless require " +
+      `the fence must see. It is an actively-wired file listed as dead. unreachable = ${JSON.stringify(r.unreachable)}`
+    );
+    assert.ok(
+      !r.unreachable.includes('src/lib/plan-numbering.js'),
+      'src/lib/plan-numbering.js must not be dead either (already wired via the Write hook)'
+    );
+  });
+
+  it('8 · a require inside a COMMENT still credits nothing after the pattern change', () => {
+    withProject({
+      [MENU]: "require('../lib/livecom');\n",
+      'src/lib/livecom.js': "// require('./commented')\nmodule.exports = {};\n",
+      'src/lib/commented.js': 'module.exports = {};\n'
+    }, (root) => {
+      const r = analyze(root);
+      assert.ok(
+        r.unreachable.includes('src/lib/commented.js'),
+        'the stripped-comment guarantee must survive the extensionless pattern change — ' +
+        `a fence a comment can disarm is not a fence. unreachable = ${JSON.stringify(r.unreachable)}`
+      );
+    });
+  });
+
+  it('9 · SECURE — a traversal require credits nothing and reads nothing', () => {
+    withProject({
+      [MENU]: 'module.exports = {};\n',
+      'agents/evil.md': 'node -e "require(\'../../../etc/passwd\')"\n',
+      'src/lib/real.js': 'module.exports = {};\n'
+    }, (root) => {
+      const r = analyze(root);
+      assert.ok(
+        !r.roots.some((f) => f.includes('passwd')),
+        'the capture is anchored on src/, so a traversal path is never captured, looked up, or read'
+      );
+      assert.ok(
+        r.unreachable.includes('src/lib/real.js'),
+        'a hostile surface must not perturb the honest verdict'
+      );
+    });
+  });
+});
+
 // ─── fail-loud on unreadable input ──────────────────────────────────────────
 
 describe('dead-code fence — unreadable input is FATAL, absent input is not', () => {
