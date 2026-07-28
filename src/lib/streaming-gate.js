@@ -205,6 +205,29 @@ function stripLeadingFrontmatter(content) {
   return lines.slice(i).join('\n');
 }
 
+/**
+ * A plan with nothing in it. `stripLeadingFrontmatter` drops every stacked
+ * frontmatter block; what remains is what a human would read. A file carrying only a
+ * `# Heading` and no other content counts as EMPTY: a title is a LABEL, not a plan,
+ * and nobody can decide whether a label is finished — so a title-only file is exactly
+ * as undecidable as a blank one (Decision 4 in plan 00155, the judgement most likely
+ * to be argued with, pinned by case 5 of its test).
+ *
+ * Only a SINGLE leading top-level `# ` heading is stripped: one title-as-label, no
+ * more. A second heading, a sentence, a list — any non-heading, non-whitespace
+ * character — makes the plan non-empty.
+ *
+ * Never throws; a non-string input is empty.
+ *
+ * @param {string} content raw plan file content (already read by the caller — no re-read)
+ * @returns {boolean}
+ */
+function isEmptyPlan(content) {
+  if (typeof content !== 'string') return true;
+  const body = stripLeadingFrontmatter(content).replace(/^\s*#\s+[^\n]*\n?/, '');
+  return body.trim() === '';
+}
+
 // A plan body is shown in full up to this many lines; beyond it the body is cut and
 // the cut is DISCLOSED (never silently swallowed).
 const MAX_BODY_LINES = 120;
@@ -597,6 +620,12 @@ function pendingGateDecisions(projectRoot) {
         approveLabel: gateWords.approveLabel(stage),
         passesValidation,
         critical: isCritical(plan.metadata),
+        // A broken artifact is MARKED, never hidden: excluding it would make the file
+        // invisible — sitting at a gate forever with nothing saying so — a worse
+        // dishonesty than being asked about it. `gateScreenAt` renders the
+        // broken-plan screen for a broken descriptor. Computed on content already read
+        // (no second file read).
+        broken: isEmptyPlan(plan.content),
         // The ENOUGH-INFORMATION verdict — shown to the human, acted on by nothing.
         enough: sufficiency.enough,
         sufficiencyReason: sufficiency.reason,
@@ -918,6 +947,74 @@ function richQuestionScreen(d, index, total, statusLine, root) {
 }
 
 /**
+ * A BROKEN plan at a gate is an artifact to be told about, not a decision to make.
+ *
+ * THE GENERAL RULE this screen embodies, made checkable: an option whose description
+ * says it will be refused must not be an option. Validation has already answered
+ * "this cannot cross"; offering an Approve anyway — greyed, last, or explained — is
+ * the defect (a surface presenting a verdict it already computed and then ignored).
+ * So there is NO Approve here, and NO "Check validation": the screen already says
+ * why. Only actions that DO something are offered — Write it, Delete it, Leave it —
+ * and each already exists in this file's action vocabulary.
+ *
+ * The plan is NOT named by its slug: an empty plan has no title, and printing the
+ * filename as a title would show a person a filename to rule on. The filename appears
+ * only in the small print, labelled as a filename.
+ *
+ * TOTAL by contract: never throws. `gateWords.moment` yields '' off a gate, and the
+ * moment line is then omitted — the human still learns WHERE the file sits when it is
+ * at a gate, with no number and without being asked to act on it.
+ *
+ * @param {string} stage the stage the plan sits in
+ * @param {string} file the plan filename (shown LABELLED as a filename, never as a title)
+ * @param {string} projectRoot
+ * @param {'empty'|'unreadable'} reason why the artifact is broken
+ * @returns {{text: string, ask: object, actions: object}}
+ */
+function brokenPlanScreen(stage, file, projectRoot, reason) {
+  const safeFile = stripCtl(String(file));
+  const momentLine = gateWords.moment(stage); // '' when the plan is not at a gate
+  let text;
+  if (reason === 'unreadable') {
+    text = `This plan could not be read.\n${'─'.repeat(40)}\n\n`;
+    text += '  The file is there but its contents could not be read — it may not be a\n';
+    text += '  plain file. Nobody can decide anything about it, and nothing can be built\n';
+    text += '  from it.\n\n';
+  } else {
+    text = `This plan is empty.\n${'─'.repeat(40)}\n\n`;
+    text += '  The file exists and has no content — no title, no problem statement,\n';
+    text += '  nothing to build from. Nobody can decide anything about it, and nothing\n';
+    text += '  can be built from it.\n\n';
+  }
+  if (momentLine) text += `  ${momentLine}\n\n`;
+  text += `  Filename on disk: ${safeFile}\n\n\n`;
+
+  const stageFile = `${stage}/${file}`;
+  return {
+    text,
+    ask: {
+      questions: [{
+        question: reason === 'unreadable'
+          ? 'This plan cannot be read — what now?'
+          : 'This plan is empty — what now?',
+        header: 'Broken plan',
+        options: [
+          { label: 'Write it', description: 'Recommended — open the plan and give it a body. The only thing that turns it into something decidable.' },
+          { label: 'Delete it', description: 'Remove the file. There is nothing in it, so nothing is lost.' },
+          { label: 'Leave it', description: 'Nothing changes for now.' },
+        ],
+      }],
+    },
+    // Every action already exists in this file's vocabulary; nothing new is invented.
+    actions: {
+      'Write it': `claude:view-edit ${stageFile}`,
+      'Delete it': `claude:delete ${stageFile}`,
+      'Leave it': '',
+    },
+  };
+}
+
+/**
  * `plan <ref>` — OPEN a plan. This is a QUESTION, never a navigation menu.
  *
  * What it renders:
@@ -954,11 +1051,19 @@ function planDecisionScreen(ref, projectRoot) {
   const planPath = path.join(getPlansDir(projectRoot), stage, file);
 
   let content = '';
+  let unreadable = false;
   try {
-    content = safeFs.existsSync(planPath) ? safeFs.readFileSync(planPath, 'utf8') : '';
+    if (safeFs.existsSync(planPath)) content = safeFs.readFileSync(planPath, 'utf8');
   } catch {
-    content = ''; // unreadable → an honest empty body, never a crash
+    unreadable = true; // e.g. the path is a directory — handled here, never thrown
   }
+
+  // BROKEN ARTIFACT branches FIRST, before any title, scope, product-question or gate
+  // logic. An empty or unreadable plan is not a decision to make — it is a broken file
+  // to be told about — and it has no product question to ask (the precompute branch
+  // below would be asking about a document with no content).
+  if (unreadable) return brokenPlanScreen(stage, file, projectRoot, 'unreadable');
+  if (isEmptyPlan(content)) return brokenPlanScreen(stage, file, projectRoot, 'empty');
 
   const titleMatch = content.match(/^#\s+(.+)$/m);
   const title = titleMatch ? stripCtl(titleMatch[1].trim()) : slug;
@@ -1012,11 +1117,15 @@ function planDecisionScreen(ref, projectRoot) {
       passes = false;
     }
     const approveLabel = gateWords.approveLabel(stage);
+    // THE GENERAL RULE: an option that validation has already refused is not offered.
+    // When the plan passes, the affirmative option leads; when it fails, it is ABSENT
+    // (not greyed, not buried) — offering an Approve whose own description announces
+    // its refusal is the exact defect this slice removes. The `stream approve` ACTION
+    // string is preserved below regardless, because it is a machine identifier no
+    // human reads and the send-back/validate actions must stay byte-identical.
     const approve = {
       label: approveLabel,
-      description: passes
-        ? 'Recommended — everything checks out. Your answer is recorded as yours.'
-        : 'This plan FAILS its checks — saying yes is refused here. Check what is failing first.',
+      description: 'Recommended — everything checks out. Your answer is recorded as yours.',
     };
     // `validate <ref>` is the ONLY route to the validation detail screen and to the
     // deliberate `claude:approve --override` force-crossing — the human's own
@@ -1028,7 +1137,7 @@ function planDecisionScreen(ref, projectRoot) {
         ? 'Show the pre-transition validation detail before crossing.'
         : 'Recommended — show exactly which checks fail, with the option to override.',
     };
-    const options = passes ? [approve, check] : [check, approve];
+    const options = passes ? [approve, check] : [check];
     if (stage === 'review') {
       // The human chooses between WHAT IS WRONG — the thing, or the way. The stage
       // identifier survives only in the action string, which no human reads, so the
@@ -1118,14 +1227,16 @@ function sufficiencyLine(d) {
   return `  Enough information: NO — ${why}.\n`;
 }
 
-/** Build the option list; the RECOMMENDED option is placed FIRST (menu convention). */
+/**
+ * Build the option list; the RECOMMENDED option is placed FIRST (menu convention).
+ *
+ * THE GENERAL RULE: an option validation has already refused is NOT offered. On a
+ * failing plan the affirmative Approve is ABSENT (not last, not with a self-refusing
+ * description) — Open leads, then Skip. On a clean plan Approve leads. The
+ * `stream approve` ACTION is still built by the caller regardless; this governs only
+ * what the human is OFFERED.
+ */
 function buildOptions(d) {
-  const approve = {
-    label: d.approveLabel,
-    description: d.passesValidation
-      ? 'Recommended — everything checks out. Your answer is recorded as yours.'
-      : 'This plan FAILS its checks — saying yes is refused. Open it first to fix it.',
-  };
   const open = {
     label: 'Open the plan',
     description: d.passesValidation
@@ -1133,8 +1244,12 @@ function buildOptions(d) {
       : 'Recommended — this plan fails validation; open it to see what to fix.',
   };
   const skip = { label: 'Skip for now', description: 'Move to the next pending decision (nothing is changed).' };
-  // Recommended-first: Approve leads on a clean plan; Open leads when it fails.
-  return d.passesValidation ? [approve, open, skip] : [open, approve, skip];
+  if (!d.passesValidation) return [open, skip];
+  const approve = {
+    label: d.approveLabel,
+    description: 'Recommended — everything checks out. Your answer is recorded as yours.',
+  };
+  return [approve, open, skip];
 }
 
 /**
@@ -1179,6 +1294,18 @@ function gateScreenAt(decisions, index, statusLine, root) {
   }
   const d = decisions[index];
   const total = decisions.length;
+
+  // BROKEN ARTIFACT first: an empty plan is not a decision and has no product
+  // question to ask. Render the broken-plan screen instead of the approval question,
+  // deriving the stage/file from the descriptor's ref (a broken descriptor is only
+  // ever produced for a readable-but-empty plan — an unreadable one is skipped by
+  // readPlans and never reaches here — so the reason is always 'empty').
+  if (d.broken) {
+    const parsed = parseRef(d.ref);
+    const stage = parsed ? parsed.stage : d.fromStage;
+    const file = parsed ? parsed.file : `${d.slug}.md`;
+    return brokenPlanScreen(stage, file, root, 'empty');
+  }
 
   // PRE-COMPUTE: if this plan has fresh, not-yet-fully-answered precomputed
   // questions, ask the first unanswered one INSTANTLY. Otherwise (no precompute,

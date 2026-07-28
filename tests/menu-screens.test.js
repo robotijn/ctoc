@@ -280,18 +280,23 @@ describe('Menu Screens Tests', () => {
     assert.equal(result.actions['Check validation'], 'validate functional/my-plan.md');
   });
 
-  test('a review plan keeps the affirmative and BOTH send-backs, worded by what is wrong', () => {
+  test('a FAILING review plan drops the affirmative OPTION but keeps BOTH send-backs, worded by what is wrong', () => {
+    // `reviewed-plan` has a body but no verify evidence, so review→done validation
+    // FAILS. TIGHTENED (2026-07-28, plan 00155 — "an empty plan is a broken file,
+    // not a decision"): this is the owner's exact rejected screen — a review send-back
+    // screen whose option 2 read "Approve — approving is refused here". An option
+    // validation has already refused must not be an OPTION, so the affirmative is now
+    // ABSENT from what the human is offered. The `stream approve` ACTION string still
+    // survives (a machine identifier no human reads), asserted below.
     createPlan('review', 'reviewed-plan');
 
     const result = menuScreens.route(['plan', 'review/reviewed-plan.md'], testDir);
     const labels = allLabels(result);
 
-    // INVERTED (2026-07-20): these three used to be found by the substrings
-    // 'Approve', 'Feedback' and 'Rework'. "Feedback → Functional" and
-    // "Rework → Implementation" print stage-directory names at a human — the same
-    // class of internal vocabulary as the gate number — so the options now name WHAT
-    // IS WRONG (the thing, or the way), from the ONE vocabulary encoding.
-    assert.ok(labels.includes(gateWords.approveLabel('review')), 'the affirmative option is offered');
+    assert.ok(!labels.includes(gateWords.approveLabel('review')),
+      'the self-refusing affirmative option is NOT offered on a failing plan');
+    // The way out of a failed check is still reachable — Check validation leads.
+    assert.ok(labels.includes('Check validation'), 'Check validation is offered as the route past a failed check');
     for (const sb of gateWords.SEND_BACK) {
       assert.ok(labels.includes(sb.label), `the send-back is offered: ${sb.label}`);
       assert.ok(result.actions[sb.label].startsWith('claude:reject'), 'a send-back rejects');
@@ -304,10 +309,11 @@ describe('Menu Screens Tests', () => {
       assert.doesNotMatch(l, NO_GATE_NUMBER, `an option label names a gate number: ${l}`);
       assert.doesNotMatch(l, /\b(functional|implementation|todo|review)\b/i,
         `an option label names a raw stage: ${l}`);
+      assert.doesNotMatch(l, /\brefus(e|ed|es)\b/i, `an offered option announces its own refusal: ${l}`);
     }
 
     assert.equal(result.actions[gateWords.approveLabel('review')], 'stream approve review/reviewed-plan.md',
-      'the affirmative still crosses through the gate-safe approvePlan');
+      'the affirmative ACTION still crosses through the gate-safe approvePlan where no human reads it');
     // The ACTION values keep the stage identifier — no human reads them.
     const rejects = Object.values(result.actions).filter(v => String(v).startsWith('claude:reject'));
     assert.deepStrictEqual(rejects.sort(), [
