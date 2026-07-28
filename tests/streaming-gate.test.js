@@ -237,7 +237,7 @@ describe('streamingGateScreen — a focused single-decision question', () => {
     assert.doesNotMatch(open.description, /Recommended/i);
   });
 
-  it('recommends Open the plan (first option) when the plan FAILS validation — never recommends approving it', () => {
+  it('recommends Open the plan (first option) when the plan FAILS validation — and never OFFERS approving it', () => {
     const root = makeSandbox();
     writePlan(root, 'functional', 'dirty', invalidFunctionalBody('dirty'));
 
@@ -246,14 +246,18 @@ describe('streamingGateScreen — a focused single-decision question', () => {
 
     assert.equal(opts[0].label, 'Open the plan', 'Open is the recommended (first) option when validation fails');
     assert.match(opts[0].description, /Recommended/i);
-    // INVERTED (2026-07-20): found by the literal label 'Approve'; now by the
-    // vocabulary's affirmative label for this edge.
+    // TIGHTENED (2026-07-28, plan 00155 — "an empty plan is a broken file, not a
+    // decision"): the affirmative option used to be offered BURIED (with a description
+    // that literally said "saying yes is refused"). That is the exact self-refusing
+    // option plan 00155's general rule removes — an option validation has already
+    // refused must not be an option. The approved plan REPLACES the old contract, so
+    // this case now asserts the affirmative option is ABSENT, not merely un-recommended.
     const approve = opts.find(o => o.label === gateWords.approveLabel('functional'));
-    assert.ok(approve, 'the affirmative option is still offered (buried)');
-    assert.doesNotMatch(approve.description, /Recommended/i, 'a failing plan is never recommended for approval');
+    assert.equal(approve, undefined, 'the self-refusing affirmative option is not offered at all');
     for (const o of opts) {
       assert.doesNotMatch(o.label, NO_GATE_NUMBER, `option label names a gate number: ${o.label}`);
       assert.doesNotMatch(o.description, NO_GATE_NUMBER, `option description names a gate number: ${o.description}`);
+      assert.doesNotMatch(o.description, /\brefus(e|ed|es)\b/i, `an offered option announces its own refusal: ${o.description}`);
     }
   });
 
