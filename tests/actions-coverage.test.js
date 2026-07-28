@@ -205,17 +205,21 @@ describe('movePlan', () => {
 // ── rejectPlan ────────────────────────────────────────────────────────────────
 
 describe('rejectPlan', () => {
-  it('increments an EXISTING revision (2→3), records the reason, and reverts the plan to functional/', () => {
+  // UPDATED for plan 00085: rejection sends a plan back exactly ONE stage, so a
+  // review-stage plan reverts to in-progress, not four stages down to functional
+  // (defect D1). The human replaced that contract; these tests assert the new
+  // destination and the (unchanged) revision/reason/header behavior.
+  it('increments an EXISTING revision (2→3), records the reason, and reverts the plan ONE stage to in-progress/', () => {
     // Arrange — a review-stage plan already on its 2nd revision.
     const planPath = writePlan('review', 'rev-plan', '---\nrevision: 2\n---\n\n# Rev Plan\n\nbody\n');
 
     // Act
     const newPath = actions.rejectPlan(planPath, 'JWT expiry not handled', root);
 
-    // Assert — reverted to functional/, revision bumped, reason recorded, header prepended.
-    assert.equal(newPath, path.join(root, 'plans', 'functional', 'rev-plan.md'));
-    assert.equal(exists('functional', 'rev-plan'), true);
-    const content = read('functional', 'rev-plan');
+    // Assert — reverted ONE stage back to in-progress/, revision bumped, reason recorded, header present.
+    assert.equal(newPath, path.join(root, 'plans', 'in-progress', 'rev-plan.md'));
+    assert.equal(exists('in-progress', 'rev-plan'), true);
+    const content = read('in-progress', 'rev-plan');
     assert.match(content, /# REVISION 3/);
     assert.match(content, /revision:\s*3/);
     assert.match(content, /rejection_reason:\s*"JWT expiry not handled"/);
@@ -229,13 +233,13 @@ describe('rejectPlan', () => {
     actions.rejectPlan(planPath, 'needs work', root);
 
     // Assert — first rejection is REVISION 1, not 0 or NaN.
-    const content = read('functional', 'fresh');
+    const content = read('in-progress', 'fresh');
     assert.match(content, /# REVISION 1/);
     assert.match(content, /revision:\s*1/);
   });
 
   it('truncates the recorded rejection_reason to 100 characters', () => {
-    // Arrange — a 150-char reason exercises the .slice(0, 100) boundary.
+    // Arrange — a 150-char reason exercises the truncate-to-100 boundary.
     const planPath = writePlan('review', 'long-reason', '# Long\n\nbody\n');
     const longReason = 'A'.repeat(150);
 
@@ -243,7 +247,7 @@ describe('rejectPlan', () => {
     actions.rejectPlan(planPath, longReason, root);
 
     // Assert — exactly the first 100 chars are stored in the metadata line.
-    const content = read('functional', 'long-reason');
+    const content = read('in-progress', 'long-reason');
     assert.ok(content.includes(`rejection_reason: "${'A'.repeat(100)}"`), 'stored reason is 100 chars');
     assert.ok(!content.includes(`rejection_reason: "${'A'.repeat(101)}"`), 'the 101st char was truncated away');
   });

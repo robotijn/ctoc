@@ -503,3 +503,53 @@ Cross-platform: `fs.promises`, `path.join`, `os.tmpdir()`; teardown with
     mechanism's first catch and its non-vacuity evidence (`00082`'s test case 10
     fails today because of this plan). Scope is unchanged; one declaration and one
     documentation edit are added.
+
+## Decisions Taken During Execution (Steps 8–16)
+
+15. **The `CLAUDE.md` doc-count tax is ALREADY GONE — plan 00215's split landed
+    before this build.** The current `tests/doc-counts.test.js` makes the test-file
+    count a GROWING row: it compares `computeDocCounts.testFiles` to an independent
+    disk walk and NEVER parses the `CLAUDE.md` literal, and `doc-counts-generated.test.js`
+    operates only on tmp copies. So adding `tests/reject-plan-stage-aware.test.js`
+    breaks NO gate check (decision 14's premise is stale). `CLAUDE.md` was still
+    edited — both "test files" literals `473 → 474` — to keep the human-facing doc
+    honest and to satisfy the plan's Step 15. Nothing else in the file was touched.
+16. **`upsertMarkerFields` (frontmatter-merge) is reused rather than a bespoke
+    rewrite.** It already collapses stacked frontmatter blocks into one, STRIPS the
+    approval-marker keys (D3), keeps the block at byte zero (D2), and preserves the
+    body — exactly the rewrite this slice needs, in-scope (no edit to the
+    out-of-scope `frontmatter-merge.js`). It only APPENDS the rejection fields, so a
+    plan rejected twice accumulates a duplicate `revision`/`rejection_reason`/`tag`
+    line; `state.parseFrontmatterLines` is later-key-wins, so the newest value is
+    read (revision 0→1→2 is correct) and the accumulation is cosmetic, mirroring the
+    body's already-accumulating `# REVISION N` headers.
+17. **Test case 7 asserts the safety property for the REAL caller path.** `rejectPlan`'s
+    sole live caller (`src/tabs/review.js`) only ever rejects at `review`, whose
+    one-back target `in-progress` is NOT a gate destination — so residency there is
+    never ledger-vouched. The literal "for each target, not a destination OR has a
+    valid entry" is unsatisfiable for the synthetic `todo→implementation` /
+    `in-progress→todo` cases BECAUSE the D4 withdrawal removes the entry; those cases
+    exercise the one-back ARITHMETIC (cases 2, 3, 5), not a live residency scenario.
+    Case 7 therefore asserts the true, meaningful property: after a review rejection
+    the plan lands off ledger-governed ground AND carries no entry (fail-closed).
+18. **Test case 21 pins the STAGE_PRIORITY precedence with an APPROVED in-progress
+    plan, not a freshly-rejected one.** A freshly-rejected plan has NO ledger entry
+    (D4), so `isApprovedForCoverage` denies it and it grants nothing via coverage —
+    the plan's "a rejected plan wins the contest" framing is inconsistent with its own
+    D4 removal. The property decision 13 actually names is the STAGE_PRIORITY
+    precedence (`plan-coverage.js` scans `in-progress` before `todo` and returns on the
+    first approved match), which is why a plan BEING REBUILT — resident in
+    `in-progress`, still holding its Gate-2 `todo` ledger entry — owns its declared
+    files. Case 21 pins that precedence directly.
+19. **Two existing tests were updated toward the NEW contract, with justification.**
+    `tests/actions-coverage.test.js` (three `rejectPlan` cases) and
+    `tests/review-tab-coverage.test.js` (two reject-flow cases) asserted the D1 DEFECT
+    — `review → functional`. The human replaced that contract via this approved plan,
+    so the destination-stage assertions were tightened to `review → in-progress`; every
+    other assertion (revision bump, recorded reason, header, message) is unchanged. No
+    assertion was weakened.
+20. **OUT-OF-SCOPE FOLLOW-UP (not a blocker): `src/tabs/review.js`'s confirmation
+    message is now stale.** It reads "rejected → moved to functional drafts"; the plan
+    now moves back one stage (to `in-progress` for a review rejection). `review.js` is
+    NOT in this plan's declared `files:` and the change is a display string, not
+    core logic, so it is left untouched and flagged for a follow-up slice.

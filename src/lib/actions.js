@@ -779,38 +779,121 @@ function recordRefinementGate(planPath) {
 }
 
 // Reject a plan with feedback
-function rejectPlan(planPath, feedback, projectPath) {
+// Reject a plan: send it back EXACTLY ONE STAGE along `gate-order.STAGE_ORDER`,
+// withdraw the approval-ledger entry it no longer has, and rewrite its content
+// without corrupting the frontmatter (plan 00085, defects D1–D5).
+//
+// ONE STAGE BACK, NOT FOUR (D1). The former code did `movePlan(plan, 'functional')`
+// unconditionally, so a Gate-3 rejection dropped a plan from `review` (order 4) to
+// `functional` (order 0) — past Gate 2 and Gate 1. The target is now the immediately
+// preceding stage: `STAGE_ORDER[index - 1]`. That single rule REPRODUCES the
+// documented per-gate revert table at all three gate destinations (todo→implementation,
+// implementation→functional, done→review) AND answers the case the table omits — the
+// live one, since the sole caller (`src/tabs/review.js`) only ever rejects at `review`,
+// which goes back to `in-progress` ("send the build back to being built").
+//
+// `gate-order.sourceOf` is DELIBERATELY NOT used: it maps a gate DESTINATION to its
+// source and is built for the residency sweep. A plan being rejected sits at a gate
+// SOURCE, so `sourceOf('review')` is `undefined` — it would fail on the only path that
+// runs. Fail CLOSED: an unknown stage, or `functional` (which has no earlier stage),
+// REFUSES the rejection loudly rather than moving a plan to a stage nobody chose.
+//
+// WITHDRAW THE LEDGER ENTRY, ABORTING ON FAILURE (D4). Leaving the entry is
+// exploitable: a stale `stage_to: 'implementation'` entry re-accepts the plan at that
+// non-hash-sensitive gate destination with no new approval. So the entry is removed —
+// no entry means not approved, the fail-closed default. This is NOT best-effort: unlike
+// `stampAndLedger:399` and `streaming-gate.js:435`, a failed withdrawal here ABORTS the
+// rejection BEFORE the move (no `catch`), because the failure it would hide is precisely
+// the stale-record bypass this withdrawal exists to close. Rejected-but-unmoved is the
+// safe failure state; moved-with-a-surviving-entry is the bypass. A future tidy-up that
+// "makes the three consistent" must NOT wrap this call in a swallow.
+//
+// FRONTMATTER STAYS AT BYTE ZERO (D2) AND THE APPROVAL MARKER IS STRIPPED (D3).
+// `upsertMarkerFields` collapses any stacked frontmatter blocks into one, removes the
+// gate-stamp marker keys (`approved_by`/`approved_at`/`gate_crossed`/`override`/
+// `override_reason`), and keeps the `---` block at byte zero — the rejection header is
+// then inserted AFTER that block, never above it. The old code prepended the header
+// above the frontmatter, so every reader (`parseMetadata`, the coverage check's `files:`
+// scan) lost the plan's declared write surface after one rejection.
+//
+// ORDERING (write → withdraw → move) so a partial failure cannot strand the plan: a
+// crash after the in-place rewrite but before the move leaves a rejected-but-unmoved
+// plan with no ledger entry — visible and safe.
+//
+// The audit trade-off is disclosed: removing the entry loses the ledger's record that
+// the approval ever existed. It is bounded — the rejection itself is recorded in the
+// plan (revision counter, `rejection_reason`, `tag: rejected`) and the move is logged.
+//
+// @param {string} planPath - the plan's current path
+// @param {string} feedback - the human's rejection feedback (untrusted input)
+// @param {string} [projectPath] - resolved project root
+// @param {{ removeEntry?: (slug:string, root:string)=>void }} [deps] - injectable
+//   ledger-withdrawal seam (defaults to the real `approval-ledger.removeEntry`), so a
+//   crash-injection test can force the withdrawal to throw and assert the abort.
+// @returns {string} the destination path one stage back
+function rejectPlan(planPath, feedback, projectPath, deps = {}) {
   const root = projectPath || findProjectRoot();
-  let content = safeFs.readFileSync(planPath, 'utf8');
-  const metadata = parseMetadata(content);
+  const ledger = require('./approval-ledger');
+  const removeEntry = deps.removeEntry || ledger.removeEntry;
 
+  // 1. Stage-aware ONE-STAGE-BACK target, computed BEFORE any write so a refusal
+  //    leaves the file byte-identical on disk.
+  const currentStage = path.basename(path.dirname(planPath));
+  const idx = gateOrder.STAGE_ORDER.indexOf(currentStage);
+  if (idx < 0) {
+    throw new Error(
+      `rejectPlan: refusing to reject a plan in the unknown stage "${currentStage}" ` +
+      `— it is not in the stage order, so there is no one-stage-back target.`,
+    );
+  }
+  if (idx === 0) {
+    throw new Error(
+      `rejectPlan: a "${currentStage}" plan has no earlier stage to return to; ` +
+      `refusing to reject it.`,
+    );
+  }
+  const target = gateOrder.STAGE_ORDER[idx - 1];
+
+  // 2. Rewrite the content. Read + compute the new revision from the CURRENT frontmatter.
+  const content = safeFs.readFileSync(planPath, 'utf8');
+  const metadata = parseMetadata(content);
   const revision = (metadata.revision || 0) + 1;
 
-  // Prepend rejection feedback
-  const rejectionHeader = `# REVISION ${revision}
+  // SAFE FEEDBACK ENCODING (D5). Human input is written into YAML and into the body.
+  //  - body: keep newlines/tabs (it is markdown), strip other control chars (ANSI/NUL).
+  //  - YAML `rejection_reason`: truncate FIRST (so a `"` or `\` at the boundary is never
+  //    truncated mid-escape), THEN strip ALL control chars incl. newlines, THEN escape
+  //    backslash and double-quote — a single-line, quote-safe scalar.
+  const rawFeedback = String(feedback == null ? '' : feedback);
+  const bodyFeedback = rawFeedback.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '');
+  const yamlFeedback = rawFeedback
+    .slice(0, 100)
+    .replace(/[\x00-\x1f\x7f-\x9f]/g, ' ')
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"');
 
-## Rejection Feedback
+  // `upsertMarkerFields` collapses stacked blocks, STRIPS the approval-marker keys (D3),
+  // keeps the frontmatter at byte zero (D2), and appends our rejection fields.
+  const merged = upsertMarkerFields(content, [
+    ['revision', String(revision)],
+    ['rejection_reason', `"${yamlFeedback}"`],
+    ['tag', 'rejected'],
+  ]);
 
-${feedback}
+  // Insert the rejection header AFTER the (single) frontmatter block, never above it.
+  const rejectionHeader =
+    `# REVISION ${revision}\n\n## Rejection Feedback\n\n${bodyFeedback}\n\n---\n\n`;
+  const fm = merged.match(/^(---\r?\n[\s\S]*?\r?\n---\r?\n)([\s\S]*)$/);
+  const rewritten = fm ? fm[1] + rejectionHeader + fm[2] : rejectionHeader + merged;
+  safeFs.writeFileSync(planPath, rewritten);
 
----
+  // 3. Withdraw the ledger entry. A failure ABORTS the rejection before the move —
+  //    NOT best-effort here (see the header). No `catch`: a throw propagates so the
+  //    plan stays put with its record intact rather than moving with a stale entry.
+  removeEntry(ledger.slugFromPlanPath(planPath), root);
 
-`;
-
-  // Update metadata
-  const metadataUpdates = `revision: ${revision}\nrejection_reason: "${feedback.replace(/"/g, '\\"').slice(0, 100)}"\ntag: rejected\n`;
-
-  if (content.match(/^---\n/)) {
-    content = content.replace(/^---\n/, `---\n${metadataUpdates}`);
-  } else {
-    content = `---\n${metadataUpdates}---\n\n${content}`;
-  }
-
-  content = rejectionHeader + content;
-  safeFs.writeFileSync(planPath, content);
-
-  // Move to functional
-  return movePlan(planPath, 'functional', root);
+  // 4. Move exactly one stage back.
+  return movePlan(planPath, target, root);
 }
 
 // Rename a plan
