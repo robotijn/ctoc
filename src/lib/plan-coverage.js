@@ -45,6 +45,21 @@
  *      because the whitelist covers every stage folder. Residing in a post-approval
  *      folder is not proof of approval.
  *
+ * AN UNANCHORED DECLARATION GRANTS NOTHING UNLESS IT SAYS SO OUT LOUD (00126).
+ * A `files:` entry whose FIRST `/`-separated segment is a wildcard (for example a
+ * bare globstar, a bare star, or a repository-rooted extension glob) is rooted at
+ * the repository itself and reads one character away from a bounded `src` subtree
+ * glob. Such an entry is refused UNLESS the plan's own approved
+ * frontmatter carries a non-empty `unanchored_scope` acknowledgement — which is
+ * inside the hashed specification (`approval-ledger.computeSpecHash`), so it cannot
+ * be added after approval without breaking the approval. The rule is ANCHORING, not
+ * a file count: a count would have to walk the tree on this every-edit path and its
+ * verdict would drift with unrelated files. The predicate lives in ONE place,
+ * `declared-breadth.{isAnchored,hasUnanchoredAcknowledgement}`; `countMatching` (the
+ * I/O half in that module) is NEVER called from here. The denial ranking is the
+ * canonical `denialSeverity`/`rankDenial` below — reason severity first, glob
+ * specificity only as a within-reason tiebreak.
+ *
  * IT FAILS CLOSED, AND FAIL-CLOSED MEANS RETURN `null`, NEVER THROW.
  * `PreToolUse.Edit.js` wraps the whole enforcement decision in a catch that fails
  * OPEN, so a THROW out of this module becomes an ALLOW — a permission check whose
@@ -363,6 +378,56 @@ function specificity(glob) {
 }
 
 /**
+ * THE DENIAL RANKING — canonical, and this is the only place it is defined.
+ *
+ * The `denial` slot exists to tell the human what to DO about a plan that declared
+ * the target but grants nothing. Three writers share it, with three different
+ * remedies, so it is ranked by REASON SEVERITY first and glob specificity only as a
+ * tiebreak WITHIN the same reason. A stronger reason never loses to a more specific
+ * glob carrying a weaker one, because a remedy that cannot work (telling the human to
+ * "start building" a plan nobody approved) is worse than no remedy at all.
+ *
+ * Severity, strongest first:
+ *   3  approval reasons (unapproved, hash-mismatch, no-ledger-entry, …) — the DEFAULT,
+ *      and the deepest blocker: nobody approved, or the approval no longer matches the
+ *      content.
+ *   2  unanchored-declaration — the plan is approved, but this declaration was never
+ *      bounded (00126).
+ *   1  not-building — the plan is approved and bounded, but nothing is building it.
+ *      OWNED BY 00129: add its token here, and add nothing else to this ranking.
+ *
+ * A fourth reason MUST be added to this function, never ranked ad hoc at a call site.
+ *
+ * @param {string|null} reason
+ * @param {string} refusalReason - `declaredBreadth.REFUSAL_REASON` (one spelling)
+ * @returns {number}
+ */
+function denialSeverity(reason, refusalReason) {
+  if (reason === refusalReason) return 2;
+  // if (reason === 'not-building') return 1;  // owned by 00129
+  return 3;
+}
+
+/**
+ * Choose the surviving denial candidate: higher severity wins; within one severity,
+ * the more specific glob (higher `score`) wins. A slot holding nothing accepts any
+ * candidate, so a refused `**` (the lowest possible score, -5) can still explain
+ * itself when it is the ONLY candidate.
+ *
+ * @param {object|null} current
+ * @param {object} candidate - { plan, stage, glob, reason, score }
+ * @param {string} refusalReason
+ * @returns {object} the winner
+ */
+function rankDenial(current, candidate, refusalReason) {
+  if (!current) return candidate;
+  const cs = denialSeverity(candidate.reason, refusalReason);
+  const ds = denialSeverity(current.reason, refusalReason);
+  if (cs !== ds) return cs > ds ? candidate : current;
+  return candidate.score > current.score ? candidate : current;
+}
+
+/**
  * THE SCAN. Walks the coverage stages in priority order and returns BOTH the
  * best APPROVED match and, for the block path, the best REJECTED candidate.
  *
@@ -427,6 +492,13 @@ function scanForCoverage(targetFile, root) {
     return { ok: true, match: null, denial: null };
   }
 
+  // LAZY require, mirroring parsePlanFiles' require of stale-detector: declared-breadth
+  // top-level-requires THIS module (for globToRegex), so a top-level require here would
+  // form a load-time cycle and hand declared-breadth a half-built exports object. By
+  // the time scanForCoverage RUNS, this module's exports are complete, so the cycle
+  // resolves cleanly. `isAnchored`/`hasUnanchoredAcknowledgement` are PURE and never
+  // throw, so no I/O and no crash enter the hook path here.
+  const declaredBreadth = require('./declared-breadth');
   let denial = null;
   for (const stage of STAGE_PRIORITY) {
     const stageDir = path.join(root, 'plans', stage);
@@ -464,6 +536,7 @@ function scanForCoverage(targetFile, root) {
       // globs matched — so the hash is never computed for a plan that was never a
       // candidate. `undefined` means "not yet asked".
       let approval;
+      const ref = `${stage}/${f.replace(/\.md$/, '')}`;
       for (const rawGlob of globs) {
         // Normalize the glob ONCE (collapse `.`/`..`/`//` segments) so a non-escaping
         // `..` like `src/mod/../mod/**` both survives the escape check AND matches
@@ -473,6 +546,29 @@ function scanForCoverage(targetFile, root) {
           : rawGlob;
         // Defense in depth: a plan may not declare out-of-tree coverage.
         if (globEscapesRoot(glob)) continue;
+
+        // UNANCHORED-DECLARATION GUARD (00126). A declaration whose first `/`-segment
+        // is a wildcard is rooted at the repository itself; it grants nothing UNLESS
+        // the plan's own approved frontmatter says out loud that it is unanchored
+        // (`unanchored_scope`, inside the hashed specification, so it cannot be minted
+        // after approval). The `content` is already in hand — NO extra read. Both
+        // predicates are pure and total, so no I/O and no throw enters the hook path.
+        //
+        // The refused glob is EXCLUDED FROM THE ALLOW PATH unconditionally (the
+        // `continue` below), so it never becomes `best` and an anchored less-specific
+        // glob can never be beaten by a refused broad one. The DENIAL is recorded only
+        // when the refused glob would actually have MATCHED the target — otherwise
+        // buildBlockMessage's "the plan declares this file" would name a target the
+        // glob never covered, a lockout the human cannot correctly act on.
+        if (!declaredBreadth.isAnchored(glob) && !declaredBreadth.hasUnanchoredAcknowledgement(content)) {
+          if (globToRegex(glob).test(relTarget)) {
+            denial = rankDenial(denial, {
+              plan: ref, stage, glob, reason: declaredBreadth.REFUSAL_REASON, score: specificity(glob),
+            }, declaredBreadth.REFUSAL_REASON);
+          }
+          continue;
+        }
+
         const re = globToRegex(glob);
         if (!re.test(relTarget)) continue;
 
@@ -480,13 +576,14 @@ function scanForCoverage(targetFile, root) {
           approval = approvalResidency.isApprovedForCoverage(planPath, stage, root, content);
         }
         const score = specificity(glob);
-        const ref = `${stage}/${f.replace(/\.md$/, '')}`;
         if (!approval.approved) {
           // EXCLUDED BEFORE RANKING, so an APPROVED less-specific glob correctly
           // beats an UNAPPROVED more-specific one. Kept only to explain the denial.
-          if (!denial || score > denial.score) {
-            denial = { plan: ref, stage, glob, reason: approval.reason, score };
-          }
+          // Ranked through the shared comparator: an approval reason (severity 3)
+          // outranks an unanchored-declaration (severity 2) even on a broader glob.
+          denial = rankDenial(denial, {
+            plan: ref, stage, glob, reason: approval.reason, score,
+          }, declaredBreadth.REFUSAL_REASON);
           continue;
         }
         if (!best || score > best.score) {
