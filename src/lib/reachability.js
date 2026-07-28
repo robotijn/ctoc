@@ -305,7 +305,9 @@ function edgesFrom(file, allFiles, projectRoot = null) {
 /**
  * Collect the shipped INSTRUCTION SURFACES — the markdown/CI files the session
  * model actually executes: command specs (`src/commands/*.md`), agent definitions,
- * skill bodies, and CI workflows. Both fences honor the same surfaces: a file (or
+ * every `.md` under `skills/` (skill bodies AND the binding agent-fragments, not
+ * only files named `SKILL.md`), and CI workflows. Both fences honor the same
+ * surfaces: a file (or
  * an export) named in a shipped instruction is genuinely reachable by a human's
  * session, because the session does what those files say.
  *
@@ -326,7 +328,11 @@ function collectSurfaceFiles(projectRoot) {
   };
   walk(path.join(projectRoot, 'src', 'commands'), ['.md']);
   walk(path.join(projectRoot, 'agents'), ['.md']);
-  walk(path.join(projectRoot, 'skills'), ['SKILL.md']);
+  // Every `.md` under skills/ is a surface, not only SKILL.md: the agent-fragments
+  // (skills/agent-fragments/*.md) are binding operating instructions CLAUDE.md and
+  // every v7 agent preamble link and the session executes — restricting to SKILL.md
+  // left an entire shipped instruction surface invisible to both fences.
+  walk(path.join(projectRoot, 'skills'), ['.md']);
   walk(path.join(projectRoot, '.github', 'workflows'), ['.yml', '.yaml']);
   return surfaces;
 }
@@ -335,8 +341,14 @@ function collectSurfaceFiles(projectRoot) {
  * `node:`-excluding shape as the code-side rule. */
 const SURFACE_NODE_RUNS_RE = /\bnode(?![:\w])[^\n]{0,80}?(src\/[A-Za-z0-9_\-/.]+\.js)/g;
 /** A shipped instruction that REQUIRES a src file — the session's inline
- * `node -e "require('./src/lib/x.js')"` recipe form. Quote-delimited, linear. */
-const SURFACE_REQUIRES_RE = /\brequire\s*\(\s*['"][^'"\n]{0,64}?(src\/[A-Za-z0-9_\-/.]+\.js)['"]\s*\)/g;
+ * `node -e "require('./src/lib/x.js')"` recipe form. Quote-delimited, linear.
+ * The `.js` extension is OPTIONAL in the capture because Node's module system
+ * resolves `require('./x')` to `./x.js` and always has; a shipped recipe that
+ * omits it (as start.md's cleanup-exec and plan-number recipes do) is a genuine
+ * invocation. The captured path is credited to `<path>.js` ONLY when that file
+ * exists in the scanned set (see the resolution below) — the text alone never
+ * invents an edge to a file that is not there. */
+const SURFACE_REQUIRES_RE = /\brequire\s*\(\s*['"][^'"\n]{0,64}?(src\/[A-Za-z0-9_\-/.]+?)(\.js)?['"]\s*\)/g;
 
 /**
  * Resolve the live roots for a project.
@@ -408,7 +420,16 @@ function liveRoots(projectRoot, allFiles, options = {}) {
       re.lastIndex = 0;
       let m;
       while ((m = re.exec(text)) !== null) {
-        const hit = byRel.get(m[1]);
+        // SURFACE_REQUIRES_RE captures the path WITHOUT its extension (Node
+        // resolves `require('./x')` to `./x.js`); SURFACE_NODE_RUNS_RE captures
+        // it WITH `.js` (`node ./x` runs nothing). Resolving both to `<path>.js`
+        // and looking that up in the scanned set is what GATES the credit on the
+        // file's existence: a path that resolves to nothing — a ghost file or a
+        // directory-style `./dir` with only `dir/index.js` — is in `byRel` under
+        // no key, so it credits nothing. The fence never invents an edge to a
+        // file that is not there.
+        const rel = m[1].endsWith('.js') ? m[1] : `${m[1]}.js`;
+        const hit = byRel.get(rel);
         if (hit) roots.add(hit);
       }
     }
