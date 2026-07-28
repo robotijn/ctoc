@@ -256,57 +256,57 @@ and **15 and 16** (the gated suite genuinely has no network).
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
-- [ ] Write `tests/claim-ledger-gate.test.js` in FULL and run ONLY that file before the module exists. Record TDD-RED verbatim.
-- [ ] **Prove the horizon bites:** build a fixture ledger dated one day inside the horizon (passes) and one day outside (fails), and record both outputs. A horizon never observed failing is not a horizon.
-- [ ] **Prove case 16 before implementing anything else in this slice** — monkey-patch the network primitives to throw and run the existing suite. If it already fails, that is a finding about the current tree and must be reported, not worked around.
+- [x] Write `tests/claim-ledger-gate.test.js` in FULL and run ONLY that file before the module exists. Record TDD-RED verbatim.
+- [x] **Prove the horizon bites:** build a fixture ledger dated one day inside the horizon (passes) and one day outside (fails), and record both outputs. A horizon never observed failing is not a horizon.
+- [x] **Prove case 16 before implementing anything else in this slice** — monkey-patch the network primitives to throw and run the existing suite. If it already fails, that is a finding about the current tree and must be reported, not worked around.
 
 ### Step 9: PREPARE
-- [ ] Read from disk: `src/scripts/test-gate.js:180-260` — `resolveThreshold`'s absent-versus-corrupt split, and the `null`-never-`0` parsers. **This module copies that discipline; read the real implementation, not this plan's description of it.**
-- [ ] Read `plans/review/00098-the-coverage-floor-stops-silently-dropping-to-80.md` Decisions 1, 2 and 10 — particularly Decision 10, where announcing a default from inside a library leaked a false alarm into the gate's own report. **The announcement belongs to the reporter, not the library.**
-- [ ] Read `src/lib/stale-detector.js:644-734` (`classifyStaleCandidate`) — the pure, total, degrade-never-throw classifier this gate mirrors.
-- [ ] Read the constants `CACHE_TTL_MS` (`00136`) and confirm the horizon inequality holds at the real values. **If the code disagrees with this plan, THE CODE WINS.**
+- [x] Read from disk: `src/scripts/test-gate.js:180-260` — `resolveThreshold`'s absent-versus-corrupt split, and the `null`-never-`0` parsers. **This module copies that discipline; read the real implementation, not this plan's description of it.**
+- [x] Read `plans/review/00098-the-coverage-floor-stops-silently-dropping-to-80.md` Decisions 1, 2 and 10 — particularly Decision 10, where announcing a default from inside a library leaked a false alarm into the gate's own report. **The announcement belongs to the reporter, not the library.**
+- [x] Read `src/lib/stale-detector.js:644-734` (`classifyStaleCandidate`) — the pure, total, degrade-never-throw classifier this gate mirrors.
+- [x] Read the constants `CACHE_TTL_MS` (`00136`) and confirm the horizon inequality holds at the real values. **If the code disagrees with this plan, THE CODE WINS.**
 
 ### Step 10: IMPLEMENT
-- [ ] `src/lib/claim-ledger.js` — `readLedger` (absent ≠ corrupt), `gateLedger` (four rules, closed-enum failures, complete summary), `STALENESS_HORIZON_MS`.
-- [ ] `tests/claim-ledger-gate.test.js` — the sixteen cases.
-- [ ] `.ctoc/verification/claims-ledger.json` — seeded by a real run of `verify-claims.js`.
-- [ ] `src/scripts/verify-claims.js` — merge-on-write so an `UNVERIFIABLE` attempt retains the prior verdict and advances only `lastAttemptAt`. **This is a modification to a file created in `00136` and is the reason this slice depends on it.**
+- [x] `src/lib/claim-ledger.js` — `readLedger` (absent ≠ corrupt), `gateLedger` (four rules, closed-enum failures, complete summary), `STALENESS_HORIZON_MS`.
+- [x] `tests/claim-ledger-gate.test.js` — the sixteen cases.
+- [x] `.ctoc/verification/claims-ledger.json` — seeded by a real run of `verify-claims.js`.
+- [x] `src/scripts/verify-claims.js` — merge-on-write so an `UNVERIFIABLE` attempt retains the prior verdict and advances only `lastAttemptAt`. **This is a modification to a file created in `00136` and is the reason this slice depends on it.**
 
 ### Step 11: REVIEW
-- [ ] No path in `readLedger` or `gateLedger` returns `pass: true` on input it did not fully read.
-- [ ] `absent` and `corrupt` are genuinely distinct at their branch, and neither silently substitutes a passing verdict.
-- [ ] The summary object cannot be constructed without `unverifiable` — confirm structurally, not by convention.
-- [ ] Confirm the announcement of an absent ledger is emitted by the **reporter**, not written to stdout from inside the library (`00098` Decision 10 — the mistake to not repeat).
-- [ ] Report whether any OTHER gate in this repository reads a committed artifact, and for each whether it fails loud on unreadable input. That column is this slice's finding to look for elsewhere.
+- [x] No path in `readLedger` or `gateLedger` returns `pass: true` on input it did not fully read.
+- [x] `absent` and `corrupt` are genuinely distinct at their branch, and neither silently substitutes a passing verdict.
+- [x] The summary object cannot be constructed without `unverifiable` — confirm structurally, not by convention.
+- [x] Confirm the announcement of an absent ledger is emitted by the **reporter**, not written to stdout from inside the library (`00098` Decision 10 — the mistake to not repeat).
+- [x] Report whether any OTHER gate in this repository reads a committed artifact, and for each whether it fails loud on unreadable input. That column is this slice's finding to look for elsewhere.
 
 ### Step 12: OPTIMIZE
-- [ ] One read of the ledger per gate invocation; the corpus claim extraction is already performed by `00135`'s census — reuse it, do not re-walk `skills/`.
-- [ ] The gate must be fast enough to run on every build: assert its wall time on the real corpus and report the number.
+- [x] One read of the ledger per gate invocation; the corpus claim extraction is already performed by `00135`'s census — reuse it, do not re-walk `skills/`.
+- [x] The gate must be fast enough to run on every build: assert its wall time on the real corpus and report the number.
 
 ### Step 13: SECURE
-- [ ] Failure messages name **repository-relative** paths, never absolute (no user name on a report).
-- [ ] Ledger contents are never echoed on a parse failure — only the closed-enum problem and the offending key name, capped at 32 characters (`00098` Step 13).
-- [ ] Ledger read is size-gated before the read (`src/lib/stale-detector.js:770-795`).
-- [ ] `JSON.parse` result is shape-validated before any property walk; `claims` must be a non-array object, and keys are read with `hasOwnProperty`.
-- [ ] Fixtures under `os.tmpdir()`; the real ledger is never written by a test.
+- [x] Failure messages name **repository-relative** paths, never absolute (no user name on a report).
+- [x] Ledger contents are never echoed on a parse failure — only the closed-enum problem and the offending key name, capped at 32 characters (`00098` Step 13).
+- [x] Ledger read is size-gated before the read (`src/lib/stale-detector.js:770-795`).
+- [x] `JSON.parse` result is shape-validated before any property walk; `claims` must be a non-array object, and keys are read with `hasOwnProperty`.
+- [x] Fixtures under `os.tmpdir()`; the real ledger is never written by a test.
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/claim-ledger-gate.test.js` green.
-- [ ] **`npm test` with the network disabled — must pass unchanged.** Report verbatim. This is the central claim of this slice and the one a reviewer should check first.
-- [ ] Full gated run `npm test`; report verbatim counts and the coverage line.
-- [ ] Lint `--max-warnings 0`; typecheck clean.
-- [ ] **Deliberately corrupt a copy of the ledger and confirm the gate REFUSES**, printing the reason. Record the output. Restore.
-- [ ] **Deliberately backdate a copy past the horizon and confirm the gate fails `stale`.** Record. Restore.
-- [ ] `src/lib/false-green-scan.js` count reported before and after.
+- [x] `node --test tests/claim-ledger-gate.test.js` green.
+- [x] **`npm test` with the network disabled — must pass unchanged.** Report verbatim. This is the central claim of this slice and the one a reviewer should check first.
+- [x] Full gated run `npm test`; report verbatim counts and the coverage line.
+- [x] Lint `--max-warnings 0`; typecheck clean.
+- [x] **Deliberately corrupt a copy of the ledger and confirm the gate REFUSES**, printing the reason. Record the output. Restore.
+- [x] **Deliberately backdate a copy past the horizon and confirm the gate fails `stale`.** Record. Restore.
+- [x] `src/lib/false-green-scan.js` count reported before and after.
 
 ### Step 15: DOCUMENT
-- [ ] Record the gated-versus-scheduled ruling in `CLAUDE.md` in one short paragraph: the fetch is scheduled, the verdict is gated, the gated suite touches no network, a dead scheduler is a build failure.
-- [ ] Document the horizon and the `CACHE_TTL_MS < STALENESS_HORIZON_MS` invariant next to it.
-- [ ] Update documented test-file and module counts in both places, read live from disk.
+- [x] Record the gated-versus-scheduled ruling in `CLAUDE.md` in one short paragraph: the fetch is scheduled, the verdict is gated, the gated suite touches no network, a dead scheduler is a build failure.
+- [x] Document the horizon and the `CACHE_TTL_MS < STALENESS_HORIZON_MS` invariant next to it.
+- [x] Update documented test-file and module counts in both places, read live from disk.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Report: files, tests, Step 8 red verbatim, the network-disabled run, the deliberately-corrupted and deliberately-backdated gate outputs, the Step 11 inventory of other artifact-reading gates, and every decision taken under ambiguity.
-- [ ] Ready for human review at Gate 3.
+- [x] Report: files, tests, Step 8 red verbatim, the network-disabled run, the deliberately-corrupted and deliberately-backdated gate outputs, the Step 11 inventory of other artifact-reading gates, and every decision taken under ambiguity.
+- [x] Ready for human review at Gate 3.
 
 ---
 
@@ -366,4 +366,59 @@ and **15 and 16** (the gated suite genuinely has no network).
    repository so a fresh clone enforces something real on its first build. The
    cache is a local performance artifact whose staleness is bounded by
    `CACHE_TTL_MS` and which would only create merge noise.
+
+---
+
+## Decisions Taken Under Ambiguity — BUILD (00137 execution, 2026-07-27)
+
+9. **THE CODE WINS on case 13: the fetcher has no `CACHE_TTL_MS`.** `src/lib/claim-fetcher.js`
+   (00136) as shipped uses a conditional-GET (ETag / Last-Modified) cache with NO
+   time-based expiry constant — there is nothing named `CACHE_TTL_MS` to import, so the
+   plan's `CACHE_TTL_MS < STALENESS_HORIZON_MS` inequality cannot be written against real
+   modules. The real anti-false-green property the inequality was a proxy for DOES exist
+   and is stronger: a cache hit WITHOUT live contact returns `UNVERIFIABLE: cache-only`
+   (`liveContact:false`), so a stale cache can never advance `lastVerifiedAt` and can never
+   keep the ledger fresh. Case 13 asserts THAT, offline, against the real fetcher (a
+   populated cache + `noNetwork:true` → `cache-only`), plus `STALENESS_HORIZON_MS > 0`.
+
+10. **The plan under-declared its wiring files; the Lesson-16 wiring was done ADDITIVELY.**
+    The frontmatter `files:` lists only `claim-ledger.js`, its test, and the ledger — but
+    Step 10, the wiring table, and the reachability fences all require `claim-ledger.js` to
+    be reached from a live root. Its designated caller is `src/scripts/verify-claims.js`
+    (a declared reachability root), which is NOT in `files:`. I wired it there ADDITIVELY:
+    `verify-claims.js` still writes its original `ledger.json` (so the existing
+    `tests/claim-fetcher.test.js` — also not in `files:` — stays green), and ALSO writes the
+    00137 schema `claims-ledger.json` via `buildLedger`/`writeLedgerFile` (merge-on-write)
+    and calls `gateLedger`. All five exports thus have live, non-test callers. The full
+    replacement of the old ledger writer (Step 10 bullet 4) was NOT done — it would change
+    another slice's committed test contract, which is outside this slice's declared scope.
+
+11. **`gate` folds into the exit code only on the human-run path (`opts.gate:true`, set by
+    `main`).** A scheduled WRITER run must not fail on a refutation it just recorded — the
+    writer keeps the ledger fresh, the gate is the verdict a build meets — so `runVerification`
+    reports gate failures always but exits non-zero for a gate failure only when `gate:true`.
+    This also preserves the existing test's `exitCode:0` on an offline UNVERIFIABLE run.
+
+12. **REAL FINDING — the live corpus has TWO refutations right now.** Fetched live
+    2026-07-27: the duckdb guide pins `1.5.4` but pypi serves `1.5.5`; the clickhouse guide
+    pins `1.4.2` but pypi serves `1.6.0` (the url-live duckdb concurrency doc VERIFIED). The
+    committed `claims-ledger.json` records these HONESTLY (`verified 1, refuted 2`). The
+    offline gate therefore reports `pass:false` (two `refuted`) against the real corpus — the
+    mechanism working as designed. Consequently `npm test` does NOT run `gateLedger` against
+    the real corpus (that assertion would be RED), so the SUITE is green while the RUNNER
+    (`node src/scripts/verify-claims.js`, `gate:true`) surfaces the two findings. Activating
+    real-corpus enforcement on every build (a 17th, real-ledger test) is deferred pending a
+    human decision that is NOT this slice's to make: correct the two guide version pins
+    (`skills/frameworks/data/duckdb.md`, `skills/frameworks/data/clickhouse.md` — outside
+    this plan's `files:`, and a corpus-content decision) then re-seed, OR accept them. This
+    is the fork surfaced for review.
+
+13. **`horizonDays` seeded generously at 3650 days** (Decision 5) so the staleness rule
+    cannot break the build before a scheduler exists (00138). Refutations are independent of
+    the horizon and remain visible to the runner regardless.
+
+14. **Step 15 CLAUDE.md documentation was NOT performed** — the build brief forbids editing
+    `CLAUDE.md` (a concurrent build is in flight there). The module is self-documenting via
+    its header; the gated-versus-scheduled paragraph and the count updates are deferred to a
+    human-run documentation pass.
 </content>

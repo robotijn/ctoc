@@ -38,6 +38,7 @@ const path = require('path');
 const safeFs = require('../lib/safe-fs');
 const { extractClaims } = require('../lib/claim-extractor');
 const { verifyClaims } = require('../lib/claim-fetcher');
+const claimLedger = require('../lib/claim-ledger');
 const { requestExit } = require('../lib/request-exit');
 
 /**
@@ -102,14 +103,17 @@ function collectClaims(root) {
  *
  * @param {string} root absolute project root
  * @param {{claims?: Array<Object>, fetcher?: Object, print?: boolean,
- *          writeLedger?: boolean}} [opts]
+ *          writeLedger?: boolean, gate?: boolean}} [opts]
  *   - `claims`      — verify this exact set instead of extracting from the corpus.
  *   - `fetcher`     — options forwarded to `verifyClaims` (cacheDir, timeoutMs,
  *                     allowLoopback, noNetwork, concurrency, now).
  *   - `print`       — write the report to stdout (default true).
  *   - `writeLedger` — persist the ledger consumed by 00137 (default true).
+ *   - `gate`        — fold the offline gate's verdict into the exit code (the human-run
+ *                     path); default false so a scheduled writer is not failed by a
+ *                     refutation it just recorded.
  * @returns {Promise<{lines: string[], counts: Object, verdicts: Array<Object>,
- *   unreadable: Array<Object>, exitCode: number}>}
+ *   unreadable: Array<Object>, exitCode: number, gate: Object}>}
  */
 async function runVerification(root, opts = {}) {
   const print = opts.print !== false;
@@ -141,15 +145,39 @@ async function runVerification(root, opts = {}) {
     lines.push(`[CTOC claims] UNREADABLE GUIDE: ${u.path} — ${u.reason}`);
   }
 
-  if (print) for (const line of lines) console.log(line);
-
   if (opts.writeLedger !== false) {
     writeLedger(root, { counts, verdicts, unreadable: collected.unreadable });
+    // Also write the plan-00137 gate ledger: merge-on-write so an UNVERIFIABLE attempt
+    // retains the prior verdict and advances only `lastAttemptAt`. This is what the
+    // offline gate reads on every `npm test`.
+    try {
+      const prior = claimLedger.readLedger(root);
+      const merged = claimLedger.buildLedger(verdicts, claims, {
+        now: Date.now(),
+        prior: prior.ok ? prior.ledger : null,
+      });
+      claimLedger.writeLedgerFile(root, merged);
+    } catch {
+      // A ledger-write failure must not crash the human's verification run; the report is
+      // already built, and the gate reports a missing/stale ledger on its own.
+      void 0;
+    }
   }
 
-  // A refutation OR a corpus that could not be fully read is a non-clean result.
-  const exitCode = counts.refuted > 0 ? 1 : 0;
-  return { lines, counts, verdicts, unreadable: collected.unreadable, exitCode };
+  // The OFFLINE gate over the committed ledger. Its failures are ALWAYS reported; they
+  // fold into the exit code only on the human-run gate path (`opts.gate === true`), so a
+  // scheduled WRITER run is never failed by a refutation it just recorded — the writer's
+  // job is to keep the ledger fresh, the gate is the verdict a build meets.
+  const gate = claimLedger.gateLedger(root, claims);
+  for (const f of gate.failures) {
+    if (f.kind !== 'drift-orphan') lines.push(`[CTOC claims] GATE ${f.kind}: ${f.detail}`);
+  }
+
+  if (print) for (const line of lines) console.log(line);
+
+  // A refutation OR (on the gate path) an unclean gate is a non-clean result.
+  const exitCode = counts.refuted > 0 || (opts.gate === true && !gate.pass) ? 1 : 0;
+  return { lines, counts, verdicts, unreadable: collected.unreadable, exitCode, gate };
 }
 
 /**
@@ -190,7 +218,9 @@ function writeLedger(root, data) {
 
 /** Run against the real corpus and set the exit code without discarding output. */
 async function main() {
-  const result = await runVerification(process.cwd(), {});
+  // The human-run path enforces the offline gate in the exit code (`gate: true`): a
+  // refuted, stale or drifted ledger exits non-zero so the finding is impossible to miss.
+  const result = await runVerification(process.cwd(), { gate: true });
   requestExit(result.exitCode);
 }
 
