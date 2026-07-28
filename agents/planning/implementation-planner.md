@@ -368,7 +368,11 @@ functional stubs); here it is functional plan → N implementation slice plans.
 Each slice must be small enough that its full blueprint + build (Step 10) + test
 (Step 8) fits ONE focused executor pass. Concretely:
 
-- **Target ~1–3 files per slice.**
+- **Target ~1–3 files per slice.** The ~1–3 budget counts the slice's OWN work
+  surface only. Ratchet files (`CLAUDE.md` when the slice creates a counted
+  artifact) are a conditional write permission emitted under the separate commented
+  block in the `files:` skeleton and are EXCLUDED from this count — a slice does not
+  become oversized by declaring the `CLAUDE.md` its count move requires.
 - **A module and its own test file ALWAYS ship in the SAME slice.**
   **Never split a module from its test.** (The test is the module's specification;
   they are one unit of work.)
@@ -412,8 +416,21 @@ parent_plan: <parent-slug>          # the functional plan's slug as a BARE slug 
                                      # path here would fail the equality match and the
                                      # batch would find zero siblings.)
 depends_on: <sibling slugs, comma-separated, or none>
-files:                               # the FOCUSED file list for THIS slice only (~1–3),
-  - <path/for/this/slice/only>       # so the PreToolUse coverage hook scopes edits here
+files:
+  # THE SLICE'S OWN FILES — the work surface. ~1–3. The sizing rule governs THIS
+  # list only, so the PreToolUse coverage hook scopes edits here.
+  - <path/for/this/slice/only>
+  # RATCHET FILES — in scope BY RULE, not by prediction, and NOT counted toward the
+  # ~1–3 budget above: a conditional write permission, not planned work.
+  # ENFORCED AT GATE 2: a slice that CREATES a counted artifact (tests/*.test.js,
+  # src/lib/*.js, src/hooks/*.js, src/tabs/*.js, agents/**/*.md, skills/**/*.md)
+  # MUST declare CLAUDE.md, because creating it moves a documented count and the
+  # build needs permission to update that count. src/lib/documented-counts.js checks
+  # this in plan-validator.validateForQueue and the implementation→todo transition
+  # FAILS without it. Include the line below ONLY when this slice creates such an
+  # artifact. The two .ctoc/ baselines are already permitted by the hook whitelist
+  # and need no declaration.
+  # - "CLAUDE.md"
 priority: <inherited from the parent>
 ```
 
