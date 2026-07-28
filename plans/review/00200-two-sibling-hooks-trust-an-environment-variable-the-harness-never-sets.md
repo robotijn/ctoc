@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "Two sibling hooks trust an environment variable the harness never sets — the fix applied to one of three is applied to all three, and the divergence is fenced"
 type: implementation
 parent_plan: none
@@ -10,6 +11,9 @@ files:
   - "src/hooks/PreToolUse.Edit.js"
   - "src/hooks/guard-files.js"
   - "tests/hook-payload-single-source.test.js"
+approved_by: human
+approved_at: 2026-07-28T23:27:25.958Z
+gate_crossed: implementation → todo
 ---
 
 # Two sibling hooks trust an environment variable the harness never sets
@@ -333,3 +337,54 @@ as its own reviewed change, and every decision taken under ambiguity.
 7. **`getTarget` is newly exported.** Testing it through the spawned process would mean
    asserting on an allow, which is an absence — an unobservable pass. The export is a
    second view of an already-live function, not new machinery.
+
+## Decisions Taken During Implementation
+
+1. **Scope held to the two files with the defect.** Only `PreToolUse.Edit.js`
+   (`getTargetFile`) and `guard-files.js` (`getTarget`) contained the env read in CODE.
+   `PreToolUse.Write.js`, `PreToolUse.MultiEdit.js` and `PreToolUse.NotebookEdit.js`
+   delegate to the exported `enforce()` and never reimplement the reader, so they needed
+   NO source change. `PreToolUse.Bash.js` names the variable only in a comment (already
+   stdin-only). No sibling-hook scope fork arose.
+2. **Blast radius corrected toward the new contract (Rule 4).** Eight existing cases
+   asserted the removed env-first behavior and went RED:
+   - `tests/pretooluse-edit-coverage.test.js` — 4 cases in the `getTargetFile` block
+     (env-first read, env `.path`/`.notebook_path`, env-wins-over-stdin precedence, the
+     regex fallback). Each rewritten to assert the env is IGNORED and stdin is the sole
+     source. Justification: they asserted the defect; the contract changed to stdin-only.
+   - `tests/guard-files-coverage.test.js` — the env-only secret case, the two env-operand
+     cases, and `should_NOT_consult_stdin_when_env_supplies_a_command`. Rewritten so the
+     env decoy is proven IGNORED and the stdin target is always read. Stale comments
+     (JSON.parse-of-env, "env may override") corrected. The two env-operand cases were
+     re-pointed at stdin so the 2nd/3rd `||` operands of `getTarget` stay covered.
+   No assertion was weakened; every rewrite tightens toward "the env cannot substitute a
+   target." No other test in the enforcement/security surface (487 tests across the hook,
+   ledger, verify-evidence, whitelist, link-confinement, e2e and parity suites) changed
+   behavior.
+3. **The `.secret` pattern is a literal, ReDoS-safe RegExp** `/(^|[/\\])\.secret\b/i` —
+   anchored to a path-segment start (so `mysecret.js`/`secretly.js` do not match), no
+   nested quantifier, no data-derived construction. Reviewed as its own change per the
+   plan.
+4. **False-green baseline TIGHTENED, not loosened.** Deleting the two
+   `try { JSON.parse(env) } catch {}` blocks removed two `silent-catch` findings
+   (`guard-files.js:silent-catch:getTarget`, `PreToolUse.Edit.js:silent-catch:getTargetFile`).
+   `.ctoc/false-green-baseline.json` `maxFindings` lowered 210 → 208 and the two keys
+   removed. Zero new false-green sites introduced by this change (verified by diffing the
+   live scan against the baseline).
+5. **CLAUDE.md NOT edited (executor Rule 7).** The plan's Step 15 asked for a one-line
+   CLAUDE.md note and a test-count refresh; the build brief forbids editing CLAUDE.md
+   (counts are auto-generated later). The stdin-only contract is fully documented in the
+   two hook headers and in `tests/hook-payload-single-source.test.js`. The CLAUDE.md line
+   is deferred to the later count-reconciliation pass.
+6. **`npm install` was required** in this worktree so the lint and typecheck GATE tests
+   could run (they fail loudly when the tools are absent — correctly). This touched
+   `package-lock.json`, which is deliberately NOT staged in the commit.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

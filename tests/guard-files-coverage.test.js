@@ -20,17 +20,19 @@
  *   1. The exported pure matcher `isSecretTarget` — required in-process, fast,
  *      drives every pattern and its negation.
  *   2. The hook as a real process — spawned with a PreToolUse JSON payload on
- *      stdin and/or CLAUDE_TOOL_INPUT in env, asserting the real exit code and
+ *      stdin (the ONLY input channel, plan 00200; a CLAUDE_TOOL_INPUT decoy is set
+ *      in some cases only to prove it is ignored), asserting the real exit code and
  *      stderr. This is the only way to exercise the un-exported readStdinJson,
  *      getTarget, and main (guarded by `require.main === module`). Child V8
  *      coverage is aggregated back through the inherited NODE_V8_COVERAGE env.
  *
  * DOCUMENTED UNREACHABLE (honesty clause — never fabricated a hit):
- *   Lines 122-125, the outer `catch (err)` fail-open in main(), cannot be
- *   reached through the hook's real invocation. Everything inside main()'s try
- *   swallows its own errors: readStdinJson has an internal try/catch, getTarget
- *   wraps its JSON.parse in try/catch, and isSecretTarget only does String(...)
- *   + RegExp.test(...) which never throw. process.exit / process.stderr.write do
+ *   The outer `catch (err)` fail-open in main() cannot be reached through the
+ *   hook's real invocation. Everything inside main()'s try swallows its own errors:
+ *   readStdinJson has an internal try/catch, getTarget does only property access +
+ *   string concatenation (plan 00200 removed its JSON.parse; it never throws), and
+ *   isSecretTarget only does String(...) + RegExp.test(...) which never throw.
+ *   process.exit / process.stderr.write do
  *   not throw for a piped child. No public input makes the try body throw, so
  *   the fail-open branch is defensive-only. It is left uncovered by design.
  *
@@ -190,7 +192,11 @@ describe('isSecretTarget — normalization and falsy guard', () => {
 // NODE_V8_COVERAGE and its coverage is aggregated.
 // ---------------------------------------------------------------------------
 describe('guard-files hook process — getTarget source resolution + exit codes', () => {
-  /** Spawn the real hook. `env` may override CLAUDE_TOOL_INPUT; stdin carries `input`. */
+  /**
+   * Spawn the real hook. stdin carries `input` (the ONLY input channel, plan 00200).
+   * `envToolInput` still sets CLAUDE_TOOL_INPUT so the tests can PROVE it is ignored —
+   * a decoy in the env must never change the verdict.
+   */
   function runHook({ toolInput = '', envToolInput = '' }) {
     return spawnSync(process.execPath, [HOOK], {
       input: toolInput,
@@ -223,11 +229,14 @@ describe('guard-files hook process — getTarget source resolution + exit codes'
     assert.doesNotMatch(res.stderr || '', /BLOCKED/);
   });
 
-  it('should_exit_1_when_env_CLAUDE_TOOL_INPUT_file_path_is_secret', () => {
-    // env branch of getTarget: JSON.parse(CLAUDE_TOOL_INPUT) succeeds and wins
+  it('should_IGNORE_env_CLAUDE_TOOL_INPUT_file_path_secret_when_stdin_empty', () => {
+    // CONTRACT CHANGE (plan 00200): CLAUDE_TOOL_INPUT is no longer an input channel.
+    // A secret named ONLY in the env, with stdin empty, is INVISIBLE → allow. The old
+    // behavior (env-first read) is the defect this slice removes: a decoy in the env
+    // could substitute for the real stdin payload.
     const res = runHook({ envToolInput: JSON.stringify({ file_path: 'config/secrets.json' }) });
 
-    assert.equal(res.status, 2); // BLOCK = harness deny exit code (emitDeny); a bare exit 1 was NON-blocking
+    assert.equal(res.status, 0, 'env-only secret target is not read; the hook allows (fails open on empty stdin)');
   });
 
   it('should_exit_1_when_target_is_a_bash_command_reading_a_secret', () => {
@@ -239,22 +248,24 @@ describe('guard-files hook process — getTarget source resolution + exit codes'
     assert.equal(res.status, 2); // BLOCK = harness deny exit code (emitDeny); a bare exit 1 was NON-blocking
   });
 
-  it('should_resolve_env_path_field_via_second_or_operand', () => {
-    // getTarget: parsed.path is the 2nd operand of `file_path || path || notebook_path`
-    const res = runHook({ envToolInput: JSON.stringify({ path: '.aws/credentials' }) });
+  it('should_resolve_stdin_path_field_2nd_or_operand', () => {
+    // getTarget stdin: tool_input.path is the 2nd operand of file_path || path || notebook_path
+    const payload = JSON.stringify({ tool_name: 'Read', tool_input: { path: '.aws/credentials' } });
+    const res = runHook({ toolInput: payload });
 
     assert.equal(res.status, 2); // BLOCK = harness deny exit code (emitDeny); a bare exit 1 was NON-blocking
   });
 
-  it('should_resolve_env_notebook_path_field_via_third_or_operand', () => {
-    // getTarget: parsed.notebook_path is the 3rd operand — a mutant dropping it would allow this
-    const res = runHook({ envToolInput: JSON.stringify({ notebook_path: 'id_rsa' }) });
+  it('should_resolve_stdin_notebook_path_field_3rd_or_operand', () => {
+    // getTarget stdin: tool_input.notebook_path is the 3rd operand — a mutant dropping it would allow this
+    const payload = JSON.stringify({ tool_name: 'Read', tool_input: { notebook_path: 'id_rsa' } });
+    const res = runHook({ toolInput: payload });
 
     assert.equal(res.status, 2); // BLOCK = harness deny exit code (emitDeny); a bare exit 1 was NON-blocking
   });
 
   it('should_resolve_stdin_path_field_when_env_absent', () => {
-    // stdin fallback, 2nd operand: tool_input.path
+    // stdin, 2nd operand: tool_input.path
     const payload = JSON.stringify({ tool_input: { path: '.ssh/id_rsa' } });
 
     const res = runHook({ toolInput: payload });
@@ -263,7 +274,7 @@ describe('guard-files hook process — getTarget source resolution + exit codes'
   });
 
   it('should_resolve_stdin_notebook_path_field_when_env_absent', () => {
-    // stdin fallback, 3rd operand: tool_input.notebook_path
+    // stdin, 3rd operand: tool_input.notebook_path
     const payload = JSON.stringify({ tool_input: { notebook_path: 'model.pem' } });
 
     const res = runHook({ toolInput: payload });
@@ -272,7 +283,8 @@ describe('guard-files hook process — getTarget source resolution + exit codes'
   });
 
   it('should_fall_through_to_stdin_when_env_json_is_malformed', () => {
-    // getTarget: JSON.parse('not json{') throws -> catch -> stdin is consulted
+    // getTarget ignores the env entirely (plan 00200): a malformed env is irrelevant,
+    // the stdin .env target is read and blocked.
     const payload = JSON.stringify({ tool_input: { file_path: '.env' } });
 
     const res = runHook({ toolInput: payload, envToolInput: 'not json{' });
@@ -280,15 +292,17 @@ describe('guard-files hook process — getTarget source resolution + exit codes'
     assert.equal(res.status, 2); // BLOCK = harness deny exit code (emitDeny); a bare exit 1 was NON-blocking
   });
 
-  it('should_NOT_consult_stdin_when_env_supplies_a_command', () => {
-    // The `(!filePath && !command)` gate: a non-secret env command short-circuits
-    // the stdin fallback, so the secret file_path on stdin is never seen -> ALLOW.
+  it('should_ALWAYS_consult_stdin_even_when_env_supplies_a_command', () => {
+    // CONTRACT CHANGE (plan 00200): the old `(!filePath && !command)` gate let a
+    // benign env command short-circuit the stdin read, discarding the real payload —
+    // the exact defect this slice removes. Now the env is never read: a secret
+    // file_path on stdin is ALWAYS seen -> BLOCK, whatever the env holds.
     const res = runHook({
       envToolInput: JSON.stringify({ command: 'echo safe' }),
-      toolInput: JSON.stringify({ tool_input: { file_path: '.env' } }),
+      toolInput: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: '.env' } }),
     });
 
-    assert.equal(res.status, 0);
+    assert.equal(res.status, 2, 'stdin .env is read regardless of the env command; the decoy cannot mask it');
   });
 
   it('should_exit_0_when_both_stdin_and_env_are_empty', () => {
