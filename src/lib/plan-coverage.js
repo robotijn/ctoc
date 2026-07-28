@@ -404,7 +404,7 @@ function specificity(glob) {
  */
 function denialSeverity(reason, refusalReason) {
   if (reason === refusalReason) return 2;
-  // if (reason === 'not-building') return 1;  // owned by 00129
+  if (reason === 'not-building') return 1;  // owned by 00129 (Part B): approved but not building — the weakest reason
   return 3;
 }
 
@@ -434,6 +434,20 @@ function rankDenial(current, candidate, refusalReason) {
  * TOTAL BY CONSTRUCTION — every fault returns `{ ok: false }`, which both public
  * entry points turn into `null` (a DENY). It never throws, because a throw reaches
  * `PreToolUse.Edit.js`'s fail-OPEN catch and becomes an ALLOW.
+ *
+ * OPEN FINDING (00129) — coverage is PLAN-SCOPED but NOT BUILD-SCOPED. This scan
+ * answers "does ANY approved plan declare this file?", so an executor building plan A
+ * may edit any file declared by an approved plan B. Narrowing that to "declared by a
+ * plan that is CURRENTLY BUILDING" requires a building witness — a plan resident in
+ * `plans/in-progress/`, or a `running`/`cancelling` implement task naming its slug. As
+ * MEASURED on 2026-07-20 no such witness is set on the live dispatch path (the session
+ * model dispatching an executor subagent directly): `plans/in-progress/` is empty and
+ * the task registry holds zero running/cancelling tasks while builds are in flight, so
+ * the narrowing (00129 Part B) would deny the ORDINARY case and is BLOCKED behind a live
+ * precondition gate rather than shipped. The cross-plan write surface therefore stays
+ * open. The `not-building` severity slot in `denialSeverity` and the `not-building`
+ * remedy row in `PreToolUse.Edit.js` are the forward-compatible halves that ship now;
+ * the conjunct that produces the reason does not.
  *
  * @param {string} targetFile - path relative to project root, or absolute
  * @param {string} root - project root

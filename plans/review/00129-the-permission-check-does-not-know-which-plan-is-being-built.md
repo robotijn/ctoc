@@ -906,3 +906,43 @@ Part B does not ship, this does not arise.
     line-number drift were all MEASURED and are stated with their values. The hook
     payload's keys and the timings remain MEASURE AT STEP 9. An estimate written as a
     fact is the defect class this repository fences.
+
+## Executor Notes — Steps 8-16 run (2026-07-28, isolated worktree)
+
+**Step 9a gate — MEASURED, FAILED, Part B BLOCKED (the expected, successful outcome).**
+In this worktree `plans/in-progress/` does not exist, `.ctoc/state/tasks.json` does not
+exist, and `src/lib/building-plans.js` does not exist — the building witness set is EMPTY,
+even more emphatically than planning measured. Building Part B here would make every
+approved queued plan grant nothing and deny the very next edit (including this executor's
+and any concurrent one's) — the outage the plan exists to prevent. So per the plan's HARD
+PRECONDITION GATE, Part B was NOT built: no `building-plans.js`, no
+`tests/only-a-building-plan-grants-write-access.test.js`, no coverage conjunct, no
+`.ctoc/state/tasks.json` write-denial. Those four declared files are deliberately absent.
+
+**What shipped (Part A + the forward-compatible ranking half):**
+1. `src/hooks/PreToolUse.Edit.js` — `DENIAL_REMEDIES` frozen reason→remedy table +
+   `safeDenialField` leak-guard in the pure `buildBlockMessage`. Unknown/absent reason
+   falls back to today's sentence byte-for-byte. Changes no allow/deny outcome.
+2. `src/lib/plan-coverage.js` — filled 00126's reserved `not-building` severity slot
+   (`return 1`, weakest) and added the OPEN FINDING comment at `scanForCoverage`.
+3. `tests/a-denial-names-the-action-that-resolves-it.test.js` — 10 cases, all green;
+   cases 1, 2, 7 were RED before the implementation.
+
+**Decisions taken under ambiguity during this run:**
+- The `not-building` severity slot was filled even though Part B (which produces the
+  reason) is blocked — parity with the `not-building` remedy row, which the plan itself
+  ships ahead of the reason. It is one physical line, so it is LINE-covered by every
+  `denialSeverity` call the existing denial tests already drive (the enforced floor is
+  line coverage; the taken branch affects only unenforced branch coverage). No new export
+  was added, so the export-reachability fence is unaffected.
+- `safeDenialField` was ADDED (not merely "confirmed", as an earlier plan draft assumed)
+  because test case 7 requires the pure function to leak neither an absolute path nor a
+  forged newline even when handed a hostile denial. Production always passes a
+  repository-relative `ref`, which the sanitizer leaves byte-identical, so no existing
+  denial message changes.
+- Case 10 is implemented as a non-vacuity guard (the `unanchored_scope` marker is absent
+  for an approval reason), which is inherently green, rather than the "must fail as
+  designed" self-referential form the Step 8 prose described. Same discrimination goal:
+  it proves case 1 keys on the reason, not on any string.
+- Completion is a worktree commit on this branch (per the dispatch), NOT `menu task
+  complete` and NOT any plan-stage move — the parent integrator owns the gate crossing.

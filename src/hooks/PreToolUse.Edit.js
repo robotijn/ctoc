@@ -371,15 +371,58 @@ function findEscapeInTranscript(transcript) {
  * @param {object} info - { target_file?, project_root?, denial? }
  * @returns {string} the multi-line stderr banner, containing no canonical phrase
  */
+// DENIAL_REMEDIES — the reason-keyed remedy table (00129, Part A).
+//
+// A denial reason is not a remedy. Each row names the ACTION that resolves ITS reason,
+// never a restatement of the reason. An UNKNOWN or ABSENT reason falls back to
+// DEFAULT_REMEDY (today's sentence, byte-for-byte) so this table can only ADD
+// information to a denial, never make one less informative than it is now — a NEW denial
+// reason must add a row here or it will render a remedy that does not apply.
+const DEFAULT_REMEDY =
+  '       Only an APPROVED plan grants write access. Approve or re-approve it via /ctoc:start.\n\n';
+const DENIAL_REMEDIES = Object.freeze({
+  // 00126: the plan IS approved; re-approving it unchanged changes nothing. The
+  // frontmatter key alters the hashed specification — that is the whole point — so it
+  // must be added BEFORE the re-approval, in that order.
+  'unanchored-declaration':
+    '       This plan is already approved, so re-approving it unchanged will not help. '
+    + 'Add `unanchored_scope: "<why this file is declared>"` to the plan\'s frontmatter, '
+    + 'THEN re-approve it via /ctoc:start.\n\n',
+  // 00129 Part B: the plan is approved AND bounded; approval is not the blocker. This row
+  // ships ahead of the reason being produced — an unreached row is harmless, a missing
+  // row when the reason arrives is a silent fallback to the wrong remedy.
+  'not-building':
+    '       This plan is approved and bounded; approval is not what is blocking it. '
+    + 'Start it building via /ctoc:start, or type an escape phrase yourself.\n\n',
+});
+
+// A denial reference reaches this message from `plan-coverage` as a repository-relative
+// plan path and a fixed-vocabulary reason — never an absolute path or a multi-line
+// string. This PURE, public function must nonetheless leak neither even if handed a
+// hostile denial: collapse control characters (no newline → no forged line), strip any
+// leading absolute-path prefix, and bound the length.
+function safeDenialField(value) {
+  return String(value)
+    .replace(/[\x00-\x1f\x7f]+/g, ' ')
+    .replace(/^([A-Za-z]:)?[\\/]+/, '')
+    .trim()
+    .slice(0, 200);
+}
+
 function buildBlockMessage(reason, info) {
   const target = (info && info.target_file) || '(unknown)';
   const project = (info && info.project_root) || process.cwd();
   const denial = info && info.denial;
-  const explanation = denial && denial.plan
-    ? `  Why: the plan "${denial.plan}" declares this file, but it grants nothing `
-      + `(${denial.reason || 'not approved'}).\n`
-      + `       Only an APPROVED plan grants write access. Approve or re-approve it via /ctoc:start.\n\n`
-    : '';
+  let explanation = '';
+  if (denial && denial.plan) {
+    const planRef = safeDenialField(denial.plan);
+    const reasonText = denial.reason ? safeDenialField(denial.reason) : 'not approved';
+    // Exact-match lookup on the RAW reason token; an unknown or absent reason falls back.
+    const remedy = (denial.reason && DENIAL_REMEDIES[denial.reason]) || DEFAULT_REMEDY;
+    explanation = `  Why: the plan "${planRef}" declares this file, but it grants nothing `
+      + `(${reasonText}).\n`
+      + remedy;
+  }
   return `\n[CTOC v7] Edit BLOCKED: ${reason}\n`
     + `  Target: ${target}\n`
     + `  Project: ${project}\n\n`
