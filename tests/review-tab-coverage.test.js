@@ -548,7 +548,11 @@ test('executeAction: digit "6" switches to reject-input mode with a cleared valu
 // handleKey() — reject flows (end-to-end against a tmp fixture)
 // =====================================================================
 
-test('handleKey actions: Enter WITH directInput rejects the plan (review -> functional)', () => {
+// UPDATED for plan 00085: rejection now sends a plan back ONE stage, so a review-stage
+// plan reverts to in-progress ("send the build back to being built"), NOT four stages
+// down to functional. The human replaced the review→functional contract (defect D1); this
+// asserts the new destination and keeps every other assertion.
+test('handleKey actions: Enter WITH directInput rejects the plan (review -> in-progress)', () => {
   // Direct feedback == reject. Destructive move, but only on the throwaway fixture.
   const proj = makeProject(['broken-plan']);
   try {
@@ -566,18 +570,18 @@ test('handleKey actions: Enter WITH directInput rejects the plan (review -> func
     assert.equal(app.mode, 'list', 'returns to the list after reject');
     assert.equal(app.directInput, '', 'feedback buffer cleared');
     assert.match(app.message, /rejected/, 'confirmation message names the rejection');
-    // The plan physically moved out of review and into functional drafts.
+    // The plan physically moved out of review and one stage back into in-progress.
     assert.ok(!fs.existsSync(proj.planPath('broken-plan')), 'plan left the review dir');
     assert.ok(
-      fs.existsSync(path.join(proj.root, 'plans', 'functional', 'broken-plan.md')),
-      'plan landed in functional drafts'
+      fs.existsSync(path.join(proj.root, 'plans', 'in-progress', 'broken-plan.md')),
+      'plan landed one stage back in in-progress'
     );
   } finally {
     proj.cleanup();
   }
 });
 
-test('handleKey reject-input: Enter with a reason rejects the plan (review -> functional)', () => {
+test('handleKey reject-input: Enter with a reason rejects the plan (review -> in-progress)', () => {
   const proj = makeProject(['needs-work']);
   try {
     const app = {
@@ -595,8 +599,8 @@ test('handleKey reject-input: Enter with a reason rejects the plan (review -> fu
     assert.match(app.message, /rejected/);
     assert.ok(!fs.existsSync(proj.planPath('needs-work')), 'plan left review');
     assert.ok(
-      fs.existsSync(path.join(proj.root, 'plans', 'functional', 'needs-work.md')),
-      'plan landed in functional'
+      fs.existsSync(path.join(proj.root, 'plans', 'in-progress', 'needs-work.md')),
+      'plan landed one stage back in in-progress'
     );
   } finally {
     proj.cleanup();
