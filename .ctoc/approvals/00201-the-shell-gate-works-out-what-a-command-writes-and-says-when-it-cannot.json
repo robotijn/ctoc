@@ -1,0 +1,9 @@
+{
+  "content_sha256": "42b943f18d6a24edde3bd1e2b3205cdf8ce42e08cd8833b564d8e0f5b6131f62",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-28T22:58:55.709Z",
+  "approved_by": "human",
+  "plan_basename": "00201-the-shell-gate-works-out-what-a-command-writes-and-says-when-it-cannot"
+}

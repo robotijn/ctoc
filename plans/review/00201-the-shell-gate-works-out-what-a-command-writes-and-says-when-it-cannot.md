@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "The shell gate works out what a command writes, and says plainly when it cannot — a two-character prefix stops disabling the write gate"
 type: implementation
 parent_plan: none
@@ -10,6 +11,9 @@ files:
   - "src/lib/shell-write-targets.js"
   - "src/hooks/PreToolUse.Bash.js"
   - "tests/shell-write-targets.test.js"
+approved_by: human
+approved_at: 2026-07-28T22:58:55.662Z
+gate_crossed: implementation → todo
 ---
 
 # The shell gate works out what a command writes, and says plainly when it cannot
@@ -477,3 +481,66 @@ radius from Step 14, and every decision taken under ambiguity.
     attacker-controlled input is a denial-of-service against the session, and an
     unbounded capture is one of the five false-green signatures this repository fences.
     Over-bound input fails toward `indeterminate`, never toward `none`.
+
+## Decisions Taken During Implementation
+
+1. **`patch` classifies as a write (`indeterminate`), reversing the plan's table
+   omission — the existing real-hook contract wins.** The plan's determinate table did
+   not list `patch`, but `tests/security-bash-hook.test.js` (which spawns the REAL
+   hook) requires `patch -p1 < changes.patch` to BLOCK at a planning step. Step 9's rule
+   is "where the code disagrees with the plan, the code wins." `patch`'s write targets
+   live in the diff data, not on the command line, so `indeterminate` (reason `write
+   target could not be read`) is the honest, block-ward verdict.
+2. **The reason enum was extended by two command-text-free words beyond the plan's
+   seven:** `write target could not be read` (an empty/missing redirect target such as
+   `zz >`, a `cp`/`mv` with one operand, and `patch`) and `analysis fault` (the
+   return-never-throw backstop). The plan's security-critical invariant — a reason NEVER
+   carries command text (a command may hold a secret) — is preserved, and the enum stays
+   closed. The alternative (forcing these into `task runner`) would be dishonest to the
+   human reading `00202`'s deny banner.
+3. **Both `ALWAYS_ALLOWED` and `WRITE_PATTERNS` were DELETED, not kept per segment
+   (resolving Decision 9 with Step 9 evidence).** After the rebuild `isWriteCommand`
+   calls only `classifyWrites`, which subsumes read-detection: every read command the
+   existing suite pins (`ls`, `cat`, `grep`, `git status/log/diff`, `head`, `tail`,
+   `pwd`, `find` without `-exec`) classifies `none`. Grep found no other consumer of
+   either array, so keeping either would be dead code AND an eslint `no-unused-vars`
+   error. The comments that named the deleted symbols were reworded to historical
+   phrasing; no enforcement code (ledger-forgery, irreversible net, commit/plan-move
+   gates) was touched.
+4. **`perl` and `awk` classify as interpreters (`indeterminate`), not determinate
+   in-place edits.** The plan's determinate table lists `perl -i`, but reading perl's
+   write targets reliably past the `-e`/`-pe`/`-i.bak` forms is error-prone, no
+   acceptance test pins perl's targets, and `indeterminate` still blocks (satisfying the
+   security test's `perl -i -pe s/a/b/ f` block). `awk -i inplace` writes content
+   determined by the awk program, so `interpreter` is honest. `sed -i` IS handled
+   determinately (case 9 pins its targets and sed's operand grammar is simple).
+5. **`splitSegments` was made clobber-redirect aware.** A single `|` immediately
+   preceded by `>` is the `>|` clobber redirect, not a pipe, so it is not a split point
+   (negative lookbehind). Without this, `>| src/x.js` (plan case 31) split into `>` and
+   `src/x.js` and lost the target.
+6. **The classifier's `token` variables were renamed (`spec`, `target`).** The eslint
+   rule `security/detect-possible-timing-attacks` false-flags a variable named `token`
+   (a shell command token is not a cryptographic token). Behaviour and the positional
+   `resolveTarget(prefix, …)` signature are unchanged; "warnings are bugs" required a
+   clean lint.
+7. **SURFACED RISK for review / `00202` (not a build blocker — no acceptance criterion
+   fails).** Because interpreters now classify `indeterminate` and `isWriteCommand`
+   returns true for `indeterminate` (the plan's explicit "makes it visible to the step
+   gate" doctrine, case 12), a benign `node -e` menu recipe run with **no active
+   feature** now hits `main()`'s existing "no feature context" write-gate block —
+   verified empirically: at no state and at state-with-`feature:null` the recipe is
+   DENIED, where `ALWAYS_ALLOWED` previously waved it through. No existing test exercises
+   this path (the menu recipes are pinned only at step 10 + feature, case 37, where they
+   remain allowed), and the plan scopes the indeterminate deny/allow decision to
+   `00202`. The natural fix lives in `00202` (distinguish an indeterminate-with-no-
+   write-shape bare interpreter from an indeterminate write shape, or exempt the
+   sanctioned menu recipes). Flagged so the human decides rather than discovering it.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
