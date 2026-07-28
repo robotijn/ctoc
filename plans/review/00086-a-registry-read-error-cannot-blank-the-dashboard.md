@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "A registry read error cannot blank the dashboard — an unreadable agent status says so instead of showing idle"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild
@@ -15,6 +16,9 @@ files:
   - "tests/dashboard-survives-unreadable-registry.test.js"
   - "CLAUDE.md"
   - ".ctoc/false-green-baseline.json"
+approved_by: human
+approved_at: 2026-07-28T19:45:59.491Z
+gate_crossed: implementation → todo
 ---
 
 # A registry read error cannot blank the dashboard
@@ -466,3 +470,50 @@ some platform and a skipped test is a gate failure under the zero-skipped rule.
     still in `todo/` and changes a plan template rather than any code this slice
     touches — so both ratchet files are declared explicitly here rather than assumed
     to be in scope by a rule that has not landed.
+
+### Discrepancies found at build time — the CODE won, recorded
+
+13. **Line numbers had drifted; the code was followed, not the plan's line
+    references.** The unguarded `getAgentStatus` call in `buildDashboardTable` is at
+    `menu-screens.js:492` (plan said `:400`); the `AGENT` block is at `:683–692` (plan
+    said `:559–570`); `dashboardCommands` builds its options at `:1622` (plan said
+    `:1465`). The propagation point is `task-registry.js:392` — `safeFs.existsSync(p)`,
+    OUTSIDE the loader's own try (the `readFileSync` at `:396` is INSIDE it and fails
+    open) — exactly the seam the plan named. The red evidence pins that path.
+14. **The false-green baseline was `maxFindings: 210`, not `217`, and the fix CLEARED
+    the tracked finding.** On disk the baseline held `maxFindings: 210` with the key
+    `src/lib/state.js:silent-catch:getAgentStatus` (plan said 217). Change 2 gave the
+    detail-file catch real work (record on a non-`ENOENT` error), so the scanner no
+    longer flags it. Live count fell 210 → 209. Per the ratchet's only allowed
+    direction, `maxFindings` was lowered to 209 and the key removed from `findings`
+    (208 entries + 1 whitelist entry = 209 live). **No `whitelist` entry was added on
+    any path** — the fence was right and the code was fixed.
+15. **`CLAUDE.md`'s body was NOT edited; the test-file count is a GENERATED growing
+    tally now (plan 00215), not a hand-edited literal.** `tests/doc-counts.test.js`
+    cross-checks `computeDocCounts.testFiles` against an independent disk walk — both
+    move together when a test file is added, so adding one never breaks the check and
+    never requires a `CLAUDE.md` edit. The plan's "428 → 429 in two places" is
+    obsolete. `CLAUDE.md` stays in this slice's declared `files:` (it is a ratchet the
+    plan reserved) but its body is left untouched, matching the build directive that a
+    sibling build may own the doc body.
+16. **`getAgentStatus` now DECLARES its return type via a JSDoc `@typedef AgentStatus`
+    to keep `tsc --noEmit` clean.** Adding the `unreadable` variant widened the inferred
+    `active` to `boolean`, which broke the discriminated-union narrowing the pre-existing
+    renderers relied on to read their optional legacy display fields (`stale`, `pid`,
+    `name`, `stalePlan` — always `undefined` at runtime, guarded dead branches this slice
+    does not own). The typedef restores the permissive shape those reads assumed and
+    documents the real runtime object, rather than loosening any check or touching the
+    legacy branches.
+17. **The Commands screen return shape is `{ text, ask: { questions }, actions }`.** The
+    Step-16 test reads the Start-agent option through `screen.ask.questions[0].options`
+    and the route key through `screen.actions['Start agent']`. No existing test was
+    changed — only this slice's own new test was written to the real contract.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

@@ -15,7 +15,16 @@ function render(app) {
   let out = '\n';
   out += `${c.bold}Agent${c.reset}\n\n`;
 
-  if (agent.active) {
+  if (agent.unreadable) {
+    // The registry could not be READ (an OS-level error out of state.getAgentStatus).
+    // This is NOT "idle" — an agent may be running right now — so it renders its own block
+    // above `agent.active`, in the register of the existing `⚠ Stale lock` block. The
+    // message is already stripped + bounded at the source (state.msgOf).
+    out += `  ${c.red}⛔${c.reset} ${c.bold}Unknown${c.reset}\n`;
+    out += `  The agent status could not be read — this is not "idle".\n`;
+    out += `  The task registry could not be read: ${agent.unreadable}\n`;
+    out += `  An agent may be running right now; do not assume the pipeline is stopped.\n`;
+  } else if (agent.active) {
     out += `  ${c.green}●${c.reset} ${c.bold}Active${c.reset}\n`;
     out += `  Plan       ${c.cyan}${stripCtl(agent.plan || 'unknown')}${c.reset}\n`;
     // R7-A: step + phase are read from the agent-writable `.ctoc/state/agent.json`
@@ -62,6 +71,14 @@ function handleKey(key, app) {
   const status = state.getAgentStatus(root);
 
   if (seq === 'g') {
+    if (status.unreadable) {
+      // The registry could not be read, so liveness is UNKNOWN. Starting a second agent on
+      // the same file set is the damage this key can do, and actions.startAgent would itself
+      // throw on the same unreadable registry. Under uncertainty, REFUSE the damaging action
+      // — do not call startAgent.
+      if (app) app.message = 'Agent status could not be read — refusing to start; an agent may already be running.';
+      return true;
+    }
     if (status.active) {
       // R7-A: status.plan is the agent-writable task-registry slug (.ctoc/**); it flows
       // into app.message, which the mount renders. Sanitize at the source.
@@ -88,6 +105,21 @@ function handleKey(key, app) {
   }
 
   // seq === 'x' — graceful stop.
+  // Under an unknown status the asymmetry with `g` is deliberate: refuse the action that can
+  // do damage (start), ALLOW the action that can only reduce activity (stop). Requesting a
+  // stop when nothing is running is inert; refusing one when something IS running strands the
+  // human. So on `unreadable` we PROCEED — but stopAgent itself can throw on the same
+  // unreadable registry, so it is wrapped and the failure is reported BY NAME rather than the
+  // unconditional "Stop requested", which would be a claim about a write that did not happen.
+  if (status.unreadable) {
+    try {
+      const res = actions.stopAgent(root);
+      if (app) app.message = (res && res.message) || 'Stop requested';
+    } catch (err) {
+      if (app) app.message = `Stop could not be requested — ${stripCtl(String(err && err.message ? err.message : err))}`;
+    }
+    return true;
+  }
   if (!status.active) {
     if (app) app.message = 'No agent is running';
     return true;

@@ -244,6 +244,20 @@ const getPlanCounts = memoize(function getPlanCountsImpl(projectPath) {
   };
 }, 'getPlanCounts');
 
+/** Max chars of a read-error message rendered on one agent line, mirroring
+ * menu-screens.FAILURE_MESSAGE_CAP. Bounded and control-stripped because the message
+ * can carry a filesystem path (potentially attacker-influenced via a crafted registry
+ * file) and a newline in a rendered message can forge a dashboard row. */
+const AGENT_MESSAGE_CAP = 120;
+
+/** Sanitize a caught error into a bounded, control-stripped one-line message. Only
+ * `err.message` is read — never `err.stack`, which would leak absolute paths. */
+function msgOf(err) {
+  const raw = String(err && err.message ? err.message : err);
+  const clean = raw.replace(/[\x00-\x1f\x7f-\x9f]/g, '');
+  return clean.length > AGENT_MESSAGE_CAP ? `${clean.slice(0, AGENT_MESSAGE_CAP)}…` : clean;
+}
+
 // Get agent status (task-registry aware).
 // LIVENESS comes from the scheduler registry, not a pid lock file (the agent-lock
 // module is retired in F1-s2). The agent is "active" iff the registry holds at least
@@ -251,11 +265,56 @@ const getPlanCounts = memoize(function getPlanCountsImpl(projectPath) {
 // supplementary detail record (step/phase/task) but never decides liveness. Orphan
 // reconciliation (task-reconcile) — not a pid check — recovers a crashed session's
 // stale `running` tasks, so there is no "stale lock" state to report.
+//
+// THREE STATES, NOT TWO. `task-registry.load` fails OPEN on a DATA problem (an
+// unparseable file, a wrong shape, a malformed entry) — but NOT on an OPERATING-SYSTEM
+// problem: `safeFs.existsSync` / `safeFs.readFileSync` delegate to `fs` and THROW on
+// EACCES/EIO/EISDIR/ELOOP. Unguarded, that throw propagated straight out of the dashboard
+// builder and the human saw NOTHING at all. Caught, it must NOT become the opposite
+// failure — an empty registry read as "no agent is running" is a verdict on input we
+// never received. So a read error is a THIRD state, `unreadable`, that every render site
+// prints INSTEAD of an idle claim, never beside one. `active: false` is retained beside it
+// deliberately: under an unreadable registry there is no plan, step or start time, so the
+// falsy `active` keeps the fabricating "Active" branch closed while `unreadable` carries
+// the truth.
+/**
+ * @typedef {object} AgentStatus
+ * @property {boolean} active  true iff the registry holds a running `implement` task.
+ * @property {string} [unreadable]  set (WITH `active:false`) when the registry itself could
+ *   not be READ — an operating-system error, not a data problem. Every render site prints
+ *   this INSTEAD of an idle claim, never beside one.
+ * @property {string} [detailUnreadable]  set when the supplementary detail file existed but
+ *   could not be read/parsed (an EACCES/EIO or corrupt file, NOT a normal absent file).
+ * @property {(string|null)} [plan]  primary running plan (active only).
+ * @property {string[]} [plans]  every concurrently-running implement plan.
+ * @property {number} [running]  count of running implement tasks.
+ * @property {(string|null)} [startedAt]
+ * @property {(string|null)} [elapsed]
+ * @property {*} [step]
+ * @property {*} [phase]
+ * @property {*} [task]
+ * @property {*} [pid]
+ * @property {boolean} [stale]  legacy display field; the registry model reports no stale-lock state.
+ * @property {*} [stalePlan]  legacy display field.
+ * @property {*} [name]  legacy display field read by the overview tab.
+ */
+
+/**
+ * @param {string} [projectPath]  Project root; defaults to the discovered root.
+ * @returns {AgentStatus}
+ */
 function getAgentStatus(projectPath) {
   const root = projectPath || findProjectRoot();
   const taskRegistry = require('./task-registry');
 
-  const registry = taskRegistry.load(root); // fail-open: a corrupt registry → empty
+  let registry;
+  try {
+    // fail-open on a DATA problem (handled inside load); an OPERATING-SYSTEM read error
+    // (EACCES/EIO/EISDIR) propagates out of load and is caught HERE — see the note above.
+    registry = taskRegistry.load(root);
+  } catch (err) {
+    return { active: false, unreadable: msgOf(err) };
+  }
   const runningImplement = registry.tasks.filter(
     t => t.status === 'running' && t.kind === 'implement'
   );
@@ -267,13 +326,23 @@ function getAgentStatus(projectPath) {
   // Supplementary detail for the dashboard (never authoritative for liveness).
   const stateFile = path.join(root, '.ctoc', 'state', 'agent.json');
   let step = null, phase = null, task = null, detailStartedAt = null;
+  let detailUnreadable = null;
   try {
     const detail = JSON.parse(safeFs.readFileSync(stateFile, 'utf8'));
     step = detail.step || null;
     phase = detail.phase || null;
     task = detail.task || null;
     detailStartedAt = detail.startedAt || null;
-  } catch { /* the detail file is optional — liveness already decided by the registry */ }
+  } catch (err) {
+    // An ABSENT detail file is normal on this path and stays silent. Any OTHER read
+    // failure (EACCES/EIO/EISDIR) or a corrupt/unparseable file is a real fault being
+    // discarded — record it as `detailUnreadable` so the agent surface cannot present a
+    // silent gap as a clean reading. Liveness is already decided by the registry above
+    // and is left intact.
+    if (!(err && err.code === 'ENOENT')) {
+      detailUnreadable = msgOf(err);
+    }
+  }
 
   const plans = runningImplement.map(t => t.plan).filter(Boolean);
   const primary = runningImplement[0];
@@ -288,7 +357,8 @@ function getAgentStatus(projectPath) {
     elapsed: startedAt ? timeAgo(new Date(startedAt)).replace(' ago', '') : null,
     step,
     phase,
-    task
+    task,
+    ...(detailUnreadable ? { detailUnreadable } : {})
   };
 }
 

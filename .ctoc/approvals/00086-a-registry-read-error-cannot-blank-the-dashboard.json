@@ -1,0 +1,9 @@
+{
+  "content_sha256": "0802fffef1f5bedc3b88d04c1966f69974a495f58ccfbd7f3d5bdafb27b02818",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-28T19:45:59.560Z",
+  "approved_by": "human",
+  "plan_basename": "00086-a-registry-read-error-cannot-blank-the-dashboard"
+}
