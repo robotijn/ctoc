@@ -10,13 +10,13 @@
  * (`.ctoc/approvals/`) is CTOC's only source of human-approval truth, and
  * `PreToolUse.Edit.js` denies every Edit/Write/MultiEdit/NotebookEdit call that
  * targets it. Until this slice the Bash channel had NO such deny: this file never
- * mentioned `.ctoc/approvals`, and its `ALWAYS_ALLOWED` list matched
+ * mentioned `.ctoc/approvals`, and its old write-allowlist matched
  * `/^\s*node\s+/` FIRST — so
  *   node -e "require('./src/lib/approval-ledger').writeEntry(…)"
  * minted a human-kind approval entry and forged Gate 2 or Gate 3, and
  *   cat > .ctoc/approvals/x.json
  * forged one with no node at all. `isLedgerForgery()` now runs as the FIRST deny
- * layer in `main()` — before `ALWAYS_ALLOWED`, before the irreversible net, before
+ * layer in `main()` — before the write gate, before the irreversible net, before
  * the step gates — so no allowlist can short-circuit past it.
  *
  * WHAT IT DENIES (exactly, and no more — a false positive that breaks a menu
@@ -51,9 +51,9 @@
  * tests in `isLedgerWrite` reason about NAMES; a symbolic link is a fact about the
  * filesystem, not about a name, so `ln -s .ctoc src/link && echo x > src/link/approvals/f.json`
  * spelled no protected path and forged the ledger. The chosen control is NOT a
- * longer blocklist of link-creating commands: adding `ln` to WRITE_PATTERNS buys
- * NOTHING (its only consequence is a Step-8 gate the attacker is already past, and
- * `ALWAYS_ALLOWED` routes every interpreter around it) and COSTS the install step
+ * longer blocklist of link-creating commands: treating `ln` as a write buys NOTHING
+ * against this attack (its only consequence is a Step-8 gate the attacker is already
+ * past) and COSTS the install step
  * (`npm install` legitimately creates symbolic links in node_modules). The control
  * goes at RESOLUTION: a third, independent test asks the ONE encoding of real-path
  * confinement (`src/lib/real-path-confinement.js`, `resolvesUnder`) whether an
@@ -87,6 +87,14 @@ const { loadState, STEP_NAMES } = require('../lib/state-manager');
 const { writeToTerminal, colors } = require('../lib/ui');
 const { emitDeny } = require('../lib/hook-deny-signal');
 
+// EAGER, NON-fail-soft require (00201). The write-target classifier IS the write
+// decision: it works out what a shell command writes and says plainly when it
+// CANNOT. A silent degradation to the old allow-everything behaviour is the exact
+// defect being fixed, so a load failure must be LOUD — it throws here, reaches the
+// fail-open outer catch, and exits 1 (a crash, not an allow), rather than quietly
+// restoring the bypass.
+const shellWrites = require('../lib/shell-write-targets');
+
 // FAIL-SOFT require of the ONE real-path-confinement encoding (matching the shape
 // PreToolUse.Edit.js uses). If it cannot load, `realPathConfinement` stays null and
 // the ledger guard degrades to its two ARITHMETIC tests — the link path into the
@@ -103,43 +111,12 @@ try {
 const MINIMUM_STEP_FOR_WRITE = 8;
 const MINIMUM_STEP_FOR_COMMIT = 15;
 
-/**
- * Patterns that indicate file-writing commands
- */
-const WRITE_PATTERNS = [
-  /[^>]>\s*[^\s>]/,            // Single redirect
-  />>\s*[^\s]/,                // Append redirect
-  /\btee\s+/,                  // tee command
-  /\bsed\s+.*-i/,              // sed in-place
-  /\bawk\s+.*-i\s*inplace/,    // awk in-place
-  /\bperl\s+.*-i/,             // perl in-place
-  /\binstall\s+/,              // install command
-  /\bpatch\s+/,                // patch command
-  /\btouch\s+/,                // touch command
-  /\bdd\s+/,                   // dd command
-  /\btruncate\s+/              // truncate command
-];
-
-/**
- * Commands that are always allowed
- */
-const ALWAYS_ALLOWED = [
-  /^\s*node\s+/,
-  /^\s*npm\s+/,
-  /^\s*npx\s+/,
-  /^\s*python\s+/,
-  /^\s*pip\s+/,
-  /^\s*cargo\s+/,
-  /^\s*ls\s*/,
-  /^\s*cat\s+[^>|]+$/,
-  /^\s*find\s+/,
-  /^\s*grep\s+/,
-  /^\s*head\s+/,
-  /^\s*tail\s+/,
-  /^\s*pwd\s*/,
-  /^\s*cd\s+/,
-  /^\s*echo\s+[^>]+$/
-];
+// The write decision (WRITE_PATTERNS + the whole-string ALWAYS_ALLOWED list) moved
+// into src/lib/shell-write-targets.js in 00201. The old ALWAYS_ALLOWED was anchored
+// to the START of the WHOLE command and consulted FIRST, so any command whose first
+// token was cd/ls/node/… never reached the write patterns: `cd . && echo evil > x`
+// was allowed. The classifier now walks segments and says `indeterminate` when it
+// cannot read the write set, so the step gate fails closed instead.
 
 // ---------------------------------------------------------------------------
 // LEDGER FORGERY GATE (R3-A). The FIRST deny layer in main(). Every regex below
@@ -673,33 +650,29 @@ function isDestructiveGitCommand(command) {
 }
 
 /**
- * Check if command is a write command
+ * Is this a file-writing command that the Iron Loop step gate must judge?
+ *
+ * PER SEGMENT (00201 — the cd-prefix bypass). The old form tested a whole-string-
+ * anchored ALWAYS_ALLOWED list FIRST and returned false on a match, so any command
+ * whose FIRST token was cd/ls/node/npm/find/… never reached the write patterns at
+ * all: `cd . && echo evil > src/lib/plan-coverage.js` was ALLOWED. The write set is
+ * now worked out by shell-write-targets.classifyWrites, which walks segments and
+ * cannot be short-circuited by a benign first token.
+ *
+ * INDETERMINATE counts as a write here: a command whose targets cannot be read has
+ * NOT been shown to be harmless, and the classifier's whole point is that "unknown"
+ * is sayable rather than silently collapsed into "writes nothing". The step gate is
+ * the weaker of the two consequences (a write before step 8 waits until step 8);
+ * coverage and the indeterminate-deny are 00202.
+ * @param {string} command
+ * @returns {boolean}
  */
 function isWriteCommand(command) {
   if (!command) return false;
-
-  const normalized = command.trim().toLowerCase();
-
-  // Check always allowed
-  for (const pattern of ALWAYS_ALLOWED) {
-    if (pattern.test(normalized)) {
-      return false;
-    }
-  }
-
-  // Check write patterns
-  for (const pattern of WRITE_PATTERNS) {
-    if (pattern.test(command)) {
-      return true;
-    }
-  }
-
-  // Check redirects
-  if (command.includes(' > ') || command.includes(' >> ')) {
-    return true;
-  }
-
-  return false;
+  const result = shellWrites.classifyWrites(command);
+  // A pure-read segment carries no write shape and is already 'none'; reaching a
+  // non-'none' verdict means a real write shape or an unreadable one.
+  return result.verdict !== 'none';
 }
 
 /**
@@ -796,10 +769,10 @@ async function main() {
     process.exit(0);
   }
 
-  // R3-A: LEDGER FORGERY — the FIRST deny layer of all, ahead of ALWAYS_ALLOWED
-  // (which matches /^\s*node\s+/ and would otherwise wave the forging one-liner
-  // straight through) and ahead of every step gate, so no allowlist and no Iron
-  // Loop step can short-circuit past it. Pure string check: no state read, no fs.
+  // R3-A: LEDGER FORGERY — the FIRST deny layer of all, ahead of the write gate and
+  // ahead of every step gate, so no allowlist and no Iron Loop step can short-circuit
+  // past it (a forging `node -e` one-liner must be denied even at a step where the
+  // write gate would allow it). Pure string check: no state read, no fs.
   const forgery = isLedgerForgery(command);
   const opaque = isOpaqueDecodedExecution(command);
   if (forgery.deny || opaque) {
