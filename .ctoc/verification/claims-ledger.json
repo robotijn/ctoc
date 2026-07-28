@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-27T20:31:57.188Z",
+  "generator": "src/scripts/verify-claims.js",
+  "horizonDays": 3650,
+  "claims": {
+    "skills/frameworks/data/duckdb.md#duckdb-python-version": {
+      "kind": "registry-version",
+      "state": "REFUTED",
+      "reason": null,
+      "expectedHash": "9875d504a7eb9bfd1dd33861ff083e1f8aa7ad41a9b6bdc50aaade9b6e8131a8",
+      "lastVerifiedAt": "2026-07-27T20:31:56.940Z",
+      "lastAttemptAt": "2026-07-27T20:31:56.940Z",
+      "lastAttemptState": "REFUTED"
+    },
+    "skills/frameworks/data/duckdb.md#duckdb-concurrency-doc": {
+      "kind": "url-live",
+      "state": "VERIFIED",
+      "reason": null,
+      "expectedHash": "00774b08e57e4394ed0dbceb9e84dc6fc25c7230198b3257c7c131845b0429f1",
+      "lastVerifiedAt": "2026-07-27T20:31:56.955Z",
+      "lastAttemptAt": "2026-07-27T20:31:56.955Z",
+      "lastAttemptState": "VERIFIED"
+    },
+    "skills/frameworks/data/clickhouse.md#clickhouse-connect-version": {
+      "kind": "registry-version",
+      "state": "REFUTED",
+      "reason": null,
+      "expectedHash": "d5382fb8042cd90205ad5a5137368646f1b2de4a8fb3de9b97c8935a25ac6ce5",
+      "lastVerifiedAt": "2026-07-27T20:31:57.080Z",
+      "lastAttemptAt": "2026-07-27T20:31:57.080Z",
+      "lastAttemptState": "REFUTED"
+    }
+  }
+}
