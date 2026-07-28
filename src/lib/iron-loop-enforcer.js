@@ -407,21 +407,83 @@ function checkGateDestinationsApproved(root) {
       //
       // Acceptance is now the hook's own predicate — one definition of "approved",
       // used by both. The stage/vision/SIP1 exemptions above still apply.
-      const { hasLedgerApproval } = require('../hooks/human-gate-check');
-      if (!hasLedgerApproval(planPath, stage, root, content)) {
-        offenders.push({ plan: path.relative(root, planPath), stage });
+      //
+      // Classify (not boolean-test), so the message names the REAL cause per offender.
+      // The old boolean facade discarded the reason `classifyResidency` already
+      // computes, collapsing every distinct cause — a missing entry, a wrong edge, a
+      // moved specification hash from an appended section — into one sentence about
+      // `approved_by: human`. That message alleges a FORGED approval on an offender
+      // whose text merely gained a heading the deny-list does not know, and cost a full
+      // gate run chasing the wrong diagnosis. The reason exists one call away.
+      const { classifyResidency } = require('../hooks/human-gate-check');
+      const verdict = classifyResidency(planPath, stage, root, content);
+      if (!verdict.accepted) {
+        offenders.push({
+          plan: path.relative(root, planPath),
+          stage,
+          reason: verdict.reason,
+          sections: verdict.sections || [],
+        });
       }
     }
   }
   if (offenders.length > 0) {
     return finding({
       severity: 'block',
-      message: `${offenders.length} plans in gate destinations are missing approved_by: human in the approval ledger ` +
-               `(a frontmatter marker is not an approval — the runtime hook will revert these)`,
+      message: `${offenders.length} plans in gate destinations are not approved into them: ${describeGateOffenders(offenders)}`,
       details: { offenders: offenders.slice(0, 5) },
     });
   }
   return CLEAN();
+}
+
+/**
+ * Build the gate-destination finding message from the reasons ACTUALLY present, so it
+ * never asserts a cause it did not measure. Each clause is emitted only when at least
+ * one offender carries a reason in its category:
+ *   - a MISSING or unrecognised approval keeps the `approved_by: human` sentence — TRUE
+ *     for `no-ledger-entry` / `unknown-provenance`, and ONLY those;
+ *   - an APPENDED SECTION (`hash-mismatch-new-section`) is reported as the plan's text
+ *     changing after approval by adding section(s) the boundary does not recognise, the
+ *     sections NAMED, pointing at `EXECUTION_SECTION_PRODUCERS`;
+ *   - a specification change (`hash-mismatch` / `hash-mismatch-legacy`) is reported as a
+ *     post-approval change to the specification;
+ *   - an INDETERMINATE reason (`spec-boundary-unlocatable`, `ledger-corrupt`,
+ *     `ledger-unkeyable`, `unreadable`, anything else) is reported as the check being
+ *     unable to establish the answer — worded so it cannot read as a clean result.
+ *
+ * @param {Array<{plan: string, stage: string, reason: (string|null), sections: string[]}>} offenders
+ * @returns {string}
+ */
+function describeGateOffenders(offenders) {
+  const missing = [];
+  const added = [];
+  const changed = [];
+  const indeterminate = [];
+  for (const o of offenders) {
+    if (o.reason === 'no-ledger-entry' || o.reason === 'unknown-provenance') missing.push(o);
+    else if (o.reason === 'hash-mismatch-new-section') added.push(o);
+    else if (o.reason === 'hash-mismatch' || o.reason === 'hash-mismatch-legacy') changed.push(o);
+    else indeterminate.push(o);
+  }
+  const parts = [];
+  if (missing.length > 0) {
+    parts.push(`${missing.length} missing approved_by: human in the approval ledger ` +
+      `(a frontmatter marker is not an approval — the runtime hook will revert these)`);
+  }
+  if (added.length > 0) {
+    const names = [...new Set(added.flatMap((o) => o.sections || []))].slice(0, 5);
+    parts.push(`${added.length} changed after approval by adding section(s) the specification boundary does not recognise` +
+      `${names.length > 0 ? ` (${names.join('; ')})` : ''} — the recognised set is defined in approval-ledger.EXECUTION_SECTION_PRODUCERS`);
+  }
+  if (changed.length > 0) {
+    parts.push(`${changed.length} changed in the specification after approval`);
+  }
+  if (indeterminate.length > 0) {
+    const reasons = [...new Set(indeterminate.map((o) => o.reason))].join(', ');
+    parts.push(`${indeterminate.length} where the check could not establish the answer (${reasons})`);
+  }
+  return parts.join('; ');
 }
 
 function checkStalePlans(root, days = 7) {

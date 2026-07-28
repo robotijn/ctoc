@@ -398,3 +398,46 @@ plan text.
     Re-hashing it to make the fence green would be exactly the laundering the
     mechanism exists to expose. Its approval is repaired by the human re-crossing
     the gate, and the slice must not do that to itself.
+
+## Decisions Taken During Execution (Step 16)
+
+11. **No new exempting heading row was added — arm 3 is a no-op by MEASUREMENT, not
+    omission.** Step 9 measured the scope-stop rule's actual heading: plan 00123
+    records what landed under `## Execution Record`, which is ALREADY the first row of
+    the list. The repository self-check was CLEAN on this branch (no current offender to
+    measure a novel heading from), and Decision 8 forbids guessing heading strings. The
+    only headings an executor invented that broke the hash (measured in
+    `plans/review/00084-…`, e.g. `## A second verified defect, for the human to
+    schedule`) are exactly the "novel headings nobody thought of" the plan's own "What
+    this does NOT fix" says must keep breaking NOISILY. Adding an exempting row for them
+    would change WHAT the boundary decides and make a failing check pass — forbidden by
+    the human's explicit brief ("do NOT change WHAT the boundary decides… never make a
+    failing approval check pass… FAIL-CLOSED"). So the producer table names the
+    `execution record` row's producer as including the scope-stop rule, and adds ZERO
+    new exempting rows. The exclusion set is byte-for-byte unchanged (GOLDEN digest
+    pinned in `tests/source-stays-searchable.test.js` is unmoved), so no existing
+    approval was affected. Arms 1 (producer table) and 2 (legible diagnosis) are
+    implemented in full; arm 3 required nothing to add.
+12. **`diagnoseSpecMismatch` implements the plan's line-126 intent `(b)` — "sections
+    not present in the recorded set" — via a SOUND positional proxy, because line 228's
+    literal "all non-execution top-level headings" is inadequate.** With only the
+    recorded digest (no approved text, and NO write-path/schema change permitted),
+    excluding ALL non-execution top-level sections would drop legitimate specification
+    sections (e.g. `## Implementation Details`) that the recorded digest INCLUDED, so the
+    proof could never restore it on a real plan — and the acceptance tests (case 1)
+    require detection on a realistic plan carrying `## Implementation Details`. The
+    candidate set is therefore the non-execution top-level (`##`) sections positioned
+    AFTER the last execution section — where an executor demonstrably APPENDS its
+    invented sections. SOUNDNESS IS INDEPENDENT OF THE HEURISTIC: an exact match of the
+    candidate-excluded hash against the recorded digest is a byte-for-byte demonstration
+    that those sections are the entire difference, whatever the selection; a poor choice
+    only lowers diagnostic RECALL (falls back to plain `hash-mismatch`), never fails
+    closed the wrong way and never grants acceptance.
+13. **One justified existing-test change.** `tests/approval-hash-survives-execution.test.js`
+    asserted that a no-frontmatter specification entry reports `hash-mismatch`. This plan
+    (approved at Gate 2) replaces that contract: an unlocatable boundary now reports
+    `spec-boundary-unlocatable` ("the check could not look") — a MORE precise reason.
+    Acceptance is unchanged (still `false`); the assertion was tightened toward truth,
+    never loosened. The enforcer message keeps the exact phrase `approved_by: human in
+    the approval ledger` for genuinely missing approvals, so its existing test needed no
+    change.

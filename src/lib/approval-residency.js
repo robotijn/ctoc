@@ -142,15 +142,20 @@ function readPlan(filePath) {
  * @param {string} folderName - the gate-destination folder the plan resides in
  * @param {string} [projectPath] - project root (defaults to cwd)
  * @param {string|null} [content] - pre-read file content, to avoid a re-read
- * @returns {{accepted: boolean, reason: (string|null), kind: ('human'|'backfilled'|'pipeline'|'sufficiency'|'unknown'|null)}}
+ * @returns {{accepted: boolean, reason: (string|null), kind: ('human'|'backfilled'|'pipeline'|'sufficiency'|'unknown'|null), sections?: string[]}}
  *   accepted (with the entry's real kind), or a reason: `ledger-unkeyable` |
  *   `ledger-corrupt` | `no-ledger-entry` | `wrong-edge` | `hash-mismatch` |
- *   `hash-mismatch-legacy` | `unreadable` | `unknown-provenance` | `pipeline-no-evidence` |
- *   `pipeline-not-allowed` | `sufficiency-no-evidence` | `sufficiency-not-allowed`
- *   (`hash-mismatch` is a mismatch under SPECIFICATION semantics — the specification
- *   really did change after approval; `hash-mismatch-legacy` is a mismatch under a
- *   pre-specification `hash_scope: 'file'` entry, where the difference may be nothing
- *   but the execution log of the build the approval authorised. BOTH reject.)
+ *   `hash-mismatch-new-section` | `spec-boundary-unlocatable` | `hash-mismatch-legacy` |
+ *   `unreadable` | `unknown-provenance` | `pipeline-no-evidence` |
+ *   `pipeline-not-allowed` | `sufficiency-no-evidence` | `sufficiency-not-allowed`.
+ *   Under SPECIFICATION semantics the mismatch reason is the proof-carrying diagnosis:
+ *   `hash-mismatch` (the specification really changed after approval),
+ *   `hash-mismatch-new-section` (unrecognised section(s) were appended — named in
+ *   `sections`), or `spec-boundary-unlocatable` (the boundary could not be established
+ *   at all — the check could not look). `hash-mismatch-legacy` is a mismatch under a
+ *   pre-specification `hash_scope: 'file'` entry. EVERY one of these reasons REJECTS —
+ *   the legibility changed, the acceptance decision did not, and `spec-boundary-unlocatable`
+ *   in particular denies because a check that cannot look must deny.
  */
 function classifyResidency(filePath, folderName, projectPath = process.cwd(), content = null) {
   const ledger = require('./approval-ledger');
@@ -182,11 +187,17 @@ function classifyResidency(filePath, folderName, projectPath = process.cwd(), co
       // specification actually changed after the approval". Without it the fence cries
       // wolf on every legacy entry and the real signal stays buried, which is the harm
       // this distinction removes — indistinguishability, never strictness.
-      return {
-        accepted: false,
-        reason: cmp.scope === 'file' ? 'hash-mismatch-legacy' : 'hash-mismatch',
-        kind,
-      };
+      //
+      // A legacy (`file`) mismatch carries no diagnosis — whole-file semantics cannot
+      // support one. A specification mismatch carries the proof-carrying reason from
+      // `contentMatches` (`hash-mismatch` | `hash-mismatch-new-section` |
+      // `spec-boundary-unlocatable`) and the offending section titles. EVERY one of
+      // these rejects, exactly as `hash-mismatch` did; the message became legible, the
+      // decision did not move.
+      if (cmp.scope === 'file') {
+        return { accepted: false, reason: 'hash-mismatch-legacy', kind };
+      }
+      return { accepted: false, reason: cmp.reason, sections: cmp.sections || [], kind };
     }
   }
 
