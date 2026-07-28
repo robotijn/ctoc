@@ -2371,6 +2371,24 @@ function taskComplete(root, rest) {
     // never pass. REFUSE (task stays as it is); `ran:false` remains a soft report only for
     // kinds whose `plan` field names a NON-plan (review/decompose — excluded above).
     if (completion.ran === false) {
+      // A caller fault (plan 00131) is a bug in the CALL, not a verdict about the plan:
+      // report it as such, carry the reason verbatim, and offer NO remediation advice
+      // about the plan slug or its folder. The task is still left unsettled — no
+      // completion becomes acceptable that was not acceptable before.
+      if (completion.fault === 'caller') {
+        return {
+          ok: false,
+          taskId: id,
+          blocked: true,
+          error: 'plan completion called incorrectly',
+          completion,
+          text:
+            `Task ${id} NOT completed — the completion was called incorrectly ` +
+            `(a bug in the call, not a problem with the plan): ` +
+            `${completion.reason ? stripCtl(String(completion.reason)) : 'the arguments were wrong'}. ` +
+            `The task is left unsettled.`,
+        };
+      }
       return {
         ok: false,
         taskId: id,

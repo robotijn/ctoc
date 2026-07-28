@@ -555,7 +555,10 @@ describe('applyBasicIronLoopTemplate', () => {
 describe('completeTaskPlan — slug safety guard', () => {
   it('reports "task carries no plan" for an empty slug (never touches the filesystem)', () => {
     const res = actions.completeTaskPlan(root, '');
-    assert.deepEqual(res, { ran: false, reason: 'task carries no plan' });
+    // fault is now present on EVERY return (plan 00131): a consumer never distinguishes
+    // absent from null. fault:null marks a genuine report about the plan (as opposed to
+    // a caller fault), so this exact-shape pin tightens to include it.
+    assert.deepEqual(res, { ran: false, fault: null, reason: 'task carries no plan' });
   });
 
   it('REFUSES a slug containing a path separator before any path.join', () => {
