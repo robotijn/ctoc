@@ -298,6 +298,37 @@ function runConfiguredCommand(cmd, options = {}) {
 }
 
 /**
+ * Run a language's TEST command with the right trust model (repair of 00203 F1).
+ *
+ * A command DERIVED FROM `package.json` scripts.test (`langTools.testFromScript`, set by
+ * tool-detector) is the project's own trusted, checked-in file. A hugely common benign
+ * pattern — `"test": "jest && tsc"`, `"test": "npm run lint && npm run test:unit"` — carries
+ * `&&`, which {@link parseConfiguredCommand} correctly refuses for the `.ctoc` attack
+ * surface but which must NOT block a normal project's own push. So a script-derived command
+ * is launched through npm as a 2-token argv (`npm test`, execFileSync shell:false): npm
+ * executes the project-owned compound INTERNALLY and NO shell ever reaches this module.
+ *
+ * Any OTHER configured test command (from `.ctoc/quality-config.yaml` or a capability file —
+ * the agent-writable attack surface, where provenance is absent/cleared) stays on
+ * {@link runConfiguredCommand}: shell structure is REFUSED, never launched. This preserves
+ * the injection defense the 00203 slice added.
+ *
+ * Cross-platform: the launcher is `npm.cmd` on Windows and `npm` elsewhere, mirroring the
+ * shipped `npx.cmd` handling in runSpecificTests and sca-runner's `npm.cmd`.
+ *
+ * @param {{test: string, testFromScript?: boolean}} langTools the detected tools for a language
+ * @param {{silent?: boolean, allowFail?: boolean, timeout?: number, label?: string}} [options]
+ * @returns {{success: boolean, output: string, error?: string, timedOut?: boolean, refused?: boolean}}
+ */
+function runProjectTestCommand(langTools, options = {}) {
+  if (langTools.testFromScript) {
+    const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    return runCommandArgv(npm, ['test'], options);
+  }
+  return runConfiguredCommand(langTools.test, options);
+}
+
+/**
  * Finding A (SEVERE) — languages whose test command the DETECTOR could not determine
  * (test:null AND testUndetermined:true). tool-detector sets testUndetermined ONLY when it
  * GAVE UP (no scripts.test, no recognized framework); an EXPLICIT user `test:null` override
@@ -647,11 +678,11 @@ function runSpecificTests(tools, testFiles) {
       }))];
       result = runCommandArgv('go', ['test', ...packages], { allowFail: true, silent: true });
     } else {
-      // Fallback: run the full suite. langTools.test is a CONFIGURED command string from
-      // the detector (agent-writable .ctoc config), so it runs as an argv vector with NO
-      // shell. A configured `npm test && ...` no longer works: a compound command carries
-      // shell structure and is REFUSED as a FAILED check (put it in a checked-in script).
-      result = runConfiguredCommand(langTools.test, { allowFail: true, silent: true, label: `${lang} test` });
+      // Fallback: run the full suite. A PACKAGE-SCRIPT-derived test command (testFromScript)
+      // is launched via `npm test` (argv, no shell), so a benign `"test": "jest && tsc"`
+      // runs; an EXTERNAL .ctoc-config command runs as an argv vector and a shell-operator
+      // command is REFUSED as a FAILED check (00203 F1 repair — see runProjectTestCommand).
+      result = runProjectTestCommand(langTools, { allowFail: true, silent: true, label: `${lang} test` });
     }
 
     if (!result.success) {
@@ -713,9 +744,11 @@ async function runFullTests(tools) {
     if (!langTools.test) continue;
 
     console.log(`   Running full ${lang} test suite...`);
-    // NO SHELL: configured full-suite command → argv vector; a shell-operator command is
-    // a FAILED check, never handed to a shell.
-    const result = runConfiguredCommand(langTools.test, { allowFail: true, silent: true, label: `${lang} test` });
+    // A PACKAGE-SCRIPT-derived command (testFromScript) is launched via `npm test` (argv,
+    // no shell), so a benign `"test": "jest && tsc"` runs internally through npm; an EXTERNAL
+    // .ctoc-config command runs as an argv vector and a shell-operator command is REFUSED as
+    // a FAILED check, never handed to a shell (00203 F1 repair — see runProjectTestCommand).
+    const result = runProjectTestCommand(langTools, { allowFail: true, silent: true, label: `${lang} test` });
 
     if (!result.success) {
       const output = result.output || result.error || '';
