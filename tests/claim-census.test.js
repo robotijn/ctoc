@@ -411,16 +411,58 @@ describe('census ratchet — declared coverage moves in one direction', () => {
     );
   });
 
-  it('(15) the ratchet BITES — a floor above the live count fails the same comparison', () => {
-    const c = censusCorpus(REAL_ROOT);
-    const wouldRegress = c.declaredFiles < c.declaredFiles + 1; // floor raised by one
-    assert.equal(
-      wouldRegress,
-      true,
-      'raising the floor above the live declared count MUST fail the ratchet — a ratchet ' +
-        'never seen failing is indistinguishable from an assertion-free test',
-    );
-  });
+  it('(15) the ratchet BITES — a floor ONE ABOVE the live declared count blocks the live check', () =>
+    withFixture((root) => {
+      // This replaces a tautology — the old case asserted `N < N+1`, which is true
+      // for every N and exercised NOTHING (no census, no ratchet, no enforcer). It
+      // now drives the REAL live check: iron-loop-enforcer's `claim-census`, which
+      // IS the enforcement of case 14's contract (checkClaimCensus, the `<` at
+      // src/lib/iron-loop-enforcer.js). A fixture is used rather than mutating the
+      // committed baseline in place, because tests/iron-loop-enforcer.test.js runs
+      // checkAllInvariants(thorough) on the real repo root in a PARALLEL process and
+      // would read a half-mutated baseline. Keying the fixture to the live declared
+      // count keeps the assertion tied to the corpus's real current coverage.
+      const live = censusCorpus(REAL_ROOT).declaredFiles;
+
+      // Seed a fixture whose declared count equals the live count, plus one
+      // undeclared guide so totalFiles > 0 even when live === 0 (an empty corpus is
+      // CLEAN by design and would not exercise the ratchet at all).
+      for (let i = 0; i < live; i++) writeGuide(root, `declared/g${i}.md`, WELL_FORMED);
+      writeGuide(root, 'undeclared/u.md', '# no block here\n');
+      fs.mkdirSync(path.join(root, '.ctoc'), { recursive: true });
+
+      const setFloor = (min) =>
+        fs.writeFileSync(
+          path.join(root, '.ctoc', 'claim-coverage-baseline.json'),
+          JSON.stringify({ minDeclaredFiles: min }),
+        );
+      const claimCensusFinding = () =>
+        checkAllInvariants({ root, mode: 'thorough', scopes: ['architecture'] }).findings.find(
+          (x) => x.id === 'claim-census',
+        );
+
+      // Floor ONE ABOVE the declared count: the ratchet MUST bite.
+      setFloor(live + 1);
+      const biting = claimCensusFinding();
+      assert.ok(biting, 'a floor above the live declared count MUST surface a claim-census finding');
+      assert.equal(biting.severity, 'block');
+      assert.match(biting.message, /regress/i, 'the finding names the regression');
+      assert.match(
+        biting.message,
+        /may only rise|never be lowered/i,
+        'the finding carries the never-lower instruction',
+      );
+
+      // Floor AT the declared count: the SAME check must be CLEAN. This is the other
+      // side of the comparison — proving the bite is the `<`, not a constant.
+      // Inverting `<`/`>=` in checkClaimCensus reddens BOTH assertions.
+      setFloor(live);
+      assert.equal(
+        claimCensusFinding(),
+        undefined,
+        'a floor at the declared count is satisfied — no finding',
+      );
+    }));
 
   it('(16) the live census is REPORTED, never asserted equal to a literal', () => {
     const c = censusCorpus(REAL_ROOT);
