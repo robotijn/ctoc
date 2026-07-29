@@ -109,7 +109,12 @@ function splitSegments(command) {
  * Under-modelling a flag is SAFE: an unconsumed flag leaves the resolved word starting
  * with `-`, which the fail-closed guard in `classifySegment` turns into `indeterminate`
  * (deny-ward), never `none`. Over-consuming would mis-resolve a real command, so the
- * `value`/`operands` sets are the minimum needed to reach the command word. */
+ * `value`/`operands` sets are the minimum needed to reach the command word.
+ *
+ * `suppressOperand` (taskset only): a flag that REPLACES a positional operand — taskset
+ * takes a MASK operand in `taskset MASK cmd`, but NOT in `taskset -c CPU-LIST cmd` where
+ * `-c` supplies the cpu list instead. Without this the operand count would swallow the
+ * real command word in the `-c` form. */
 const WRAPPERS = new Map([
   ['env', { value: new Set(['-u', '--unset', '-C', '--chdir', '-S', '--split-string']), operands: 0, varAssign: true }],
   ['command', { value: new Set(), operands: 0 }],
@@ -121,7 +126,49 @@ const WRAPPERS = new Map([
   ['doas', { value: new Set(['-C', '-u']), operands: 0 }],
   ['chroot', { value: new Set(['--userspec', '--groups']), operands: 1 }],
   ['watch', { value: new Set(['-n', '--interval']), operands: 0 }],
+  // Exec-wrappers: run ANOTHER command after tuning scheduling / signals / privileges.
+  ['nice', { value: new Set(['-n', '--adjustment']), operands: 0 }],
+  ['nohup', { value: new Set(), operands: 0 }],
+  ['timeout', { value: new Set(['-s', '--signal', '-k', '--kill-after']), operands: 1 }],
+  ['stdbuf', { value: new Set(['-i', '--input', '-o', '--output', '-e', '--error']), operands: 0 }],
+  ['ionice', { value: new Set(['-c', '--class', '-n', '--classdata', '-p', '--pid']), operands: 0 }],
+  ['setsid', { value: new Set(), operands: 0 }],
+  ['setpriv', { value: new Set(['--reuid', '--regid', '--groups', '--inh-caps', '--ambient-caps', '--bounding-set', '--securebits', '--pdeathsig', '--selinux-label', '--apparmor-profile']), operands: 0 }],
+  ['runuser', { value: new Set(['-u', '--user', '-g', '--group', '-G', '--supp-group', '-s', '--shell']), operands: 0 }],
+  ['taskset', { value: new Set(['-c', '--cpu-list', '-p', '--pid']), operands: 1, suppressOperand: new Set(['-c', '--cpu-list']) }],
+  ['chrt', { value: new Set(), operands: 1 }],
 ]);
+
+/*
+ * THE HONEST CEILING — this is a DENYLIST and a denylist is never provably complete.
+ *
+ * What the write-gate CATCHES, and why those three are load-bearing:
+ *   (i)   REDIRECT writes (`>`, `>>`, `2>`, `&>`, `>|`) — read from the RAW segment text,
+ *         so they are IMMUNE to any command-word prefix. `<anything> > src/x.js` is caught
+ *         regardless of what leads it. Redirection is the COMMON write shape.
+ *   (ii)  The MODELLED wrapper set above — a leading word that execs another command has its
+ *         own flags/operands consumed so the REAL command word (`tee`, an interpreter, …)
+ *         is the one classified.
+ *   (iii) Any prefix whose flags this classifier does NOT model still fails closed: an
+ *         unconsumed flag (or an unknown wrapper's operand) leaves the resolved command word
+ *         starting with `-`, which the guard in `classifySegment` turns into `indeterminate`
+ *         (deny-ward), never `none`.
+ *
+ * THE KNOWN RESIDUAL, stated plainly rather than papered over: an OPERAND-FORM writer
+ * (`tee FILE`, `cp … FILE`, `dd of=FILE`) placed behind an UNMODELLED bareword wrapper —
+ * a wrapper that is NOT in the map above and whose own argument, being a plain word, does
+ * NOT begin with `-`. Then the wrapper's operand is mistaken for the command word and the
+ * segment falls to `none`. Every wrapper we could name is modelled; the class stays open
+ * because the next wrapper cannot be named in advance. This is NOT closed here and must not
+ * be reported as closed.
+ *
+ * Why the residual is not the whole gate failing: the two independent defenses do NOT
+ * depend on this list being complete — (a) a REDIRECT write is caught no matter what
+ * precedes it (defense i above), and (b) the approval-ledger write channel (the Edit hook,
+ * `src/lib/approval-residency.js`) is a SEPARATE gate that is not routed through this shell
+ * classifier at all. This module closes the common exec-wrapper and bare-assignment cases
+ * and NAMES what stays open; it does not claim the class is fully closed.
+ */
 
 /** Skip a wrapper's own flags, `NAME=VALUE` assignments and positional operands,
  * returning the index of the token that is the real command word (or another wrapper).
@@ -131,11 +178,20 @@ function skipWrapperArgs(tokens, start, w) {
   let i = start;
   let operands = w.operands || 0;
   let flagsDone = false;
+  const suppresses = (tok) => {
+    if (!w.suppressOperand) return false;
+    for (const f of w.suppressOperand) {
+      if (tok === f || tok.startsWith(f + '=')) return true;      // `-c LIST` / `--cpu-list=LIST`
+      if (f.length === 2 && f[0] === '-' && tok.startsWith(f)) return true; // `-cLIST` attached
+    }
+    return false;
+  };
   while (i < tokens.length) {
     const tok = tokens[i].replace(/['"]/g, '');
     if (!flagsDone && tok === '--') { flagsDone = true; i += 1; continue; }
     if (!flagsDone && tok.length > 1 && tok.startsWith('-')) {
-      i += w.value.has(tok) ? 2 : 1; // value-flag consumes its argument
+      if (suppresses(tok)) operands = 0; // this flag replaces the positional operand
+      i += w.value.has(tok) ? 2 : 1;     // value-flag consumes its argument
       continue;
     }
     if (w.varAssign && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) { i += 1; continue; }
@@ -151,6 +207,11 @@ function commandWord(tokens) {
   let i = 0;
   while (i < tokens.length) {
     const raw = tokens[i].replace(/^\\/, '').replace(/['"]/g, '');
+    // A leading run of BARE `NAME=VALUE` assignments (`FOO=bar tee f`) is an environment
+    // prefix, not the command word — skip it, exactly as the `env` wrapper does for the
+    // assignments AFTER it. A `--flag=value` is NOT an assignment (it starts with `-`, so
+    // the anchored `[A-Za-z_]` class rejects it) and is left to resolve/guard, never skipped.
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(raw)) { i += 1; continue; }
     const base = raw.includes('/') ? raw.slice(raw.lastIndexOf('/') + 1) : raw;
     const key = base.toLowerCase();
     const w = WRAPPERS.get(key);
@@ -158,6 +219,26 @@ function commandWord(tokens) {
     return { word: key, index: i };
   }
   return { word: '', index: 0 };
+}
+
+/** `env -S`/`--split-string 'tee f'` re-splits its single remaining token into a fresh
+ * argv INSIDE env — so the real writer never appears as an argv token this classifier can
+ * read. Detect it (through any wrapper chain, e.g. `sudo env -S …`) and fail closed. */
+function usesEnvSplitString(tokens) {
+  for (let i = 0; i < tokens.length; i += 1) {
+    const raw = tokens[i].replace(/^\\/, '').replace(/['"]/g, '');
+    const key = (raw.includes('/') ? raw.slice(raw.lastIndexOf('/') + 1) : raw).toLowerCase();
+    if (key !== 'env') continue;
+    for (let j = i + 1; j < tokens.length; j += 1) {
+      const t = tokens[j].replace(/['"]/g, '');
+      if (t === '--') break;
+      if (t === '-S' || t === '--split-string' || t.startsWith('-S') || t.startsWith('--split-string=')) return true;
+      if (t.startsWith('-')) continue;                                   // another env flag
+      if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(t)) continue;                  // NAME=VALUE
+      break;                                                             // env's command word
+    }
+  }
+  return false;
 }
 
 /**
@@ -260,6 +341,10 @@ function classifySegment(seg, prefix) {
   // an unknown prefix flag cannot slip through. Closes the env/command/exec-flag family
   // and any future prefix whose flags this classifier does not model.
   if (word.startsWith('-')) markIndet(REASONS.UNREADABLE_TARGET);
+
+  // `env -S '…'` re-splits a single token into a fresh argv inside env — the real writer
+  // leaks into a string this classifier cannot read. Fail closed (deny-ward).
+  if (usesEnvSplitString(tokens)) markIndet(REASONS.UNREADABLE_TARGET);
 
   // Heredoc anywhere in the segment — payload is out of band.
   if (/<<-?\s*['"]?[A-Za-z_]/.test(seg) || /<<-?\s*['"]/.test(seg)) markIndet(REASONS.HEREDOC);

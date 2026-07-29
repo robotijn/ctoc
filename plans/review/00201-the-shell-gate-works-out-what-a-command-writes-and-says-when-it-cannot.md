@@ -571,6 +571,59 @@ radius from Step 14, and every decision taken under ambiguity.
    write-shape bare interpreter from an indeterminate write shape, or exempt the
    sanctioned menu recipes). Flagged so the human decides rather than discovering it.
 
+### Third round — restored regressed wrappers, closed the bareword bypasses, and named the ceiling
+
+Context: a re-review found the round-2 refactor had regressed the exec-wrapper family and
+left bareword bypasses. Confirmed by running `classifyWrites` on the round-2 code (twelve
+`writes`/`indeterminate` cases each returned `none` = ALLOWED at a planning step): `nice`,
+`nice -n 5`, `timeout 5`, `nohup`, `stdbuf -oL`, `setpriv --reuid=1000`, `runuser -u foo`,
+`ionice`, `taskset -c 0`, `chrt 1`, a bare `FOO=bar` prefix, and `env -S '…'` — each in
+front of a real `tee` write. The round-2 wrappers that WERE kept (`sudo`, `time`, `flock`,
+`doas`, `chroot`, `watch`) were re-verified green and none was lost.
+
+8. **Bare `NAME=VALUE` prefix is skipped in `commandWord`, before wrapper resolution.**
+   `FOO=bar tee f` is an environment prefix, not a command — the anchored
+   `^[A-Za-z_][A-Za-z0-9_]*=` skip resolves it to `tee`. A `--flag=value` is deliberately
+   NOT skipped (it begins with `-`, which the anchored `[A-Za-z_]` class rejects); a lone
+   `--foo=bar` command word therefore falls to the existing dash guard → `indeterminate`
+   (deny-ward), which the brief accepts. This mirrors the `varAssign` handling the `env`
+   wrapper already did for assignments AFTER it.
+9. **`WRAPPERS` restored and extended with the common exec-wrapper family**, each with only
+   the argument grammar needed to reach the real command word (under-modelling a flag is
+   safe — it leaves a `-`-led word for the dash guard; over-consuming would mis-resolve a
+   real command). Added: `nice` (`-n`), `nohup`, `timeout` (`-s`/`--signal`/`-k`/
+   `--kill-after` + a leading duration operand), `stdbuf` (`-i`/`-o`/`-e`), `ionice`
+   (`-c`/`-n`/`-p`), `setsid`, `setpriv` (`--reuid`/`--regid`/`--groups` + related
+   value-flags), `runuser` (`-u`/`--user` + related), `taskset`, `chrt` (a priority
+   operand). The full final list is env · command · builtin · exec · sudo · time · flock ·
+   doas · chroot · watch · nice · nohup · timeout · stdbuf · ionice · setsid · setpriv ·
+   runuser · taskset · chrt (20). Nothing from the earlier rounds was dropped.
+10. **`taskset` needed a conditional operand (`suppressOperand`).** `taskset MASK cmd` takes
+    a positional mask, but `taskset -c CPU-LIST cmd` supplies the cpu list via `-c` and has
+    NO mask operand — a fixed operand count would swallow the real command word in the `-c`
+    form. `suppressOperand` zeroes the operand count when a cpu-list flag appears (spaced
+    `-c 0`, attached `-c0`, or `--cpu-list=0`). This is the one genuine grammar-ambiguity
+    corner and is marked as such in the code.
+11. **`env -S`/`--split-string` classifies `indeterminate` (reason `write target could not
+    be read`).** Its single remaining token is re-split into a fresh argv INSIDE `env`, so
+    the real writer never appears as an argv token this classifier can read. `usesEnvSplitString`
+    detects it through any wrapper chain (`sudo env -S …`) and fails closed. No new reason
+    word was added — the existing command-text-free `UNREADABLE_TARGET` is honest here.
+12. **THE HONEST CEILING (documented, NOT claimed closed).** The `WRAPPERS` set is a
+    DENYLIST and can never be provably complete. A clear comment block was added to
+    `src/lib/shell-write-targets.js` stating what the gate catches — (i) REDIRECT writes,
+    read from raw text and therefore immune to ANY command-word prefix; (ii) the modelled
+    wrapper set; (iii) any dash-flag-resolved prefix via the fail-closed guard — and the
+    KNOWN RESIDUAL: an OPERAND-FORM writer (`tee FILE`, `cp … FILE`, `dd of=FILE`) behind an
+    UNMODELLED bareword wrapper whose own argument is a plain word (not `-`-led) is mistaken
+    for the command word and falls to `none`. Every wrapper we could name is modelled; the
+    class stays open because the next one cannot be named in advance. The two INDEPENDENT
+    defenses do not depend on the list being complete: a redirect write is caught regardless
+    of what precedes it, and the approval-ledger write channel (the Edit hook via
+    `src/lib/approval-residency.js`) is a separate gate not routed through this classifier.
+    This round closes the common exec-wrapper and bare-assignment cases and NAMES what stays
+    open — it does not claim the class is fully closed.
+
 
 ## Deferred Questions
 

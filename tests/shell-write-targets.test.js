@@ -236,6 +236,80 @@ describe('classifyWrites — wrapper flag & bareword bypass (second-round fix)',
   });
 });
 
+describe('classifyWrites — exec-wrapper & bare-assignment bypass (third-round fix)', () => {
+  // The round-2 WRAPPERS map covered sudo/time/flock/doas/chroot/watch but dropped the
+  // common exec-wrapper family (nice/timeout/nohup/stdbuf/ionice/setsid/setpriv/runuser/
+  // taskset/chrt) and never handled a BARE `NAME=VALUE` prefix. Each classified `none`
+  // (an ALLOW at a planning step) while running a real write via `tee`.
+  const writeThrough = [
+    ['nice tee', 'nice tee src/x.js', ['src/x.js']],
+    ['nice -n 5 tee', 'nice -n 5 tee src/x.js', ['src/x.js']],
+    ['timeout duration operand tee', 'timeout 5 tee src/x.js', ['src/x.js']],
+    ['timeout -s SIG duration tee', 'timeout -s KILL 5 tee src/x.js', ['src/x.js']],
+    ['timeout -k after duration tee', 'timeout -k 1 5 tee src/x.js', ['src/x.js']],
+    ['nohup tee', 'nohup tee src/x.js', ['src/x.js']],
+    ['stdbuf -oL attached tee', 'stdbuf -oL tee src/x.js', ['src/x.js']],
+    ['stdbuf -o L spaced tee', 'stdbuf -o L tee src/x.js', ['src/x.js']],
+    ['ionice tee', 'ionice tee src/x.js', ['src/x.js']],
+    ['ionice -c 3 tee', 'ionice -c 3 tee src/x.js', ['src/x.js']],
+    ['setsid tee', 'setsid tee src/x.js', ['src/x.js']],
+    ['setpriv --reuid=1000 tee', 'setpriv --reuid=1000 tee src/x.js', ['src/x.js']],
+    ['setpriv --reuid 1000 tee', 'setpriv --reuid 1000 tee src/x.js', ['src/x.js']],
+    ['runuser -u foo tee', 'runuser -u foo tee src/x.js', ['src/x.js']],
+    ['taskset -c cpulist tee', 'taskset -c 0 tee src/x.js', ['src/x.js']],
+    ['taskset -c0 attached cpulist tee', 'taskset -c0 tee src/x.js', ['src/x.js']],
+    ['taskset mask operand tee', 'taskset 0x1 tee src/x.js', ['src/x.js']],
+    ['chrt priority operand tee', 'chrt 1 tee src/x.js', ['src/x.js']],
+    ['bare NAME=VALUE tee', 'FOO=bar tee src/x.js', ['src/x.js']],
+    ['two bare assignments tee', 'FOO=bar BAZ=qux tee src/x.js', ['src/x.js']],
+    ['bare assignment before a wrapper', 'FOO=bar nice tee src/x.js', ['src/x.js']],
+  ];
+  for (const [label, cmd, targets] of writeThrough) {
+    test(`writes through an exec-wrapper / assignment: ${label}`, () => {
+      const r = classifyWrites(cmd);
+      assert.equal(r.verdict, 'writes', `${cmd} -> ${JSON.stringify(r)}`);
+      assert.deepEqual(r.targets, targets, `${cmd} targets`);
+    });
+  }
+
+  test('env -S / --split-string is indeterminate (a re-split string, not argv)', () => {
+    for (const cmd of ["env -S 'tee f'", "env --split-string='tee f'", "sudo env -S 'tee f'"]) {
+      const r = classifyWrites(cmd);
+      assert.equal(r.verdict, 'indeterminate', `${cmd} -> ${JSON.stringify(r)}`);
+      assert.equal(r.reason, 'write target could not be read', `${cmd} reason`);
+    }
+  });
+
+  // The round-2 wrappers must NOT be lost by the extension.
+  const round2Kept = [
+    ['sudo tee', 'sudo tee src/x.js'],
+    ['time tee', 'time tee src/x.js'],
+    ['flock lockfile tee', 'flock /tmp/lock tee src/x.js'],
+    ['doas tee', 'doas tee src/x.js'],
+    ['chroot newroot tee', 'chroot /jail tee src/x.js'],
+    ['watch tee', 'watch tee src/x.js'],
+  ];
+  for (const [label, cmd] of round2Kept) {
+    test(`round-2 wrapper still resolves: ${label}`, () => {
+      const r = classifyWrites(cmd);
+      assert.equal(r.verdict, 'writes', `${cmd} -> ${JSON.stringify(r)}`);
+      assert.deepEqual(r.targets, ['src/x.js'], `${cmd} targets`);
+    });
+  }
+
+  // Over-fire guard: a real READ behind an exec-wrapper / assignment must stay `none`.
+  for (const cmd of [
+    'nice ls', 'nice -n 5 ls', 'timeout 5 ls', 'nohup ls', 'stdbuf -oL ls',
+    'ionice ls', 'setsid ls', 'taskset -c 0 ls', 'taskset 0x1 ls', 'chrt 1 ls',
+    'FOO=bar ls', 'FOO=bar BAZ=qux ls', 'env -i ls',
+  ]) {
+    test(`over-fire guard — read stays none: ${cmd}`, () => {
+      const r = classifyWrites(cmd);
+      assert.equal(r.verdict, 'none', `${cmd} -> ${JSON.stringify(r)}`);
+    });
+  }
+});
+
 describe('splitSegments + resolveTarget — the exported helpers', () => {
   test('splitSegments splits on ; newline && || | &', () => {
     assert.deepEqual(
@@ -358,6 +432,18 @@ describe('the spawned hook — the cd-prefix bypass is closed (the defect)', () 
     setState(3);
     const d = denyOf(runHook('command -p tee src/x.js'));
     assert.ok(d, 'a writer behind command -p must reach the step gate and be denied');
+  });
+
+  test('40 nice tee src/x.js is DENIED at a planning step (exec-wrapper bypass, RED before fix)', () => {
+    setState(3);
+    const d = denyOf(runHook('nice tee src/x.js'));
+    assert.ok(d, 'a writer behind an exec-wrapper (nice) must reach the step gate and be denied');
+  });
+
+  test('41 FOO=bar tee src/x.js is DENIED at a planning step (bare assignment bypass, RED before fix)', () => {
+    setState(3);
+    const d = denyOf(runHook('FOO=bar tee src/x.js'));
+    assert.ok(d, 'a writer behind a bare NAME=VALUE prefix must reach the step gate and be denied');
   });
 
   test('37 every node -e recipe from start.md is still ALLOWED at its normal step', () => {
