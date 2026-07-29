@@ -749,6 +749,19 @@ CTOC improves itself. When implementing features:
     a live entry point in the same unit of work that creates it; deferring the
     wiring to "a follow-up" is an unasked question and produces well-tested dead
     code. Enforce this with a reachability gate where one can exist.
+17. **A foregone answer is not a question — presenting it as a choice is
+    manipulation.** If you frame the obvious as one good option and one bad
+    option, it is not a real choice and therefore not a conversation — you are
+    steering the human while pretending to consult. If the answer is genuinely
+    obvious, DO NOT ASK: act, and report what you did. Ask only when the fork is
+    real. And separate the two kinds of decision: a **quality** decision has an
+    objectively best answer, so recommend it honestly; an **owner** decision
+    (what to schedule, what to build and when, how much cost or risk is
+    acceptable, proceed-or-hold) belongs to the human, so present the options
+    flat with symmetric pros and cons and manufacture NO recommendation. Never
+    tilt an owner decision with a "(Recommended)" tag, a "risk" wrapped around
+    the option you disfavor, or loaded pros and cons. The full format is in
+    [`.ctoc/ask-me-questions.md`](./.ctoc/ask-me-questions.md).
 
 **Methodology reference:** CTOC runs a **16-step** Iron Loop across **4 human gates**
 (Gate 0 vision→functional, Gate 1 functional→implementation, Gate 2
