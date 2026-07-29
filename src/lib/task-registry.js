@@ -377,8 +377,20 @@ function diskGeneration(root) {
  * malformed task entry → skip + `task_skipped_malformed` warn, the rest load.
  * Duplicate ids → last wins + `task_id_collision` warn. `seq` is repaired so it can
  * never collide with an existing id.
+ *
+ * DISTINGUISHING "present-but-unreadable" FROM "absent". The file EXISTS but its bytes
+ * could not be READ (EACCES/EIO/EISDIR out of `readFileSync`) or could not be PARSED
+ * (`JSON.parse` throws on a corrupt file) is a fundamentally different fact from a
+ * genuinely ABSENT registry, yet both used to return a byte-identical empty value — so a
+ * caller could not tell "no agent is running" from "I could not read whether an agent is
+ * running". `getAgentStatus` needs that distinction to render the honest UNKNOWN line
+ * instead of a false `○ Idle`. The read/parse-failure return therefore carries
+ * `unreadable: true` and a `reason` message; `tasks` STAYS `[]` so every caller that only
+ * reads `.tasks` is unaffected, and load STILL never throws (fail-open resilience for the
+ * menu is preserved). A wrong-shape / version-mismatch file is NOT flagged — it parsed
+ * fine and is a data/migration problem the pipeline legitimately treats as empty.
  * @param {string} root  Project root (a non-empty string).
- * @returns {{version:number, generation:number, seq:number, tasks:Array<object>}}
+ * @returns {{version:number, generation:number, seq:number, tasks:Array<object>, unreadable?:boolean, reason?:string}}
  */
 function load(root) {
   if (typeof root !== 'string' || root.length === 0) {
@@ -395,8 +407,12 @@ function load(root) {
   try {
     data = JSON.parse(safeFs.readFileSync(p, 'utf8'));
   } catch (err) {
-    warnLog(root, 'registry_load_failed', { message: err && err.message ? err.message : String(err) });
-    return loadedEmpty();
+    // The file EXISTS (existsSync above) but could not be read or parsed — an
+    // operating-system read error OR a corrupt file. Fail open (never throw), but SAY
+    // SO on the value so a caller can distinguish this from a benign absent registry.
+    const reason = err && err.message ? err.message : String(err);
+    warnLog(root, 'registry_load_failed', { message: reason });
+    return { ...loadedEmpty(), unreadable: true, reason };
   }
   if (!data || typeof data !== 'object' || !Array.isArray(data.tasks) || data.version !== REGISTRY_VERSION) {
     warnLog(root, 'registry_load_failed', { message: 'registry file has an unexpected shape or version' });
