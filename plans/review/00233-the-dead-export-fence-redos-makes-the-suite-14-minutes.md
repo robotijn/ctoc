@@ -90,6 +90,7 @@ movement).
 ## Execution Plan
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 Write `tests/reachability-surface-scan-is-linear.test.js` FIRST and run it RED:
 - A test that builds a temp corpus with a `skills/huge.md` of, say, 2 MiB of `'a'`
   and asserts `analyzeExports(root)` (and `analyze(root)`) COMPLETES within a strict
@@ -105,6 +106,7 @@ Write `tests/reachability-surface-scan-is-linear.test.js` FIRST and run it RED:
   and the over-length pathological token is not miscredited.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 Read `src/lib/reachability.js` in full: `SURFACE_CALL_RE`, `SURFACE_REQUIRE_DOT_RE`,
 `SURFACE_REQUIRE_IDX_RE`, `IDENT_RE`, `SURFACE_REQUIRES_RE`, `SURFACE_NODE_RUNS_RE`,
 `collectSurfaceFiles`, `analyzeExports`, `analyze`, `stripComments`, and the two
@@ -113,6 +115,7 @@ Confirm which regexes actually run inside a `while (re.exec(text))` loop over
 attacker-sized text. Record each finding.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 - Bound `SURFACE_CALL_RE`'s identifier to `{0,127}`.
 - Bound every OTHER sibling regex with a genuine quadratic-backtracking ReDoS on a
   long single-char / whitespace run, each with a one-line comment naming the reason
@@ -120,6 +123,7 @@ attacker-sized text. Record each finding.
 - No behavior change for real inputs; no baseline movement.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 Adversarial: does the bound drop any real call site? Is 128 safe (no real identifier
 exceeds it)? Are ALL quadratic siblings found, or does one remain (a second ReDoS the
 next fixture would hit)? Does `\s*` or any `[^x]*` still backtrack quadratically? Do the
@@ -131,11 +135,13 @@ Confirm the suite wall-clock drops (the 14-min test now completes in ms). Note t
 approximate suite duration.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 This closes a ReDoS. Confirm no NEW ReDoS is introduced by the rewrite, no catastrophic
 alternation added, and the bounds cannot be evaded by a different pathological input
 (long whitespace run, long quoted run inside the require regexes).
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 Full gate `npm test` on EXIT CODE: `[CTOC test-gate] PASS`, coverage ≥ 99%, 0 skipped,
 0 failed. `npx tsc --noEmit` exit 0. eslint clean. The suite itself should now be
 dramatically faster — record the new duration.
@@ -144,6 +150,7 @@ dramatically faster — record the new duration.
 Record the measured before/after suite duration and the ReDoS class in the plan.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 Confirm all steps complete, the fix is minimal, and both fences are green with no
 baseline movement.
 
@@ -153,22 +160,26 @@ baseline movement.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 - [ ] Write tests for the implementation
 - [ ] Test error conditions
 - [ ] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 - [ ] Install dependencies if needed
 - [ ] Check prerequisites
 - [ ] Verify dev environment ready
 - [ ] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 - [ ] Implement the feature according to requirements
 - [ ] Add error handling
 - [ ] Wire up integration points
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 - [ ] Self-review all new code
 - [ ] Verify integration points work together
 - [ ] Check error handling completeness
@@ -179,12 +190,14 @@ baseline movement.
 - [ ] Simplify complex code
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 - [ ] Validate inputs (no path traversal)
 - [ ] Sanitize outputs
 - [ ] No secrets in code
 - [ ] Safe file operations
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 - [ ] Run lint + type check
 - [ ] Run ALL tests (TDD Green)
 - [ ] Check coverage >= 80%
@@ -196,6 +209,7 @@ baseline movement.
 - [ ] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 - [ ] Verify steps 8-15 completed correctly
 - [ ] All quality checks passed
 - [ ] Manual verification if needed

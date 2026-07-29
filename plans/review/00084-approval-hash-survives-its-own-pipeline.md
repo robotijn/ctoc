@@ -276,14 +276,20 @@ a scope change and assert it **breaks**.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write the file in full, run ONLY it, record red verbatim. Cases 1, 6, 7, 10, 12 and 14 MUST be red. Case 9 and case 17 MUST be GREEN before the change: they are the "nothing else moves" guards, and a fix that turns either red has weakened a gate rather than repaired a hash.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — **settle the open fact first**: determine from `actions.js` (`startAgent`, `completeExecution`, `movePlan`) and the plans directory whether a plan physically resides in `todo/` for the duration of its build. Record the answer verbatim in the Step 16 report — it decides whether this defect causes a mid-build revert or advisory noise, and the human needs the real answer either way. Then read in full: `src/lib/approval-ledger.js`; `src/hooks/human-gate-check.js:120-300`; `src/lib/stale-detector.js`'s `extractFrontmatterRegion`; and two real executed plans, to confirm the section names and marker shapes against disk rather than against this plan's quotation.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/approval-ledger.js` — `EXECUTION_SECTIONS`, `computeSpecHash`, `hash_scope` on all three write paths, the scope-branching fail-closed `verify`.
   - `src/hooks/human-gate-check.js` — route the comparison through the shared predicate, add `hash-mismatch-legacy`, correct the false premise in the comment at `:143-144`.
 ### Step 11: REVIEW — grep for every remaining direct call to `computeContentHash` and justify each. Confirm no path reaches `accepted: true` when `computeSpecHash` returns `ok: false`. Then run the fence against this repository's live ledger and report the real counts: how many of the 263 entries are legacy, and how many plans currently in a gate destination would be accepted or rejected before and after.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — one linear pass over the lines; no regular expression compiled per line; no second read of the plan.
 ### Step 13: SECURE — this is approval-provenance code, so state the threat model explicitly in the report: excluding a region means content there is unhashed, and the argument that this is safe rests on excluded regions carrying no grant. Confirm `files:` and every frontmatter field remain hashed. Confirm no new path can write a ledger entry, and that `.ctoc/approvals/` stays agent-write-denied on both channels.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/approval-hash-survives-execution.test.js tests/approval-ledger*.test.js tests/human-gate*.test.js tests/gate*.test.js` green, then the full gated run `npm test`. Lint the changed files. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — the module header states what the hash now covers and, in plain words, why: the plan file is both specification and execution log, and an approval binds to the part the human ruled on. Document the deny-list, the fail-closed rule, the `hash_scope` versioning, and the disclosed loss on the decisions section.
 ### Step 16: FINAL-REVIEW — report files, tests, red and green evidence verbatim, the Step 9 answer about `todo/` residency, the Step 11 ledger counts, and every decision taken under ambiguity.
 

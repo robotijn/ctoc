@@ -264,16 +264,23 @@ degenerate artifact rather than a valid plan.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/fresh-repository-is-its-own-project.test.js` in full, run ONLY that file, record the red output verbatim. Cases 1, 2, 3, 9, 11 and 14 MUST be red. Case 14's red output MUST include the offered decision about the PARENT project's plan, reproducing the owner's screen from a fixture.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — re-read from disk: `src/lib/project-root.js` in full; `src/commands/menu.js`'s `ensureInitialized`; `src/lib/menu-screens.js` around the version header. The landed code WINS over this plan's line numbers. Then enumerate EVERY caller of `findProjectRoot` across `src/` and confirm none passes a `startDir` that would newly stop at a boundary in a way this plan has not considered — list them and their fixtures.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/project-root.js` — Changes 1 and 2.
   - `src/lib/menu-screens.js` — the header disclosure line.
 ### Step 11: REVIEW — confirm every existing project-root test still passes UNCHANGED; any that needs changing is a behaviour change this plan did not intend and must be reported, not accommodated. Confirm `findProjectRoot` has exactly one walk after the refactor. Confirm the header line cannot render an absolute path on any platform. Explicitly assess the nested-submodule case (a git submodule inside a CTOC project now resolves to the submodule) and report it as a behaviour change with a recommendation.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — one additional `existsSync` per climbed level, on a walk that already performs several per level and runs once per process. The refactor must not double the walk: `findProjectRoot` delegates, it does not re-walk.
 ### Step 13: SECURE — the header renders a path. Confirm it is relative and passes through `stripCtl`. Confirm `describeProjectRoot` never returns a path outside what the walk visited, and that a symbolic link in the ancestry cannot make the walk escape the filesystem root (the existing `parent === dir` termination plus the fifteen-level cap both remain).
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/fresh-repository-is-its-own-project.test.js tests/project-root.test.js tests/menu-screens-coverage.test.js tests/init-project.test.js tests/e2e-menu-lifecycle.test.js` green, then the full gated run `npm test`. Lint both changed files. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — extend the block comment at `project-root.js:25-33`, which currently explains the two-pass design, with the boundary rule and the defect that motivated it: a fresh repository nested under a CTOC project could never become one. A comment that explains only half the algorithm is how the missing half stayed missing.
 ### Step 16: FINAL-REVIEW — report case 14's screen BEFORE and AFTER, verbatim, the full list of `findProjectRoot` callers checked at Step 9, the submodule behaviour change, and every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

@@ -329,17 +329,24 @@ menu completion route.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/caller-error-is-not-a-verdict.test.js` in full, run ONLY it, record the red output verbatim. Cases 1, 2, 3, 6, 9 and 12 MUST be red. Cases 4, 5, 8, 10, 11 and 15 MUST be GREEN before any source change: they pin the behaviour that must not move, and a change turning any of them red has altered a completion path rather than clarified a message.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — **settle the concurrency first.** Confirm that no other executor holds `src/lib/actions.js`; if one does, STOP and report rather than editing. Then read in full: `actions.js:990-1100` (the completion path and its guards), `actions.js:1280-1300` (`planDependsOn`), `menu-screens.js:2200-2300` (the live completion route), `product-loop.js:25-40` and `step-13-verify.js:325-355` (the two precedents this fix copies). Re-verify the call-site enumeration in this plan against the current tree — a plan's list of call sites is a claim, and it must be re-measured before it is relied on.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/actions.js` — `classifyCompletionFault`, `completeTaskPlan` returning `fault` on every path, the updated JSDoc.
   - `src/lib/menu-screens.js` — split the `ran === false` refusal on `fault`, leaving the existing branch word-for-word.
   - `CLAUDE.md` — the documented test-file count, read live from disk.
 ### Step 11: REVIEW — prove nothing became permissive: diff every return of `completeTaskPlan` and confirm `ran`, `blocked`, `newPath` and `verify` are identical on every path, and that both `menu-screens` branches keep `ok: false` and leave the task unsettled. Re-run the enumerated call sites and confirm none needed changing. Confirm `classifyCompletionFault` is not exported and has exactly one caller.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — the fault classification is a handful of string tests on values already in hand: no filesystem access, no new require, no regular expression compiled per call, and it runs before any `path.join` exactly as the guard it replaces did.
 ### Step 13: SECURE — the guard being replaced is a PATH-TRAVERSAL guard on an attacker-influenceable registry field, so state in the report that the predicate `isSafePlanSlug` is unchanged and that the refusal still happens BEFORE any `path.join` or filesystem access. Confirm the reason string still truncates the offending value (40 characters) so a crafted `plan` field cannot flood the output, and that control characters are still stripped at the render boundary. Confirm no new value from the registry reaches the filesystem.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/caller-error-is-not-a-verdict.test.js tests/actions-*.test.js tests/menu-task-wiring.test.js tests/greenfield-journey.test.js tests/last-mile-wired.test.js tests/scheduler-enforced.test.js` green, then the full gated run `npm test` with coverage at or above the enforced floor and 0 skipped. Lint the changed files. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — the JSDoc states, in plain words, that this function has two kinds of negative answer: a report about the plan, and a bug in the call, and that a consumer must never render the second as the first. Name the two coherent argument-order families in `actions.js` so the next author can see which one a new function belongs in, and record why `completeTaskPlan` straddles them.
 ### Step 16: FINAL-REVIEW — report files, tests, red and green evidence verbatim, the Step 9 concurrency finding, the re-measured call-site list, and every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

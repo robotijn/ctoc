@@ -206,16 +206,23 @@ failure.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/hooks-do-not-manufacture-the-project-marker.test.js` in full, run ONLY that file, record the red output verbatim. Cases 1, 7, 8, 10, 11 and 12 MUST be red. Any case green before implementation must be individually shown to be already-correct behaviour rather than a vacuous assertion, and the finding written down. Case 8 in particular: if the sync hook already returns early on `loadWiring`, its greenness is already-correct behaviour and must be recorded as such rather than read as the guard working.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — re-read from disk: `src/hooks/PreToolUse.Write.js:105-165` in full; `src/hooks/PostToolUse.plan-index-sync.js:145-200`; `src/lib/plan-index/sync-unit.js:185-235` for `logNote`'s falsy guard and `syncUnit`'s destructuring of `logDir`; `src/lib/plan-index/wiring.js` (or wherever `loadWiring` lives) to determine whether the store is under `.ctoc/` and therefore whether site two is reachable in the broken world. Grep `src/hooks/` and `src/lib/` for every other `mkdirSync` whose path contains `.ctoc` with `recursive: true`, and record the full list — the two named here are the ones the brief found, not necessarily the only ones. Report any additional finding rather than expanding scope to fix it.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/hooks/PreToolUse.Write.js` — Change 1.
   - `src/hooks/PostToolUse.plan-index-sync.js` — Change 2.
 ### Step 11: REVIEW — confirm neither hook can create `.ctoc/` on any path, including the working-directory fallback and every catch block. Confirm both remain best-effort and cannot break a Write. Confirm `sync-unit.js` is unmodified. Confirm the stderr warning is unconditional and was not accidentally moved inside the new guard — silencing the human while fixing a directory would be a strictly worse trade than the one this slice chose.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — each guard adds one `existsSync` on a path that already performs filesystem work. In the un-initialised case it REMOVES a recursive `mkdirSync` and a file append, so the broken world gets faster.
 ### Step 13: SECURE — confirm no path outside the resolved root is written, that the `projectPath` fallback cannot be steered to write outside the working directory, and that nothing from the plan's content reaches a path component of the log destination.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/hooks-do-not-manufacture-the-project-marker.test.js tests/plan-index-*.test.js tests/duplicate-guard*.test.js tests/pretooluse-write*.test.js` green (adjust to the file names found at Step 9), then the full gated run `npm test`. Lint both changed files. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — a JavaScript doc on `appendLog` and on the `logDir` expression stating the rule: an operation that is permitted to fail silently must never create the directory that decides whether a project exists. Name the permanently-uninitialisable defect and its date.
 ### Step 16: FINAL-REVIEW — report a directory listing BEFORE and AFTER a plan Write in an empty directory, verbatim, on the real hook driven as a process. Report the full list of other `.ctoc` creators found at Step 9. Report every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

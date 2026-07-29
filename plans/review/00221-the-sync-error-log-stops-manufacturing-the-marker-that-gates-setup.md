@@ -203,15 +203,22 @@ the append/reset/coerce arms covered. No new dark branch, so the 99 floor holds.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — add cases L1-L4 in full, run ONLY this file, record the red output verbatim. L1 (and the no-marker portion) MUST be red against current `main` — current `logError` manufactures `.ctoc/` unconditionally. Any new case green before the change must be shown already-correct rather than vacuous, and the finding recorded.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — re-read from disk: `src/hooks/PostToolUse.plan-index-sync.js:141-228` in full (the `logError` body, the three call sites at 208/212/218, and the current `module.exports`); `tests/posttooluse-plan-index-sync-coverage.test.js:183-320` to confirm `makeFixture` always creates `.ctoc/logs`+`.ctoc/state` (so B3-B5 stay green) and to match the file's Layer-A conventions. Confirm no OTHER caller of `logError` exists outside `main()`.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/hooks/PostToolUse.plan-index-sync.js` — Change 1 (the guard) and Change 2 (the export).
 ### Step 11: REVIEW — confirm `logError` cannot create `.ctoc/` on any path, including the outer catch and the best-effort inner catch. Confirm the append/reset/500-cap logic below the guard is byte-for-byte unchanged. Confirm `main()` still calls the local binding and its exit-0 contract is untouched. Confirm the export adds no production coupling.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — the guard adds one `existsSync`; in the un-initialised case it REMOVES a recursive `mkdirSync`, a read, a parse and a write, so the not-a-project error path gets cheaper.
 ### Step 13: SECURE — confirm nothing outside `process.cwd()/.ctoc/logs` is written, that the marker can no longer be manufactured under any working directory, and that `err.message` reaches only a value, never a path segment.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/posttooluse-plan-index-sync-coverage.test.js tests/w10-plan-index-sync-await.test.js tests/hooks-do-not-manufacture-the-project-marker.test.js` green, then the full gated run `npm test` (`# fail 0`, coverage at or above the floor, 0 skipped). Lint the changed file. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — a JavaScript doc on `logError` stating the rule and naming this as the fourth of the four producers 00177 identified; note that the `process.cwd()` base is deliberately kept and made harmless by the guard (00177 precedent), and that re-routing to the resolved root is a separate, unshipped improvement.
 ### Step 16: FINAL-REVIEW — report a directory listing BEFORE and AFTER a forced `logError` in an empty directory, verbatim, showing `.ctoc/` absent both times. Report every decision taken under ambiguity, including the choice not to thread the resolved root.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

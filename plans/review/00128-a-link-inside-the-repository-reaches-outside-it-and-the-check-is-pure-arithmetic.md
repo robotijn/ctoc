@@ -318,6 +318,7 @@ Nothing here is reachable only from a test.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 Write `tests/a-link-cannot-leave-the-repository.test.js` in full and run **only that
 file, before touching `src/`**. Record the starting state verbatim.
 
@@ -338,6 +339,7 @@ file, before touching `src/`**. Record the starting state verbatim.
   fail-open catch.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 Read from disk, in full: `src/lib/plan-coverage.js:333-480`;
 `src/hooks/PreToolUse.Edit.js:58-190` and `:394-473`; `src/lib/safe-fs.js`'s
 `realpathSync` and `lstatSync` (including `validatePath`, which every call passes
@@ -364,6 +366,7 @@ Where the code disagrees with this plan, **the code wins and the discrepancy is
 recorded.**
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 One step, files as sub-items.
 - `src/lib/real-path-confinement.js` — `resolveExisting`, `isWithin`, `escapesRoot`,
   `resolvesUnder`; total, never throws, bounded ancestor walk.
@@ -374,6 +377,7 @@ One step, files as sub-items.
 - `tests/a-link-cannot-leave-the-repository.test.js` — the fourteen cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 Confirm there is exactly ONE encoding of real-path confinement and that neither
 `plan-coverage.js` nor `PreToolUse.Edit.js` contains a second copy. Confirm the
 resolution runs ONCE per coverage call, not once per plan or per glob — read the loop
@@ -390,6 +394,7 @@ fast path is a single `realpathSync` and that the ancestor walk runs only when t
 target does not exist. Record the after-timing against Step 9's before-numbers.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 This is the security step of a security fix; do it adversarially.
 - Confirm every fault path DENIES and **returns rather than throws**: missing path,
   `EACCES`, `ELOOP`, `ENOTDIR`, an unresolvable root, a `validatePath` refusal.
@@ -406,6 +411,7 @@ This is the security step of a security fix; do it adversarially.
   whitelist, unchanged.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 Targeted run first: `tests/a-link-cannot-leave-the-repository.test.js`,
 `tests/unapproved-plan-grants-nothing.test.js`,
 `tests/plan-coverage-coverage.test.js`, `tests/enforcement-hook.test.js`,
@@ -439,6 +445,7 @@ hook's catch fails open". A comment at each of the three call sites naming which
 means deny.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 Report: the paths; the Step 8 verbatim red for cases 1, 2 and 6 and — separately and
 plainly — whether 7, 8 and 9 were red, confirming or **refuting** planning's own ledger
 finding; every symbolic link found in this repository; all six timing numbers; the Step
@@ -510,6 +517,7 @@ All steps 8–16 executed. Files changed:
 - OUT OF DECLARED SCOPE, moved as count RATCHETS only: `CLAUDE.md` (436→437 test files ×2, 105→106 lib modules) and `tests/readme-numbers.test.js` (the live-disk equality 105→106). See Decision 13.
 
 ### Step 8: TEST — TDD RED, recorded verbatim BEFORE any src/ change
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 
 `node --test tests/a-link-cannot-leave-the-repository.test.js`:
 `tests 14 · suites 2 · pass 6 · fail 8 · cancelled 0 · skipped 0 · todo 0`
@@ -528,6 +536,7 @@ Case 13 (realpath fault): the fault did not reach the hook's fail-open catch; it
 happened, because nothing on either path called `realpathSync` at all.
 
 ### Step 9: PREPARE — measured, not assumed
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 
 Symbolic links in this repository, excluding `node_modules/` and `.git/`: **NONE**. `src/`,
 `tests/`, `plans/`, `agents/`, `skills/`, `.ctoc/` and `docs/` contain zero links, so nothing
@@ -558,6 +567,7 @@ confirming the placement after the arithmetic block. The two hook guards cost **
 **0.025 ms** per call.
 
 ### Step 13: SECURE — probe verdicts, reported and NOT fixed
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 
 **The Bash channel: an agent CAN create the link.** `PreToolUse.Bash.js` was driven with real
 payloads. `WRITE_PATTERNS` does not contain `ln` at all, and the ledger guard matches PATH TEXT:

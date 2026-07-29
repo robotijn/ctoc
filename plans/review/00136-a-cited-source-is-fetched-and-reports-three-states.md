@@ -303,56 +303,63 @@ All of Steps 8-16 executed. Summary of evidence:
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
-- [ ] Write `tests/claim-fetcher.test.js` in FULL and run ONLY that file before the module exists. Record TDD-RED verbatim.
-- [ ] **Case 3 is the proof obligation of this slice.** Record its red, then its green, verbatim. Additionally, run the whole file once with the local server never started, and confirm **zero** cases report `VERIFIED`.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
+- [x] Write `tests/claim-fetcher.test.js` in FULL and run ONLY that file before the module exists. Record TDD-RED verbatim.
+- [x] **Case 3 is the proof obligation of this slice.** Record its red, then its green, verbatim. Additionally, run the whole file once with the local server never started, and confirm **zero** cases report `VERIFIED`.
 
 ### Step 9: PREPARE
-- [ ] Read from disk: `src/lib/stale-detector.js:55-66` and `:89-102` (the contract and the closed enum to mirror), `:437-450` (degrade-vs-throw split), `:484-504` (the `degraded()` shape).
-- [ ] Read `src/lib/request-exit.js` — the exemplar for exiting without discarding writes.
-- [ ] Read `src/lib/version.js` and `src/lib/deployment.js` for the existing network-call conventions in this repository, and follow them rather than inventing a third.
-- [ ] Read `src/lib/false-green-scan.js` for the five signatures this module must not introduce.
-- [ ] Confirm `package.json` `engines.node >= 18` so global `fetch` is available. **If the code disagrees with this plan, THE CODE WINS — record it.**
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
+- [x] Read from disk: `src/lib/stale-detector.js:55-66` and `:89-102` (the contract and the closed enum to mirror), `:437-450` (degrade-vs-throw split), `:484-504` (the `degraded()` shape).
+- [x] Read `src/lib/request-exit.js` — the exemplar for exiting without discarding writes.
+- [x] Read `src/lib/version.js` and `src/lib/deployment.js` for the existing network-call conventions in this repository, and follow them rather than inventing a third.
+- [x] Read `src/lib/false-green-scan.js` for the five signatures this module must not introduce.
+- [x] Confirm `package.json` `engines.node >= 18` so global `fetch` is available. **If the code disagrees with this plan, THE CODE WINS — record it.**
 
 ### Step 10: IMPLEMENT
-- [ ] `src/lib/claim-fetcher.js` — `verifyClaim`, `verifyClaims`, cache with conditional requests, closed-enum reasons, `liveContact`.
-- [ ] `tests/claim-fetcher.test.js` — the sixteen cases, all against `127.0.0.1`.
-- [ ] `src/scripts/verify-claims.js` — extract, verify, print all three counts, write the ledger, `process.exitCode`.
-- [ ] Annotate the first handful of guides with `ctoc:claims` blocks (Decision 4) and raise `.ctoc/claim-coverage-baseline.json` to the new live count.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
+- [x] `src/lib/claim-fetcher.js` — `verifyClaim`, `verifyClaims`, cache with conditional requests, closed-enum reasons, `liveContact`.
+- [x] `tests/claim-fetcher.test.js` — the sixteen cases, all against `127.0.0.1`.
+- [x] `src/scripts/verify-claims.js` — extract, verify, print all three counts, write the ledger, `process.exitCode`.
+- [x] Annotate the first handful of guides with `ctoc:claims` blocks (Decision 4) and raise `.ctoc/claim-coverage-baseline.json` to the new live count.
 
 ### Step 11: REVIEW
-- [ ] **No path returns `VERIFIED` without `liveContact === true`.** Grep the module for every `VERIFIED` literal and confirm each at its site.
-- [ ] No `catch {}`; every catch maps to a named reason and a returned verdict.
-- [ ] `selector-missing` and `REFUTED` are genuinely distinct at their branch.
-- [ ] Confirm no retry loop exists anywhere.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
+- [x] **No path returns `VERIFIED` without `liveContact === true`.** Grep the module for every `VERIFIED` literal and confirm each at its site.
+- [x] No `catch {}`; every catch maps to a named reason and a returned verdict.
+- [x] `selector-missing` and `REFUTED` are genuinely distinct at their branch.
+- [x] Confirm no retry loop exists anywhere.
 
 ### Step 12: OPTIMIZE
-- [ ] Conditional requests confirmed to produce 304s against the local server — assert the byte count of a revalidation is far below a full body.
-- [ ] Per-host serialization and the concurrency cap verified under a multi-claim run; no unbounded parallel fan-out.
+- [x] Conditional requests confirmed to produce 304s against the local server — assert the byte count of a revalidation is far below a full body.
+- [x] Per-host serialization and the concurrency cap verified under a multi-claim run; no unbounded parallel fan-out.
 
 ### Step 13: SECURE
-- [ ] **Server-side request forgery guard:** `https` only; reject userinfo, explicit ports, and hosts resolving to loopback / link-local / private ranges. **A redirect is re-validated against the same policy, never followed blindly** (case 16). Loopback is permitted only under an explicit test-only option that is off by default and asserted off in production paths.
-- [ ] Response bodies never reach a verdict, a log line, or the ledger — only a 128-char truncated `observed`. A documentation page can contain anything.
-- [ ] Cache files are written under `.ctoc/verification/cache/` with **hashed** filenames (a URL is not a safe filename on Windows) and are git-ignored.
-- [ ] Cache reads are size-gated before the read, mirroring `src/lib/stale-detector.js:770-795`.
-- [ ] The `select` walk uses `hasOwnProperty` at each step; the extractor already rejected `__proto__`-style selectors in `00135`, and this is the second layer.
-- [ ] No URL, host, or path from the corpus is ever interpolated into a shell string — there is no subprocess in this slice at all.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
+- [x] **Server-side request forgery guard:** `https` only; reject userinfo, explicit ports, and hosts resolving to loopback / link-local / private ranges. **A redirect is re-validated against the same policy, never followed blindly** (case 16). Loopback is permitted only under an explicit test-only option that is off by default and asserted off in production paths.
+- [x] Response bodies never reach a verdict, a log line, or the ledger — only a 128-char truncated `observed`. A documentation page can contain anything.
+- [x] Cache files are written under `.ctoc/verification/cache/` with **hashed** filenames (a URL is not a safe filename on Windows) and are git-ignored.
+- [x] Cache reads are size-gated before the read, mirroring `src/lib/stale-detector.js:770-795`.
+- [x] The `select` walk uses `hasOwnProperty` at each step; the extractor already rejected `__proto__`-style selectors in `00135`, and this is the second layer.
+- [x] No URL, host, or path from the corpus is ever interpolated into a shell string — there is no subprocess in this slice at all.
 
 ### Step 14: VERIFY
-- [ ] `node --test tests/claim-fetcher.test.js` green.
-- [ ] **Run the whole gated suite `npm test` with the machine's network disabled**, and confirm it passes unchanged — **proof that the gated suite does not depend on the open internet**, which is `00137`'s central ruling and must be true from the moment a fetcher exists in the tree.
-- [ ] Full gated run `npm test` normally; report the verbatim counts and coverage lines.
-- [ ] Lint `--max-warnings 0`; typecheck clean.
-- [ ] Run `src/scripts/verify-claims.js` against the newly annotated guides and **report its full output verbatim**, including the unverifiable count.
-- [ ] `src/lib/false-green-scan.js` count reported before and after; no new finding.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
+- [x] `node --test tests/claim-fetcher.test.js` green.
+- [x] **Run the whole gated suite `npm test` with the machine's network disabled**, and confirm it passes unchanged — **proof that the gated suite does not depend on the open internet**, which is `00137`'s central ruling and must be true from the moment a fetcher exists in the tree.
+- [x] Full gated run `npm test` normally; report the verbatim counts and coverage lines.
+- [x] Lint `--max-warnings 0`; typecheck clean.
+- [x] Run `src/scripts/verify-claims.js` against the newly annotated guides and **report its full output verbatim**, including the unverifiable count.
+- [x] `src/lib/false-green-scan.js` count reported before and after; no new finding.
 
 ### Step 15: DOCUMENT
-- [ ] Record the three states and the closed reason enum in `CLAUDE.md`, in the same voice as the false-green fence section.
-- [ ] State in `CLAUDE.md` that the gated suite performs **no** network access, and that `verify-claims.js` is the only network path.
-- [ ] Update documented test-file and module counts in both places, read live from disk.
+- [x] Record the three states and the closed reason enum in `CLAUDE.md`, in the same voice as the false-green fence section.
+- [x] State in `CLAUDE.md` that the gated suite performs **no** network access, and that `verify-claims.js` is the only network path.
+- [x] Update documented test-file and module counts in both places, read live from disk.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Report: files, tests, Step 8 red verbatim, the network-disabled `npm test` result, the live `verify-claims.js` output, which guides were annotated, the baseline movement, and every decision taken under ambiguity.
-- [ ] Ready for human review at Gate 3.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
+- [x] Report: files, tests, Step 8 red verbatim, the network-disabled `npm test` result, the live `verify-claims.js` output, which guides were annotated, the baseline movement, and every decision taken under ambiguity.
+- [x] Ready for human review at Gate 3.
 
 ---
 

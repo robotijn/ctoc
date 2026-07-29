@@ -285,16 +285,23 @@ under the zero-skipped rule.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/secrets-scanner-external-tool-findings.test.js` in full, run ONLY that file, record the red output verbatim. Cases 1, 2, 3, 4, 6, 8, 9, 11 and 12 MUST be red today: the throw path discards everything, and `runSecurityScan` never reaches the external tools at all.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — re-read from disk before editing: `src/lib/secrets-scanner.js:1118-1210` (the two runners and `isToolAvailable`), `:1030-1098` (`run` / `runWithExternalTools`, to confirm `errors` is the same array reference the caller reads), `src/lib/quality-agent.js:827-900` (the secrets block and the `scanner.errors` fold), and `.ctoc/false-green-baseline.json` for the three tracked keys. If any line number or shape in this plan disagrees with the file, THE CODE WINS — record the discrepancy here.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/secrets-scanner.js` — Changes 1, 2, 3 and 4 (`outputFromError`; both runners parse the throw path; spawn-failure and unparseable-report errors; the unparseable-line counter).
   - `src/lib/quality-agent.js` — wire the external scanners into `runSecurityScan`, with an uninstalled tool reported as a visible skip.
 ### Step 11: REVIEW — confirm no path returns `[]` without EITHER a parsed report or a recorded error. Confirm `run()`'s `success: true` is now distinguishable from a failed external scan by a non-empty `errors` array, and say plainly whether `success` itself should become conditional (report the finding; do not widen scope). List every remaining `catch` in this file with a one-line justification.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — one extra string coercion on the exception path only; no additional process spawn, no re-scan. Confirm the external tools are invoked at most once each per scan.
 ### Step 13: SECURE — the recovered stdout contains SECRET MATERIAL by definition. Confirm: no raw output, no stderr text and no unredacted `Raw` value is ever written to `this.errors`, to a log, or to the console; every finding still passes through `redactSecret`; error messages carry only the tool name, the exit status, the error code and a count. Confirm `execFileSync` stays in argv form (no shell) on both runners.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — run the new file plus `tests/secrets-scanner*.test.js`, `tests/quality-agent*.test.js`, `tests/false-green-fence.test.js`, `tests/reachability.test.js`, then the full gated run `npm test`. Lint the changed JavaScript. The coverage floor is a ratchet — do not lower it. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — JavaScript doc on `outputFromError` stating why the exception is the success path for the run that matters. Correct the two comments that named the discarded condition. Bump the test-file count in `CLAUDE.md` (both places) by the number of test files added, reading the live count from disk first — `tests/doc-counts.test.js` verifies it.
 ### Step 16: FINAL-REVIEW — report files, verbatim red evidence, verbatim green evidence, the baseline movement, and every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Step 9 PREPARE — discrepancies found on disk (THE CODE WON)
 

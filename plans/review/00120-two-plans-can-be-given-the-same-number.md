@@ -435,18 +435,21 @@ number alone, this slice's severity changes and it must be reported before the f
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 - Write `tests/plan-number-allocation.test.js` in full and run ONLY that file, before touching any source.
 - **Cases 1, 3, 6, 13 and 22 MUST be RED.** Record each red verbatim, including the number actually returned — "the allocator returned `00001` against a repository holding twenty-nine plans" is the evidence, and a plan asserting it is worth less than the output.
 - Reproduce Defect A end-to-end first: empty `plans/implementation/`, numbered plans in `review/`, call `nextImplementationPlanNumber`, record that it returns `00001`.
 - **Cases 14 through 18 are the false-refusal guards and MUST be written before the refusal exists.** A refusal implemented first and guarded second is a refusal tuned to its own implementation.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 - Read from disk: `src/lib/plan-numbering.js` in full; `src/lib/task-registry.js:49-64` and `withRegistry` (the retry shape being mirrored, not copied); `src/hooks/PreToolUse.Write.js` in full — its plan-write detection, its duplicate-guard call, **its deny-decision shape if one exists**, its logging path, its fail-open discipline; `src/lib/escape-phrases.js`; `src/commands/menu.md:52`; `.ctoc/reachability-baseline.json`.
 - **Establish exactly how this hook emits a deny decision.** The duplicate guard never does, so the shape may not exist in this file. Read a sibling enforcement hook (`src/hooks/PreToolUse.Edit.js`) for the sanctioned shape and follow it. Do not invent one.
 - Read `src/lib/streaming-gate.js` around line 428 and the approval-ledger key derivation; settle the approval-key question. Report the answer.
 - List every plan number across all seven stage directories and record the real spread. Where the code disagrees with this plan, **THE CODE WINS** — record it.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 - `src/lib/plan-numbering.js` — global scan; refuse on unreadable; `allocatePlanNumber` with the bounded exclusive-create claim; `findNumberCollisions`; `checkPlanWriteCollision`.
 - `src/hooks/PreToolUse.Write.js` — the deny decision, delegating the predicate; the actionable message; the `unknown` allow-and-say-so path; escape-phrase honouring; fail-open on internal error. **Comment the divergence from the duplicate guard and why.**
 - `src/commands/menu.md` — line 52 points at `allocatePlanNumber`.
@@ -454,6 +457,7 @@ number alone, this slice's severity changes and it must be reported before the f
 - `.ctoc/reachability-baseline.json` — remove `src/lib/plan-numbering.js`, lower `maxUnreachable` to the **live measured** count.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 - **Walk all nine edge cases against the implementation, one by one, and record the decision each produces.** This is the review's primary work; a refusal reviewed in the abstract is not reviewed.
 - Confirm no path in the allocator returns a number derived from a directory it failed to read.
 - Confirm the claims directory can only cause a skip, never a reissue: delete it mid-test and re-verify.
@@ -466,6 +470,7 @@ number alone, this slice's severity changes and it must be reported before the f
 - The hook adds no measurable latency to a non-plan write — return before any directory read.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 - Refusal and warning messages name repository-relative paths only, never an absolute home directory.
 - The number parsed from a filename is bounded and validated before use; a crafted filename cannot drive an unbounded loop or a path outside `plans/`.
 - The claim filename derives from a validated integer, never from caller-supplied text — no traversal into `.ctoc/state/`.
@@ -473,6 +478,7 @@ number alone, this slice's severity changes and it must be reported before the f
 - Fixtures write only under `os.tmpdir()` and never touch the real `plans/` or `.ctoc/state/`.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 - `node --test tests/plan-number-allocation.test.js tests/plan-numbering.test.js tests/plan-numbering-coverage.test.js` plus every existing `PreToolUse.Write` test, green.
 - Reachability and export-reachability fences green, with the baseline count **measured**. **Report whether `renumberImplementationPlans` is flagged as a dead export** — a real finding either way.
 - Full gated run `npm test`: lint at `--max-warnings 0`, typecheck clean, coverage at or above the enforced floor, fail 0, 0 skipped except a documented platform skip.
@@ -486,6 +492,7 @@ number alone, this slice's severity changes and it must be reported before the f
 - Update the documented test-file count in **both** places, reading the live count from disk first.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 - Report: files changed; the Step 8 reds verbatim with the numbers actually returned; the Step 11 walk of all nine edge cases with the decision each produced; both refusal messages verbatim; the measured `maxUnreachable` movement and the dead-export finding; the real-repository collision scan; the approval-key finding; the before/after documented test-file count; and every decision taken under ambiguity.
 
 ## Decisions Taken Under Ambiguity

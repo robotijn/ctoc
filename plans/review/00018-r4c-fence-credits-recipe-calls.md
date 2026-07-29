@@ -84,22 +84,29 @@ export-reachability.test.js / reachability.test.js:
 
 ## Execution Plan (Steps 8-16)
 ### Step 8: TEST — write the tests, run ONLY the two named files, record red.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — read reachability.js in full (R4-B's current version on
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 disk), and grep menu.md/agents for the call-syntax vs prose forms so the regex
 matches reality, not a guess.
 ### Step 10: IMPLEMENT — item 1; re-seed the baseline (item 2).
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 ### Step 11: REVIEW — DIFF the dead set before/after; every export that left
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 the dead set must have a real `name(` or `require().name` in a surface or code
 (list them); every export that stayed must be genuinely caller-less.
 ### Step 12: OPTIMIZE — one pass over surfaces; regex only.
 ### Step 13: SECURE — the regex must not be ReDoS-prone (bounded, no nested
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 quantifier over untrusted-length input); surfaces are repo files but keep it
 linear.
 ### Step 14: VERIFY — node --test on the two files + eslint; no git.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — reachability.js header states the rule precisely: a
 surface CALL (`name(` / `require().name`) is a caller; a bare prose token is
 not; a test is never a caller.
 ### Step 16: FINAL-REVIEW — report: the before/after dead diff, the four gate
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 exports proven live, the re-catch fixture proving completeExecution still dies
 when its code edge is cut.
 
