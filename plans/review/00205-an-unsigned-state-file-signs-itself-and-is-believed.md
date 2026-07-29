@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "An unsigned state file signs itself and is believed — forging the Iron Loop position stops requiring a key, and the migration cost is stated rather than assumed"
 type: implementation
 parent_plan: none
@@ -9,6 +10,9 @@ iron_loop: true
 files:
   - "src/lib/state-manager.js"
   - "tests/unsigned-state-rejected.test.js"
+approved_by: human
+approved_at: 2026-07-29T00:34:00.034Z
+gate_crossed: implementation → todo
 ---
 
 # An unsigned state file signs itself and is believed
@@ -329,3 +333,57 @@ installation holding an unsigned state loses its Iron Loop position and restarts
 8. **Home-directory isolation is established before any test runs.** A test suite that
    writes to the developer's real `~/.ctoc/state/` can destroy their working Iron Loop
    position, which is a worse outcome than the defect.
+
+## Decisions Taken During Implementation
+
+1. **Home isolation via `HOME`/`USERPROFILE` override before require.** `os.homedir()`
+   reads `$HOME` (POSIX) / `%USERPROFILE%` (Windows) on every call — verified in-process —
+   and `crypto.js`/`state-manager.js` compute `CTOC_HOME`/`STATE_DIR` at module load. The
+   new test file sets both env vars to a fresh `os.tmpdir()` mkdtemp dir and asserts
+   `os.homedir() === ISOLATED_HOME` *before* requiring any CTOC module, refusing to run if
+   the override did not take. Nothing is ever written to the developer's real `~/.ctoc/`.
+   This is cleaner than the pre-existing `tests/state-manager.test.js`, which writes to the
+   REAL home and unlinks one hash file; that suite is left as-is except for the one
+   blast-radius case below. `node --test` runs each file in its own process, so the env
+   override is local to this file.
+
+2. **The Bash-hook banner is NOT wired to name the unsigned state — reported as a scope
+   finding, not edited.** Step 9 confirmed the unsigned reason does not reach the commit
+   banner: `main()` rebuilds its own reason (`Commit requires step 15+ ... Current: 1`)
+   from the now-null state, so the human sees "step 1" rather than "unsigned state". The
+   security fix (deny at the forged step) is COMPLETE in `state-manager.js` alone — the
+   forged `currentStep: 16` no longer reaches the gate, and the commit is denied. Wiring
+   the unsigned reason into the banner would require editing `src/hooks/PreToolUse.Bash.js`,
+   which is (a) outside this plan's declared `files:` (which never listed it), (b) gate/hook
+   logic that CLAUDE.md flags as requiring explicit human approval. Per the executor brief's
+   no-scope-creep rule, the banner-naming improvement is surfaced as a follow-up finding for
+   the human rather than taken unauthorized. Test case 13 therefore asserts the *reachable*
+   truth today — the commit is denied and a block banner is printed to stderr — and does not
+   assert the banner contains the word "unsigned" (which would force the out-of-scope edit).
+
+3. **The one blast-radius existing test is corrected toward the new contract.**
+   `tests/state-manager.test.js` "loadState migrates unsigned (legacy) state" (lines
+   242-258) asserted the now-deleted self-signing migration. It is rewritten to assert the
+   new contract: an unsigned state is REJECTED (`state: null`, `valid: false`,
+   `unsigned: true`, `migrated` absent, error naming recovery) and is NOT rewritten on disk.
+   Justification: the assertion pinned the exact defect being fixed (unauthenticated input
+   → authenticated output). The contract that replaced it comes from this security plan, not
+   from the test; the change tightens toward the real behaviour (rejection) and does not
+   loosen any assertion. This is the only existing test that wrote an unsigned fixture and
+   relied on it loading — a repository-wide grep for `_migrated_at` / state `migrated` and
+   for unsigned-fixture writers confirmed no other consumer (all other `migrated:` hits
+   belong to the unrelated gate-migration / frontmatter subsystems).
+
+4. **`_migrated_at` and `STATE_SCHEMA_VERSION` are left in place outside `loadState`.**
+   `_migrated_at` lost its only writer (the deleted branch) and has no other reader in the
+   repository; `STATE_SCHEMA_VERSION` is still written by `createState`. This slice removes
+   nothing outside `loadState`, per the plan.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

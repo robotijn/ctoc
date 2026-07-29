@@ -1,0 +1,9 @@
+{
+  "content_sha256": "91e16e7f20b6281d9ba587bb84f8bf262130f7869ffcfecfb19ab4becc675e92",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-29T00:34:00.084Z",
+  "approved_by": "human",
+  "plan_basename": "00205-an-unsigned-state-file-signs-itself-and-is-believed"
+}

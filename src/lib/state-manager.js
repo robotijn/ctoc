@@ -84,7 +84,14 @@ function createState(projectPath, feature, language, framework) {
 }
 
 /**
- * Loads state for a project (with signature verification)
+ * Loads state for a project (with signature verification).
+ *
+ * An UNSIGNED state file is REJECTED, not signed on load. Signing it would mean the
+ * signature proves nothing: forging state would need no key at all — write an unsigned
+ * file and the next load mints the signature. The two fields it controls (currentStep,
+ * feature) are the only inputs to the Bash hook's write gate and commit gate.
+ * Recovery from a rejected state is to start the Iron Loop again from the menu;
+ * saveState signs unconditionally.
  */
 function loadState(projectPath) {
   const statePath = getStatePath(projectPath);
@@ -97,12 +104,20 @@ function loadState(projectPath) {
     const content = safeFs.readFileSync(statePath, 'utf8');
     const state = JSON.parse(content);
 
-    // Check if unsigned (legacy v2.x state)
-    if (!state._signature) {
-      // Migrate to signed format
-      const signedState = signState({ ...state, _version: STATE_SCHEMA_VERSION, _migrated_at: new Date().toISOString() });
-      safeFs.writeFileSync(statePath, JSON.stringify(signedState, null, 2));
-      return { state: signedState, valid: true, migrated: true };
+    // An unsigned state cannot be authenticated. Signing it on load would mean any
+    // hand-written file became valid state, so it is REJECTED — never migrated. The
+    // `unsigned: true` discriminator lets a caller tell "never signed" from "tampered"
+    // without parsing the message.
+    if (!state || typeof state !== 'object' || !state._signature) {
+      return {
+        state: null,
+        valid: false,
+        error: 'State file is unsigned. An unsigned state cannot be authenticated, so it '
+             + 'is not accepted — signing it on load would mean any hand-written file '
+             + 'became valid state. Start the Iron Loop again from the menu to write a '
+             + 'fresh signed state.',
+        unsigned: true,
+      };
     }
 
     // Verify signature
