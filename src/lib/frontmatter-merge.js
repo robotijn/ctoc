@@ -187,12 +187,20 @@ function assembleSingleBlock(blockLines, body) {
  *
  * - No frontmatter → create exactly one block with the marker fields.
  * - Existing frontmatter (one or, defensively, several stacked blocks) → flatten
- *   to one block (first-key-wins), remove the OWNED marker keys, then append the
- *   fresh marker fields in order. Idempotent: re-stamping updates in place and a
- *   clean re-crossing clears a stale override.
+ *   to one block (first-key-wins), remove the OWNED marker keys AND every key this
+ *   call is about to insert, then append the fresh marker fields in order.
+ *   Idempotent: re-stamping updates in place and a clean re-crossing clears a stale
+ *   override.
+ *
+ * UPSERT means replace-or-insert: any key present in `markerFields` is stripped from
+ * the existing block before re-appending, so a caller that upserts the SAME key
+ * twice (e.g. `rejectPlan` writing `revision`/`rejection_reason`/`tag` on every
+ * rejection) updates the value in place instead of accumulating a duplicate line.
+ * `MARKER_KEYS` is stripped unconditionally on top of that so a clean re-crossing
+ * clears a stale `override`/`override_reason` even when this call does not set them.
  *
  * The plan's own fields (`title`/`type`/`files:`/`depends_on`/…) are never
- * touched, only the marker keys.
+ * touched, only the marker keys and the keys being upserted.
  *
  * @param {string} content plan file contents
  * @param {string[][]} markerFields ordered [key, value] pairs
@@ -206,8 +214,11 @@ function upsertMarkerFields(content, markerFields) {
     return '---\n' + markerLines.join('\n') + '\n---\n\n' + String(content);
   }
 
+  // Strip the always-owned marker keys AND every key we are about to insert, so an
+  // upsert replaces rather than appends (no duplicate key on a second upsert).
+  const toStrip = MARKER_KEYS.concat(markerFields.map(([k]) => k));
   const merged = mergeBlocksFirstKeyWins(blocks);
-  const kept = removeTopLevelKeys(merged, MARKER_KEYS);
+  const kept = removeTopLevelKeys(merged, toStrip);
   return assembleSingleBlock(kept.concat(markerLines), body);
 }
 

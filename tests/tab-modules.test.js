@@ -691,7 +691,10 @@ describe('Tab Modules - handleKey()', () => {
 
       const review = loadTabWithMocks('review', {
         state: { readPlans: () => [plan] },
-        actions: { rejectPlan: (p, f) => { rejectCalled = true; rejectFeedback = f; } }
+        // The real rejectPlan RETURNS its destination path (return movePlan(...)); the
+        // review tab now names that stage in the confirmation. The stub must honor that
+        // contract, else path.dirname(undefined) throws. Assertions below are unchanged.
+        actions: { rejectPlan: (p, f) => { rejectCalled = true; rejectFeedback = f; return 'plans/in-progress/mock.md'; } }
       });
 
       const app = createMockApp({
@@ -741,7 +744,8 @@ describe('Tab Modules - handleKey()', () => {
 
       const review = loadTabWithMocks('review', {
         state: { readPlans: () => [plan] },
-        actions: { rejectPlan: () => { rejectCalled = true; } }
+        // Stub honors the real rejectPlan contract (returns the destination path).
+        actions: { rejectPlan: () => { rejectCalled = true; return 'plans/in-progress/mock.md'; } }
       });
 
       const app = createMockApp({

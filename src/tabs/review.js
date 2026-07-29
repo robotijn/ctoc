@@ -116,10 +116,11 @@ function handleKey(key, app) {
     }
     if (key.name === 'return') {
       if (app.directInput && app.directInput.length > 0) {
-        // Direct feedback = reject
-        rejectPlan(app.selectedPlan.path, app.directInput, app.projectPath);
+        // Direct feedback = reject. Name the REAL destination from the returned path
+        // (rejectPlan moves ONE stage back — a review plan lands in in-progress).
+        const dest = rejectPlan(app.selectedPlan.path, app.directInput, app.projectPath);
         app.mode = 'list';
-        app.message = `✓ ${stripCtl(app.selectedPlan.name)} rejected → moved to functional drafts`;
+        app.message = `✓ ${stripCtl(app.selectedPlan.name)} rejected → sent back to ${path.basename(path.dirname(dest))}`;
         app.directInput = '';
         return true;
       }
@@ -147,9 +148,10 @@ function handleKey(key, app) {
       return true;
     }
     if (key.name === 'return' && app.inputValue) {
-      rejectPlan(app.selectedPlan.path, app.inputValue, app.projectPath);
+      // Name the REAL destination from the returned path (one stage back).
+      const dest = rejectPlan(app.selectedPlan.path, app.inputValue, app.projectPath);
       app.mode = 'list';
-      app.message = `✓ ${stripCtl(app.selectedPlan.name)} rejected → moved to functional drafts`;
+      app.message = `✓ ${stripCtl(app.selectedPlan.name)} rejected → sent back to ${path.basename(path.dirname(dest))}`;
       app.inputValue = '';
       return true;
     }
