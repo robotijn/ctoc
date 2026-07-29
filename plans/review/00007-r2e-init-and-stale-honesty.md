@@ -63,15 +63,22 @@ again); corrupt dismissal store fails open to no-filter.
 
 ## Execution Plan (Steps 8-16)
 ### Step 8: TEST — write tests, run ONLY these two test files, record red.
+- [x] TEST — TDD tests present; Step-11 workflow re-review (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — read init-project.js, stale-detector.js,
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 compliance-regime.js (reader of record), and the existing tests IN FULL.
 ### Step 10: IMPLEMENT — changes 1–3.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 ### Step 11: REVIEW — diff vs plan; init must not scaffold anything else new.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3; findings minor/info only, documented.
 ### Step 12: OPTIMIZE — detector stays O(plans).
 ### Step 13: SECURE — safe-fs; no user-controlled paths in the store.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — node --test on the two files + eslint; no git.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — module headers updated to the corrected rules.
 ### Step 16: FINAL-REVIEW — report files/tests/red-evidence/decisions.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

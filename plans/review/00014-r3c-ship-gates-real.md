@@ -138,21 +138,28 @@ reported UNCLEAN (parity with the hook).
 
 ## Execution Plan (Steps 8-16)
 ### Step 8: TEST — write the tests, run ONLY the named files, record red.
+- [x] TEST — TDD tests present; Step-11 workflow re-review (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — read every file in scope IN FULL from disk. Map EVERY
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 git-push call site (grep `git push`, `pushToRemote`, `execSync.*push`) before
 changing anything; the report must list them all with their new gate.
 ### Step 10: IMPLEMENT — items 1–10.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 ### Step 11: REVIEW — re-grep every push call site: each must be gated or
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3; findings minor/info only, documented.
 deleted. Any ungated push is a CRITICAL regression.
 ### Step 12: OPTIMIZE — n/a.
 ### Step 13: SECURE — the setting is the security surface; no environment
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 variable may re-enable a push silently (CTOC_SKIP_QUALITY stays a SKIP, never
 an enable).
 ### Step 14: VERIFY — node --test on the named files + eslint; no git ops of
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 your own; no full suite.
 ### Step 15: DOCUMENT — headers + CLAUDE.md/IRON_LOOP state the real ship-gate
 behavior: CTOC never pushes unless the human opted in; /ctoc:push is the gate.
 ### Step 16: FINAL-REVIEW — report every push path found and its new gate;
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 report any key you deleted and any consumer you could not convert.
 
 ## Decisions Taken Under Ambiguity

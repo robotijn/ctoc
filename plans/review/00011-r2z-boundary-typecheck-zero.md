@@ -90,18 +90,25 @@ tests/task-registry.test.js) to prove zero behavior drift.
 
 ## Execution Plan (Steps 8-16)
 ### Step 8: TEST — record the current 94-error output verbatim as the red.
+- [x] TEST — TDD tests present; Step-11 workflow re-review (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — read each file's error sites from disk before annotating.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — items 1–4.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 ### Step 11: REVIEW — diff must contain ONLY comments/JSDoc/casts + the two
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3; findings minor/info only, documented.
 count lines + the fixture — any behavioral hunk is a violation UNLESS reported
 as a real-bug fix.
 ### Step 12: OPTIMIZE — n/a.
 ### Step 13: SECURE — no `@ts-ignore`/`@ts-nocheck` anywhere (forbidden — they
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 hide, not fix).
 ### Step 14: VERIFY — the Test Plan above, AND (added at the 2026-07-27 record
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 reconciliation) the full `npm test` gate on HEAD, which the original run skipped.
 ### Step 15: DOCUMENT — n/a (annotations ARE documentation).
 ### Step 16: FINAL-REVIEW — report error count before/after per file, casts
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 used with reasons, any real bugs found.
 
 ## Decisions Taken Under Ambiguity

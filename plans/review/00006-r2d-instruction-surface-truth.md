@@ -76,18 +76,25 @@ ask-me-questions pair stays byte-identical.
 
 ## Execution Plan (Steps 8-16)
 ### Step 8: TEST — adjust/add the pins, run readme-numbers + doc-counts, red.
+- [x] TEST — TDD tests present; Step-11 workflow re-review (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — read every file IN FULL from disk; read post-R2-B
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 actions.js startAgent signature (skipped[]/force) before writing the recipe.
 If R2-B's return shape is absent on disk, STOP and report.
 ### Step 10: IMPLEMENT — changes 1–8.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 ### Step 11: REVIEW — every remaining superlative claim in README checked
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3; findings minor/info only, documented.
 against code; list any you left and why.
 ### Step 12: OPTIMIZE — n/a (prose); keep recipes terse.
 ### Step 13: SECURE — no secrets/paths leaked into docs.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — node --test tests/readme-numbers.test.js
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 tests/doc-counts.test.js + the grep-zeros above; no git.
 ### Step 15: DOCUMENT — n/a (this IS documentation).
 ### Step 16: FINAL-REVIEW — report every claim changed, before → after.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 
