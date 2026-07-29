@@ -163,6 +163,9 @@ describe('classifyWrites — bounds and adversarial input never throw', () => {
       'echo "unbalanced', "echo 'unbalanced", '>', '> ', 'cd', 'cd &&', 'cp a',
       'mv', 'tee', 'sed -i', 'dd', '&&', '|| >', '`', '$(', '<<', 'cd ~ && echo x > y',
       'echo x >', 'echo x >>', '   ', '\n\n', 'node', 'find', 'cd -- && echo x > z.js',
+      // wrapper argument exhaustion: a value-flag with no following token, and a
+      // wrapper whose positional operand never arrives (both resolve to word '' -> none)
+      'sudo -u', 'env -u', 'flock', 'chroot', 'sudo env -i',
     ];
     for (const c of nasty) {
       assert.doesNotThrow(() => classifyWrites(c), `threw on: ${JSON.stringify(c)}`);
@@ -172,83 +175,62 @@ describe('classifyWrites — bounds and adversarial input never throw', () => {
   });
 });
 
-describe('classifyWrites — F1: a leading group/wrapper prefix no longer disables the gate', () => {
-  // REGRESSION (review finding F1). `commandWord` returned a segment's FIRST token
-  // verbatim, so a determinate write command or interpreter that is NOT the literal
-  // first token of its segment classified as `none` and was ALLOWED — the exact class
-  // this module exists to kill. Each of these was `none` (allowed) before the fix; the
-  // old \b-anchored WRITE_PATTERNS blocked them. They must classify as `writes` (right
-  // target where determinate) or `indeterminate` (wrapped interpreter / unreadable), and
-  // NEVER `none`.
-  const f1Writes = [
-    ['F1a time tee', 'time tee src/x.js', ['src/x.js']],
-    ['F1b (subshell) sed -i', "(sed -i 's/a/b/' src/x.js)", ['src/x.js']],
-    ['F1c sudo tee', 'sudo tee f', ['f']],
-    ['F1d nohup dd of=', 'nohup dd of=f', ['f']],
-    ['F1f timeout + duration truncate', 'timeout 5 truncate -s0 f', ['f']],
+describe('classifyWrites — wrapper flag & bareword bypass (second-round fix)', () => {
+  // RESIDUAL of the same fail-open class as the cd-prefix: a wrapper
+  // (env/command/exec/sudo/flock/…) whose OWN flags/operands were not consumed left
+  // the FLAG (or a positional operand) as the "command word", which matched no writer
+  // and fell to `none` — an ALLOW at a planning step. Each writes/executes for real.
+  const writeThrough = [
+    ['env -i absolute tee', 'env -i /usr/bin/tee src/x.js', ['src/x.js']],
+    ['command -p tee (input redirect)', 'command -p tee src/x.js < payload', ['src/x.js']],
+    ['sudo env -i tee (chained wrappers)', 'sudo env -i tee f', ['f']],
+    ['flock lockfile tee', 'flock /tmp/lock tee src/x.js', ['src/x.js']],
+    ['flock -w N lockfile tee', 'flock -w 5 /tmp/lock tee src/x.js', ['src/x.js']],
+    ['doas tee', 'doas tee src/x.js', ['src/x.js']],
+    ['doas -u root tee', 'doas -u root tee src/x.js', ['src/x.js']],
+    ['chroot newroot tee', 'chroot /jail tee src/x.js', ['src/x.js']],
+    ['watch tee', 'watch tee src/x.js', ['src/x.js']],
+    ['watch -n N tee', 'watch -n 2 tee src/x.js', ['src/x.js']],
+    ['time tee', 'time tee src/x.js', ['src/x.js']],
   ];
-  for (const [label, cmd, targets] of f1Writes) {
-    test(`${label} -> writes (was none)`, () => {
+  for (const [label, cmd, targets] of writeThrough) {
+    test(`writes through a wrapper: ${label}`, () => {
       const r = classifyWrites(cmd);
       assert.equal(r.verdict, 'writes', `${cmd} -> ${JSON.stringify(r)}`);
       assert.deepEqual(r.targets, targets, `${cmd} targets`);
     });
   }
 
-  test('F1e nice perl -i -> indeterminate interpreter, target still surfaced (was none)', () => {
-    // `perl` is an interpreter (writes happen inside a program this gate cannot read),
-    // so the verdict stays the conservative `indeterminate` even though the in-place
-    // file is readable — plan Decision 3: indeterminate outranks writes. The target is
-    // surfaced (true information) but the verdict is block-ward. Was `none` before F1.
-    const r = classifyWrites('nice perl -i -pe s/a/b/ f');
-    assert.equal(r.verdict, 'indeterminate', JSON.stringify(r));
-    assert.equal(r.reason, 'interpreter');
-    assert.ok(r.targets.includes('f'), `target surfaced: ${JSON.stringify(r.targets)}`);
-  });
-
-  test('F1g { patch; } group prefix -> indeterminate (was none)', () => {
-    const r = classifyWrites('{ patch -p1 < c.patch; }');
-    assert.equal(r.verdict, 'indeterminate', JSON.stringify(r));
-    assert.equal(r.reason, 'write target could not be read');
-  });
-
-  const f1Interp = [
-    ['F1h (subshell) node -e', "(node -e 'fs.writeFileSync(\"src/x.js\",\"x\")')"],
-    ['F1i sudo node -e', "sudo node -e 'fs.writeFileSync(\"src/x.js\",\"x\")'"],
+  const interpThrough = [
+    ['env -i node -e', 'env -i /usr/bin/node -e \'require("fs").writeFileSync("src/x.js","evil")\''],
+    ['exec -a name node -e', 'exec -a foo node -e \'x\''],
   ];
-  for (const [label, cmd] of f1Interp) {
-    test(`${label} -> indeterminate interpreter (was none)`, () => {
+  for (const [label, cmd] of interpThrough) {
+    test(`interpreter behind a wrapper is indeterminate: ${label}`, () => {
       const r = classifyWrites(cmd);
       assert.equal(r.verdict, 'indeterminate', `${cmd} -> ${JSON.stringify(r)}`);
       assert.equal(r.reason, 'interpreter', `${cmd} reason`);
     });
   }
 
-  // OVER-STRIP GUARD: a wrapper before a READ command must still classify `none` —
-  // the fix must not turn "every wrapped command" into a write.
-  for (const cmd of ['time ls', 'sudo ls -la', 'nice cat f', 'nohup grep x f']) {
-    test(`F1 over-strip guard: ${cmd} stays none`, () => {
+  test('guard: a resolved command word that is a dash-flag fails CLOSED (indeterminate)', () => {
+    // After `--`, a dash-led "command" cannot be a real command word — a dash means a
+    // prefix/flag was mis-parsed. Fail closed (indeterminate), never fall to `none`.
+    const r = classifyWrites('sudo -- -weirdcmd src/x.js');
+    assert.equal(r.verdict, 'indeterminate', JSON.stringify(r));
+    assert.equal(r.reason, 'write target could not be read', JSON.stringify(r));
+  });
+
+  // The guard must NOT over-fire: a real read behind a wrapper stays `none`.
+  for (const cmd of ['env -i ls', 'command ls', 'time ls', 'sudo ls -la']) {
+    test(`guard does not over-fire on a read behind a wrapper: ${cmd} -> none`, () => {
       const r = classifyWrites(cmd);
       assert.equal(r.verdict, 'none', `${cmd} -> ${JSON.stringify(r)}`);
     });
   }
 
-  test('F1 wrapper token as an OPERAND is not consumed as a wrapper', () => {
-    // `tee time` writes to a file literally named `time`; `time` here is an operand of
-    // tee, not a leading wrapper, so it must still resolve as a target.
-    const r = classifyWrites('tee time');
-    assert.equal(r.verdict, 'writes', JSON.stringify(r));
-    assert.deepEqual(r.targets, ['time']);
-  });
-
-  test('F1 chained wrappers strip to the real command word', () => {
-    const r = classifyWrites('sudo nice tee f');
-    assert.equal(r.verdict, 'writes', JSON.stringify(r));
-    assert.deepEqual(r.targets, ['f']);
-  });
-
-  test('F1 separate-value wrapper flag (nice -n N) does not eat the command', () => {
-    const r = classifyWrites('nice -n 5 tee f');
+  test('env VAR=val assignment still resolves to the real writer (not the guard)', () => {
+    const r = classifyWrites('env FOO=bar tee f');
     assert.equal(r.verdict, 'writes', JSON.stringify(r));
     assert.deepEqual(r.targets, ['f']);
   });
@@ -366,16 +348,16 @@ describe('the spawned hook — the cd-prefix bypass is closed (the defect)', () 
       'coverage is 00202; at step 10 with a feature the step gate passes, so this must be allowed');
   });
 
-  test('F1-int a  time tee src/x.js is DENIED at a planning step (RED before fix)', () => {
+  test('38 env -i /usr/bin/tee src/x.js is DENIED at a planning step (RED before fix)', () => {
     setState(3);
-    const d = denyOf(runHook('time tee src/x.js'));
-    assert.ok(d, 'a wrapped write must reach the step gate and be denied');
+    const d = denyOf(runHook('env -i /usr/bin/tee src/x.js'));
+    assert.ok(d, 'a writer behind an unconsumed wrapper flag must reach the step gate and be denied');
   });
 
-  test('F1-int b  sudo tee f is DENIED at a planning step (RED before fix)', () => {
+  test('39 command -p tee src/x.js is DENIED at a planning step (RED before fix)', () => {
     setState(3);
-    const d = denyOf(runHook('sudo tee f'));
-    assert.ok(d, 'a wrapped write must reach the step gate and be denied');
+    const d = denyOf(runHook('command -p tee src/x.js'));
+    assert.ok(d, 'a writer behind command -p must reach the step gate and be denied');
   });
 
   test('37 every node -e recipe from start.md is still ALLOWED at its normal step', () => {

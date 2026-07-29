@@ -523,33 +523,40 @@ radius from Step 14, and every decision taken under ambiguity.
    (a shell command token is not a cryptographic token). Behaviour and the positional
    `resolveTarget(prefix, …)` signature are unchanged; "warnings are bugs" required a
    clean lint.
-8. **F1 REGRESSION FIX (post-review finding, Medium — the commandWord wrapper/group
-   bypass).** Adversarial review found that `commandWord` returned a segment's FIRST
-   token VERBATIM, so a determinate write command or interpreter that was NOT the literal
-   first token classified as `none` and was ALLOWED — a regression in the exact class this
-   module exists to kill, where the old `\b`-anchored `WRITE_PATTERNS` blocked it.
-   Confirmed bypasses (each `none`/allowed before the fix): `time tee src/x.js`,
-   `(sed -i 's/a/b/' src/x.js)`, `sudo tee f`, `nohup dd of=f`, `nice perl -i -pe s/a/b/ f`,
-   `{ patch -p1 < c.patch; }`, `timeout 5 truncate -s0 f`, `(node -e '…')`, `sudo node -e '…'`.
-   **Fix**, mirroring the sibling `PreToolUse.Bash.js:288` (`seg.replace(/^[\s({]+/, '')`):
-   `commandWord` now (a) strips a leading `^[\s({]+` group/subshell prefix off the token
-   (a bare `(`/`{` token is skipped), and (b) skips a leading command WRAPPER token —
-   `time`, `sudo`, `nice`, `nohup`, `timeout` (+ its numeric duration operand), `stdbuf`,
-   `ionice`, `setsid`, and `!` — plus each wrapper's flags and any separately-given flag
-   value (`nice -n 5`, `sudo -u root`, `stdbuf -o L`) — so the REAL command word
-   (tee/sed/node/dd/…) is what gets classified. `resolveTarget` also strips an UNBALANCED
-   trailing `)` (the subshell close that sticks to the last operand, `src/x.js)` from
-   `(sed … src/x.js)`), balanced parens in a real filename untouched. The wrapper set is
-   bounded to a KNOWN-SAFE list, never an arbitrary first token, so a wrapped READ
-   (`time ls`, `sudo ls -la`, `nice cat f`) still classifies `none`; a wrapper appearing
-   as an OPERAND (`tee time`) is not consumed as a wrapper. A wrapper before an interpreter
-   yields `indeterminate`, not `none` (`sudo node -e`, `(node -e …)`); `nice perl -i …` is
-   `indeterminate` (perl is an interpreter — Decision 3, indeterminate outranks writes)
-   with the in-place target surfaced. 24 new test cases in
-   `tests/shell-write-targets.test.js` (all RED against the pre-fix code, now green); the
-   33 existing 00201 cases and the `security-bash-hook` / `ledger-forgery-closed` spawned-
-   hook suites stay green. Scope: F1 only — the cd-taint (F2) and `cp -t` (F3) findings are
-   left for `00202`.
+8. **SECOND-ROUND FIX — the residual flag/operand bypass of the same fail-open class.**
+   Re-review found the first fix's `commandWord` skipped the `env`/`command`/`builtin`/
+   `exec` wrapper WORD but not that word's own flags/operands, so the flag became the
+   resolved "command word": `env -i /usr/bin/tee src/x.js` resolved to `-i` → matched no
+   writer → `none` → ALLOWED at a planning step. Reproduced live for `env -i tee`,
+   `env -i node -e '…'` (the interpreter case), `command -p tee`, `exec -a foo node -e`,
+   and the chained `sudo env -i tee`. Two changes close the whole family:
+   (a) `commandWord` now consumes each wrapper's own flags (value-flags such as `env -u`,
+   `exec -a`, `flock -w`, `doas -u`, `watch -n` consume their argument) AND its positional
+   operands (`flock <lockfile>`, `chroot <newroot>`), resolving through a CHAIN of wrappers
+   (`sudo env -i tee` → `tee`). This keeps `env -i ls`/`command ls`/`time ls` → `none`
+   (the read resolves to `ls`, not `-i`) while `env -i tee` → `writes` and `env -i node -e`
+   → `indeterminate`.
+   (b) A fail-closed GUARD in `classifySegment`: if the resolved command word still starts
+   with `-` (a real command word never does — a dash means a prefix/flag we did not model),
+   mark the segment `indeterminate` (`write target could not be read`) instead of `none`.
+   This is the backstop for any future prefix whose flags are unmodelled, so under-modelling
+   a wrapper flag fails toward deny, never toward allow.
+9. **`sudo` and `time` were added to `WRAPPERS` alongside the plan's `flock`/`doas`/
+   `chroot`/`watch`.** `sudo env -i tee f` is an explicitly listed live bypass and only
+   closes if `sudo` is skipped so the chained `env -i` reaches the flag-guard; `time tee f`
+   is the identical same-class sibling of `time ls`. Both are pure command-runner prefixes
+   (never a write command themselves), so skipping them is safe and closes the family rather
+   than leaving a known sibling open for a third review. `flock`/`chroot` declare one
+   positional operand (lockfile / newroot) so that operand's basename cannot become the
+   false command word (`flock /tmp/lock tee` → `tee`, not `lock`).
+10. **Under-modelling a wrapper flag is SAFE by construction; over-consuming is the only
+    danger.** The `value`/`operands` declarations are the minimum needed to reach the real
+    command word. An unmodelled flag leaves the resolved word starting with `-`, which the
+    guard turns into `indeterminate` (deny-ward). Over-consuming would mis-resolve a real
+    command, so no speculative flags were added. New adversarial no-throw inputs
+    (`sudo -u`, `env -u`, `flock`, `chroot`, `sudo env -i`) pin the wrapper-argument
+    exhaustion paths (a value-flag or positional operand that never arrives resolves to the
+    empty command word → `none`).
 
 7. **SURFACED RISK for review / `00202` (not a build blocker — no acceptance criterion
    fails).** Because interpreters now classify `indeterminate` and `isWriteCommand`
