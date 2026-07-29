@@ -6,8 +6,8 @@
   kind: registry-version
   source: https://pypi.org/pypi/duckdb/json
   select: info.version
-  expect: 1.5.4
-  retrieved: 2026-07-10
+  expect: 1.5.5
+  retrieved: 2026-07-30
 - id: duckdb-concurrency-doc
   kind: url-live
   source: https://duckdb.org/docs/stable/connect/concurrency

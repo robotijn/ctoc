@@ -6,8 +6,8 @@
   kind: registry-version
   source: https://pypi.org/pypi/clickhouse-connect/json
   select: info.version
-  expect: 1.4.2
-  retrieved: 2026-07-10
+  expect: 1.6.0
+  retrieved: 2026-07-30
 -->
 
 ## Installation (CURRENT - January 2026)

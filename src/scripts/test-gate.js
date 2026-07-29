@@ -31,6 +31,14 @@
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const safeFs = require('../lib/safe-fs');
+// The OFFLINE half of corpus claim verification (plan 00137). Neither module touches the
+// network: claim-ledger reads the committed ledger off disk, corpus-claims walks skills/
+// via the offline extractor. Requiring them here is what makes the plan's title true —
+// "the verification verdict is enforced offline on every build" — because `npm test` runs
+// through this gate. NEITHER pulls src/lib/claim-fetcher.js (which contains `fetch`) into
+// the build's module graph; tests/test-gate-ledger-wiring.test.js proves that boundary.
+const claimLedger = require('../lib/claim-ledger');
+const { collectCorpusClaims } = require('../lib/corpus-claims');
 // This script prints a very large report and then its VERDICT. `process.exit` would
 // discard whatever is still buffered when stdout is a PIPE — which is exactly how
 // Step 14 VERIFY reads this gate — cutting the output at ~64KB and throwing away the
@@ -192,6 +200,60 @@ function evaluateSummary(summary, opts) {
   }
 
   return { ok: reasons.length === 0, reasons };
+}
+
+/**
+ * The OFFLINE corpus-claim ledger gate (plan 00137), folded into `npm test`.
+ *
+ * Reads the COMMITTED ledger (`.ctoc/verification/claims-ledger.json`) off disk with NO
+ * network and checks it against the claims declared in the corpus on disk. Fails the build
+ * when a claim is REFUTED, STALE (older than the ledger's horizon — a scheduled verifier
+ * that silently stopped becomes a loud build failure), or DRIFTED (a declared claim with no
+ * verified ledger entry, or one whose expected value was edited since it was verified — so
+ * editing a version in a guide cannot silence a refutation). A drift-orphan (a ledger entry
+ * with no corpus claim) is reported but does NOT fail — a deleted guide legitimately orphans
+ * entries. The verdict logic lives in the pure, total `gateLedger`; this only collects the
+ * corpus and shapes the result like `evaluateSummary`.
+ *
+ * NOT APPLICABLE when the corpus declares ZERO claims: there is nothing to verify, so an
+ * absent ledger is correct and the gate passes. Deleting all claims to silence the gate is
+ * a different failure, fenced by the claim-census floor (`tests/claim-census.test.js`), not
+ * here. This is the same "an absent input is not a fault" discipline as the stale detector.
+ *
+ * @param {string} projectRoot absolute project root
+ * @param {{nowMs?: number}} [opts]
+ * @returns {{ok: boolean, reasons: string[], applicable: boolean, line: string}}
+ */
+function evaluateLedgerGate(projectRoot, opts) {
+  let claims;
+  try {
+    ({ claims } = collectCorpusClaims(projectRoot));
+  } catch (err) {
+    // collectCorpusClaims degrades per-file rather than throwing, but a pathological corpus
+    // must never be a silent pass: an uncollectable corpus is a gate failure, not green.
+    return {
+      ok: false,
+      applicable: true,
+      reasons: [`corpus claims could not be collected: ${(err && err.message) || 'unknown error'}`],
+      line: 'corpus claims: could not collect the corpus — the ledger gate cannot certify this build',
+    };
+  }
+
+  if (claims.length === 0) {
+    return { ok: true, applicable: false, reasons: [], line: 'corpus claims: none declared — offline ledger gate not applicable' };
+  }
+
+  const gate = claimLedger.gateLedger(projectRoot, claims, opts || {});
+  const reasons = [];
+  for (const f of gate.failures) {
+    if (f.kind === 'drift-orphan') continue; // reported by the verifier, not build-failing
+    reasons.push(`corpus claim verification: ${f.kind}${f.detail ? ` — ${f.detail}` : ''}`);
+  }
+  const s = gate.summary;
+  const line =
+    `corpus claims: verified ${s.verified}  refuted ${s.refuted}  unverifiable ${s.unverifiable}  ` +
+    `(offline ledger gate: ${reasons.length === 0 ? 'PASS' : 'FAIL'})`;
+  return { ok: reasons.length === 0, applicable: true, reasons, line };
 }
 
 /**
@@ -380,16 +442,22 @@ function main() {
   };
   const verdict = evaluateSummary(summary, { threshold });
 
+  // The OFFLINE corpus-claim ledger gate (plan 00137). No network — reads the committed
+  // ledger off disk and enforces the scheduled verifier's verdict on THIS build.
+  const ledger = evaluateLedgerGate(projectRoot);
+
   // Report an unreadable counter AS unreadable. Printing "failed 0" for a count the
   // gate could not read is the human-facing half of the X2 defect: it told an operator
   // a number that was not true. "unreadable" is the honest word.
   const measured = summary.coveragePct === null ? 'unmeasured' : `${summary.coveragePct}%`;
   const show = (n) => (n === null || !Number.isFinite(n) ? 'unreadable' : String(n));
   process.stdout.write(`\n[CTOC test-gate] coverage ${measured} (threshold ${threshold}%), skipped ${show(summary.skipped)}, failed ${show(summary.fail)}\n`);
+  process.stdout.write(`[CTOC test-gate] ${ledger.line}\n`);
 
-  if (!verdict.ok) {
+  const reasons = [...verdict.reasons, ...ledger.reasons];
+  if (reasons.length > 0) {
     process.stderr.write('[CTOC test-gate] FAIL:\n');
-    for (const reason of verdict.reasons) {
+    for (const reason of reasons) {
       process.stderr.write(`  - ${reason}\n`);
     }
     return requestExit(1);
@@ -403,7 +471,7 @@ function main() {
 // three parsers use it internally, and the tests exercise it THROUGH them, on real
 // colorized fixtures). A test is not a caller — exporting it would add surface that
 // nothing reaches. Keep the module's contract to the gate decision + its parsers.
-module.exports = { parseSkipped, parseFail, parseCoveragePct, evaluateSummary, resolveTestFiles, resolveThreshold };
+module.exports = { parseSkipped, parseFail, parseCoveragePct, evaluateSummary, evaluateLedgerGate, resolveTestFiles, resolveThreshold };
 
 if (require.main === module) {
   main();

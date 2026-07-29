@@ -421,4 +421,69 @@ and **15 and 16** (the gated suite genuinely has no network).
     `CLAUDE.md` (a concurrent build is in flight there). The module is self-documenting via
     its header; the gated-versus-scheduled paragraph and the count updates are deferred to a
     human-run documentation pass.
+
+---
+
+## Decisions Taken During Implementation — GATE WIRING (00137 fix, 2026-07-30)
+
+This fix resolves the fork surfaced as Decision 12 above, by an explicit HUMAN decision:
+WIRE the committed-ledger verdict into `npm test`, and REFRESH the two refuted guides so
+the build is green with the gate live. The plan's title — "the verification verdict is
+enforced offline on every build" — is now LITERALLY TRUE; it was aspirational before this
+fix (Decision 12 said so) because `npm test` never read the ledger.
+
+15. **The verdict is now enforced on `npm test` through `src/scripts/test-gate.js`, offline.**
+    `test-gate.js` (the gated entry point) gained a pure `evaluateLedgerGate(root, opts)` that
+    collects the corpus claims declared on disk and runs `claimLedger.gateLedger` against the
+    COMMITTED `.ctoc/verification/claims-ledger.json` — no network, no subprocess, no writes.
+    `main()` folds its verdict into the exit code alongside the coverage/fail/skip verdict, so
+    a REFUTED, STALE, or DRIFTED committed ledger fails the build. The network stays out of the
+    build: `test-gate.js` requires only `claim-ledger` (offline) and the new `corpus-claims`
+    (offline), NEITHER of which pulls `claim-fetcher` (the `fetch` module) into the `npm test`
+    module graph — proven by a require-cache test mirroring 00136/00137 case 15.
+
+16. **New network-free module `src/lib/corpus-claims.js` (`collectCorpusClaims`).** The corpus
+    walk + claim extraction previously lived inline in `src/scripts/verify-claims.js`, which
+    requires `claim-fetcher`. Extracting it into a module that requires only the offline
+    `claim-extractor` lets BOTH the gated `test-gate.js` and the networked `verify-claims.js`
+    share ONE collector while the network module loads only in the script that actually
+    fetches. `verify-claims.js` now requires the shared collector (its inline `collectGuides`
+    / `collectClaims` deleted — no behaviour change).
+
+17. **ZERO declared corpus claims ⇒ the ledger gate is NOT APPLICABLE (passes).** A project
+    with no `ctoc:claims` anywhere has nothing to verify, so an absent ledger is correct — the
+    same "an absent input is not a fault" discipline as the stale detector. Deleting all claims
+    to silence the gate is a DIFFERENT failure, fenced by the claim-census floor
+    (`tests/claim-census.test.js`), not here. This also keeps the pre-existing temp-dir gate
+    fixtures (which declare no claims) valid.
+
+18. **The two refutations were resolved by refreshing the guides to the VERIFIED live versions,
+    not by weakening the claim.** Fetched live 2026-07-30 via the fetcher against the real
+    registries: `duckdb` `info.version` = **1.5.5** (was pinned 1.5.4) and `clickhouse-connect`
+    `info.version` = **1.6.0** (was pinned 1.4.2), both from `pypi.org`. The guide `expect:`
+    and `retrieved:` fields were updated and `node src/scripts/verify-claims.js` re-run, which
+    merge-wrote the committed ledger: now `verified 3  refuted 0  unverifiable 0`, exit 0,
+    `horizonDays` 3650 preserved. The `expectedHash` in each entry changed with the edited
+    `expect` — so the ONLY way to clear the refutation was to re-verify (Decision 5's whole
+    point), never a hand-edit of the ledger.
+
+19. **Two existing test files that copy `test-gate.js` into a temp dir were updated to re-export
+    the new offline modules** (`tests/coverage-gate.test.js` cases 6 & 8, and
+    `tests/coverage-ratchet-direction.test.js`). This is a fixture-dependency update — the
+    copied gate now legitimately requires `claim-ledger`/`corpus-claims`/`claim-extractor` — not
+    a weakening: every assertion (fail counts, coverage verdict, threshold behaviour) is
+    unchanged. Those fixtures declare no corpus claims, so the ledger gate is not applicable in
+    them and cannot be the cause of the exit code they assert.
+
+20. **The wiring is proven both as a pure unit AND end-to-end.** `tests/test-gate-ledger-wiring.test.js`
+    unit-tests `evaluateLedgerGate` (refuted/stale/absent/drift/clean/not-applicable, plus the
+    LIVE repo ledger being clean and the two network-boundary proofs), and spawns the REAL gate
+    to prove `npm test` exits NON-ZERO on a refuted committed ledger and ZERO on a clean one —
+    with a passing fixture suite so the ledger is the sole differentiator.
+
+Files touched by this fix: `src/scripts/test-gate.js`, `src/scripts/verify-claims.js`,
+`src/lib/corpus-claims.js` (new), `tests/test-gate-ledger-wiring.test.js` (new),
+`tests/coverage-gate.test.js`, `tests/coverage-ratchet-direction.test.js`,
+`skills/frameworks/data/duckdb.md`, `skills/frameworks/data/clickhouse.md`,
+`.ctoc/verification/claims-ledger.json`.
 </content>

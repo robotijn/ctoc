@@ -398,19 +398,18 @@ test('X2 case 6 — the REAL gate spawned under FORCE_COLOR=3 over a failing sui
       path.join(__dirname, '..', 'src', 'scripts', 'test-gate.js'),
       path.join(dir, 'src', 'scripts', 'test-gate.js')
     );
-    // Re-export the real safe-fs so the copied gate resolves '../lib/safe-fs'.
-    const realSafeFs = path.join(__dirname, '..', 'src', 'lib', 'safe-fs.js');
-    fs.writeFileSync(
-      path.join(dir, 'src', 'lib', 'safe-fs.js'),
-      `module.exports = require(${JSON.stringify(realSafeFs)});\n`
-    );
-    // Same treatment for the real request-exit, which the gate uses to flush its
-    // output before exiting (without it the copied gate cannot resolve its require).
-    const realRequestExit = path.join(__dirname, '..', 'src', 'lib', 'request-exit.js');
-    fs.writeFileSync(
-      path.join(dir, 'src', 'lib', 'request-exit.js'),
-      `module.exports = require(${JSON.stringify(realRequestExit)});\n`
-    );
+    // Re-export the real library dependencies so the copied gate resolves its requires:
+    // safe-fs + request-exit as before, plus the OFFLINE ledger-gate modules the gate now
+    // loads (claim-ledger + corpus-claims + the extractor corpus-claims uses). None of
+    // these touch the network. This temp project declares no corpus claims, so the ledger
+    // gate is not applicable and cannot be the reason for the exit code under test.
+    for (const mod of ['safe-fs', 'request-exit', 'claim-ledger', 'corpus-claims', 'claim-extractor']) {
+      const real = path.join(__dirname, '..', 'src', 'lib', `${mod}.js`);
+      fs.writeFileSync(
+        path.join(dir, 'src', 'lib', `${mod}.js`),
+        `module.exports = require(${JSON.stringify(real)});\n`
+      );
+    }
     // A covered src file, so coverage is MEASURED and cannot be the failure reason —
     // isolating the fail count as the sole cause of the non-zero exit.
     fs.writeFileSync(path.join(dir, 'src', 'thing.js'), 'module.exports = () => 42;\n');
@@ -501,7 +500,7 @@ test('V1 case 8 — the REAL gate PIPED over a LOUD suite still delivers its cov
       path.join(__dirname, '..', 'src', 'scripts', 'test-gate.js'),
       path.join(dir, 'src', 'scripts', 'test-gate.js')
     );
-    for (const mod of ['safe-fs', 'request-exit']) {
+    for (const mod of ['safe-fs', 'request-exit', 'claim-ledger', 'corpus-claims', 'claim-extractor']) {
       const real = path.join(__dirname, '..', 'src', 'lib', `${mod}.js`);
       fs.writeFileSync(
         path.join(dir, 'src', 'lib', `${mod}.js`),
