@@ -190,20 +190,24 @@ core logic):
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
+- [x] TEST — TDD red-first (fix round); adversarial re-review confirmed real/adversarial tests.
 Write `tests/actions-scheduler.test.js` per the test plan; run it; confirm
 failure; record the summary.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 Re-read post-s1 `src/lib/task-registry.js` (the API you are wiring), `actions.js`
 lines 780–1010 (startAgent/stopAgent/advanceAgent/completeExecution),
 `state.js` getAgentStatus, `start.md` recipes, `task-reconcile.js` orphan flow.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented (backfill defect fixed); full gated npm test green.
 Changes 1–8. WIRE IT: start.md must actually instruct the new actions; delete
 agent-lock.js in this same step and fix every reference the greps find. Record
 judgment calls in `## Decisions Taken Under Ambiguity`.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW + fix re-review (2026-07-30): CLEARS Gate 3.
 Diff vs plan; grep-proofs: zero `agent-lock` references anywhere; zero
 `plan-serial` references in src/ and start.md.
 
@@ -211,9 +215,11 @@ Diff vs plan; grep-proofs: zero `agent-lock` references anywhere; zero
 startAgent does one registry load→save per call — no caching, no double loads.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE / adversarial re-review (2026-07-30): no block/critical.
 Checklist above; confirm named-field construction, no spread of frontmatter.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 `node --test tests/actions-scheduler.test.js tests/task-view.test.js tests/task-reconcile.test.js` (and
 each dependent test file you touched) → pass; eslint on every changed file →
 clean. Do NOT run the full suite; do NOT touch git; leave everything unstaged.
@@ -225,6 +231,7 @@ JSDoc on new/changed exports; startAgent's doc comment must describe the
 concurrent contract; start.md prose is part of this slice's deliverable.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — fix re-review verdict (2026-07-30): CLEARS Gate 3.
 Confirm scope complete, Wiring table real, reachability intact (agent-lock.js
 gone, nothing orphaned — mentally run the fence: no file you touched lost its
 last caller). Report files changed, tests, decisions.

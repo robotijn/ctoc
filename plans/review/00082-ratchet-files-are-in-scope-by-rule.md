@@ -385,8 +385,11 @@ landed on the dead-export list on arrival. That constraint chose the placement.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/plan-declares-count-moving-ratchets.test.js` in full and run ONLY that file. Cases 1, 5, 6 and 7 MUST be red today (no check exists). Cases 3, 4 and 8 must be GREEN before and after — they pin the no-cry-wolf property, and a red there means the trigger is too broad and must be narrowed before Step 10. **Case 10 must be GREEN**, because the one plan the trigger flagged (`00085`) has already been corrected; if it is RED, a new offender has entered the queue — record which plan, and if the count exceeds three, STOP (Step 9). Record every output verbatim.
+- [x] TEST — TDD red-first (fix round); adversarial re-review confirmed real/adversarial tests.
 ### Step 9: PREPARE — read from disk: `tests/doc-counts.test.js` in full (the six classes and their live counters — the definitions being MOVED, not reinvented); `src/lib/plan-validator.js:820-870` (`validateTransition`, `validateForQueue`); `src/lib/actions.js:1242-1277` (the multi-block declared-files reader and WHY the single-block one returns `[]`); `agents/planning/implementation-planner.md` (confirm the inline skeleton at `:419-428` and the sizing rule at `:43-45`/`:425`); `src/hooks/PreToolUse.Edit.js:58-89` (re-confirm the whitelist finding against the code, not this plan's quotation). **Re-run `grep -rn "implementation-plan.md.template" src/ agents/`** — if it now has a reader, the code wins and the retarget must be revisited before implementing. **Then scan `plans/implementation/` + `plans/todo/` with the new check and record the offender list. If it names more than three plans, STOP and report — the trigger is broader than this analysis and re-deriving it is the human's call, not an executor's.**
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented (backfill defect fixed); full gated npm test green.
   - `src/lib/documented-counts.js` — the shared classes, `movesDocumentedCount`, `checkPlanDeclaresCountMovers`.
   - `src/lib/plan-validator.js` — `validateForQueue` calls the check; hard ERROR, multi-block reader.
   - `tests/doc-counts.test.js` — consume the shared definitions; every assertion and count preserved.
@@ -394,11 +397,15 @@ landed on the dead-export list on arrival. That constraint chose the placement.
   - `agents/planning/implementation-planner.md` — the two-block skeleton, the exclusion sentence, the guidance paragraph naming the enforcement.
   - `CLAUDE.md` — the two documented counts this slice moves, read live from disk.
 ### Step 11: REVIEW — confirm the counted-artifact classes are defined in EXACTLY ONE place and that `doc-counts.test.js` no longer carries its own copy, with every one of its assertions preserved. Confirm `validateForQueue` uses the multi-block reader — a single-block read makes the fence pass everything, so verify by driving case 6. Confirm the emitted skeleton still parses as valid plan frontmatter (generate one and validate it through `plan-validator`). Confirm the sizing rule and the ratchet block no longer contradict each other read end to end. Confirm no existing test asserts an exact `files:` length or an exact skeleton body that this change breaks; if one does, the code is right and the test is corrected toward the new reality, never loosened.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW + fix re-review (2026-07-30): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — the check runs once per plan over an already-read frontmatter; the disk-existence test is one `existsSync` per declared path. No globbing, no directory walk per path.
 ### Step 13: SECURE — the check reads plan frontmatter and tests path existence; it executes nothing. Confirm path normalisation cannot escape the project root (a declared `../../etc/x` must not be probed), that both separators normalise, and that no error message leaks an absolute home path. **Confirm no ratchet entry in the emitted skeleton names anything under `.ctoc/approvals/` or `.ctoc/state/verify/`** — both are denied ahead of the whitelist precisely because a write there would forge an approval or fabricate Gate-3 evidence, and neither may ever enter this list.
+- [x] SECURE — security-scanner SECURE / adversarial re-review (2026-07-30): no block/critical.
 ### Step 14: VERIFY — `node --test tests/plan-declares-count-moving-ratchets.test.js tests/doc-counts.test.js tests/plan-validator*.test.js` green, then the full gated run `npm test`. Lint the changed JavaScript at `--max-warnings 0`. No git operations. **`00098` must have landed first** — see the ordering section; this slice's verification runs through the gate that slice repairs.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — the generator's guidance paragraph states the rule, its limit, and its enforcement. **`documented-counts.js`'s module header states the trigger condition and ALL SEVEN blind spots**, so the next reader cannot mistake it for total — the deletion hole especially, since it is the one a future maintainer is most likely to assume is covered. Update `CLAUDE.md`'s documented library-module and test-file counts, reading the live values from disk first.
 ### Step 16: FINAL-REVIEW — report files, tests, the Step 8 red and green evidence verbatim (especially cases 3, 4 and 8 proving the no-cry-wolf property), the Step 9 offender scan result, the grep result for the dead template, the before/after documented counts, and every decision taken under ambiguity.
+- [x] FINAL-REVIEW — fix re-review verdict (2026-07-30): CLEARS Gate 3.
 
 ## Ordering — why this slice lands SECOND
 
@@ -537,8 +544,12 @@ it repairs the parser that makes this slice's generator output legible.)*
    "block-list stops at first non-dash line" asserted the buggy contract by NAME while
    its fixture (a top-level `status:` key) exercised only correct top-level-key
    termination. The fixture and assertion are unchanged; the name is tightened to "ends
-   at a new top-level key". Two new red-first cases pin the comment/blank-skip behavior
-   and the trailing-key non-capture.
+   at a new top-level key". One new red-first case pins the comment/blank-skip behavior
+   (it returned `[]` against the old break-at-first-non-dash reader); a second new case
+   pins the trailing-key non-capture — that one is a green-before regression guard, not a
+   red-first proof (the old reader broke at the comment and coincidentally returned the
+   same result), and it guards against a wrong fix that would parse a `key: value` line
+   as an entry.
 4. **Scope kept minimal.** No `CLAUDE.md`, no VERSION bump, no plan stage move — the fix
    touches only the shared reader and its direct unit test; it creates no counted
    artifact, so this slice's own ratchet fence does not fire.

@@ -300,16 +300,23 @@ not have caught the class.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/gate-numbers-fence.test.js` in full, run ONLY that file, record the red output verbatim. Every case is red at the start (the module does not exist). Cases 14 and 15 are the ones to watch: if either is red AFTER the module works, a preceding slice has not fully landed and that is the finding.
+- [x] TEST — TDD red-first (fix round); adversarial re-review confirmed real/adversarial tests.
 ### Step 9: PREPARE — re-read from disk: `src/lib/iron-loop-enforcer.js`'s `false-green-fence` check, to copy its registration shape exactly rather than inventing a second one; `src/lib/false-green-scan.js`, for this repository's established scanner conventions; and confirm `node_modules/typescript` is present. Confirm the preceding slices have landed by running their tests — if `src/lib/gate-words.js` is absent, STOP and report.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented (backfill defect fixed); full gated npm test green.
   - `src/lib/human-facing-scan.js` — the parser-based scanner, the registry, the contract query.
   - `src/lib/iron-loop-enforcer.js` — the `gate-words-fence` check.
 ### Step 11: REVIEW — confirm the walk visits no comment (prove it by case 4 and 5, not by reading the code). Confirm no code path returns an empty findings list when the file could not be read. Confirm the enforcer check treats unavailable as failure. Confirm `require('typescript')` is lazy and inside a `try`, so a user project without the development dependency does not crash the enforcer.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW + fix re-review (2026-07-30): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — the registry is a handful of files and the scan is one parse each; it runs on demand and in the gated suite, not on every render. Confirm the parse is not repeated per pattern.
 ### Step 13: SECURE — the scan reads source files under the project root only. Confirm every path is resolved and confined beneath `root` before it is read, so a crafted registry entry cannot read outside the project. Confirm findings echo the matched text through a control-character strip, since a finding is printed to a terminal.
+- [x] SECURE — security-scanner SECURE / adversarial re-review (2026-07-30): no block/critical.
 ### Step 14: VERIFY — `node --test tests/gate-numbers-fence.test.js tests/false-green-fence.test.js tests/iron-loop-enforcer-coverage.test.js tests/gate-words.test.js tests/dashboard-says-the-moment.test.js` green, then the full gated run `npm test`. Lint both changed JavaScript files. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — a header comment on `human-facing-scan.js` carrying the rule, the two patterns, and **the six blind spots verbatim**. A fence whose limits live only in a plan file is a fence somebody will trust past its edge. Add the fence to `CLAUDE.md`'s quality section beside the false-green fence; if that edit is required, add `CLAUDE.md` to this plan's `files:` rather than editing an undeclared file.
 ### Step 16: FINAL-REVIEW — report the fence's findings on the real repository, the verbatim red and green evidence, the six blind spots, and every decision taken under ambiguity.
+- [x] FINAL-REVIEW — fix re-review verdict (2026-07-30): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

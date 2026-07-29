@@ -228,15 +228,22 @@ would have to be skipped on some platform and a skip is a gate failure.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/menu-reports-what-init-did.test.js` in full, run ONLY that file, record the red output verbatim. Cases 3, 4, 5, 6, 9, 10, 11 and 12 MUST be red. Case 12's red output MUST include the announcement alongside a listing of the directory, so the contradiction is on the record as the owner experienced it.
+- [x] TEST — TDD red-first (fix round); adversarial re-review confirmed real/adversarial tests.
 ### Step 9: PREPARE — re-read from disk: `src/commands/menu.js:597-613` and `:660-745`; `src/lib/init-project.js:565-749` for the exact return shape and every `skipped.push` site; `src/lib/regulatory-regime.js` for `loadActiveProfiles`'s signature and failure behaviour. The landed code WINS over this plan's line numbers. Confirm `initProject`'s return still carries `created` and `skipped`.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented (backfill defect fixed); full gated npm test green.
   - `src/commands/menu.js` — Changes 1, 2 and 3.
 ### Step 11: REVIEW — confirm no path renders a success sentence without `ok === true`. Confirm every other `try/catch` in `menu.js` that swallows a failure is listed with a justification, since this slice's whole subject is a swallowed outcome. Confirm the dashboard renders in every failure fixture. Confirm the read-back uses the real reader for the compliance anchor and not a local regular expression.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW + fix re-review (2026-07-30): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — the read-back is four existence checks and one small parse, and it runs ONLY on the path where initialization was attempted, which is once per project lifetime. Confirm an already-set-up project performs no extra read.
 ### Step 13: SECURE — the failure message names paths. Confirm they are project-relative, not absolute, so the message does not leak the filesystem layout. Confirm no error stack reaches the screen — message text only.
+- [x] SECURE — security-scanner SECURE / adversarial re-review (2026-07-30): no block/critical.
 ### Step 14: VERIFY — `node --test tests/menu-reports-what-init-did.test.js tests/init-project.test.js tests/menu-environment.test.js tests/e2e-menu-lifecycle.test.js tests/compliance-mode.test.js` green, then the full gated run `npm test`. Lint the changed file. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — a JavaScript doc on `ensureInitialized` stating the rule: the menu never claims an action it did not take, and the claim is derived from a read-back through the reader of record. Name the discarded-report defect and its date so the reason survives the code.
 ### Step 16: FINAL-REVIEW — report the announcement BEFORE and AFTER on a fixture where setup genuinely fails, verbatim, and every decision taken under ambiguity.
+- [x] FINAL-REVIEW — fix re-review verdict (2026-07-30): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

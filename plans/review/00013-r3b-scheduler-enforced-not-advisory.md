@@ -11,7 +11,7 @@ files:
   - "src/lib/task-reconcile.js"
   - "src/lib/task-view.js"
   - "src/lib/menu-screens.js"
-  - "src/commands/menu.js"
+  - "src/commands/start.js"
   - "src/lib/actions.js"
   - "tests/task-registry.test.js"
   - "tests/task-reconcile.test.js"
@@ -74,7 +74,7 @@ unlocked. Verified on disk:
    from task-registry.js and import it — ONE encoding, no mirror).
    `completeExecution` must accept `running | cancelling | orphaned` (orphaned
    → done: a falsely-orphaned agent that finishes is recorded, not dropped).
-5. **Live-list honesty (H2).** `menu.js extractLiveAgentIds`: a present-but-
+5. **Live-list honesty (H2).** `start.js extractLiveAgentIds`: a present-but-
    empty `--live-agent-ids` maps to `undefined` (unavailable), NOT `[]`
    (authoritative empty) — today an empty flag mass-orphans every live agent
    and refills their slots in the same render. AND in `reconcile`: a running
@@ -128,13 +128,13 @@ unlocked. Verified on disk:
 
 | change | live call site | root |
 |---|---|---|
-| guarded start | menu task start route (this slice) | /ctoc:menu |
-| plan-uniqueness | startAgent/advanceAgent (this slice) | /ctoc:menu |
-| TERMINAL export | menu-screens imports it (this slice) | /ctoc:menu |
-| live-id honesty | menu.js flag parse + reconcile (this slice) | /ctoc:menu |
-| sweep liveness | cleanupStaleInProgress (this slice) | /ctoc:menu |
-| withRegistry CAS | every registry mutator (this slice) | /ctoc:menu |
-| quarantine/retention/deadline | reconcile (this slice) | /ctoc:menu |
+| guarded start | menu task start route (this slice) | /ctoc:start |
+| plan-uniqueness | startAgent/advanceAgent (this slice) | /ctoc:start |
+| TERMINAL export | menu-screens imports it (this slice) | /ctoc:start |
+| live-id honesty | start.js flag parse + reconcile (this slice) | /ctoc:start |
+| sweep liveness | cleanupStaleInProgress (this slice) | /ctoc:start |
+| withRegistry CAS | every registry mutator (this slice) | /ctoc:start |
+| quarantine/retention/deadline | reconcile (this slice) | /ctoc:start |
 
 ### Test Plan (TDD-Red first) — new tests/scheduler-enforced.test.js
 THE ENFORCEMENT TEST: `menu task start <id>` on a task the ladder refuses
