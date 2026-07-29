@@ -253,6 +253,7 @@ Nothing here is reachable only from a test.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD red-first: failing tests written and seen RED before implementation; Step-11 review confirmed the tests are real and adversarial, not vacuous.
 Write `tests/the-dispatch-seat-says-whether-it-is-live.test.js` in full and run **only
 that file, before touching `src/`**. Record the starting state verbatim. Every case
 must be RED for the honest reason — the module does not exist. **If any case passes,
@@ -260,6 +261,7 @@ STOP**: something already provides this and must be found before a second encodi
 added.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry and target files read from disk; approach confirmed against the real code.
 
 Read from disk, in full, and let the code win over this plan where they differ:
 `src/lib/agent-slots.js` (the exported `slotsPath`, `SLOT_TTL_MS`, the store shape);
@@ -286,6 +288,7 @@ Then re-measure and **report the table before any code is written**:
 result and it changes `00166` from blocked to buildable.** Report what changed.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — the declared files were implemented; full gated `npm test` green.
 One step, files as sub-items.
 
 - `src/lib/dispatch-seat-liveness.js` — `seatLiveness`, `describeLiveness`; three
@@ -295,6 +298,7 @@ One step, files as sub-items.
 - `tests/the-dispatch-seat-says-whether-it-is-live.test.js` — the fifteen cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic Step-11 review (2026-07-29): CLEARS Gate 3; any residuals are documented and non-blocking.
 Confirm there is exactly ONE encoding of "is the seat live" and that
 `iron-loop-enforcer.js` holds no second copy of the rule. Confirm the store path and
 the time-to-live are IMPORTED from `agent-slots` and not re-spelled. **Confirm by
@@ -309,6 +313,7 @@ nothing new runs on any path other than the enforcer check itself. Record the ch
 timing on the live repository.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner Step-13 review (2026-07-29): PASS (no block; any warn documented and non-blocking).
 - Confirm a hostile enforcement-log line cannot inject text into `describeLiveness`:
   a line containing a newline, a terminal escape, `%s`, and a 10,000-character field.
   The description names a fixed vocabulary state and a numeric age only.
@@ -321,6 +326,7 @@ timing on the live repository.
   store, store that is a directory, unreadable log, log that is a directory.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to `.ctoc/state/verify/<slug>.json`: passed=true, coverage ≥99%, 0 skipped, 0 failed.
 Targeted run first: the new test file, plus `tests/architecture-invariants.test.js`,
 `tests/export-reachability.test.js`, `tests/false-green-fence.test.js`,
 `tests/doc-counts.test.js`, `tests/readme-numbers.test.js`, and whatever test file
@@ -345,6 +351,7 @@ slot is the evidence; and that this module observes only and must never be exten
 repair what it measures. A comment at the enforcer check recording why `unknown` fails.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — iron-loop-critic final verdict (2026-07-29): CLEARS Gate 3.
 Report, in this order:
 
 1. **The Step 9 measurement table verbatim**, and whether the seat shows as live.

@@ -163,12 +163,14 @@ a third implementation of the delta from appearing later.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD red-first: failing tests written and seen RED before implementation; Step-11 review confirmed the tests are real and adversarial, not vacuous.
 Write the test file in full FIRST and run only it. **Cases 1, 2, 3, 4, 6 and 8 must be
 RED.** Record case 1's red verbatim — a shallow clone reporting
 `{ passed: true, passCount: 0 }` is the evidence, and it is what a standard hosted
 continuous-integration run does today. Cases 5, 7 and 9 must be GREEN and stay green.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry and target files read from disk; approach confirmed against the real code.
 Read from disk: `src/lib/quality-agent.js:655-730` (`runSmartTests` in full),
 `:727-767` (`getPushChangedFiles` and its history comment), `:600-655` (`runFullTests`
 and the counter-reading discipline it already applies), `:1200-1250` (the tier-1
@@ -179,11 +181,13 @@ repository for other `HEAD~1` uses. Choose the case-4 simulation technique and r
 it. **Where the code disagrees with this plan, THE CODE WINS — record it.**
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — the declared files were implemented; full gated `npm test` green.
 - `src/lib/quality-agent.js` — `runSmartTests` uses `getPushChangedFiles`; `null` and
   `[]` both escalate to the full suite with distinct, honest messages.
 - `tests/test-selection-scope.test.js` — the ten cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic Step-11 review (2026-07-29): CLEARS Gate 3; any residuals are documented and non-blocking.
 Confirm no path in `runSmartTests` returns `passed: true` without either running tests
 or having positively measured that file contents are unchanged. Confirm exactly one
 changed-files implementation remains in the module. Confirm the
@@ -196,6 +200,7 @@ it now runs a full suite where it previously ran nothing, which is slower and is
 entire point. Note in the plan that the previous speed was the speed of not testing.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner Step-13 review (2026-07-29): PASS (no block; any warn documented and non-blocking).
 `getPushChangedFiles` uses `execSync` with fixed argument strings and no interpolated
 user input — confirm that remains true and that no filename reaches a shell. Confirm
 `path.resolve` cannot escape the project root when a delta contains an unexpected
@@ -203,6 +208,7 @@ path, and that a git error message is never echoed raw into output (it can carry
 absolute home directory paths).
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to `.ctoc/state/verify/<slug>.json`: passed=true, coverage ≥99%, 0 skipped, 0 failed.
 `node --test tests/test-selection-scope.test.js` plus every existing quality-agent
 test, then the full gated run `npm test`. Lint at `--max-warnings 0`. No git
 operations of any kind — **the tests create their own throwaway repositories under
@@ -216,6 +222,7 @@ passing. Update the documented test-file count in both places from the live disk
 count.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — iron-loop-critic final verdict (2026-07-29): CLEARS Gate 3.
 Report every Step 8 red verbatim (case 1 especially), the case-4 simulation technique
 chosen, the escalation cost measured at Step 14, and every decision taken under
 ambiguity.
