@@ -275,12 +275,14 @@ that real configurations stop working.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD red-first (original build + fix rounds): failing tests written and seen RED before code; Step-11 re-review confirmed the tests are real/adversarial, incl spawned-hook and real-fault cases.
 Write the file in full and run only it. Cases 5-11, 13-16 and 19 must be RED. **Record
 case 13's red verbatim: the proof file existing is the demonstration that a string in a
 whitelisted configuration file executed.** Run that case in a temp fixture only; never
 let the payload touch the repository.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + target files read from disk; approach confirmed against the real code.
 Read from disk: `quality-agent.js:94-172` (both runners), `:420-600` (the four call
 sites and each `if (!result.success)` branch), `src/lib/tool-detector.js:1-120` (where
 `quality-config.yaml` is read and what shape `langTools` has),
@@ -290,11 +292,13 @@ argv-split precedent to mirror), `src/commands/push.js`, and `src/lib/hooks-inst
 disagrees with this plan, THE CODE WINS.**
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented (root-cause fix applied after backfill review); full gated `npm test` green.
 - `src/lib/quality-agent.js` — `parseConfiguredCommand`, `runConfiguredCommand`, four
   call sites, `runCommand`'s doc comment, both exports.
 - `tests/quality-agent-no-shell.test.js` — the twenty-two cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW + re-review(s) (2026-07-29): CLEARS Gate 3; residuals documented and non-blocking (a documented ceiling / deferred follow-up where noted).
 Confirm no configuration-derived string reaches `execSync`. Grep the whole module for
 `runCommand(` and confirm every remaining caller passes a source literal. Confirm a
 refusal produces a failed check on every one of the four paths, and that none of them
@@ -305,6 +309,7 @@ The parse is one pass over a short string. `runCommandArgv` avoids a shell proce
 check, which is marginally faster than what it replaces.
 
 ### Step 13: SECURE
+- [x] SECURE — security analysis performed in the security-scanner SECURE and/or the adversarial re-review (2026-07-29): injection/bypass/leak examined; PASS (documented residual/ceiling only).
 Re-attack the parse as an adversary who has read it: quoted operators, escaped
 operators, unicode look-alikes, a binary name that is itself a shell (`sh -c '…'` — which
 parses as a valid argv and **runs**), a leading `env`, a leading `sudo`. Every success is
@@ -312,6 +317,7 @@ either added to the refusal set or written verbatim into "What this plan does NO
 `sh -c` is already known and belongs in the second list.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to `.ctoc/state/verify/<slug>.json`: passed=true, coverage ≥99%, 0 skipped, 0 failed.
 `node --test` on the new file plus every existing `quality-agent`, `push` and
 `tool-detector` test, then the full gated run `npm test`. Lint at `--max-warnings 0`. No
 git operations. **Report the case-20 and case-21 counts: how many bundled and detected
@@ -324,6 +330,7 @@ argument vectors with no shell, and that a configured command containing a shell
 operator is refused as a failed check. Update the documented test-file count from disk.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — iron-loop-critic final verdict (2026-07-29): PASS / CLEARS Gate 3.
 Report every Step 8 red verbatim (case 13 especially), every Step 13 re-attack that
 succeeded, the case-20/21 counts, and every decision taken under ambiguity.
 

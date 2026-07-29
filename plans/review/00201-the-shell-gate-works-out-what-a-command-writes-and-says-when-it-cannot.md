@@ -370,12 +370,14 @@ case 36 record limits in the suite so a future reader finds them without re-deri
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD red-first (original build + fix rounds): failing tests written and seen RED before code; Step-11 re-review confirmed the tests are real/adversarial, incl spawned-hook and real-fault cases.
 Write the file in full and run only it. Cases 2, 3, 4, 12-21, 27-31, 33 and 34 must be
 RED. Record case 2's and case 12's red verbatim — an ALLOW on `cd . && echo evil >`
 is the sentence that justifies this slice, and it must be captured from the **spawned**
 hook, not the unit function.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + target files read from disk; approach confirmed against the real code.
 Read from disk: `PreToolUse.Bash.js` in full (it is 779 lines and the ledger logic at
 `:197-265` is the reference implementation of cd-tracking to mirror), `src/commands/menu.md`
 for the recipes case 37 must not break, `tests/ledger-forgery-closed.test.js` for the
@@ -384,12 +386,14 @@ regex conventions. Grep for every consumer of `ALWAYS_ALLOWED` and `isWriteComma
 **Where the code disagrees with this plan, THE CODE WINS.**
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented (root-cause fix applied after backfill review); full gated `npm test` green.
 - `src/lib/shell-write-targets.js` — the classifier.
 - `src/hooks/PreToolUse.Bash.js` — `isWriteCommand` rebuilt; `ALWAYS_ALLOWED` applied
   per segment or deleted if nothing consumes it.
 - `tests/shell-write-targets.test.js` — the thirty-seven cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW + re-review(s) (2026-07-29): CLEARS Gate 3; residuals documented and non-blocking (a documented ceiling / deferred follow-up where noted).
 Confirm no path returns `none` after observing a write shape. Confirm the module has no
 `throw` and no `fs`/`child_process` import. Confirm every fault path returns
 `indeterminate` — the deny-ward value — by reading each `catch` and each early return.
@@ -401,6 +405,7 @@ bound from cases 27 and 28 rather than reasoning about it: this runs on every Ba
 and a slow gate is a gate someone turns off.
 
 ### Step 13: SECURE
+- [x] SECURE — security analysis performed in the security-scanner SECURE and/or the adversarial re-review (2026-07-29): injection/bypass/leak examined; PASS (documented residual/ceiling only).
 Re-attack the classifier as an adversary who has read it: try to construct a command
 that writes a file and classifies `none`. Every success is either added to the
 recognized set or **written into "What this plan does NOT fix" verbatim**. Confirm no
@@ -408,6 +413,7 @@ recognized set or **written into "What this plan does NOT fix" verbatim**. Confi
 hold on adversarial input.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to `.ctoc/state/verify/<slug>.json`: passed=true, coverage ≥99%, 0 skipped, 0 failed.
 `node --test` on the new file plus every existing test that spawns `PreToolUse.Bash.js`
 (`tests/ledger-forgery-closed.test.js` and siblings), then the full gated run `npm test`.
 Lint at `--max-warnings 0`. Run `src/lib/false-green-scan.js` against the new module and
@@ -423,6 +429,7 @@ indeterminate, and the fact that "writes nothing" is not soundly decidable). Upd
 documented module and test counts from the live counts on disk.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — iron-loop-critic final verdict (2026-07-29): PASS / CLEARS Gate 3.
 Report every Step 8 red verbatim, every Step 13 re-attack that succeeded, the blast
 radius from Step 14, and every decision taken under ambiguity.
 
