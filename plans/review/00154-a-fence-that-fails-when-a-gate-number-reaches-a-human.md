@@ -607,3 +607,12 @@ the walk; numbers in comments are legal by the rule. Left as-is, deliberately.
 red-first hyphen/underscore case + the prose over-false-positive guard) were touched. No
 module was added, so the src/lib count is unchanged and `readme-numbers.test.js`/CLAUDE.md
 need no edit. No VERSION bump, no plan stage move.
+
+### Round 2 — sibling COMPOSED_END gap (2026-07-30)
+
+A re-review found the round-1 WRITTEN widening left the sibling `COMPOSED_END` at `\s+`,
+so a composed template literal `` `Gate-${n}` `` / `` `Gate_${n}` `` (TemplateHead cooks to
+"Gate-"/"Gate_") still leaked — the same hyphen/underscore weakness one pattern over.
+Closed: `COMPOSED_END` -> `/\bgates?[\s_-]+$/i` (the `+`, not `*`, keeps the zero-separator
+plural count-phrase `` `at gates${flag}` `` quiet). Two red-first cases added (composed
+hyphen/underscore is found; the flush plural stays quiet).
