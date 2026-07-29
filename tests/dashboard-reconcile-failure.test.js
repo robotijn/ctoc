@@ -150,17 +150,26 @@ describe('dashboard — a reconcile pass that did not produce a trustworthy resu
     assert.ok(text.length > 0);
   });
 
-  // 3 — reachability evidence: an unparseable file fails OPEN at load, so the dashboard
-  // must NOT claim a corrupt registry it did not observe. A false alarm is the same
-  // defect class as a silent failure: a verdict on input the surface never received.
-  it('does not claim a corrupt registry when the loader failed open to empty', async () => {
+  // 3 — the RECONCILE pass must not false-alarm on a corrupt file: its load fails OPEN
+  // (no throw), so it observes an empty registry and its own health line — `could not be
+  // read (load-failed)` — must be absent, and the `DID NOT RUN` (threw) line must be
+  // absent too. But the AGENT status DID observe the corrupt file: `getAgentStatus`'s
+  // `load` now distinguishes present-but-unreadable from absent, so the AGENT block
+  // correctly says UNKNOWN rather than the false `○ Idle` it used to. This asserts BOTH:
+  // the reconcile surface stays quiet (it saw nothing) AND the agent surface speaks (it
+  // saw the unreadable file). The two are different observers of the same registry.
+  it('reconcile stays quiet on a corrupt file while the agent status reports UNKNOWN', async () => {
     await seed('not json at all');
 
     const text = menuScreens.buildDashboardTable(root);
 
     assert.ok(text.length > 0);
-    assert.doesNotMatch(text, /the task registry could not be read/);
+    // reconcile's own health line and its threw-line are BOTH absent — it failed open.
+    assert.doesNotMatch(text, /could not be read \(load-failed\)/);
     assert.doesNotMatch(text, /DID NOT RUN/);
+    // the agent status, a separate observer, correctly reports the unreadable registry.
+    assert.match(text, /the agent status is UNKNOWN/);
+    assert.doesNotMatch(text, /○ Idle/);
   });
 
   // 4 — a REAL load failure. The report is built by the REAL code at task-reconcile.js:609;

@@ -510,6 +510,73 @@ some platform and a skipped test is a gate failure under the zero-skipped rule.
     changed — only this slice's own new test was written to the real contract.
 
 
+## Decisions Taken During Implementation
+
+_Adversarial-review repair (v6.13.79+). The shipped fix was TEST-THEATER: the
+`unreadable` state was reachable ONLY through the `breakRegistryReads` seam, which makes
+`safeFs.existsSync` THROW — a condition real `fs.existsSync` never produces (it returns a
+boolean on EACCES). In the real runtime `task-registry.load` NEVER throws for the named
+faults: `existsSync` doesn't throw, and `readFileSync` + `JSON.parse` are inside load's
+own try/catch, so a corrupt or permission-denied `tasks.json` fails OPEN to an empty
+registry → `getAgentStatus` returned `{active:false}` → the dashboard rendered `○ Idle` —
+the exact false-idle the slice claims to remove, UNCHANGED. Repro captured verbatim before
+the fix: a corrupt file (`printf 'not json'`) and a `chmod 000` file (readFileSync threw
+EACCES, caught in load) BOTH yielded `load.unreadable=undefined`, `getAgentStatus={active:false}`._
+
+18. **Fix shape (a) — `load` signals the failure — was chosen over (b) re-probe in
+    `getAgentStatus`.** `load` is the shared function every caller routes through, and it
+    ALREADY knows at the point of failure that the file existed but could not be read or
+    parsed — it was discarding that fact by returning an empty value byte-identical to the
+    genuinely-absent case. Shape (a) makes the read/parse-failure return carry
+    `unreadable: true` + `reason` while keeping `tasks: []`; `getAgentStatus` reads the
+    flag. Shape (b) would duplicate load's read in a second stat/read probe, race the file,
+    and re-read on every idle render — more code, in the wrong place. This is the
+    root-cause fix: one guard in the shared function, not a probe bolted onto one caller.
+19. **`load` STAYS fail-open — it never throws on the fault; the signal rides on the
+    value.** The requirement that a vanished/absent file must never crash or block the menu
+    is preserved: `load` returns `{...loadedEmpty(), unreadable:true, reason}` rather than
+    throwing. Every one of load's ~14 callers reads `.tasks` (or `.tasks.length` /
+    `.tasks.filter`), which stays `[]`, so none is affected. `save` (task-registry.js:507)
+    builds its payload from an explicit field whitelist (`version`, `generation`, `seq`,
+    `tasks`), so `unreadable`/`reason` can NEVER leak into a persisted registry file.
+20. **Scoped to the READ/PARSE failure (existing catch), NOT to wrong-shape/version.** The
+    two kill-claim faults — corrupt JSON (parse throw) and EACCES (read throw) — both land
+    in load's single `try/catch` at task-registry.js:407. A valid-JSON-but-wrong-shape or
+    version-mismatch file (the branch below) parses cleanly and is a genuine data/migration
+    problem the pipeline legitimately treats as empty; flagging it `unreadable` would show
+    UNKNOWN for a merely-outdated registry. Left as benign empty, matching the plan's own
+    "fails open on a DATA problem" classification.
+21. **Two files touched BEYOND the plan's declared set — reported, not hidden.**
+    - `src/lib/task-registry.js` (NOT declared): the root-cause fix lives here — `load`
+      must emit the distinguishing signal. Unavoidable for shape (a) and the honest place
+      for it.
+    - `tests/dashboard-reconcile-failure.test.js` (NOT declared): case 3 encoded the OLD
+      theater contract — it asserted a corrupt `tasks.json` renders with NO "could not be
+      read" text, i.e. as idle. That is the false-idle the review replaces. Its regex
+      `/the task registry could not be read/` was written to assert the RECONCILE line is
+      absent but is too broad and now also catches the correct new AGENT UNKNOWN line. Per
+      Operating Lesson 14 (the test asserted a contract the review explicitly replaced), it
+      was TIGHTENED, not weakened: the reconcile-absence assertion is narrowed to the
+      reconcile line's true signature `could not be read (load-failed)` (reconcile still
+      fails open silently here, so that line is legitimately absent), AND a positive
+      assertion was ADDED that the AGENT block now says `the agent status is UNKNOWN` and
+      never `○ Idle`. Net: MORE assertions, tighter toward real behavior. No assertion was
+      loosened, no case deleted, no whitelist entry added.
+22. **Kill-claim tests use the REAL faults, no seam.** Three cases were appended to the
+    declared `tests/dashboard-survives-unreadable-registry.test.js`: a real corrupt file
+    (`writeFile 'not json'`), a real `fs.chmodSync(p, 0o000)` (which asserts EACCES was
+    actually produced as a precondition, and SKIPS LOUDLY on Windows/root — printing the
+    reason to stderr and returning — because a permissions test that silently no-ops is
+    itself theater), and an absent-registry case proving idle does NOT regress to a false
+    UNKNOWN. The chmod case RAN (non-root macOS) and was red-then-green; it is not a
+    skipped test in the gate. The shipped 17 seam-based cases were KEPT — no coverage
+    deleted; the real-fault cases are the kill-claim additions.
+23. **No new test FILE was added, so no doc-count / test-file ratchet applies.** The plan's
+    declared `CLAUDE.md` and `.ctoc/false-green-baseline.json` ratchets were NOT touched:
+    cases were appended to two EXISTING test files, the test-file count is unchanged, the
+    fix adds no new silent-catch (the catch it edits already logged via `warnLog`), and the
+    false-green fence stayed green in the full gate.
+
 ## Deferred Questions
 
 _Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO

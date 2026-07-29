@@ -266,17 +266,20 @@ function msgOf(err) {
 // reconciliation (task-reconcile) — not a pid check — recovers a crashed session's
 // stale `running` tasks, so there is no "stale lock" state to report.
 //
-// THREE STATES, NOT TWO. `task-registry.load` fails OPEN on a DATA problem (an
-// unparseable file, a wrong shape, a malformed entry) — but NOT on an OPERATING-SYSTEM
-// problem: `safeFs.existsSync` / `safeFs.readFileSync` delegate to `fs` and THROW on
-// EACCES/EIO/EISDIR/ELOOP. Unguarded, that throw propagated straight out of the dashboard
-// builder and the human saw NOTHING at all. Caught, it must NOT become the opposite
-// failure — an empty registry read as "no agent is running" is a verdict on input we
-// never received. So a read error is a THIRD state, `unreadable`, that every render site
-// prints INSTEAD of an idle claim, never beside one. `active: false` is retained beside it
-// deliberately: under an unreadable registry there is no plan, step or start time, so the
-// falsy `active` keeps the fabricating "Active" branch closed while `unreadable` carries
-// the truth.
+// THREE STATES, NOT TWO. `task-registry.load` fails OPEN — it NEVER throws on a file or
+// data problem. `safeFs.existsSync` returns a boolean (it does not throw on EACCES), and
+// the `readFileSync` + `JSON.parse` inside `load` are wrapped in load's own try/catch, so
+// a permission-denied read AND a corrupt file both fail open to an EMPTY registry. That is
+// correct for menu resilience — but an empty registry has two meanings that must not be
+// conflated: the file is genuinely ABSENT (the agent is idle) versus the file EXISTS but
+// could not be read or parsed (liveness is UNKNOWN). Reading the second as "no agent is
+// running" is a verdict on input we never received — the exact false idle a human sees when
+// `.ctoc/state/tasks.json` is corrupt or unreadable. `load` distinguishes them with an
+// `unreadable` flag on its return value (present-but-unreadable only, never absent), and
+// this function turns that into the THIRD state every render site prints INSTEAD of an idle
+// claim. `active: false` is retained beside it deliberately: under an unreadable registry
+// there is no plan, step or start time, so the falsy `active` keeps the fabricating "Active"
+// branch closed while `unreadable` carries the truth.
 /**
  * @typedef {object} AgentStatus
  * @property {boolean} active  true iff the registry holds a running `implement` task.
@@ -309,11 +312,20 @@ function getAgentStatus(projectPath) {
 
   let registry;
   try {
-    // fail-open on a DATA problem (handled inside load); an OPERATING-SYSTEM read error
-    // (EACCES/EIO/EISDIR) propagates out of load and is caught HERE — see the note above.
+    // A programming error (e.g. a bad root) can still throw out of load; a file/data
+    // problem cannot — load fails open. Caught here as defence, never the primary path.
     registry = taskRegistry.load(root);
   } catch (err) {
     return { active: false, unreadable: msgOf(err) };
+  }
+  // THE THIRD STATE, made production-reachable. `load` fails OPEN for menu resilience —
+  // it returns an EMPTY registry both when the file is genuinely ABSENT and when it EXISTS
+  // but could not be READ (EACCES/EIO/EISDIR) or PARSED (corrupt JSON). Those two are NOT
+  // the same fact: absent → the agent is idle; present-but-unreadable → liveness is UNKNOWN
+  // and reading the empty `tasks` as "idle" is a verdict on input we never received. `load`
+  // now flags the second case with `unreadable`, so we render UNKNOWN instead of a false idle.
+  if (registry.unreadable) {
+    return { active: false, unreadable: msgOf(registry.reason) };
   }
   const runningImplement = registry.tasks.filter(
     t => t.status === 'running' && t.kind === 'implement'

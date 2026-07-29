@@ -362,3 +362,105 @@ describe('the dashboard survives an unreadable task registry', () => {
     assert.ok(!('detailUnreadable' in status), 'an absent detail file is normal — no alarm');
   });
 });
+
+// THE KILL-CLAIM — the REAL runtime faults, driven with NO seam.
+//
+// Every case in the block above induced the failure by making `safeFs.existsSync`
+// THROW. Real `fs.existsSync` NEVER throws on EACCES/EIO/EISDIR — it returns a
+// boolean — so that seam exercised a condition the runtime cannot produce. The two
+// faults a human actually hits are a CORRUPT tasks.json (JSON.parse throws) and a
+// PERMISSION-DENIED tasks.json (readFileSync throws EACCES); both throws land INSIDE
+// `task-registry.load`'s own try/catch, which fails open to an EMPTY registry. On the
+// shipped code that made `getAgentStatus` return `{active:false}` and the dashboard
+// render `○ Idle` for a genuinely unreadable registry — the exact false-idle the slice
+// claims to remove. These cases drive the real files and MUST be red before the fix.
+describe('the real corrupt / permission-denied faults reach the unreadable state', () => {
+  let realRoot;
+  let realRegistryPath;
+
+  beforeEach(async () => {
+    realRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ctoc-real-fault-registry-'));
+    realRegistryPath = path.join(realRoot, '.ctoc', 'state', 'tasks.json');
+    await fs.promises.mkdir(path.dirname(realRegistryPath), { recursive: true });
+  });
+
+  afterEach(async () => {
+    // Restore permissions so the temp dir can be removed even after a chmod 000.
+    try { await fs.promises.chmod(realRegistryPath, 0o600); } catch { /* absent — fine */ }
+    await fs.promises.rm(realRoot, { recursive: true, force: true });
+  });
+
+  // A — a genuinely CORRUPT tasks.json (JSON.parse throws) is UNKNOWN, not idle.
+  it('a corrupt tasks.json is unreadable, and the dashboard says UNKNOWN not idle', async () => {
+    await fs.promises.writeFile(realRegistryPath, 'not json');
+
+    // load itself must distinguish present-but-unparseable from absent, WITHOUT throwing
+    // (fail-open resilience for its other callers) — the signal is on the value.
+    let reg;
+    assert.doesNotThrow(() => { reg = require('../src/lib/task-registry').load(realRoot); });
+    assert.equal(reg.unreadable, true, 'load must flag a present-but-unparseable registry');
+    assert.deepEqual(reg.tasks, [], 'tasks stays empty so .tasks-only callers are unaffected');
+
+    const status = state.getAgentStatus(realRoot);
+    assert.equal(status.active, false);
+    assert.equal(typeof status.unreadable, 'string');
+    assert.ok(status.unreadable.length > 0);
+
+    const text = menuScreens.buildDashboardTable(realRoot);
+    assert.match(text, /the agent status is UNKNOWN/);
+    assert.doesNotMatch(text, /○ Idle/);
+  });
+
+  // B — a PERMISSION-DENIED tasks.json (readFileSync throws EACCES) is UNKNOWN, not idle.
+  it('a chmod 000 tasks.json is unreadable, and the dashboard says UNKNOWN not idle', async () => {
+    const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+    if (process.platform === 'win32' || isRoot) {
+      // A permissions test that silently no-ops is itself theater. Skip LOUDLY with the
+      // reason, and pass: this environment CANNOT produce EACCES from chmod(000).
+      process.stderr.write(
+        `[SKIP-LOUD] chmod-000 EACCES fault not exercised: platform=${process.platform} ` +
+        `root=${isRoot} — chmod(0o000) is a no-op here so the fault cannot be produced\n`
+      );
+      return;
+    }
+    await fs.promises.writeFile(realRegistryPath, JSON.stringify(cleanRegistry([task({
+      id: 't1', kind: 'implement', status: 'running', plan: 'x',
+      ts: { created: ago(MIN), started: ago(MIN), cancelRequested: null, done: null }
+    })])));
+    await fs.promises.chmod(realRegistryPath, 0o000);
+
+    // Prove the chmod actually bit — otherwise the test asserts nothing about EACCES.
+    let eacces = false;
+    try { fs.readFileSync(realRegistryPath, 'utf8'); } catch (e) { eacces = e && e.code === 'EACCES'; }
+    assert.ok(eacces, 'precondition: the registry must be genuinely unreadable (EACCES)');
+
+    let reg;
+    assert.doesNotThrow(() => { reg = require('../src/lib/task-registry').load(realRoot); });
+    assert.equal(reg.unreadable, true, 'load must flag a present-but-unreadable registry');
+
+    const status = state.getAgentStatus(realRoot);
+    assert.equal(status.active, false);
+    assert.equal(typeof status.unreadable, 'string');
+    assert.ok(status.unreadable.length > 0);
+
+    const text = menuScreens.buildDashboardTable(realRoot);
+    assert.match(text, /the agent status is UNKNOWN/);
+    assert.doesNotMatch(text, /○ Idle/);
+  });
+
+  // C — a genuinely ABSENT registry MUST still render idle (no false UNKNOWN). This is
+  // the resilience the fix must not regress: absent ≠ unreadable.
+  it('a genuinely absent tasks.json still renders idle, never unreadable', async () => {
+    // No registry file written at all.
+    const reg = require('../src/lib/task-registry').load(realRoot);
+    assert.ok(!reg.unreadable, 'an absent registry is benign empty, not unreadable');
+
+    const status = state.getAgentStatus(realRoot);
+    assert.equal(status.active, false);
+    assert.ok(!('unreadable' in status), 'absent registry must not fabricate an unreadable status');
+
+    const text = menuScreens.buildDashboardTable(realRoot);
+    assert.match(text, /○ Idle/);
+    assert.doesNotMatch(text, /the agent status is UNKNOWN/);
+  });
+});
