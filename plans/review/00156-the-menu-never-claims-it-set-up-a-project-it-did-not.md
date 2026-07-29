@@ -127,6 +127,13 @@ Anything absent lands in `missing` and `ok` is false.
 | `!attempted` (already set up) | nothing — silence is correct and is today's behaviour |
 | `!attempted` because the root resolved elsewhere | `Working in <root>, not <cwd>.` — the fresh-repository slice owns the detection; this slice renders the reason it is given |
 
+**RECONCILED for successor slice 00176 (2026-07-21):** the message-per-state table
+above is unchanged, but which state an empty/partial `.ctoc/` REACHES is not. As
+this slice shipped, an empty `.ctoc/` reached `attempted && !ok` (its failure was
+narrated). 00176 moved the trigger to the read-back, so an empty/partial `.ctoc/`
+is now REPAIRED on open and reaches `ok` — the success sentence. The
+`attempted && !ok` row is now reached only by a gap setup genuinely cannot repair.
+
 The failure message names what is missing. A person can act on "Missing:
 `.ctoc/settings.yaml`". Nobody can act on "initialized".
 
@@ -303,6 +310,48 @@ would have to be skipped on some platform and a skip is a gate failure.
     directory (case 13) and a leak check on the failure message (case 14, Step 13
     SECURE — no absolute path, no stack frame).
 
+## Decisions Taken During Implementation
+
+*Added 2026-07-21, reconciling this slice with successor slice 00176 (repair-on-open).*
+
+15. **Case 14 (the Step 13 SECURE leak check) went VACUOUS after 00176 and was
+    repaired.** As this slice shipped, case 14's fixture was an empty `.ctoc/`,
+    which reached `attempted && !ok` and produced the failure message. 00176 then
+    inverted that fixture: it moved the setup trigger to the read-back, so an
+    empty `.ctoc/` is now REPAIRED on open to `ok:true`, and `setupMessage`
+    returns the CONSTANT success sentence `CTOC is set up for this project.` That
+    sentence contains neither a path nor a stack by construction, so both of case
+    14's leak assertions passed trivially — a check reporting a verdict on input
+    it never received, the exact false-green shape this repository fences.
+    Detection: bypassing `sanitizeReason` (raw `reason` straight into the
+    message) left the old case 14 GREEN — the scrubber was never on the code path
+    the fixture exercised.
+
+    The fix reaches a GENUINE failure whose `reason` carries the two things Step
+    13 forbids on a screen — an absolute path and a `file:line:col` stack frame —
+    so the render-seam scrubber (`start.js` `sanitizeReason`) is actually
+    exercised. Under 00176's repair-on-open the realistic unrepairable failure is
+    a caught error out of `initProject`; case 14 injects one through the
+    require-cache seam (the same seam case 6 uses) with an `EACCES … open
+    '<absolute path>'` message and a no-function-name V8 stack frame `at
+    <absolute path>:line:col` (the form the stack regex actually detects). The
+    case now asserts `ok:false` and `attempted:true` FIRST (so it can never again
+    silently ride the success sentence), then that the rendered message contains
+    neither the absolute directory nor a stack frame. Mutation-proof: bypassing
+    `sanitizeReason` now turns case 14 RED on the leaked absolute path.
+    `src/commands/start.js` was NOT modified — only the test.
+
+16. **The leak fixture is a mocked throw, not the plan's suggested anchorless
+    settings file.** An anchorless/corrupt `settings.yaml` reaches `ok:false`
+    but produces NO `reason` (nothing throws; the read-back simply finds the
+    anchor unusable), so it never routes a leaky string through `sanitizeReason`
+    and cannot make the leak check mutation-proof. The Step 13 concern is
+    specifically that a caught fs error's raw message — absolute path plus stack —
+    must be scrubbed at the render seam; only a fixture that produces such a
+    `reason` exercises it. The require-cache throw seam is that fixture, and it is
+    already the established pattern in this suite (case 6) and its sibling
+    (`menu-repairs-what-it-reports-missing.test.js` case 10/12).
+
 
 ## Execution Record
 
@@ -434,12 +483,28 @@ AFTER, driving the real entry point in a real fresh directory:
     CTOC is set up for this project.
     (.ctoc/settings.yaml on disk: true)
 
-AFTER, on a directory holding an empty `.ctoc/`:
+AFTER, on a directory holding an empty `.ctoc/` — **as this slice shipped** (the
+empty marker was treated as a broken world and its failure was NARRATED):
 
     CTOC is not fully set up for this project. Missing: .ctoc/settings.yaml,
     .ctoc/state/iron-loop.yaml, plans/vision, plans/canvas, plans/functional,
     plans/implementation, plans/todo, plans/in-progress, plans/review,
     plans/done. Nothing here will work properly until that is fixed.
     (.ctoc/settings.yaml on disk: false)
+
+**RECONCILED for the successor slice 00176 (2026-07-21) — the record above is no
+longer what the human reads on an empty `.ctoc/`.** 00176 changed the trigger to
+the READ-BACK: whenever the pre-check finds anything missing, setup attempts the
+idempotent `initProject` and REPAIRS the gap rather than narrating it forever. So
+a directory holding an empty (or partial) `.ctoc/` now reads:
+
+    CTOC is set up for this project.
+    (.ctoc/settings.yaml on disk: true)
+
+The failure message above is now reached ONLY by a gap setup genuinely cannot
+repair — a write that fails at its source, or `plans` occupied by a file so the
+stage directories can never be created. That is the state this slice's leak check
+(case 14) now drives, after 00176's repair-on-open made the old empty-`.ctoc/`
+fixture repair to success and rendered the leak assertions vacuous.
 
 A healthy, already-set-up project stays silent.

@@ -322,10 +322,55 @@ describe('the menu reports what initialization actually did', () => {
   });
 
   it('14 — the failure message leaks no absolute path and no stack', () => {
+    // VACUITY REPAIR (plan 00176, 2026-07-21).
+    //  (a) Contract from OUTSIDE this test: Step 13 SECURE — the failure message
+    //      names paths, and those paths must be project-RELATIVE with no error
+    //      stack. The only leak vector that reaches a failure message is `reason`
+    //      (a raw fs error), which `src/commands/start.js` `sanitizeReason`
+    //      scrubs at the render seam. The `missing` list is relative by
+    //      construction and cannot leak.
+    //  (b) Why the OLD assertion was vacuous, not merely weak: its fixture was an
+    //      empty `.ctoc/`, which the 00176 repair-on-open now REPAIRS to ok:true.
+    //      `setupMessage` then returns the CONSTANT success sentence, which by
+    //      construction contains neither a path nor a stack — so both leak
+    //      assertions passed trivially and the scrubber was never exercised.
+    //      Proven: bypassing `sanitizeReason` (raw reason straight into the
+    //      message) left the old case 14 GREEN.
+    //  (c) What newly fails: setup must GENUINELY fail (ok:false) with a `reason`
+    //      that carries the two things that must never reach a screen — an
+    //      absolute path and a `file:line:col` stack frame. The render seam must
+    //      scrub both. Injecting either back into the message (removing
+    //      `sanitizeReason`) now makes this case RED.
     const dir = freshDir();
-    fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true });
-    const message = menu.setupMessage(menu.ensureInitialized(dir));
-    assert.ok(!message.includes(dir), 'paths must be project-relative, never absolute');
-    assert.ok(!/\bat\s+\S+:\d+:\d+/.test(message), 'no stack frames on the screen');
+    // A reason a caught fs error really produces: an absolute path, and a
+    // no-function-name V8 stack frame `at <abs>:line:col` (the form the stack
+    // regex actually detects).
+    const leakyReason =
+      `EACCES: permission denied, open '${path.join(dir, '.ctoc', 'settings.yaml')}'\n` +
+      `    at ${path.join(dir, 'src', 'init-project.js')}:412:19`;
+    const original = require.cache[INIT_PROJECT_PATH];
+    require.cache[INIT_PROJECT_PATH] = {
+      id: INIT_PROJECT_PATH,
+      filename: INIT_PROJECT_PATH,
+      loaded: true,
+      exports: { initProject() { throw new Error(leakyReason); } }
+    };
+    let setup;
+    try {
+      setup = menu.ensureInitialized(dir);
+    } finally {
+      if (original) require.cache[INIT_PROJECT_PATH] = original;
+      else delete require.cache[INIT_PROJECT_PATH];
+    }
+
+    // The fixture must reach the FAILURE branch of setupMessage, never the
+    // success sentence — otherwise the leak assertions are tautologies again.
+    assert.equal(setup.ok, false, 'the fixture must genuinely fail setup, not repair to success');
+    assert.equal(setup.attempted, true, '"we tried and failed" carries the leaky reason');
+    const message = menu.setupMessage(setup);
+    assert.ok(message && !/\bis set up\b/.test(message), `must be a failure message: ${message}`);
+    // The reason carried an absolute path and a stack frame; both must be gone.
+    assert.ok(!message.includes(dir), `paths must be project-relative, never absolute: ${message}`);
+    assert.ok(!/\bat\s+\S+:\d+:\d+/.test(message), `no stack frames on the screen: ${message}`);
   });
 });
