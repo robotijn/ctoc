@@ -91,7 +91,15 @@ function parseArgs(argv = process.argv.slice(2)) {
 }
 
 /**
- * Run a shell command and capture output
+ * Run a shell command and capture output.
+ *
+ * NEVER call this with a CONFIGURATION-DERIVED string. `.ctoc/quality-config.yaml` and
+ * `.ctoc/capabilities/**` are agent-writable (the `/^\.ctoc\//` edit whitelist), and this
+ * function's string form is interpreted by a shell (`/bin/sh -c` / `cmd.exe`). Configured
+ * lint/typecheck/test commands go through {@link runConfiguredCommand} (argv, shell:false).
+ * This function is for FIRST-PARTY LITERALS only — the one remaining caller passes the
+ * hardcoded `git push` literal from pushToRemote's body; the git object listing already
+ * runs argv-only in getPushDeltaBlobs/readCommittedBlob.
  */
 function runCommand(cmd, options = {}) {
   // A quality check must never hang the gate forever. Every subprocess is bounded;
@@ -168,6 +176,125 @@ function runCommandArgv(bin, args, options = {}) {
     }
     throw err;
   }
+}
+
+// A configured command carrying any of these OUTSIDE a quote is shell STRUCTURE this
+// module cannot faithfully turn into an argv vector — a pipe, a redirect, a background/
+// chain operator, or a backtick command substitution. It is REFUSED, never split and
+// never escaped (escaping is a losing game against a shell's grammar; splitting would
+// silently run a DIFFERENT command). `$(` is detected separately (a two-character
+// lookahead). This is the same rule app-runner already applies to the declared entry
+// point.
+const SHELL_STRUCTURE_CHARS = new Set(['|', '&', ';', '<', '>', '`']);
+
+/**
+ * Split a CONFIGURED command string into an argument vector, or refuse it.
+ *
+ * A configured command comes from `.ctoc/quality-config.yaml` or
+ * `.ctoc/capabilities/languages/*.yaml` — both under the `/^\.ctoc\//` edit whitelist,
+ * both agent-writable, and both reaching this module on `/ctoc:push` and on the detached
+ * post-commit hook. Handing such a string to execSync is remote code execution on the
+ * human's own commit. Tokens split on whitespace, honouring single and double quotes so
+ * `eslint --format "compact json"` keeps its argument intact; every UNQUOTED shell
+ * operator (`&&`, `||`, `|`, `;`, `&`, `$(`, a backtick, `<`, `>`, a newline) is REFUSED
+ * rather than parsed. A quoted operator is DATA — `eslint --msg "a && b"` is one literal
+ * argv element — because nothing here is ever handed to a shell to expand.
+ *
+ * Return-never-throw. A flat shape (not a discriminated union) so checkJs reads it
+ * without narrowing: on success `bin`/`args` carry the argv and `reason` is empty; on a
+ * refusal `bin` is empty, `args` is empty and `reason` names the shell structure.
+ *
+ * @param {string} cmd
+ * @returns {{ok: boolean, bin: string, args: string[], reason: string}}
+ */
+function parseConfiguredCommand(cmd) {
+  if (typeof cmd !== 'string') {
+    return { ok: false, bin: '', args: [], reason: 'command is not a string' };
+  }
+  const tokens = [];
+  let cur = '';
+  let hasToken = false;
+  let inSingle = false;
+  let inDouble = false;
+
+  for (let i = 0; i < cmd.length; i++) {
+    const c = cmd[i];
+
+    if (inSingle) {
+      if (c === "'") inSingle = false;
+      else cur += c;
+      hasToken = true;
+      continue;
+    }
+    if (inDouble) {
+      if (c === '"') {
+        inDouble = false;
+      } else if (c === '\\' && i + 1 < cmd.length && (cmd[i + 1] === '"' || cmd[i + 1] === '\\')) {
+        cur += cmd[++i]; // \" and \\ are the only escapes a double quote honours
+      } else {
+        cur += c;
+      }
+      hasToken = true;
+      continue;
+    }
+
+    // Outside any quote.
+    if (c === "'") { inSingle = true; hasToken = true; continue; }
+    if (c === '"') { inDouble = true; hasToken = true; continue; }
+    if (c === '\\' && i + 1 < cmd.length) { cur += cmd[++i]; hasToken = true; continue; }
+    if (c === ' ' || c === '\t') {
+      if (hasToken) { tokens.push(cur); cur = ''; hasToken = false; }
+      continue;
+    }
+    if (c === '\n' || c === '\r') {
+      return { ok: false, bin: '', args: [], reason: 'shell structure not expressible as argv: a newline' };
+    }
+    if (c === '$' && cmd[i + 1] === '(') {
+      return { ok: false, bin: '', args: [], reason: 'shell structure not expressible as argv: a command substitution $(' };
+    }
+    if (SHELL_STRUCTURE_CHARS.has(c)) {
+      return { ok: false, bin: '', args: [], reason: `shell structure not expressible as argv: the operator ${c}` };
+    }
+    cur += c;
+    hasToken = true;
+  }
+
+  if (inSingle || inDouble) {
+    return { ok: false, bin: '', args: [], reason: 'an unterminated quote' };
+  }
+  if (hasToken) tokens.push(cur);
+  if (tokens.length === 0) {
+    return { ok: false, bin: '', args: [], reason: 'empty or whitespace-only command' };
+  }
+  return { ok: true, bin: tokens[0], args: tokens.slice(1), reason: '' };
+}
+
+/**
+ * Run a CONFIGURED command with NO shell, or return a FAILED check describing why it
+ * could not be run. Never silently skips: an unrunnable check has NOT passed (CLAUDE.md
+ * "no silent test failures"). On a successful parse it delegates to {@link runCommandArgv},
+ * inheriting the {success, output, error?, timedOut?} contract, the allowFail capture,
+ * the silent flag and the 300000 ms timeout unchanged.
+ *
+ * @param {string} cmd
+ * @param {{silent?: boolean, allowFail?: boolean, timeout?: number, label?: string}} [options]
+ * @returns {{success: boolean, output: string, error?: string, timedOut?: boolean, refused?: boolean}}
+ */
+function runConfiguredCommand(cmd, options = {}) {
+  const parsed = parseConfiguredCommand(cmd);
+  if (parsed.ok) {
+    return runCommandArgv(parsed.bin, parsed.args, options);
+  }
+  const label = options.label ? `configured ${options.label} command` : 'configured command';
+  const shown = typeof cmd === 'string' ? cmd : JSON.stringify(cmd);
+  return {
+    success: false,
+    refused: true,
+    output: '',
+    error: `${label} REFUSED (not run — ${parsed.reason}): ${shown}. `
+      + 'Configured commands run as an argument vector with no shell; put a compound '
+      + 'command in a checked-in script and configure the script instead.'
+  };
 }
 
 /**
@@ -428,10 +555,12 @@ function unreadableTestsResult(lang, passCount, skipped) {
 async function runLint(tools) {
   console.log('\n  Running lint...');
 
-  for (const [_lang, langTools] of Object.entries(tools)) {
+  for (const [lang, langTools] of Object.entries(tools)) {
     if (!langTools.lint) continue;
 
-    const result = runCommand(langTools.lint, { allowFail: true, silent: true });
+    // NO SHELL: langTools.lint is a CONFIGURED string (agent-writable .ctoc config); run
+    // it as an argv vector, refusing a shell-operator command as a FAILED check.
+    const result = runConfiguredCommand(langTools.lint, { allowFail: true, silent: true, label: `${lang} lint` });
     if (!result.success) {
       return {
         passed: false,
@@ -452,10 +581,12 @@ async function runLint(tools) {
 async function runTypecheck(tools) {
   console.log('\n  Running type check...');
 
-  for (const [_lang, langTools] of Object.entries(tools)) {
+  for (const [lang, langTools] of Object.entries(tools)) {
     if (!langTools.typecheck) continue;
 
-    const result = runCommand(langTools.typecheck, { allowFail: true, silent: true });
+    // NO SHELL: configured typecheck string → argv vector; a shell-operator command is a
+    // FAILED check, never a shell fallback.
+    const result = runConfiguredCommand(langTools.typecheck, { allowFail: true, silent: true, label: `${lang} typecheck` });
     if (!result.success) {
       return {
         passed: false,
@@ -516,10 +647,11 @@ function runSpecificTests(tools, testFiles) {
       }))];
       result = runCommandArgv('go', ['test', ...packages], { allowFail: true, silent: true });
     } else {
-      // Fallback: run the full suite. langTools.test is a CONFIGURED command string
-      // from the detector (e.g. `npm test`) with NO file-derived interpolation, so it
-      // legitimately stays on the shell path — a user's `npm test && ...` still works.
-      result = runCommand(langTools.test, { allowFail: true, silent: true });
+      // Fallback: run the full suite. langTools.test is a CONFIGURED command string from
+      // the detector (agent-writable .ctoc config), so it runs as an argv vector with NO
+      // shell. A configured `npm test && ...` no longer works: a compound command carries
+      // shell structure and is REFUSED as a FAILED check (put it in a checked-in script).
+      result = runConfiguredCommand(langTools.test, { allowFail: true, silent: true, label: `${lang} test` });
     }
 
     if (!result.success) {
@@ -581,7 +713,9 @@ async function runFullTests(tools) {
     if (!langTools.test) continue;
 
     console.log(`   Running full ${lang} test suite...`);
-    const result = runCommand(langTools.test, { allowFail: true, silent: true });
+    // NO SHELL: configured full-suite command → argv vector; a shell-operator command is
+    // a FAILED check, never handed to a shell.
+    const result = runConfiguredCommand(langTools.test, { allowFail: true, silent: true, label: `${lang} test` });
 
     if (!result.success) {
       const output = result.output || result.error || '';
@@ -1538,6 +1672,8 @@ module.exports = {
   parseArgs,
   runCommand,
   runCommandArgv,
+  parseConfiguredCommand,
+  runConfiguredCommand,
   classifySeverity,
   runLint,
   runTypecheck,

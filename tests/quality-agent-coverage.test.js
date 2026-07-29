@@ -115,22 +115,6 @@ const failCmd = () => `"${NODE}" -e "process.exit(1)"`;
 const REAL_EXECSYNC = cp.execSync;
 const QA_PATH = require.resolve('../src/lib/quality-agent');
 
-function withExecSyncSpy(impl, fn) {
-  const calls = [];
-  cp.execSync = (command, opts) => {
-    calls.push(command);
-    return impl(command, opts);
-  };
-  delete require.cache[QA_PATH];
-  const qa = require(QA_PATH);
-  try {
-    return { calls, ...fn(qa, calls) };
-  } finally {
-    cp.execSync = REAL_EXECSYNC;
-    delete require.cache[QA_PATH];
-  }
-}
-
 // ---------------------------------------------------------------------------
 // child_process argv spy seam — the INJECTION-SAFE boundary. runSpecificTests now
 // runs jest/vitest/pytest/go via execFileSync with an ARGV VECTOR (shell:false), so
@@ -332,13 +316,21 @@ describe('runSpecificTests — per-framework argv construction (injection-safe p
     });
   });
 
-  it('falls back to langTools.test verbatim (shell path) when no framework is named, and parses the pass count', () => {
-    // The fallback is a CONFIGURED full-suite string from the detector (langTools.test)
-    // with NO file-derived interpolation, so it legitimately stays on the shell path.
-    withExecSyncSpy(() => '7 passed', (qa, calls) => {
+  it('falls back to langTools.test as an ARGV VECTOR (no shell) when no framework is named, and parses the pass count', () => {
+    // CONTRACT CHANGE (plan 00203): langTools.test is a CONFIGURED command from an
+    // agent-writable .ctoc config, so the full-suite fallback now runs it as an argv
+    // vector (runConfiguredCommand → execFileSync, shell:false), NOT via execSync. The
+    // old assertion (`execSync calls include 'my-custom-runner'`) asserted the SHELL path
+    // this fix removes and is re-pointed at the argv path — a tightening, not a weakening:
+    // it now proves the configured command never reaches a shell.
+    withExecSpies(() => '7 passed', (qa, fileCalls, shellCalls) => {
       const res = qa.runSpecificTests({ js: { test: 'my-custom-runner' } }, ['a.test.js']);
-      assert.ok(calls.includes('my-custom-runner'),
-        `the fallback must run langTools.test verbatim; got ${JSON.stringify(calls)}`);
+      const c = fileCalls.find(x => x.bin === 'my-custom-runner');
+      assert.ok(c, `the fallback must run langTools.test via execFileSync argv; got ${JSON.stringify(fileCalls)}`);
+      assert.deepEqual(c.args, [], 'a single-token configured command has no args');
+      assert.equal(c.opts && c.opts.shell, false, 'shell:false so no shell interprets the configured command');
+      assert.ok(!shellCalls.includes('my-custom-runner'),
+        'the configured command must NEVER reach the execSync shell path');
       assert.equal(res.passCount, 7); // parsed from "7 passed"
       return {};
     });

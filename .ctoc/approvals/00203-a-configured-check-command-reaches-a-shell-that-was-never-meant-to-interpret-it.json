@@ -1,0 +1,9 @@
+{
+  "content_sha256": "9c7e059c3d086714a397af49b2c69e9c76a0086ef1237598c3ca3846a3714cac",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-29T11:09:26.683Z",
+  "approved_by": "human",
+  "plan_basename": "00203-a-configured-check-command-reaches-a-shell-that-was-never-meant-to-interpret-it"
+}
