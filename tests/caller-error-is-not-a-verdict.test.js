@@ -283,14 +283,25 @@ describe('menu task complete — a caller fault renders as a call bug, not a pla
     assert.deepEqual(verifyDirFiles(root), [], 'no evidence minted');
   });
 
-  // Case 10 — GREEN before source: a genuine missing-plan completion keeps the existing message.
-  it('10: an implement task with a safe but missing plan slug keeps the existing missing-plan message', () => {
+  // Case 10 — a genuine missing-plan completion still reports the failure, now WITHOUT
+  // a gate number. This assertion was INVERTED (not softened): it previously demanded
+  // the message read "must produce Gate-3 evidence" word for word.
+  //   (a) The contract from outside the test: the gate-number fence's whole reason to
+  //       exist is that a gate number is an internal code the human reads as evasive;
+  //       the fence caught this very string as a live leak (menu-screens.js:2423).
+  //   (b) Why the test was wrong, not the code: it demanded the screen PRINT the exact
+  //       number the fence forbids — it asserted the bug the fence exists to catch.
+  //   (c) What newly fails: the doesNotMatch guard makes a gate digit RETURNING to this
+  //       diagnostic a failing case, not a silent regression.
+  it('10: an implement task with a missing plan slug reports the failure with NO gate number', () => {
     mkProject(root);
     const id = seedRunningImplement(root, 'ghost-plan');
     const res = ms.route(['menu', 'task', 'complete', id, '--summary', 'ok'], root);
     assert.equal(res.ok, false);
-    assert.match(String(res.text), /An implement task must produce Gate-3 evidence/,
-      'the genuine missing-plan path is unchanged word for word');
+    assert.match(String(res.text), /An implement task must produce completion evidence/,
+      'the missing-plan path names what the task must produce, without a gate number');
+    assert.doesNotMatch(String(res.text), /\bGate[\s_-]*[0-3]\b/i,
+      'no gate number may return to this diagnostic');
     assert.match(String(res.text), /in in-progress\/ or review\//);
     assert.equal(taskOf(root, id).status, 'running');
   });

@@ -84,6 +84,28 @@ describe('the fence catches a gate number on its way to a human', () => {
     assert.match(findings[0].text, /Gate 3/);
   });
 
+  it('case 1b — a HYPHEN- or UNDERSCORE-separated gate number is found (the shipped miss)', () => {
+    // THE DEFECT THIS SLICE FIXES. WRITTEN used `\s+` between the word and the digit,
+    // copied from the composed-end pattern where it fends off the English plural. But
+    // `\s` does not match a hyphen, so `Gate-3` slipped straight through, and TWO live
+    // human-facing strings in src/lib/menu-screens.js — the review `done-all` hint and
+    // the "must produce Gate-3 evidence" completion diagnostic — kept saying the number
+    // while scanRegistry reported the registry clean. A hyphen and an underscore are
+    // exactly as human-facing as a space; the separator class must include them.
+    const abs = fixture(dir, 'separators.js', [
+      "const a = 'done-all = Gate-3 approve all reviewed slices';",
+      "const b = 'must produce Gate_2 evidence';",
+      "const c = 'crossing gate-1 now';",
+      'module.exports = { a, b, c };',
+    ].join('\n'));
+
+    const findings = findingsOf(abs);
+    assert.equal(findings.length, 3, `expected 3 findings, got ${JSON.stringify(findings)}`);
+    assert.ok(findings.every((f) => f.pattern === 'written'),
+      `each separated gate number is a WRITTEN finding, got ${JSON.stringify(findings)}`);
+    assert.deepEqual(findings.map((f) => f.line), [1, 2, 3]);
+  });
+
   it('case 2 — the COMPOSED form is found, and its source text has no digit at all', () => {
     // THE REGRESSION TEST FOR THE DEFECT THAT ACTUALLY SHIPPED.
     // `gateName: `Gate ${meta.gate}`` put "Gate 3" on the owner's screen. Grepping
@@ -256,6 +278,23 @@ describe('the fence stays quiet on everything the rule permits', () => {
     ].join('\n')));
     assert.deepEqual(findings, [],
       `the plural noun "gates" in prose must not fire, got ${JSON.stringify(findings)}`);
+  });
+
+  it('the plural "gates" and a bare "gate" in prose, with no adjacent gate digit, stay clean', () => {
+    // The over-false-positive guard for the widened separator class. Extending the
+    // separator to `[\s_-]*` must NOT make the English words "gate"/"gates" fire
+    // wherever some unrelated 0-3 digit happens to sit elsewhere in the sentence — the
+    // digit has to be ADJACENT to the gate word (only separators between). Prose about
+    // the pipeline's gates, and a gate word with a far-off number, both stay silent.
+    const findings = findingsOf(fixture(dir, 'prose.js', [
+      "const a = 'all four gates are human decisions';",
+      "const b = 'the gate to the next stage is a human call';",
+      "const c = 'version 2 shipped 3 gates ago';",
+      "const d = 'this gate opens onto 12 more plans';",
+      'module.exports = { a, b, c, d };',
+    ].join('\n')));
+    assert.deepEqual(findings, [],
+      `prose "gate"/"gates" with no adjacent gate digit must not fire, got ${JSON.stringify(findings)}`);
   });
 
   it('a file with no gate vocabulary at all is clean and AVAILABLE', () => {

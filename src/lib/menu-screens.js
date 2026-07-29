@@ -1779,7 +1779,7 @@ function stageBrowse(stage, projectPath) {
   const bulkHints = [];
   if (bulkDiscuss) bulkHints.push('discuss = critique every plan');
   if (bulkAdvance) bulkHints.push('todo-all = move all to todo + run iron loop');
-  if (doneAllParents.length) bulkHints.push("done-all-<parent> = Gate-3 approve all of <parent>'s reviewed slices");
+  if (doneAllParents.length) bulkHints.push("done-all-<parent> = approve all of <parent>'s reviewed slices");
   const bulkSuffix = bulkHints.length ? ` · ${bulkHints.join(' · ')}` : '';
 
   text += plans.length > 0
@@ -2420,7 +2420,7 @@ function taskComplete(root, rest) {
         completion,
         text:
           `Task ${id} NOT completed — ${completion.reason ? stripCtl(String(completion.reason)) : 'the plan file was not found'}. ` +
-          `An implement task must produce Gate-3 evidence; the task is left unsettled ` +
+          `An implement task must produce completion evidence; the task is left unsettled ` +
           `(check the plan slug / that the plan is in in-progress/ or review/).`,
       };
     }
