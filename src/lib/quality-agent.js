@@ -664,13 +664,28 @@ async function runSmartTests(tools) {
   const undetermined = undeterminedTestLanguages(tools);
   if (undetermined.length) return undeterminedTestsResult(undetermined);
 
-  // 1. Get changed files from git
-  const changedResult = runCommand('git diff HEAD~1 --name-only', { silent: true, allowFail: true });
-  const gitChangedFiles = (changedResult.output || '').split('\n').filter(f => f.trim());
+  // 1. Determine what THIS PUSH changed using the SAME push-delta encoding the security
+  //    scanner uses (getPushDeltaBlobs) — NOT `git diff HEAD~1`, which reads only the tip
+  //    commit and returns EMPTY on a shallow clone (actions/checkout defaults to
+  //    fetch-depth:1) or a single-commit repo, then reported passed:true over ZERO tests
+  //    run. `null` (git could not be consulted — "I could not look") and `[]` (git looked,
+  //    nothing in range) are DIFFERENT facts and BOTH escalate to the FULL suite with
+  //    distinct, honest messages. Neither may report a zero-test pass over input the
+  //    instrument never received (the false-green class). The resolution base for
+  //    getPushDeltaBlobs and path.resolve below is the SAME (process.cwd()), so a
+  //    repository-relative delta path selects the right file.
+  const deltaBlobs = getPushDeltaBlobs(process.cwd());
+
+  if (deltaBlobs === null) {
+    console.log('   Could not determine the push delta — git is unavailable or this is not a git repository. Running the full suite.');
+    return runFullTests(tools);
+  }
+
+  const gitChangedFiles = [...new Set(deltaBlobs.map(b => b.path))];
 
   if (gitChangedFiles.length === 0) {
-    console.log('   No changed files detected.');
-    return { passed: true, passCount: 0, failed: 0, skipped: 0, flaky: 0, cached: true };
+    console.log('   Git reports no delta for this push. Running the full suite.');
+    return runFullTests(tools);
   }
 
   // 2. Compare hashes to find actually-changed files

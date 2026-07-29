@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "A shallow clone stops reporting that every test passed — test selection uses the real push delta instead of the last commit only"
 type: implementation
 parent_plan: none
@@ -9,6 +10,9 @@ iron_loop: true
 files:
   - "src/lib/quality-agent.js"
   - "tests/test-selection-scope.test.js"
+approved_by: human
+approved_at: 2026-07-29T00:05:21.991Z
+gate_crossed: implementation → todo
 ---
 
 # A shallow clone stops reporting that every test passed
@@ -266,3 +270,79 @@ ambiguity.
    persisted state. Keeping them separate means a crash in the larger, riskier change
    does not lose this one — which is the reachable-in-continuous-integration defect and
    the more urgent of the two.
+
+## Decisions Taken During Implementation
+
+**THE CODE WINS — the function the plan names does not exist.** The plan says "reuse
+`getPushChangedFiles` at `:742-767`, which returns a flat file list and `null` when git
+is unavailable." No such function exists. The R4-A repair the plan cites went further
+than the plan's snapshot: it replaced any flat-file-list function with
+`getPushDeltaBlobs(projectRoot)` (quality-agent.js:753), which returns
+`Array<{rev, path}>|null` — the push delta walked COMMIT BY COMMIT (needed because a
+secret added-then-removed across two pushed commits nets to zero in a range diff). The
+plan's `getPushChangedFiles` is the earlier design that blob-walking superseded. I
+REUSED the real encoding (`getPushDeltaBlobs`) exactly as the plan's intent requires —
+one delta encoding, no drift — and derived the unique changed-file set from it:
+`[...new Set(deltaBlobs.map(b => b.path))]`. The three-outcome contract is preserved
+verbatim: `null` → full suite (could not look), `[]` → full suite (looked, empty),
+non-empty → the existing hash/coverage selection. This is a stronger reuse than the
+plan imagined, because it shares the SAME function the security scanner uses, so the two
+paths cannot drift.
+
+**How the shallow-clone case actually reaches the full suite.** The plan assumed a
+shallow clone yields `[]`. In reality `getPushDeltaBlobs` on a no-upstream shallow /
+single-commit clone runs `git rev-list HEAD` → the present commit(s) → `git diff-tree
+--root` → the WHOLE tree — a NON-EMPTY delta. That non-empty delta contains files with
+no coverage-map entry and no heuristic test match, so `findAffectedTests` returns
+`requiresFullSuite: true` and the full suite runs anyway. Where a shallow clone DOES
+have an upstream at the same commit, `@{upstream}..HEAD` is empty → `[]` → the explicit
+full-suite escalation. Both sub-cases run the full suite; neither returns the zero-test
+cached pass. The defect (verbatim before: `{passed:true, passCount:0, cached:true}` over
+"No changed files detected") is cured by both routes.
+
+**Resolution base.** `getPushDeltaBlobs(process.cwd())` and the existing
+`gitChangedFiles.map(f => path.resolve(f))` now share `process.cwd()` as their base —
+the module-wide convention (`runSecurityScan` defaults `projectRoot` to
+`process.cwd()`), and the base every existing `runSmartTests` test already assumes via
+`withCwd`. No new parameter was threaded: adding one the sole live caller
+(`runTieredChecks` → push.js) does not supply would be dead surface.
+
+**Case-4 simulation technique (plan Decision 6 deferred this to Step 9).** Chosen: the
+`child_process` seam, not PATH-stripping. `execFileSync('git', …)` throws `ENOENT` (git
+not on PATH) and `execSync` throws `status 127` for any `git …` shell command so the
+PRE-FIX `git diff HEAD~1` path also produces its empty-list false green — making the
+case RED before the fix and GREEN after. PATH mutation is platform-sensitive (Decision
+6); the seam is portable and deterministic on Windows/macOS/Linux.
+
+**Blast radius — one existing test asserted the BUG and was flipped (Lesson 14).**
+`tests/quality-agent-coverage.test.js` had `it('returns a CACHED pass when git reports
+no changed files (one-commit repo has no HEAD~1)')` asserting `res.cached === true` for a
+single-commit repo — i.e. it asserted the exact false green this plan removes.
+Justification for the change (disputable, per the justify-every-test-change rule): the
+test encodes a contract the human has explicitly replaced (a shallow/single-commit repo
+must NOT report a zero-test pass); the fix is in the code, and the test is tightened
+TOWARD the real behavior (`!res.cached` and `passCount === 3` — the runner must actually
+run), never loosened. This edit is a THIRD file beyond the two declared, authorized by
+the brief's blast-radius clause, and reported here and in the executor summary.
+
+**Two `HEAD~1` mentions remain in the module and both are correct.** The live
+`git diff HEAD~1` command is gone; the surviving `HEAD~1` occurrence is inside
+`getPushDeltaBlobs`'s history comment (why the tip-only scope was wrong). Case 10 asserts
+every `HEAD~1` line is a comment and the `git diff HEAD~1 --name-only` invocation is
+absent — the drift guard against a third changed-files implementation appearing later.
+
+**Escalation cost (plan Step 12/14).** On the failure path the gate now runs the full
+suite where it previously ran nothing. The previous speed was the speed of not testing.
+Measured cost is the full-suite runtime for the project under test; for CTOC's own suite
+that is the normal `npm test` duration. No git command was added to the hot path beyond
+what `getPushDeltaBlobs` already runs (one `rev-parse @{upstream}`, one `rev-list`, one
+`diff-tree` per commit).
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

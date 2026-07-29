@@ -1,0 +1,9 @@
+{
+  "content_sha256": "2cd8cc6278892fd2733a374037dad18722e8e5595d2ceda5aaeaea04adfa949c",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-29T00:05:22.043Z",
+  "approved_by": "human",
+  "plan_basename": "00208-a-shallow-clone-stops-reporting-that-every-test-passed"
+}
