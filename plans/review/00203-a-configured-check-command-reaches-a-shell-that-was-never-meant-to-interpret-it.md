@@ -380,6 +380,27 @@ succeeded, the case-20/21 counts, and every decision taken under ambiguity.
 5. **CLAUDE.md and the documented test-file count were NOT edited.** The plan's Step 15
    asked for a CLAUDE.md note; the executor brief explicitly forbade any CLAUDE.md edit and
    scope creep. Brief (latest instruction) overrides the plan here.
+6. **F1 repair (downstream regression): package-script-derived test commands are LAUNCHED
+   via npm, not parse-or-refused.** `tool-detector.js` sets `tools.test` to the VERBATIM
+   `package.json` `scripts.test`, and a hugely common benign pattern (`"test": "jest && tsc"`,
+   `"test": "npm run lint && npm run test:unit"`) carries `&&`. After the original 00203
+   slice the full-test fallback routed that through `runConfiguredCommand`, which REFUSED the
+   compound — so on any normal Node project installing CTOC, `/ctoc:push` was blocked telling
+   the user to move the compound into "a checked-in script", when `scripts.test` already IS
+   that script. Invisible on CTOC's own repo (its `scripts.test` is single-argv). The fix
+   carries PROVENANCE: tool-detector marks a `scripts.test`-derived command `testFromScript:
+   true` (line ~561) and CLEARS the flag when a `.ctoc/quality-config.yaml` `test` override
+   replaces it (the untrusted attack surface). quality-agent's new `runProjectTestCommand`
+   (used at both `runSpecificTests` and `runFullTests` fallbacks) launches a `testFromScript`
+   command via the npm launcher as a 2-token argv `['test']` (`npm`/`npm.cmd`, execFileSync
+   shell:false) — npm executes the project-owned compound INTERNALLY, so NO shell reaches
+   CTOC and the benign compound runs. A non-script external configured command keeps the
+   argv-parse-or-refuse behavior unchanged, so the injection defense the 00203 slice added is
+   intact (a config `test: npm test && curl evil` is still REFUSED). Cross-platform launcher
+   spelling mirrors the shipped `npx.cmd` handling in `runSpecificTests` and sca-runner's
+   `npm.cmd`. Touched `src/lib/tool-detector.js` (beyond the plan's declared `files:`) and
+   added `tests/quality-agent-script-launcher.test.js`. F2 (Windows `.cmd`/PATHEXT for
+   bare-name EXTERNAL bins) is a separate concern and was NOT changed.
 
 ## Decisions Taken Under Ambiguity
 

@@ -453,7 +453,7 @@ function configUsesTabIndentedLanguages(raw) {
  */
 function toolsFromRegistry(lang, registryLanguages) {
   /** @type {{lint: (string|null), typecheck: (string|null), test: (string|null), coverage: (string|null), testFramework?: string}} */
-  /** @type {{lint: ?string, typecheck: ?string, test: ?string, coverage: ?string, testFramework?: string, testUndetermined?: boolean}} */
+  /** @type {{lint: ?string, typecheck: ?string, test: ?string, coverage: ?string, testFramework?: string, testUndetermined?: boolean, testFromScript?: boolean}} */
   const tools = { lint: null, typecheck: null, test: null, coverage: null };
   const cap = registryLanguages && registryLanguages[lang];
   const toolchain = cap && cap.toolchain && typeof cap.toolchain === 'object' ? cap.toolchain : {};
@@ -515,7 +515,7 @@ function detectTools(projectPath = process.cwd()) {
     // typescript toolchain unless there is real TypeScript evidence.
     if (lang === 'typescript' && !hasTypeScriptEvidence(projectPath)) continue;
 
-    /** @type {{lint: ?string, typecheck: ?string, test: ?string, coverage: ?string, testFramework?: string, testUndetermined?: boolean}} */
+    /** @type {{lint: ?string, typecheck: ?string, test: ?string, coverage: ?string, testFramework?: string, testUndetermined?: boolean, testFromScript?: boolean}} */
     const tools = toolsFromRegistry(lang, registryLanguages);
 
     // JAVA build-system nuance (documented decision): the registry's java commands are
@@ -560,6 +560,13 @@ function detectTools(projectPath = process.cwd()) {
 
       if (scriptTest) {
         tools.test = scriptTest; // honest: the project declares its own test command
+        // PROVENANCE (repair of 00203 F1): this command IS `package.json` scripts.test — a
+        // checked-in, project-owned file, NOT the agent-writable `.ctoc` attack surface. The
+        // quality agent launches it via `npm test` (argv, no shell reaching CTOC), so a benign
+        // compound like `"test": "jest && tsc"` RUNS instead of being refused as un-argv-able.
+        // A `.ctoc/quality-config.yaml` `test` override (below) is untrusted and CLEARS this
+        // flag, so an external command stays on the parse-or-refuse path.
+        tools.testFromScript = true;
       } else if (fw) {
         tools.test = fw.test;    // framework-correct runner (never bare `npx <fw>`)
       } else {
@@ -589,7 +596,13 @@ function detectTools(projectPath = process.cwd()) {
         if (Object.prototype.hasOwnProperty.call(ov, phase)) {
           tools[phase] = ov[phase];
           appliedUserOverride = true;
-          if (phase === 'test') delete tools.testUndetermined;
+          if (phase === 'test') {
+            delete tools.testUndetermined;
+            // A `.ctoc` config test override is the agent-writable ATTACK SURFACE, not a
+            // project script: clear script provenance so the quality agent PARSES-OR-REFUSES
+            // it (no npm launch of an arbitrary configured command). 00203 F1 repair.
+            delete tools.testFromScript;
+          }
         }
       }
     }
