@@ -394,7 +394,13 @@ describe('runFullTests', () => {
 // runSmartTests — git-delta short-circuits and the affected-test path (341-398)
 // ---------------------------------------------------------------------------
 describe('runSmartTests', () => {
-  it('returns a CACHED pass when git reports no changed files (one-commit repo has no HEAD~1)', async () => {
+  it('runs the FULL suite for a one-commit repo (HEAD~1 absent), NEVER a zero-test cached pass', async () => {
+    // CONTRACT CHANGE (plan 00208): a single-commit / shallow-clone repo (HEAD~1 does not
+    // resolve) used to return { passed:true, passCount:0, cached:true } — a PASS over ZERO
+    // tests run, the false-green class. Test selection now derives the push delta from
+    // getPushDeltaBlobs (no upstream → the whole tree), which contains unmapped files and
+    // escalates to the full suite. The old assertion (`res.cached === true`) asserted the
+    // BUG and is replaced, not weakened: the runner MUST actually run.
     const dir = mkTmp('ctoc-smart-nochange-');
     try {
       git(['init'], dir);
@@ -405,7 +411,8 @@ describe('runSmartTests', () => {
       const { res } = await withCwd(dir, () =>
         captureLog(() => qualityAgent.runSmartTests({ js: { test: passCmd() } })));
       assert.equal(res.passed, true);
-      assert.equal(res.cached, true); // the short-circuit fired, not the runner
+      assert.ok(!res.cached, 'a shallow/single-commit repo must run the full suite, not the cached shortcut');
+      assert.equal(res.passCount, 3, 'the real runner count must surface (proves the suite ran)');
     } finally {
       rm(dir);
     }
