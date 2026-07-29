@@ -607,6 +607,46 @@ test('handleKey reject-input: Enter with a reason rejects the plan (review -> in
   }
 });
 
+// Defect (adversarial review of plan 00085): the confirmation message must name the
+// REAL destination. rejectPlan now moves a review-stage plan back ONE stage to
+// in-progress, but the message still read "moved to functional drafts" — telling the
+// human the OPPOSITE of what happened on the exact flow this plan changed. The message
+// must name in-progress (back one stage) and must NOT claim "functional drafts".
+test('handleKey actions: reject confirmation message names the REAL destination (in-progress, not functional)', () => {
+  const proj = makeProject(['wrong-msg']);
+  try {
+    const app = {
+      projectPath: proj.root,
+      mode: 'actions',
+      actionIndex: 0,
+      directInput: 'ships a bug',
+      selectedPlan: { path: proj.planPath('wrong-msg'), name: 'wrong-msg' }
+    };
+    review.handleKey(keyName('return'), app);
+    assert.match(app.message, /in-progress/, 'message names the real destination (in-progress)');
+    assert.ok(!/functional/.test(app.message), 'message must NOT claim it moved to functional drafts');
+  } finally {
+    proj.cleanup();
+  }
+});
+
+test('handleKey reject-input: reject confirmation message names the REAL destination (in-progress, not functional)', () => {
+  const proj = makeProject(['wrong-msg2']);
+  try {
+    const app = {
+      projectPath: proj.root,
+      mode: 'reject-input',
+      inputValue: 'missing error handling',
+      selectedPlan: { path: proj.planPath('wrong-msg2'), name: 'wrong-msg2' }
+    };
+    review.handleKey(keyName('return'), app);
+    assert.match(app.message, /in-progress/, 'message names the real destination (in-progress)');
+    assert.ok(!/functional/.test(app.message), 'message must NOT claim it moved to functional drafts');
+  } finally {
+    proj.cleanup();
+  }
+});
+
 test('handleKey reject-input: Enter with an EMPTY reason does nothing (no move, no false-reject)', () => {
   const proj = makeProject(['keep-me']);
   try {

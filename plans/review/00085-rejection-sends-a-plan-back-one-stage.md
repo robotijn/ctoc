@@ -553,3 +553,40 @@ Cross-platform: `fs.promises`, `path.join`, `os.tmpdir()`; teardown with
     now moves back one stage (to `in-progress` for a review rejection). `review.js` is
     NOT in this plan's declared `files:` and the change is a display string, not
     core logic, so it is left untouched and flagged for a follow-up slice.
+
+## Decisions Taken During Implementation — adversarial-review fix round (2026-07-30)
+
+An adversarial review of this shipped plan found that decisions 16 and 20 above had
+each shipped a real MAJOR defect, not the harmless cosmetics they claimed. Both are
+fixed here, TDD-red-first, on top of v6.13.94.
+
+21. **Decision 20's stale message was a MAJOR honesty bug, not a follow-up.** On the
+    exact flow this plan changed, `src/tabs/review.js` told the human rejecting at
+    review "rejected → moved to functional drafts" while `rejectPlan` had actually
+    sent the plan back ONE stage to `in-progress` — the opposite of what happened.
+    Fixed at BOTH call sites (the direct-feedback path and the reject-input submit)
+    by capturing `rejectPlan`'s RETURN VALUE (the real destination path) and naming
+    `path.basename(path.dirname(dest))` in the message ("sent back to in-progress").
+    Deriving the destination from the actual move — rather than a hardcoded stage
+    name — makes the message correct for any stage `rejectPlan` is ever called on and
+    means it can never drift from the code again.
+22. **Decision 16's "cosmetic" duplicate keys were a MAJOR frontmatter bug.** A plan
+    rejected TWICE carried `revision`, `rejection_reason` and `tag` DUPLICATED inside
+    one frontmatter block, because `upsertMarkerFields` stripped only the fixed
+    `MARKER_KEYS` before appending — never the caller's own upserted keys. Root-caused
+    in `src/lib/frontmatter-merge.js` (NOT actions.js): an "upsert" that appends a
+    duplicate instead of replacing is a bug in upsert semantics affecting every caller,
+    so the fix strips the UNION of `MARKER_KEYS` and the keys the call is inserting
+    before re-appending. The approval-stamp caller (`addApprovalMarker`) passes only
+    `MARKER_KEYS`-subset keys, so its `toStrip` is unchanged — zero regression there.
+    `frontmatter-merge.js` is reported as the third touched file (beyond actions.js and
+    review.js); the dedup could not live in actions.js without re-implementing the
+    module's frontmatter parser, which would be a divergent second encoding.
+23. **The MINOR and INFO findings are OUT OF SCOPE, by instruction.** (a) MINOR: a
+    failed ledger withdrawal aborts AFTER the content was already rewritten in place, so
+    the abort is not a byte-clean rollback (the plan stays at its stage but its body now
+    carries the rejection header/revision bump). Left as-is — the safe invariant
+    ("rejected-but-unmoved, no surviving ledger entry") holds, and a true transactional
+    rewrite is a separate change. (b) INFO: `js-yaml` is used in `circuit-breaker.js`
+    but is absent from `package.json`; pre-existing, belongs to a separate
+    dependency-audit slice. Neither is touched here.

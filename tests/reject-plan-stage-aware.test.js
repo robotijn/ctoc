@@ -280,6 +280,27 @@ describe('the revision counter increments across rejections', () => {
     p = actions.rejectPlan(reviewPath, 'second', dir);
     assert.equal(parseMetadata(fs.readFileSync(p, 'utf8')).revision, 2);
   });
+
+  it('16b: a double-reject does NOT duplicate revision/rejection_reason/tag in the frontmatter', () => {
+    const dir = makeProject();
+    let p = writePlan(dir, 'review', 'xi2');
+    p = actions.rejectPlan(p, 'first', dir);
+    const reviewPath = path.join(dir, 'plans', 'review', 'xi2.md');
+    fs.renameSync(p, reviewPath);
+    p = actions.rejectPlan(reviewPath, 'second', dir);
+
+    // Extract the single leading frontmatter block and count each key at line start.
+    const after = fs.readFileSync(p, 'utf8');
+    const m = after.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
+    assert.ok(m, 'exactly one leading frontmatter block present');
+    const block = m[1];
+    for (const key of ['revision', 'rejection_reason', 'tag']) {
+      const count = block.split('\n').filter((l) => l.startsWith(`${key}:`)).length;
+      assert.equal(count, 1, `after two rejections "${key}" must appear exactly once, saw ${count}`);
+    }
+    // And the surviving value is the newest one (revision 2), not a stale first copy.
+    assert.equal(parseMetadata(after).revision, 2);
+  });
 });
 
 // ── 17 / 18 / 19: safe feedback encoding (D5) ────────────────────────────────
