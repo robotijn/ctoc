@@ -642,8 +642,16 @@ function regexAllowed(prev) {
 
 /** A surface CALL: an identifier immediately followed by optional whitespace and
  * `(` — an invocation the session runs (`approveSubplans(parentSlug, 'review')`).
- * Disjoint char classes + a literal `(` sentinel → linear, ReDoS-safe. */
-const SURFACE_CALL_RE = /([A-Za-z_$][A-Za-z0-9_$]*)\s*\(/g;
+ * Disjoint char classes + a literal `(` sentinel. The identifier length is BOUNDED
+ * to ≤128 chars (`{0,127}` after the required first char) so the scan is linear:
+ * without the bound, a long run of identifier characters with no `(` makes the
+ * greedy `*` consume the whole run, fail `\s*\(`, and retry from every start
+ * position → O(n²), which took 14 minutes on a 1-MiB single-char surface and was a
+ * live ReDoS (`collectSurfaceFiles` never skips an oversized surface). 128 clips only
+ * a pathological token — no real JavaScript identifier approaches it — so the credited
+ * call-site set is unchanged. Same hardening the sibling `SURFACE_NODE_RUNS_RE`
+ * (`{0,80}`) and `SURFACE_REQUIRES_RE` (`{0,64}`) already use. */
+const SURFACE_CALL_RE = /([A-Za-z_$][A-Za-z0-9_$]{0,127})\s*\(/g;
 /** A resolved property reference off a relative require — `require('./x').name`
  * or `require('./x')['name']` — a caller even without an immediate paren (the
  * recipe assigns the function then invokes it). Quote-delimited, bounded, linear. */
