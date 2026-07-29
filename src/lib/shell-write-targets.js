@@ -83,38 +83,6 @@ const TASK_RUNNERS = new Set([
 const DATA_DRIVEN = new Set(['xargs', 'parallel', 'eval']);
 
 /**
- * Command WRAPPERS that precede the real command word (F1 fix). Before this set,
- * `commandWord` returned a segment's literal first token, so a determinate write or
- * interpreter behind a wrapper (`time tee f`, `sudo node -e …`, `timeout 5 truncate f`)
- * classified `none` and was ALLOWED — the exact bypass this module exists to kill, and
- * the shape `PreToolUse.Bash.js:288` already strips with `^[\s({]+`. The wrapper token,
- * its flags and any flag value / positional operand it consumes are skipped so the REAL
- * command word (tee/sed/node/dd/…) is what gets classified. Bounded to a KNOWN-SAFE set
- * — never an arbitrary first token — so a legitimate `time ls` still classifies `none`.
- */
-const WRAPPERS = new Set([
-  'time', 'sudo', 'nice', 'nohup', 'timeout', 'stdbuf', 'ionice', 'setsid',
-]);
-
-/** Per-wrapper flags that take a SEPARATE value token (`nice -n 5`, `sudo -u root`,
- * `stdbuf -o L`). The value is skipped with the flag so the real command word is not
- * mistaken for the flag's operand. Fused forms (`-n5`, `-oL`, `-c2`) are plain flags. */
-const WRAPPER_VALUE_FLAGS = {
-  sudo: new Set(['-u', '-g', '-C', '-h', '-p', '-r', '-t', '-U', '-R',
-    '--user', '--group', '--close-from', '--host', '--prompt', '--role', '--type']),
-  nice: new Set(['-n', '--adjustment']),
-  timeout: new Set(['-s', '-k', '--signal', '--kill-after']),
-  stdbuf: new Set(['-i', '-o', '-e', '--input', '--output', '--error']),
-  ionice: new Set(['-c', '-n', '-p', '-P', '-u', '--class', '--classdata', '--pid']),
-  time: new Set(['-o', '--output', '-f', '--format']),
-};
-
-/** A `timeout` duration operand (`5`, `5s`, `1.5m`) — never a command word, so it is
- * safe to skip past. A command word is never all-digits-and-dots; a single linear
- * char class keeps this off the safe-regex radar. */
-const DURATION_RE = /^[0-9.]+[smhd]?$/;
-
-/**
  * Split a command into shell segments on `;`, newline, `&&`, `||`, `|`, `&`.
  * QUOTE-UNAWARE by design (a correct shell parser is a large attack surface and the
  * failure it prevents, a false-positive deny, fails in the safe direction). `&&`
@@ -128,44 +96,66 @@ function splitSegments(command) {
   return String(command).split(/\|\||&&|[;\n&]|(?<!>)\|/);
 }
 
-/** The command word (basename, lower-cased) of a segment, ignoring a leading
- * group/subshell prefix (`(sed …`, `{ patch …`), an `env`/`command`/`builtin`/`exec`/`\`
- * wrapper, a command wrapper (`time`/`sudo`/`nice`/… — F1), and an absolute path. */
+/**
+ * Command WRAPPERS: a leading word that runs ANOTHER command, so the write decision
+ * belongs to the word AFTER it, not the wrapper. Each entry declares the wrapper's
+ * argument grammar so the wrapper's OWN flags/operands are consumed and the resolved
+ * word is the real command — NOT a stray flag (`env -i tee` must resolve to `tee`,
+ * not `-i`) and NOT a positional operand (`flock /lock tee` must resolve to `tee`,
+ * not `lock`). `value` = flags that consume the FOLLOWING token; `operands` = the
+ * count of positional operands the wrapper takes BEFORE the command (flock's lockfile,
+ * chroot's newroot); `varAssign` = accepts `NAME=VALUE` assignments (env).
+ *
+ * Under-modelling a flag is SAFE: an unconsumed flag leaves the resolved word starting
+ * with `-`, which the fail-closed guard in `classifySegment` turns into `indeterminate`
+ * (deny-ward), never `none`. Over-consuming would mis-resolve a real command, so the
+ * `value`/`operands` sets are the minimum needed to reach the command word. */
+const WRAPPERS = new Map([
+  ['env', { value: new Set(['-u', '--unset', '-C', '--chdir', '-S', '--split-string']), operands: 0, varAssign: true }],
+  ['command', { value: new Set(), operands: 0 }],
+  ['builtin', { value: new Set(), operands: 0 }],
+  ['exec', { value: new Set(['-a']), operands: 0 }],
+  ['sudo', { value: new Set(['-u', '--user', '-g', '--group', '-C', '--close-from', '-p', '--prompt', '-r', '--role', '-t', '--type', '-U', '--other-user', '-h', '--host', '-R', '--chroot', '-D', '--chdir']), operands: 0 }],
+  ['time', { value: new Set(['-o', '--output', '-f', '--format']), operands: 0 }],
+  ['flock', { value: new Set(['-w', '--timeout', '-E', '--conflict-exit-code']), operands: 1 }],
+  ['doas', { value: new Set(['-C', '-u']), operands: 0 }],
+  ['chroot', { value: new Set(['--userspec', '--groups']), operands: 1 }],
+  ['watch', { value: new Set(['-n', '--interval']), operands: 0 }],
+]);
+
+/** Skip a wrapper's own flags, `NAME=VALUE` assignments and positional operands,
+ * returning the index of the token that is the real command word (or another wrapper).
+ * A value-flag (`-u NAME`) consumes the next token; a `--flag=value` form is
+ * self-contained; `--` ends flag parsing. */
+function skipWrapperArgs(tokens, start, w) {
+  let i = start;
+  let operands = w.operands || 0;
+  let flagsDone = false;
+  while (i < tokens.length) {
+    const tok = tokens[i].replace(/['"]/g, '');
+    if (!flagsDone && tok === '--') { flagsDone = true; i += 1; continue; }
+    if (!flagsDone && tok.length > 1 && tok.startsWith('-')) {
+      i += w.value.has(tok) ? 2 : 1; // value-flag consumes its argument
+      continue;
+    }
+    if (w.varAssign && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) { i += 1; continue; }
+    if (operands > 0) { operands -= 1; i += 1; continue; }
+    return i;
+  }
+  return i;
+}
+
+/** The command word (basename, lower-cased) of a segment, resolving through any chain
+ * of wrappers (`sudo env -i tee` -> `tee`) and an absolute path. */
 function commandWord(tokens) {
   let i = 0;
   while (i < tokens.length) {
-    // Strip a leading group/subshell prefix off the token: `(sed`, `{`, `((`. A bare
-    // `(`/`{` token becomes empty and is skipped — the mirror of `PreToolUse.Bash.js`'s
-    // `seg.replace(/^[\s({]+/, '')`. Without this, `(sed -i … f)` had word `(sed`,
-    // never matched a write command, and classified `none` (allowed) — the F1 defect.
-    let t = tokens[i].replace(/^[\s({]+/, '');
-    if (t === '') { i += 1; continue; }
-    t = t.replace(/^\\/, '');
-    if (t === 'env' || t === 'command' || t === 'builtin' || t === 'exec') { i += 1; continue; }
-    // `env` VAR=val assignments before the real command word
-    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(t)) { i += 1; continue; }
-    if (t === '!') { i += 1; continue; } // shell negation prefix
-    // Command wrapper (time/sudo/nice/nohup/timeout/stdbuf/ionice/setsid): skip the
-    // wrapper, its flags, any separate flag value, and `timeout`'s duration operand, so
-    // the REAL command word after it is classified — a wrapped write/interpreter must
-    // NOT read as `none`. Bounded to the known-safe set (never an arbitrary first token).
-    if (WRAPPERS.has(t)) {
-      const valueFlags = WRAPPER_VALUE_FLAGS[t];
-      i += 1;
-      while (i < tokens.length && tokens[i].startsWith('-') && tokens[i] !== '--') {
-        const flag = tokens[i];
-        i += 1;
-        if (valueFlags && valueFlags.has(flag) && i < tokens.length && !tokens[i].startsWith('-')) {
-          i += 1; // the flag's separately-given value
-        }
-      }
-      if (i < tokens.length && tokens[i] === '--') { i += 1; }
-      if (t === 'timeout' && i < tokens.length && DURATION_RE.test(tokens[i])) { i += 1; }
-      continue;
-    }
-    t = t.replace(/['"]/g, '');
-    const base = t.includes('/') ? t.slice(t.lastIndexOf('/') + 1) : t;
-    return { word: base.toLowerCase(), index: i };
+    const raw = tokens[i].replace(/^\\/, '').replace(/['"]/g, '');
+    const base = raw.includes('/') ? raw.slice(raw.lastIndexOf('/') + 1) : raw;
+    const key = base.toLowerCase();
+    const w = WRAPPERS.get(key);
+    if (w) { i = skipWrapperArgs(tokens, i + 1, w); continue; }
+    return { word: key, index: i };
   }
   return { word: '', index: 0 };
 }
@@ -183,14 +173,6 @@ function commandWord(tokens) {
 function resolveTarget(prefix, spec) {
   if (spec == null) return null;
   let t = String(spec).replace(/^["']|["']$/g, ''); // strip surrounding quotes
-  if (!t) return null;
-  // Strip an UNBALANCED trailing subshell close: the last operand of `(sed … src/x.js)`
-  // tokenizes as `src/x.js)` (the leading `(` is stripped by commandWord, the `)` sticks
-  // to the last token). Only strip when there are more `)` than `(`, so a real filename
-  // like `f(1).js` (balanced) is untouched. `{`/`}` already fall out as non-literal below.
-  if ((t.match(/\)/g) || []).length > (t.match(/\(/g) || []).length) {
-    t = t.replace(/\)+$/, '');
-  }
   if (!t) return null;
   if (t.startsWith('~')) return null;                 // home expansion — shell only
   t = t.replace(/\\/g, '/');                          // backslash path -> POSIX
@@ -270,6 +252,14 @@ function classifySegment(seg, prefix) {
 
   const tokens = tokenize(seg);
   const { word, index } = commandWord(tokens);
+
+  // FAIL CLOSED on a mis-parsed command word. A real command word never begins with
+  // `-`; a leading dash means a wrapper prefix or one of its flags was not modelled
+  // and the flag became the "command word". Rather than fall to `none` (an ALLOW),
+  // mark the segment indeterminate — deny-ward — so a writer/interpreter hidden behind
+  // an unknown prefix flag cannot slip through. Closes the env/command/exec-flag family
+  // and any future prefix whose flags this classifier does not model.
+  if (word.startsWith('-')) markIndet(REASONS.UNREADABLE_TARGET);
 
   // Heredoc anywhere in the segment — payload is out of band.
   if (/<<-?\s*['"]?[A-Za-z_]/.test(seg) || /<<-?\s*['"]/.test(seg)) markIndet(REASONS.HEREDOC);
