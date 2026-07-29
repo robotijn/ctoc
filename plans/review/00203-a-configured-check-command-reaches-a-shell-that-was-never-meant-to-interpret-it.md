@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "A configured check command reaches a shell that was never meant to interpret it — the quality agent runs its lint, typecheck and test commands as argument vectors"
 type: implementation
 parent_plan: none
@@ -9,6 +10,9 @@ iron_loop: true
 files:
   - "src/lib/quality-agent.js"
   - "tests/quality-agent-no-shell.test.js"
+approved_by: human
+approved_at: 2026-07-29T11:09:26.630Z
+gate_crossed: implementation → todo
 ---
 
 # A configured check command reaches a shell that was never meant to interpret it
@@ -345,6 +349,38 @@ succeeded, the case-20/21 counts, and every decision taken under ambiguity.
   commands keep it.
 - It does **not** audit the other twelve modules under `src/lib/` that import `execSync`.
 
+## Decisions Taken During Implementation
+
+1. **`parseConfiguredCommand` returns a FLAT shape** `{ok, bin, args, reason}`, not a
+   discriminated union. checkJs (`tsc --noEmit`) would not narrow the JSDoc union
+   `{ok:true,…}|{ok:false,reason}` — it widened `ok` to `boolean`, so `parsed.reason`
+   failed to type-check. The flat shape (the same style `app-runner.js` uses for
+   `resolveScriptCommand`) needs no narrowing: on success `bin`/`args` carry the argv and
+   `reason` is `''`; on a refusal `bin`/`args` are empty and `reason` names the structure.
+2. **`runConfiguredCommand` takes an optional `options.label`** (e.g. `"javascript lint"`)
+   so the refusal message names the language and key, as the plan asked, WITHOUT adding a
+   branch at any call site — the refusal flows through the existing `if (!result.success)`
+   unchanged. `runCommandArgv` ignores the extra key.
+3. **Composition with plan 00208 (test-selection) — Case 4 assertion retargeted, a
+   TIGHTENING.** `tests/test-selection-scope.test.js` Case 4 (`git unavailable on PATH runs
+   the full suite`) asserted the full-suite CONFIGURED command reached the `execSync`
+   SHELL path (`shellCalls.some(c => c.includes('-e'))`). This slice moves that command to
+   the argv path (call site #4, `runFullTests`), so the assertion could not stay literally
+   true without leaving the vulnerability unfixed. It was re-pointed at the argv path (the
+   seam now captures non-git `execFileSync` calls) AND now also asserts the command NEVER
+   reaches the shell — strictly stronger, intent preserved (the full suite still runs, still
+   proven by `assertFullSuiteRan` + `passCount`). The git-DELTA path (`getPushDeltaBlobs`)
+   was NOT touched; both named 00208 tests stay green. This is the same category of
+   blast-radius tightening the coverage-test fallback needed.
+4. **`runCommand` doc comment corrected, not just annotated.** The plan's suggested text
+   named `git diff HEAD~1 --name-only` as a remaining caller; that command no longer exists
+   (00208 replaced it with `getPushDeltaBlobs`, argv-only) and the literal string trips
+   00208's Case 10 drift guard. The comment now names the one real remaining caller: the
+   hardcoded `git push` in `pushToRemote`.
+5. **CLAUDE.md and the documented test-file count were NOT edited.** The plan's Step 15
+   asked for a CLAUDE.md note; the executor brief explicitly forbade any CLAUDE.md edit and
+   scope creep. Brief (latest instruction) overrides the plan here.
+
 ## Decisions Taken Under Ambiguity
 
 1. **Shell operators are refused, not escaped or split.** Escaping is a losing game
@@ -375,3 +411,12 @@ succeeded, the case-20/21 counts, and every decision taken under ambiguity.
    human's call, not a ride-along in an injection fix.
 8. **The bundled capability files are corrected if they fail the parse, never the
    parse.** A rule that bends to its own seed data is not a rule.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

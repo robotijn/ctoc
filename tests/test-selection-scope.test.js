@@ -146,6 +146,7 @@ const REAL_EXECFILESYNC = cp.execFileSync;
 function withGitAbsent(fn) {
   const shellCalls = [];
   const gitFileCalls = [];
+  const fileCalls = [];
   cp.execFileSync = (bin, args, opts) => {
     if (bin === 'git') {
       gitFileCalls.push(args);
@@ -153,6 +154,10 @@ function withGitAbsent(fn) {
       err.code = 'ENOENT';
       throw err;
     }
+    // The full-suite CONFIGURED test command now runs via execFileSync (argv, shell:false)
+    // — plan 00203 took it off the shell. Capture the non-git argv calls so the case can
+    // prove the command ran via the injection-safe path, not the shell.
+    fileCalls.push({ bin, args });
     return REAL_EXECFILESYNC(bin, args, opts);
   };
   cp.execSync = (command) => {
@@ -170,7 +175,7 @@ function withGitAbsent(fn) {
   delete require.cache[QA_PATH];
   const qa = require(QA_PATH);
   try {
-    return fn(qa, { shellCalls, gitFileCalls });
+    return fn(qa, { shellCalls, gitFileCalls, fileCalls });
   } finally {
     cp.execFileSync = REAL_EXECFILESYNC;
     cp.execSync = REAL_EXECSYNC;
@@ -254,12 +259,18 @@ describe('test selection uses the real push delta, never HEAD~1 (plan 00208)', (
 
   // Case 4 — git not on PATH. Simulated via the child_process seam (Decision 6).
   it('4. git unavailable on PATH runs the full suite (child_process seam)', () =>
-    withGitAbsent((qa, { shellCalls, gitFileCalls }) =>
+    withGitAbsent((qa, { shellCalls, gitFileCalls, fileCalls }) =>
       qa.runSmartTests({ js: { test: GREEN } }).then((res) => {
         assertFullSuiteRan(res, 'git-absent');
         assert.ok(gitFileCalls.length > 0, 'git WAS attempted (and threw ENOENT)');
-        assert.ok(shellCalls.some(c => c.includes('-e')),
-          'the full-suite test command must actually have been invoked');
+        // The full-suite CONFIGURED command runs via the argv (no-shell) path (plan
+        // 00203). Proving it ran there — never on the execSync shell path — is a tightening
+        // of the old shell-path check, not a weakening: the full suite still actually ran
+        // (assertFullSuiteRan proves passCount), and now provably without a shell.
+        assert.ok(fileCalls.some(c => Array.isArray(c.args) && c.args.includes('-e')),
+          'the full-suite test command must have been invoked via the argv (no-shell) path');
+        assert.ok(!shellCalls.some(c => c.includes('-e')),
+          'the configured full-suite command must NEVER reach the execSync shell path');
       })));
 
   // Case 5 — git works and a real delta is present: affected tests are selected, green
