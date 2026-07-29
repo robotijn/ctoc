@@ -605,8 +605,34 @@ describe('parseFilesField — direct units', () => {
   it('absent files: key ⇒ []', () => {
     assert.deepEqual(parseFilesField('title: x\nstatus: y\n'), []);
   });
-  it('block-list stops at first non-dash line', () => {
+  it('block-list ends at a new top-level key', () => {
+    // A non-indented top-level `key:` line ENDS the sequence; a dash line after
+    // it belongs to no sequence and is not captured. (Renamed from "stops at
+    // first non-dash line": after the interspersed-comment fix, a comment/blank
+    // line is a non-dash line that does NOT end the block — only a top-level key
+    // or `---` does. The fixture and assertion are unchanged; the name is
+    // tightened toward the real contract. Lesson 14.)
     const region = 'files:\n  - src/a.js\nstatus: refined\n  - not-a-file.js\n';
+    assert.deepEqual(parseFilesField(region), ['src/a.js']);
+  });
+  it('block-list skips an interspersed # comment and blank line, keeping later entries', () => {
+    // The bug: the block-list loop broke at the first non-dash line, so a YAML
+    // comment inside a `files:` block made every entry after it invisible. This
+    // is the exact shape the ratchet-files generator emits (labelled comment
+    // blocks between the work-surface files and the ratchet files).
+    const region =
+      'files:\n' +
+      "  # THE SLICE'S OWN FILES\n" +
+      '  - src/a.js\n' +
+      '\n' +
+      '  # RATCHET FILES\n' +
+      '  - src/b.js\n' +
+      '  - CLAUDE.md\n' +
+      'status: refined\n';
+    assert.deepEqual(parseFilesField(region), ['src/a.js', 'src/b.js', 'CLAUDE.md']);
+  });
+  it('block-list does NOT capture a trailing top-level key as a file (after a comment)', () => {
+    const region = 'files:\n  - src/a.js\n  # note\ndepends_on: 00098\n';
     assert.deepEqual(parseFilesField(region), ['src/a.js']);
   });
 });

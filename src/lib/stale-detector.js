@@ -331,8 +331,12 @@ function parseListItem(raw) {
  * - Scalar single value (`files: src/lib/x.js`) — tolerated as a one-element
  *   list; quotes stripped.
  * - Block-list (`files:` then `  - path` lines) — each dash-item line is an
- *   entry; trailing line comments stripped (F5); collection stops at the first
- *   non-dash line (frontmatter sequences are contiguous).
+ *   entry; trailing line comments stripped (F5). Interspersed blank lines and
+ *   full-line `#` comments are SKIPPED (YAML block-sequence semantics — the
+ *   ratchet-files generator emits labelled comment blocks between the work
+ *   surface and the ratchet files). Collection ends ONLY at a new non-indented
+ *   top-level `key:` line or the `---` delimiter — never at a comment or blank,
+ *   and a following top-level key is not captured as a file.
  *
  * @param {string} region Combined frontmatter region from extractFrontmatterRegion.
  * @returns {string[]} Declared file paths (possibly empty).
@@ -370,13 +374,28 @@ function parseFilesField(region) {
     return v.length > 0 ? [v] : [];
   }
 
-  // Block-list syntax: walk subsequent dash-item lines.
+  // Block-list syntax: walk subsequent lines. A YAML block sequence may contain
+  // interspersed blank lines and full-line `#` comments; those are skipped, not
+  // terminators. The sequence ends ONLY at a new non-indented top-level `key:`
+  // line or the `---` frontmatter delimiter — so a comment can never make later
+  // entries invisible, and a trailing top-level key is never captured as a file.
   const out = [];
   for (let k = idx + 1; k < lines.length; k++) {
-    const dash = lines[k].match(/^[ \t]*-[ \t]*(.+?)[ \t]*$/);
-    if (!dash) break; // stop at first non-dash line (new key or blank)
-    const v = parseListItem(dash[1]);
-    if (v.length > 0) out.push(v);
+    const line = lines[k];
+    const trimmed = line.trim();
+    if (trimmed === '') continue; // blank line within the block
+    if (trimmed === '---') break; // frontmatter delimiter ends the block
+    if (trimmed.startsWith('#')) continue; // full-line YAML comment within the block
+    const dash = line.match(/^[ \t]*-[ \t]*(.+?)[ \t]*$/);
+    if (dash) {
+      const v = parseListItem(dash[1]);
+      if (v.length > 0) out.push(v);
+      continue;
+    }
+    if (/^\S/.test(line)) break; // a new non-indented top-level key ends the sequence
+    // An indented, non-dash, non-comment, non-blank line is not a valid sequence
+    // entry and — per the ends-only-at-top-level-key rule — not a terminator
+    // either; skip it and keep scanning.
   }
   return out;
 }

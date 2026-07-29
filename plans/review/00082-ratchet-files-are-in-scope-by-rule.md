@@ -512,3 +512,33 @@ direction.
     and a `tests/*.test.js`, so it trips its own trigger and must declare the file it
     is about to move. A fence whose own arrival violated it would be evidence the
     trigger was wrong.
+
+## Decisions Taken During Implementation
+
+*(Follow-up defect fix, TDD red-first, against the shared declared-files reader this
+mechanism depends on. Not part of this slice's declared `files:` — recorded here because
+it repairs the parser that makes this slice's generator output legible.)*
+
+1. **Root cause, one fix, shared reader.** The critical defect lived in
+   `parseFilesField` (`src/lib/stale-detector.js`), the ONE declared-files reader shared
+   by `plan-validator.validateForQueue` (the Gate-2 call site of THIS slice's fence),
+   `plan-declares-count-moving-ratchets.test.js`, and the stale detector. Its block-list
+   loop broke at the FIRST non-dash line, so a YAML comment inside a `files:` block made
+   every entry after it invisible — and this slice's own generator emits exactly that
+   shape (labelled `# THE SLICE'S OWN FILES` / `# RATCHET FILES` comment blocks between
+   the work-surface files and the ratchet files). One guard in the shared function fixes
+   every caller; patching a single caller would have left the siblings broken.
+2. **YAML block-sequence semantics.** Interspersed blank lines and full-line `#`
+   comments are now SKIPPED, not terminators; the sequence ends ONLY at a new
+   non-indented top-level `key:` line or the `---` delimiter. A trailing top-level key is
+   never captured as a file. An indented non-dash line is neither a valid entry nor a
+   terminator, so it is skipped rather than ending the block.
+3. **`:608` test renamed, not weakened (Lesson 14).** `stale-detector-cheap.test.js`'s
+   "block-list stops at first non-dash line" asserted the buggy contract by NAME while
+   its fixture (a top-level `status:` key) exercised only correct top-level-key
+   termination. The fixture and assertion are unchanged; the name is tightened to "ends
+   at a new top-level key". Two new red-first cases pin the comment/blank-skip behavior
+   and the trailing-key non-capture.
+4. **Scope kept minimal.** No `CLAUDE.md`, no VERSION bump, no plan stage move — the fix
+   touches only the shared reader and its direct unit test; it creates no counted
+   artifact, so this slice's own ratchet fence does not fire.
