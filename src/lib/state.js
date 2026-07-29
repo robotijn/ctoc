@@ -410,33 +410,6 @@ function setAgentStatus(projectPath, status) {
 }
 
 /**
- * Clear agent status (mark as idle)
- *
- * @param {string} projectPath - Project root path
- */
-function clearAgentStatus(projectPath) {
-  const stateDir = path.join(projectPath, '.ctoc', 'state');
-  const stateFile = path.join(stateDir, 'agent.json');
-
-  // Ensure state directory exists
-  if (!safeFs.existsSync(stateDir)) {
-    safeFs.mkdirSync(stateDir, { recursive: true });
-  }
-
-  const agentStatus = {
-    active: false,
-    plan: null,
-    step: null,
-    phase: null,
-    task: null,
-    completedAt: new Date().toISOString()
-  };
-
-  safeFs.writeFileSync(stateFile, JSON.stringify(agentStatus, null, 2));
-  return agentStatus;
-}
-
-/**
  * Get next plan from todo queue (FIFO - oldest first)
  *
  * @param {string} projectPath - Project root path
@@ -635,7 +608,6 @@ module.exports = {
   getVisionStubs,
   getAgentStatus,
   setAgentStatus,
-  clearAgentStatus,
   getNextFromTodo,
   getFinishedItems,
   NavStack,

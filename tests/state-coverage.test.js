@@ -668,7 +668,7 @@ describe('getAgentStatus', () => {
 });
 
 // ===========================================================================
-// setAgentStatus / clearAgentStatus
+// setAgentStatus
 // ===========================================================================
 describe('setAgentStatus', () => {
   test('creates the state directory when absent and persists the given status', () => {
@@ -708,28 +708,6 @@ describe('setAgentStatus', () => {
     const written = state.setAgentStatus(root, { plan: 'x' });
 
     assert.strictEqual(written.active, true);
-  });
-});
-
-describe('clearAgentStatus', () => {
-  test('creates the state directory when absent and writes an idle record', () => {
-    const root = mkProject();
-
-    const cleared = state.clearAgentStatus(root);
-
-    assert.strictEqual(cleared.active, false);
-    assert.strictEqual(cleared.plan, null);
-    assert.strictEqual(typeof cleared.completedAt, 'string');
-    assert.ok(fs.existsSync(path.join(root, '.ctoc', 'state', 'agent.json')));
-  });
-
-  test('works when the state directory already exists', () => {
-    const root = mkProject();
-    ensureDir(path.join(root, '.ctoc', 'state'));
-
-    const cleared = state.clearAgentStatus(root);
-
-    assert.strictEqual(cleared.active, false);
   });
 });
 

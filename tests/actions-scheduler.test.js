@@ -3,7 +3,7 @@
  *
  * Behavioral tests over the real actions.js + task-registry.js + state.js on
  * isolated temp roots (real fs, no mocks of core logic). Proves the retirement of
- * the global agent lock: startAgent/advanceAgent/stopAgent now sit on the s1
+ * the global agent lock: startAgent/stopAgent now sit on the s1
  * scheduler (addAndClaim + the drain-stop trio + the cancelled status), plan
  * frontmatter is translated into task fields by taskSpecFromPlan, cancelTask and
  * enqueueWaveSync are the live cancel/wave-sync surfaces, and getAgentStatus takes
@@ -264,10 +264,10 @@ describe('startAgent (scheduler-backed, lock-free)', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 4. stopAgent / advanceAgent drain-stop semantics
+// 4. stopAgent drain-stop semantics
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('stopAgent + advanceAgent (drain-stop)', () => {
+describe('stopAgent (drain-stop)', () => {
   it('stopAgent sets the drain-stop flag and lists the currently running plans', () => {
     writePlan('todo', 'run-a', { files: ['src/ra.js'] });
     actions.startAgent(root);
@@ -277,27 +277,6 @@ describe('stopAgent + advanceAgent (drain-stop)', () => {
     assert.equal(taskRegistry.isDrainStopRequested(root), true, 'drain-stop flag is set');
     assert.ok(r.running.includes('run-a'), 'the running plan is named');
     assert.ok(/run-a/.test(r.message), 'the message lists the running plan');
-  });
-
-  it('advanceAgent under a drain-stop → stopped, agent status cleared, nothing new claimed', () => {
-    writePlan('todo', 'adv-a', { files: ['src/aa.js'] });
-    taskRegistry.requestDrainStop(root);
-
-    const r = actions.advanceAgent(root);
-    assert.equal(r.stopped, true);
-    assert.equal(r.next, false);
-
-    const agentJson = JSON.parse(fs.readFileSync(path.join(root, '.ctoc', 'state', 'agent.json'), 'utf8'));
-    assert.equal(agentJson.active, false, 'agent status cleared');
-    assert.equal(loadReg().tasks.length, 0, 'no task claimed while draining');
-  });
-
-  it('advanceAgent with no drain-stop claims the next todo plan', () => {
-    writePlan('todo', 'adv-b', { files: ['src/ab.js'] });
-    const r = actions.advanceAgent(root);
-    assert.equal(r.next, true);
-    assert.equal(r.plan.name, 'adv-b');
-    assert.equal(runningImplement().length, 1);
   });
 });
 
@@ -505,7 +484,7 @@ describe('completeExecution — task/plan coupling (C1-3)', () => {
 // R2-B / 2. drain never stalls at the head — skip-and-surface (C1-4)
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('startAgent / advanceAgent skip-and-surface (C1-4)', () => {
+describe('startAgent skip-and-surface (C1-4)', () => {
   it('startAgent: an unclaimable head (no files:) is surfaced in skipped[], the next valid plan is claimed', () => {
     writePlan('todo', 'a1-nofiles', { files: null });      // head, unclaimable
     writePlan('todo', 'a2-good', { files: ['src/a2.js'] }); // behind it, valid
@@ -517,18 +496,6 @@ describe('startAgent / advanceAgent skip-and-surface (C1-4)', () => {
     const s = r.skipped.find((x) => x.plan === 'a1-nofiles');
     assert.ok(s, 'the unclaimable head is surfaced in skipped[]');
     assert.match(s.reason, /files:/, 'with its refusal reason');
-  });
-
-  it('advanceAgent: same skip-and-surface — a bad head does not stall the plans behind it', () => {
-    writePlan('todo', 'b1-nofiles', { files: null });
-    writePlan('todo', 'b2-good', { files: ['src/b2.js'] });
-
-    const r = actions.advanceAgent(root);
-    assert.equal(r.next, true);
-    assert.equal(r.plan.name, 'b2-good');
-    assert.ok(Array.isArray(r.skipped), 'skipped[] is present');
-    const s = r.skipped.find((x) => x.plan === 'b1-nofiles');
-    assert.ok(s, 'the bad head is surfaced');
   });
 });
 
