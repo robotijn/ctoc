@@ -239,10 +239,12 @@ describe('State Loading', () => {
     assert.strictEqual(result.state.feature, 'test-feature');
   });
 
-  test('loadState migrates unsigned (legacy) state', () => {
-    // Write unsigned state directly
+  test('loadState REJECTS an unsigned (legacy) state — it is not signed on load', () => {
+    // Contract change (00205): an unsigned state used to be signed on load and believed.
+    // That made the signature prove nothing — forging the Iron Loop position needed no
+    // key. An unsigned state is now REJECTED, not migrated.
     const statePath = getTestStatePath();
-    const unsignedState = createTestState();
+    const unsignedState = createTestState({ currentStep: 16 });
 
     if (!fs.existsSync(TEST_STATE_DIR)) {
       fs.mkdirSync(TEST_STATE_DIR, { recursive: true });
@@ -251,10 +253,15 @@ describe('State Loading', () => {
 
     const result = stateManager.loadState(TEST_PROJECT_PATH);
 
-    assert.strictEqual(result.valid, true);
-    assert.strictEqual(result.migrated, true);
-    assert.ok(result.state._signature, 'Should have signature after migration');
-    assert.ok(result.state._migrated_at, 'Should have migration timestamp');
+    assert.strictEqual(result.valid, false, 'unsigned state is not valid');
+    assert.strictEqual(result.state, null, 'the forged step must not be returned');
+    assert.strictEqual(result.unsigned, true, 'discriminated as never-signed');
+    assert.strictEqual(result.migrated, undefined, 'nothing was migrated');
+    assert.match(result.error, /menu/i, 'the error names the recovery');
+
+    // The file on disk must NOT have been signed by the failed load.
+    const onDisk = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    assert.strictEqual(onDisk._signature, undefined, 'load must not sign an unsigned file');
   });
 
   test('loadState rejects tampered state', () => {
