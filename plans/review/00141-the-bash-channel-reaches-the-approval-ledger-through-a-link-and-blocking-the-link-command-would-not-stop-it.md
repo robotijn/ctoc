@@ -353,6 +353,7 @@ If the human schedules it, it is its own plan with its own measurement.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 Write `tests/the-bash-channel-cannot-reach-the-ledger-through-a-link.test.js` in full
 and run **only that file, before touching `src/`**. Record the starting state verbatim.
 
@@ -369,6 +370,7 @@ and run **only that file, before touching `src/`**. Record the starting state ve
   state is a comparison rather than a claim.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 Read from disk, in full: `src/hooks/PreToolUse.Bash.js` — all of `isLedgerWrite`,
 `resolveTokenPath`, `isReadOnlyLedgerCommand`, `isLedgerForgery`, `isWriteCommand` and
 `main()`; `src/lib/real-path-confinement.js` as built by 00140;
@@ -396,6 +398,7 @@ Where the code disagrees with this plan, **the code wins and the discrepancy is
 recorded.**
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 One step, files as sub-items.
 - `src/hooks/PreToolUse.Bash.js` — the fail-soft require with its degradation comment,
   `operandResolvesIntoLedger`, the third test inside `isLedgerWrite`, and a header
@@ -407,6 +410,7 @@ One step, files as sub-items.
   live, if adding one test file trips them. Nothing else, no assertion loosened.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 Confirm there is still exactly ONE encoding of real-path confinement and that this file
 contains no copy of it. Confirm the two arithmetic tests run first and short-circuit,
 so a command already matching costs no syscall. Confirm the `cd` prefix is applied
@@ -424,6 +428,7 @@ is acceptable, or hoist it. Record the after-timing against Step 9's numbers, me
 and worst case. Confirm a command with no operands costs zero syscalls.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 This is the security step of a security fix; do it adversarially, against the built
 code and by hand, not only through the suite.
 - Re-attack the full chain: create the link, then write through it, in the direct,
@@ -445,6 +450,7 @@ code and by hand, not only through the suite.
   traces, and name the sanctioned writer as they do today.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 Targeted run first: the new file, plus `tests/ledger-forgery-closed.test.js`,
 `tests/security-enforcement-evasion.test.js`, `tests/enforcement-hook.test.js`,
 `tests/e2e-enforcement-and-gates.test.js`, `tests/a-link-cannot-leave-the-repository.test.js`,
@@ -473,6 +479,7 @@ reason from the editing hook's fail-open catch, reaching the same conclusion, an
 must be preserved rather than unified.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 Report: the paths; the Step 8 verbatim red, naming which cases confirmed or **refuted**
 the finding; the timing median and worst case before and after; the operand-count
 distribution and the cap chosen from it; the false-deny count over the corpus; the

@@ -335,18 +335,25 @@ plan text.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/approval-boundary-is-legible.test.js` in full, run ONLY it, record the red output verbatim. Cases 1, 2, 7, 11 and 15 MUST be red. Cases 3, 4, 9 and 13 MUST be GREEN before any source change: they are the "nothing else moves" guards, and a change that turns any of them red has weakened a gate rather than clarified a message.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — **measure the two headings before writing anything.** Find the plan that blocked the self-check and read its ACTUAL top-level headings from disk; read `plans/implementation/00123-an-executor-that-needs-one-more-file-stops-and-asks.md` and the current text of `agents/iron-loop/iron-loop-executor.md` to see which headings the executor contract actually names. Record the measured heading strings verbatim in the Step 16 report — this plan deliberately does not guess them. Then confirm `src/lib/iron-loop-enforcer.js` is not under the concurrent executor's hand; if it is, STOP and report. Read in full: `src/lib/approval-ledger.js`, `src/lib/approval-residency.js`, `iron-loop-enforcer.js:337-420`, and `tests/source-stays-searchable.test.js` (it pins a digest of this module — confirm what it pins before editing).
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/approval-ledger.js` — `EXECUTION_SECTION_PRODUCERS`, the derived `EXECUTION_SECTIONS`, `diagnoseSpecMismatch`, `contentMatches` carrying the reason, the extended block comment, the two new exports.
   - `src/lib/approval-residency.js` — pass the specification-scope reason and `sections` through `classifyResidency`; update the returns documentation.
   - `src/lib/iron-loop-enforcer.js` — classify instead of boolean-test, per-offender reasons, a message rebuilt from the reasons actually present.
   - `CLAUDE.md` — the documented test-file count, read live from disk.
 ### Step 11: REVIEW — prove the three properties this slice rests on. First: no path reaches `accepted: true` that did not before — diff the acceptance logic and state that `match` is computed identically. Second: run the fence against this repository's live ledger and report the real counts — how many plans in gate destinations are accepted, and the reason breakdown before and after, which must differ only in reason STRINGS. Third: grep every consumer of `EXECUTION_SECTIONS` and confirm the derivation changed none of them.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — confirm the diagnosis costs at most one extra hash pass and runs ONLY on an already-failed comparison; no regular expression compiled per line; no second read of any plan; no new require in `approval-ledger.js`.
 ### Step 13: SECURE — this is approval-provenance code, so state the threat model explicitly in the report. Confirm the excluded region grew by exactly the measured, named headings and by nothing else, and that each new row names its producer. Confirm the frontmatter (and therefore `files:`, the write-surface grant) stays hashed in full. Confirm `diagnoseSpecMismatch` cannot be reached before a failed match, cannot write anything, and cannot flip a verdict. Confirm `.ctoc/approvals/` remains agent-write-denied on both channels.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/approval-boundary-is-legible.test.js tests/approval-*.test.js tests/human-gate*.test.js tests/gate*.test.js tests/source-stays-searchable.test.js` green, then the full gated run `npm test` with coverage at or above the enforced floor and 0 skipped. Lint the changed files. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — the module header states the narrow-versus-widen ruling in plain words: the boundary stays a frozen list because a runtime-chosen boundary lets the executor decide what is excluded, and the whole safety argument is that the only silent exemption is a reviewed source diff. Document the producer table, the proof-carrying diagnosis and its three distinct answers, and restate the disclosed loss unchanged.
 ### Step 16: FINAL-REVIEW — report files, tests, red and green evidence verbatim, the Step 9 measured heading strings, the Step 11 ledger counts, and every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

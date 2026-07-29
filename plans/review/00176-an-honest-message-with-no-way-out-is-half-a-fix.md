@@ -290,15 +290,22 @@ after its own plan got this wrong.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/menu-repairs-what-it-reports-missing.test.js` in full, run ONLY that file, record the red output verbatim. Cases 1, 2, 3 and 14 MUST be red. Any case green before implementation exists must be individually shown to be already-correct behaviour rather than a vacuous assertion, and the finding written down — the sibling slice found a vacuous read-back by exactly this means and it is the highest-value habit in this program.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — re-read from disk: `src/commands/menu.js:595-765` in full (the landed code WINS over this plan's line numbers); `src/lib/init-project.js:572-749` to re-confirm every write is `!existsSync || force` guarded and that `force` is not set from this call site; `src/lib/hooks-installer.js:624-660` and `src/lib/claude-md-lessons.js:241+` for the two sentinel/hash idempotency claims made in the table above. If any claim in that table no longer holds, the trigger decision must be revisited before implementing — it is the load-bearing input.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/commands/menu.js` — Changes 1 and 2.
 ### Step 11: REVIEW — confirm no path renders a success sentence without `ok === true`. Confirm the failure message ALWAYS carries an action, with no branch producing a description alone. Confirm `verifySetup` and `complianceAnchorUsable` are unmodified. Confirm the sibling slice's test file still passes unchanged, since its contract is the fence around this one.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — the pre-check read-back is the same dozen `existsSync` calls plus one small parse that already run today; the second read-back runs only when an attempt was made. Confirm a healthy project performs exactly ONE read-back and no initialisation pass, and measure the added cost on a broken project.
 ### Step 13: SECURE — `missing` holds project-relative display paths only. Confirm `reason` is truncated and carries no absolute path and no stack frame into the message (case 12). Confirm the action clause names a path relative to the project.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/menu-repairs-what-it-reports-missing.test.js tests/menu-reports-what-init-did.test.js tests/menu-auto-init.test.js tests/menu-coverage.test.js tests/init-project.test.js tests/e2e-menu-lifecycle.test.js tests/fresh-repository-is-its-own-project.test.js` green, then the full gated run `npm test`. Lint the changed file. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — a JavaScript doc on `ensureInitialized` stating the rule: the trigger for setup is the read-back, never the existence of a directory any code can create; and a surface that reports a fixable problem must attempt the fix. Name the dead end, its date, and the slice that created it.
 ### Step 16: FINAL-REVIEW — report, verbatim, what the human reads on the exact reproduction fixture (a directory holding only `.ctoc/logs/`) BEFORE and AFTER, across two consecutive opens. Report every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

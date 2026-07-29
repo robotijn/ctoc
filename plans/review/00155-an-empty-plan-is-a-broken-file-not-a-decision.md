@@ -235,15 +235,22 @@ Cross-platform: `path.join`, `os.tmpdir()`, `fs.promises.rm` teardown.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/empty-plan-is-not-a-decision.test.js` in full, run ONLY that file, record the red output verbatim. Cases 1, 2, 3, 4, 5, 7, 9, 10, 11, 12 and 16 MUST be red. The red evidence MUST include the full rendered screen for case 1, so the defect is reproduced as the owner saw it.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — re-read from disk: `src/lib/streaming-gate.js` at `:182-223` (`stripLeadingFrontmatter`, `renderPlanBody`), `:856-984` (`planDecisionScreen`), `:1018-1034` (`buildOptions`), `:1072-1119` (`gateScreenAt`) and `:471-528` (`pendingGateDecisions`). The landed code WINS over this plan's line numbers. Confirm `src/lib/gate-words.js` exists; if it does not, the preceding slice has not landed — STOP and report.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/streaming-gate.js` — Changes 1 through 5.
 ### Step 11: REVIEW — confirm no screen this file produces offers an option it will refuse (case 9 proves it; also read every remaining option-building site and list them with a justification). Confirm the empty plan still APPEARS in `pendingGateDecisions` — a fix that hides the file is a worse defect than the one being fixed. Confirm the broken branch runs before the product-question branch, not after.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — `isEmptyPlan` runs on content already read; no extra file read. Confirm `pendingGateDecisions` does not read each plan a second time to compute `broken`.
 ### Step 13: SECURE — the broken screen renders a filename. Confirm it passes through `stripCtl` and that the traversal guard `isUnsafePlanFile` has already rejected any path-bearing name before this screen is reached. Case 15's directory fixture proves the read failure is handled rather than thrown.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/empty-plan-is-not-a-decision.test.js tests/gate-words.test.js tests/streaming-gate.test.js tests/menu-protocol.test.js tests/e2e-menu-lifecycle.test.js` green, then the full gated run `npm test`. Lint the changed file. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — a JavaScript doc on `brokenPlanScreen` stating the general rule in one sentence: an option whose description says it will be refused must not be an option. Record on `isEmptyPlan` the decision that a title-only file counts as empty, and why.
 ### Step 16: FINAL-REVIEW — report the screen BEFORE and AFTER, verbatim, and every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

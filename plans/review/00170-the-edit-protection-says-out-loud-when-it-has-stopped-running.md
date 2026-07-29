@@ -469,6 +469,7 @@ Nothing here is reachable only from a test.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 
 Write `tests/the-edit-protection-says-whether-it-is-running.test.js` in full and run
 **only that file, before touching `src/`**. Record the starting state verbatim.
@@ -482,6 +483,7 @@ besides `GRANULARITY_MS`. A duration that creeps in here is the wolf-crying desi
 this plan rejected, and case 3 is the test that catches it.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 
 Read from disk, in full, and let the code win over this plan where they differ:
 
@@ -513,6 +515,7 @@ the finding.** Report it as such and stop before implementing; do not adjust the
 design until it agrees with the plan.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 
 One step, files as sub-items.
 
@@ -526,6 +529,7 @@ One step, files as sub-items.
   cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 
 Confirm there is exactly ONE encoding of "is the protection recording" and that
 `src/areas/system.js` holds no second copy of the rule — the area renders a verdict,
@@ -547,6 +551,7 @@ should not be walked to produce a count nobody reads. Record the measured render
 cost on this repository.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 
 - Confirm a hostile enforcement-log entry cannot inject into the rendered line: an
   entry whose `target_file` contains a newline, a terminal escape, `%s`, and a
@@ -562,6 +567,7 @@ cost on this repository.
   declared glob matching nothing.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 
 Targeted run first: the new test file, plus `tests/enforcement-log.test.js`,
 `tests/architecture-invariants.test.js`, `tests/export-reachability.test.js`,
@@ -591,6 +597,7 @@ comment at the `src/areas/system.js` call site recording that the byte count it
 replaced was accurate and meaningless.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 Report, in this order:
 

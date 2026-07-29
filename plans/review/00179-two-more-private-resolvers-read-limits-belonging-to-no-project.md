@@ -221,16 +221,23 @@ identically on Windows.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/no-private-root-resolver.test.js` in full, run ONLY that file, record the red output verbatim. Cases 1, 4, 7, 8 and 11 MUST be red. Case 2 must be red-then-green for the RIGHT reason: it must detect a synthetic positive, so verify it fails when the scanner is stubbed to find nothing. A fence that only ever counts to zero is a fence that would pass if it scanned nothing at all.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — re-read from disk: `src/lib/budget.js` in full (its config loader, its `DEFAULTS`, and every export); `src/lib/iron-loop-enforcer.js` in full, listing every check function, its result contract, and whether a not-applicable shape already exists; `src/lib/project-root.js:33-198`. Grep the repository for callers of both modules' `findProjectRoot` and for `require.*budget` / `require.*iron-loop-enforcer`, and list every external caller. Re-run the private-resolver scan by hand and confirm the count is five copies and three defects before implementing — if a sixth has appeared since this plan was written, report it.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/budget.js` — Changes 1 and 2.
   - `src/lib/iron-loop-enforcer.js` — Changes 3 and 4.
 ### Step 11: REVIEW — confirm no private ancestry walk remains in either file. Confirm NO enforcer path returns `clean: true` when the root was a fallback, by tracing every check's return. Confirm the defaulted budget is distinguishable from a read one at every exit. Confirm both exported resolvers still return a string for every input. Confirm the fence's exemption list is an explicit permanent list with justifications, and NOT a shrink-only baseline.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — the shared resolver's two-pass walk replaces a one-pass walk in each module. Confirm neither module resolves more than once per entry-point call, and that the fence scans `src/**` once rather than per-case.
 ### Step 13: SECURE — confirm no reason string carries an absolute path into a human-read surface. Confirm the fence's file scan is bounded (no unbounded read of an arbitrarily large file) and cannot be steered outside `src/`.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/no-private-root-resolver.test.js tests/budget*.test.js tests/iron-loop-enforcer*.test.js tests/project-root*.test.js tests/refinement-loop-writes-into-the-project.test.js` green, then the full gated run `npm test`. Lint both changed files. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — a JavaScript doc on each delegating resolver stating that it delegates and MUST NOT be re-implemented, naming the bare-marker over-rooting defect and pointing at `project-root.js:87-94`. A header comment on the fence stating what it catches, what it deliberately does not catch, and why the exemption list is permanent rather than a shrinking baseline.
 ### Step 16: FINAL-REVIEW — report, verbatim, the resolved root BEFORE and AFTER for a project beneath a stand-in home directory carrying `.ctoc`, for both modules. Report the enforcer's verdict on an unidentifiable project BEFORE and AFTER, since "clean" becoming "not applicable" is the whole point. Report the final private-resolver count. Report every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

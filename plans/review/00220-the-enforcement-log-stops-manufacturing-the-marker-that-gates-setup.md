@@ -219,15 +219,22 @@ dark branch, so the 99 floor is held.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — add cases 5-9 to `tests/enforcement-log.test.js` in full, run ONLY that file, record the red output verbatim. Case 5 (and the no-marker half of case 9) MUST be red against current `main` — current `logEnforcement` manufactures `.ctoc/` unconditionally. Any new case green before the change must be shown to be already-correct behaviour rather than vacuous, and the finding written down.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — re-read from disk: `src/lib/enforcement-log.js:22-63` in full; `src/lib/durable-log.js:207-239` to confirm `appendEntry`'s recursive `mkdirSync` of `path.dirname(logPath)` is the reason a local-mkdir-only guard fails; `src/hooks/PreToolUse.Edit.js:54,366-402` to confirm BOTH `allow`/`block` ignore the return value and pass `info.project_root`; `tests/enforcement-log.test.js:32-37` to confirm the existing `beforeEach` pre-creates `.ctoc/` (so cases 1-4 stay green). Record the confirmation.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/enforcement-log.js` — the `logEnforcement` guard (return before `appendEntry` when `.ctoc/` is absent or `root` is bad; create only the leaf under an existing `.ctoc/`).
 ### Step 11: REVIEW — confirm no path can create `.ctoc/`: the local mkdir AND `appendEntry` are both unreachable when `.ctoc/` is absent, because the function returns first. Confirm the write path in a real project is unchanged. Confirm `durable-log.js` is untouched. Confirm both enforcement callers still compile against the `null`-returning signature and still fail open.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — the guard adds one `existsSync` on a path that already did filesystem work; in the un-initialised case it REMOVES a recursive `mkdirSync` plus the entire append, so the not-a-project case gets cheaper.
 ### Step 13: SECURE — confirm nothing outside the resolved root is written, that a bad root can no longer steer a write into the process working directory, and that no entry field reaches a path component.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/enforcement-log.test.js tests/durable-log.test.js tests/pretooluse-edit-coverage.test.js tests/hooks-do-not-manufacture-the-project-marker.test.js` green, then the full gated run `npm test` (`# fail 0`, coverage at or above the floor, 0 skipped). Lint the changed file. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — a JavaScript doc on `logEnforcement` stating the rule: an operation permitted to fail silently must never create the directory that decides whether a project exists; name this as the third of the four producers 00177 identified, and note that guarding the local mkdir alone is insufficient because `durable-log.appendEntry` re-creates the parent.
 ### Step 16: FINAL-REVIEW — report a directory listing BEFORE and AFTER a `logEnforcement` call in an empty directory, verbatim, showing `.ctoc/` absent both times. Report every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

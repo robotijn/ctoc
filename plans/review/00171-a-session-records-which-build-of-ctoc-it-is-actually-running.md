@@ -285,6 +285,7 @@ the state that says so honestly instead of guessing.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 
 Write `tests/a-session-records-the-build-it-loaded.test.js` in full and run **only
 that file, before touching `src/`**. Record the starting state verbatim. Cases 1-5
@@ -295,6 +296,7 @@ place and this slice must not proceed. Report which state case 9 started in; it 
 the dependency check.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 
 Read from disk, in full, and let the code win over this plan where they differ:
 
@@ -321,6 +323,7 @@ Then measure and **report before writing code**:
    recorded decision) so the two slices are measured against the same moment.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 
 One step, files as sub-items.
 
@@ -332,6 +335,7 @@ One step, files as sub-items.
 - `tests/a-session-records-the-build-it-loaded.test.js` — the thirteen cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 
 Confirm the beacon is strictly additive: read the diff and confirm no existing line
 of `main()` changed behaviour, that the pending-agent output and the quality-gate
@@ -359,6 +363,7 @@ report the added wall time per tool call**; if it is not comfortably under a
 millisecond, say so rather than shipping a tax on every action.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 
 - The beacon records a version string, a timestamp and a pid. **Confirm no
   environment variable, no tool input, no file path and no user content reaches it**
@@ -377,6 +382,7 @@ millisecond, say so rather than shipping a tax on every action.
   `.ctoc` that is a file, a full disk simulated by a write failure.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 
 Targeted run first: the new test file, plus `00170`'s test file (unchanged and still
 green — this is the regression gate), `tests/hooks.test.js`,
@@ -409,6 +415,7 @@ A comment at the `beacon` source in `enforcement-liveness.js` recording why
 downgrade a `not-recording` verdict.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 Report, in this order:
 

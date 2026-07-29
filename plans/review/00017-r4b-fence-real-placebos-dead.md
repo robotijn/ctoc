@@ -137,13 +137,16 @@ the completion path.
 
 ## Execution Plan (Steps 8-16)
 ### Step 8: TEST — [x] The fence guards (prose→dead, comment-after-quote-regex→dead,
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 call-edge→live, planted-dead-export non-vacuity, `completeExecution`/`approveSubplans`
 live) exist in `tests/export-reachability.test.js` and `tests/reachability.test.js`.
 The placebo-absence assertions exist in the init/settings/sync test files. All were
 seen RED before their respective fixes.
 ### Step 9: PREPARE — [x] Read `reachability.js`, `init-project.js`, `sync.js`,
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 `settings.js`, `push.md` in full from disk before editing.
 ### Step 10: IMPLEMENT — [x] Placebo half (this plan, persisting):
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 - push placebo block deleted from init `generateSettings`; `push.md` renders
   `git.autoPushEnabled`;
 - `moveToReviewAfterPush` deleted from `sync.js` (+ its export, + now-unused imports);
@@ -155,19 +158,23 @@ call-syntax rule (see the reconciliation report — the fenced-block rule buried
 `approveSubplans` and had to be reverted). The coverage-floor doc is owned by a
 sibling plan and is not touched here.
 ### Step 11: REVIEW — [x] Re-ran the analyzer against the shipped tree: the
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 call-syntax fence keeps `completeExecution` and `approveSubplans` LIVE via real code
 edges and reports a true zero-caller export as dead. `maxDead` on disk is 68 (ratchet
 history 102 → 71 → 69 → 68, never through 126).
 ### Step 12: OPTIMIZE — [x] Analyzer stays O(source chars); no AST, no new dependency.
 ### Step 13: SECURE — [x] Source-scan assertions only; reads via safe file access; no
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 path traversal, no secrets, no unsafe writes.
 ### Step 14: VERIFY — [x] `npm test` (the GATED entry point) run against the current
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 tree after `npm install` in this worktree: `# fail 0`, `# skipped 0`, coverage 99.03%
 (threshold 99). Lint and typecheck gates green. See the Step-16 report for the tail.
 ### Step 15: DOCUMENT — [x] `reachability.js` header states exactly what counts as a
 caller (call syntax / require) and what does NOT (prose, comments, tests). `push.md`
 documents `git.autoPushEnabled`. This record reconciled to the shipped tree.
 ### Step 16: FINAL-REVIEW — [x] Reconciliation report delivered below: each finding's
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 disposition, the fence-design supersession, the true baseline/floor numbers, and the
 real-gate result.
 

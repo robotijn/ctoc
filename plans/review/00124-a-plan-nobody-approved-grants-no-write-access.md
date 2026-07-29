@@ -479,6 +479,7 @@ Nothing here is reachable only from a test.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 Write `tests/unapproved-plan-grants-nothing.test.js` in full and run **only that file,
 before touching `src/`**. Required starting state, recorded verbatim:
 
@@ -495,6 +496,7 @@ before touching `src/`**. Required starting state, recorded verbatim:
 - **Case 17** must be GREEN from the first run.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 Read from disk, in full, before changing anything: `src/lib/plan-coverage.js`;
 `src/hooks/human-gate-check.js:142-340`; `src/lib/approval-ledger.js` (`classifyResidency`'s
 whole dependency surface — `readEntryResult`, `entryKind`, `contentMatches`,
@@ -520,6 +522,7 @@ every count it enforces. Where the code disagrees with this plan, **the code win
 record the discrepancy.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 One step, files as sub-items.
 - `src/lib/approval-residency.js` — the extraction plus `isApprovedForCoverage`, with the
   stage→edge map and the never-throw wrapper.
@@ -536,6 +539,7 @@ One step, files as sub-items.
 - `.ctoc/false-green-baseline.json` — only if a finding genuinely disappeared.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 Confirm: there is exactly **one** definition of `classifyResidency` in the repository, and
 `src/lib/plan-coverage.js` contains **no** second approval predicate. Confirm no `require`
 points from `lib/` into `hooks/`. Confirm `globToRegex`, `touchesOverlap` and
@@ -555,6 +559,7 @@ and that dropping a stage plus lazy hashing leaves the measured timing at or bel
 Step 9 before-number. Record the after-number.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 This is the security step of a security fix; do it adversarially.
 - Confirm **fail-closed on every fault path**: unlistable stage directory, unreadable plan,
   absent/corrupt/unkeyable ledger, unestablishable specification boundary, unexpected
@@ -571,6 +576,7 @@ This is the security step of a security fix; do it adversarially.
   and **report** the finding. It is not fixed here.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 Targeted run first: the new file, the four amended coverage/enforcement files,
 `tests/human-gate-check-coverage.test.js`, `tests/ledger-forgery-closed.test.js`,
 `tests/approval-hash-survives-execution.test.js`, `tests/gate-migration.test.js`,
@@ -598,6 +604,7 @@ values; if its enforcement paragraph describes the three-stage priority, correct
 match the code.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 Report: the paths; the Step 8 verbatim red for cases 1, 3 and 6 and which paths the
 unapproved `**` matched; the Step 9 measurements (`00067`'s verdict, the full
 todo/in-progress classification, both timing numbers); the Step 13 hand-run probe results

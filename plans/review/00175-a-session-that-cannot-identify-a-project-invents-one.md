@@ -264,15 +264,22 @@ platform and a skip is a gate failure.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/session-start-does-not-fabricate-a-project.test.js` in full, run ONLY that file, record the red output verbatim. Cases 1, 2, 3, 9, 10 and 13 MUST be red. Cases 4, 5, 6, 7, 8, 11 and 12 are expected GREEN before implementation — they are the regression fence, and each one must be examined individually against the rule that a case green before the code exists is either already-correct behaviour or a vacuous assertion. Record which of the two each one is, in writing. That examination is not optional: the sibling slice for the menu found a vacuous read-back exactly this way.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — re-read from disk: `src/hooks/SessionStart.js` `main()` and `generateContext` in full; `src/lib/project-root.js:33-198` for the exact `describeProjectRoot` return shape and every `marker` value; `src/lib/state-manager.js` `saveState`/`createState` to determine whether state creation writes to disk under a fallback root and therefore needs Change 2's guard. The landed code WINS over this plan's line numbers.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/hooks/SessionStart.js` — Changes 1, 2, 3 and 4.
 ### Step 11: REVIEW — confirm NO write to disk occurs on any path where `marker === 'fallback'`, by tracing every `mkdirSync`, `writeFileSync` and `appendFileSync` reachable from `main()`, including inside `saveState`, `maybeInjectLessons` and the plan-index backfill kick. Each one is either guarded or listed with a justification for why it is safe. Confirm every evidenced marker value still scaffolds.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — `describeProjectRoot` performs the same single walk `findProjectRoot` already performed; this slice reads its result instead of discarding it, so the added cost is zero walks and one object. Confirm no second resolution call was introduced anywhere in the hook.
 ### Step 13: SECURE — the fallback message renders `fallbackReason`, which can carry a filesystem error message. Confirm no absolute path and no stack frame reaches the injected context; the reason is truncated to a bounded length so a pathological error cannot flood the session context.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/session-start-does-not-fabricate-a-project.test.js tests/session-start*.test.js tests/project-root*.test.js tests/fresh-repository-is-its-own-project.test.js` green, then the full gated run `npm test`. Lint the changed file. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — a JavaScript doc on `main()` stating the rule: a session never creates the evidence it will later read as proof of a project, and scaffolding requires an evidenced marker. Name the self-ratifying loop and its date so the reason survives the code.
 ### Step 16: FINAL-REVIEW — report, verbatim, what a session prints and what the directory contains, BEFORE and AFTER, on a genuinely empty directory run twice. Report every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

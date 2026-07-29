@@ -464,6 +464,7 @@ schedules `00129` before this plan, option (c) costs nothing.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 Write `tests/declared-breadth.test.js` in full and run **only that file, before
 touching `src/`**. Record the starting state verbatim.
 
@@ -482,6 +483,7 @@ touching `src/`**. Record the starting state verbatim.
   unmet.**
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 Read from disk, in full, before changing anything: `src/lib/plan-coverage.js` (all of
 it); **`src/lib/declared-breadth.js` as `00127` actually built it** — the code wins
 over both plans; `src/lib/approval-ledger.js:364-425` (`computeSpecHash`) to CONFIRM
@@ -520,6 +522,7 @@ Where the code disagrees with this plan, **the code wins and the discrepancy is
 recorded.**
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 One step, files as sub-items.
 - `src/lib/declared-breadth.js` — `hasUnanchoredAcknowledgement`, `REFUSAL_REASON`,
   and `isAnchored` only if `00127` did not ship it; total, no I/O, never throws.
@@ -530,6 +533,7 @@ One step, files as sub-items.
 - `tests/declared-breadth.test.js` — the fourteen cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 Confirm there is exactly ONE encoding of anchoring in the repository, and that
 `plan-coverage.js` contains no second copy of the rule. **Confirm by grep that nothing
 on the hook path calls `countMatching`** — a filesystem walk on every Edit call is the
@@ -551,6 +555,7 @@ severity lookup is a constant-time map read, not a scan. Record the after-timing
 against the Step 9 before-number.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 Adversarially, on a permission path.
 - Confirm every fault returns rather than throws: non-string glob, unreadable
   frontmatter, unparseable frontmatter, a `unanchored_scope` key with an empty or
@@ -568,6 +573,7 @@ Adversarially, on a permission path.
   traces — a fixed-vocabulary reason and a repository-relative plan reference only.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 Targeted run first: `tests/declared-breadth.test.js`,
 `tests/unapproved-plan-grants-nothing.test.js`,
 `tests/plan-coverage-coverage.test.js`, `tests/enforcement-hook.test.js`,
@@ -606,6 +612,7 @@ ad hoc. If `CLAUDE.md` or `README.md` carry a module count that this change move
 that is **scope growth** — see below.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 Report: the paths; the Step 8 verbatim red for case 4 and which of the reporter's four
 paths an approved `**` matched before the fix; the Step 9 measurements (the live
 re-confirmation of zero unanchored declarations in the tree, the seven fixtures'

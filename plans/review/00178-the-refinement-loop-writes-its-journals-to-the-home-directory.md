@@ -238,15 +238,22 @@ hardcoded separators, `os.homedir()` never written to.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/refinement-loop-writes-into-the-project.test.js` in full, run ONLY that file, record the red output verbatim. Cases 1, 2, 3, 5, 10 and 11 MUST be red. Any case green before implementation must be individually shown to be already-correct behaviour rather than a vacuous assertion, and the finding written down.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — re-read from disk: `src/lib/refinement-loop.js` in full, listing EVERY function whose default parameter is `findProjectRoot()` and classifying each as reader or writer; `src/lib/project-root.js:33-198` for the exact `describeProjectRoot` contract; `src/lib/crypto.js:13-35` to confirm the `~/.ctoc` creation the fixture models. Grep the whole repository for `require.*refinement-loop` and for `findProjectRoot` imported from it, and list every external caller — the export's contract is theirs, not this module's. Determine whether any caller depends on resolving by `.claude-plugin` alone.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/refinement-loop.js` — Changes 1 and 2.
 ### Step 11: REVIEW — confirm no private walk remains in the file. Confirm every writer identified at Step 9 is guarded and every reader is not. Confirm the exported `findProjectRoot` still returns a string for every input, including a non-string and `undefined`. Confirm no path under `os.homedir()` can be produced from a project that has no `.ctoc` of its own.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — the shared resolver performs one two-pass walk against the private copy's one-pass. Confirm resolution is not performed more than once per `appendRound` call, since three path builders each default to it and a naive change would resolve three times.
 ### Step 13: SECURE — confirm the refusal reason carries no absolute path into any surface a human reads, and that a `planSlug` cannot traverse out of `loops/` via `..` — the slug reaches a path component and this slice is touching the code that builds it.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/refinement-loop-writes-into-the-project.test.js tests/refinement-loop*.test.js tests/project-root*.test.js` green, then the full gated run `npm test`. Lint the changed file. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — a JavaScript doc on `findProjectRoot` stating that it delegates and MUST NOT be re-implemented, naming the bare-marker over-rooting defect, its date, and the shared resolver's comment at `project-root.js:87-94` as the record of the fix this copy never received.
 ### Step 16: FINAL-REVIEW — report, verbatim, where a journal lands BEFORE and AFTER for a project beneath a stand-in home directory that carries `.ctoc`. Report the real path where stranded journals may exist on the operator's machine, without touching them. Report every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

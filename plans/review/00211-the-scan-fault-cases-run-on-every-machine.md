@@ -157,6 +157,7 @@ existing, reachable production code.
 ## Execution Plan
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 Run `npm test` FIRST and record the per-file coverage line for
 `src/lib/stale-detector.js` — the before-state, in the plan, as measured rather than
 assumed. Then write cases A–D and see them RED before any of them can pass: temporarily
@@ -165,11 +166,13 @@ immediately. Case D must pass only once A is real. **A case that is green before
 mechanism exists is either already covered or vacuous — account for every one.**
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 Confirm the sandbox helpers already present (`makeSandbox` `:65`, `writePlan` `:78`,
 `revoke` `:98`, `restoreModes` `:63`) and reuse them. Add no new dependency. Confirm the
 `after` hook restores modes and removes sandboxes so the new cases leak nothing.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 Add cases A–D to `tests/stale-scan-says-when-it-could-not-look.test.js`. Sub-items:
 (a) a helper that makes a path unreadable-by-shape (file-as-directory,
 directory-as-file) with no permission manipulation; (b) cases A and B; (c) case C over
@@ -177,6 +180,7 @@ both; (d) case D, the vacuity guard. Leave `CAN_REVOKE_READ`, `NO_REVOKE_REASON`
 `announceSkip` and every existing case untouched.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 Verify no case asserts a symlink or an absent stage produces an `unread` entry. Verify
 no case mocks `safe-fs`. Verify each assertion names a behaviour a caller depends on,
 not a line that executed.
@@ -186,11 +190,13 @@ Fold A–D into the existing `describe` rather than a parallel structure. No sle
 timing dependence.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 Assert `path` in every `unread` entry is repository-relative. Assert no absolute path,
 username or raw error string reaches the result. Sandboxes stay under `os.tmpdir()` and
 the real repository is never written to.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 `npm test` — lint, typecheck, ALL tests, coverage at or above the floor in
 `.ctoc/coverage-baseline.json` (99), 0 skipped, 0 flaky. Record the AFTER per-file
 coverage for `src/lib/stale-detector.js` next to the Step 8 before-state. Run twice and
@@ -202,6 +208,7 @@ contradicts the expectations above, write down what was actually true — the me
 outranks the plan.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 Confirm: no test file created; no source file modified; the loud-skip design intact; no
 assertion that would pass vacuously; the two deliberate non-faults still not treated as
 faults; `minPct` untouched.

@@ -115,20 +115,27 @@ Completion record (all steps done):
 - [x] Step 16 FINAL-REVIEW — report delivered (encodings converged, follow-ups named, override-provenance proof).
 
 ### Step 8: TEST — write the tests, run ONLY the named files, record red.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — read actions.js (approvePlan/approveSubplans/HUMAN_GATES/
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 flowMap/assignDirectly), gate-order.js, iron-loop-enforcer.js, functional.js,
 plan-validator.js validateTransition IN FULL from disk.
 ### Step 10: IMPLEMENT — items 1–4.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 ### Step 11: REVIEW — grep: zero hardcoded gate-edge literals remain in your
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 files outside gate-order.js; approvePlan has no crossing path that skips the
 validator except the recorded override.
 ### Step 12: OPTIMIZE — validator called once per crossing.
 ### Step 13: SECURE — the override MUST be recorded; a silent override is the
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 defect. No path crosses Gate 3 without either clean evidence or a logged override.
 ### Step 14: VERIFY — node --test on the named files + eslint; no git.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — actions.js header: approvePlan validates + records
 overrides; gate-order is the one encoding.
 ### Step 16: FINAL-REVIEW — report every gate-edge encoding converged, every one
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 left for a follow-up, and the override-provenance proof.
 
 ## Decisions Taken Under Ambiguity

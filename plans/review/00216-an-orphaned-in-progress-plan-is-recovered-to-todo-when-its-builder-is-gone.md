@@ -256,12 +256,14 @@ seen. A second wiring point is the human's to schedule.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 Write `tests/plan-recovery.test.js` in full FIRST and run only it. Cases 1–13 must be
 RED (the module does not exist). Record case 1's red (a plan that stays in `in-progress`
 when its builder is dead) and case 2's red verbatim — case 2 is the safety tier that
 must NOT move a still-quarantined orphan.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 Read from disk, and let the CODE win where it disagrees with this plan:
 `src/lib/task-reconcile.js:367-447` (the orphan transition, the `orphanReason` markers,
 the quarantine-release branch) and `:711-716` (the quarantine reserve predicate — the
@@ -275,12 +277,14 @@ veto and cleanup-log shape to mirror), `:1376` (`spec.plan = plan.name`);
 file, so it can throw). Confirm no existing module already imports a `plan-recovery`.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 - `src/lib/plan-recovery.js` — `recoverOrphanedPlans` per the algorithm, each I/O
   boundary in its own try/catch, JSDoc on the export documenting the tiered auto-vs-surface
   contract and the reuse of the reconciler's verdict.
 - `tests/plan-recovery.test.js` — the thirteen cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 Confirm: no path moves a task whose `orphanReason === 'staleness'`; the liveness veto
 precedes every move; the review-ready gate leaves review-ready plans untouched; every
 catch records a skip/surface with a reason and continues the batch; the module never
@@ -292,6 +296,7 @@ One registry load, one in-progress read, one pass over orphaned tasks. The dedup
 the `bySlug` map avoid re-scanning. No per-plan registry reload.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 Path handling: plan paths come from `readPlans` (inside `plans/in-progress/`) and
 `movePlan`'s own collision guard; no user-supplied path is interpolated. The cleanup-log
 `reason` strings describe state, never echo file contents or a stack trace. `safeFs` is
@@ -300,6 +305,7 @@ escape `plans/` (it names a `bySlug` key derived from a real in-progress filenam
 task naming a non-resident plan is simply ignored).
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 `node --test tests/plan-recovery.test.js`, then the full gated run `npm test`. Lint at
 `--max-warnings 0`. Coverage on `src/lib/plan-recovery.js` at or above the 99 floor
 (scoped `src/**`) with 0 skipped. No git operations. Report the real numbers.
@@ -312,6 +318,7 @@ test-file add does not need it. If a human-facing note belongs in `CLAUDE.md`, t
 follow-up the human schedules.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 Report every Step 8 red verbatim (cases 1 and 2 especially), the Step 14 coverage number
 for `plan-recovery.js`, and every decision below. Confirm the module is a leaf with no
 live caller yet (00217 wires it) and say so plainly — a module whose only caller is its

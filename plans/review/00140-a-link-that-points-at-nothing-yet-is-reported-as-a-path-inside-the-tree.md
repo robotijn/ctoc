@@ -228,6 +228,7 @@ Nothing here is reachable only from a test.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 Write `tests/a-dangling-link-is-not-a-path-inside-the-tree.test.js` in full and run
 **only that file, before touching `src/`**. Record the starting state verbatim.
 
@@ -244,6 +245,7 @@ Write `tests/a-dangling-link-is-not-a-path-inside-the-tree.test.js` in full and 
   **stop and report** rather than widening the branch to make red go green.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 Read from disk, in full: `src/lib/real-path-confinement.js`; `src/lib/safe-fs.js`'s
 `lstatSync`, `realpathSync`, `readlinkSync` and `validatePath`;
 `src/lib/plan-coverage.js:333-480`; `src/hooks/PreToolUse.Edit.js:57-64` and `:170-211`.
@@ -267,6 +269,7 @@ Where the code disagrees with this plan, **the code wins and the discrepancy is
 recorded.**
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 One step, files as sub-items.
 - `src/lib/real-path-confinement.js` — the `dangling` branch on the `ENOENT` path,
   the reason added to the JSDoc vocabulary, the header paragraph on the missing-path
@@ -277,6 +280,7 @@ One step, files as sub-items.
   assertion loosened. Declared here so the executor is covered rather than stopping.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 Confirm the `lstat` runs on the `ENOENT` branch ONLY and never on a path that exists.
 Confirm the walk still terminates: the new branch RETURNS, so it cannot extend the
 loop. Confirm the function still cannot throw — the new `lstat` is inside its own
@@ -290,6 +294,7 @@ after-timing against Step 9's before-numbers, all six. Confirm the extra cost fa
 only on the missing-path branch and is bounded by the depth of the missing tail.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 This is the security step of a security fix; do it adversarially.
 - Re-attack by hand against the built code: a dangling link at the target, in the
   middle of the path, and chained (`a → b`, `b → <absent>`).
@@ -302,6 +307,7 @@ This is the security step of a security fix; do it adversarially.
   rather than an assumption).
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 Targeted run first: the new file, plus `tests/a-link-cannot-leave-the-repository.test.js`,
 `tests/plan-coverage-coverage.test.js`, `tests/unapproved-plan-grants-nothing.test.js`,
 `tests/enforcement-hook.test.js`, `tests/pretooluse-edit-coverage.test.js`,
@@ -330,6 +336,7 @@ segment has been excluded. Add the rejected one-hop-follow alternative and why. 
 `'dangling'` to the reason vocabulary in the JSDoc.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 Report: the paths; the Step 8 verbatim red, naming separately whether case 2 confirmed
 or **refuted** the ledger claim; the errno observed for a dangling link on this
 platform; all six timing numbers and the counted extra `lstat` calls; any dangling link
@@ -391,6 +398,7 @@ All steps 8–16 executed. Files changed:
   (106 modules, unchanged by this slice), so nothing tripped and nothing was touched.
 
 ### Step 8: TEST — TDD RED, recorded verbatim BEFORE any src/ change
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 
 `node --test tests/a-dangling-link-is-not-a-path-inside-the-tree.test.js`:
 `tests 14 · suites 1 · pass 6 · fail 8 · cancelled 0 · skipped 0 · todo 0`
@@ -434,6 +442,7 @@ but only because a non-existent directory contains no plans to match. The predic
 itself never denied. Fixed here by resolving a comparison BASIS strictly, with no walk.
 
 ### Step 9: PREPARE — measured, not assumed
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 
 Symbolic links in this repository outside `node_modules/` and `.git/`: **ZERO**, so
 dangling links outside those directories are necessarily zero too. The over-refusal in
@@ -468,6 +477,7 @@ The added cost is inside run-to-run noise — at most a few hundredths of a mill
 roughly 100× under the 10 ms budget, and it falls only on the missing-path branch.
 
 ### Step 13: SECURE — the re-attack, by hand, against the built code
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 
 | attack | verdict |
 |---|---|

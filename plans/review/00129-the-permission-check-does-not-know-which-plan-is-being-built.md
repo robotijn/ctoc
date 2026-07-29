@@ -631,6 +631,7 @@ the only place a remedy can do any good.**
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 Write `tests/a-denial-names-the-action-that-resolves-it.test.js` in full and run **only
 that file, before touching `src/`**. Record the starting state verbatim.
 
@@ -646,6 +647,7 @@ precondition passes.** Writing Part B's tests first would produce a red suite fo
 part that is not going to be built, which is a false signal in the opposite direction.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 
 **9a — THE PRECONDITION MEASUREMENT. This decides whether Part B exists.**
 
@@ -703,6 +705,7 @@ Where the code disagrees with this plan, **the code wins and the discrepancy is
 recorded.**
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 One step, files as sub-items.
 
 **Part A (always):**
@@ -721,6 +724,7 @@ One step, files as sub-items.
 - `tests/only-a-building-plan-grants-write-access.test.js` — the nineteen cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 **Part A:** Confirm the remedy table is the ONLY place a remedy sentence is spelled,
 that `buildBlockMessage` remains pure, and that the fallback path is byte-identical to
 today's output. Confirm no allow/deny logic was touched — read the diff, do not infer
@@ -747,6 +751,7 @@ whitelist fast path. Confirm `explainDenial`'s second scan is still block-path o
 Record the after-timing.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 **Part A:**
 - Confirm a hostile `denial.reason` cannot inject text: a reason containing a newline,
   a terminal escape, `%s`, and a 10,000-character string. The table is keyed by exact
@@ -768,6 +773,7 @@ Record the after-timing.
   registry, unreadable registry, unlistable `in-progress/`, a lazy require that fails.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 Targeted run first: the new Part A file, `tests/enforcement-hook.test.js`,
 `tests/pretooluse-edit-coverage.test.js`, `tests/w01-edit-write-deny-protocol.test.js`,
 `tests/w01-multiedit-notebookedit-parity.test.js`,
@@ -808,6 +814,7 @@ plan-scoped-but-not-build-scoped, that narrowing it requires a building witness,
 that no such witness is set on the live dispatch path as measured on 2026-07-20.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 Report, in this order:
 
 1. **Whether the Step 9a gate passed**, with the full plan/task table and the registry

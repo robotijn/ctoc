@@ -293,6 +293,7 @@ answer a gate — the only place this information can do any good.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 Write `tests/scope-shown-at-approval.test.js` in full and run **only that file, before
 touching `src/`**. Record the starting state verbatim.
 
@@ -304,6 +305,7 @@ touching `src/`**. Record the starting state verbatim.
   green. It is the proof this change cannot take the approval surface down.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 Read from disk, in full: `src/lib/streaming-gate.js:190-300` and `:840-900`;
 `src/lib/plan-coverage.js:236-340` for `readPlanFiles`' real signature and its
 `globToRegex` export; and `src/lib/safe-fs.js` for the readdir surface.
@@ -329,6 +331,7 @@ Then MEASURE:
    as fact.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 One step, files as sub-items.
 - `src/lib/declared-breadth.js` — `isAnchored` (pure, total) and `countMatching`
   (bounded, link-free, total); the header carries the I/O-free-half / I/O-half split,
@@ -338,6 +341,7 @@ One step, files as sub-items.
 - `tests/scope-shown-at-approval.test.js` — the thirteen cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 Confirm `isAnchored` is I/O-free and total, and that nothing outside `countMatching`
 in this module touches the filesystem — `00126` will put `isAnchored` on the
 enforcement hook path, and a filesystem read there is a latency defect while a throw
@@ -353,6 +357,7 @@ circuits the walk rather than being applied after it. Record the after-timing ag
 Step 9's number.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 - Confirm a hostile `files:` entry cannot forge screen rows or emit terminal escapes:
   newline, carriage return, `[`, and a very long single entry.
 - Confirm the walk cannot be induced to leave the repository: an in-tree symbolic link
@@ -364,6 +369,7 @@ Step 9's number.
 - Confirm no absolute path leaks into the rendered text — repository-relative only.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 Targeted run first: `tests/scope-shown-at-approval.test.js`,
 every existing `streaming-gate` test file, `tests/plan-coverage-coverage.test.js`,
 `tests/false-green-fence.test.js`, `tests/architecture-invariants.test.js`,
@@ -387,6 +393,7 @@ approval time, not a guarantee. A comment at `renderDeclaredScope`'s call site s
 that a fault here must never take the gate screen down.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 Report: the paths; the Step 8 verbatim red for case 1; every approval path found at
 Step 9 and whether each renders scope — naming explicitly whether the batch approval
 path does; the measured walk cost and repository file count; what the screen actually

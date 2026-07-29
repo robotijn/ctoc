@@ -271,6 +271,7 @@ Nothing here is reachable only from a test.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 Write `tests/the-whitelist-cannot-leave-the-repository.test.js` in full and run **only
 that file, before touching `src/`**. Record the starting state verbatim.
 
@@ -287,6 +288,7 @@ that file, before touching `src/`**. Record the starting state verbatim.
   change, so the after state is a comparison rather than a claim.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 Read from disk, in full: `src/hooks/PreToolUse.Edit.js:57-97`, `:104-211` and
 `:419-500`; `src/lib/real-path-confinement.js` as built by 00140;
 `src/hooks/PreToolUse.Write.js`'s delegation into `enforce()`;
@@ -313,6 +315,7 @@ Where the code disagrees with this plan, **the code wins and the discrepancy is
 recorded.**
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 One step, files as sub-items.
 - `src/hooks/PreToolUse.Edit.js` — the `escapesRoot` test at the end of
   `isWhitelisted`, with the failing direction and the fall-through consequence written
@@ -322,6 +325,7 @@ One step, files as sub-items.
   live, if adding one test file trips them. Nothing else, no assertion loosened.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 Confirm the resolution runs ONLY after a pattern matched — read the function and prove
 an ordinary source edit costs zero syscalls. Confirm the arithmetic path is byte-for-byte
 unchanged. Confirm there is still exactly ONE encoding of real-path confinement and that
@@ -338,6 +342,7 @@ path and it must not regress at all. Confirm the root is resolved once per call.
 Record the after-timing against Step 9's six numbers.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 This is the security step of a security fix; do it adversarially.
 - Re-attack by hand against the built code: each whitelisted prefix in turn
   (`plans/`, `.ctoc/`, `.local/`), through a live link, a dangling link and a loop.
@@ -353,6 +358,7 @@ This is the security step of a security fix; do it adversarially.
 - Confirm the deny path leaks no absolute paths, no file contents and no stack traces.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 Targeted run first: the new file, plus `tests/pretooluse-edit-coverage.test.js`,
 `tests/enforcement-hook.test.js`, `tests/security-enforcement-evasion.test.js`,
 `tests/w01-edit-write-deny-protocol.test.js`,
@@ -386,6 +392,7 @@ coverage and not a denial, and where it lands; and that the resolution deliberat
 only after a pattern matched, so the hot path is untouched.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 Report: the paths; the Step 8 verbatim red, confirming or **refuting** the sibling
 executor's probe; all six timing numbers, with the non-whitelisted path shown to be
 unchanged; any link found under a whitelisted prefix in this repository; the loop

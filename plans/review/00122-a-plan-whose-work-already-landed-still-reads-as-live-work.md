@@ -267,12 +267,14 @@ dead code.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 - Write `tests/plan-work-already-landed.test.js` in full and run ONLY that file, before touching any source.
 - **Cases 1, 3, 5, 8 and 10 MUST be RED.**
 - **Case 2 is the one to fear and must be proven, not assumed.** A landed-check that flags pending plans is worse than no landed-check: it teaches the human to ignore the output, which is how the original 37 accumulated. Build the fixture so case 2 would fail if the derivation were sloppy, and record its output either way.
 - Case 4 must be red-then-green in the honest direction: confirm that today a non-git fixture already yields `inconclusive`, and that the new fields cannot turn that into a confident negative.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 - Read from disk: `src/lib/stale-detector.js` — `verifyStaleCandidate` in full, `StaleEvidence`, the `degraded()` shape, `slugMatchCommits` and the `slugHistoryCache` hoist, and `classifyStaleCandidate` with every existing category.
 - Read `src/lib/plan-index/conflict-detect.js` in full — the AND, `filesOverlap`, the broad-glob downgrade, the fail-open contract, and the lazy-require pattern for `related` / `getWiring`.
 - Read `src/areas/pipeline.js` — `prefetchConflicts` and `renderConflictPanel` — and confirm how an unrecognised `severity` value renders before choosing one.
@@ -280,11 +282,13 @@ dead code.
 - Where the code disagrees with this plan, **THE CODE WINS** — record it.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 - `src/lib/stale-detector.js` — the four evidence fields; the `landed-candidate` category with a null action; the degraded path preserved.
 - `src/lib/plan-index/conflict-detect.js` — the third term; the stage-based cheap half; the lazy-require landed-check; the unverified labelling; fail-open preserved.
 - `tests/plan-work-already-landed.test.js` — the twelve cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 - Confirm **`landedByOther: false` is unreachable whenever git could not be read.** The single most important review item in this slice.
 - Confirm no new git invocation was added — count them.
 - Confirm `detectConflicts` still returns `[]` for every existing empty condition and still throws only on a non-string slug.
@@ -296,6 +300,7 @@ dead code.
 - The conflict landed-gate is capped at the existing 20-candidate limit; the stage-key check is a string test and must run **before** any landed derivation so the common case pays nothing.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 - Commit messages and plan slugs are agent-writable and reach a dashboard: sanitize before rendering, following the `stripCtl` treatment `renderConflictPanel` already applies. Assert it.
 - `landingCommits` and `landingAttributedTo` are bounded, so a repository with a long history cannot balloon the returned object.
 - Git pathspecs are built from validated, repository-relative POSIX paths, never from raw declared strings; the existing `..`-stripping in `declaredFileExists` is the precedent.
@@ -303,6 +308,7 @@ dead code.
 - Fixtures create throwaway git repositories under `os.tmpdir()` only, and never invoke git against the real repository.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 - `node --test tests/plan-work-already-landed.test.js` plus every existing `tests/stale-*`, `tests/plan-index-*` and `tests/pipeline*` test, green.
 - Full gated run `npm test`: lint at `--max-warnings 0`, typecheck clean, coverage at or above the enforced floor, fail 0, 0 skipped except a documented git-absence skip that prints its reason.
 - **Run the landed-check against the real repository and report the candidate list verbatim.** Then, for each candidate, state whether the evidence looks right — this is the calibration, and it is the only way to know whether case 2's guarantee holds outside a fixture. Report false positives as findings; **do not tune the derivation to make the list shorter.**
@@ -314,6 +320,7 @@ dead code.
 - Update the documented test-file count in **both** places, reading the live count from disk first.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 - Report: files changed; the Step 8 reds verbatim; the real-repository candidate list with a judgment on each; the before/after conflict row counts; the git-invocation count proving no second scan; the before/after documented test-file count; and every decision taken under ambiguity.
 
 ## Decisions Taken Under Ambiguity

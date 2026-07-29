@@ -158,15 +158,22 @@ Cross-platform: `path.join`, `os.tmpdir()`, `fs.promises.rm` teardown.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/dashboard-says-the-moment.test.js` in full, run ONLY that file, record the red output verbatim. Cases 1, 2, 4, 5 and 7 MUST be red. Include the rendered dashboard text in the red evidence.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — re-read from disk: `src/lib/menu-screens.js` around `:850-930` and `:2280-2300`. The landed code WINS over this plan's line numbers. Confirm `src/lib/gate-words.js` exists (if it does not, the preceding slice has not landed — STOP and report rather than inlining the phrasing). Then search the whole file for any OTHER human-facing gate number this plan did not name; if one exists, add it to Change 2 and record it, because case 4 will fail on it regardless.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/menu-screens.js` — Changes 1, 2 and 3.
 ### Step 11: REVIEW — confirm no remaining string literal on a dashboard render path matches the gate-number pattern. Confirm the deploy-ready block comment at `:855` no longer describes a line that was changed out from under it. Confirm the counts still render.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — two string builds on a path that already builds strings; no new read, no new allocation on the path where neither line renders.
 ### Step 13: SECURE — neither line interpolates plan-derived text beyond a count, so no new injection surface. Confirm the counts are numbers and cannot carry a crafted string.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/dashboard-says-the-moment.test.js tests/gate-words.test.js tests/menu-screens-coverage.test.js tests/menu-protocol.test.js` green, then the full gated run `npm test`. Lint the changed file. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — update the block comment at `:855` to state the rule rather than the number.
 ### Step 16: FINAL-REVIEW — report the dashboard BEFORE and AFTER, verbatim, and every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

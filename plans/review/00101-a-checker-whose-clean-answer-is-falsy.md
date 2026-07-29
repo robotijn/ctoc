@@ -177,6 +177,7 @@ if any unrelated case turns red the code is wrong, not the case.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 Write the contract group in `tests/iron-loop-enforcer.test.js` and run ONLY that
 file before touching `src/`. Cases 1, 2, 4 and 5 must be **RED** — case 2's red is
 the human's crash reproduced as an assertion, and cases 4 and 5 prove the consumer
@@ -187,6 +188,7 @@ safety argument. Record every output verbatim, and record the exact
 measured rather than something assumed.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 Read from disk: `src/lib/iron-loop-enforcer.js` in full — all twenty checks, the
 registry at `:565-586`, the consumer at `:718-745`, the formatters at `:750-798`,
 and the exports at `:800-810`. Enumerate **every** call site of every exported
@@ -197,6 +199,7 @@ a comment and not a call. Note that this module requires `./reachability` at
 ordering note. Where the code disagrees with this plan, record the discrepancy.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 One step, files as sub-items.
 - `src/lib/iron-loop-enforcer.js` — the `CLEAN` and `finding` helpers, all twenty
   checks rewritten to the envelope, the consumer's filter and its unreadable-verdict
@@ -210,6 +213,7 @@ and the callers that break the moment it changes. Splitting them would leave the
 suite red between two slices, which is a worse failure than a slightly large one.)*
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 Go through all twenty checks and confirm, one by one, that severity, message text
 and details are byte-identical to before — the envelope changed, the verdict did
 not. Confirm no check can return a bare `null` any more. Confirm the consumer's
@@ -223,12 +227,14 @@ over plans or files, and that the fresh-object choice did not introduce a per-pl
 allocation.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 Confirm no message gained a path, a plan body, or file contents; the envelope
 carries exactly what the message carried before. Confirm the unreadable-verdict
 error names the check id only, never the check's return value, which could carry
 arbitrary content from a future check.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 Run `node --test` on `tests/iron-loop-enforcer.test.js`,
 `tests/iron-loop-enforcer-coverage.test.js`, `tests/ship-gate-real.test.js`,
 `tests/approveplan-validates.test.js`, `tests/gates.test.js` and
@@ -248,6 +254,7 @@ understands the cost. Note in the same comment that a check returning nothing is
 error, and why.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 Report the four paths, the Step 8 verbatim red, the enumerated call-site list from
 Step 9 with any discrepancy against this plan's cost table, the identical self-check
 reports from Step 14, the recommendation about a repository-wide census, an explicit

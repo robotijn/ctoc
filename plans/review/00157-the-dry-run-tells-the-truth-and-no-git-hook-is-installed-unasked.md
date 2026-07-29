@@ -263,15 +263,22 @@ installed.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/init-tells-the-truth.test.js` in full, run ONLY that file, record the red output verbatim. Cases 1 through 6, 8, 9, 10 and 14 MUST be red. Case 5's red evidence MUST show the installed hook file's contents, because a git hook appearing in a user's repository unasked is the finding a reader most needs to see.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — re-read from disk: `src/lib/init-project.js:565-749` in full, every `created.push` / `skipped.push` site, `PLAN_DIRS` and `CTOC_DIRS`, and `src/lib/hooks-installer.js:614-665` for `installPostCommitHook`'s return shape. The landed code WINS over this plan's line numbers. Confirm `src/commands/menu.js`'s `ensureInitialized` reads the report (the preceding slice); if it still discards it, STOP and report — changing the report shape under a caller that ignores it would leave the defect intact while looking fixed.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/init-project.js` — Changes 1, 2 and 3.
 ### Step 11: REVIEW — confirm no `created.push` remains on a preview path. Confirm no write remains outside `record`. Confirm the install path is byte-identical when `installGitHook: true`. Confirm every other caller of `initProject` in the repository still works with the new shape, and list each one. Confirm `success` cannot be true while `failed` is non-empty.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — `record` replaces four duplicated branches; the required-artifact check is a handful of existence calls at the end of a once-per-project operation.
 ### Step 13: SECURE — writing into `.git/hooks/` is the highest-privilege thing setup does, and this slice removes it from the default path. Confirm the install runs ONLY under the explicit option. Confirm `failed` entries carry the error MESSAGE and never a stack trace or an absolute path.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/init-tells-the-truth.test.js tests/init-project.test.js tests/menu-reports-what-init-did.test.js tests/hooks-installer.test.js tests/e2e-menu-lifecycle.test.js` green, then the full gated run `npm test`. Lint the changed file. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — a JavaScript doc on `initProject` stating the two rules: a preview reports what it WOULD do under a different key, and setup never installs anything into a git repository without being asked. Record the follow-up that would offer the install, so it is visible rather than forgotten.
 ### Step 16: FINAL-REVIEW — report the preview report and the real report side by side for the same fixture, verbatim, plus the filesystem listing proving the git hook was not installed. Report every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

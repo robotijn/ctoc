@@ -271,22 +271,30 @@ trustworthy must be shown to be repeatable, not assumed to be.
 - [x] `CLAUDE.md` test-file count ratchet moved 427 → 428 (decision 13)
 
 ### Step 16: FINAL-REVIEW — [x] COMPLETE — reported below and in the executor's report
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ---
 
 ## Original Execution Plan (as written at Step 7)
 
 ### Step 8: TEST — write `tests/last-mile-drives-entry-point.test.js` in full, run ONLY that file, record the red output verbatim. Cases 1-5, 7, 8 and 10 MUST be red; case 6 MUST be GREEN in its first half (a library project is `applicable: false` today) and red only on the extended reason — record that distinction, because case 6 is the "nothing else regresses" guard.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — read from disk, in full: `src/lib/app-runner.js` (especially `detectAppShape`, `driveApp`, `driveAppSync`, `nativeNotApplicableResult`); `src/lib/step-13-verify.js:120-235` (`applyAppRunCheck` and `countSubstantiveChecks`); `src/lib/settings.js` to determine whether a schema entry is required at all. Confirm how `driveAppSync` runs its child today (`--drive` re-entry into the same file) and reuse that mechanism rather than inventing a second one.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/app-runner.js` — `readDeclaredEntryPoint`, `driveDeclaredEntryPoint`, the declaration-first branch in `driveApp`/`driveAppSync`, and the extended not-applicable reason.
   - `src/lib/settings.js` — the `general.entry_point` schema entry, only if the schema requires it (Step 9 decides; record either way).
 ### Step 11: REVIEW — confirm no path can report `applicable: false` for a DECLARED entry point: a declared-but-failing entry point must always be a failure, never a skip. Grep for every remaining `applicable: false` construction in `app-runner.js` and justify each. Confirm `countSubstantiveChecks` still excludes non-applicable results. Confirm the timeout path produces a failure and not a not-applicable.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — one child process, one run, no retries, no polling loop. Do not add a warm-up run; a warm-up is a retry wearing a different name.
 ### Step 13: SECURE — the command comes from project configuration, which is trusted input at the same level as the project's own source, but it is executed **without a shell** (argument array, never string interpolation) so a value containing shell metacharacters cannot become a second command. `expect` is a literal substring, never compiled as a pattern. The child gets `cwd: projectPath` and a bounded timeout, and is killed on timeout. Captured output is bounded and never rendered into evidence beyond a byte count and a matched flag — a command's stdout may contain secrets and must not be copied into the Gate-3 evidence artifact.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/last-mile-drives-entry-point.test.js tests/step-13-verify*.test.js tests/verify-fails-loudly.test.js tests/verify-parses-full-output.test.js` green, then the full gated run `npm test`. Lint every changed file. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — `app-runner.js`'s header gains the declared-entry-point shape beside the existing four, stating plainly that "no app to launch" is not "no entry point". Document the settings key with its three fields and a worked example. State the non-goals (no browser automation, no screenshots, no multi-step interaction) so the check is not later "improved" into a flaky one.
 ### Step 16: FINAL-REVIEW — report files, tests, verbatim red evidence, verbatim green evidence, the case-12 repeat-run result, whether `settings.js` needed a change, and every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

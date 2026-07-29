@@ -317,16 +317,23 @@ Cross-platform: `path.join`, `os.tmpdir()`, `fs.promises.rm` teardown.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/gate-words.test.js` in full, run ONLY that file, record the red output verbatim. Cases 8, 9 and 13 MUST be red, and the red output MUST include the rendered screen text so the defect is reproduced from the human's seat, not merely from an assertion message.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — re-read from disk: `src/lib/streaming-gate.js` at every site this plan names (`:66-73`, `:505-520`, `:801`, `:818`, `:878-881`, `:896`, `:914-943`, `:1019-1033`, `:1094`, `:1112-1113`). The landed code WINS over this plan's line numbers — if a site has moved, use the site, and record the correction. Confirm `humanPlanName` still exists and still returns the title. Then search the whole file for every remaining reader of `gate` and `gateName` so Change 2 leaves none behind.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/gate-words.js` — the vocabulary module.
   - `src/lib/streaming-gate.js` — Changes 1 through 6.
 ### Step 11: REVIEW — confirm `GATE_META` has no numeric field and `grep -n "gateName" src/lib/streaming-gate.js` is empty. Confirm every `header` handed to a question is at most 12 characters. Confirm the four action strings are byte-identical to before. Confirm no screen path can render `undefined` when a stage is unknown.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — the module is frozen data and template interpolation; no file read, no allocation on a render that does not use it. Confirm no consumer builds the whole `EDGES` table per render.
 ### Step 13: SECURE — the plan title reaches these phrases. Confirm it passes through `stripCtl` BEFORE `gate-words.question` interpolates it, and that `gate-words.js` itself introduces no second, weaker sanitiser. Case 14 proves it from the render.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/gate-words.test.js tests/streaming-gate.test.js tests/menu-protocol.test.js tests/e2e-menu-lifecycle.test.js` green, then the full gated run `npm test`. Lint both changed JavaScript files. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — a header comment on `gate-words.js` stating the rule in one sentence and recording that the numbers remain legal in identifiers, comments and file formats. Replace the now-false comment at `streaming-gate.js:66-67` ("the gate NUMBER is the human-facing name").
 ### Step 16: FINAL-REVIEW — report the rendered screen BEFORE and AFTER, verbatim, so the change is judged on what a person reads. Report every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

@@ -126,14 +126,21 @@ simulated failure — or assert temp+rename usage).
 
 ## Execution Plan (Steps 8-16)
 ### Step 8: TEST — [x] wrote tests/ledger-forgery-closed.test.js, ran ONLY that file, recorded RED (MODULE_NOT_FOUND on the not-yet-written script).
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — [x] read every in-scope file IN FULL from disk, plus PreToolUse.Edit.js (the deny mirrored, read-only), hooks.json, and every `node -e` recipe in start.md.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — [x] ALL items 1–7 done and LIVE in the tree, verified against disk during this rework. Items 4 and 7-deploy-ready are NOT skipped: `stampAndLedger` passes `plan_basename` on the live human-approval path (`src/lib/actions.js:354`), and `recordDeployReadyNotice` writes atomically via temp+rename (`src/lib/actions.js:1261-1263`). Item 3's vision-archive call site is also live: `src/lib/vision-decomposer.js:280` calls `writeVisionArchiveEntry` immediately before the move. The earlier record's "SKIPPED / deferred to a concurrent slice" note was wrong — corrected here, and the phantom follow-ups are retired.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 ### Step 11: REVIEW — [x] enumerated every denied vs allowed command form; the forgery test drives the REAL spawned hook against all start.md recipes verbatim (all ALLOW) and all forgery forms (all DENY).
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — [x] the guard is pure regex on the command string: no fs walk, no state read, linear-time literals only. It runs before loadState.
 ### Step 13: SECURE — [x] re-attacked; broadened the JS-runtime inline-eval set (node → node/deno/bun/ts-node/tsx) after the re-attack found `deno eval`/`bun -e` bypasses. Residual (write-a-.js-file-then-`node` it) is documented in the module docstring AND in this plan's Decisions section (see below) — it is not eliminated by a static string gate.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — [x] RE-RUN during rework with the REAL ship gate `npm test` (src/scripts/test-gate.js — enforces the coverage floor AND the zero-skipped gate, which `node --test` bypasses), on the FULL tree with these enforcement-code changes integrated. Result recorded in the Step-16 rework report below (# fail 0, # skipped 0, coverage ≥ floor). Supersedes the earlier subset `node --test` run (386 files) that never exercised the coverage floor or the ~71 unrun files.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — [x] module headers rewritten to state the REAL guarantee and its honest limits (approval-ledger, PreToolUse.Bash, human-gate-check, ledger-backfill).
 ### Step 16: FINAL-REVIEW — [x] report returned with the honest residual-bypass list. Reworked (see rework report below) to reconcile the record with the shipped tree and run the real ship gate.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Step-16 Rework Report (adversarial-review response)
 

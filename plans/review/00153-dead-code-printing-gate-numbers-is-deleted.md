@@ -180,18 +180,25 @@ after this slice:
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — add cases 1, 2 and 5 to `tests/ui.test.js` BEFORE deleting anything, run ONLY that file, record the red output verbatim. Cases 1, 2 and 5 MUST be red: all seven exports exist and the module is full of gate numbers today.
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — prove the five are dead, exhaustively, and do not trust this plan's table. Search the WHOLE repository (`src/`, `tests/`, `agents/`, `skills/`, `.claude-plugin/`, `src/scripts/`) for each of the five names, for `require('./ui')` and `require('../lib/ui')` in every form, and for dynamic property access (`ui[`, `ui.dashboard`, destructuring). Read `.ctoc/export-reachability-baseline.json` and confirm it already records these five as unreachable. **If ANY of the five has a live non-test caller, STOP and report — this plan is then wrong about that export and the correct change for it is re-wording, not deletion.**
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
   - `src/lib/ui.js` — delete the five exports and every private constant left with no reader.
   - `tests/ui.test.js` — delete the cases for the deleted exports; keep cases 1-5.
   - `tests/hooks.test.js` — delete the `ui.blocked` case; re-assert live hook behaviour against the hook's own message if that case carried any.
   - `.ctoc/export-reachability-baseline.json` — remove the five entries, lower the maximum.
 ### Step 11: REVIEW — confirm no file anywhere still names a deleted export. Confirm `colors` and `writeToTerminal` are byte-identical. Confirm the two hooks still load the module and still work. REPORT (do not fix) what the Edit hook's block message says today, since `blocked` was the previous encoding of that message and a reader deserves to know whether the live one is any better.
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 ### Step 12: OPTIMIZE — the module gets smaller; there is nothing to tune. Confirm no remaining private constant is now unused.
 ### Step 13: SECURE — deleting a function a hook calls would break enforcement, which is a security-relevant path. Case 3 and 4 plus the hook tests prove both survivors still work. Confirm neither hook reaches any deleted name.
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 ### Step 14: VERIFY — `node --test tests/ui.test.js tests/hooks.test.js tests/export-reachability.test.js tests/pretooluse-edit-coverage.test.js` green, then the full gated run `npm test`. Coverage will MOVE when 150-odd lines of tested-but-dead code leave the denominator — record the before and after figures verbatim and confirm the floor is not lowered to accommodate either direction. Lint the changed files. No git operations.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — a header comment on `src/lib/ui.js` stating what the module is now (terminal colours and a terminal writer) and recording that five screen builders were removed as unreachable, with the date. A module whose scope shrank should say so.
 ### Step 16: FINAL-REVIEW — report the five deleted exports, the exhaustive evidence from Step 9 that each was dead, the coverage before and after, and every decision taken under ambiguity.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

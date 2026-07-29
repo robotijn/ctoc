@@ -226,22 +226,26 @@ creates no new module and therefore no new dead code.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD tests present; workflow Step-11 REVIEW (2026-07-29) confirmed real/adversarial, not vacuous.
 - Write `tests/stale-scan-says-when-it-could-not-look.test.js` in full and run ONLY that file, before touching any source.
 - **Cases 1, 2, 5, 6, 7 and 12 MUST be RED** — the `unread` channel does not exist and implementation-stage plans are actionable today.
 - Record case 2's red verbatim. "A backlog that could not be read and a clean backlog returned the same object" is the evidence this slice exists for, and the verbatim output is worth more than any assertion about it.
 - Before fixing case 7, count how many implementation-stage plans in the **real repository** are currently marked actionable on `missing-files` alone, and record the number. That is the size of the noise, measured.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 - Read from disk: `src/lib/stale-detector.js` in full — the header contract, `GATE_SOURCE_STAGES` (`:88`), `NOT_STARTED_STAGES` (`:100`), `scanCheapCandidates` (`:794`) and all four skip points, `verifyStaleCandidate`'s `degraded()` shape (`:401`, the convention to mirror), and `classifyStaleCandidate` (`:561`).
 - Read `src/lib/inbox.js:230-310` — both call sites and the `NOT_STARTED_STAGES` fail-safe at `:296`.
 - Read `src/lib/menu-screens.js:1100-1250` — the classifier call sites, to confirm the additive change cannot break the verify screen.
 - Where the code disagrees with this plan, **THE CODE WINS** — record it. The line numbers here were read on 2026-07-19 and the file is long enough to have moved.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 - `src/lib/stale-detector.js` — the `unread` / `unreadCount` channel at all four skip points; the closed reason enum; `implementation` added to `NOT_STARTED_STAGES`; `actionable` scoped accordingly; the header contract updated to state what `unreadCount === 0` guarantees.
 - `tests/stale-scan-says-when-it-could-not-look.test.js` — the twelve cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3.
 - Confirm **no** path returns `unreadCount: 0` without having completed the walk. This is the single assertion the whole slice rests on.
 - Confirm `candidates` and `count` are unchanged in meaning and shape, and that every existing stale-detector test passes **unmodified**. If one asserts a silent skip, the **code is right** — correct that test toward real behaviour, never loosen it.
 - Confirm the broad-generator design is preserved: candidates are still emitted at not-started stages, only `actionable` changed.
@@ -252,12 +256,14 @@ creates no new module and therefore no new dead code.
 - The `unread` array is bounded by the number of plans; no unbounded accumulation.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 - **No raw error message reaches the returned value.** The `reason` field is the closed four-value enum; a caller renders it directly on the dashboard, and a filesystem error string can carry absolute paths and user names. Assert this in case 12.
 - Paths in `unread` are repository-relative, never absolute.
 - The existing symlink and size defences (`lstatSync`, `MAX_PLAN_BYTES`) are preserved exactly — a skip becoming audible must not become a skip that reads.
 - Fixtures write only under `os.tmpdir()`; the real `plans/` and `.ctoc/state/stale-dismissals.json` are never touched.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 - `node --test tests/stale-scan-says-when-it-could-not-look.test.js` plus every existing `tests/stale-*.test.js` and `tests/inbox*.test.js`, green.
 - Full gated run `npm test`: lint at `--max-warnings 0`, typecheck clean, coverage at or above the enforced floor, fail 0, and **0 skipped except any platform-conditional permission case, each printing its stated reason**.
 - Run the scan against the **real repository** and report verbatim: total candidates, `unreadCount`, and the actionable count before and after the `NOT_STARTED_STAGES` change. The drop in actionable count is the measured size of the noise removed.
@@ -268,6 +274,7 @@ creates no new module and therefore no new dead code.
 - Update the documented test-file count in **both** places, reading the live count from disk first.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 - Report: files changed; the Step 8 reds verbatim, especially case 2; the real-repository scan before and after with all three numbers; the measured noise reduction; the before/after documented test-file count; and every decision taken under ambiguity.
 
 ## Decisions Taken Under Ambiguity
