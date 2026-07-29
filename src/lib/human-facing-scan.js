@@ -35,9 +35,14 @@
  *   returns/tmpl
  *
  * ── TWO PATTERNS, because the defect has two shapes ───────────────────────────
- *   written   any inspected literal whose text matches /\bgates?\s+[0-3]\b/i.
- *             Narrow on purpose: [0-3], not [0-9] — there are four gates, and a
- *             wider class fires on "Gate 8080" in a URL or "Gate 42" in a version.
+ *   written   any inspected literal whose text matches /\bgates?[\s_-]*[0-3]\b/i —
+ *             a gate word followed by a gate DIGIT, whatever separates the two:
+ *             "Gate 3", "Gate-3", "Gate_2", "gate3". The separator class must include
+ *             the hyphen and underscore: `\s` alone missed "Gate-3" and let two live
+ *             strings ship. Narrow on the DIGIT on purpose: [0-3], not [0-9] — there
+ *             are four gates, and a wider class fires on "Gate 8080" in a URL or
+ *             "Gate 42" in a version. The bare plural noun "gates" in prose carries no
+ *             adjacent 0-3 and so never matches WRITTEN.
  *   composed  a TemplateHead/TemplateMiddle whose text ENDS with /\bgates?\s*$/i
  *             (the `` `Gate ${n}` `` shape) and a StringLiteral that is an operand
  *             of a `+` and ends the same way (the `'Gate ' + n` shape). This is the
@@ -115,7 +120,18 @@ const SCREEN_MODULES = Object.freeze([
 /** The three property names every screen in this codebase returns together. */
 const SCREEN_CONTRACT = Object.freeze(['text', 'ask', 'actions']);
 
-const WRITTEN = /\bgates?\s+[0-3]\b/i;
+// The written shape is a gate word followed by a gate digit, whatever separates the
+// two: `Gate 3`, `Gate-3`, `Gate_2`, `gate3`. The first cut used `\s+` — copied from
+// COMPOSED_END, where the whitespace fends off the English plural in a count phrase —
+// but `\s` does NOT match a hyphen, so `Gate-3` slipped straight through and two live
+// human-facing strings kept saying the number while scanRegistry reported the registry
+// clean. WRITTEN does not need the plural guard COMPOSED_END needs: it requires a
+// literal gate DIGIT immediately after the word (only separators between), so the bare
+// plural noun "gates" in prose — which carries no adjacent 0-3 — never matches. The
+// separator class is `[\s_-]*` (space, underscore, hyphen; zero or more) so an
+// unseparated `gate3` is caught too. `[0-3]`, not `[0-9]`: there are four gates, and a
+// wider class fires on "Gate 8080" in a URL or "Gate 42" in a version.
+const WRITTEN = /\bgates?[\s_-]*[0-3]\b/i;
 // The composed shape is `` `Gate ${n}` `` / `'Gate ' + n`: the literal ALWAYS ends
 // with the word "gate" followed by the whitespace that precedes the interpolated
 // number. Requiring that trailing whitespace (\s+, not \s*) is what separates the

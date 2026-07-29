@@ -557,3 +557,53 @@ shipped tree:
   own test.
 
 The record is faithful to the shipped code; this is the only reconciliation applied.
+
+## Decisions Taken During Implementation
+
+### Follow-up fix (v6.13.89) — the WRITTEN separator missed a HYPHEN, and two live `Gate-3` strings survived the fence
+
+**The defect.** `WRITTEN` was `/\bgates?\s+[0-3]\b/i`. `\s` matches spaces, not a
+hyphen, so `Gate-3` never matched. The scanner therefore reported the registry CLEAN
+while two live human-facing strings in `src/lib/menu-screens.js` kept printing the
+number — the exact false-green the fence exists to prevent, in the fence itself:
+
+- `src/lib/menu-screens.js:1782` — the review list `done-all` bulk hint:
+  `"done-all-<parent> = Gate-3 approve all of <parent>'s reviewed slices"`.
+- `src/lib/menu-screens.js:2423` — the completion-failure diagnostic:
+  `` `An implement task must produce Gate-3 evidence; the task is left unsettled` ``.
+
+Both are `written`-shape literals with a literal hyphenated `Gate-3`; the widened
+pattern flagged exactly these two and nothing else on the real registry (proven by a
+scanRegistry run BEFORE the strings were fixed — 2 findings, both at the lines above).
+
+**The fix (two parts).**
+1. `WRITTEN` widened to `/\bgates?[\s_-]*[0-3]\b/i`. The separator class now spans
+   space, underscore and hyphen (zero or more), so `Gate 3`, `Gate-3`, `Gate_2` and the
+   unseparated `gate3` all match. `[0-3]` (not `[0-9]`) is unchanged — the narrowing is
+   on the DIGIT, and it is what keeps the plural noun "gates" in prose silent: WRITTEN
+   requires a gate digit immediately after the word, and prose "gates" carries none.
+   The `\s+` guard that COMPOSED_END needs against the count-phrase plural is NOT needed
+   by WRITTEN and was the copy-paste origin of the bug.
+2. The two leaked strings now say the MOMENT, not the number:
+   `"done-all-<parent> = approve all of <parent>'s reviewed slices"` and
+   `"An implement task must produce completion evidence; …"`.
+
+**Decision — reword, do not baseline.** As with the original slice's five leaks, these
+two are trivially fixable and are precisely the number the owner objects to. Seeding a
+debt baseline that permits them would green-wash the defect. No baseline file exists for
+this fence and none was created; the tighter WRITTEN pattern only ever ADDS reach.
+
+**Over-false-positive check.** The plural "gates" and a bare "gate" in prose, with no
+adjacent gate digit, stay clean (locked by a dedicated test): `Gate 8080`, `Gate 42`,
+`two plans at gates`, `all four gates`, `3 gates ago` all produce zero findings. The
+composed count-phrase guard (`COMPOSED_END`) is untouched.
+
+**Comments kept their numbers.** `menu-screens.js` lines 1758, 1803, 2338 still say
+`Gate-3` in COMMENTS. Comments are trivia in the syntax tree and are never visited by
+the walk; numbers in comments are legal by the rule. Left as-is, deliberately.
+
+**Scope.** Only `src/lib/human-facing-scan.js` (the pattern + its header doc),
+`src/lib/menu-screens.js` (the two strings) and `tests/gate-numbers-fence.test.js` (the
+red-first hyphen/underscore case + the prose over-false-positive guard) were touched. No
+module was added, so the src/lib count is unchanged and `readme-numbers.test.js`/CLAUDE.md
+need no edit. No VERSION bump, no plan stage move.
