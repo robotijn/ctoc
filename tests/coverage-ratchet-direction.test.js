@@ -276,7 +276,11 @@ function buildRunnableGate(baselineContent) {
     path.join(ROOT, 'src', 'scripts', 'test-gate.js'),
     path.join(root, 'src', 'scripts', 'test-gate.js')
   );
-  for (const mod of ['safe-fs', 'request-exit']) {
+  // The gate now also loads the OFFLINE ledger-gate modules (plan 00137); re-export them
+  // too or the copied gate cannot resolve its requires. None touch the network, and this
+  // temp project declares no corpus claims, so the ledger gate is not applicable and does
+  // not affect the threshold behaviour under test here.
+  for (const mod of ['safe-fs', 'request-exit', 'claim-ledger', 'corpus-claims', 'claim-extractor']) {
     const real = path.join(ROOT, 'src', 'lib', `${mod}.js`);
     fs.writeFileSync(
       path.join(root, 'src', 'lib', `${mod}.js`),

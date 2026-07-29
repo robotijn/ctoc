@@ -36,67 +36,10 @@
 
 const path = require('path');
 const safeFs = require('../lib/safe-fs');
-const { extractClaims } = require('../lib/claim-extractor');
 const { verifyClaims } = require('../lib/claim-fetcher');
 const claimLedger = require('../lib/claim-ledger');
+const { collectCorpusClaims } = require('../lib/corpus-claims');
 const { requestExit } = require('../lib/request-exit');
-
-/**
- * Enumerate every `.md` guide under `skills/`, POSIX-relative, deterministically
- * ordered. A non-regular entry (symlink) is skipped as a security exclusion, exactly
- * as the extractor's own walk does.
- *
- * @param {string} root absolute project root
- * @returns {string[]} repository-relative POSIX paths
- */
-function collectGuides(root) {
-  const out = [];
-  const skillsDir = path.join(root, 'skills');
-  if (!safeFs.existsSync(skillsDir)) return out;
-  const rel = (abs) => path.relative(root, abs).split(path.sep).join('/');
-  const walk = (dir) => {
-    let entries;
-    try {
-      entries = safeFs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      // An unreadable subdirectory is reported by the census; here it simply yields no
-      // guides to verify (the census, not this walk, is the coverage instrument).
-      return;
-    }
-    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) { walk(full); continue; }
-      if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
-      out.push(rel(full));
-    }
-  };
-  walk(skillsDir);
-  return out;
-}
-
-/**
- * Collect every declared claim across the corpus, tagged with its source file.
- *
- * @param {string} root absolute project root
- * @returns {{claims: Array<Object>, unreadable: Array<{path: string, reason: string}>}}
- */
-function collectClaims(root) {
-  const claims = [];
-  const unreadable = [];
-  for (const relPath of collectGuides(root)) {
-    let fc;
-    try {
-      fc = extractClaims(root, relPath);
-    } catch (err) {
-      const reason = err && err.reason === 'oversized' ? 'oversized' : 'read-failed';
-      unreadable.push({ path: relPath, reason });
-      continue;
-    }
-    for (const claim of fc.claims) claims.push({ ...claim, file: fc.path });
-  }
-  return { claims, unreadable };
-}
 
 /**
  * Verify a corpus (or an explicit claim set) and produce a human-legible report.
@@ -117,7 +60,7 @@ function collectClaims(root) {
  */
 async function runVerification(root, opts = {}) {
   const print = opts.print !== false;
-  const collected = opts.claims ? { claims: opts.claims, unreadable: [] } : collectClaims(root);
+  const collected = opts.claims ? { claims: opts.claims, unreadable: [] } : collectCorpusClaims(root);
   const claims = collected.claims;
 
   const { verdicts, counts } = await verifyClaims(claims, opts.fetcher || {});
