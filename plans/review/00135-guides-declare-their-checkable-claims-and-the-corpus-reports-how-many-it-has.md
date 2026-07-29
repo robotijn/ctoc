@@ -328,7 +328,7 @@ clean).
 ### Step 8: TEST
 - [x] Write `tests/claim-census.test.js` in FULL and run ONLY that file, before `src/lib/claim-extractor.js` exists.
 - [x] TDD-RED observed and recorded verbatim: every case fails on the missing module.
-- [x] Prove the ratchet bites (case 15): raise `minDeclaredFiles` above the live count, watch case 14 fail with its full never-lower message, restore. **A ratchet never seen failing is indistinguishable from an assertion-free test.**
+- [x] Prove the ratchet bites (case 15): in a temp fixture keyed to the live declared count, set the floor ONE ABOVE it and drive the SAME live check case 14's contract rests on — iron-loop-enforcer's `claim-census` (`checkClaimCensus`) via `checkAllInvariants` — asserting it BLOCKS with the never-lower message; a floor AT the count is CLEAN. **A ratchet never seen failing is indistinguishable from an assertion-free test.** Mutation-proof: inverting the `<`/`>=` in `checkClaimCensus` reddens the case (verified — see build decision 14).
 
 ### Step 9: PREPARE
 - [x] Read from disk, not from this plan: `src/lib/stale-detector.js:104-124` (the `unread`/`unreadCount` contract to COPY), `:316-358` (`parseFilesField`, the dependency-free parser precedent), `:880-1028` (the walk and its four skip points).
@@ -491,5 +491,23 @@ slice here touches it.
     corpus wins where it would not.** Live census: `total=427 declared=0 undeclared=427
     registry-version=0 url-live=0 malformed=0 unreadable=0`. Baseline seeded at the
     live `minDeclaredFiles=0`, exactly as the plan specifies.
+
+14. **The committed case 15 was TEST THEATER — a tautology — and is rewritten to
+    actually bite (2026-07-30 fix).** As shipped, case 15 asserted only
+    `assert.equal(c.declaredFiles < c.declaredFiles + 1, true)` — `N < N+1`, true for
+    every N, exercising no census, no baseline, and no ratchet. It would have stayed
+    GREEN even with the ratchet comparison inverted, so it proved nothing; the Step 8
+    checkbox claiming the ratchet was "seen failing" was false. The rewrite drives the
+    REAL live check — `iron-loop-enforcer`'s `claim-census` (`checkClaimCensus`, the
+    `census.declaredFiles < minDeclared` comparison) via `checkAllInvariants` — inside a
+    temp fixture keyed to the live declared count: with the floor set ONE ABOVE the count
+    the check must return a `block` finding carrying the never-lower message, and with the
+    floor AT the count the same check must be CLEAN. A fixture is used rather than
+    mutating the committed `.ctoc/claim-coverage-baseline.json` in place because
+    `tests/iron-loop-enforcer.test.js` runs `checkAllInvariants(thorough)` on the real
+    repo root in a PARALLEL process and would read a half-mutated baseline (a false
+    cross-test failure). **Mutation-proof, demonstrated:** temporarily inverting the
+    `<` to `>=` in `checkClaimCensus` turned case 15 RED (`actual: undefined` — no finding
+    surfaced), and the source was reverted; the change is test-only.
 </content>
 </invoke>
