@@ -172,19 +172,26 @@ BLOCKED (this fails today).
 
 ## Execution Plan (Steps 8-16)
 ### Step 8: TEST — write the tests, run ONLY the named files, record the red.
+- [x] TEST — TDD tests present; Step-11 workflow re-review (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — read step-13-verify.js, quality-agent.js, app-runner.js,
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 push.js, plan-validator.js validateReviewToDone (READ-ONLY: it consumes your
 artifact) IN FULL from disk.
 ### Step 10: IMPLEMENT — items 1–7.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 ### Step 11: REVIEW — enumerate every path by which `passed:true` can be
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3; findings minor/info only, documented.
 returned; each must name at least one check that actually RAN.
 ### Step 12: OPTIMIZE — verify stays a single pass; no redundant tool probes.
 ### Step 13: SECURE — the secrets scoping fix is a security surface: prove the
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 new scope catches a secret the old one missed, with a real git repo.
 ### Step 14: VERIFY — node --test on the named files + eslint; no git.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — step-13-verify's header states the fail-closed contract
 plainly: a check that did not run is not a check that passed.
 ### Step 16: FINAL-REVIEW — report. State plainly whether Gate 3 evidence is now
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 real, and name the test that proves it on a project WITH code.
 
 ## Decisions Taken Under Ambiguity

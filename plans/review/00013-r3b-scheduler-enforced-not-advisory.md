@@ -155,17 +155,24 @@ Empty-blockedBy sync via `menu task add` → refused.
 
 ## Execution Plan (Steps 8-16)
 ### Step 8: TEST — write the tests, run ONLY the named files, record red.
+- [x] TEST — TDD tests present; Step-11 workflow re-review (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — read every file in scope IN FULL from disk.
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 ### Step 10: IMPLEMENT — items 1–12.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 ### Step 11: REVIEW — grep for every remaining `status: 'running'` write and
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3; findings minor/info only, documented.
 every load→save not routed through withRegistry; list them with justification.
 ### Step 12: OPTIMIZE — CAS retry bounded; no busy-wait.
 ### Step 13: SECURE — no regex in task-registry; safe-fs; the --force override
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 is logged, never silent.
 ### Step 14: VERIFY — node --test on the named files + eslint; no git.
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 ### Step 15: DOCUMENT — headers state the enforcement points (where the ladder
 is CHECKED, not just defined) and the single-writer assumption's replacement.
 ### Step 16: FINAL-REVIEW — report; name any bypass you did NOT close.
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 
 ## Decisions Taken Under Ambiguity
 

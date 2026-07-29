@@ -167,22 +167,26 @@ TDD-Red first: write these, see them fail, then implement.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
+- [x] TEST — TDD tests present; Step-11 workflow re-review (2026-07-29) confirmed real/adversarial, not vacuous.
 Write the test plan above into `tests/task-registry.test.js`; run
 `node --test tests/task-registry.test.js`; confirm the new tests FAIL and record
 the failure summary.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 Re-read `src/lib/task-registry.js`, `src/lib/plan-coverage.js` (globToRegex
 contract), and `src/lib/plan-index/conflict-detect.js` (the shipped overlap
 predicate to mirror).
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 The seven changes above, plus `touchesOverlap` in plan-coverage.js. WIRE IT:
 Rule 4 must actually call `touchesOverlap`. Update the module header comments
 to describe the new design truthfully. Record every judgment call in
 `## Decisions Taken Under Ambiguity`.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3; findings minor/info only, documented.
 Self-review the diff against this plan; especially: no remaining reference to
 plan-serial anywhere in `src/` (grep), rule order documented as load-bearing.
 
@@ -192,10 +196,12 @@ plan-serial anywhere in `src/` (grep), rule order documented as load-bearing.
 (do not add a cache speculatively).
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 Run the security checklist above; verify no raw `fs`, no regex in
 task-registry.js, no spread of caller specs.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 `node --test tests/task-registry.test.js` → all pass;
 `npx eslint src/lib/task-registry.js src/lib/plan-coverage.js tests/task-registry.test.js` → clean.
 Do NOT run the full suite (wave boundary does that); do NOT touch git; leave
@@ -206,6 +212,7 @@ Module header rewritten (design comments must describe shipped truth); JSDoc on
 every new/changed export.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 Confirm every item in this plan's scope is done, the Wiring table's s1-side
 entries are real, and report: files changed, tests added/updated/failed-first,
 decisions taken under ambiguity.

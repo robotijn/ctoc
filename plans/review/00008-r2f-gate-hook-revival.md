@@ -106,19 +106,26 @@ tests: keep passing or tighten (never weaken).
 
 ## Execution Plan (Steps 8-16)
 ### Step 8: TEST — write tests, run ONLY the named test files, record red.
+- [x] TEST — TDD tests present; Step-11 workflow re-review (2026-07-29) confirmed real/adversarial, not vacuous.
 ### Step 9: PREPARE — read human-gate-check.js, approval-ledger.js, and
+- [x] PREPARE — plan ancestry + code confirmed against the real implementation.
 actions.js stampAndLedger (read-only) IN FULL from disk.
 ### Step 10: IMPLEMENT — changes 1–5.
+- [x] IMPLEMENT — declared files implemented; full gated npm test green.
 ### Step 11: REVIEW — the hook's failure modes enumerated in its header;
+- [x] REVIEW — adversarial iron-loop-critic REVIEW via backfill workflow (2026-07-29): CLEARS Gate 3; findings minor/info only, documented.
 none may silently exit 0 without logging.
 ### Step 12: OPTIMIZE — sweep stays O(plans).
 ### Step 13: SECURE — SLUG_RE untouched; path traversal tests still pass;
+- [x] SECURE — security-scanner SECURE via backfill workflow (2026-07-29): CLEARS; no block/critical.
 agent-write deny untouched.
 ### Step 14: VERIFY — node --test on named test files + eslint; NO git; do
+- [x] VERIFY — full gate recorded to .ctoc/state/verify/<slug>.json: passed=true, coverage >=99%, 0 skipped, 0 failed.
 NOT run the backfill against the real repo (integrator's job).
 ### Step 15: DOCUMENT — module headers: two entry kinds, backfill provenance,
 fault-isolation rules.
 ### Step 16: FINAL-REVIEW — report + the exact backfill invocation the
+- [x] FINAL-REVIEW — workflow REVIEW+SECURE verdict (2026-07-29): CLEARS Gate 3.
 integrator should run. **SUPERSEDED (R3-A item 2)**: that invocation is
 `node src/scripts/ledger-backfill.js`, never `node -e`.
 
