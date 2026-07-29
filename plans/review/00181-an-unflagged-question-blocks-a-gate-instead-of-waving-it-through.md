@@ -193,6 +193,7 @@ defect; case 3 and case 13 are the regression guards that stop the fix from beco
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD red-first: failing tests written and seen RED before implementation; Step-11 review confirmed the tests are real and adversarial, not vacuous.
 Write the test file in full FIRST and run only it. **Cases 4, 5, 6, 7, 8, 9, 10, 11
 and 12 must be RED.** Record case 9's red verbatim — `enough: true` with twelve
 unanswered questions is the evidence, and it is the sentence that justifies this
@@ -200,6 +201,7 @@ slice. Cases 1, 2, 3 and 13 pass immediately; that is expected and is not a fals
 green, because they are the guards against over-correction.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry and target files read from disk; approach confirmed against the real code.
 Read from disk: `streaming-precompute.js:200-260` (the validator),
 `:505-535` (`isBlockingQuestion` and its comment), `:728-763`
 (`hasEnoughInformation`), and `streaming-gate.js:471-528` (`pendingGateDecisions`, to
@@ -209,12 +211,14 @@ repository for other callers of `isBlockingQuestion` and `validatePlanQuestions`
 before changing either. **Where the code disagrees with this plan, THE CODE WINS.**
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — the declared files were implemented; full gated `npm test` green.
 - `src/lib/streaming-precompute.js` — `isBlockingQuestion` inverted to fail closed;
   `validatePlanQuestions` requires both flags as booleans; the three doc comments
   corrected.
 - `tests/question-blocking-default.test.js` — the thirteen cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic Step-11 review (2026-07-29): CLEARS Gate 3; any residuals are documented and non-blocking.
 Confirm no path returns non-blocking without having read two present booleans.
 Confirm the validator's error messages name the question id — an error that says only
 "a question is invalid" is unactionable when a payload holds twelve. Confirm no
@@ -225,11 +229,13 @@ that test is corrected toward the real behaviour, **never loosened**.
 Two boolean comparisons per question. Nothing added to any read path.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner Step-13 review (2026-07-29): PASS (no block; any warn documented and non-blocking).
 Validator errors quote the question id, which is producer-authored — pass it through
 `stripCtl` and cap its length, so a hostile id cannot inject control characters into a
 gate screen. Never echo an entire rejected question object into an error.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to `.ctoc/state/verify/<slug>.json`: passed=true, coverage ≥99%, 0 skipped, 0 failed.
 `node --test tests/question-blocking-default.test.js` plus every existing test file
 touching streaming questions or the gate, then the full gated run `npm test`. Lint at
 `--max-warnings 0`. No git operations. **Report whether any plan currently in
@@ -242,6 +248,7 @@ mandatory and that an undeclared flag blocks. Update the documented test-file co
 both places, reading the live count from disk first.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — iron-loop-critic final verdict (2026-07-29): CLEARS Gate 3.
 Report every verbatim Step 8 red (case 9 especially), the blast radius from Step 14,
 whether any stored questions file was rejected, and every decision taken under
 ambiguity.

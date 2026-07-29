@@ -231,12 +231,14 @@ signature is *for*.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD red-first: failing tests written and seen RED before implementation; Step-11 review confirmed the tests are real and adversarial, not vacuous.
 Establish the home-directory isolation **first** — no case runs until writes are proven
 confined to a temporary directory. Then write the file in full and run only it. Cases 1,
 2, 3, 9, 11 and 12 must be RED. Record case 12's red verbatim: a commit allowed at a
 forged step 16 is the sentence that justifies this slice.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry and target files read from disk; approach confirmed against the real code.
 Read from disk: `state-manager.js` in full, `src/lib/crypto.js` in full (how `CTOC_HOME`
 is computed and whether it is overridable), and **every caller of `loadState`** — grep
 the whole repository and read each one, confirming none treats `state: null` in a way
@@ -246,6 +248,7 @@ to find the established isolation mechanism. **Where the code disagrees with thi
 THE CODE WINS** — especially on how many installations could hold an unsigned state.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — the declared files were implemented; full gated `npm test` green.
 - `src/lib/state-manager.js` — the self-signing branch replaced by the rejection; the
   doc comment.
 - `src/hooks/PreToolUse.Bash.js` — **only if** Step 9 shows the reason does not reach the
@@ -254,6 +257,7 @@ THE CODE WINS** — especially on how many installations could hold an unsigned 
 - `tests/unsigned-state-rejected.test.js` — the fourteen cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic Step-11 review (2026-07-29): CLEARS Gate 3; any residuals are documented and non-blocking.
 Confirm no path in `loadState` writes. Confirm the rejection's return shape matches the
 existing bad-signature shape so no caller needs changing. Confirm the error text names a
 concrete action, not just a condition.
@@ -263,6 +267,7 @@ One branch removed, and one filesystem **write** removed from a read path — `l
 no longer writes, which is a correctness improvement as much as a performance one.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner Step-13 review (2026-07-29): PASS (no block; any warn documented and non-blocking).
 Confirm the error message names no absolute path from outside the project and no file
 contents. Re-attack: an empty-string signature, a signature of the wrong type (a number,
 an object, `null`), a signature with the right prefix and no digest, a state object that
@@ -270,6 +275,7 @@ is an array. Each must reject, and `verifyState:100-116` must be read to confirm
 of those it already handles rather than assuming.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to `.ctoc/state/verify/<slug>.json`: passed=true, coverage ≥99%, 0 skipped, 0 failed.
 `node --test` on the new file plus every existing `state-manager`, `crypto`, `iron-loop`
 and Bash-hook test, then the full gated run `npm test`. Lint at `--max-warnings 0`. No
 git operations. **Report whether any existing test writes an unsigned state fixture and
@@ -283,6 +289,7 @@ unsigned state is not migrated, and that the recovery is to start the loop again
 the documented test-file count from disk.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — iron-loop-critic final verdict (2026-07-29): CLEARS Gate 3.
 Report every Step 8 red verbatim (case 12 especially), the Step 14 count of tests relying
 on unsigned state, whether the banner needed wiring, and every decision taken under
 ambiguity. **State the migration cost in the report as a fact for the human: any

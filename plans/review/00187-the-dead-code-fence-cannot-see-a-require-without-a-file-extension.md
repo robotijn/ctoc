@@ -206,12 +206,14 @@ defect the re-seed removed three days ago.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD red-first: failing tests written and seen RED before implementation; Step-11 review confirmed the tests are real and adversarial, not vacuous.
 Write the cases FIRST. **Cases 1, 5 and 7 must be RED.** Record case 7's red verbatim —
 two actively-used files listed as dead is the evidence. Cases 2, 3, 6 and 8 pass
 immediately and are the over-correction guards; a change that reds any of them is wrong
 regardless of what it fixes.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry and target files read from disk; approach confirmed against the real code.
 Read `src/lib/reachability.js:300-420` in full. Grep every shipped surface
 (`src/commands/*.md`, `agents/**/*.md`, `skills/**/*.md`, `.github/workflows/*`) for
 `require(` and for `node ` and **tabulate every form that appears**, so the pattern change
@@ -221,12 +223,14 @@ whether or not it fires. Confirm whether `00185` has landed, since it determines
 expected baseline arithmetic.
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — the declared files were implemented; full gated `npm test` green.
 - `src/lib/reachability.js` — optional extension with resolution-gated credit; skills walk
   collects `.md`.
 - `tests/reachability.test.js` — the eight cases.
 - `.ctoc/reachability-baseline.json` — measured count, measured removals, extended comment.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic Step-11 review (2026-07-29): CLEARS Gate 3; any residuals are documented and non-blocking.
 Confirm no path credits a file that does not exist. Confirm the skills-walk widening did
 not pull in a non-instruction `.md` under `skills/` that turns prose into roots — list
 what the widening newly collected and eyeball it. Confirm `SURFACE_NODE_RUNS_RE` is
@@ -237,6 +241,7 @@ The skills walk now visits more files. Report the added analyzer runtime at Step
 walk is bounded by the repository and runs once per suite; no caching.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner Step-13 review (2026-07-29): PASS (no block; any warn documented and non-blocking).
 The captured path is used to look up a file in an already-collected set, never to read
 from disk directly, so a hostile surface file cannot cause a traversal. Assert that: a
 fixture surface containing `require('../../../etc/passwd')` credits nothing and reads
@@ -244,6 +249,7 @@ nothing. The `{0,64}` and `{0,80}` bounds stay bounded — an unbounded quantifi
 attacker-influenced text is a denial-of-service shape.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to `.ctoc/state/verify/<slug>.json`: passed=true, coverage ≥99%, 0 skipped, 0 failed.
 `node --test tests/reachability.test.js`, then the full gated `npm test`. Lint at
 `--max-warnings 0`. No git operations. **Report the live unreachable list before and
 after, in full** — if any file NEWLY appears, stop and report it rather than adding it to
@@ -256,6 +262,7 @@ runtime-built path, and prose citation) in one sentence each, so the fence's lim
 documented where its claims are.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — iron-loop-critic final verdict (2026-07-29): CLEARS Gate 3.
 Report the Step 9 tabulation, case 7's red verbatim, the before-and-after unreachable
 lists, the blind-spot-5 finding, and every decision taken under ambiguity.
 

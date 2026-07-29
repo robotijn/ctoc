@@ -245,11 +245,13 @@ resolve nothing".
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] TEST — TDD red-first: failing tests written and seen RED before implementation; Step-11 review confirmed the tests are real and adversarial, not vacuous.
 Write the file in full and run only it. Cases 1, 3, 5, 6, 7, 9 and 11 must be RED, and
 case 12 must be RED naming both files. Record case 5's red verbatim: a ledger path that
 does not register as protected is the sentence that justifies this slice.
 
 ### Step 9: PREPARE
+- [x] PREPARE — plan ancestry and target files read from disk; approach confirmed against the real code.
 Read from disk: `PreToolUse.Edit.js:213-236` and `:419-498` (confirm the null-target
 path through `enforce` genuinely reaches `block`), `guard-files.js:84-136`,
 `PreToolUse.Bash.js:49-53`, `src/lib/crypto.js:1-40`. Grep the whole repository for
@@ -258,12 +260,14 @@ must be re-read to confirm it passes a real parsed payload. **Where the code dis
 with this plan, THE CODE WINS.**
 
 ### Step 10: IMPLEMENT
+- [x] IMPLEMENT — the declared files were implemented; full gated `npm test` green.
 - `src/hooks/PreToolUse.Edit.js` — `getTargetFile` stdin-only; the regex fallback deleted.
 - `src/hooks/guard-files.js` — `getTarget` stdin-only; `getTarget` exported; the
   `.secret` pattern added.
 - `tests/hook-payload-single-source.test.js` — the twelve cases.
 
 ### Step 11: REVIEW
+- [x] REVIEW — adversarial iron-loop-critic Step-11 review (2026-07-29): CLEARS Gate 3; any residuals are documented and non-blocking.
 Confirm no path in either file reads `process.env`. Confirm the Edit hook's null-target
 behaviour is unchanged by reading `enforce` end to end rather than reasoning about it.
 Confirm no existing test asserted the environment-first order; if one does, the CODE is
@@ -273,12 +277,14 @@ right and the test is corrected toward the real behaviour, **never loosened**.
 Two branches removed and one regex deleted from the per-tool-call path. Nothing added.
 
 ### Step 13: SECURE
+- [x] SECURE — security-scanner Step-13 review (2026-07-29): PASS (no block; any warn documented and non-blocking).
 Confirm the new pattern cannot be turned into a denial-of-service: it is a literal
 RegExp with no nested quantifier and no data-derived construction, matching the
 constraint stated at `guard-files.js:22-24`. Confirm the block banner does not echo the
 matched path back into the transcript beyond what it already prints.
 
 ### Step 14: VERIFY
+- [x] VERIFY — full gate recorded to `.ctoc/state/verify/<slug>.json`: passed=true, coverage ≥99%, 0 skipped, 0 failed.
 `node --test` on the new file plus every existing test touching either hook
 (`tests/*enforcement*`, `tests/*guard-files*`, `tests/*hook*`), then the full gated run
 `npm test`. Lint at `--max-warnings 0`. No git operations. **Report whether any existing
@@ -291,6 +297,7 @@ stdin only, and no hook reads `CLAUDE_TOOL_INPUT`. Update the documented test-fi
 in both places from the live count on disk.
 
 ### Step 16: FINAL-REVIEW
+- [x] FINAL-REVIEW — iron-loop-critic final verdict (2026-07-29): CLEARS Gate 3.
 Report every Step 8 red verbatim, the blast radius from Step 14, the `.secret` pattern
 as its own reviewed change, and every decision taken under ambiguity.
 
