@@ -125,6 +125,33 @@ describe('the fence catches a gate number on its way to a human', () => {
     assert.equal(findings[0].line, 2);
   });
 
+  it('case 2b — a composed template with a HYPHEN or UNDERSCORE separator is found', () => {
+    // ROUND-2 REGRESSION. `` `Gate-${n}` `` and `` `Gate_${n}` `` render "Gate-3" /
+    // "Gate_3" to a human — the SAME digit-free composed leak as case 2, one
+    // non-space separator over. The TemplateHead cooked text is "Gate-" / "Gate_";
+    // a COMPOSED_END that accepted only a trailing SPACE (\s+) missed it, exactly the
+    // hyphen gap the sibling WRITTEN work exists to close.
+    const hyphen = findingsOf(fixture(dir, 'composed-hyphen.js', [
+      'function render(n) {',
+      '  return `Gate-${n} ready`;',
+      '}',
+      'module.exports = { render };',
+    ].join('\n')));
+    assert.equal(hyphen.length, 1, `hyphen: expected 1 finding, got ${JSON.stringify(hyphen)}`);
+    assert.equal(hyphen[0].pattern, 'composed');
+    assert.equal(hyphen[0].line, 2);
+
+    const underscore = findingsOf(fixture(dir, 'composed-underscore.js', [
+      'function render(n) {',
+      '  return `Gate_${n} ready`;',
+      '}',
+      'module.exports = { render };',
+    ].join('\n')));
+    assert.equal(underscore.length, 1, `underscore: expected 1 finding, got ${JSON.stringify(underscore)}`);
+    assert.equal(underscore[0].pattern, 'composed');
+    assert.equal(underscore[0].line, 2);
+  });
+
   it('case 3 — string concatenation onto a gate word is found', () => {
     const findings = findingsOf(fixture(dir, 'concat.js', [
       'function render(n) {',
@@ -295,6 +322,23 @@ describe('the fence stays quiet on everything the rule permits', () => {
     ].join('\n')));
     assert.deepEqual(findings, [],
       `prose "gate"/"gates" with no adjacent gate digit must not fire, got ${JSON.stringify(findings)}`);
+  });
+
+  it('the word "gates" flush against an interpolation (zero separators) stays quiet — the + not the *', () => {
+    // `` `…at gates${flag}` `` — the TemplateHead "…at gates" ends in the plural noun
+    // with NO separator before the interpolation. COMPOSED_END uses [\s_-]+ (one or
+    // more), NOT [\s_-]* — so a real "Gate-" / "Gate " separator fires while this
+    // count-phrase head, which has zero separators, does not. Were the quantifier *,
+    // this would become the exact plural false positive Finding B first hit. This
+    // guard fails if [\s_-]* is ever reintroduced.
+    const findings = findingsOf(fixture(dir, 'gates-flush.js', [
+      'function line(flag) {',
+      '  return `at gates${flag}`;',
+      '}',
+      'module.exports = { line };',
+    ].join('\n')));
+    assert.deepEqual(findings, [],
+      `the plural noun "gates" with no separator must not fire; got ${JSON.stringify(findings)}`);
   });
 
   it('a file with no gate vocabulary at all is clean and AVAILABLE', () => {

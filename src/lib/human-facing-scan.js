@@ -133,13 +133,15 @@ const SCREEN_CONTRACT = Object.freeze(['text', 'ask', 'actions']);
 // wider class fires on "Gate 8080" in a URL or "Gate 42" in a version.
 const WRITTEN = /\bgates?[\s_-]*[0-3]\b/i;
 // The composed shape is `` `Gate ${n}` `` / `'Gate ' + n`: the literal ALWAYS ends
-// with the word "gate" followed by the whitespace that precedes the interpolated
-// number. Requiring that trailing whitespace (\s+, not \s*) is what separates the
-// real leak from the English plural in a count phrase — `` `…plans at gates${flag}` ``
-// ends with the word "gates" flush against the interpolation, no trailing space, and
-// must NOT fire. Precision over reach: a fence that cries wolf gets whitelisted into
-// uselessness.
-const COMPOSED_END = /\bgates?\s+$/i;
+// with the word "gate" followed by the separator that precedes the interpolated
+// number. Requiring at least one separator ([\s_-]+, not [\s_-]*) is what separates
+// the real leak from the English plural in a count phrase — `` `…plans at gates${flag}` ``
+// ends with the word "gates" flush against the interpolation, no separator, and
+// must NOT fire. The separator class matches space, underscore, or hyphen so a
+// composed `` `Gate-${n}` `` / `` `Gate_${n}` `` (the same hyphen/underscore leak the
+// WRITTEN pattern closes) is caught, while the count-phrase with zero separators is
+// not. Precision over reach: a fence that cries wolf gets whitelisted into uselessness.
+const COMPOSED_END = /\bgates?[\s_-]+$/i;
 
 /**
  * Strip C0 and C1 control characters from text before it is reported — a finding is
