@@ -1765,87 +1765,6 @@ function stopAgent(projectPath) {
 }
 
 /**
- * Advance the agent to the next todo plan. Honors the drain-stop flag (drain
- * semantics unchanged for the human), otherwise runs the same scheduler claim flow
- * as startAgent. Completion marking of the FINISHED task lives in the menu's WORK
- * completion recipe + task-reconcile orphan handling — this function does not move it.
- *
- * The FIFO drain never stalls at the head (C1-4): a plan whose spec cannot be built
- * is recorded in `skipped[]` and the NEXT plan is tried; the first plan with a valid
- * spec wins. A single refusal never blocks the plans queued behind it.
- *
- * @param {string} projectPath - Project root
- * @returns {{ next: boolean, plan?: object, stopped?: boolean, done?: boolean,
- *   queued?: boolean, reason?: string, task?: object, error?: string,
- *   skipped?: Array<{plan:string, reason:string}>,
- *   queuedTasks?: Array<{plan:string, taskId:string, reason:string}>, remainingTodo?: number }}
- */
-function advanceAgent(projectPath) {
-  const root = projectPath || findProjectRoot();
-  const { readPlans, getPlansDir, clearAgentStatus, setAgentStatus } = require('./state');
-
-  // 1. Drain-stop → clear status and stop (no new claim).
-  if (taskRegistry.isDrainStopRequested(root)) {
-    clearAgentStatus(root);
-    return { next: false, stopped: true };
-  }
-
-  // 2. Next from todo.
-  const plansDir = getPlansDir(root);
-  const todoPlans = readPlans(path.join(plansDir, 'todo'));
-  if (todoPlans.length === 0) {
-    clearAgentStatus(root);
-    return { next: false, done: true };
-  }
-
-  // 3. Walk the FIFO queue and claim the first plan the scheduler lets start. A spec
-  //    refusal goes to skipped[]; a ladder refusal keeps the head's SINGLE queued task
-  //    (item 2 — no duplicate) and continues to the next plan (item 3). Mirrors startAgent.
-  const skipped = [];
-  const queuedTasks = [];
-  for (const plan of todoPlans) {
-    let spec;
-    try {
-      spec = taskSpecFromPlan(plan, root);
-    } catch (err) {
-      skipped.push({ plan: plan.name, reason: err.message });
-      continue;
-    }
-    // R3-B rework — atomic plan-uniqueness (see startAgent for the rationale).
-    const { task, claimed, reason, existing } = taskRegistry.addAndClaim(root, spec, { uniquePlan: true });
-    if (existing) {
-      queuedTasks.push({ plan: plan.name, taskId: task.id, reason: 'already-queued' });
-      continue;
-    }
-    if (!claimed) {
-      queuedTasks.push({ plan: plan.name, taskId: task.id, reason });
-      continue;
-    }
-    const newPath = startExecution(plan.path, root);
-    setAgentStatus(root, {
-      active: true,
-      plan: plan.name,
-      step: 8,
-      phase: 'TEST',
-      task: 'Starting implementation'
-    });
-    return {
-      next: true,
-      task,
-      plan: { name: plan.name, path: newPath },
-      skipped,
-      queuedTasks,
-      remainingTodo: todoPlans.length - 1
-    };
-  }
-
-  if (queuedTasks.length > 0) {
-    return { next: false, queued: true, reason: queuedTasks[0].reason, skipped, queuedTasks };
-  }
-  return { next: false, error: 'No claimable plan in todo queue', skipped, queuedTasks };
-}
-
-/**
  * Cancel a background task — the live surface of the two-phase `cancel` transition
  * (C1-2). The registry only records the transition; killing the harness-level agent
  * is the CALLER's job, so the task's `agentTaskId` is returned for it.
@@ -2392,7 +2311,6 @@ module.exports = {
   // Agent orchestration functions
   startAgent,
   stopAgent,
-  advanceAgent,
   cleanupStaleInProgress,
   // F1-s2: plan→task translation, cancel, and wave-sync scheduler surfaces
   taskSpecFromPlan,

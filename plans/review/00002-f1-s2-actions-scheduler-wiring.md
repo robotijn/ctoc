@@ -10,7 +10,7 @@ files:
   - "src/lib/actions.js"
   - "src/lib/agent-lock.js"
   - "src/lib/state.js"
-  - "src/commands/menu.md"
+  - "src/commands/start.md"
   - "tests/agent-lock.test.js"
   - "tests/actions-scheduler.test.js"
   - "tests/task-view.test.js"
@@ -27,7 +27,7 @@ files:
 > `src/lib/actions.js` onto the s1 scheduler API (`addAndClaim`, drain-stop
 > trio, `cancelled`), DELETE `src/lib/agent-lock.js` (no dead code — rewire or
 > delete, no third state), translate plan frontmatter into task fields, add the
-> wave `sync` enqueue action, and true up `src/commands/menu.md` prose. Depends
+> wave `sync` enqueue action, and true up `src/commands/start.md` prose. Depends
 > on s1's API; s1+s2 are committed together at the wave boundary.
 
 ## Implementation Details
@@ -99,7 +99,7 @@ re-imposes one-at-a-time).
    adds a `sync` task (`gitOp: true`, `touches: []`, blockedBy = the wave's
    task ids). The wave boundary (integrated suite + ratchet reconcile + commit)
    becomes a REAL scheduled task instead of operator memory. Wire the
-   instruction surface: `src/commands/menu.md`'s `claude:advance-all-implementation`
+   instruction surface: `src/commands/start.md`'s `claude:advance-all-implementation`
    and `claude:start-agent` recipes gain the step "after enqueuing the wave's
    implement tasks, call `enqueueWaveSync` with their ids; when the scheduler
    promotes the sync task, run the integrated suite + baseline reconcile +
@@ -119,7 +119,7 @@ re-imposes one-at-a-time).
    that coverage exists before deleting, add to
    `tests/actions-scheduler.test.js` anything genuinely uncovered.
 
-8. **`src/commands/menu.md` truth pass.** Every mention of plan-serial /
+8. **`src/commands/start.md` truth pass.** Every mention of plan-serial /
    "one plan at a time" / the NB1 scheduler serializing plan-mutating work
    (line 53 and any grep hit for `plan-serial`) is rewritten to the file-based
    contract: implement tasks run concurrently (≤5) when file-disjoint; same-file
@@ -132,17 +132,18 @@ re-imposes one-at-a-time).
 actions.js ──requires──> task-registry.js (addAndClaim, drain-stop, updateTask, load/save)  [s1 API]
            ──deletes edge──> agent-lock.js (module deleted)
 state.js   ──rewires──> task-registry.js (getAgentStatus liveness)
-menu.md    ──instructs──> startAgent / cancelTask / enqueueWaveSync (instruction-surface root)
+start.md    ──instructs──> startAgent / cancelTask / enqueueWaveSync (instruction-surface root)
 ```
 
 ### Wiring — the live call sites (MANDATORY)
 
 | module / export | live call site | root |
 |---|---|---|
-| rewired `startAgent`/`stopAgent`/`advanceAgent` | existing menu recipes (`claude:start-agent`, `claude:advance-all-implementation`) in `src/commands/menu.md` | `/ctoc:menu` |
-| `taskSpecFromPlan` | `startAgent`/`advanceAgent` internal | `/ctoc:menu` |
-| `cancelTask` | menu.md task-plane recipe (add a cancel option to the AGENT/task section instructions) | `/ctoc:menu` |
-| `enqueueWaveSync` | menu.md wave recipes (change 6) | `/ctoc:menu` |
+| rewired `startAgent`/`stopAgent` | existing menu recipes (`claude:start-agent`, `claude:advance-all-implementation`) in `src/commands/start.md` | `/ctoc:menu` |
+| ~~`advanceAgent`~~ **DELETED in review** | *(no live caller — see Review Fix below)* | *(none)* |
+| `taskSpecFromPlan` | `startAgent` internal | `/ctoc:menu` |
+| `cancelTask` | start.md task-plane recipe (add a cancel option to the AGENT/task section instructions) | `/ctoc:menu` |
+| `enqueueWaveSync` | start.md wave recipes (change 6) | `/ctoc:menu` |
 | `state.js getAgentStatus` rewrite | dashboard status rendering (existing callers) | `/ctoc:menu` |
 
 ### Test Plan
@@ -195,16 +196,16 @@ failure; record the summary.
 ### Step 9: PREPARE
 Re-read post-s1 `src/lib/task-registry.js` (the API you are wiring), `actions.js`
 lines 780–1010 (startAgent/stopAgent/advanceAgent/completeExecution),
-`state.js` getAgentStatus, `menu.md` recipes, `task-reconcile.js` orphan flow.
+`state.js` getAgentStatus, `start.md` recipes, `task-reconcile.js` orphan flow.
 
 ### Step 10: IMPLEMENT
-Changes 1–8. WIRE IT: menu.md must actually instruct the new actions; delete
+Changes 1–8. WIRE IT: start.md must actually instruct the new actions; delete
 agent-lock.js in this same step and fix every reference the greps find. Record
 judgment calls in `## Decisions Taken Under Ambiguity`.
 
 ### Step 11: REVIEW
 Diff vs plan; grep-proofs: zero `agent-lock` references anywhere; zero
-`plan-serial` references in src/ and menu.md.
+`plan-serial` references in src/ and start.md.
 
 ### Step 12: OPTIMIZE
 startAgent does one registry load→save per call — no caching, no double loads.
@@ -221,7 +222,7 @@ its module.
 
 ### Step 15: DOCUMENT
 JSDoc on new/changed exports; startAgent's doc comment must describe the
-concurrent contract; menu.md prose is part of this slice's deliverable.
+concurrent contract; start.md prose is part of this slice's deliverable.
 
 ### Step 16: FINAL-REVIEW
 Confirm scope complete, Wiring table real, reachability intact (agent-lock.js
@@ -236,11 +237,11 @@ last caller). Report files changed, tests, decisions.
   no work). All 20 target behaviors failed (functions absent, lock-based paths live,
   agent-lock present). ✅
 - **Step 9 PREPARE:** re-read post-s1 `task-registry.js`, `actions.js` 780–1010,
-  `state.js` getAgentStatus, `menu.md` recipes, `task-reconcile.js`. ✅
+  `state.js` getAgentStatus, `start.md` recipes, `task-reconcile.js`. ✅
 - **Step 10 IMPLEMENT:** changes 1–8 landed; agent-lock.js + its test deleted in the
   same change; every reference rewired. ✅
 - **Step 11 REVIEW:** grep-proofs — zero live `agent-lock` module requires anywhere;
-  zero `plan-serial` literal in the files I own (menu.md, actions.js). ✅
+  zero `plan-serial` literal in the files I own (start.md, actions.js). ✅
 - **Step 12 OPTIMIZE:** startAgent = one `addAndClaim` (single load→save);
   taskSpecFromPlan does one extra read-only `load` to resolve deps; no double loads,
   no caching. ✅
@@ -249,10 +250,10 @@ last caller). Report files changed, tests, decisions.
   safe-fs; task-reconcile still orphans stale running tasks (16/16 green). ✅
 - **Step 14 VERIFY:** all in-scope test files green; eslint clean on changed JS. ✅
 - **Step 15 DOCUMENT:** JSDoc on taskSpecFromPlan / startAgent (concurrent contract)
-  / stopAgent / advanceAgent / cancelTask / enqueueWaveSync / getAgentStatus; menu.md
+  / stopAgent / advanceAgent / cancelTask / enqueueWaveSync / getAgentStatus; start.md
   prose truth-passed. ✅
 - **Step 16 FINAL-REVIEW:** agent-lock.js gone, nothing orphaned; every touched
-  export retains a live caller (menu.md recipes, tabs/areas consumers). ✅
+  export retains a live caller (start.md recipes, tabs/areas consumers). ✅
 
 ## Decisions Taken Under Ambiguity
 
@@ -291,11 +292,40 @@ last caller). Report files changed, tests, decisions.
    plan's own scope note) and Gate 3 batches per parent; moving s2 alone to review
    would desync the s1+s2 wave. The dispatch asked for steps 8–16 + a report, not a
    stage move, so placement is deferred to the CTO Chief. No git operations performed.
-8. **`plan-serial` literal removed from owned files only.** menu.md and my actions.js
+8. **`plan-serial` literal removed from owned files only.** start.md and my actions.js
    comment now describe the file-based contract without the literal token. The three
    remaining `plan-serial` mentions live in `task-registry.js` (s1-owned) and
    explicitly DOCUMENT the deletion — out of this slice's scope, cannot touch.
-9. **cancelTask/enqueueWaveSync instruction surface.** Wired into menu.md as
+9. **cancelTask/enqueueWaveSync instruction surface.** Wired into start.md as
    function-call recipes (matching the existing `startAgent()`/`stopAgent()` recipe
    style), not new slash commands or `menu.js` CLI subcommands — menu.js is out of
    scope and CTOC ships exactly three slash commands.
+
+10. **REVIEW FIX (2026-07-30) — `advanceAgent` was never wired; it is DEAD CODE, now
+    DELETED.** The Wiring table above (and item 3 of the Architecture Decision) claimed
+    `advanceAgent` was reached through the `claude:advance-all-implementation` recipe. It
+    was not: that recipe calls `startAgent()`, `approveSubplans()` and `enqueueWaveSync()`
+    — never `advanceAgent`. `advanceAgent` had ZERO live callers anywhere in `src/`,
+    `src/commands/*.md`, `agents/` or `skills/`; the export-reachability fence had it
+    baselined dead (`src/lib/actions.js#advanceAgent`). It was a near-exact duplicate of
+    `startAgent`'s claim loop — a vestige of the pre-scheduler foreground implement loop
+    that `start.md` now explicitly forbids ("Do NOT run a foreground implement loop; each
+    plan drains as background work and completions promote the next runnable plan").
+    Promotion runs through the scheduler's `promote[]`/`nextRunnable` set returned by
+    `menu task complete`, so there is no sanctioned call site for a per-call advance.
+    Wiring it in would REINTRODUCE the forbidden loop — inventing a caller — so the honest
+    fix is DELETE. Its dead tests were removed; the export-reachability baseline ratcheted
+    down 66 → 65. **Coupled deletion:** `advanceAgent` was the ONLY caller of
+    `state.js#clearAgentStatus`, whose written `agent.json` is never authoritative for
+    liveness (`getAgentStatus` derives `active` from the registry's running implement
+    tasks). `clearAgentStatus` was therefore dead by transitivity and was DELETED too
+    rather than baselined — a new baseline entry is forbidden by the ratchet, and keeping
+    a dead function only so the fence still saw its token would be gaming the instrument.
+    Its dedicated test block was removed.
+11. **REVIEW FIX (2026-07-30) — `src/commands/menu.md` never existed.** Throughout this
+    plan the instruction surface was named `src/commands/menu.md`; the real, shipped file
+    is `src/commands/start.md` (CTOC's three slash commands are `start`, `push`,
+    `update`). Every `menu.md` reference in this plan is corrected to `start.md`. The s2
+    recipe work did land in `start.md` (`claude:start-agent`,
+    `claude:advance-all-implementation`, `claude:stop-agent`, plus the
+    `cancelTask`/`enqueueWaveSync` recipes); the plan simply mis-named the file.

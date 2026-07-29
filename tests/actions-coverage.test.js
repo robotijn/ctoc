@@ -4,7 +4,7 @@
  * These tests drive the REAL src/lib/actions.js against real os.tmpdir() plan
  * fixtures (real fs, no mocks of core logic — the only boundary is the filesystem).
  * They complement tests/actions-scheduler.test.js (which owns the scheduler surface:
- * taskSpecFromPlan / startAgent / stopAgent / advanceAgent / cancelTask /
+ * taskSpecFromPlan / startAgent / stopAgent / cancelTask /
  * enqueueWaveSync / completeExecution coupling). This file owns the pieces that had
  * ZERO real coverage: approvePlan gate semantics (refuse / override / stamp / unknown
  * location), rejectPlan, movePlan, renamePlan, deletePlan, the queue reorder
