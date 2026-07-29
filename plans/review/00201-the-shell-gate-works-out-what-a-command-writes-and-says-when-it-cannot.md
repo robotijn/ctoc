@@ -523,6 +523,34 @@ radius from Step 14, and every decision taken under ambiguity.
    (a shell command token is not a cryptographic token). Behaviour and the positional
    `resolveTarget(prefix, …)` signature are unchanged; "warnings are bugs" required a
    clean lint.
+8. **F1 REGRESSION FIX (post-review finding, Medium — the commandWord wrapper/group
+   bypass).** Adversarial review found that `commandWord` returned a segment's FIRST
+   token VERBATIM, so a determinate write command or interpreter that was NOT the literal
+   first token classified as `none` and was ALLOWED — a regression in the exact class this
+   module exists to kill, where the old `\b`-anchored `WRITE_PATTERNS` blocked it.
+   Confirmed bypasses (each `none`/allowed before the fix): `time tee src/x.js`,
+   `(sed -i 's/a/b/' src/x.js)`, `sudo tee f`, `nohup dd of=f`, `nice perl -i -pe s/a/b/ f`,
+   `{ patch -p1 < c.patch; }`, `timeout 5 truncate -s0 f`, `(node -e '…')`, `sudo node -e '…'`.
+   **Fix**, mirroring the sibling `PreToolUse.Bash.js:288` (`seg.replace(/^[\s({]+/, '')`):
+   `commandWord` now (a) strips a leading `^[\s({]+` group/subshell prefix off the token
+   (a bare `(`/`{` token is skipped), and (b) skips a leading command WRAPPER token —
+   `time`, `sudo`, `nice`, `nohup`, `timeout` (+ its numeric duration operand), `stdbuf`,
+   `ionice`, `setsid`, and `!` — plus each wrapper's flags and any separately-given flag
+   value (`nice -n 5`, `sudo -u root`, `stdbuf -o L`) — so the REAL command word
+   (tee/sed/node/dd/…) is what gets classified. `resolveTarget` also strips an UNBALANCED
+   trailing `)` (the subshell close that sticks to the last operand, `src/x.js)` from
+   `(sed … src/x.js)`), balanced parens in a real filename untouched. The wrapper set is
+   bounded to a KNOWN-SAFE list, never an arbitrary first token, so a wrapped READ
+   (`time ls`, `sudo ls -la`, `nice cat f`) still classifies `none`; a wrapper appearing
+   as an OPERAND (`tee time`) is not consumed as a wrapper. A wrapper before an interpreter
+   yields `indeterminate`, not `none` (`sudo node -e`, `(node -e …)`); `nice perl -i …` is
+   `indeterminate` (perl is an interpreter — Decision 3, indeterminate outranks writes)
+   with the in-place target surfaced. 24 new test cases in
+   `tests/shell-write-targets.test.js` (all RED against the pre-fix code, now green); the
+   33 existing 00201 cases and the `security-bash-hook` / `ledger-forgery-closed` spawned-
+   hook suites stay green. Scope: F1 only — the cd-taint (F2) and `cp -t` (F3) findings are
+   left for `00202`.
+
 7. **SURFACED RISK for review / `00202` (not a build blocker — no acceptance criterion
    fails).** Because interpreters now classify `indeterminate` and `isWriteCommand`
    returns true for `indeterminate` (the plan's explicit "makes it visible to the step

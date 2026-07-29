@@ -172,6 +172,88 @@ describe('classifyWrites — bounds and adversarial input never throw', () => {
   });
 });
 
+describe('classifyWrites — F1: a leading group/wrapper prefix no longer disables the gate', () => {
+  // REGRESSION (review finding F1). `commandWord` returned a segment's FIRST token
+  // verbatim, so a determinate write command or interpreter that is NOT the literal
+  // first token of its segment classified as `none` and was ALLOWED — the exact class
+  // this module exists to kill. Each of these was `none` (allowed) before the fix; the
+  // old \b-anchored WRITE_PATTERNS blocked them. They must classify as `writes` (right
+  // target where determinate) or `indeterminate` (wrapped interpreter / unreadable), and
+  // NEVER `none`.
+  const f1Writes = [
+    ['F1a time tee', 'time tee src/x.js', ['src/x.js']],
+    ['F1b (subshell) sed -i', "(sed -i 's/a/b/' src/x.js)", ['src/x.js']],
+    ['F1c sudo tee', 'sudo tee f', ['f']],
+    ['F1d nohup dd of=', 'nohup dd of=f', ['f']],
+    ['F1f timeout + duration truncate', 'timeout 5 truncate -s0 f', ['f']],
+  ];
+  for (const [label, cmd, targets] of f1Writes) {
+    test(`${label} -> writes (was none)`, () => {
+      const r = classifyWrites(cmd);
+      assert.equal(r.verdict, 'writes', `${cmd} -> ${JSON.stringify(r)}`);
+      assert.deepEqual(r.targets, targets, `${cmd} targets`);
+    });
+  }
+
+  test('F1e nice perl -i -> indeterminate interpreter, target still surfaced (was none)', () => {
+    // `perl` is an interpreter (writes happen inside a program this gate cannot read),
+    // so the verdict stays the conservative `indeterminate` even though the in-place
+    // file is readable — plan Decision 3: indeterminate outranks writes. The target is
+    // surfaced (true information) but the verdict is block-ward. Was `none` before F1.
+    const r = classifyWrites('nice perl -i -pe s/a/b/ f');
+    assert.equal(r.verdict, 'indeterminate', JSON.stringify(r));
+    assert.equal(r.reason, 'interpreter');
+    assert.ok(r.targets.includes('f'), `target surfaced: ${JSON.stringify(r.targets)}`);
+  });
+
+  test('F1g { patch; } group prefix -> indeterminate (was none)', () => {
+    const r = classifyWrites('{ patch -p1 < c.patch; }');
+    assert.equal(r.verdict, 'indeterminate', JSON.stringify(r));
+    assert.equal(r.reason, 'write target could not be read');
+  });
+
+  const f1Interp = [
+    ['F1h (subshell) node -e', "(node -e 'fs.writeFileSync(\"src/x.js\",\"x\")')"],
+    ['F1i sudo node -e', "sudo node -e 'fs.writeFileSync(\"src/x.js\",\"x\")'"],
+  ];
+  for (const [label, cmd] of f1Interp) {
+    test(`${label} -> indeterminate interpreter (was none)`, () => {
+      const r = classifyWrites(cmd);
+      assert.equal(r.verdict, 'indeterminate', `${cmd} -> ${JSON.stringify(r)}`);
+      assert.equal(r.reason, 'interpreter', `${cmd} reason`);
+    });
+  }
+
+  // OVER-STRIP GUARD: a wrapper before a READ command must still classify `none` —
+  // the fix must not turn "every wrapped command" into a write.
+  for (const cmd of ['time ls', 'sudo ls -la', 'nice cat f', 'nohup grep x f']) {
+    test(`F1 over-strip guard: ${cmd} stays none`, () => {
+      const r = classifyWrites(cmd);
+      assert.equal(r.verdict, 'none', `${cmd} -> ${JSON.stringify(r)}`);
+    });
+  }
+
+  test('F1 wrapper token as an OPERAND is not consumed as a wrapper', () => {
+    // `tee time` writes to a file literally named `time`; `time` here is an operand of
+    // tee, not a leading wrapper, so it must still resolve as a target.
+    const r = classifyWrites('tee time');
+    assert.equal(r.verdict, 'writes', JSON.stringify(r));
+    assert.deepEqual(r.targets, ['time']);
+  });
+
+  test('F1 chained wrappers strip to the real command word', () => {
+    const r = classifyWrites('sudo nice tee f');
+    assert.equal(r.verdict, 'writes', JSON.stringify(r));
+    assert.deepEqual(r.targets, ['f']);
+  });
+
+  test('F1 separate-value wrapper flag (nice -n N) does not eat the command', () => {
+    const r = classifyWrites('nice -n 5 tee f');
+    assert.equal(r.verdict, 'writes', JSON.stringify(r));
+    assert.deepEqual(r.targets, ['f']);
+  });
+});
+
 describe('splitSegments + resolveTarget — the exported helpers', () => {
   test('splitSegments splits on ; newline && || | &', () => {
     assert.deepEqual(
@@ -282,6 +364,18 @@ describe('the spawned hook — the cd-prefix bypass is closed (the defect)', () 
     const res = runHook('cd . && echo x > src/x.js');
     assert.equal(denyOf(res), null,
       'coverage is 00202; at step 10 with a feature the step gate passes, so this must be allowed');
+  });
+
+  test('F1-int a  time tee src/x.js is DENIED at a planning step (RED before fix)', () => {
+    setState(3);
+    const d = denyOf(runHook('time tee src/x.js'));
+    assert.ok(d, 'a wrapped write must reach the step gate and be denied');
+  });
+
+  test('F1-int b  sudo tee f is DENIED at a planning step (RED before fix)', () => {
+    setState(3);
+    const d = denyOf(runHook('sudo tee f'));
+    assert.ok(d, 'a wrapped write must reach the step gate and be denied');
   });
 
   test('37 every node -e recipe from start.md is still ALLOWED at its normal step', () => {
