@@ -255,11 +255,13 @@ over-reaching into the legitimate path or being "completed" into breaking it.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Write the file in full and run only it. Cases 2, 3, 4, 7, 8 and 19 must be RED. Record
 case 2's red verbatim: a pipeline-kind parent vouching for a slice is the sentence that
 justifies this slice.
 
 ### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Read from disk: `human-gate-check.js:1-100` (the header stating the intended rule) and
 `:174-260`; `src/lib/approval-residency.js` **in full** — the exact contract of
 `classifyResidency` (its return shape `{ accepted, reason, kind }`, the folders it
@@ -275,6 +277,7 @@ check, and `approval-residency.js:163` is the correct kind- and edge-sensitive p
 Re-confirm at Step 9; if a new caller has since appeared, report it.)
 
 ### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 - `src/hooks/human-gate-check.js` — replace the two-line `status === 'ok'` parent check
   with the single `classifyResidency(parentPlan, 'implementation', projectPath).accepted`
   delegation; correct the doc comment including the explicit no-hash-check rationale.
@@ -286,6 +289,7 @@ Re-confirm at Step 9; if a new caller has since appeared, report it.)
   beyond what `release.js` regenerates; do NOT assert a stale literal.
 
 ### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Confirm the exemption cannot be reached from any folder but `implementation/`. Confirm
 every fault resolves to not-exempt (delegation returns non-`true`). Confirm no
 content-hash check was added at `implementation/`. Confirm the slice's own `absent`
@@ -298,6 +302,7 @@ code performed, now routed through the shared predicate. For an `implementation/
 no content read occurs (not hash-sensitive). No new filesystem access.
 
 ### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Confirm no plan content or absolute path reaches a log or a message. Re-attack: a parent
 plan whose `parent_plan` value contains a traversal, a slug colliding with another
 plan's, a `stage_to` of the right string in the wrong case, and an entry with
@@ -306,6 +311,7 @@ plan's, a `stage_to` of the right string in the wrong case, and an entry with
 test.
 
 ### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 `node --test` on the new file plus every existing `human-gate-check`, `approval-ledger`,
 `approval-residency` and SIP1 test, then the full gated run `npm test`. Lint at
 `--max-warnings 0`. No git operations. **Report whether any plan currently in
@@ -323,6 +329,7 @@ The documented test-file count in `CLAUDE.md` is a generated tally regenerated b
 in `files:` is what admits the generated bump.
 
 ### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Report every Step 8 red verbatim, the Step 9 list of other `readEntryResult` callers
 making the same substitution (expected: none new), the Step 14 per-plan blast radius, and
 every decision taken under ambiguity.

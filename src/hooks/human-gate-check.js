@@ -181,14 +181,27 @@ function logViolation(entry) {
  *     `parseMetadata` fix);
  *   - it has NEVER appeared in the ledger (`readEntry === null`), the operational
  *     proxy for "never resided downstream / never crossed a gate";
- *   - its `parent_plan` resolves to a parent that ITSELF carries a real ledger
- *     entry (an approved/ledgered parent — the same `readEntryResult(...).status
- *     === 'ok'` check the residency sweep uses for a normal resident). Without
- *     this leg the exemption was a Gate-1 residency HOLE: because `plans/**.md` is
- *     Edit-whitelisted, an agent could Write `plans/implementation/x.md` carrying a
- *     lone `parent_plan:` line and squat the Gate-1 destination with zero
- *     provenance. A dangling / unapproved / nonexistent parent is NOT a valid
- *     provenance root, so the slice is NOT exempt (fail toward flagging).
+ *   - its `parent_plan` resolves to a parent that would ITSELF be ACCEPTED as a
+ *     legitimate resident of `implementation/` by `approval-residency.classifyResidency`
+ *     — the SAME single predicate the residency sweep applies to a normal resident. That
+ *     accepts a human, backfilled, or sufficiency crossing INTO `implementation/` and
+ *     rejects a pipeline entry (valid only at `done/`), an unknown provenance, a
+ *     wrong-edge entry, and a missing / corrupt / un-keyable one. A bare
+ *     `readEntryResult(...).status === 'ok'` — "has ANY entry" — was NOT that claim: it
+ *     was the last place in this codebase where "has a ledger entry" stood in for "has
+ *     THIS approval", and it DIVERGED from the kind- and edge-sensitive predicate the
+ *     sweep actually uses. Without this leg the exemption was a Gate-1 residency HOLE:
+ *     because `plans/**.md` is Edit-whitelisted, an agent could Write
+ *     `plans/implementation/x.md` carrying a lone `parent_plan:` line pointing at any
+ *     ledgered parent and squat the Gate-1 destination. A dangling / unapproved /
+ *     nonexistent parent is NOT a valid provenance root, so the slice is NOT exempt
+ *     (fail toward flagging).
+ *
+ *     The parent's CONTENT HASH is deliberately NOT checked: `implementation` is not a
+ *     `HASH_SENSITIVE_FOLDER`, and a plan legitimately edited in `implementation/` cannot
+ *     refresh its own hash (the ledger is agent-write-denied). Delegating to
+ *     `classifyResidency` preserves that rule through the one encoding; do not "complete"
+ *     the check by adding a hash comparison here.
  * The exemption cannot fire outside `implementation/`.
  *
  * @param {string} filePath - absolute path to the plan file
@@ -213,14 +226,20 @@ function isFreshSip1Slice(filePath, folderName, projectPath = process.cwd(), con
   if (ledger.readEntryResult(ledger.slugFromPlanPath(filePath), projectPath).status !== 'absent') {
     return false;
   }
-  // The exemption is valid ONLY under an approved/ledgered parent. Resolve the
-  // parent slug the same way a plan path maps to a ledger key (basename minus .md,
-  // lowercased — robust to a bare slug, a `<slug>.md`, or a path value), then apply
-  // the SAME ledger-entry check the sweep uses for a normal resident: the parent
-  // must have a real, readable ledger entry (`status === 'ok'`). A dangling,
-  // unapproved, un-keyable, or corrupt parent yields anything but 'ok' → NOT exempt.
-  const parentSlug = ledger.slugFromPlanPath(parentPlan);
-  return ledger.readEntryResult(parentSlug, projectPath).status === 'ok';
+  // The parent is a valid provenance root iff classifyResidency — THE single
+  // encoding the sweep uses for a normal resident — would accept it as a legitimate
+  // resident of implementation/, i.e. it genuinely crossed Gate 1 into implementation/.
+  // classifyResidency derives the parent slug internally (slugFromPlanPath — robust to a
+  // bare slug, a `<slug>.md`, or a path value), so the normalization is preserved.
+  // Accepts a human / backfilled / sufficiency crossing into implementation/; rejects a
+  // pipeline entry (valid only at done/), an unknown provenance, a wrong-edge entry, and
+  // a missing / corrupt / un-keyable one. No content-hash check, because implementation
+  // is not a HASH_SENSITIVE_FOLDER — the deliberate no-hash rule (a plan legitimately
+  // edited in implementation/ cannot refresh its own hash), preserved through the one
+  // encoding. A bare `readEntryResult(...).status === 'ok'` — "has ANY entry" — was NOT
+  // that claim, and diverged from this predicate: the last place "has a ledger entry"
+  // stood in for "has THIS approval". classifyResidency never throws.
+  return classifyResidency(parentPlan, 'implementation', projectPath).accepted;
 }
 
 /**
