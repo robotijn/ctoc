@@ -796,60 +796,77 @@ If ANY fails — kickback to the relevant step (per the smart-kickback table in 
 
 ---
 
-## v6.9.27 — Cross-Industry Critique Integrations
+## v6.9.27 — Cross-Industry Critique Controls (opt-in profiles; libraries present, NOT ENFORCED until wired)
 
 The cross-industry critique (real-time / safety-critical, manufacturing, finance, legal) added 42 industry-grade controls. All are **opt-in via the regulatory-regime profile system**. Default profile is `none`: CTOC stays lean. Set `.ctoc/settings.yaml` → `regulatory_regime.active_profiles: [...]` to one or more of the 14 profiles in `.ctoc/regulatory-regimes/` to activate the relevant controls. Library: `src/lib/regulatory-regime.js`. Documentation: `docs/INDEPENDENCE.md`, `docs/PROCESS_FMEA.md`, `docs/CRITICAL_CONTROL_POINTS.md`, `docs/CONTINUOUS_IMPROVEMENT.md`, `docs/REALTIME.md`, `docs/REGULATORY_OPS.md`, `docs/EVALUATION_HARNESS.md`.
 
 ### Step extensions by control
 
+**NOT ENFORCED — read before relying on any control below.** Every control in this
+section is opt-in via the regulatory-regime profile system. The libraries and skills
+named are present and tested, but with ONE exception (Independent Verification and
+Validation, which `agents/coordinator/ivv-chief.md` consults through a real
+`isControlEnabled` call) **nothing evaluates whether the control is active**, so none
+of these extensions actually gate a step today. Each item is marked individually below;
+choosing a profile RECORDS the control, it does not enforce it. Wiring is unbuilt work
+the human schedules.
+
 **Step 5 PLAN** gains when `wcet_budget` is active: dispatch `skills/realtime/wcet-budget` to establish a worst-case execution time budget for performance-critical paths.
 
 **Step 6 DESIGN** gains:
-- `skills/safety/fmeda-analyzer` when `fmeda_design` is active — bottom-up failure-modes-effects-and-diagnostic analysis with single-point-fault-metric and latent-fault-metric.
-- `skills/safety/fault-tree-builder` when `fault_tree_analysis` is active — top-down deductive analysis for plans flagged `criticality: high`.
-- `skills/safety/redundancy-pattern-picker` when `graceful_degradation_matrix` is active — recommends lockstep, triple-modular, dual-channel diverse, or N-version per safety integrity level.
+- `skills/safety/fmeda-analyzer` when `fmeda_design` is active — bottom-up failure-modes-effects-and-diagnostic analysis with single-point-fault-metric and latent-fault-metric. **NOT ENFORCED** (no evaluator; unbuilt wiring).
+- `skills/safety/fault-tree-builder` when `fault_tree_analysis` is active — top-down deductive analysis for plans flagged `criticality: high`. **NOT ENFORCED** (no evaluator; unbuilt wiring).
+- `skills/safety/redundancy-pattern-picker` when `graceful_degradation_matrix` is active — recommends lockstep, triple-modular, dual-channel diverse, or N-version per safety integrity level. **NOT ENFORCED** (no evaluator; unbuilt wiring).
 
 **Step 6.5 THREAT MODEL** already dispatches `skills/security/threat-modeler` (Spoofing-Tampering-Repudiation-Information-disclosure-Denial-Elevation plus Linking-Identifying-Non-repudiation-Detecting-Disclosure-Unawareness-Non-compliance plus MITRE Adversarial Threat Landscape for Artificial-Intelligence Systems). Added in v6.9.27: also dispatch `skills/safety/fmeda-analyzer` and `skills/safety/fault-tree-builder` for non-security failure modes when the relevant safety profile is active.
 
 **Step 7 SPEC** integrates `src/lib/proportionality.js` when `proportionality_test` is active — every refinement-loop kickback logs the six Federal Rules of Civil Procedure Rule 26(b)(1) factors (importance, amount in controversy, parties' access, resources, importance of discovery in resolving issues, burden vs benefit) to `.ctoc/proportionality-log/<date>.yaml`.
 
 **Step 9 PREPARE** gains:
-- Clock-source posture verification recorded to `.ctoc/audit/clock-source.yaml` when `precision_time_protocol` is active (MiFID II Regulatory Technical Standard 25 sub-100-microsecond requirement).
-- Tool-qualification record check at `.ctoc/tool-qualification/<tool>.yaml` when `tool_qualification` is active (ISO 26262-8 §11 Tool Confidence Level — TCL2 / TCL3 tools require qualification evidence).
+- Clock-source posture verification recorded to `.ctoc/audit/clock-source.yaml` when `precision_time_protocol` is active (MiFID II Regulatory Technical Standard 25 sub-100-microsecond requirement). **NOT ENFORCED** (no evaluator; unbuilt wiring).
+- Tool-qualification record check at `.ctoc/tool-qualification/<tool>.yaml` when `tool_qualification` is active (ISO 26262-8 §11 Tool Confidence Level — TCL2 / TCL3 tools require qualification evidence). **NOT ENFORCED** (no evaluator; unbuilt wiring).
 
 **Step 10 IMPLEMENT** dispatches:
-- `src/lib/ai-provenance.js` PostToolUse stamp when `ai_provenance_stamp` is active (European Union Artificial Intelligence Act Article 50, effective 2 August 2026).
-- `src/lib/data-lineage.js` for each agent dispatch when `data_lineage` is active (Basel Committee on Banking Supervision Principle 3 lineage directed-acyclic-graph).
+- `src/lib/ai-provenance.js` PostToolUse stamp when `ai_provenance_stamp` is active (European Union Artificial Intelligence Act Article 50, effective 2 August 2026). **NOT ENFORCED** (no evaluator; unbuilt wiring).
+- `src/lib/data-lineage.js` for each agent dispatch when `data_lineage` is active (Basel Committee on Banking Supervision Principle 3 lineage directed-acyclic-graph). **NOT ENFORCED** (no evaluator; unbuilt wiring).
 
 **Step 13 SECURE** gains:
-- `skills/security/cra-incident-clocks` when `cra_incident_clocks` is active (European Union Cyber Resilience Act Article 14 — 24-hour early warning, 72-hour notification, 14-day final report from 11 September 2026).
+- `skills/security/cra-incident-clocks` when `cra_incident_clocks` is active (European Union Cyber Resilience Act Article 14 — 24-hour early warning, 72-hour notification, 14-day final report from 11 September 2026). **NOT ENFORCED** (no evaluator; unbuilt wiring).
 
 **Step 14 VERIFY** gains:
-- `skills/realtime/hil-harness` when `hil_test_ladder` is active and the target is embedded hardware — Model / Software / Processor / Hardware-in-the-Loop ladder per the automotive V-model.
-- `skills/realtime/wcet-budget` re-check when `wcet_budget` is active — confirm the design-time budget held under actual implementation.
+- `skills/realtime/hil-harness` when `hil_test_ladder` is active and the target is embedded hardware — Model / Software / Processor / Hardware-in-the-Loop ladder per the automotive V-model. **NOT ENFORCED** (no evaluator; unbuilt wiring).
+- `skills/realtime/wcet-budget` re-check when `wcet_budget` is active — confirm the design-time budget held under actual implementation. **NOT ENFORCED** (no evaluator; unbuilt wiring).
 
 **Step 14.5 RECONCILE** (NEW, between Step 14 VERIFY and Step 15 DOCUMENT) when `spec_code_reconciliation` is active: diff the plan's declared `files:` and acceptance criteria against the actual changed files and passing tests. Block Gate 3 if drift exceeds threshold. Required by Basel Committee on Banking Supervision Principle 3 reconciliation-with-golden-source.
 
 **Step 15 DOCUMENT** gains:
-- `skills/legal/dsar-handler` when `dsar_handler` is active (Data Subject Access Request — General Data Protection Regulation Article 12 one month, California Consumer Privacy Act 45 days).
-- `skills/legal/clm-obligations` when `clm_obligations_tracker` is active (Contract Lifecycle Management obligations registered at `.ctoc/contracts/obligations.yaml`).
-- `src/lib/irac-schema.js` enforcement on every compliance-skill finding when `irac_compliance_output` is active (Issue-Rule-Application-Conclusion legal-memo structure).
-- `src/lib/traceability-matrix.js` cross-walk against `.ctoc/traceability/matrix.yaml` when `requirements_traceability_matrix` is active (RTCA DO-178C and IEC 62304 bidirectional requirements traceability).
+- `skills/legal/dsar-handler` when `dsar_handler` is active (Data Subject Access Request — General Data Protection Regulation Article 12 one month, California Consumer Privacy Act 45 days). **NOT ENFORCED** (no evaluator; unbuilt wiring).
+- `skills/legal/clm-obligations` when `clm_obligations_tracker` is active (Contract Lifecycle Management obligations registered at `.ctoc/contracts/obligations.yaml`). **NOT ENFORCED** (no evaluator; unbuilt wiring).
+- `src/lib/irac-schema.js` enforcement on every compliance-skill finding when `irac_compliance_output` is active (Issue-Rule-Application-Conclusion legal-memo structure). **NOT ENFORCED** (no evaluator; unbuilt wiring).
+- `src/lib/traceability-matrix.js` cross-walk against `.ctoc/traceability/matrix.yaml` when `requirements_traceability_matrix` is active (RTCA DO-178C and IEC 62304 bidirectional requirements traceability). **NOT ENFORCED** (no evaluator; unbuilt wiring).
 
 **Step 16 FINAL-REVIEW** gains:
 - **Independent Verification and Validation chief** (`agents/coordinator/ivv-chief.md`) when `independent_verification_validation` is active. IV&V chief reports to user (not to CTO Chief) and re-runs Steps 11 REVIEW, 13 SECURE, 14 VERIFY in fresh isolated subagent contexts, writing to a separate audit-log root at `.ctoc/audit/ivv-dispatches/`. Required by DO-178C Level A, ISO 26262 ASIL D, IEC 62304 Class C, NASA SWE-141.
-- **Four-eyes verification** (`src/lib/four-eyes.js`) when `four_eyes_gate3` is active — Gate 3 requires two distinct `approved_by_author_review:` and `approved_by_independent:` markers resolving to different identities per `.ctoc/roles.yaml`.
-- **Privilege-posture stamp** (`src/lib/privilege-posture.js`) on every plan when `privilege_posture` is active. Allowed values: `none`, `counsel-directed`, `client-only`. Warning banner flags the work-product-doctrine implications of the posture.
+- **Four-eyes verification** (`src/lib/four-eyes.js`) when `four_eyes_gate3` is active — the library resolves two distinct `approved_by_author_review:` and `approved_by_independent:` markers to different identities per `.ctoc/roles.yaml`. **NOT ENFORCED** (no evaluator; the final gate does not require two distinct approvers today — unbuilt wiring).
+- **Privilege-posture stamp** (`src/lib/privilege-posture.js`) on every plan when `privilege_posture` is active. Allowed values: `none`, `counsel-directed`, `client-only`. Warning banner flags the work-product-doctrine implications of the posture. **NOT ENFORCED** (no evaluator; unbuilt wiring).
 
-### Cross-cutting infrastructure (always available regardless of profile)
+### Cross-cutting infrastructure (libraries always present; the profile-gated ones are NOT ENFORCED)
 
-- **Audit hash-chain** (`src/lib/audit-chain.js`) — every dispatch entry is content-hashed with Secure Hash Algorithm 256 and linked to the previous chain head. Verify with `verifyChain(projectRoot)`. Required when `audit_hash_chain` is active (Securities and Exchange Commission 17a-4 / FINRA Rule 4511 audit-trail alternative).
+**NOT ENFORCED — read before relying on the profile-gated items below.** These
+libraries and scripts exist and are tested, but the ones that name a control
+(`audit_hash_chain`, `config_baseline`, `andon_cord_halt`) are gated by no evaluator,
+so activating a profile RECORDS the control and does not switch the behaviour on. Each
+is marked individually. The retention sweeper, legal-hold register and spoliation-safe
+deletion are libraries too; they run only where a caller invokes them, which is unbuilt
+wiring the human schedules.
+
+- **Audit hash-chain** (`src/lib/audit-chain.js`) — the library content-hashes a dispatch entry with Secure Hash Algorithm 256 and links it to the previous chain head. Verify with `verifyChain(projectRoot)`. Intended when `audit_hash_chain` is active (Securities and Exchange Commission 17a-4 / FINRA Rule 4511 audit-trail alternative). **NOT ENFORCED** (no evaluator consults the control, and no dispatch path calls the chain today; unbuilt wiring).
 - **Retention sweeper** (`src/lib/retention.js`) — surfaces artifacts older than the per-category retention window; longest-window-wins across stacked profiles.
 - **Legal-hold register** (`.ctoc/legal-hold/<id>.yaml`) — while any hold has `status: active`, `src/lib/legal-hold.js` blocks destructive operations on plans, audit logs, and preservation copies (Federal Rules of Civil Procedure Rule 37(e)).
 - **Spoliation-safe deletion** (`src/lib/spoliation-safe.js`) — every destructive operation routes through a content-addressed snapshot at `.ctoc/preservation/<sha256>/` first.
-- **Configuration baseline** — `node src/scripts/release.js` writes `.ctoc/baselines/<version>/manifest.yaml` with file hashes when `config_baseline` is active.
+- **Configuration baseline** — `node src/scripts/release.js` writes `.ctoc/baselines/<version>/manifest.yaml` with file hashes when `config_baseline` is active. **NOT ENFORCED** (no evaluator; unbuilt wiring).
 - **Continuous Controls Monitoring evidence pack** — `node src/scripts/evidence-pack.js` bundles dispatch audit, gate approvals, threat models, model-risk attestations, provenance events, baselines, and CAPA entries into `.ctoc/evidence-packs/<date>.tar.gz` (Sarbanes-Oxley Section 404 continuous-controls-monitoring expectation).
-- **Andon-cord halt** — auto-blocks new dispatches when quality metrics (escape rate, process capability index, flaky tests) breach the thresholds at `.ctoc/config/andon-thresholds.yaml`, when `andon_cord_halt` is active.
+- **Andon-cord halt** — intended to block new dispatches when quality metrics (escape rate, process capability index, flaky tests) breach the thresholds at `.ctoc/config/andon-thresholds.yaml`, when `andon_cord_halt` is active. **NOT ENFORCED** (no evaluator; unbuilt wiring).
 - **Process-FMEA** of the 16-step loop documented at `docs/PROCESS_FMEA.md` using the 2019 Automotive Industry Action Group / Verband der Automobilindustrie Action Priority matrix.
 - **Critical Control Point map** at `docs/CRITICAL_CONTROL_POINTS.md` marks Steps 5, 6, 7, 10, 13, 14 as CCPs per the HACCP pattern.
 

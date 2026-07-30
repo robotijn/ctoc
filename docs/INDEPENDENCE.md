@@ -5,8 +5,8 @@ This document explains the three independence controls in CTOC's regulatory regi
 The three controls are:
 
 1. `independent_verification_validation` — the Independent Verification and Validation Chief.
-2. `four_eyes_gate3` — two distinct principals at Gate 3.
-3. `privilege_posture` — per-plan work-product privilege classification.
+2. `four_eyes_gate3` — two distinct principals at Gate 3. **NOT ENFORCED**: no hook, gate or agent consults this control, so the final gate does not require two distinct approvers today; the library is present and tested, wiring it is unbuilt work.
+3. `privilege_posture` — per-plan work-product privilege classification. **NOT ENFORCED**: no evaluator consults this control; the library validates and stamps a posture only where a caller invokes it, which is unbuilt wiring.
 
 None of these are active by default. CTOC remains lean for the common case. Each control activates only when an active regulatory profile (in `.ctoc/regulatory-regimes/*.yaml`) declares it as required.
 
@@ -80,7 +80,7 @@ The two role names resolve in [`.ctoc/roles.yaml`](../.ctoc/roles.yaml). The lib
 
 ### How it integrates with the Iron Loop
 
-The pre-tool hook in `src/hooks/human-gate-check.js` consults `four-eyes.js` when the `four_eyes_gate3` control is active. If a plan reaches `done/` without both markers satisfying the identity-distinctness property, the hook auto-reverts the move, logs the violation to `.ctoc/logs/gate-violations.json`, and alerts the user.
+**NOT ENFORCED.** `src/lib/four-eyes.js` implements the identity-distinctness check for `four_eyes_gate3`, but nothing calls it: the pre-tool hook `src/hooks/human-gate-check.js` does not reference `four-eyes.js`, does not read the `four_eyes_gate3` control, and performs no dual-approver check. A plan can therefore reach `done/` today with a single approver; the final gate does not require two distinct identities. The library is present and tested — wiring it into the gate is unbuilt work the human schedules.
 
 ### Solo-developer mode
 
@@ -92,7 +92,7 @@ The default `.ctoc/roles.yaml` ships with a single `human` role and one `ai-auth
 
 ### What it is
 
-The per-plan `privilege_posture` frontmatter field declares whether the work product of a given plan is intended to fall inside the protection of the attorney-client privilege and the attorney work-product doctrine. Implemented by [`src/lib/privilege-posture.js`](../src/lib/privilege-posture.js).
+The per-plan `privilege_posture` frontmatter field declares whether the work product of a given plan is intended to fall inside the protection of the attorney-client privilege and the attorney work-product doctrine. Implemented by [`src/lib/privilege-posture.js`](../src/lib/privilege-posture.js). **NOT ENFORCED**: no evaluator consults the `privilege_posture` control; the library validates and stamps a posture only where a caller invokes it, and that call site is unbuilt wiring.
 
 Three valid values:
 
@@ -119,7 +119,7 @@ Together these rulings make declaration-at-creation-time load-bearing. The privi
 
 ### When it is required
 
-The `privilege_posture` control activates when any active profile sets it. In practice this includes:
+The `privilege_posture` control is recorded when any active profile sets it. **NOT ENFORCED**: no evaluator consults it, so setting the profile does not make the posture stamp mandatory today — it remains a library a caller must invoke. In practice a profile that sets it includes:
 
 - `legal-hold-enabled` profile (litigation-active projects).
 - `sox-itgc` profile in companies whose general counsel directs the ITGC remediation work.
@@ -148,7 +148,7 @@ regulatory_regime:
     - legal-hold-enabled       # activates privilege_posture
 ```
 
-A typical United States public-company SaaS product activates only `four_eyes_gate3` via `sox-itgc`. A consumer mobile app activates none of them.
+A typical United States public-company SaaS product records only `four_eyes_gate3` via `sox-itgc`. A consumer mobile app records none of them. **NOT ENFORCED**: recording any of these three controls does not activate a behaviour today — each is a present, tested library with no evaluator consulting the control, so wiring is unbuilt work.
 
 ---
 

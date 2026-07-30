@@ -23,15 +23,17 @@ explicit, auditable evidence:
 
 | Control | What it documents | Activated by |
 |---|---|---|
-| `wcet_budget` | Worst-Case Execution Time bound per real-time task, with tool reference | `iso-26262-asil-d`, `do-178c-level-a`, `iec-61508-sil-3` |
-| `hil_test_ladder` | Per-function verification evidence at Model / Software / Processor / Hardware-in-the-Loop rungs | `iso-26262-asil-d`, `do-178c-level-a`, `iec-61508-sil-3` |
-| `precision_time_protocol` | Sub-100-microsecond clock provenance on every dispatch | `mifid-ii` |
+| `wcet_budget` | Worst-Case Execution Time bound per real-time task, with tool reference | `iso-26262-asil-d`, `do-178c-level-a`, `iec-61508-sil-3` — NOT ENFORCED |
+| `hil_test_ladder` | Per-function verification evidence at Model / Software / Processor / Hardware-in-the-Loop rungs | `iso-26262-asil-d`, `do-178c-level-a`, `iec-61508-sil-3` — NOT ENFORCED |
+| `precision_time_protocol` | Sub-100-microsecond clock provenance on every dispatch | `mifid-ii` — NOT ENFORCED |
 
 Each control activates only when the corresponding regulatory regime profile is
 active in `.ctoc/settings.yaml`. None of them are on by default; CTOC stays
 lean for the projects that do not need them.
 
 ## Worst-Case Execution Time (`wcet_budget`)
+
+> **NOT ENFORCED.** The `wcet_budget` control is recorded by its profile, but no evaluator consults it and no step is gated on it. The skill and analysis discipline below are present and dispatched only where a caller invokes them; wiring the control to a step is unbuilt work.
 
 The Worst-Case Execution Time is the tightest provable upper bound on the time
 a task can take to complete on the target hardware under any legal input or
@@ -92,6 +94,8 @@ finding per the warnings-are-bugs rule.
 
 ## Hardware-in-the-Loop test ladder (`hil_test_ladder`)
 
+> **NOT ENFORCED.** The `hil_test_ladder` control is recorded by its profile, but no evaluator consults it and Step 14 is not gated on it. The ladder below describes intended evidence; nothing today blocks on its absence.
+
 Hardware-in-the-Loop is the top rung of a four-rung verification ladder that
 mirrors the V-model. Each rung is named by what is "in the loop" — the
 simulated quantity is everything else.
@@ -120,8 +124,8 @@ is to record the skip and the reasoning:
 > for this architecture and Processor-in-the-Loop will catch any deviation."
 
 When the active regulatory regime declares `hil_test_ladder`, the absence of
-Hardware-in-the-Loop evidence at Step 14 (VERIFY) is a `severity: critical`
-finding. There is no "the unit tests are enough" override for safety-certifiable
+Hardware-in-the-Loop evidence at Step 14 (VERIFY) is intended to be a `severity: critical`
+finding. **NOT ENFORCED**: nothing evaluates the `hil_test_ladder` control, so Step 14 does not raise this finding today. There is no "the unit tests are enough" override for safety-certifiable
 functions; unit tests live at Software-in-the-Loop and below and cannot
 exercise integration, timing under load, electrical effects, or fault-response.
 
@@ -159,6 +163,8 @@ expired.
 - MathWorks Simulink Test — https://www.mathworks.com/products/simulink-test.html
 
 ## Precision Time Protocol on the audit log (`precision_time_protocol`)
+
+> **NOT ENFORCED.** The `precision_time_protocol` control is recorded by its profile, but no evaluator consults it; no dispatch is gated on clock provenance today. The description below is intended behaviour, not wired behaviour.
 
 The Markets in Financial Instruments Directive II Regulatory Technical
 Standard 25 requires that participants in markets where high-frequency
@@ -257,7 +263,7 @@ network interface card rather than in user space.
 The three controls activate via the regulatory regime profiles in
 [`.ctoc/regulatory-regimes/`](../.ctoc/regulatory-regimes/):
 
-| Profile | `wcet_budget` | `hil_test_ladder` | `precision_time_protocol` |
+| Profile (every control below is recorded by the profile but NOT ENFORCED) | `wcet_budget` | `hil_test_ladder` | `precision_time_protocol` |
 |---|---|---|---|
 | `iso-26262-asil-d` (Automotive Safety Integrity Level D) | required | required | not required |
 | `do-178c-level-a` (Airborne software Design Assurance Level A) | required | required | not required |

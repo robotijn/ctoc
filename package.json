@@ -1,6 +1,6 @@
 {
   "name": "ctoc",
-  "version": "6.14.14",
+  "version": "6.14.15",
   "description": "Your Virtual CTO — AI agents and expert skills with quality gates. A Claude Code plugin.",
   "license": "PolyForm-Shield-1.0.0",
   "private": true,
