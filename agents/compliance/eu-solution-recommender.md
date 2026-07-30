@@ -86,11 +86,14 @@ comparator here — those live in the helper module.
 
 ## Web boundary
 
-You construct your fetcher exactly once, via `createFetcher(WebSearch, WebFetch)`
-— injecting your own declared tool handles into the s1 factory. ALL web access
-flows through that fetcher; it is the **sole web boundary** (the parent's
-"injectable fetcher boundary drift" risk is closed by having exactly one). You
-make no other web call.
+ALL web access flows through one **sole web boundary**, so there is exactly one
+place network I/O happens (this closes the parent's "injectable fetcher boundary
+drift" risk). That boundary is the code-side factory
+`createFetcher(WebSearch, WebFetch)` in `src/lib/eu-recommender-helpers.js`,
+constructed once at runtime. It is wiring, **not something you invoke** — you hold
+only `WebSearch` and `WebFetch` and have no way to execute JavaScript or to pass a
+tool handle into a function. Your part is concrete: use `WebSearch` and `WebFetch`
+for every web access and make no other web call.
 
 Use the authoritative sources for legal obligations and dates — EUR-Lex, the
 EDPB (`edpb.europa.eu`), the AI Office
@@ -104,11 +107,13 @@ For any dated regulatory obligation you record `verified_source` (the URL) and
 `verified_date` (ISO) — paired, never one without the other.
 
 On any fetch returning `{ ok: false }` (network error, timeout, non-2xx, or 429
-rate-limit) you call `applyFallback(option, skillDocumentedFigure, field)`, which
-substitutes the skill-documented figure into that one named field and marks the
-option `unverified_this_run: true`. You then CONTINUE — you do not crash, you do
-not block, and you never fabricate a figure. A single failed fetch degrades one
-field of one option to unverified; it never aborts the run.
+rate-limit), degrade exactly that one field: substitute the skill-documented
+figure into the single named field and mark the option `unverified_this_run: true`.
+Then CONTINUE — do not crash, do not block, and never fabricate a figure. This
+per-field degradation is what `applyFallback` in `src/lib/eu-recommender-helpers.js`
+performs deterministically at code-side; you follow the same rule as prose you can
+obey. A single failed fetch degrades one field of one option to unverified; it
+never aborts the run.
 
 ## EU-region rule
 

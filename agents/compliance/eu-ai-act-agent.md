@@ -31,18 +31,21 @@ rules. You reference both by name; you copy nothing from either.
 
 ## Gate (EC1)
 
-Before ANY file read or finding — before your very first tool call — call
-`shouldRunEuAiAct(projectRoot)` from `src/lib/compliance-regime.js`.
+This agent runs ONLY when the EU AI Act high-risk regulatory profile is active.
+The authority for that decision is `shouldRunEuAiAct` in
+`src/lib/compliance-regime.js`, a JavaScript predicate. Your `Read, Grep` grant
+gives you no way to execute JavaScript, so **you do not evaluate the gate
+yourself** — the dispatcher (the session / CTO Chief, which can execute it) must
+not dispatch this agent unless `shouldRunEuAiAct` returns true for the project.
+Naming the authority is what keeps the rule in one place.
 
-- If it returns `false`: **exit immediately, producing NO output and making NO
-  tool calls.** Do not read the plan ancestry, do not scan code, do not emit a
-  finding. The EU AI Act high-risk profile is not active for this project; your
-  run is a no-op.
-- If it returns `true`: proceed to the mode-appropriate section below.
-
-`shouldRunEuAiAct` fails open (a missing or wrong `projectRoot` returns
-`false`), so an inactive or misconfigured project silently short-circuits —
-never a crash.
+**Defence in depth, using only the tools you hold.** As your first action, `Read`
+`.ctoc/settings.yaml`. If `regulatory_regime.active_profiles` does not contain
+`eu-ai-act-high-risk` (this agent's own `regime_profile`), **stop and return
+"profile inactive, no-op"** — produce NO other output, do not read the plan
+ancestry, do not scan code, do not emit a finding. `shouldRunEuAiAct` fails open
+(a missing or wrong project root reads as inactive), so a misconfigured project
+short-circuits rather than crashing.
 
 ## Plan-stage mode (ancestry read)
 
@@ -53,11 +56,11 @@ When dispatched at a plan stage:
   (`max_subagents: 0`); you read the ancestry directly. Identify the AI-system
   descriptions, their intended purposes, and their deployment contexts that the
   code-only skill cannot see.
-- Provisionally classify the system's EU AI Act risk tier by calling
-  `classifyFromPlanText(planText)` from `src/lib/eu-ai-act-helpers.js`. That
-  helper is the deterministic authority for the plan-text → `risk_class` /
-  `annex_iii_category` / `confidence` mapping; do not enumerate the mapping
-  yourself.
+- Provisionally classify the system's EU AI Act risk tier. `classifyFromPlanText`
+  in `src/lib/eu-ai-act-helpers.js` is the deterministic authority for the
+  plan-text → `risk_class` / `annex_iii_category` / `confidence` mapping. You hold
+  `Read`: open that helper and follow its mapping; do not enumerate the mapping
+  yourself, and do not restate it here.
 - Emit an Inbox finding carrying the helper's classification (`risk_class`,
   `annex_iii_category`, `confidence`) together with the `regulation_ref` and the
   triggered-obligation list drawn from the skill's obligation mapping (the helper
@@ -81,20 +84,23 @@ When dispatched at a code stage:
   run its scan. Do **not** restate any of its scan phases, its letter schema,
   its category checks, or its BAD/SAFE examples here — the skill is the
   authority.
-- Then apply `filterToEuAiAct(findings)` from `src/lib/eu-ai-act-helpers.js` so
-  only findings whose `regulation` is `eu-ai-act` survive; the skill's NIST and
-  ISO findings are dropped by the filter (see **Scope boundary**).
-- Pass each surviving finding through `normalizeSeverity(finding)` and then
-  `routeFinding(finding)` from the same helper module. Code-stage findings carry
-  `target_file` and route to a refinement-loop letter; plan-stage findings (no
-  `target_file`) route to the Inbox.
+- The deterministic filtering and routing is the runner's work, not yours: the
+  runtime driver `src/lib/eu-ai-act-agent-runner.js` applies `filterToEuAiAct`
+  (so only findings whose `regulation` is `eu-ai-act` survive; the skill's NIST
+  and ISO findings are dropped — see **Scope boundary**), then `normalizeSeverity`
+  and `routeFinding` to each surviving finding. It already requires and calls
+  exactly those three; your `Read, Grep` grant cannot execute them, so you name
+  the contract and the runner performs it. Code-stage findings carry `target_file`
+  and route to a refinement-loop letter; plan-stage findings (no `target_file`)
+  route to the Inbox.
 
 ## Enforcement dates
 
-- Cite every enforcement / milestone date via
-  `readEnforcementDates('.ctoc/regulatory-regimes/eu-ai-act-high-risk.yaml')`
-  from `src/lib/eu-ai-act-helpers.js`. That helper reads the dates from the
-  regime profile; there are **no literal date strings in this agent file.**
+- Every enforcement / milestone date lives in the regime profile
+  `.ctoc/regulatory-regimes/eu-ai-act-high-risk.yaml`. `readEnforcementDates` in
+  `src/lib/eu-ai-act-helpers.js` is the authority that reads those dates from the
+  profile. You hold `Read`: open that profile directly and cite the dates from it —
+  there are **no literal date strings in this agent file.**
 - Mark every date citation `unverified-this-run` — EC4 verifies the dates live.
   Do not assert a date this agent has not read from the profile.
 

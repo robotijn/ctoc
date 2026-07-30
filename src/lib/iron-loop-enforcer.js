@@ -703,6 +703,7 @@ const CHECKS = [
   { id: 'plan-counts',                 scope: 'info',         mode: 'fast', fn: checkPlanCounts },
   { id: 'reachability-fence',          scope: 'architecture', mode: 'thorough', fn: checkReachabilityFence },
   { id: 'dead-export-fence',           scope: 'architecture', mode: 'thorough', fn: checkDeadExportFence },
+  { id: 'unexecutable-instruction-fence', scope: 'architecture', mode: 'thorough', fn: checkUnexecutableInstructionFence },
   { id: 'false-green-fence',           scope: 'architecture', mode: 'thorough', fn: checkFalseGreenFence },
   { id: 'golden-corpus-fence',         scope: 'architecture', mode: 'thorough', fn: checkGoldenCorpusFence },
   { id: 'recipe-execution-fence',      scope: 'architecture', mode: 'thorough', fn: checkRecipeExecutionFence },
@@ -796,6 +797,62 @@ function checkDeadExportFence(root) {
   return finding({
     severity: 'block',
     message: `${fresh.length} NEW dead export(s) — defined and exported, called by nothing live: ${fresh.slice(0, 10).join(', ')}${fresh.length > 10 ? ` (+${fresh.length - 10} more)` : ''} — wire each to a live call site or delete it; a test is not a caller`
+  });
+}
+
+/**
+ * Unexecutable-order fence invariant (plan 00110). An agent definition is a set of
+ * orders, and its `tools:` frontmatter is the complete list of what it can do. An order
+ * to CALL a JavaScript function — `call `shouldRunGdpr(projectRoot)`` — under a grant
+ * with no way to execute JavaScript (in practice, no `Bash`) is IMPOSSIBLE: the agent
+ * skips the part it cannot do and returns a result that reads like success. Five agent
+ * definitions carried exactly this. `src/lib/unexecutable-instruction-scan.js` finds
+ * such orders across the agent corpus (following reachability.js's strip-first,
+ * parenthesis-required, under-reporting discipline — a citation is not an invocation),
+ * and this is its LIVE call site.
+ *
+ * Compares the live scan against `.ctoc/unexecutable-instruction-baseline.json`, which
+ * holds TWO deliberately separate structures: `debt` is real orders being paid down (may
+ * only SHRINK, no per-entry justification) and `exemptions` is a PERMANENT list asserting
+ * the detector is wrong (a written reason per entry, shipped EMPTY). Anything in neither
+ * blocks. A malformed baseline excuses NOTHING, mirroring checkDeadExportFence. A scan
+ * that read ZERO agents is not a CTOC agent corpus → CLEAN (never a false zero). Thorough
+ * mode only (walks the whole agent corpus).
+ *
+ * Structured for extension: plan 00073 appends its two remaining detections to the same
+ * scanner and this same CHECKS entry; `Finding.detection` is already a union.
+ *
+ * @param {string} root - Project root
+ * @returns {{clean: boolean, severity?: string, message?: string}} not-clean, or { clean: true }
+ */
+function checkUnexecutableInstructionFence(root) {
+  const { scan } = require('./unexecutable-instruction-scan');
+  const path = require('path');
+  const safeFs = require('./safe-fs');
+
+  const result = scan(root);
+  if (result.scanned.agents === 0) return CLEAN(); // not a CTOC agent corpus — nothing to check
+
+  const baselineFile = path.join(root, '.ctoc', 'unexecutable-instruction-baseline.json');
+  /** @type {Set<string>} */
+  const excused = new Set();
+  if (safeFs.existsSync(baselineFile)) {
+    try {
+      const parsed = JSON.parse(safeFs.readFileSync(baselineFile, 'utf8'));
+      for (const key of (parsed && parsed.debt) || []) if (typeof key === 'string') excused.add(key);
+      for (const e of (parsed && parsed.exemptions) || []) if (e && typeof e.key === 'string') excused.add(e.key);
+    } catch {
+      // A malformed baseline excuses NOTHING: drop any partially-parsed keys so every
+      // finding blocks. An unreadable ledger must never read as "all clear".
+      excused.clear();
+    }
+  }
+
+  const fresh = result.findings.filter((f) => !excused.has(f.key));
+  if (fresh.length === 0) return CLEAN();
+  return finding({
+    severity: 'block',
+    message: `${fresh.length} agent order(s) that cannot execute — an agent told to run JavaScript its tools: grant gives it no way to run: ${fresh.slice(0, 10).map((f) => f.key).join(', ')}${fresh.length > 10 ? ` (+${fresh.length - 10} more)` : ''} — rewrite the order for the granted tools, name the actor that really performs it, or grant a tool that can; a citation is not an invocation`
   });
 }
 
