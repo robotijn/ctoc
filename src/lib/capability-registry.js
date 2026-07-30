@@ -368,6 +368,29 @@ function load(projectRoot) {
   return { languages, warnings };
 }
 
+/**
+ * Compile a `*`-glob detectionMarker into a ReDoS-SAFE, anchored whole-filename regex,
+ * or return null when the marker is not safe to compile.
+ *
+ * A project-LOCAL override under `<projectRoot>/.ctoc/capabilities` is UNTRUSTED input
+ * (the module's stated threat model). Only SINGLE-`*` globs are valid and shipped; a
+ * marker with MORE THAN ONE `*` compiles to `^.*a.*a…a$`, which catastrophically
+ * backtracks against a single crafted root filename — an empirical ~59s hang,
+ * exponential in star count, reachable on the Step-14 / init / quality hot paths.
+ * `safeRegExp` centralizes construction but does NOT bound backtracking, so the cap
+ * lives here: a multi-star marker is REJECTED (returns null → the caller treats it as
+ * matching nothing), never handed to the regex engine. Single-`*` and literal-in-glob
+ * markers compile to the identical linear-time `.*` regex as before — byte-for-byte
+ * unchanged behavior. Shared by detectLanguages and projectTypeFor (the two glob sites).
+ *
+ * @param {string} marker a detectionMarker containing at least one `*`.
+ * @returns {RegExp|null} the anchored pattern, or null when the marker has >1 `*`.
+ */
+function globMarkerToRegExp(marker) {
+  if ((marker.match(/\*/g) || []).length > 1) return null;
+  return safeRegExp('^' + escapeRegExp(marker).replace(/\\\*/g, '.*') + '$');
+}
+
 // ── project-type dimension (CR3) ────────────────────────────────────────────────
 // A language names the toolchain; a project TYPE names which phases matter, the run
 // strategy, and the config scaffold — so a Flutter app, a Rust CLI, a data-science
@@ -477,9 +500,11 @@ function loadProjectTypes(projectRoot) {
  *     project ROOT matched with an ANCHORED regex built identically to
  *     `detectLanguages` (escape every metachar via `escapeRegExp`, then `\*` → `.*`,
  *     wrapped in `^…$`). NO raw `new RegExp` — the pattern is escaped and constructed
- *     through `safeRegExp`, the single audited choke point. `safeRegExp` centralizes
- *     construction but does not itself cap backtracking; the only shipped glob markers
- *     are single-`*` patterns, which compile to linear-time `.*` regexes.
+ *     through `globMarkerToRegExp` → `safeRegExp`, the single audited choke point.
+ *     `safeRegExp` centralizes construction but does not itself cap backtracking, so
+ *     `globMarkerToRegExp` REJECTS any marker with more than one `*` (returns null →
+ *     matches nothing): only single-`*` globs compile, to linear-time `.*` regexes,
+ *     closing the ReDoS an untrusted multi-star override could otherwise trigger.
  *
  * Priority resolution is UNCHANGED. Returns the winning project-type name, or null.
  *
@@ -503,9 +528,10 @@ function projectTypeFor(projectRoot) {
     for (const marker of markers) {
       if (typeof marker !== 'string') continue;
       if (marker.includes('*')) {
-        // Glob marker: ReDoS-safe, anchored whole-filename match (see JSDoc above).
-        const pattern = safeRegExp('^' + escapeRegExp(marker).replace(/\\\*/g, '.*') + '$');
-        if (rootFiles.some((f) => pattern.test(f))) { matched = true; break; }
+        // Glob marker: ReDoS-safe, anchored whole-filename match (see globMarkerToRegExp).
+        // A multi-star (hostile-override) marker returns null → treated as non-matching.
+        const pattern = globMarkerToRegExp(marker);
+        if (pattern && rootFiles.some((f) => pattern.test(f))) { matched = true; break; }
       } else {
         // Exact filename/dirname marker: unchanged existsSync (matches a file OR a dir).
         try {
@@ -856,9 +882,11 @@ function frameworkCapability(name, projectRoot) {
  *     it, C-vs-C++ disambiguation falls out naturally per-marker (`main.c`→c,
  *     `app.cpp`→cpp) with NO special-case code.
  *
- * NO raw `new RegExp` — the pattern goes through `safeRegExp`/`escapeRegExp` (the
- * single audited choke point) so a data-derived glob can never be a ReDoS or
- * injection vector. This is root-level glob + exact matching only — the same
+ * NO raw `new RegExp` — the pattern goes through `globMarkerToRegExp` →
+ * `safeRegExp`/`escapeRegExp` (the single audited choke point), which REJECTS any
+ * marker carrying more than one `*` (an untrusted multi-star override that would
+ * otherwise catastrophically backtrack), so a data-derived glob can never be a ReDoS
+ * or injection vector. This is root-level glob + exact matching only — the same
  * detection power as `tool-detector`; file-extension tree-walking stays in
  * stack-detector (CR5-s4), out of scope here.
  *
@@ -913,9 +941,10 @@ function detectLanguages(projectRoot) {
     for (const marker of markers) {
       if (typeof marker !== 'string') continue;
       if (marker.includes('*')) {
-        // Glob marker: ReDoS-safe, anchored whole-filename match (see JSDoc above).
-        const pattern = safeRegExp('^' + escapeRegExp(marker).replace(/\\\*/g, '.*') + '$');
-        if (rootFiles.some((f) => pattern.test(f))) glob = true;
+        // Glob marker: ReDoS-safe, anchored whole-filename match (see globMarkerToRegExp).
+        // A multi-star (hostile-override) marker returns null → treated as non-matching.
+        const pattern = globMarkerToRegExp(marker);
+        if (pattern && rootFiles.some((f) => pattern.test(f))) glob = true;
       } else {
         // Exact-filename marker: unchanged existsSync behavior (matches a file OR a dir).
         try {

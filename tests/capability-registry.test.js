@@ -44,6 +44,12 @@ function writeOverride(dir, name, body) {
   fs.mkdirSync(d, { recursive: true });
   fs.writeFileSync(path.join(d, name), body);
 }
+/** Write a project-type override YAML into a project. */
+function writeProjectTypeOverride(dir, name, body) {
+  const d = path.join(dir, '.ctoc', 'capabilities', 'project-types');
+  fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(d, name), body);
+}
 
 describe('capability-registry: load() — data-driven, fail-open', () => {
   it('loads all six seed languages from the bundled data', () => {
@@ -241,6 +247,79 @@ describe('capability-registry: detectLanguages() — GLOB markers (CR5-s1, parit
         'adding glob detection must not add a false positive for a Cargo.toml-only dir');
       assert.equal(langs[0], 'rust',
         'app-runner consumes detectLanguages[0]; it must stay rust for a rust project');
+    } finally { rm(dir); }
+  });
+});
+
+describe('capability-registry: GLOB markers are ReDoS-safe against a hostile multi-star override (S1)', () => {
+  // A project-LOCAL override under <projectRoot>/.ctoc/capabilities is UNTRUSTED input the
+  // module explicitly defends against. A detectionMarker with MORE THAN ONE '*' compiles to
+  // ^.*a.*a…a$ and causes catastrophic backtracking against a single crafted filename — an
+  // empirical ~59s hang (exponential in star count) on the Step-14 / init / quality hot paths.
+  // Only single-'*' globs are valid and shipped. A multi-star marker must be SKIPPED (treated
+  // as non-matching), never compiled into a backtracking regex. MAX_FILE_BYTES does not
+  // mitigate — a ~40-byte file suffices.
+  const STARS = 20;
+  const EVIL_MARKER = '*a'.repeat(STARS);           // *a*a…*a → ^.*a.*a…a$ (backtracking)
+  const EVIL_FILE = 'a'.repeat(46) + '!';           // 47-byte no-match input → exponential blowup
+  const TIME_BOUND_MS = 1000;                        // generous; the fix is O(1) skip, unfixed hangs ~59s
+
+  it('detectLanguages completes FAST and does not detect a hostile multi-star language marker', () => {
+    const dir = makeProject('ctoc-redos-lang-');
+    try {
+      writeOverride(dir, 'evilglob.yaml',
+        'language: evilglob\n' +
+        `detectionMarkers: [${EVIL_MARKER}]\n` +
+        'toolchain:\n' +
+        '  test: { cmd: "echo hi", tool: echo, verified: UNVERIFIED }\n' +
+        'verified: UNVERIFIED\n');
+      fs.writeFileSync(path.join(dir, EVIL_FILE), '');
+      const start = Date.now();
+      const langs = registry.detectLanguages(dir);
+      const elapsed = Date.now() - start;
+      assert.ok(elapsed < TIME_BOUND_MS,
+        `detectLanguages must not backtrack on a multi-star marker (took ${elapsed}ms, bound ${TIME_BOUND_MS}ms)`);
+      assert.ok(!langs.includes('evilglob'),
+        'a multi-star marker is invalid — it must be skipped (match nothing), never compiled to a ReDoS regex');
+    } finally { rm(dir); }
+  });
+
+  it('projectTypeFor completes FAST and does not detect a hostile multi-star project-type marker', () => {
+    const dir = makeProject('ctoc-redos-type-');
+    try {
+      writeProjectTypeOverride(dir, 'eviltype.yaml',
+        'projectType: eviltype\n' +
+        `detectionMarkers: [${EVIL_MARKER}]\n` +
+        'phases:\n' +
+        '  test: required\n' +
+        'run:\n' +
+        '  strategy: build\n' +
+        '  honest: build-is-last-mile\n' +
+        'configScaffold: [evil.cfg]\n' +
+        'priority: 999\n');
+      fs.writeFileSync(path.join(dir, EVIL_FILE), '');
+      const start = Date.now();
+      const detected = registry.projectTypeFor(dir);
+      const elapsed = Date.now() - start;
+      assert.ok(elapsed < TIME_BOUND_MS,
+        `projectTypeFor must not backtrack on a multi-star marker (took ${elapsed}ms, bound ${TIME_BOUND_MS}ms)`);
+      assert.notEqual(detected, 'eviltype',
+        'a multi-star project-type marker must be skipped, never compiled to a ReDoS regex');
+    } finally { rm(dir); }
+  });
+
+  it('a legitimate SINGLE-star glob override still detects normally (the guard does not reject valid globs)', () => {
+    const dir = makeProject('ctoc-redos-ok-');
+    try {
+      writeOverride(dir, 'singlestar.yaml',
+        'language: singlestar\n' +
+        'detectionMarkers: [*.widget]\n' +
+        'toolchain:\n' +
+        '  test: { cmd: "echo hi", tool: echo, verified: UNVERIFIED }\n' +
+        'verified: UNVERIFIED\n');
+      fs.writeFileSync(path.join(dir, 'thing.widget'), '');
+      assert.ok(registry.detectLanguages(dir).includes('singlestar'),
+        'a valid single-star glob must still match — only MULTI-star markers are rejected');
     } finally { rm(dir); }
   });
 });
