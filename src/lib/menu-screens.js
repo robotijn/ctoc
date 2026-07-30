@@ -139,12 +139,14 @@ function invalidPlanRefScreen(stage, file) {
 // rather than lingering as dead data. HUMAN_GATES below is the set that actually
 // governs a crossing, and it is read by the live screens.
 
-// Human gates: transitions requiring human approval marker
-const HUMAN_GATES = {
-  functional: 'implementation',
-  implementation: 'todo',
-  review: 'done'
-};
+// Human gates: transitions requiring a human approval marker, keyed source→next.
+// DERIVED (never a literal) from gate-order.GATE_SOURCE — the single home of the
+// gate-edge set — as its exact inverse, so this map cannot drift from the canonical
+// edges. It maps each gate SOURCE stage to the stage it crosses INTO.
+const { GATE_SOURCE } = require('./gate-order');
+const HUMAN_GATES = Object.fromEntries(
+  Object.entries(GATE_SOURCE).map(([dest, src]) => [src, dest])
+);
 
 /**
  * Get the project path for rendering
