@@ -269,7 +269,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 495 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 497 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -298,6 +298,33 @@ and `whitelist` is a PERMANENT exemption that starts EMPTY and requires a writte
 justification per entry. Conflating them is what kills a fence. The fixed exemplars are
 the specification: `src/scripts/test-gate.js` (parsers return `null`, never `0`) and
 `src/lib/request-exit.js` (`process.exitCode` + return, so Node drains before exiting).
+
+**The golden-corpus fence — a synthetic-only test for a module that reads a persisted
+real-world contract.** In the human's words: "the matrix fix passed its own tests while
+your screen was still unreadable. It only broke when rendered against the real question
+files in your store." A decision-matrix renderer was fixed test-first, four SYNTHETIC
+tests passed, and the human's screen was still unreadable — because the real question
+file in `.ctoc/streaming/questions/` carries option fields over a thousand characters
+long, full of file-and-line citations, and against that shape the matrix wrapped ~20
+lines down a narrow column, split `src/lib/task-reconcile.js` mid-word, and duplicated a
+cell. There is no shape in source that says "this test is synthetic", so this fence
+cannot scan for one: it HOLDS the real data. `src/lib/golden-corpus-scan.js` carries a
+curated registry of five persisted contracts (streaming-questions, verify-evidence,
+approval-ledger, task-registry, plan-frontmatter) and detects, by two signals
+(reader-import OR inline path-build-plus-parse), a `src/**` module that consumes one; a
+module linked by no test naming its corpus directory is a finding. The LOAD-BEARING half
+is not that static scan — it is `tests/golden-corpus-fence.test.js`, which drives every
+BYTE-FOR-BYTE captured sample in `tests/fixtures/golden-corpus/` through its canonical
+reader, plus the EXTREMES RATCHET (the measured longest field / bytes / depth / array
+length may only ever GROW — shorten a sample and the fence fails by name), and
+`tests/real-question-file-render.test.js`, which renders the real question file through
+the public `planDecisionScreen` and is RED against the pre-fix renderer. Captures are
+never redacted or shortened — REDACTION IS SANITISATION, the exact defect — so a contract
+whose real instances cannot be committed is recorded as an uncaptured variant in
+`tests/fixtures/golden-corpus/manifest.yaml`, never faked. `.ctoc/golden-corpus-baseline.json`
+holds the same TWO separate structures as its siblings: `findings` is DEBT that may only
+SHRINK, `exemptions` is a PERMANENT exemption that starts EMPTY. Wired live in
+`iron-loop-enforcer`'s `golden-corpus-fence` check (thorough mode).
 
 **The stale scan says when it could not look — and `unreadCount === 0` is the only
 thing that licenses reading a zero.** `scanCheapCandidates` in `src/lib/stale-detector.js`
@@ -525,13 +552,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (start, push, update)
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use, subagent stop)
-    lib/                 124 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 125 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 495 test files
+  tests/                 497 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
