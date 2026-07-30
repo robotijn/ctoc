@@ -1,0 +1,63 @@
+{
+  "_comment": "00186 — the execution-fence ratchet for state-changing shipped recipes in src/commands/start.md. Two separate structures, mirroring .ctoc/reachability-baseline.json. 'covered' recipes have a fixture + assertion in tests/shipped-recipes-execute.test.js and are proven by RUNNING them; it may only GROW. 'uncovered' state-changing recipes exist and have no fixture yet, each with a one-line reason; it may only SHRINK. A new state-changing recipe in start.md absent from BOTH lists fails the test. 'id' is recipe-harness.recipeId (sha1 of the normalized program), matched against a live scan.",
+  "minCovered": 4,
+  "maxUncovered": 5,
+  "covered": [
+    {
+      "id": "3eba28106abb",
+      "label": "create-plan (allocatePlanNumber)",
+      "calls": ["plan-numbering.allocatePlanNumber"],
+      "effect": "stakes an exclusive claim file under .ctoc/state/plan-numbers/ and returns the 5-digit number"
+    },
+    {
+      "id": "357632359c17",
+      "label": "cleanup-exec per-plan (executeCleanup)",
+      "calls": ["stale-cleanup.executeCleanup"],
+      "effect": "archives a seeded-stale review plan to plans/done/; returns to:done, never skipped:true (the 00185 defect, generalized)"
+    },
+    {
+      "id": "0e8e9a244d2d",
+      "label": "set-environment (setSetting environment)",
+      "calls": ["settings.setSetting"],
+      "effect": "writes general.environment to .ctoc/settings.json"
+    },
+    {
+      "id": "7cb591292ecc",
+      "label": "env-keep-defaults (setSetting environment_prompt_dismissed)",
+      "calls": ["settings.setSetting"],
+      "effect": "writes general.environment_prompt_dismissed=true to .ctoc/settings.json"
+    }
+  ],
+  "uncovered": [
+    {
+      "id": "bdaff378d9a5",
+      "label": "plan-number repair (renumberImplementationPlans)",
+      "calls": ["plan-numbering.renumberImplementationPlans"],
+      "reason": "needs a multi-plan fixture with unnumbered implementation plans and cross-references (parent_plan/depends_on) to rewrite; heavier fixture deferred"
+    },
+    {
+      "id": "3594b0d29528",
+      "label": "cleanup-exec category batch (_buildCleanupItems + executeCleanup)",
+      "calls": ["menu-screens._buildCleanupItems", "stale-cleanup.executeCleanup"],
+      "reason": "needs a git-initialised fixture with a category of dead-on-arrival plans; the per-plan executeCleanup form is covered"
+    },
+    {
+      "id": "025207ad3837",
+      "label": "dismiss-stale (scanCheapCandidates + dismissStale)",
+      "calls": ["stale-detector.scanCheapCandidates", "stale-detector.dismissStale"],
+      "reason": "needs a fixture seeded with stale candidates so the dismissal is non-empty and observable"
+    },
+    {
+      "id": "bd4babc0f03a",
+      "label": "set-compliance-regime (writeActiveProfiles)",
+      "calls": ["compliance-regime.writeActiveProfiles"],
+      "reason": "the shipped program passes a bare ARR identifier substituted from the {profile} enum and needs a .ctoc/settings.yaml fixture with an active_profiles line; not executable as-extracted without modelling the profile->array substitution"
+    },
+    {
+      "id": "a3a516a3b131",
+      "label": "ledger-backfill --vision (approve-stubs / maintainer script)",
+      "script": "src/scripts/ledger-backfill.js",
+      "reason": "script recipe needing a plans/done/ decomposed-vision fixture and approval-ledger seeding to observe an idempotent backfill entry"
+    }
+  ]
+}
