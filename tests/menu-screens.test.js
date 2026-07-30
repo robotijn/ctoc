@@ -431,6 +431,43 @@ describe('Menu Screens Tests', () => {
     console.log('# validateScreen clean Confirm approve has no override');
   });
 
+  // R6-A hardening — action strings are SPACE-DELIMITED, model-interpreted recipes
+  // (`claude:approve <stage>/<file>`). A plan filename carrying whitespace or a
+  // control character injects extra tokens into that recipe — e.g. `bar --override .md`
+  // rides a `--override` token onto a CLEAN crossing, defeating the audit property
+  // that a forced crossing is byte-distinguishable from a clean one. isUnsafePlanFile
+  // is the shared guard; a whitespace/control name must be REFUSED (invalidPlanRefScreen),
+  // so no ref is ever interpolated into an emitted `claude:*` action.
+  const injectionNames = [
+    ['space (injects --override token)', 'bar --override .md'],
+    ['plain space', 'a b.md'],
+    ['tab', 'a\tb.md'],
+    ['carriage return', 'a\rb.md'],
+    ['newline', 'a\nb.md'],
+    ['form feed', 'a\fb.md'],
+    ['vertical tab', 'a\vb.md'],
+    ['NUL control char', 'a\x01b.md'],
+  ];
+  for (const [desc, name] of injectionNames) {
+    test(`validateScreen refuses a plan filename with ${desc} — no token injection`, () => {
+      const result = menuScreens.validateScreen('functional', name, testDir);
+      // Refused as an invalid reference (the traversal/injection guard), never
+      // resolved into an approve recipe.
+      assert.match(result.text, /Refusing a reference that escapes/,
+        'whitespace/control filename is refused, not interpolated');
+      const emitted = Object.values(result.actions);
+      for (const action of emitted) {
+        assert.ok(!action.includes('claude:'),
+          `refused ref must emit no claude: recipe (got "${action}")`);
+        assert.ok(!action.includes('--override'),
+          `refused ref must never carry an --override token (got "${action}")`);
+      }
+      assert.strictEqual(result.actions['Approve anyway'], undefined, 'no override action on a refused ref');
+      assert.strictEqual(result.actions['Confirm approve'], undefined, 'no approve action on a refused ref');
+      console.log(`# validateScreen refuses injection filename: ${desc}`);
+    });
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // HUMAN-GATE Approve affordance. The Approve option must be gated on the REAL
   // crossable set (HUMAN_GATES: functional→implementation, implementation→todo,
