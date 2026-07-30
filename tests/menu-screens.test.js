@@ -724,5 +724,63 @@ describe('Menu Screens Tests', () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// R6-B follow-up (00023): the FORWARD gate-edge map is encoded ONCE too.
+//
+// The inverse (destination→source) fence lives in approval-ledger-provenance.test.js.
+// This mirrors it for the FORWARD direction (source→destination). menu-screens.js
+// held a fourth, forward literal of the exact gate-edge set as `HUMAN_GATES`
+// ({ functional:'implementation', implementation:'todo', review:'done' }) — a
+// duplicate encoding that falsified R6-B's "declared ONCE" claim and could silently
+// diverge. After the fix it DERIVES from gate-order.GATE_SOURCE; no forward gate-edge
+// object literal may live in any src file outside gate-order.js.
+describe('R6-B forward gate-edge single-encoding', () => {
+  const gateOrder = require('../src/lib/gate-order.js');
+
+  function collectJsFiles(dir, acc = []) {
+    for (const name of fs.readdirSync(dir)) {
+      const full = path.join(dir, name);
+      if (fs.statSync(full).isDirectory()) collectJsFiles(full, acc);
+      else if (name.endsWith('.js')) acc.push(full);
+    }
+    return acc;
+  }
+
+  test('no forward gate-edge literal (functional→implementation / review→done) survives outside gate-order.js', () => {
+    const srcRoot = path.join(__dirname, '..', 'src');
+    const gateOrderFile = path.join(srcRoot, 'lib', 'gate-order.js');
+    // Two unambiguous forward pairs identify the gate map. (The full-pipeline flow
+    // shares them, but no such flow map exists in src — NEXT_STAGE was deliberately
+    // removed; see menu-screens.js. gate-order.js carries the edges only as the
+    // GATE_EDGES tuple, never this object shape, so it is excluded like the inverse
+    // fence excludes it.)
+    const forwardPairs = [
+      /\bfunctional\s*:\s*['"]implementation['"]/,
+      /\breview\s*:\s*['"]done['"]/,
+    ];
+    const offenders = [];
+    for (const file of collectJsFiles(srcRoot)) {
+      if (path.resolve(file) === path.resolve(gateOrderFile)) continue;
+      const text = fs.readFileSync(file, 'utf8');
+      for (const re of forwardPairs) {
+        if (re.test(text)) offenders.push(`${path.relative(srcRoot, file)} :: ${re}`);
+      }
+    }
+    assert.deepStrictEqual(offenders, [],
+      `the forward gate-edge map must live ONCE (derived from gate-order.js); offenders:\n${offenders.join('\n')}`);
+  });
+
+  test('menu-screens HUMAN_GATES equals the canonical forward gate map (behavior unchanged)', () => {
+    delete require.cache[require.resolve('../src/lib/menu-screens.js')];
+    const menuScreens = require('../src/lib/menu-screens.js');
+    const canonical = { functional: 'implementation', implementation: 'todo', review: 'done' };
+    assert.deepStrictEqual(menuScreens.HUMAN_GATES, canonical);
+    // …and it is the exact inverse of gate-order.GATE_SOURCE (the one encoding).
+    const derived = Object.fromEntries(
+      Object.entries(gateOrder.GATE_SOURCE).map(([dest, src]) => [src, dest]));
+    assert.deepStrictEqual(menuScreens.HUMAN_GATES, derived);
+  });
+});
+
 console.log('\nMenu Screens Tests');
 console.log('==================\n');

@@ -12,6 +12,8 @@ files:
   - "src/lib/approval-ledger.js"
   - "tests/gate-order.test.js"
   - "tests/approval-ledger-provenance.test.js"
+  - "src/lib/menu-screens.js"
+  - "tests/menu-screens.test.js"
 ---
 
 # R6-B — Finish the single gate encoding
@@ -76,6 +78,20 @@ gate-order.js in src/.
   single source. No external doc change needed (internal library invariant).
 - [x] Step 16 REPORT — returned to the orchestrator (see Rework Report below).
 
+### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 ## Decisions Taken Under Ambiguity
 1. **`sourceOf` is wired into approval-ledger's live backfill path, not just exported.**
    The plan asked for both an exported `GATE_SOURCE` map and a `sourceOf(to)` function.
@@ -100,6 +116,22 @@ gate-order.js in src/.
    a different map that also covers non-gate edges). Keying the fence on the two pairs
    that belong ONLY to the gate inverse map avoids those false positives while still
    catching any real reintroduction of the inverse encoding.
+4. **The FORWARD fence (00023 rework, 2026-07-30) keys on two forward pairs and excludes
+   gate-order.js.** menu-screens.js held a FOURTH, forward literal of the gate-edge set as
+   `HUMAN_GATES` (source→dest), live-read at ~line 1908 (`HUMAN_GATES[stage]`) and re-exported
+   — a duplicate encoding that falsified R6-B's "ONLY literal" claim. It now DERIVES from
+   `gate-order.GATE_SOURCE` (its exact inverse), values byte-identical. The mirror fence in
+   tests/menu-screens.test.js keys on `functional:'implementation'` + `review:'done'`. A
+   full-pipeline flow map would legitimately share the gate pairs (the gate set is a subset of
+   the full flow), so no forward pair is unique against a hypothetical NEXT_STAGE map; none
+   exists in src today (NEXT_STAGE was deliberately removed — see menu-screens.js), so the
+   two-pair key is safe now and, if a real full-flow map is later added, will trip and force a
+   review — acceptable. gate-order.js carries the edges only as the `GATE_EDGES` tuple, never
+   the object shape, so it is excluded exactly as the inverse fence excludes it.
+5. **The derived-binding comment must not contain the object-literal shape.** The forward fence
+   scans whole file text (comments included, like the inverse fence). The first draft of the
+   comment quoted the map values in `key:'value'` shape and tripped the fence on itself; the
+   comment now describes the mapping in prose.
 
 ## Straggler Report (files NOT in this plan's scope)
 - `src/lib/stale-cleanup.js:79-83` `REVERT_MAP` — a per-stage BACKWARD-revert map for
