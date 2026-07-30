@@ -28,22 +28,23 @@ const WHITELIST = [
 ];
 ```
 
-Two carve-outs sit above it, at `:430` and `:443`: `.ctoc/approvals/` (human-approval
-provenance) and `.ctoc/state/verify/` (Gate-3 evidence). Both exist because a file whose
-*contents are believed by a gate* must not be agent-writable.
+Three carve-outs run ahead of it inside `enforce()`, at `:571`, `:584` and `:600`:
+`.ctoc/approvals/` (human-approval provenance), `.ctoc/state/verify/` (Gate-3 evidence)
+and `.ctoc/streaming/` (the gate question/answer store). All three exist because a file
+whose *contents are believed by a gate* must not be agent-writable.
 
-There is a third category under that whitelist, and it is not carved out: **files whose
+There is a fourth category under that whitelist, and it is not carved out: **files whose
 contents become a subprocess.**
 
 - `.ctoc/quality-config.yaml` — read by `tool-detector` as the explicit override for
-  `lint`, `typecheck` and `test` (`tool-detector.js:2-10`);
-- `.ctoc/capabilities/languages/*.yaml` — the per-project capability table, whose `cmd`,
+  `lint`, `typecheck` and `test` (`tool-detector.js:5-9`);
+- `.ctoc/capabilities/**/*.yaml` — the per-project capability table, whose `cmd`,
   `lint`, `typecheck` and `test` strings reach the same consumer
   (`capability-registry.js:11-13, 60-63`).
 
-Those strings reach `execSync` **with a shell** at `quality-agent.js:435`, `:459`,
-`:523` and `:585`. `/ctoc:push` runs them, and the installed git post-commit hook runs
-them detached after every commit.
+Those strings reach `execSync` **with a shell** at `quality-agent.js:111` (one central
+`execSync(cmd, …)` that every tool/capability command string flows into). `/ctoc:push`
+runs them, and the installed git post-commit hook runs them detached after every commit.
 
 An approval file is believed. An evidence file is believed. **A command table is
 obeyed** — which is strictly worse, and it is the one with no carve-out.
@@ -56,8 +57,11 @@ for free.
 
 ## The fix
 
-A third protected-path guard in `enforce()`, alongside the ledger and verify-evidence
-guards, covering the **command tables** — not the whole configuration directory.
+An exclusion covering the **command tables** — not the whole configuration directory.
+`enforce()` already carries three protected-path guards ahead of the whitelist (ledger,
+verify-evidence, streaming); each of those DENIES. This one is deliberately different —
+see "Fall through to coverage, not deny" below — so it is NOT a fourth guard in
+`enforce()` but a negation inside `isWhitelisted`, the function that made the grant.
 
 ```js
 /**
@@ -78,8 +82,9 @@ const COMMAND_TABLE_PATHS = [
 
 ### Fall through to coverage, not deny
 
-The ledger and verify guards **deny outright**, because no legitimate agent edit to
-those stores exists — they are written by the pipeline or by a human crossing a gate.
+The ledger, verify and streaming guards **deny outright**, because no legitimate agent
+edit to those stores exists — they are written by the pipeline or by a human crossing a
+gate.
 
 That is not true here. Changing a project's lint command is ordinary, legitimate work.
 So a command table is not denied; it is **removed from the whitelist** and falls through
@@ -101,17 +106,17 @@ whitelist sees the exception without having to find it forty lines away.
 
 Matching reuses the two helpers already in the file:
 
-- `normalizeForProtection` (`:138`) — absolute → relative, backslash → slash, `.`/`..`
+- `normalizeForProtection` (`:185`) — absolute → relative, backslash → slash, `.`/`..`
   resolved, escape-the-root rejected;
-- `isUnderProtectedDir` (`:165`) — case-insensitive, segment-precise, so
+- `isUnderProtectedDir` (`:212`) — case-insensitive, segment-precise, so
   `.ctoc/CAPABILITIES/x.yaml` matches (macOS and Windows route it to the real directory)
   while `.ctoc/capabilities-old/x.yaml` does not.
 
-`real-path-confinement.resolvesUnder` is also consulted, exactly as the ledger and
-verify guards do at `:190-192` and `:208-210`, so a symbolic link under an ordinary
-`.ctoc/` path whose real destination is `.ctoc/capabilities/` is caught. It returns true
-to deny on every fault and never throws — the failing direction the file already
-established.
+`real-path-confinement.resolvesUnder` is also consulted, exactly as the ledger, verify
+and streaming guards do at `:238-239`, `:256-257` and `:298-299`, so a symbolic link
+under an ordinary `.ctoc/` path whose real destination is `.ctoc/capabilities/` is
+caught. It returns true to deny on every fault and never throws — the failing direction
+the file already established.
 
 ## Implementation Details
 
@@ -139,7 +144,8 @@ function isCommandTablePath(filePath) {
 }
 ```
 
-In `isWhitelisted`, after the normalization block and before the pattern loop:
+In `isWhitelisted`, after the normalization block (whose last line is `:90`,
+`if (norm.startsWith('../')) return false;`) and before the pattern loop at `:91`:
 
 ```js
   // A command table is NOT whitelisted, even though it lives under `.ctoc/`: its
@@ -151,44 +157,57 @@ In `isWhitelisted`, after the normalization block and before the pattern loop:
 
 Note the argument: `filePath`, the **original** value, not the locally normalized `norm`
 — `isCommandTablePath` does its own normalization and the confinement check needs the
-raw path to resolve links. Step 9 must confirm `resolvesUnder`'s expected input shape
-before relying on this.
+raw path to resolve links. Confirmed against the current file:
+`resolvesUnder(targetFile, protectedDirRelative, root)` accepts an absolute OR
+root-relative `targetFile` (`real-path-confinement.js:283, :299`) and returns true on
+every fault without throwing, so the raw `filePath` (absolute from Claude Code, relative
+in tests) is the correct input.
 
-`isCommandTablePath` joins `module.exports` next to `isProtectedLedgerPath` and
-`isProtectedVerifyPath`, for the same reason those are exported: it is a second view of
-a function `enforce` reaches on every tool call.
+CAVEAT the test plan below already accounts for: `isWhitelisted` has a pre-existing
+traversal guard at `:88` (`norm.includes('/../') → return false`) that fires BEFORE this
+early return. So for any path containing `/../`, `isWhitelisted` returns false via that
+guard and the command-table exclusion is never consulted. The exclusion's handling of
+`..` (re-entering vs out-resolving) is therefore proven by testing `isCommandTablePath`
+directly — cases 8 and 9.
+
+`isCommandTablePath` joins `module.exports` (`:657-662`) next to `isProtectedLedgerPath`,
+`isProtectedVerifyPath` and `targetsStreamingLive`, for the same reason those are
+exported: it is a second view of a function `enforce` reaches on every tool call.
 
 Nothing else changes. `enforce`'s flow, its exit codes and its logging are untouched.
 
 ### File: `tests/config-command-tables-protected.test.js`
 **Action:** CREATE — `node:test`
 
-| # | Path | Expected |
+| # | Function · Path | Expected |
 |---|---|---|
-| 1 | **`.ctoc/quality-config.yaml`** | `isWhitelisted` **false** — RED today |
-| 2 | **`.ctoc/capabilities/languages/javascript.yaml`** | false — RED today |
-| 3 | **`.ctoc/capabilities/project-types/x.yaml`** | false — the whole directory, not just `languages` |
-| 4 | `.ctoc/quality-config.yml` | false — both spellings |
-| 5 | absolute form of case 1 | false |
-| 6 | Windows separators `.ctoc\\capabilities\\languages\\x.yaml` | false |
-| 7 | case variant `.ctoc/CAPABILITIES/x.yaml` | false — case-insensitive, as the ledger guard is |
-| 8 | traversal that lands back inside: `.ctoc/state/../capabilities/x.yaml` | false |
-| 9 | traversal that resolves out: `.ctoc/capabilities/../settings.json` | **true** — still whitelisted, because it is not a command table. Guards against the exclusion over-reaching |
-| 10 | sibling that must stay whitelisted: `.ctoc/capabilities-old/x.yaml` | **true** — the `/` boundary is required |
-| 11 | `.ctoc/settings.json` | **true** — unchanged; this slice does not touch it |
-| 12 | `.ctoc/state/agent-status.json` | true — unchanged |
-| 13 | `VERSION`, `plans/todo/a.md`, `.gitignore` | true — the rest of the whitelist is intact |
-| 14 | `.ctoc/approvals/x.json` | false via `isProtectedLedgerPath`, unchanged |
-| 15 | `null`, `''`, `'../outside'` | false, no throw |
+| 1 | `isWhitelisted(`**`.ctoc/quality-config.yaml`**`)` | **false** — RED today (matches `/^\.ctoc\//` → true today) |
+| 2 | `isWhitelisted(`**`.ctoc/capabilities/languages/javascript.yaml`**`)` | false — RED today |
+| 3 | `isWhitelisted(`**`.ctoc/capabilities/project-types/x.yaml`**`)` | false — the whole directory, not just `languages` |
+| 4 | `isWhitelisted(.ctoc/quality-config.yml)` | false — both spellings |
+| 5 | `isWhitelisted(` absolute form of case 1 `)` | false |
+| 6 | `isWhitelisted(` Windows separators `.ctoc\\capabilities\\languages\\x.yaml` `)` | false |
+| 7 | `isWhitelisted(.ctoc/CAPABILITIES/x.yaml)` | false — case-insensitive, as the ledger guard is |
+| 8 | **`isCommandTablePath`**`(.ctoc/state/../capabilities/x.yaml)` | **true** — `normalizeForProtection` resolves it to `.ctoc/capabilities/x.yaml`, which is under the table dir. (`isWhitelisted` also returns false, but via its own `/../` traversal guard at `:88`, which short-circuits before the exclusion — so the re-entry handling is proven on `isCommandTablePath` directly.) |
+| 9 | **`isCommandTablePath`**`(.ctoc/capabilities/../settings.json)` | **false** — resolves to `.ctoc/settings.json`, NOT a command table; proves the exclusion does not over-reach. (`isWhitelisted` also returns false for this input, again via the `:88` traversal guard, independent of this change — it is NOT re-whitelisted by the exclusion.) |
+| 10 | `isWhitelisted(.ctoc/capabilities-old/x.yaml)` | **true** — the `/` boundary is required; sibling stays whitelisted |
+| 11 | `isWhitelisted(.ctoc/settings.json)` | **true** — unchanged; this slice does not touch it |
+| 12 | `isWhitelisted(.ctoc/state/agent-status.json)` | true — unchanged |
+| 13 | `isWhitelisted(VERSION)`, `plans/todo/a.md`, `.gitignore` | true — the rest of the whitelist is intact |
+| 14 | `isProtectedLedgerPath(.ctoc/approvals/x.json)` | true — unchanged |
+| 15 | `isCommandTablePath(null)`, `''`, `'../outside'` | false, no throw |
 | 16 | **a symbolic link into the capabilities directory** | create `src/link.yaml` → `.ctoc/capabilities/languages/x.yaml` in a temp fixture; `isCommandTablePath` true. Skip with a **recorded reason** where link creation is unavailable (Windows without the privilege), never silently |
 | 17 | **an approved plan declaring the file still grants the edit** | fixture with an approved `plans/todo/` plan whose `files:` includes `.ctoc/quality-config.yaml`; drive the real spawned hook → **allowed**, logged with the plan name. This is the case that proves the fix is an approval requirement and not a ban |
-| 18 | **no plan, no escape phrase** | same fixture without the plan; drive the spawned hook → `permissionDecision:"deny"` |
+| 18 | **no plan, no escape phrase** | same fixture without the plan; drive the spawned hook → `permissionDecision:"deny"` (via `emitDeny` in `block()`) |
 | 19 | never throws | every case through a wrapper asserting no exception, plus a fixture where `real-path-confinement` is unresolvable |
 
 Case 17 is the load-bearing guard. Without it, a later reader cannot tell this exclusion
 from a ban, and the first person blocked from a legitimate toolchain change deletes it.
 
-Fixtures under `os.tmpdir()`, `path.join` throughout, `fs.promises.rm` teardown.
+Fixtures under `os.tmpdir()`, `path.join` throughout, `fs.promises.rm` teardown. The
+`isCommandTablePath` / `isWhitelisted` cases (1-16, 19) call the exported functions
+directly with `process.cwd()` at the repo root, where `.ctoc/quality-config.yaml` and
+`.ctoc/capabilities/**` really exist so `resolvesUnder` resolves real paths.
 
 ---
 
@@ -196,7 +215,7 @@ Fixtures under `os.tmpdir()`, `path.join` throughout, `fs.promises.rm` teardown.
 
 | change | live call site | root |
 |---|---|---|
-| `isCommandTablePath` | `isWhitelisted` at `PreToolUse.Edit.js:75`, called from `enforce():450` | the registered `PreToolUse` hook on Edit/Write/MultiEdit/NotebookEdit |
+| `isCommandTablePath` | `isWhitelisted` (defined at `PreToolUse.Edit.js:75`), called from `enforce()` at `:607` | the registered `PreToolUse` hook on Edit/Write/MultiEdit/NotebookEdit |
 
 `isWhitelisted` runs on every editing tool call, and `PreToolUse.Write.js` delegates into
 the same `enforce`. Nothing here is reachable only from a test.
@@ -210,20 +229,30 @@ ordinary configuration or becoming a ban.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
-Write the file in full and run only it. Cases 1-8, 16 and 18 must be RED. Record case 1's
-red verbatim — a whitelist allow on a file whose contents run on every commit is the
-sentence that justifies this slice.
+Write the file in full and run only it. Cases 1-8, 16 and 18 must be RED (cases 8, 16
+red because `isCommandTablePath` does not exist yet; cases 1-7, 18 red because
+`.ctoc/quality-config.yaml` is whitelisted/allowed today). Record case 1's red verbatim —
+a whitelist allow on a file whose contents run on every commit is the sentence that
+justifies this slice.
 
 ### Step 9: PREPARE
-Read from disk: `PreToolUse.Edit.js:66-211` (the whitelist, both protected-path guards
-and both helpers), `src/lib/real-path-confinement.js` (**confirm** `resolvesUnder`'s
-signature and its expected input shape before passing a raw path),
-`src/lib/tool-detector.js` (confirm which configuration paths are actually read, and
-whether the `.yml` spelling is supported — if it is not, case 4 changes and the CODE
-wins), and `src/lib/capability-registry.js:55-80`. Grep the repository for every writer
-of `.ctoc/quality-config.yaml` and `.ctoc/capabilities/**`: **if CTOC itself writes
-either through an editing tool, this change breaks it and that must be found now, not at
-Step 14.** `init-project.js` is the first place to look.
+Read from disk: `PreToolUse.Edit.js:66-300` (the whitelist at `:66-73`, all THREE
+protected-path guards — `isProtectedLedgerPath:226`, `isProtectedVerifyPath:251`,
+`targetsStreamingLive:290` — and the two helpers `normalizeForProtection:185` and
+`isUnderProtectedDir:212`), `src/lib/real-path-confinement.js` (already confirmed:
+`resolvesUnder:283` accepts an absolute or root-relative `targetFile` and returns true on
+every fault, never throwing), `src/lib/tool-detector.js` (confirm which configuration
+paths are actually read — the docstring at `:5-9` names `.ctoc/quality-config.yaml`; if
+the `.yml` spelling is not read, case 4 stays harmless per Decision 4 and the CODE wins),
+and `src/lib/capability-registry.js:55-80`. Grep the repository for every writer of
+`.ctoc/quality-config.yaml` and `.ctoc/capabilities/**`: **if CTOC itself writes either
+through an editing tool, this change breaks it and that must be found now, not at
+Step 14.** Already checked during this plan's rebase: `init-project.js` contains no
+reference to either path (it and `capability-registry` write via safe-fs `fs` calls, NOT
+editing tools, so they never pass through this hook). NOTE for the blast radius: in THIS
+repo the bundled seed files `.ctoc/capabilities/**/*.yaml` (~75 tracked files) and
+`.ctoc/quality-config.yaml` ARE real tracked files — after this change an Edit to any of
+them needs an approved covering plan. That is the intended effect, not a regression.
 
 ### Step 10: IMPLEMENT
 - `src/hooks/PreToolUse.Edit.js` — `COMMAND_TABLE_PATHS`, `isCommandTablePath`, the
@@ -238,8 +267,8 @@ is untouched by re-reading cases 11-13 against the code.
 
 ### Step 12: OPTIMIZE
 Three string comparisons and at most three confinement resolutions per editing tool
-call, and only for paths already normalized. The confinement check is already run twice
-per call for the ledger and verify guards; this is a third of the same cost.
+call, and only for paths already normalized. The confinement check is already run for the
+ledger, verify and streaming guards on every call; this is the same cost pattern.
 
 ### Step 13: SECURE
 Re-attack: reach `.ctoc/quality-config.yaml` through a path spelling the exclusion misses
@@ -253,13 +282,15 @@ message echoes file contents.
 `init-project` test, then the full gated run `npm test`. Lint at `--max-warnings 0`. No
 git operations. **Report whether any CTOC code path writes a command table through an
 editing tool and is now blocked — that is the blast radius, and a blocked initializer is
-a defect in this slice, not in the initializer.**
+a defect in this slice, not in the initializer.** (Expected: none — the writers route
+through safe-fs, not editing tools; the only newly-gated writes are hand edits to this
+repo's own tracked seed files, which is intended.)
 
 ### Step 15: DOCUMENT
 Update the whitelist description in `CLAUDE.md`'s enforcement section: `.ctoc/*` is
-whitelisted except the approval ledger, the verify evidence and the command tables, and
-say why the third one is different — its contents are obeyed, not believed. Update the
-documented test-file count from disk.
+whitelisted except the approval ledger, the verify evidence, the streaming store and the
+command tables, and say why the command tables are different from the other three — their
+contents are obeyed, not believed. Update the documented test-file count from disk.
 
 ### Step 16: FINAL-REVIEW
 Report every Step 8 red verbatim, every Step 13 re-attack that succeeded, the Step 14
@@ -282,8 +313,9 @@ blast radius, and every decision taken under ambiguity.
   `.ctoc/quality-config.yaml` is governed by `00202`, which imports this same
   `isWhitelisted` — so this exclusion propagates there automatically once both have
   landed, and does not before.
-- It does **not** audit the rest of `.ctoc/` for a fourth category of believed-or-obeyed
-  file. Three are now carved out; a systematic audit is separate work.
+- It does **not** audit the rest of `.ctoc/` for a fifth category of believed-or-obeyed
+  file. Four are now carved out (ledger, verify, streaming, command tables); a systematic
+  audit is separate work.
 - It does **not** protect these files from a process outside the tool hooks. Any code
   running as the user writes them directly; this is a guard against agent mistakes and
   drift, not against intent.
@@ -297,13 +329,13 @@ blast radius, and every decision taken under ambiguity.
 2. **The exclusion lives inside `isWhitelisted`.** The negation of a grant belongs where
    the grant is written, so the next reader of the whitelist sees the exception without
    hunting for it.
-3. **The whole `.ctoc/capabilities` directory, not just `languages/`.** `project-types/`
-   and `databases/` are read by the same registry, and enumerating subdirectories is a
-   list that goes stale the day a fourth is added.
+3. **The whole `.ctoc/capabilities` directory, not just `languages/`.** `project-types/`,
+   `databases/` and `frameworks/` are read by the same registry, and enumerating
+   subdirectories is a list that goes stale the day a fifth is added.
 4. **Both `.yaml` and `.yml` are listed.** If Step 9 finds only one spelling is read,
    the unread one is harmless to include and protects against a later reader accepting
    it. If it turns out `.yml` is read and this plan named only `.yaml`, the CODE wins.
-5. **Real-path confinement is consulted, matching the two existing guards.** A link is
+5. **Real-path confinement is consulted, matching the three existing guards.** A link is
    how a name-based check is defeated, and the module for it is already loaded in this
    file with the correct failing direction.
 6. **`.ctoc/settings.json` is deliberately excluded from this slice.** Protecting it
@@ -315,4 +347,10 @@ blast radius, and every decision taken under ambiguity.
    inconveniences someone.
 8. **Matching is case-insensitive.** macOS and Windows route a case variant to the real
    file, so a case-sensitive check is forgeable — the identical reasoning already
-   recorded at `:158-163` for the ledger guard.
+   recorded at `:204-217` for `isUnderProtectedDir` (shared by the ledger, verify and
+   streaming guards).
+9. **Traversal cases 8 and 9 assert on `isCommandTablePath`, not `isWhitelisted`.**
+   `isWhitelisted`'s pre-existing `/../` traversal guard at `:88` short-circuits before
+   the exclusion, so it returns false for both traversal inputs regardless of this change.
+   Testing `isCommandTablePath` directly is what actually exercises the exclusion's `..`
+   handling — re-entering (case 8, caught) vs out-resolving (case 9, not over-reached).

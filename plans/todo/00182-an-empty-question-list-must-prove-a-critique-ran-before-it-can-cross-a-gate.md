@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "An empty question list must prove a critique ran before it can cross a gate — attestation replaces emptiness as the evidence"
 type: implementation
 parent_plan: none
@@ -9,18 +10,22 @@ iron_loop: true
 files:
   - "src/lib/streaming-precompute.js"
   - "tests/questions-attestation.test.js"
+  - "CLAUDE.md"
+approved_by: human
+approved_at: 2026-07-30T14:47:43.962Z
+gate_crossed: implementation → todo
 ---
 
 # An empty question list must prove a critique ran before it can cross a gate
 
 ## The file contradicts itself, and the permissive reading is the one wired to a gate
 
-`src/lib/streaming-precompute.js:332-336`, on the `ready` status:
+`src/lib/streaming-precompute.js:354-358`, on the `ready` status:
 
 > `questions` MAY be `[]` — the honest "the critique ran and found nothing to ask".
 > That is a REAL state.
 
-`:694-696`, in the same file, on a missing questions file:
+`:725-727`, in the same file, in `hasEnoughInformation`'s fail-closed doc block:
 
 > **ABSENCE OF EVIDENCE IS NOT EVIDENCE OF ABSENCE**: a plan whose questions were
 > never computed does not thereby have "enough information" — we simply do not KNOW,
@@ -33,10 +38,10 @@ the state the second refuses.
 **And the first is the one with an action attached.** `validatePlanQuestions([])`
 returns valid — every `errors.push` sits inside a `forEach` over the array, and an
 empty array iterates zero times. `hasEnoughInformation` then filters an empty list
-twice, gets two empty lists, and reaches `:762` with `enough: true`. At
-`streaming-gate.js:498-502` that verdict crosses the plan from `functional` to
-`implementation`, or from `implementation` to `todo`, writes a sufficiency ledger
-entry, and `continue`s past the human entirely.
+twice, gets two empty lists, and reaches `:793` with `enough: true`. At
+`streaming-gate.js:603-607` (`crossBySufficiency`, defined `:498`) that verdict
+crosses the plan from `functional` to `implementation`, or from `implementation` to
+`todo`, writes a sufficiency ledger entry, and `continue`s past the human entirely.
 
 ### The real defect is not the emptiness — it is what is not recorded
 
@@ -117,12 +122,12 @@ argument rather than adding evidence of a problem — which is the rule
 meet the bar above. A file with a non-empty `questions` array is unaffected — the
 questions display and block exactly as they do today.
 
-That scoping is the whole compatibility story. The two questions files in this
-repository have no attestation block and non-empty arrays; both continue to work
+That scoping is the whole compatibility story. The 15 questions files in this
+repository have no attestation block and non-empty arrays; all continue to work
 unmodified. **Verified by reading them.**
 
 `hasEnoughInformation` fails closed on `unattested`, joining `not-computed`, `stale`,
-`invalid` and `unknown-plan` in the list at `:700-706`. The reason string is
+`invalid` and `unknown-plan` in the list at `:731-737`. The reason string is
 `unattested`, distinct from every other, so a gate screen can say *"no critique is on
 record for this plan"* rather than the misleading *"questions were never generated"*.
 
@@ -149,16 +154,21 @@ the absence of output.
    attestation is supplied, the write is REFUSED** with an error saying so plainly.
    An empty list is the one shape that must never reach disk unexplained.
    The parameter is positional and optional, so every existing non-empty call site
-   compiles and behaves identically.
-4. **`planQuestionsStatus`** — after the existing validity and staleness checks, if
-   `questions.length === 0` and `attestsEmptiness` is not satisfied, return
+   (the sweeper's `precompute.writePlanQuestions(root, ref, payload.questions,
+   currentMtimeMs)` at `streaming-questions-sweeper.js:195`) compiles and behaves
+   identically.
+4. **`planQuestionsStatus`** — after the existing validity and staleness checks (the
+   staleness branch ends at `:465`, before the final `return {status:'ready', …}` at
+   `:467`), if `questions.length === 0` and `attestsEmptiness` is not satisfied, return
    `{status: 'unattested', reason, errors}` where `reason` names which lens failed the
    bar. Ordered AFTER staleness so a stale empty file still reports `stale`, the more
-   actionable instruction.
+   actionable instruction. Read `parsed.attestation` from the object already parsed at
+   `:427` — no second read.
 5. **`hasEnoughInformation`** — no logic change needed; it already fails closed on
-   every non-`ready` status. **Update its doc block at `:700-706` to list
-   `unattested`**, and update the `:332-336` comment that currently blesses an empty
-   array, which is the sentence this slice exists to retract.
+   every non-`ready` status (the `if (status.status !== 'ready')` guard at `:764`).
+   **Update its fail-closed doc block at `:731-737` to list `unattested`**, and update
+   the `:354-358` comment that currently blesses an empty array, which is the sentence
+   this slice exists to retract.
 
 ### File: `tests/questions-attestation.test.js`
 **Action:** CREATE
@@ -180,7 +190,7 @@ the absence of output.
 | 13 | `writePlanQuestions` accepts an empty list with a valid attestation | `ok:true`, and the attestation round-trips byte-faithfully |
 | 14 | `writePlanQuestions` on a non-empty list without attestation | `ok:true` — existing call sites unbroken |
 | 15 | a stale empty file reports `stale`, not `unattested` | ordering guard |
-| 16 | the two live questions files still read `ready` | run against the real `.ctoc/streaming/questions/` — proof no stored data broke |
+| 16 | the live questions files still read `ready` | run against the real `.ctoc/streaming/questions/` — proof no stored data broke |
 | 17 | **`unattested` is distinguishable from `not-computed`** | the two reasons differ, and neither renders as the other. "I could not look" versus "I looked and found nothing" |
 
 Fixtures under `os.tmpdir()`, `path.join`, teardown via
@@ -192,8 +202,8 @@ Fixtures under `os.tmpdir()`, `path.join`, teardown via
 
 | change | live call site | root |
 |---|---|---|
-| `unattested` status | `hasEnoughInformation:733` → `streaming-gate.sufficiencyFor:359` → `pendingGateDecisions:494` | `/ctoc:menu` gate screen |
-| the write refusal | `writePlanQuestions` — called by `src/lib/streaming-questions-sweeper.js` | the sweeper, on every promotion |
+| `unattested` status | `hasEnoughInformation:759` → `streaming-gate.sufficiencyFor:458` → `pendingGateDecisions:576` | `/ctoc:start` gate screen |
+| the write refusal | `writePlanQuestions` — called by `src/lib/streaming-questions-sweeper.js:195` | the sweeper, on every promotion |
 
 Already-live paths on every gate render. Nothing reachable only from a test.
 
@@ -215,10 +225,14 @@ stored data does not have the shape this plan assumed, and the plan is wrong bef
 the code is.
 
 ### Step 9: PREPARE
-Read from disk: `streaming-precompute.js:200-330` (validator and writer), `:370-452`
-(`planQuestionsStatus`, and the exact order of its checks), `:682-763`
+Read from disk: `streaming-precompute.js:226-344` (validator and writer), `:392-474`
+(`planQuestionsStatus`, and the exact order of its checks), `:759-794`
 (`hasEnoughInformation`); `src/lib/streaming-questions-sweeper.js` in full — it is the
-only production caller of `writePlanQuestions` and the fifth parameter must reach it;
+only production caller of `writePlanQuestions` and calls it at `:195` with FOUR
+positional args, so an empty list promoted through it is now REFUSED (`invalid-questions`
+→ discarded), which is the intended fail-closed direction; threading an `attestation`
+THROUGH the sweeper (reading `payload.attestation` and passing it as the fifth arg) is
+`00183`'s work, not this slice's — this slice keeps the sweeper unmodified;
 `agents/iron-loop/gate-critic.md:27-56` and `:105-125` (the four-lens expectation and
 the three-state classification); `agents/iron-loop/premortem-critic.md:175-220` (the
 `self_assessment` block this attestation projects). Grep for every caller of
@@ -234,7 +248,7 @@ the three-state classification); `agents/iron-loop/premortem-critic.md:175-220` 
 ### Step 11: REVIEW
 Confirm the four expected lens names are a module constant and are never read from the
 payload. Confirm `unattested` cannot be reached by a non-empty questions list — the
-compatibility promise rests on it. Confirm the `:332-336` comment no longer blesses an
+compatibility promise rests on it. Confirm the `:354-358` comment no longer blesses an
 empty array, because leaving it would reproduce the self-contradiction this slice
 removes, only inverted.
 
@@ -253,7 +267,7 @@ against module constants — never by prefix, substring, or fuzzy match, mirrori
 ### Step 14: VERIFY
 `node --test` on the new file plus every existing streaming/gate test, then the full
 gated run `npm test`. Lint at `--max-warnings 0`. No git operations. **Report whether
-any plan currently at a pre-build gate changes its verdict**, and confirm both live
+any plan currently at a pre-build gate changes its verdict**, and confirm the live
 questions files still read `ready`.
 
 ### Step 15: DOCUMENT
@@ -272,14 +286,17 @@ changed status, and every decision taken under ambiguity.
   `unattested` and **auto-crossing on an empty list stops entirely.** That is the
   correct direction — fail closed — but it is a real behavioural change and it is
   stated here rather than discovered later. Non-empty lists are unaffected, so the
-  gate screen keeps working normally.
+  gate screen keeps working normally. `00183` is also where the sweeper learns to read
+  `payload.attestation` and pass it as the fifth writer argument; until then an
+  attested empty list cannot promote THROUGH the sweeper (the writer's contract is
+  still tested directly by case 13).
 - It does **not** verify that the attestation is TRUE. A lying producer can claim four
   clean passes. This raises the bar from "no claim at all" to "a claim on the record,
   attributable, and auditable by `00180`". A cryptographic attestation is not
   proposed: the producers are subagents inside the same trust boundary, and the
   quarantine plus sweeper already fence the untrusted write path.
-- It does **not** change the crossing at `streaming-gate.js:498`, the ledger evidence
-  (`00184`), or anything in `quality-agent.js`.
+- It does **not** change the crossing at `streaming-gate.js:498` (`crossBySufficiency`),
+  the ledger evidence (`00184`), or anything in `quality-agent.js`.
 
 ## Decisions Taken Under Ambiguity
 
@@ -318,3 +335,12 @@ changed status, and every decision taken under ambiguity.
 9. **No cryptographic signing.** The threat model is a broken or truncated producer,
    not a forger with write access to `.ctoc/`; anyone with that access can edit the
    ledger too. Signing would add key management for no coverage of the actual failure.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "A shipped recipe is proven by running it — every state-changing instruction in the menu is executed against a fixture, because no check that reads it can tell it is wrong"
 type: implementation
 parent_plan: none
@@ -10,6 +11,10 @@ files:
   - "src/lib/recipe-harness.js"
   - "tests/shipped-recipes-execute.test.js"
   - ".ctoc/recipe-coverage.json"
+  - "CLAUDE.md"
+approved_by: human
+approved_at: 2026-07-30T14:47:43.851Z
+gate_crossed: implementation → todo
 ---
 
 # A shipped recipe is proven by running it
@@ -33,7 +38,9 @@ because a parameter with a default does not count toward `length`. The broken re
 passed **three** arguments. Three arguments to a function accepting two-to-three is
 arity-legal in every sense a static checker can measure. The call was wrong in the
 *meaning* of each argument — a string where an object belonged — and JavaScript carries
-no type at that boundary to compare against.
+no type at that boundary to compare against. (Verified against the current
+`src/lib/stale-cleanup.js`: `function executeCleanup(proposal, root, deps = {})` — the
+arity argument still holds exactly.)
 
 The remaining static options were considered and are rejected with reasons:
 
@@ -69,21 +76,32 @@ deletes a file. A recipe that only reads and renders is out of scope; its failur
 visible on the screen the moment a human uses it, which is the opposite of this defect
 class.
 
-Enumerated from `src/commands/menu.md` on 2026-07-20 and to be re-enumerated at Step 9
-because the file will have changed:
+Enumerated from `src/commands/start.md` — the shipped menu instruction surface. It was
+`src/commands/menu.md` when this plan was first drafted on 2026-07-20 and has since been
+RENAMED to `start.md`; the recipes moved with it. Re-verified against the file as it stands
+during the 2026-07-30 rebase, and to be re-enumerated once more at Step 9 because the file
+keeps changing. Row anchors are approximate and shift on every edit to `start.md` — identify
+each recipe by its `claude:` menu action and the function it calls, NOT by line number:
 
-| Row | Recipe | State it changes |
+| Recipe (menu action) | Program | State it changes |
 |---|---|---|
-| `:52` | `plan-numbering.nextImplementationPlanNumber` | reads only, but its output NAMES a created file — covered, because a wrong number silently collides |
-| `:54` | `stale-cleanup.executeCleanup`, both forms | moves or deletes plan files |
-| `:65` | `settings.setSetting('general','environment',…)` | writes `.ctoc/settings.json` |
-| `:66` | `settings.setSetting('general','environment_prompt_dismissed',…)` | writes `.ctoc/settings.json` |
-| `:67` | `stale-detector.scanCheapCandidates` + `dismissStale` | writes the dismissal store |
-| `:68` | `compliance-regime.writeActiveProfiles` / `declineComplianceRegime` | writes the regime marker |
-| `:58,:59` | `src/scripts/ledger-backfill.js` | writes the approval ledger |
+| `create-plan` | `plan-numbering.allocatePlanNumber(process.cwd())` | stakes an atomic claim file under `.ctoc/` (exclusive-create) — a wrong or colliding number is silent |
+| Plan-number repair | `plan-numbering.renumberImplementationPlans(process.cwd())` | renames implementation-plan files and rewrites every `parent_plan`/`depends_on` reference |
+| `cleanup-exec` | `stale-cleanup.executeCleanup(proposal, root)` | moves or deletes plan files — the recipe `00185` repairs (its shipped call form passes a string where the `proposal` object belongs; `executeCleanup`'s real arity is `(proposal, root, deps = {})`, `length === 2`) |
+| `set-environment` | `settings.setSetting('general','environment',…)` | writes `.ctoc/settings.json` |
+| `env-keep-defaults` | `settings.setSetting('general','environment_prompt_dismissed',true,…)` | writes `.ctoc/settings.json` |
+| `dismiss-stale` | `stale-detector.scanCheapCandidates` + `dismissStale` | writes the dismissal store |
+| `set-compliance-regime` | `compliance-regime.writeActiveProfiles` / `declineComplianceRegime` | writes the regime marker |
+| `approve-stubs` / Ledger backfill | `src/scripts/ledger-backfill.js --vision` (and `--plan … --stage … --reason …`) | writes the approval ledger |
 
-**Every one of these is a `node -e` or `node <script>` program with a real signature on
-the other end, and not one of them is executed by any test today.**
+The read-only `Plan-number check` recipe (`plan-numbering.findNumberCollisions`) is OUT of
+scope — it only reads and renders, and its failure is visible on screen the moment a human
+runs it. `plan-numbering.nextImplementationPlanNumber` (the pure read-only helper the first
+draft cited as the `create-plan` recipe) is no longer that recipe; the shipped `create-plan`
+recipe now calls the claim-staking `allocatePlanNumber`, which is why it is in scope.
+
+**Every one of these in-scope recipes is a `node -e` or `node <script>` program with a real
+signature on the other end, and not one of them is executed by any test today.**
 
 ## What this builds
 
@@ -93,10 +111,10 @@ the other end, and not one of them is executed by any test today.**
   inline `node -e "…"` and `node "<path>" <args>` programs out of a shipped instruction
   file, preserving the row label so a failure names the menu action a human would click.
   Placeholders (`{{CTOC_ROOT}}`, `${CLAUDE_PLUGIN_ROOT}`, `<slug>`, `<action>`,
-  `<category>`, `{env}`, `{profile}`) are returned as a declared `placeholders` list
-  rather than silently substituted — an unrecognised placeholder is an ERROR, never a
-  guess, because guessing a substitution is how a harness produces a green run over a
-  recipe it never really executed.
+  `<category>`, `<category-or-plan>`, `{env}`, `{profile}`) are returned as a declared
+  `placeholders` list rather than silently substituted — an unrecognised placeholder is
+  an ERROR, never a guess, because guessing a substitution is how a harness produces a
+  green run over a recipe it never really executed.
 - `runRecipe(program, { root, substitutions })` → `{ code, stdout, stderr, json }`.
   Substitutes declared placeholders, runs via `spawnSync(process.execPath, ['-e', program],
   { cwd: root })` with a bounded timeout, and returns the parsed stdout when it is JSON.
@@ -104,8 +122,10 @@ the other end, and not one of them is executed by any test today.**
   swallowed — an `execSync` overflowing its default buffer and recording a passing suite
   as a failure is one of the five documented false-green signatures in this repository.
 
-Both functions return structured results and throw only on programmer error. Nothing
-here catches an error and continues.
+Both functions return structured results and throw only on programmer error (which
+includes a `markdownPath` that does not exist on disk — a moved or renamed target is a
+LOUD throw naming the missing path, never a silent zero-recipe result). Nothing here
+catches an error and continues.
 
 ### `.ctoc/recipe-coverage.json` — the ratchet, and the honest gap
 
@@ -115,7 +135,7 @@ them is what kills a fence:
 - `covered` — recipes with a fixture and an assertion. **May only ever GROW.**
 - `uncovered` — state-changing recipes that exist and have no fixture yet, each with a
   one-line reason. **May only ever SHRINK.** This list is the honest statement that the
-  mechanism is partial. A new state-changing recipe added to `menu.md` and absent from
+  mechanism is partial. A new state-changing recipe added to `start.md` and absent from
   BOTH lists fails the test — so the fence catches the *arrival* of an unchecked recipe
   even before anyone writes its fixture.
 
@@ -127,15 +147,15 @@ excludes it.
 
 | # | Case | Assertion |
 |---|---|---|
-| 1 | extraction finds every `node` program in `menu.md` | count matches a live scan; a row whose program cannot be parsed FAILS naming the row |
+| 1 | extraction finds every `node` program in `start.md` | the extracted count matches a live scan AND is NON-ZERO — a harness that extracts zero programs from `start.md` (its target file moved/renamed, or the parser regressed) FAILS rather than reporting an empty match as green; a row whose program cannot be parsed FAILS naming the row |
 | 2 | every extracted program's `require` targets resolve | each required path exists on disk, with the `.js` extension |
 | 3 | **every named function exists on the resolved module** | `typeof mod[fn] === 'function'`; a recipe naming a function that is not exported fails here. This is the one static check that IS trustworthy, and it is cheap |
 | 4 | **every covered recipe executes and produces its declared effect** | one sub-case per `covered` entry: seed fixture, run, assert the specific observable change |
 | 5 | **no covered recipe returns a silent no-op** | for each, stdout parses and does not report `skipped:true` where the fixture was seeded for a real action. This is `00185`'s defect, generalized |
-| 6 | the coverage ledger is complete | every state-changing recipe in `menu.md` appears in `covered` or `uncovered`; a new one in neither FAILS with the row text and instructions to add a fixture |
+| 6 | the coverage ledger is complete | every state-changing recipe in `start.md` appears in `covered` or `uncovered`; the in-scope scan MUST be non-empty (a zero-length in-scope set FAILS — an empty ledger otherwise passes vacuously); a new recipe in neither list FAILS with the row text and instructions to add a fixture |
 | 7 | the ratchet only tightens | `covered` count never falls below the file's recorded number; `uncovered` never rises |
-| 8 | `uncovered` entries are honest | every entry names a row that still exists in `menu.md`; a phantom entry FAILS |
-| 9 | a deliberately broken recipe is caught | a fixture markdown file containing `executeCleanup(process.cwd(), 'x', 'y')` — the historical defect — is detected by the harness as producing a no-op. **The harness is tested on the bug it exists to find**, or nobody can tell whether it works |
+| 8 | `uncovered` entries are honest | every entry names a recipe that still exists in `start.md`; a phantom entry FAILS |
+| 9 | a deliberately broken recipe is caught | a fixture markdown file containing `executeCleanup(process.cwd(), 'x', 'y')` — the historical defect, still the shape of the shipped `cleanup-exec` recipe until `00185` lands — is detected by the harness as producing a no-op. **The harness is tested on the bug it exists to find**, or nobody can tell whether it works |
 | 10 | no fixture run touches the real repository | assert `plans/` under the real root is byte-identical before and after the suite |
 
 ## Implementation Details
@@ -164,7 +184,10 @@ plan that polices dead files would be an embarrassment the ratchet is right to c
 
 Covered by `tests/shipped-recipes-execute.test.js`. Case 9 is the load-bearing one: a
 harness that has never been shown catching the historical defect is an unvalidated
-instrument, and this repository has shipped five of those.
+instrument, and this repository has shipped five of those. Case 1's non-zero clause is the
+second load-bearing one after this rebase: the recipe file was RENAMED (`menu.md` →
+`start.md`) once already, and a harness that silently extracts nothing when its target
+moves is the exact false-green shape this whole plan exists to fence.
 
 ## Execution Plan (Steps 8-16)
 
@@ -175,17 +198,26 @@ not exist. Case 6 will initially list every state-changing recipe as uncovered; 
 the correct starting state and it is not a failure.
 
 ### Step 9: PREPARE
-**Re-enumerate the state-changing recipes from `src/commands/menu.md` as it stands** — do
-not trust this plan's table, which was read on 2026-07-20 and will be stale. `00185` has
-already changed row `:54`. For each row, read the target module and confirm the named
-export exists. Read `src/lib/false-green-scan.js` for the five signatures this harness
-must not itself commit, and `tests/reachability.test.js:130-215` for the ratchet shape to
-mirror. Read `src/lib/iron-loop-enforcer.js`'s check registration in case Step 14 requires
-the wiring above.
+**Re-enumerate the state-changing recipes from `src/commands/start.md` as it stands** — do
+not trust this plan's table, which was re-verified on 2026-07-30 and will drift again.
+`00185` repairs the `cleanup-exec` recipe (the shipped `executeCleanup(process.cwd(), …)`
+call form that passes a string where the `proposal` object belongs), so confirm its FIXED
+shape on disk before covering it. Identify each recipe by its menu action, never by line
+number. For each, read the target module and confirm the named export exists — the
+2026-07-30 rebase confirmed `plan-numbering.allocatePlanNumber`/`renumberImplementationPlans`/`findNumberCollisions`,
+`settings.setSetting`, `stale-detector.scanCheapCandidates`/`dismissStale`,
+`compliance-regime.writeActiveProfiles`/`declineComplianceRegime`, and
+`src/scripts/ledger-backfill.js` all exist, but re-verify at build time. Read
+`src/lib/false-green-scan.js` for the five signatures this harness must not itself commit,
+and the live-ratchet section of `tests/reachability.test.js` (the `NO NEW DEAD FILE` /
+count-may-only-shrink assertions, ~line 135 onward) for the ratchet shape to mirror. Read
+`src/lib/iron-loop-enforcer.js`'s check registration in case Step 14 requires the wiring
+above.
 
 ### Step 10: IMPLEMENT
 - `src/lib/recipe-harness.js` — `extractRecipes`, `runRecipe`, explicit `maxBuffer`,
-  bounded timeout, no shell, no silent catch.
+  bounded timeout, no shell, no silent catch, and a LOUD throw when `markdownPath` is
+  absent.
 - `tests/shipped-recipes-execute.test.js` — the ten cases plus one sub-case per covered
   recipe.
 - `.ctoc/recipe-coverage.json` — `covered` seeded with every recipe that got a fixture in
@@ -196,9 +228,9 @@ coverage ledger claiming a fixture that does not exist is the same lie in a new 
 
 ### Step 11: REVIEW
 Confirm no extraction path substitutes an unrecognised placeholder. Confirm no `catch`
-swallows a failure into a pass. Confirm each covered case asserts a specific observable
-change and not merely exit code zero — a recipe can exit zero and do nothing, which is
-this entire defect class.
+swallows a failure into a pass. Confirm the harness throws (not zero-returns) on a missing
+target file. Confirm each covered case asserts a specific observable change and not merely
+exit code zero — a recipe can exit zero and do nothing, which is this entire defect class.
 
 ### Step 12: OPTIMIZE
 One child process per covered recipe. Report the added wall-clock time at Step 14; if it
@@ -233,7 +265,7 @@ decision taken under ambiguity.
   fixture cost is not repaid.
 - It does **not** cover the agent definitions under `agents/**`, which also carry
   executable recipes. Extending the harness to those surfaces is separate work and is the
-  human's to schedule. `src/commands/menu.md` is where the state-changing recipes live
+  human's to schedule. `src/commands/start.md` is where the state-changing recipes live
   today.
 - It does **not** detect a recipe that runs correctly but does the *wrong* thing. The
   fixture asserts the effect its author declared; a wrong declaration passes.
@@ -278,3 +310,18 @@ decision taken under ambiguity.
    plausible. A harness that guesses inherits the failure it exists to detect.
 7. **Nothing is memoized.** A cached recipe execution is a verdict on input the run never
    received, which is the exact false-green signature this repository fences.
+8. **A missing target file is a LOUD throw and a zero-recipe extraction FAILS (rebase,
+   2026-07-30).** The recipe surface was renamed once already (`menu.md` → `start.md`); a
+   harness that silently reads nothing when its target moves is the very false-green shape
+   this plan fences. `extractRecipes` throws on an absent path, and Case 1 asserts a
+   NON-ZERO extracted count, so a re-pointed or regressed harness fails red instead of
+   passing on an empty set.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

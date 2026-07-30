@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 iron_loop: true
 title: "A ratcheting fence against a test that only ever feeds a module hand-written input, while the module's real job is to read a file the pipeline actually wrote"
 type: implementation
@@ -21,28 +22,48 @@ files:
   - tests/fixtures/golden-corpus/task-registry/tasks.json
   - tests/fixtures/golden-corpus/plan-frontmatter/review__00003-r2a-scheduler-lifecycle-honesty.md
   - tests/fixtures/golden-corpus/plan-frontmatter/implementation__00073-ui1-unexecutable-instruction-fence.md
+  - "CLAUDE.md"
+approved_by: human
+approved_at: 2026-07-30T14:47:43.902Z
+gate_crossed: implementation → todo
 ---
 
 # The real-sample fence — a test that never meets the data its module was built to read
 
+> **Rebased 2026-07-30 onto the current tree.** Every file path, line number, function
+> name and reader in this plan was re-verified against today's code. Corrections folded
+> in: `CHECKS` is now at ~line 686 and `false-green-fence` at line 706 (were ~565/585);
+> `MATRIX_TOTAL_WIDTH` is 108 (was 88); the thorough self-check runs from
+> `src/scripts/run-self-check.js` (a declared reachability root), not from a menu command;
+> `checkGoldenCorpusFence` returns `CLEAN()` — never `null` — on a non-CTOC tree, because
+> the enforcer envelope now records a `null` verdict as an ERROR; and the deleted
+> `streaming-gate.answeredQuestionIds` example is replaced by the current inline reader
+> `streaming-precompute.readAnsweredQuestionIds`. Intent and acceptance criteria are
+> unchanged. The renderer fix this plan references (separator-aware `tokenBreakPoint`,
+> the option `description` moved out of the narrow Option cell) has already LANDED in
+> `src/lib/streaming-gate.js` — exactly as the plan assumes — so the worked-example test
+> asserts the current renderer's output is correct and Step 8 restores the pre-fix
+> behaviour to capture red.
+
 ## ⚠️ BUILD CONFLICT — THREE FENCES, ONE ARRAY. SERIALIZE THEM.
 
 Three plans register a check in the **same array**, `CHECKS` in
-`src/lib/iron-loop-enforcer.js` at roughly line 565. That array is the liveness wiring
+`src/lib/iron-loop-enforcer.js` at roughly line 686. That array is the liveness wiring
 every fence depends on — a lost update there does not break a test, it silently
 un-wires a fence.
 
 | Plan | What it fences | State today |
 |---|---|---|
-| The false-green fence | a check reporting a verdict on input it never received | **LANDED** — sits in `plans/review/`, its entry `false-green-fence` is already in `CHECKS` at line 585 |
-| The unexecutable-instruction fence | something documented, registered, or ordered where nothing on the other end can act on it | **PLANNED, UNBUILT** — declares `src/lib/iron-loop-enforcer.js` in its own `files:` list |
+| The false-green fence | a check reporting a verdict on input it never received | **LANDED** — sits in `plans/review/` (`00071-fg1-false-green-fence.md`), its entry `false-green-fence` is already in `CHECKS` at line 706 |
+| The unexecutable-instruction fence | something documented, registered, or ordered where nothing on the other end can act on it | **PLANNED, UNBUILT** — `plans/implementation/00073-ui1-unexecutable-instruction-fence.md`, declares `src/lib/iron-loop-enforcer.js` in its own `files:` list |
 | **This plan** | a test that only ever feeds a module synthetic input, for a module whose job is to read a persisted real-world file | **PLANNED, UNBUILT** — also appends to `CHECKS` |
 
 **Recommended order: build this plan FIRST, then the unexecutable-instruction fence.**
 
 The reasoning, and it is not arbitrary. The unexecutable-instruction fence's own plan
 records three live instances it must catch — one of them is that the critic agents
-named in `src/hooks/SessionStart.js:199-201` are instructed to call
+dispatched by the directive in `src/hooks/SessionStart.js` (the `writePlanQuestions`
+dispatch directive, ~lines 194–236) are instructed to call
 `streaming-precompute.writePlanQuestions(...)`, a JavaScript function, while not one of
 them holds a tool that can invoke a function. That instruction is what **produces** the
 question files this plan captures into the corpus. If that fence lands first and the
@@ -126,7 +147,10 @@ and the corpus directory that holds its captured samples.
 
 The consumer column is **computed**, not typed. It is shown here so a reader can sanity
 check the registry against what the scanner finds; a divergence between this table and
-the live scan is itself a finding worth looking at.
+the live scan is itself a finding worth looking at. (Every reader named above is verified
+to exist in the current tree: `streaming-precompute.loadPlanQuestions`,
+`step-13-verify.readVerifyEvidence`, `approval-ledger.readEntry`, `task-registry.load`,
+`state.parseMetadata`.)
 
 ### Decision — how a module is identified as a consumer of a persisted contract
 
@@ -156,11 +180,14 @@ fence somebody switches off inside a week. **False positives are the primary ris
 exactly as they were for the two sibling fences.**
 
 **Rejected: reader-import alone.** It is precise but it misses the case that actually
-matters most, and the proof is in the module this whole plan is about.
-`streaming-gate.answeredQuestionIds` opens `.ctoc/streaming/answers.jsonl` and parses it
-line by line, itself, without importing any reader. A reader-import-only signal would
-have declared `streaming-gate.js` — the module that broke — an innocent bystander. Signal
-(b) exists specifically to catch the module that re-implements the read inline.
+matters most — a module that re-implements the read INLINE, without importing any
+canonical reader. `streaming-precompute.readAnsweredQuestionIds` opens
+`.ctoc/streaming/answers.jsonl` and parses it line by line, itself, with no separate
+reader; a reader-import-only signal would declare any such module an innocent bystander.
+(This exact pattern is why the render module that broke this morning matters:
+`streaming-gate.js` consumes the `streaming-questions` contract, and until the answers
+read was consolidated it re-implemented a raw log read of its own.) Signal (b) exists
+specifically to catch the module that constructs the on-disk path and parses it inline.
 
 **Also rejected: whole-repository string search for the literal path.** It matches
 documentation prose, module header comments explaining a hazard, and test files. The
@@ -237,16 +264,17 @@ authority. So there is no middle path: a contract whose real instances cannot be
 committed **is not captured at all**. It is recorded in `manifest.yaml` as an uncaptured
 contract with the reason stated, and the fence reports it as an open gap rather than
 pretending coverage — the same honesty the compliance fixture manifest already practises
-with its `coverage_gaps` block.
+with its `coverage_gaps` block (`tests/fixtures/compliance/fixture-manifest.yaml`).
 
 Two concrete calls follow from that rule, and both are surfaced rather than assumed:
 
-- **The two question files are currently untracked.** `git status` shows `?? .ctoc/streaming/`.
-  Capturing them commits, for the first time, the critique fleet's written analysis of
-  the human's own plans. They contain no credentials, no personal data and no third-party
-  material — they are this repository's own review prose about this repository's own
-  code. Recorded under *Decisions Taken Under Ambiguity* as a proceed-with-disclosure, and
-  it is a one-line revert if the human disagrees.
+- **The question files' tracking state must be confirmed at capture.** These are this
+  repository's own review prose about this repository's own code — they contain no
+  credentials, no personal data and no third-party material. Capturing them into
+  `tests/fixtures/golden-corpus/` commits those bytes to a tracked path. Whether they are
+  currently untracked or already tracked under `.ctoc/streaming/` is re-checked at Step 9
+  (`git status`), not asserted here. Recorded under *Decisions Taken Under Ambiguity* as a
+  proceed-with-disclosure, and it is a one-line revert if the human disagrees.
 - **The approval ledger carries no secrets by construction** — each entry is a SHA-256
   content hash, two stage names, a timestamp and an approver kind. Reading two real
   entries confirms exactly that and nothing more.
@@ -259,9 +287,9 @@ push-protection rule this repository already follows.
 
 `approval-ledger` has a second entry kind — a sufficiency entry carrying
 `advanced_by: sufficiency` rather than `approved_by: human`, written by
-`streaming-gate.crossBySufficiency`. **A grep across all 100+ files in `.ctoc/approvals/`
+`streaming-gate.crossBySufficiency`. **A grep across all files in `.ctoc/approvals/`
 finds no `advanced_by` at all: not one has ever been written.** So there is no real
-instance to capture.
+instance to capture. (Step 9 re-confirms this before relying on it.)
 
 The corpus therefore does **not** contain one, and the manifest records it as an
 uncaptured variant with that reason. Writing a hand-made sufficiency entry to fill the
@@ -347,14 +375,24 @@ only, since `src/` enforces `security/detect-non-literal-regexp` at error under
 **Action:** MODIFY. **This is the live call site — it ships in THIS slice, not a follow-up.**
 
 - **Add** `checkGoldenCorpusFence(root)` beside `checkFalseGreenFence`, same shape:
-  lazy-require the scanner, return `null` when `filesScanned === 0` (not a CTOC source
-  tree), read `.ctoc/golden-corpus-baseline.json`, and treat **a malformed baseline as
-  excusing nothing** — mirroring `checkDeadExportFence` and `checkFalseGreenFence`,
-  because a baseline that cannot be read must never render as "all clear".
-- **Add** one row to `CHECKS` (the array at ~line 565, **read it fresh from disk first**):
+  lazy-require the scanner, and return the enforcer's VERDICT ENVELOPE — never `null`.
+  The current envelope (see the `CLEAN()` / `finding()` helpers at the top of the file,
+  and the `checkAllInvariants` loop that records a `null`/`undefined` verdict as an
+  `error`-severity finding) requires every check to return `{clean:true}` or
+  `finding({...})`. So:
+  - return **`CLEAN()`** when `filesScanned === 0` (not a CTOC source tree — mirroring
+    `checkFalseGreenFence`'s `if (result.filesScanned === 0) return CLEAN();`), and
+    `CLEAN()` when there are no fresh findings;
+  - return **`finding({ severity: 'block', message })`** when there are new unlinked
+    consumers;
+  - read `.ctoc/golden-corpus-baseline.json` and treat **a malformed baseline as excusing
+    nothing** — mirroring `checkDeadExportFence` and `checkFalseGreenFence`, because a
+    baseline that cannot be read must never render as "all clear".
+- **Add** one row to `CHECKS` (the array at ~line 686, **read it fresh from disk first**):
   `{ id: 'golden-corpus-fence', scope: 'architecture', mode: 'thorough', fn: checkGoldenCorpusFence }`
-- Severity `block`. Message names each unlinked consumer, the contract it consumes, and
-  the corpus directory holding the real samples.
+  — byte-identical in shape to the `false-green-fence` row directly above it.
+- Severity `block`. The message names each unlinked consumer, the contract it consumes,
+  and the corpus directory holding the real samples.
 
 ### File: `.ctoc/golden-corpus-baseline.json`
 
@@ -401,9 +439,11 @@ reasons. Plus a top-level `coverage_gaps` block.
 | `verify-evidence/menu-critique-first.json` | `.ctoc/state/verify/` | a differently-shaped, smaller real instance |
 | `approvals/ctoc-audit-w05-s1-…json` | `.ctoc/approvals/` | real `approved_by: human` entry |
 | `approvals/ctoc-audit-w02-s1-approval-ledger.json` | `.ctoc/approvals/` | a second real human entry |
-| `task-registry/tasks.json` | `.ctoc/state/tasks.json` | **The nesting and array extreme.** 50 sequence entries; nested `touches[]`, `result{}`, `ts{}` |
+| `task-registry/tasks.json` | `.ctoc/state/tasks.json` | **The nesting and array extreme.** nested `touches[]`, `result{}`, `ts{}` sequence entries |
 | `plan-frontmatter/review__00003-…md` | `plans/review/` | a real gate-stage plan |
 | `plan-frontmatter/implementation__00073-…md` | `plans/implementation/` | long title, multi-entry `files:` list |
+
+(All nine source files were confirmed present in the current tree at rebase time.)
 
 Captures are **byte-for-byte**. No reformatting, no re-indenting, no key reordering, no
 truncation. A pretty-printed capture is a modified capture.
@@ -461,11 +501,12 @@ structure and failure-message discipline.
 **Action:** CREATE. **This is the test that proves the fence would have caught this
 morning's defect.** It drives the real matrix renderer against the real question file.
 
-**Route.** `precomputedQuestionMatrix` is **not exported** from `streaming-gate.js`, and
-it must stay that way — adding an export for a test would be flagged by the dead-export
-fence, and it would also be the wrong test, since the human's screen is produced by the
-public path. So the test drives the **public** entry point `planDecisionScreen(ref, root)`
-and asserts on the rendered `text`:
+**Route.** `precomputedQuestionMatrix` is **not exported** from `streaming-gate.js`
+(confirmed against the current `module.exports`), and it must stay that way — adding an
+export for a test would be flagged by the dead-export fence, and it would also be the
+wrong test, since the human's screen is produced by the public path. So the test drives
+the **public** entry point `planDecisionScreen(ref, root)` (exported) and asserts on the
+rendered `text`:
 
 - build a temp root with `plans/review/` and `.ctoc/streaming/questions/`;
 - copy the corpus sample into the questions store **byte-for-byte**;
@@ -475,15 +516,16 @@ and asserts on the rendered `text`:
 
 **Assertions — one per real defect, each of which fails against the pre-fix renderer:**
 
-1. **Width.** No rendered matrix line exceeds `MATRIX_TOTAL_WIDTH` (88), counting every
-   border character. Catches defect 1.
+1. **Width.** No rendered matrix line exceeds `MATRIX_TOTAL_WIDTH` (currently **108**),
+   counting every border character. Catches defect 1. (Read the constant from the module
+   rather than hard-coding the number, so a future width tune does not break the test.)
 2. **Row height.** No single option row exceeds a bounded number of physical lines. The
    fix moved the citation paragraph out of the narrow Option cell; the pre-fix renderer
    wrapped it about twenty lines down a seventeen-character column. Bound set from the
    measured post-fix height with headroom, and the failure message states the measured
    height and which cell caused it.
 3. **Token integrity.** Every wrapped fragment of a path-like token breaks **after** a
-   separator (`MATRIX_TOKEN_BREAK_AFTER`), never mid-word — so
+   separator (`MATRIX_TOKEN_BREAK_AFTER`, via `tokenBreakPoint`), never mid-word — so
    `src/lib/task-reconcile.js` never appears as `…task-reconci` / `le.js`. Catches
    defect 2.
 4. **No duplication.** No row's `Recommendation` cell repeats the text of its `Pros`
@@ -492,25 +534,30 @@ and asserts on the rendered `text`:
 5. **Nothing dropped.** Every option `label` in the source question appears in the
    rendered matrix — the wrap never silently loses a row.
 6. **Structure not forged.** Confirms the neutralisation still holds against real
-   subagent-authored prose: no cell content introduces a box-drawing character.
+   subagent-authored prose: no cell content introduces a box-drawing character
+   (`MATRIX_BOX_DRAWING` is stripped by `matrixCellText`).
 
-**Step 8 must show these red.** Temporarily restore the pre-fix renderer behaviour (put
-the `description` back into the Option cell, and drop the separator-aware
-`tokenBreakPoint`), run the test, and **record the actual failure output as red
-evidence** in the Step 16 report. A test asserted to be red without a captured red run is
-the same unverified claim this plan exists to fence.
+**Step 8 must show these red.** The current renderer is already FIXED (the option
+`description` rides in the flattened one-sentence description, not the Option cell; and
+`tokenBreakPoint` breaks at separators) — so to see red, temporarily restore the pre-fix
+behaviour (put the `description` back into the Option cell in `precomputedQuestionMatrix`,
+and drop the separator-aware `tokenBreakPoint`), run the test, and **record the actual
+failure output as red evidence** in the Step 16 report, then restore. A test asserted to
+be red without a captured red run is the same unverified claim this plan exists to fence.
 
 ## Wiring — the live call sites
 
 | New module | Live call site | Root it becomes reachable from | Ships in |
 |---|---|---|---|
-| `src/lib/golden-corpus-scan.js` | `checkGoldenCorpusFence` in `src/lib/iron-loop-enforcer.js`, registered in `CHECKS` | `src/commands/menu.js` → the self-check path that runs `checkAllInvariants` | **this slice, Step 10** |
+| `src/lib/golden-corpus-scan.js` | `checkGoldenCorpusFence` in `src/lib/iron-loop-enforcer.js`, registered in `CHECKS` | `src/scripts/run-self-check.js` → `checkAllInvariants({ mode: 'thorough' })` — a DECLARED reachability root in `.ctoc/reachability-roots.json` | **this slice, Step 10** |
 | `tests/fixtures/golden-corpus/**` | `scanGoldenCorpus` corpus exercise + both test files | the fence itself | **this slice, Step 10** |
 
-`iron-loop-enforcer.js` is already reachable from the shipped menu command, so registering
-the check is what makes the scanner live. A test is a caller, so "module plus its own
-test" would prove nothing — the `CHECKS` row is the wiring, and it is in this slice's
-`files:` list, not deferred.
+`iron-loop-enforcer.js` is already reachable from `src/scripts/run-self-check.js` (the
+declared self-check root that runs `checkAllInvariants` in **thorough** mode — the mode
+this check registers under; `SessionStart.js` runs FAST mode and deliberately skips it).
+Registering the check in `CHECKS` is what makes the scanner live. A test is a caller, so
+"module plus its own test" would prove nothing — the `CHECKS` row is the wiring, and it
+is in this slice's `files:` list, not deferred.
 
 ## Execution Plan
 
@@ -526,7 +573,9 @@ disk** (three plans target that array; never edit it from a brief). Create
 extreme against the live file **before** capturing, including which real plan exhibits
 stacked frontmatter; substitute and record where the claim does not hold. Confirm the
 approval ledger still contains no `advanced_by` entry, so the uncaptured-variant note
-stays accurate.
+stays accurate. Confirm (via `git status`) the tracking state of any `.ctoc/streaming/`
+source before capturing it, so the disclosure in *Decisions Taken Under Ambiguity* is
+accurate rather than assumed.
 
 **Step 10: IMPLEMENT** — One step, files as sub-items:
 - capture all nine corpus samples byte-for-byte;
@@ -535,12 +584,15 @@ stays accurate.
 - generate `tests/fixtures/golden-corpus/manifest.yaml` from the scanner's measurements,
   never by hand;
 - seed `.ctoc/golden-corpus-baseline.json` from a real scan;
-- add `checkGoldenCorpusFence` and its `CHECKS` row to `src/lib/iron-loop-enforcer.js`.
+- add `checkGoldenCorpusFence` (returning `CLEAN()` / `finding(...)`, never `null`) and
+  its `CHECKS` row to `src/lib/iron-loop-enforcer.js`.
 
 **Step 11: REVIEW** — Dependency direction (`lib` never imports from `hooks` or
 `commands`); no cycles; every failure message names the module, the contract and the
 corpus path; no line number in any key; the debt list and the exemption map are
-structurally separate; the scanner throws rather than returning empty on unreadable input.
+structurally separate; the scanner throws rather than returning empty on unreadable input;
+`checkGoldenCorpusFence` returns the verdict envelope (`{clean:…}`), so `checkAllInvariants`
+never records it as an `error`.
 
 **Step 12: OPTIMIZE** — The corpus exercise runs on every thorough self-check and the
 verify-evidence sample exceeds 100KB. Confirm a full scan stays well inside the sibling
@@ -576,10 +628,10 @@ under *Decisions Taken Under Ambiguity*.
    `.ctoc` path) or too narrow (only known readers). A curated registry with mechanical
    detection *inside* it is the honest trade, and adding a contract stays a deliberate,
    reviewable act.
-2. **Committing the two question files.** They are currently untracked. They contain the
-   critique fleet's prose about this repository's own plans — no credentials, no personal
-   data, no third-party material. Proceeding with disclosure; a one-line revert if the
-   human disagrees.
+2. **Committing the two question files.** They contain the critique fleet's prose about
+   this repository's own plans — no credentials, no personal data, no third-party
+   material. Proceeding with disclosure; a one-line revert if the human disagrees. Their
+   current tracking state is confirmed at Step 9 rather than asserted here.
 3. **No synthetic sufficiency ledger entry.** No `advanced_by` entry has ever been
    written, so none is captured. Recorded as an uncaptured variant with the reason.
    Inventing one would be this exact defect class committed by the fence built to catch it.
@@ -589,3 +641,66 @@ under *Decisions Taken Under Ambiguity*.
    screen actually goes through.
 5. **Row-height bound is measured, not guessed.** Set from the observed post-fix height
    with headroom at Step 8, and the number recorded in the test with its derivation.
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

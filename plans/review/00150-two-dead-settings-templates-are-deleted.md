@@ -123,16 +123,23 @@ Cross-platform: `path.join`, `os.tmpdir()`, `fs.promises.rm(root, { recursive: t
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/settings-format-single-encoding.test.js` in full, run ONLY that file, record the red output verbatim. Cases 1 and 2 MUST be red: both template files exist on disk today.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 ### Step 9: PREPARE — re-read from disk before deleting: confirm with a repository-wide search that neither template has gained a reader since this plan was written. If EITHER has a live reader in `src/`, `tests/`, `.claude-plugin/` or `agents/`, STOP and report — the correct change is then the opposite one and this plan is wrong.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
   - `.ctoc/settings.yaml.template` — delete.
   - `.ctoc/templates/settings.yaml.template` — delete.
 ### Step 11: REVIEW — confirm no remaining file in `src/`, `tests/`, `agents/`, `skills/` or `.claude-plugin/` names either path. Confirm the plugin manifest does not ship them as assets. Confirm case 5 exercises the REAL reader (`regulatory-regime.loadActiveProfiles`) and not a local re-implementation of the parse.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 ### Step 12: OPTIMIZE — nothing to optimize; this slice removes two files and adds one test. Confirm case 2's repository walk skips `node_modules/` and `plans/` so it stays fast and does not fail on historical plan text.
 ### Step 13: SECURE — deleting a file that a hook reads would be a denial of service against the enforcement path. Prove neither template is read by any hook: search `src/hooks/` for both basenames and record the empty result. Case 5 writes only inside a temporary directory created by the test.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 ### Step 14: VERIFY — `node --test tests/settings-format-single-encoding.test.js tests/compliance-mode.test.js tests/init-project.test.js` green, then the full gated run `npm test`. Lint the new test file. No git operations.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 ### Step 15: DOCUMENT — record in the test file's header WHY the fence exists: a dead second encoding of a format is a defect waiting for its first caller. Update the documented file counts in `CLAUDE.md` only if the gated run's count test demands it; if it does, add `CLAUDE.md` to this plan's `files:` rather than editing an undeclared file.
 ### Step 16: FINAL-REVIEW — report the files deleted, the verbatim red evidence, the verbatim green evidence, and every decision taken under ambiguity.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 
 ## Decisions Taken Under Ambiguity
 
@@ -151,3 +158,17 @@ Cross-platform: `path.join`, `os.tmpdir()`, `fs.promises.rm(root, { recursive: t
    `activeProfiles`.** `loadActiveProfiles` in `src/lib/regulatory-regime.js` is the
    reader of record named in `compliance-regime.js:5-8`; asserting through it means
    the test fails if the generated format ever stops satisfying the real consumer.
+5. **Cases 3–5 drive the generator through `initProject()`, not through a direct
+   `generateSettings([], [])` call.** The Test Plan named `generateSettings([], [])`,
+   but that function is NOT in `init-project.js`'s `module.exports` — calling it
+   directly would require adding an export to `init-project.js`, a file this slice
+   does not declare in `files:`. The faithful, no-undeclared-edit alternative is to
+   run the REAL wired path: `initProject(tempRoot)` calls `generateSettings()` and
+   writes the result to `<tempRoot>/.ctoc/settings.yaml` (`init-project.js:816-820`),
+   and the test reads that produced text. This exercises the generator through the
+   exact code that ships it — a stronger claim than calling the unexported helper in
+   isolation — and gives case 5 the real settings file it needs to round-trip. Cases
+   3 and 4 were already GREEN at Step 8 (TDD Red): the generator is correct today and
+   this slice deliberately does not change it, so only the deletion assertions (cases
+   1 and 2) were red. Those green-before-implementation cases are the fence locking
+   already-shipped behavior, not banked coverage.
