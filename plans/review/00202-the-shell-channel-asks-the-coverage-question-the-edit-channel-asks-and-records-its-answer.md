@@ -11,6 +11,11 @@ files:
   - "src/hooks/PreToolUse.Bash.js"
   - "tests/bash-gate-plan-coverage.test.js"
   - "CLAUDE.md"
+  - "tests/security-bash-hook.test.js"
+  - "tests/ledger-forgery-closed.test.js"
+  - "tests/pretooluse-bash-coverage.test.js"
+  - "tests/shell-write-targets.test.js"
+  - "tests/the-bash-channel-cannot-reach-the-ledger-through-a-link.test.js"
 approved_by: human
 approved_at: 2026-07-30T19:04:14.591Z
 gate_crossed: implementation → todo
@@ -301,12 +306,14 @@ Plus a signed state at step 10 written through `state-manager.saveState(project,
 | 5 | `echo x > src/covered.js && echo y > src/uncovered.js` | strict | deny — one covered target does not clear the other |
 | 6 | `echo x > VERSION` | strict | allow, logged `whitelist` |
 | 7 | `echo x > plans/todo/a.md` | strict | allow, logged `whitelist` |
-| 8 | **`node -e 'require("fs").writeFileSync("src/uncovered.js","x")'`** | strict | **deny**, reason names `interpreter` — RED today |
-| 9 | `npm run build` | strict | deny, reason `task runner` |
-| 10 | `npm run build` | soft | **allow**, logged `allow-indeterminate` |
-| 11 | `npm run build` | off | allow, not logged |
-| 12 | transcript containing a user-typed `hotfix`, `echo x > src/uncovered.js` | strict | allow, logged `escape` with the phrase |
-| 13 | transcript where `hotfix` appears only in a `tool_result` block | strict | **deny** — the role-scoping of `findEscapeInTranscript` must survive being reused here |
+| 8 | ~~`node -e 'require("fs").writeFileSync("src/uncovered.js","x")'`~~ | — | **DEFERRED (Decision 0)** — `node -e` is `indeterminate`; the indeterminate-deny is not built. Passes this stage unchanged. |
+| 9 | ~~`npm run build`~~ | — | **DEFERRED (Decision 0)** — `indeterminate`; not denied. |
+| 10 | ~~`npm run build` soft~~ | — | **DEFERRED (Decision 0)** — no `allow-indeterminate` outcome exists; the hook is mode-blind. |
+| 11 | ~~`npm run build` off~~ | — | **DEFERRED (Decision 0)** — mode-blind; not built. |
+| 9b (mode-blind) | `echo x > src/uncovered.js` with `enforcement.mode: soft` AND `: off` | soft/off | **deny** both — the coverage deny is mode-blind (00069 fence, case 27) |
+| V (Option A guard) | `npm test`, `node --test …`, `npm run lint`, `node <script>`, `make`, `python …` | — | **allow** at step 14 strict — `indeterminate` passes this stage; the load-bearing proof the pipeline's own Step-14 commands are not broken |
+| 12 | transcript containing a user-typed `hotfix`, `echo x > src/uncovered.js` | — | allow, logged `escape` with the phrase |
+| 13 | transcript where `hotfix` appears only in a `tool_result` block | — | **deny** — the role-scoping of `findEscapeInTranscript` must survive being reused here |
 | 14 | `ls -la` | strict | allow, **nothing logged** — the log records write decisions, not every command |
 | 15 | `git status` | strict | allow, nothing logged |
 | 16 | pre-step-8 state, `echo x > src/covered.js` | strict | deny with the **step** reason, not the coverage reason — ordering |
@@ -352,12 +359,14 @@ of case 2.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Write the file in full and run only it. Cases 2, 3, 4, 5, 8, 9, 10, 12, 13, 17, 18 and
 20 must be RED. Record case 2's and case 8's red verbatim from the **spawned** hook.
 Before relying on it, confirm case 1 is GREEN once the fix lands — a case 1 that is red
 after implementation means the approval fixture is wrong, not the code.
 
 ### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Read from disk: `PreToolUse.Bash.js:708-864` (the reader and `main`),
 `PreToolUse.Edit.js:727-733` (**verify** the `require.main` guard before importing from
 it) and `PreToolUse.Edit.js:342-346` + `:425-429` (the `readTranscript` /
@@ -372,6 +381,7 @@ plan, THE CODE WINS** — particularly on whether `findCoveringPlan` wants an ab
 relative target.
 
 ### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 - `src/hooks/PreToolUse.Bash.js` — the three requires; `getCommand` returns the parsed
   payload; a `readTranscript` helper; `checkWriteCoverage` added; `main()` classifies
   once, gains the coverage/indeterminate stage after the step gate, and the logging
@@ -379,6 +389,7 @@ relative target.
 - `tests/bash-gate-plan-coverage.test.js` — the twenty-one cases.
 
 ### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Confirm every branch of `main()` that terminates records exactly one log entry, and that
 no branch records two. Confirm `checkWriteCoverage` has no `throw` and that every catch
 returns a deny. Confirm the step gate still runs before the coverage gate. Confirm no
@@ -394,6 +405,7 @@ coverage stage. Measure the added latency of a covered write and report it; a ga
 adds a visible pause to every command is a gate that gets disabled.
 
 ### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Confirm the log entry carries no command text and no absolute path outside the project
 root. Confirm the deny banner names only the target and a fixed-vocabulary reason.
 Re-attack: construct a command whose determinate target passes coverage while a second,
@@ -401,6 +413,7 @@ hidden write lands elsewhere — every success is added to the recognized set in
 or written verbatim into "What this plan does NOT fix".
 
 ### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 `node --test` on the new file plus every existing test that spawns the Bash hook
 (`tests/pretooluse-bash-coverage.test.js`, `tests/ledger-forgery-closed.test.js`), then
 the full gated run `npm test`. Lint at `--max-warnings 0`. No git operations. **Report
@@ -415,6 +428,7 @@ indeterminate commands in strict mode, and logs its decisions to the same store.
 the documented test-file count from disk.
 
 ### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Report every Step 8 red verbatim, the case-21 blast radius, every Step 13 re-attack that
 succeeded, and every decision taken under ambiguity. **Name the strict-mode default
 explicitly as a decision the human should confirm rather than inherit.**
@@ -443,12 +457,113 @@ explicitly as a decision the human should confirm rather than inherit.**
 
 ## Decisions Taken Under Ambiguity
 
-1. **The whitelist, the escape check, and the mode resolver are imported (from
-   `PreToolUse.Edit.js` and `enforcement-mode.js`), not copied.** Two channels with two
-   copies of one policy is the exact defect this slice repairs; reproducing it while
-   repairing it would be absurd. (Rebase correction: the mode comes from
-   `enforcement-mode.resolveEnforcementMode`, the shipped shared encoding, not from a
-   fresh `settings.yaml` read.)
+0. **SCOPE CUT TO OPTION A AT BUILD TIME — the indeterminate-deny is DEFERRED, and the
+   coverage deny is MODE-BLIND (both are corrections of the design below, made during
+   Step 9/14 when the code contradicted the plan on two load-bearing axes).**
+
+   - **The "refuse indeterminate writes in strict mode" policy (the "indeterminate
+     refusal" section, Decisions 4 and 5, and Test-Plan cases 8, 9, 10, 11) is NOT
+     built.** `shell-write-targets.classifyWrites` returns `indeterminate` for
+     `npm test`, `node --test …`, `npm run lint`, `node <script>`, `make`, `python …`
+     — verified against the live classifier. Denying `indeterminate` past step 8 in
+     strict mode (the default) would therefore DENY CTOC's OWN Step-14 verification
+     commands: the iron-loop executor runs `npm test`/`node --test` at step 14 (≥ 8,
+     strict), and this hook is the live `PreToolUse` `Bash` matcher, so the gate would
+     block the very command that measures whether the build passed. That is a
+     blast-radius change every installation must CONFIRM, not inherit, and it needs its
+     own human-approved slice with a verification-command ALLOWLIST whose membership is a
+     real design decision (an over-broad allowlist is a bypass surface) — not guessed
+     here. **Cases 8, 9, 10, 11 are OUT OF SCOPE / DEFERRED** and are removed from the
+     acceptance criteria for this slice. What ships is Option A: the coverage check on
+     the classifier's **`writes` verdict ONLY** — a determinate uncovered write is
+     denied; `indeterminate` and `none` commands pass this stage unchanged, exactly as
+     today, subject only to the pre-existing step gate.
+
+   - **The coverage deny is MODE-BLIND — the hook does NOT read the enforcement
+     mode.** The rebase note's plan (import `enforcement-mode.resolveEnforcementMode` and
+     gate the deny strict/soft/off, for parity with the Edit channel) violates the
+     shipped architectural fence "structural floor — the mode cannot have leaked into a
+     gate path", case 27: **`PreToolUse.Bash.js` is mode-blind by construction**
+     (plan 00069, `tests/enforcement-mode.test.js`). The Bash channel's write gates
+     (ledger forgery, irreversible, plan-move, step) are ABSOLUTE denies that the soft/off
+     convenience knob must never weaken; a mode-aware Bash gate is exactly the
+     gate-weakening surface that fence prevents. So an uncovered determinate write is
+     denied UNCONDITIONALLY (subject only to the whitelist and a user-typed escape
+     phrase). This is an intentional asymmetry: the soft/off setting relaxes the Edit
+     channel; it never relaxes the more dangerous, harder-to-audit shell channel. The
+     enforcement-mode import and the `mode`/`mode_source` log fields are therefore NOT
+     added, and Test-Plan cases 9/10/11's mode-parity is replaced by a mode-blind fence
+     (soft and off still DENY an uncovered shell write).
+
+   - **Consequence for the existing test suite (a real, authorized behavior change that
+     ripples beyond the declared files).** Closing the bypass means a determinate
+     uncovered shell write at step ≥ 8 is now DENIED where it was ALLOWED. Nine
+     assertions across five sibling test files encode the OLD "uncovered shell write is
+     allowed" contract (the bypass itself) and must be updated to the new contract
+     (`tests/security-bash-hook.test.js`, `tests/ledger-forgery-closed.test.js`,
+     `tests/pretooluse-bash-coverage.test.js`, `tests/shell-write-targets.test.js`,
+     `tests/the-bash-channel-cannot-reach-the-ledger-through-a-link.test.js`). Each is a
+     TIGHTENING toward the real behavior (add a covering plan, or expect the deny), not a
+     loosening. These files are not in this plan's declared `files:`, so the update is a
+     scope expansion the human owns.
+
+   **The human approved the scope expansion (added all 5 files to `files:`). The nine
+   updates, each TIGHTENING never loosening, with its justification — the fixture encoded
+   the now-closed bypass (an uncovered shell write was ALLOWED because the shell channel
+   enforced no coverage; this slice closes it):**
+
+   - **Cover-the-fixture** (the test's real subject is a SEPARATE guard that the new
+     coverage deny would SHADOW; a minted, APPROVED covering plan makes the write
+     coverage-allowed so the test again isolates the guard it actually checks — the
+     security property stays under test, not replaced by "coverage denied it"):
+     1. `security-bash-hook.test.js` "allows a write at step 8" — subject: the Iron-Loop
+        STEP gate. `coverPlan(['foo'])`, `touch foo` still allowed.
+     2. `security-bash-hook.test.js` "allows a write at step 16" — STEP gate.
+        `coverPlan(['f'])`, `echo x > f` still allowed.
+     3. `ledger-forgery-closed.test.js` "cd-boundary READS and unrelated cd writes stay
+        ALLOWED" — subject: the ledger-forgery deny. `coverPlan(['src/b.js'])` for the
+        non-ledger `cd src && cp a.js b.js`.
+     4. `ledger-forgery-closed.test.js` "cd option-skip fix preserves all existing cd
+        outcomes" — ledger deny. `coverPlan(['evil.json'])` for the post-`cd -` reset
+        `tee evil.json` (out of the ledger). The ledger deny runs BEFORE coverage, so
+        covering never un-denies a real ledger write.
+     5. `pretooluse-bash-coverage.test.js` "allows a non-plan mv" — subject: the
+        plan-MOVE gate. `coverPlan(['archive/notes.txt'])` for `mv notes.txt
+        archive/notes.txt`.
+     6. `the-bash-channel-...-through-a-link.test.js` "case 11: ordinary development
+        commands are ALLOWED" — subject: the ledger guard leaving ordinary commands
+        alone. `coverPlan(['src/ordinary.js'])` for the one determinate write
+        `echo hello > src/ordinary.js`; the reads/git/indeterminate commands in the same
+        list stay allowed untouched.
+     7. `the-bash-channel-...-through-a-link.test.js` "the identical redirect with NO link
+        is ALLOWED" — subject: the fence-not-vacuous (no link ⇒ not a ledger write).
+        `coverPlan(['src/ordinary.json'])`.
+
+   - **Expect-deny** (the test's subject IS the shell-write behavior; flip ALLOW→DENY —
+     a tightening):
+     8. `shell-write-targets.test.js` #36 `cd . && echo x > src/x.js` — its own comment
+        said *"coverage is 00202 … must be allowed"*, i.e. it expected allow ONLY because
+        00202 was unbuilt. 00202 is built; flipped to expect the coverage deny (pinned to
+        `/no approved plan covers/`).
+     9. `the-bash-channel-...-through-a-link.test.js` "the LINK case … under degradation"
+        — NOT cover-the-fixture: `plan-coverage.js` hard-requires `real-path-confinement`,
+        the very module `runDegraded` shims to throw, so under that degradation the Bash
+        hook's `coverage` fails to load and the stage fails CLOSED. The ledger guard is
+        still blind to the link (its documented degradation is unchanged), but this
+        DETERMINATE `echo > …` forgery is now DENIED by coverage-fail-closed —
+        defense-in-depth, a security IMPROVEMENT. Flipped ALLOW→DENY (pinned to
+        `/no approved plan covers/`), with the honest note that the residual link path
+        stays open only for INDETERMINATE forms, which 00202 deliberately does not act on.
+
+   No assertion was deleted, no range widened, no security case removed; every read, git,
+   and indeterminate command in these files still passes unchanged (verified: 334/334
+   across the six files).
+
+1. **The whitelist and the escape check are IMPORTED from `PreToolUse.Edit.js`, not
+   copied.** Two channels with two copies of one policy is the exact defect this slice
+   repairs; reproducing it while repairing it would be absurd. (Correction to the rebase
+   note: the enforcement mode is NOT imported — see Decision 0; the Bash channel is
+   mode-blind by construction.)
 2. **`plan-coverage` failing to load DENIES here, where it degrades on the Edit
    channel.** The Edit channel has a whitelist, project detection and an escape phrase
    underneath it. This gate has nothing underneath it, so a missing module means "cannot

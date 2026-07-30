@@ -415,11 +415,16 @@ describe('the spawned hook — the cd-prefix bypass is closed (the defect)', () 
     assert.equal(denyOf(res), null, `a read must not be denied\nstdout=${res.stdout}`);
   });
 
-  test('36 cd . && echo x > src/x.js is ALLOWED at step 10 (this slice restores the STEP gate only)', () => {
+  test('36 cd . && echo x > src/x.js is DENIED at step 10 (00202 now enforces coverage)', () => {
     setState(10);
-    const res = runHook('cd . && echo x > src/x.js');
-    assert.equal(denyOf(res), null,
-      'coverage is 00202; at step 10 with a feature the step gate passes, so this must be allowed');
+    const d = denyOf(runHook('cd . && echo x > src/x.js'));
+    // 00202 SHIPPED: past the step gate, a determinate write to an UNCOVERED source
+    // file is denied by the plan-coverage stage. This fixture declares no covering
+    // plan, so src/x.js is uncovered. (Before 00202 the shell channel enforced no
+    // coverage and this was allowed — the now-closed bypass.)
+    assert.ok(d, 'the cd-prefixed determinate write is uncovered, so 00202 must deny it');
+    assert.match(d.permissionDecisionReason || '', /no approved plan covers/i,
+      'the deny is the coverage stage, not a step/feature block');
   });
 
   test('38 env -i /usr/bin/tee src/x.js is DENIED at a planning step (RED before fix)', () => {

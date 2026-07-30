@@ -96,6 +96,29 @@ function setState(step = 10, feature = 'link-ledger-test') {
   stateManager.saveState(project, state);
 }
 
+const ledger = require(path.join(REPO, 'src', 'lib', 'approval-ledger'));
+
+/**
+ * Mint an APPROVED plan covering `globs` so the 00202 plan-coverage stage ALLOWS the
+ * write — isolating the guard this file tests (the link-into-`.ctoc/approvals` deny, and
+ * its degradation). Since 00202 a determinate write to an UNCOVERED file is denied on the
+ * shell channel; without a covering plan that deny would SHADOW the ledger-link
+ * assertion, replacing "denied because the link reaches the ledger" with "denied because
+ * uncovered". The ledger guard runs BEFORE coverage, so covering the target NEVER
+ * un-denies a real link-into-ledger write when the confinement module is present — it
+ * only removes the coverage shadow so the degradation case shows the ledger truth.
+ */
+function coverPlan(globs) {
+  const dir = path.join(project, 'plans', 'todo');
+  fs.mkdirSync(dir, { recursive: true });
+  const body = '---\nfiles:\n' + globs.map((g) => `  - "${g}"`).join('\n') + '\n---\n\n# 00202 coverage fixture\n';
+  const p = path.join(dir, '00202-cover.md');
+  fs.writeFileSync(p, body, 'utf8');
+  ledger.writeEntry(ledger.slugFromPlanPath(p), {
+    content: body, stage_from: 'implementation', stage_to: 'todo', approved_by: 'human',
+  }, project);
+}
+
 /** Run the REAL hook with `command` on STDIN, cwd = the fixture (so process.cwd() is root). */
 function runHook(command, cwd = project) {
   return spawnSync(process.execPath, [HOOK], {
@@ -267,6 +290,7 @@ describe('cases 10–12: no false positives (legitimate commands stay ALLOWED)',
     // Step 15 so the orthogonal COMMIT gate permits `git commit` — this case
     // isolates the LEDGER guard, which must leave every one of these alone.
     setState(15);
+    coverPlan(['src/ordinary.js']); // 00202: the one determinate write below is covered
     for (const c of [
       `git commit -m "x"`,
       `npm test`,
@@ -290,6 +314,7 @@ describe('case 15: the fence is not vacuous', () => {
   test('the identical redirect with NO link is ALLOWED', () => {
     // No link created. `src/approvals/...` does not resolve into `.ctoc/approvals`,
     // proving cases 1–7 deny for the LINK reason, not because the harness denies all.
+    coverPlan(['src/ordinary.json']); // 00202: cover the target so the LINK reason is isolated
     assertAllowed(`echo x > src/ordinary.json`, 'an ordinary in-tree write is not a ledger write');
   });
 
@@ -362,13 +387,23 @@ require(${JSON.stringify(HOOK)});
     assert.ok(denyOf(res), 'the arithmetic guard alone must still deny a direct ledger write when degraded');
   });
 
-  test('the LINK case is ALLOWED under degradation — the predicted, recorded degradation', () => {
+  test('the LINK case: the LEDGER guard is blind under degradation, but 00202 coverage fails CLOSED and DENIES the determinate forgery', () => {
     requireSymlinks();
     link('src/link', '../.ctoc');
     const res = runDegraded(`echo x > src/link/approvals/forged.json`);
     assert.equal(res.error, undefined, `degraded hook must still run: ${res.error && res.error.message}`);
-    assert.equal(denyOf(res), null,
-      'with the confinement module absent, the link path into the ledger is open again — ' +
-      'a real degradation, recorded in the code comment rather than silent');
+    // TIGHTENED by 00202 (was: assert ALLOWED). The `real-path-confinement` module the
+    // shim removes is required by BOTH the ledger guard AND `plan-coverage`. So under
+    // this degradation the ledger guard IS still blind to the link (its documented
+    // degradation is unchanged) — but the Bash hook's `coverage` module now fails to
+    // load too, and the 00202 coverage stage fails CLOSED on a DETERMINATE write it
+    // cannot verify. This exact `echo > …` redirect is a determinate write, so the
+    // forgery is DENIED anyway — defense-in-depth: a second absolute guard catches what
+    // the blinded first one cannot. (The residual link path stays open only for
+    // INDETERMINATE write forms, which 00202 deliberately does not act on — deferred.)
+    const d = denyOf(res);
+    assert.ok(d, 'a determinate link-forgery write must be denied by coverage-fail-closed under degradation');
+    assert.match(d.permissionDecisionReason || '', /no approved plan covers/i,
+      'the deny is the coverage stage failing closed (coverage module absent), not the ledger guard');
   });
 });

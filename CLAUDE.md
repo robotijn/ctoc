@@ -154,6 +154,8 @@ Resolution order (highest wins): `.ctoc/settings.yaml` → `enforcement.mode`, t
 
 **The floor: `off` never weakens a human gate.** It relaxes plan-coverage on file edits ONLY. It never relaxes the approval-ledger deny, the Gate-3 verify-evidence deny, or the streaming-questions deny, and it never touches any `PreToolUse.Bash.js` security or human-gate deny — those are absolute at every mode. Asserted by `tests/enforcement-mode.test.js`.
 
+**BOTH write channels now check plan coverage — the shell channel too.** Plan coverage used to be enforced on the EDIT channel alone (`PreToolUse.Edit.js`), so a shell command that WROTE a source file bypassed the `files:` declaration the whole design rests on. `PreToolUse.Bash.js` now asks the SAME question, using the SAME shared oracle: past the Step-8 write gate, a command the classifier reports as a DETERMINATE write (`shell-write-targets.classifyWrites` → `writes`, targets cd-resolved) has every target checked against `plan-coverage.findCoveringPlan`; an uncovered target is DENIED, naming it. The Edit channel's whitelist (`isWhitelisted`) and its role-scoped user-typed escape check (`findEscapeInTranscript`) are IMPORTED, not copied — two copies of one policy is the drift this closes — and every decision (allow / whitelist / escape / block) is logged to the same `.ctoc/logs/enforcement.json`, tagged `tool: 'Bash'`, carrying the target and a fixed-vocabulary reason but NEVER the command string (a command may carry a secret). The shell coverage deny is **MODE-BLIND by construction** (`tests/enforcement-mode.test.js` #27): an uncovered determinate shell write is denied at every mode — `soft`/`off` relax the Edit channel, never this one, because the shell channel's write gates are absolute. **What is NOT built (deferred):** refusing `indeterminate` commands (`npm test`, `node --test`, `npm run lint`, `node <script>`, `make`, `python …`) — those pass this stage UNCHANGED, because denying them in strict mode would deny CTOC's OWN Step-14 verification commands; that policy needs its own human-approved slice with a verification-command allowlist. Enforced by `tests/bash-gate-plan-coverage.test.js`.
+
 **Runtime environment** — `general.environment` in `.ctoc/settings.json` (`ask | dev | staging | prod`) selects a CTOC behavior profile via `src/lib/settings.js` (`ENVIRONMENT_PROFILES`). Resolution is `explicit user setting > environment profile > schema default`; `ask` (default) applies no profile and makes the menu prompt the user on first open. Profiles tune enforcement strictness (`dev` → `soft`) and the default model (`prod` → `opus`) — they NEVER weaken a human gate (no profile may set `requireReviewGate: false` or `enforcementMode: off`; enforced by `tests/environment-mode.test.js`).
 
 **Declared entry point — "no app to launch" is not "no entry point".** The Step 14
@@ -269,7 +271,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 504 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 505 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -623,7 +625,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 504 test files
+  tests/                 505 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

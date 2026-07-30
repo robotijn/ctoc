@@ -50,6 +50,25 @@ const { spawnSync } = require('child_process');
 const REPO = path.resolve(__dirname, '..');
 const HOOK = path.join(REPO, 'src', 'hooks', 'PreToolUse.Bash.js');
 const stateManager = require(path.join(REPO, 'src', 'lib', 'state-manager'));
+const ledger = require(path.join(REPO, 'src', 'lib', 'approval-ledger'));
+
+/**
+ * Mint an APPROVED plan covering `globs` so the 00202 plan-coverage stage ALLOWS the
+ * write — isolating the guard the test actually checks (here, the plan-MOVE gate). Since
+ * 00202 a determinate write to an UNCOVERED file is denied on the shell channel; a
+ * legitimate non-plan `mv` must reach the plan-move decision, not be pre-empted by "no
+ * covering plan". Only an APPROVED plan grants coverage, so mint the real ledger entry.
+ */
+function coverPlan(globs) {
+  const dir = path.join(project, 'plans', 'todo');
+  fs.mkdirSync(dir, { recursive: true });
+  const body = '---\nfiles:\n' + globs.map((g) => `  - "${g}"`).join('\n') + '\n---\n\n# 00202 coverage fixture\n';
+  const p = path.join(dir, '00202-cover.md');
+  fs.writeFileSync(p, body, 'utf8');
+  ledger.writeEntry(ledger.slugFromPlanPath(p), {
+    content: body, stage_from: 'implementation', stage_to: 'todo', approved_by: 'human',
+  }, project);
+}
 
 // --- hermetic project + signed-state harness (mirrors security-bash-hook) ----
 
@@ -429,6 +448,7 @@ describe('Bash gate — raw plan-file move is denied', () => {
 
   it('allows a non-plan mv (path does not match plans/<stage>/)', () => {
     setState(16);
+    coverPlan(['archive/notes.txt']); // 00202: cover the destination so the plan-move gate is isolated
     assertAllowed('mv notes.txt archive/notes.txt',
       'a move outside plans/<stage>/ is not a plan transition');
   });
