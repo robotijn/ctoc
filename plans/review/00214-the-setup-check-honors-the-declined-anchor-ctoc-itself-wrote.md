@@ -138,7 +138,10 @@ mutating the fallthrough to `return true` reddens the two teeth cases (neither /
 block); mutating it to `return false` reddens the two usable regression guards while
 the declined case stays green via its own path.
 
-## Step 8 — TEST (TDD, write first, run, see red)
+## Execution Plan (Steps 8-16)
+
+### Step 8 — TEST (TDD, write first, run, see red)
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 
 Write `tests/setup-check-honors-declined-anchor.test.js` FIRST and see it RED.
 Drive the REAL `verifySetup` / `complianceAnchorUsable` (or the exported surface)
@@ -158,41 +161,47 @@ still wrong must be RED first; the "not usable" cases may be green pre-fix —
 prove each bites by mutating the fixed predicate to accept a truly-empty anchor
 and showing it goes RED.
 
-## Step 9 — PREPARE
+### Step 9 — PREPARE
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Re-read `complianceAnchorUsable` and `loadActiveProfiles` against the live files;
 confirm the reader's return shape (`{ profiles, overrides, declined }`) and that
 `declined` is exposed, so the check can defer to it rather than re-parse.
 
-## Step 10 — IMPLEMENT
+### Step 10 — IMPLEMENT
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Make `complianceAnchorUsable` honor `declined: true` (and an explicit empty
 `active_profiles`) as usable, deferring to the reader-of-record's determination
 rather than a stricter re-parse. Update the missing-message wording so it no
 longer names only `active_profiles` if the fix changes what is required.
 
-## Step 11 — REVIEW
+### Step 11 — REVIEW
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 The completeness check and the reader now agree on what a usable anchor is; a
 declined project reads as set up; a genuinely empty anchor still reads as not
 set up.
 
-## Step 12 — OPTIMIZE
+### Step 12 — OPTIMIZE
 None.
 
-## Step 13 — SECURE
+### Step 13 — SECURE
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 The `missing` list still holds only project-relative display paths, never
 absolute paths; no settings content is echoed into the message.
 
-## Step 14 — VERIFY
+### Step 14 — VERIFY
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 `npx eslint src/commands/start.js tests/setup-check-honors-declined-anchor.test.js
 --max-warnings 0`; `node --test tests/*.test.js` fail 0; `npm test` (redirect,
 read `$?`, no pipe) real gate PASS; floor 99 (a normal-dev-machine floor, thin
 margin — cover what you add); false-green + both reachability + gate-words fences
 pass; no baseline entry.
 
-## Step 15 — DOCUMENT
+### Step 15 — DOCUMENT
 The plan record and the corrected in-code comment on `complianceAnchorUsable`
 (it now honors the reader, not a stricter re-parse) are the documentation.
 
-## Step 16 — FINAL-REVIEW
+### Step 16 — FINAL-REVIEW
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 A project that declined a compliance regime opens CTOC and is treated as fully
 set up — the pipeline runs, asks questions, and implements, instead of narrating
 that nothing will work.

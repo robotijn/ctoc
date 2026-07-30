@@ -61,20 +61,27 @@ review/tools are unchanged (same test count for those). Run the file fence:
 
 ## Execution Plan (Steps 8-16)
 ### Step 8: TEST — run tab-modules.test.js + reachability.test.js +
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 iron-loop-enforcer.test.js now; record which fail (the fence ones) and the
 overview/review/tools test counts to preserve.
 ### Step 9: PREPARE — read tests/tab-modules.test.js IN FULL; map every
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 functional reference and every shared-pattern loop.
 ### Step 10: IMPLEMENT — delete the file; carve the tests by block boundaries;
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 relocate the assignDirectly-gone guard.
 ### Step 11: REVIEW — grep the test file for `functional`; overview/review/tools
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 blocks byte-unchanged; the relocated guard runs.
 ### Step 12: OPTIMIZE — n/a.
 ### Step 13: SECURE — n/a.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 ### Step 14: VERIFY — the three named test files green; the fence reports 0
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 unreachable; eslint clean; no git.
 ### Step 15: DOCUMENT — the test header lists only the surviving tabs.
 ### Step 16: FINAL-REVIEW — report: file deleted, blocks carved, guard
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 relocated, fence 0, the preserved overview/review/tools counts.
 
 ## Decisions Taken Under Ambiguity

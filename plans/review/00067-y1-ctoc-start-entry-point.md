@@ -309,7 +309,10 @@ its own permission. The full categorized list is in the surfaced fork; the execu
 did NOT edit any of them. All IN-GRANT work is complete; only the out-of-grant
 remainder blocks the green gate.
 
-## Step 8 — TEST (TDD, write first, run, see red)
+## Execution Plan (Steps 8-16)
+
+### Step 8 — TEST (TDD, write first, run, see red)
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 
 Write `tests/ctoc-start-command.test.js` FIRST and see it RED:
 - `src/commands/start.md` exists and `src/commands/menu.md` does not.
@@ -322,33 +325,39 @@ Write `tests/ctoc-start-command.test.js` FIRST and see it RED:
 - Exactly three command files exist in `src/commands/`: `start`, `push`,
   `update`.
 
-## Step 9 — PREPARE
+### Step 9 — PREPARE
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Re-verify every reference against the live tree before editing; the reference
 list in this plan was read on 2026-07-21 and the executor MUST re-grep. If a
 reference to `commands/menu` or `ctoc:menu` exists in a file NOT in this plan's
 `files:`, STOP AND ASK — do not edit it and do not widen the grant.
 
-## Step 10 — IMPLEMENT
+### Step 10 — IMPLEMENT
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Perform the renames and reference updates. Sub-items are the files above.
 
-## Step 11 — REVIEW
+### Step 11 — REVIEW
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 No `ctoc:menu` or `commands/menu.js` reference survives in shipped code, tests
 or docs; the three-command invariant holds.
 
-## Step 12 — OPTIMIZE
+### Step 12 — OPTIMIZE
 None expected; a rename adds no complexity.
 
-## Step 13 — SECURE
+### Step 13 — SECURE
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 The command file is an entry point; confirm the renamed script keeps the same
 guards and no path became injectable through the rename.
 
-## Step 14 — VERIFY
+### Step 14 — VERIFY
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 `npx eslint <changed> --max-warnings 0`; `node --test tests/*.test.js` fail 0;
 `npm test` real gate; false-green + both reachability fences + the gate-words
 fence pass; floor 99 untouched.
 
-## Step 15 — DOCUMENT
+### Step 15 — DOCUMENT
 The docs updates above ARE the documentation; confirm they read `ctoc:start`.
 
-## Step 16 — FINAL-REVIEW
+### Step 16 — FINAL-REVIEW
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 The owner opens the tool, types `/ctoc:`, and sees `start`, not `menu`.

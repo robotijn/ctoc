@@ -409,6 +409,7 @@ exercised.
 ## Execution Plan
 
 ### Step 8: TEST — [x] DONE (TDD Red confirmed)
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Wrote `tests/false-green-fence.test.js` (17 cases: the 10 planned + the per-signature
 split + the backtracking pin) against an empty baseline, and ran it BEFORE any
 implementation existed.
@@ -436,6 +437,7 @@ The single pass is the baseline-honesty case, which reads only the (empty) basel
 file and legitimately holds with zero entries.
 
 ### Step 9: PREPARE — [x] DONE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 `.ctoc/` writable (baseline created). `src/scripts/run-self-check.js` confirmed
 present in `.ctoc/reachability-roots.json`. No dependency added.
 Confirm `.ctoc/` is writable and `src/scripts/run-self-check.js` is a declared root in

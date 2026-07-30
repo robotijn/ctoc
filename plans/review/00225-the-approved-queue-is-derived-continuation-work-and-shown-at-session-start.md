@@ -224,7 +224,10 @@ question-store checks are not applied here. The explicit fork signal is
 `registerQueueFork`; a plan that forks mid-build also leaves the queue when it is
 kicked back. Both routes make `shouldContinueQueue` allow the stop.
 
-## Step 8 — TEST (TDD, write first, run, see red)
+## Execution Plan (Steps 8-16)
+
+### Step 8 — TEST (TDD, write first, run, see red)
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Write `tests/continuation-queue.test.js` FIRST and see red. Real temp-dir state,
 real ledger entries, NOTHING mocked (mirror `tests/continuation.test.js`'s style).
 Helper: create `plans/todo/<f>.md`, then approve it for real via
@@ -255,14 +258,16 @@ matches). Cases:
 - **approvedQueueBannerLine**: `''` for depth 0 / bad root; `\nApproved queue: N plan(s) ready to build` for depth N; never throws.
 Account for every green individually; no fixture writes outside `os.tmpdir()`.
 
-## Step 9 — PREPARE
+### Step 9 — PREPARE
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Re-read `continuation.js` (the shape to mirror: WEDGE-1 return-the-persist-boolean,
 fail-open reads), `approval-residency.isApprovedForCoverage` (the approved
 predicate + the `todo`/`in-progress` edges), and `state.getPlansDir`. Confirm
 `writeEntry` with `content:` records `hash_scope:'specification'` so the test's
 approved plans actually classify as approved.
 
-## Step 10 — IMPLEMENT
+### Step 10 — IMPLEMENT
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Create `src/lib/continuation-queue.js` per the spec above (constants, state
 helpers, `approvedFreeQueue`, `effectiveBlocks`, `shouldContinueQueue`,
 `recordQueueBlock`, `registerQueueFork`, `resolveQueueFork`, `clearQueue`,
@@ -271,19 +276,21 @@ into `SessionStart.generateContext` after `${frameworksLine}`. Sub-items:
 - `src/lib/continuation-queue.js`
 - `src/hooks/SessionStart.js` (one lazy require + one splice)
 
-## Step 11 — REVIEW
+### Step 11 — REVIEW
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 No edit to `continuation.js`. Separate state file. `effectiveBlocks` is the ONE
 progress rule, used by both the decision and the recorder (no drift).
 `approvedFreeQueue` is fault-isolated and fail-open. SessionStart change is purely
 additive and guarded on `rootInfo.root`. The module is reachable from the live
 SessionStart hook (`approvedQueueBannerLine`) — not dead code.
 
-## Step 12 — OPTIMIZE
+### Step 12 — OPTIMIZE
 Enumeration is bounded (few plans) and reads each plan once via
 `isApprovedForCoverage`. No redundant re-stat. `shouldContinueQueue` stays a pure
 read; the sole write is `recordQueueBlock`.
 
-## Step 13 — SECURE
+### Step 13 — SECURE
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Only reads within `<root>/plans/**` and writes only
 `<root>/.ctoc/state/continuation-queue.json`, all via `safe-fs` (NUL/empty-path
 guarded). Refs are `stage/file.md` built from `readdirSync` names under a fixed
@@ -291,7 +298,8 @@ stage — no traversal reaches outside `plans/`. No absolute path or filesystem
 error string is placed in the banner or any message (the banner shows only a
 count). Cross-platform: `path.join`, `safe-fs`, no shell.
 
-## Step 14 — VERIFY
+### Step 14 — VERIFY
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 `npx eslint src/lib/continuation-queue.js src/hooks/SessionStart.js tests/continuation-queue.test.js --max-warnings 0`;
 `node --test tests/*.test.js` fail 0; `npm test` (redirect to a file, read `$?`,
 never pipe) PASS; false-green + BOTH reachability + gate-words fences pass —
@@ -299,12 +307,13 @@ in particular the reachability baseline count does NOT grow (the new module is
 reached from the SessionStart banner). Coverage floor 99 (normal-dev-machine, thin
 margin) — cover the reachable branches you add.
 
-## Step 15 — DOCUMENT
+### Step 15 — DOCUMENT
 Module-level JSDoc stating the derived-queue contract, the separate state file,
 and the self-healing bound. No CLAUDE.md count edit (growing counts are generated
 by `release.js`).
 
-## Step 16 — FINAL-REVIEW
+### Step 16 — FINAL-REVIEW
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 The module decides "is the approved queue undrained continuation work?" honestly
 and fails open everywhere; the session-start banner shows the human how much
 approved work waits; `continuation.js` is untouched; slice 2 can now wire the
