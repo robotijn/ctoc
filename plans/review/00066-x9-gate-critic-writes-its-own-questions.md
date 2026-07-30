@@ -20,6 +20,8 @@ files:
   - "tests/cache-freshness.test.js"
   - "agents/iron-loop/gate-critic.md"
   - "src/commands/start.md"
+  - "src/hooks/PreToolUse.Edit.js"
+  - "tests/pretooluse-edit-coverage.test.js"
 ---
 
 # X9 — the critic's questions reach disk without the human waiting
@@ -484,6 +486,9 @@ is no longer true.
 
 ---
 
+## Decisions Taken Under Ambiguity — scope expansion + human authorization (2026-07-30)
+The security review found the gate-critic's Write grant is NOT confined: PreToolUse.Edit.js allows every path under .ctoc/ except .ctoc/approvals/ and .ctoc/state/verify/, so an injected gate-critic could write the LIVE questions file (.ctoc/streaming/questions/<ref>.json) or forge .ctoc/streaming/answers.jsonl. The fix adds a deny-ahead for .ctoc/streaming/ EXCEPT the .ctoc/streaming/questions/pending/ quarantine, mirroring the existing approvals/verify guards. This edits the SAFETY-CRITICAL enforcement hook PreToolUse.Edit.js; the human (Tijn) explicitly authorized touching the enforcement hook to close this hole. src/hooks/PreToolUse.Edit.js and tests/pretooluse-edit-coverage.test.js are added to scope. KEY: the deny-ahead intercepts Write/Edit TOOL calls only (how an agent writes); CTOC lib code (streaming-precompute.writePlanQuestions via safeFs) is NOT a tool call and is unaffected, so legitimate question generation still works.
+
 ## Decisions Taken Under Ambiguity
 
 - **D-1 — the sweep hooks `nextUnansweredQuestion`, not `buildDashboardTable`.** The
@@ -545,6 +550,26 @@ is no longer true.
   concurrent sibling plan that increments the same numbers, so editing them here
   would both widen scope and race another agent on the same file. Left untouched and
   reported instead.
+- **D-11 (taken during the SECURE rework) — the `targetsStreamingLive` quarantine
+  carve-out is decided by NAME arithmetic, and the pending-symlink residual is
+  documented, not closed.** The deny-ahead denies every editing-tool write under
+  `.ctoc/streaming/` except `.ctoc/streaming/questions/pending/`. The carve-out uses
+  `isUnderProtectedDir(normalizeForProtection(path), pending)` — name arithmetic — and
+  short-circuits BEFORE the `resolvesUnder` real-path check, because a legitimate NEW
+  pending file really DOES land under `.ctoc/streaming/` and `resolvesUnder` would deny
+  it. Traversal (`pending/../<ref>.json`) is closed: `normalizeForProtection` resolves
+  the `..` first, so it lands OUTSIDE pending and is denied. The residual left open is a
+  symlink already sitting INSIDE `pending/` and pointing at the live path: it would be
+  name-exempted. Closing it needs a fail-toward-not-exempt real-path check on the
+  carve-out, whose fault direction conflicts with keeping legitimate new pending writes
+  working; and planting that symlink already requires a prior filesystem write the tool
+  hooks do not grant. This is the same class of bounded residual that
+  `real-path-confinement.js` documents for hard links. Recorded here rather than
+  over-engineered. The claim in `gate-critic.md` rule 6 was corrected to state precisely
+  what IS enforced (writes fenced under `.ctoc/streaming/` except pending/) and to STOP
+  claiming enforcement of "cannot reach a plan file / a settings file" — plans/*.md and
+  `.ctoc/settings*` are whitelisted and are NOT fenced by this deny-ahead; that restraint
+  is instruction, not enforcement.
 - **D-7 — `CLAUDE.md` is NOT edited.** Its sentence "each writing through
   `streaming-precompute.writePlanQuestions`" remains true: every question still lands
   through that function. Only the caller changed — from the dispatcher to the sweeper.
@@ -600,6 +625,7 @@ These are surfaced rather than decided. Neither blocks the slice as written.
 ## Execution Plan
 
 ### Step 8: TEST — [x] DONE, RED CAPTURED 2026-07-18
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 
 `tests/streaming-questions-sweeper.test.js` written in full (all 20 specified cases
 plus the path-helper and fail-soft cases) and RUN BEFORE any implementation existed.
@@ -623,6 +649,7 @@ including the reachability case (19) that drives `streamingGateScreen`. Run it a
 formality: record the failure output before writing any implementation.
 
 ### Step 9: PREPARE — [x] DONE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 - Re-read `src/lib/streaming-precompute.js` (`sanitizeRef`, `questionsPath`,
   `refToPlanPath`, `writePlanQuestions`) and `src/lib/safe-fs.js` (confirm
   `lstatSync`, `readdirSync` with options, `appendFileSync` are exported) fresh from
@@ -634,6 +661,7 @@ formality: record the failure output before writing any implementation.
 - No new dependency. Nothing to install.
 
 ### Step 10: IMPLEMENT — [x] DONE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 One step, files as sub-items, in dependency order:
 - `src/lib/streaming-precompute.js` — add `pendingQuestionsPath`; export it and
   `refToPlanPath`; add the quarantine JSDoc.
@@ -649,6 +677,7 @@ No stubs, no TODOs. Any ambiguity met while building is resolved with a document
 choice appended to `## Decisions Taken Under Ambiguity`.
 
 ### Step 11: REVIEW — [x] DONE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Self-review against the Architecture Validation checks:
 - dependency direction (`lib` → `lib` only; no `hooks`/`commands` import);
 - no circular require at load time (the sweeper require is lazy, inside the function);
@@ -666,6 +695,7 @@ work. Remove any redundant `statSync`. Confirm the sort and the cap do not alloc
 per render when the directory is empty.
 
 ### Step 13: SECURE — [x] DONE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Walk the Security Review table above item by item against the written code, and
 additionally:
 - prove by test that no payload-derived string reaches the report, the log, or a
@@ -677,6 +707,7 @@ additionally:
   one path family and forbids the live path in so many words.
 
 ### Step 14: VERIFY — [x] DONE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Run the **FULL gate**, not a file-scoped subset:
 
 ```
@@ -710,6 +741,7 @@ Additionally confirm in the same run:
 - No `CLAUDE.md` change (D-7).
 
 ### Step 16: FINAL-REVIEW — [x] DONE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Confirm every line of the Quality Bar:
 - every acceptance criterion maps to an implementation action AND a test case;
 - every new function has a typed signature, a description, and stated error handling;
