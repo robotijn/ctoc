@@ -144,6 +144,27 @@ const LEDGER_DIR = '.ctoc/approvals';
 const VERIFY_EVIDENCE_DIR = '.ctoc/state/verify';
 
 /**
+ * The streaming-gate question/answer store, as a POSIX-relative prefix, and its
+ * ONE sanctioned agent-write carve-out.
+ *
+ * The `gate-critic` agent holds a `Write` tool AND reads UNTRUSTED plan content.
+ * Its ONLY sanctioned target is the quarantine `STREAMING_PENDING_DIR`, from which
+ * `streaming-questions-sweeper` validates and promotes files into the live store.
+ * Everything ELSE under `.ctoc/streaming/` is human-facing provenance:
+ *   • the LIVE questions file `.ctoc/streaming/questions/<ref>.json` the gate screen
+ *     reads (a write there launders stale/forged questions as fresh), and
+ *   • the answers log `.ctoc/streaming/answers.jsonl` (a write there forges a
+ *     human's recorded gate answer).
+ * A tool-call write to either would forge what a human sees at a gate, so both are
+ * denied ahead of the `.ctoc/` whitelist — exactly like the approval ledger and the
+ * verify evidence. CTOC's OWN writer (`streaming-precompute.writePlanQuestions` via
+ * safeFs) is a Node fs call, NOT a tool call, so it never passes through this hook
+ * and is unaffected — legitimate question generation keeps working.
+ */
+const STREAMING_DIR = '.ctoc/streaming';
+const STREAMING_PENDING_DIR = '.ctoc/streaming/questions/pending';
+
+/**
  * Normalize a tool-call target to a project-root-relative POSIX path for
  * protected-directory matching, or return null if it is empty or escapes the
  * root via traversal. Mirrors `isWhitelisted`'s normalization —
@@ -234,6 +255,48 @@ function isProtectedVerifyPath(filePath) {
   return isUnderProtectedDir(normalizeForProtection(filePath), VERIFY_EVIDENCE_DIR)
     || (realPathConfinement !== null
       && realPathConfinement.resolvesUnder(filePath, VERIFY_EVIDENCE_DIR, process.cwd()));
+}
+
+/**
+ * Whether `filePath` targets the human-facing streaming store
+ * (`.ctoc/streaming/` or any path beneath it) and is NOT the sanctioned
+ * `.ctoc/streaming/questions/pending/` quarantine. See `normalizeForProtection`
+ * for the traversal-safe normalization: `pending/../<ref>.json` normalizes OUT of
+ * the quarantine and is therefore DENIED, not laundered through the carve-out.
+ *
+ * The quarantine carve-out is decided by NAME arithmetic ONLY (`isUnderProtectedDir`
+ * on the normalized path): a path we cannot normalize (`norm === null`) is never
+ * carved out, and it short-circuits BEFORE the real-path check so a legitimate new
+ * pending file — which really DOES land under `.ctoc/streaming/` — is not denied by
+ * `resolvesUnder`.
+ *
+ * FAILING DIRECTION: returns TRUE to DENY, mirroring `isProtectedLedgerPath` /
+ * `isProtectedVerifyPath`. `resolvesUnder` returns TRUE on every fault and NEVER
+ * throws, so a fault denies — a throw would reach enforce()'s fail-OPEN catch and
+ * become an ALLOW of a streaming write.
+ *
+ * KNOWN RESIDUAL (documented, not silent — same class as this module's hard-link
+ * residual): an attacker-planted SYMLINK already sitting inside the `pending/`
+ * quarantine and pointing at the live path would be name-exempted here. Closing it
+ * would require a fail-toward-not-exempt real-path check on the carve-out, whose
+ * fault direction conflicts with keeping legitimate new pending writes working;
+ * planting that symlink already requires a prior filesystem write the tool hooks do
+ * not grant. Left as a bounded residual per the plan's Decisions Taken Under Ambiguity.
+ *
+ * @param {string} filePath - the tool-call target (relative or absolute)
+ * @returns {boolean} true iff the normalized path is under .ctoc/streaming/ but not
+ *   under the pending/ quarantine (DENY), or the question could not be answered
+ */
+function targetsStreamingLive(filePath) {
+  const norm = normalizeForProtection(filePath);
+  // The gate-critic's ONE sanctioned write target — carved out by name so the
+  // quarantine stays writable. `pending/../x` has already normalized out of pending.
+  if (isUnderProtectedDir(norm, STREAMING_PENDING_DIR)) return false;
+  // Everything else under .ctoc/streaming/ (live questions file, answers log) is
+  // denied. Arithmetic OR real-path, exactly like the ledger/verify guards.
+  return isUnderProtectedDir(norm, STREAMING_DIR)
+    || (realPathConfinement !== null
+      && realPathConfinement.resolvesUnder(filePath, STREAMING_DIR, process.cwd()));
 }
 
 function readStdinJson() {
@@ -524,6 +587,22 @@ async function enforce(stdinJson) {
       });
     }
 
+    // 0c. Streaming questions/answers are human-facing gate provenance
+    //     (approval-integrity defect). The gate-critic agent holds a Write tool and
+    //     reads UNTRUSTED plan content; its sanctioned target is ONLY the quarantine
+    //     `.ctoc/streaming/questions/pending/`. Deny ANY editing-tool write elsewhere
+    //     under `.ctoc/streaming/` — the LIVE questions file the gate screen reads
+    //     and the answers log — ahead of the Step-1 `.ctoc/` whitelist, so an
+    //     injected critic cannot launder stale questions as fresh or forge a human's
+    //     recorded answer. CTOC's own writer (streaming-precompute.writePlanQuestions
+    //     via safeFs) is a Node fs call, not a tool call, so it never reaches this
+    //     hook and is unaffected.
+    if (targetFile && targetsStreamingLive(targetFile)) {
+      return block('streaming questions/answers are gate provenance; agent writes under .ctoc/streaming/ are denied except the questions/pending/ quarantine', {
+        tool, target_file: targetFile, project_root: root,
+      });
+    }
+
     // 1. Whitelist (infrastructure files always allowed)
     if (targetFile && isWhitelisted(targetFile)) {
       return allow('whitelist', { tool, target_file: targetFile, project_root: root });
@@ -577,6 +656,7 @@ async function enforce(stdinJson) {
 
 module.exports = {
   enforce, isWhitelisted, isProtectedLedgerPath, isProtectedVerifyPath,
+  targetsStreamingLive,
   getTargetFile, readStdinJson,
   findEscapeInTranscript, extractUserTypedText, buildBlockMessage,
 };

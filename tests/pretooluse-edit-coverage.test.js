@@ -56,6 +56,7 @@ const {
   enforce,
   isWhitelisted,
   isProtectedLedgerPath,
+  targetsStreamingLive,
   getTargetFile,
   findEscapeInTranscript,
   extractUserTypedText,
@@ -275,6 +276,57 @@ describe('isProtectedLedgerPath', () => {
 });
 
 // ===========================================================================
+// targetsStreamingLive — deny under .ctoc/streaming/ EXCEPT the pending/ quarantine
+// (approval-integrity fix: the gate-critic holds a Write tool + untrusted input;
+//  its ONLY sanctioned target is .ctoc/streaming/questions/pending/. The live
+//  questions file and the answers log must be denied so an injected critic cannot
+//  launder stale questions as fresh or forge a human's recorded answer.)
+// ===========================================================================
+
+describe('targetsStreamingLive', () => {
+  it('DENIES the live questions file the gate screen reads', () => {
+    assert.equal(targetsStreamingLive('.ctoc/streaming/questions/review__x.md.json'), true,
+      'the live questions path must be denied — an injected critic could launder stale questions as fresh');
+  });
+
+  it('DENIES the answers log (forging a human answer)', () => {
+    assert.equal(targetsStreamingLive('.ctoc/streaming/answers.jsonl'), true,
+      'the answers log must be denied — a write there forges a human answer');
+    assert.equal(targetsStreamingLive('.ctoc/streaming/anything-else.json'), true,
+      'any non-pending path under .ctoc/streaming/ is denied');
+  });
+
+  it('ALLOWS the sanctioned quarantine target (pending/)', () => {
+    assert.equal(targetsStreamingLive('.ctoc/streaming/questions/pending/review__x.md.json'), false,
+      'the gate-critic must keep its ONE quarantine write target');
+    assert.equal(targetsStreamingLive('.ctoc/streaming/questions/pending'), false,
+      'the pending dir itself is the carve-out');
+  });
+
+  it('DENIES a traversal that escapes pending/ back to the live path', () => {
+    assert.equal(targetsStreamingLive('.ctoc/streaming/questions/pending/../review__x.md.json'), true,
+      'pending/../<ref>.json normalizes OUT of the quarantine and must not be laundered through the carve-out');
+  });
+
+  it('returns false for a path OUTSIDE .ctoc/streaming/ (no over-block)', () => {
+    assert.equal(targetsStreamingLive('.ctoc/settings.yaml'), false,
+      'an unrelated .ctoc/ path is not our concern');
+    assert.equal(targetsStreamingLive('src/lib/x.js'), false);
+  });
+
+  it('returns false for empty/null input', () => {
+    assert.equal(targetsStreamingLive(''), false);
+    assert.equal(targetsStreamingLive(null), false);
+    assert.equal(targetsStreamingLive(undefined), false);
+  });
+
+  it('DENIES an absolute in-project streaming path after relativizing', () => {
+    const abs = path.join(process.cwd(), '.ctoc', 'streaming', 'answers.jsonl');
+    assert.equal(targetsStreamingLive(abs), true);
+  });
+});
+
+// ===========================================================================
 // getTargetFile — stdin-only (CLAUDE_TOOL_INPUT is not read, plan 00200)
 // ===========================================================================
 
@@ -381,6 +433,67 @@ describe('enforce — ledger provenance deny (step 0, BEFORE the whitelist)', ()
     assert.equal(res.exitCode, 2, 'a ledger write must hard-block (exit 2)');
     assert.ok(isDeny(res.stdout), 'the harness deny-decision JSON must be emitted');
     assert.match(res.stderr, /ledger/i, 'the block banner must name the ledger reason');
+  });
+});
+
+describe('enforce — streaming provenance deny (step 0c, BEFORE the whitelist)', () => {
+  it('BLOCKS a write to the LIVE questions file even though .ctoc/ is whitelisted', async () => {
+    const root = mkFixture();
+    markCtoc(root);
+
+    const res = await runEnforce(
+      editPayload('.ctoc/streaming/questions/review__x.md.json'), { cwd: root });
+
+    assert.equal(res.exitCode, 2, 'a live-questions write must hard-block (exit 2)');
+    assert.ok(isDeny(res.stdout), 'the harness deny-decision JSON must be emitted');
+    assert.match(res.stderr, /streaming/i, 'the block banner must name the streaming reason');
+  });
+
+  it('BLOCKS a write to the answers log (forged human answer)', async () => {
+    const root = mkFixture();
+    markCtoc(root);
+
+    const res = await runEnforce(editPayload('.ctoc/streaming/answers.jsonl'), { cwd: root });
+
+    assert.equal(res.exitCode, 2, 'an answers-log write must hard-block');
+    assert.ok(isDeny(res.stdout), 'the block emits the deny decision');
+  });
+
+  it('BLOCKS a traversal escaping pending/ back to the live path', async () => {
+    const root = mkFixture();
+    markCtoc(root);
+
+    const res = await runEnforce(
+      editPayload('.ctoc/streaming/questions/pending/../review__x.md.json'), { cwd: root });
+
+    assert.equal(res.exitCode, 2, 'pending/../<ref>.json must not launder through the carve-out');
+    assert.ok(isDeny(res.stdout), 'the block emits the deny decision');
+  });
+
+  it('ALLOWS the sanctioned quarantine write (pending/) via the .ctoc/ whitelist', async () => {
+    const root = mkFixture();
+    markCtoc(root);
+
+    const res = await runEnforce(
+      editPayload('.ctoc/streaming/questions/pending/review__x.md.json'), { cwd: root });
+
+    assert.equal(res.exitCode, 0, 'the gate-critic quarantine target stays writable');
+    assert.equal(isDeny(res.stdout), false, 'the quarantine allow is exit-0-silent');
+  });
+
+  it('does not regress the ledger or verify guards, nor over-block an unrelated .ctoc/ path', async () => {
+    const root = mkFixture();
+    markCtoc(root);
+
+    const ledger = await runEnforce(editPayload('.ctoc/approvals/forged.yaml'), { cwd: root });
+    assert.equal(ledger.exitCode, 2, 'ledger writes still denied');
+
+    const verify = await runEnforce(editPayload('.ctoc/state/verify/x.json'), { cwd: root });
+    assert.equal(verify.exitCode, 2, 'verify-evidence writes still denied');
+
+    const settings = await runEnforce(editPayload('.ctoc/settings.yaml'), { cwd: root });
+    assert.equal(settings.exitCode, 0, 'an unrelated .ctoc/ path is still whitelisted');
+    assert.equal(isDeny(settings.stdout), false, 'the unrelated allow is exit-0-silent');
   });
 });
 
