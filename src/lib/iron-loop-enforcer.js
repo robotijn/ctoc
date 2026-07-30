@@ -704,6 +704,7 @@ const CHECKS = [
   { id: 'reachability-fence',          scope: 'architecture', mode: 'thorough', fn: checkReachabilityFence },
   { id: 'dead-export-fence',           scope: 'architecture', mode: 'thorough', fn: checkDeadExportFence },
   { id: 'false-green-fence',           scope: 'architecture', mode: 'thorough', fn: checkFalseGreenFence },
+  { id: 'recipe-execution-fence',      scope: 'architecture', mode: 'thorough', fn: checkRecipeExecutionFence },
   { id: 'gate-words-fence',            scope: 'architecture', mode: 'thorough', fn: checkGateWordsFence },
   { id: 'claim-census',                scope: 'architecture', mode: 'thorough', fn: checkClaimCensus },
   { id: 'dispatch-seat-liveness',      scope: 'system',       mode: 'thorough', fn: checkDispatchSeatLiveness },
@@ -908,6 +909,67 @@ function checkFalseGreenFence(root) {
     severity: 'block',
     message: `${fresh.length} NEW false-green site(s) — a check that can report a verdict on input it never received: ` +
       `${shown.join(' | ')}${fresh.length > 5 ? ` (+${fresh.length - 5} more)` : ''}`
+  });
+}
+
+/**
+ * Recipe-execution fence (plan 00186). A shipped state-changing recipe is proven by
+ * RUNNING it, not by reading it — a static arity check is green on the 00185 defect
+ * (a string where a proposal object belonged is arity-legal). `src/lib/recipe-harness.js`
+ * extracts and executes those recipes; `tests/shipped-recipes-execute.test.js` is the
+ * ratchet. This is that instrument's LIVE call site — the harness is reached HERE, from
+ * the enforcer a human runs, exactly as `false-green-scan.js` is (a test is never a
+ * caller; see src/lib/reachability.js), so it is not dead code the ratchet must flag.
+ *
+ * It surfaces the same on-demand truth as test case 6, cheaply (no child processes): a
+ * state-changing recipe present in `src/commands/start.md` but absent from BOTH the
+ * `covered` and `uncovered` lists of `.ctoc/recipe-coverage.json` — the ARRIVAL of an
+ * unfenced recipe. Otherwise SILENT (contributes no finding on a healthy repo, leaving
+ * the enforcer summary counts unmoved). An unreadable ledger BLOCKS rather than reads as
+ * clean. Thorough mode only.
+ *
+ * @param {string} root - Project root
+ * @returns {{clean: boolean, severity?: string, message?: string}}
+ */
+function checkRecipeExecutionFence(root) {
+  const { extractRecipes, isStateChanging, recipeId } = require('./recipe-harness');
+  const path = require('path');
+  const safeFs = require('./safe-fs');
+
+  const startMd = path.join(root, 'src', 'commands', 'start.md');
+  if (!safeFs.existsSync(startMd)) return CLEAN(); // not a CTOC source tree — nothing to check
+
+  const inScope = extractRecipes(startMd).filter(isStateChanging);
+  if (inScope.length === 0) return CLEAN();
+
+  const coverageFile = path.join(root, '.ctoc', 'recipe-coverage.json');
+  if (!safeFs.existsSync(coverageFile)) {
+    return finding({
+      severity: 'block',
+      message: `${inScope.length} state-changing shipped recipe(s) exist but .ctoc/recipe-coverage.json is missing — the recipe-execution ratchet cannot be evaluated; a missing ledger must never read as "all fenced"`
+    });
+  }
+  /** @type {Set<string>} */
+  const ledgerIds = new Set();
+  try {
+    const parsed = JSON.parse(safeFs.readFileSync(coverageFile, 'utf8'));
+    for (const e of [...((parsed && parsed.covered) || []), ...((parsed && parsed.uncovered) || [])]) {
+      if (e && typeof e.id === 'string') ledgerIds.add(e.id);
+    }
+  } catch (err) {
+    return finding({
+      severity: 'block',
+      message: `.ctoc/recipe-coverage.json exists but could not be read (${err && err.message}) — an unreadable recipe ledger must never read as "all clear"; repair the file`
+    });
+  }
+
+  const unfenced = inScope.filter((r) => !ledgerIds.has(recipeId(r)));
+  if (unfenced.length === 0) return CLEAN();
+  return finding({
+    severity: 'block',
+    message: `${unfenced.length} state-changing shipped recipe(s) in start.md are in NEITHER covered nor uncovered: ` +
+      `${unfenced.slice(0, 5).map((r) => 'row ' + r.row + ' [' + (r.calls.join(',') || r.scriptPath) + ']').join(' | ')}` +
+      `${unfenced.length > 5 ? ` (+${unfenced.length - 5} more)` : ''} — add a fixture (→ covered) or a one-line reason (→ uncovered) to .ctoc/recipe-coverage.json; a shipped recipe is proven by running it`
   });
 }
 

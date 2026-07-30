@@ -262,7 +262,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 493 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 494 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -368,6 +368,33 @@ hooks manifest became `''`, killing every hook root at once), so one unreadable 
 could have nominated live code for deletion. Unreadable now throws and names the path;
 ABSENT keeps its own meaning, and `analyze()` returns `readErrors` so a seeding run can
 prove it read everything it judged (`seedReadErrors: 0`).
+
+**The recipe-execution fence — a shipped recipe is proven by RUNNING it.** A static
+check cannot catch the defect class this fence exists for: the broken `cleanup-exec`
+recipe (00185) passed a string where a proposal OBJECT belonged — three arguments to
+`executeCleanup(proposal, root, deps = {})`, whose `Function.prototype.length === 2`.
+That call is arity-legal in every sense a static checker can measure; it was wrong in the
+MEANING of an argument, and JavaScript carries no type at that boundary to compare
+against. So the mechanism EXECUTES rather than reads: `src/lib/recipe-harness.js`
+extracts each shipped `node -e`/`node <script>` recipe out of `src/commands/start.md` and
+runs it against a fixture seeded so a specific observable change MUST occur, then asserts
+the change occurred. `tests/shipped-recipes-execute.test.js` is the ratchet and
+`.ctoc/recipe-coverage.json` holds the same TWO separate structures as the reachability
+baseline: `covered` (recipes with a fixture and an assertion — proven by running them,
+may only GROW) and `uncovered` (state-changing recipes that exist and have no fixture
+yet, each with a one-line reason, may only SHRINK). A new state-changing recipe in
+`start.md` absent from BOTH lists FAILS, so the fence catches the ARRIVAL of an unchecked
+recipe. **Scope is state-changing recipes only** — one that moves a plan, writes a
+setting, writes a ledger entry, writes to `.ctoc/`, or deletes a file; a read-only recipe
+is out of scope because its failure is visible on the screen the moment a human uses it.
+It deliberately does **not** cover read-only recipes, agent-definition surfaces under
+`agents/**`, or a recipe that runs correctly but does the WRONG thing (the fixture
+asserts the effect its author declared). The harness commits none of the five false-green
+signatures: no silent catch, explicit `maxBuffer` with an overflow reported as a FAILURE,
+no memoization (a cached execution is a recipe that was not executed), no shell (argument
+array, so a program containing `&&` or `|` is a parse-time failure), and a LOUD throw when
+its target file is missing — a zero-recipe extraction FAILS rather than passing on an
+empty match, because the recipe surface was renamed once already (`menu.md` → `start.md`).
 
 **Coverage floor — the shipped truth.** Step 14 VERIFY enforces the coverage floor
 recorded in `.ctoc/coverage-baseline.json`, which is **99** today (real src line
@@ -491,13 +518,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (start, push, update)
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use, subagent stop)
-    lib/                 122 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 123 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 493 test files
+  tests/                 494 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
