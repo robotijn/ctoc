@@ -1,10 +1,6 @@
 {
-  "maxFindings": 15,
+  "maxFindings": 11,
   "findings": [
-    "approval-ledger::src/hooks/human-gate-check.js",
-    "approval-ledger::src/lib/approval-residency.js",
-    "approval-ledger::src/lib/gate-migration.js",
-    "approval-ledger::src/scripts/ledger-backfill.js",
     "plan-frontmatter::src/lib/inbox.js",
     "plan-frontmatter::src/lib/iron-loop-enforcer.js",
     "plan-frontmatter::src/lib/plan-coverage.js",

@@ -17,6 +17,7 @@ const { getLastSync, manualSync } = require('../lib/sync');
 const { reconcileState } = require('../lib/task-reconcile');
 const { readLog } = require('../lib/enforcement-log');
 const claimLedger = require('../lib/claim-ledger');
+const { auditSufficiencyCrossings, formatAuditReport } = require('../lib/sufficiency-audit');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** The Doctor action number that runs the verifier — referenced by the row itself. */
@@ -63,6 +64,14 @@ function renderDoctor(app) {
   // is produced but not yet rendered; this slice does not repeat that debt).
   output += `${c.bold}Corpus claims${c.reset}\n`;
   output += renderClaimVerdict(app.projectPath);
+  output += '\n';
+
+  // Gate-crossing audit — has any human gate ever been crossed WITHOUT a human?
+  // Read off the approval ledger on disk, no network. never-crossed, crossed and
+  // undetermined render as three distinct verdicts (an unreadable ledger must never
+  // read as a clean history).
+  output += `${c.bold}Gate crossings${c.reset}\n`;
+  output += renderSufficiencyAudit(app.projectPath);
   output += '\n';
 
   // Last sync info
@@ -311,6 +320,33 @@ function renderClaimVerdict(projectPath, opts = {}) {
 }
 
 /**
+ * Render the gate-crossing audit verdict as one or more menu rows. TOTAL by
+ * contract: a fault renders a line, never a blank and never a throw. Reads the
+ * approval ledger OFF DISK via sufficiency-audit — NO network. The colour encodes
+ * the verdict: crossed → red (a gate advanced with no human), undetermined → yellow
+ * (history could not be established), never-crossed → green.
+ *
+ * @param {string} projectPath absolute project root
+ * @returns {string}
+ */
+function renderSufficiencyAudit(projectPath) {
+  let result;
+  try {
+    result = auditSufficiencyCrossings(projectPath);
+  } catch {
+    // The only throw is a non-string projectPath; degrade to a legible line.
+    return `  ${c.red}gate crossings${c.reset}   unreadable\n`;
+  }
+  const color = result.verdict === 'crossed'
+    ? c.red
+    : result.verdict === 'undetermined' ? c.yellow : c.green;
+  return formatAuditReport(result)
+    .split('\n')
+    .map((l) => `  ${color}${stripCtl(l)}${c.reset}\n`)
+    .join('');
+}
+
+/**
  * Dispatch `node src/scripts/verify-claims.js` in the BACKGROUND and return
  * immediately — the terminal never blocks on it (CLAUDE.md: updates run in the
  * background; the human never watches a spinner). Spawned with an argument ARRAY
@@ -499,4 +535,4 @@ function handleKey(key, app) {
   return false;
 }
 
-module.exports = { render, renderDoctor, renderUpdate, renderSettings, handleKey, renderClaimVerdict, dispatchClaimVerification };
+module.exports = { render, renderDoctor, renderUpdate, renderSettings, handleKey, renderClaimVerdict, renderSufficiencyAudit, dispatchClaimVerification };

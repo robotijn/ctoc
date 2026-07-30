@@ -1,0 +1,9 @@
+{
+  "content_sha256": "5319f4e4a5d033202ed982877df1ab07e43aa89ba5ea884712876f5d199ced56",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T19:47:41.266Z",
+  "approved_by": "human",
+  "plan_basename": "00073-ui1-unexecutable-instruction-fence"
+}
