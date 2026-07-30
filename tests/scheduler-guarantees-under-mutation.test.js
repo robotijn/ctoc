@@ -20,6 +20,24 @@
  * Group A — src/lib/task-reconcile.js, the terminal-retention sweep.
  * Group B — src/lib/task-registry.js, nextRunnable's kind-aware dependency gate.
  * Group C — src/lib/task-registry.js, git-exclusivity ON THE PROMOTION PATH.
+ * Group D — src/lib/task-registry.js, the SYNC BARRIER (Rule 2) ON THE PROMOTION PATH.
+ *
+ * WHY GROUP D EXISTS — the mirror image of Group C, and the same mutual masking.
+ * Rule 2 (sync-barrier) could be deleted from `nextRunnable`'s side of the ladder and
+ * the entire suite stayed green, exactly as Rule 3 could before Group C. The two rules
+ * have been covering for each other: every promotion-path candidate carrying a git flag
+ * was a `sync`, so Rule 2 refused it before Rule 3 was reached (Group C's finding), AND
+ * every `sync` reaching the promotion path in the suite carried `gitOp: true`, so a
+ * git-flagged sync beside a running editor was refused as `git-exclusive` by Rule 3
+ * anyway (Group D's finding). Delete either rule and the other catches the same
+ * candidate, produces the same promoted set, and every assertion stays green. The
+ * candidate that walks through the gap is a `sync` with `gitOp: false` — the shape
+ * `addTask` produces by default when no git flag is asked for. So EVERY Group D case
+ * uses a `sync` with `gitOp: false`; a git-flagged sync is refused by Rule 3 when Rule 2
+ * is deleted and therefore proves nothing about Rule 2. This is the promotion-path
+ * (`nextRunnable`) twin of the oracle-path sync-barrier cases in
+ * tests/task-registry.test.js — an oracle and the projection beside it are DIFFERENT
+ * code paths, each needing its own defenders.
  *
  * WHY GROUP C EXISTS. Rule 3 (git-exclusive) could be deleted from `nextRunnable`'s
  * side of the ladder and the entire suite stayed green, while deleting any other rule
@@ -424,5 +442,130 @@ describe('Group C — git-exclusive holds through nextRunnable (task-registry.js
     const cand = task({ id: 't2', kind: 'review', status: 'queued', touches: [], gitOp: true });
     assert.deepEqual(reg.canRun(cand, r), { run: false, reason: 'git-exclusive' },
       'not max-concurrent, not sync-barrier, not file-conflict — Rule 3');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group D — the sync barrier (Rule 2) holds on the PROMOTION path, not just the oracle
+//
+// CONTRACT SOURCE (outside any test): src/lib/task-registry.js:926-932 —
+//   "Rule 2 — sync-barrier (the wave integration boundary): a `sync` candidate may not
+//    start while ANY task runs, and NO candidate may start while a `sync` runs."
+// and :995-996 — nextRunnable's returned set is JOINTLY startable: "starting the whole
+// returned set never violates ≤5 / sync-barrier / git-exclusive / file-conflict".
+//
+// HEADLINE MUTATION (defended by D1, D2, D3) — the two disjuncts of Rule 2 at :930:
+//   src/lib/task-registry.js:930, delete the `candidate.kind === 'sync'` disjunct
+//     — a sync candidate stops being blocked beside a running task   (caught by D1)
+//   src/lib/task-registry.js:930, delete the `running.some(t => t.kind === 'sync')`
+//     disjunct — a candidate stops being blocked beside a running sync (caught by D2)
+//   src/lib/task-registry.js:930-932, delete Rule 2 entirely
+//     — a follower starts alongside a barrier promoted THIS pass       (caught by D3)
+//
+// PROMOTION-PATH-ONLY (fold) MUTATION (defended by D3, and ONLY D3):
+//   src/lib/task-registry.js:1009
+//     -  projected.push({ ...cand, status: 'running' });
+//     +  projected.push({ ...cand, kind: 'review', status: 'running' });
+//   The barrier promoted this pass is folded WITHOUT its kind, so a following candidate
+//   no longer sees a running sync and is promoted straight into a live wave barrier.
+//   Verified empirically (Iron Loop Step 8): this mutation leaves the WHOLE scheduler
+//   suite green BEFORE Group D existed — the exact undefended gap Group D closes.
+//
+// D4 is the control against over-tightening ("never promote a sync", which would pass
+// D1-D3 and deadlock every wave). D5 is the control against "one task at a time" (which
+// would pass D1-D4 and destroy concurrency). D6 pins that the refusal is Rule 2 BY NAME
+// through the oracle, so D1-D3 cannot be passing on Rule 1, 3 or 4 firing by accident.
+//
+// WHY D1/D2 AND D3 ARE NOT REDUNDANT. `projected` is seeded from the real running set at
+// :1002 and grown by the fold at :1009. D1/D2 exercise the SEEDED path (the blocker is a
+// real running task); D3 exercises the FOLD path (the blocking sync did not exist as a
+// running task when the pass began). The fold-kind-drop mutation leaves D1/D2 green and
+// kills only D3.
+//
+// EVERY case below uses a `sync` with `gitOp: false`. A git-flagged sync is refused by
+// Rule 3 when Rule 2 is deleted and proves nothing — that is the masking this group breaks.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Group D — sync-barrier holds through nextRunnable (task-registry.js:930-932)', () => {
+  const promoted = (r) => reg.nextRunnable(r).map(t => t.id);
+
+  it('D1: a sync candidate is NOT promoted while a real (non-sync) task runs ' +
+     '[mutation: task-registry.js:930 delete the `candidate.kind === \'sync\'` disjunct]', () => {
+    // t1 is a really-running editor (occupies a slot, is NOT a sync). t2 is a queued sync
+    // with gitOp:false. Masking check: Rule 1 (1 < 5) no; Rule 3 (candidate gitOp false,
+    // not editing) no; Rule 4 (candidate touches empty → fast path) no. ONLY Rule 2 — via
+    // its `candidate.kind === 'sync'` disjunct — refuses t2.
+    const r = mkReg([
+      task({ id: 't1', kind: 'implement', status: 'running', touches: ['a.js'], gitOp: false, started: ago(MIN), done: undefined }),
+      task({ id: 't2', kind: 'sync', status: 'queued', touches: [], gitOp: false, blockedBy: [] })
+    ]);
+    assert.deepEqual(promoted(r), [],
+      'a wave-integration sync must not start while any task is running');
+  });
+
+  it('D2: no candidate is promoted while a real sync runs ' +
+     '[mutation: task-registry.js:930 delete the `running.some(t => t.kind === \'sync\')` disjunct]', () => {
+    // t1 is a really-running sync (gitOp:false). t2 is an ordinary queued review. Masking
+    // check: Rule 1 no; Rule 3 (t2 gitOp false, not editing) no; Rule 4 (t2 touches empty)
+    // no. ONLY Rule 2 — via its `running.some(...sync)` disjunct — refuses t2.
+    const r = mkReg([
+      task({ id: 't1', kind: 'sync', status: 'running', touches: [], gitOp: false, started: ago(MIN), done: undefined, blockedBy: [] }),
+      task({ id: 't2', kind: 'review', status: 'queued', touches: [], gitOp: false })
+    ]);
+    assert.deepEqual(promoted(r), [],
+      'nothing — not even a read-only task — may start while a sync barrier runs');
+  });
+
+  it('D3 (headline): a barrier promoted THIS pass blocks the follower behind it ' +
+     '[mutation: task-registry.js:930-932 delete Rule 2 entirely; AND :1009 drop `kind` ' +
+     'from the fold — `projected.push({ ...cand, status: \'running\' })`]', () => {
+    // dep is done → not occupying. FIFO queued: barrier (sync, gitOp:false, waits on dep),
+    // then other (review). barrier promotes because nothing occupies a slot (Rule 2's
+    // `running.length > 0` is false). It is folded into `projected` AS A SYNC, and `other`
+    // is then refused by Rule 2's `running.some(...sync)`. Deleting Rule 2, or folding the
+    // barrier without its kind, lets `other` start alongside the live barrier.
+    const r = mkReg([
+      task({ id: 'dep', kind: 'implement', status: 'done', touches: ['a.js'] }),
+      task({ id: 'barrier', kind: 'sync', status: 'queued', touches: [], gitOp: false, blockedBy: ['dep'] }),
+      task({ id: 'other', kind: 'review', status: 'queued', touches: [], gitOp: false })
+    ]);
+    assert.deepEqual(promoted(r), ['barrier'],
+      'the barrier integrates the wave alone; the follower waits behind it');
+  });
+
+  it('D4 (control): the barrier IS promoted when nothing occupies a slot ' +
+     '[control against over-tightening Rule 2 into "never promote a sync", which would ' +
+     'pass D1-D3 and deadlock every wave]', () => {
+    const r = mkReg([
+      task({ id: 'dep', kind: 'implement', status: 'done', touches: ['a.js'] }),
+      task({ id: 'barrier', kind: 'sync', status: 'queued', touches: [], gitOp: false, blockedBy: ['dep'] })
+    ]);
+    assert.deepEqual(promoted(r), ['barrier'],
+      'a sync must start when it is alone — the barrier drains the wave, it does not deadlock it');
+  });
+
+  it('D5 (control): two ordinary tasks with disjoint files DO both promote ' +
+     '[control against over-tightening Rule 2 into "one task at a time", which would ' +
+     'pass D1-D4 and destroy concurrency]', () => {
+    const r = mkReg([
+      task({ id: 't1', kind: 'implement', status: 'queued', touches: ['a.js'], gitOp: false }),
+      task({ id: 't2', kind: 'implement', status: 'queued', touches: ['b.js'], gitOp: false })
+    ]);
+    assert.deepEqual(promoted(r), ['t1', 't2'],
+      'disjoint non-sync work still runs in parallel — Rule 2 governs syncs, not everything');
+  });
+
+  it('D6: the refusal is sync-barrier BY NAME, through the oracle, for D2\'s shapes ' +
+     '[pins that D1-D3 fail on Rule 2 and not on Rule 1, 3 or 4 firing by accident]', () => {
+    // WARNING (the sibling got this wrong once): canRun builds its opposition from
+    // runningTasks() — status running or cancelling. An all-queued registry gives canRun an
+    // EMPTY running set, where the correct answer is {run:true, reason:'ok'}. So t1 here is
+    // genuinely RUNNING, matching D2's shape, and the oracle sees the real opposition.
+    const r = mkReg([
+      task({ id: 't1', kind: 'sync', status: 'running', touches: [], gitOp: false, started: ago(MIN), done: undefined, blockedBy: [] })
+    ]);
+    const cand = task({ id: 't2', kind: 'review', status: 'queued', touches: [], gitOp: false });
+    assert.deepEqual(reg.canRun(cand, r), { run: false, reason: 'sync-barrier' },
+      'not max-concurrent, not git-exclusive, not file-conflict — Rule 2');
   });
 });
