@@ -558,7 +558,14 @@ describe('completeTaskPlan — slug safety guard', () => {
     // fault is now present on EVERY return (plan 00131): a consumer never distinguishes
     // absent from null. fault:null marks a genuine report about the plan (as opposed to
     // a caller fault), so this exact-shape pin tightens to include it.
-    assert.deepEqual(res, { ran: false, fault: null, reason: 'task carries no plan' });
+    // plan 00167: the witness rides EVERY return shape, including this caller-fault/
+    // no-plan early return — a FIXED unclaimed attached WITHOUT a registry read (a
+    // crafted slug drives no filesystem access). The exact-shape pin is TIGHTENED to
+    // the full new machine-consumable shape, not loosened to field-access.
+    assert.deepEqual(res, {
+      ran: false, fault: null, reason: 'task carries no plan',
+      witness: { witness: 'unclaimed', startedAt: null, elapsedMs: null, implausible: false, taskId: null }
+    });
   });
 
   it('REFUSES a slug containing a path separator before any path.join', () => {

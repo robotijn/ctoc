@@ -1272,18 +1272,133 @@ function classifyCompletionFault(projectPath, planSlug) {
   return { fault: 'caller', reason };
 }
 
+/**
+ * The `implausible` floor (plan 00167, Decision 13): 2 minutes. A full Iron Loop slice
+ * runs Steps 8-16 including a complete `npm test` gate that alone takes tens of seconds,
+ * so a sub-two-minute end-to-end record is not a real slice. Chosen at the log-midpoint
+ * of the measured distribution — on this repository the one genuine `done` slice took
+ * 882 s with a real start, while the fabricated records (written AROUND work already
+ * finished by hand) were 6, 6 and 22 s; the geometric mean of 22 s and 882 s is ~139 s.
+ * ADVISORY ONLY: it colours the reported interval and NEVER decides the witness, which
+ * turns on `ts.started` being a real instant that precedes the completion.
+ */
+const IMPLAUSIBLE_FLOOR_MS = 120000;
+
+/**
+ * @typedef {Object} ClaimWitness
+ * @property {'claimed'|'unclaimed'|'unreadable'} witness
+ * @property {string|null} startedAt
+ * @property {number|null} elapsedMs
+ * @property {boolean} implausible
+ * @property {string|null} taskId
+ */
+
+/** The ONE encoding of the "no genuine claim" witness. @returns {ClaimWitness} */
+function unclaimedWitness() {
+  return { witness: 'unclaimed', startedAt: null, elapsedMs: null, implausible: false, taskId: null };
+}
+/** The ONE encoding of the "could not read the registry" witness. @returns {ClaimWitness} */
+function unreadableWitness() {
+  return { witness: 'unreadable', startedAt: null, elapsedMs: null, implausible: false, taskId: null };
+}
+
+/**
+ * Establish whether a plan was ever genuinely CLAIMED, so a completion can REPORT that
+ * fact instead of silently recording work the scheduler never saw start (plan 00167).
+ * Returns one of THREE states that never collapse into two:
+ *
+ *   • `claimed`    — the registry holds an `implement` task naming this slug whose
+ *                    `ts.started` is a real instant that PRECEDES the completion moment.
+ *   • `unclaimed`  — the registry was read successfully and holds no such evidence
+ *                    (no matching task, or one whose `ts.started` is null).
+ *   • `unreadable` — the registry could not be read, so nothing is known.
+ *
+ * Why three, and why `unreadable` must NEVER render as `unclaimed`: the registry's
+ * `load` fails open to empty by design (right for navigation, wrong as a verdict input).
+ * An empty answer from an UNREAD instrument is this repository's documented false-green
+ * class — the unread instrument answering as if it had been read. The distinction is
+ * CONSUMED from `load` (which flags a read/parse throw with `unreadable: true`,
+ * task-registry.js:415) rather than re-derived here, mirroring `state.getAgentStatus`
+ * (state.js:327-329); the `load` call is wrapped in try/catch for the TypeError it
+ * throws on a bad `root` (task-registry.js:396).
+ *
+ * The witness is decided by the STRUCTURAL fact (`ts.started` is a real instant that
+ * precedes now), NEVER by the elapsed interval. The interval is reported as a MEASURED
+ * number (`elapsedMs`) with a clearly-named ADVISORY flag (`implausible`, below the
+ * floor) so a reader has the single most legible piece of evidence without a heuristic
+ * being presented as a fact — the motivating measurement being `t63` at 22 s for a
+ * four-file slice and `t62`/`t61` at 6 s.
+ *
+ * Never throws. Never joins the slug into a filesystem path — it string-matches the slug
+ * against registry `task.plan` values, so a crafted slug cannot become a path oracle.
+ *
+ * @param {string} root - project root
+ * @param {string} slug - the plan slug being completed
+ * @param {{nowMs?: number, implausibleFloorMs?: number}} [opts]
+ * @returns {ClaimWitness}
+ */
+function claimWitness(root, slug, opts = {}) {
+  const nowMs = opts && typeof opts.nowMs === 'number' ? opts.nowMs : Date.now();
+  const floorMs = opts && typeof opts.implausibleFloorMs === 'number'
+    ? opts.implausibleFloorMs : IMPLAUSIBLE_FLOOR_MS;
+
+  let registry;
+  try {
+    registry = taskRegistry.load(root);
+  } catch {
+    // `load` throws a TypeError on a bad root — a read that could not happen is
+    // UNREADABLE, never unclaimed.
+    return unreadableWitness();
+  }
+  if (registry && registry.unreadable === true) {
+    return unreadableWitness();
+  }
+
+  const tasks = Array.isArray(registry && registry.tasks) ? registry.tasks : [];
+  for (const t of tasks) {
+    if (!t || t.kind !== 'implement') continue;              // only an implement task claims a slice
+    if (typeof t.plan !== 'string' || t.plan !== slug) continue; // string match; never path-joined
+    const started = t.ts && typeof t.ts.started === 'string' ? t.ts.started : null;
+    if (started === null) continue;                          // a null start is not a claim
+    const startedMs = Date.parse(started);
+    if (!Number.isFinite(startedMs) || startedMs > nowMs) continue; // real instant, precedes now
+    const elapsedMs = nowMs - startedMs;
+    return {
+      witness: 'claimed',
+      startedAt: started,
+      elapsedMs,
+      implausible: elapsedMs < floorMs,
+      taskId: typeof t.id === 'string' ? t.id : null,
+    };
+  }
+  return unclaimedWitness();
+}
+
 function completeTaskPlan(projectPath, planSlug) {
   const root = projectPath || findProjectRoot();
+  const nowMs = Date.now();
 
   // Discriminate a guard failure into a report about the plan vs a fault in the CALL
   // (plan 00131). Both still REFUSE — no path becomes more permissive; the only change
   // is that the misuse announces itself as misuse and a machine consumer can tell.
   const fault = classifyCompletionFault(root, planSlug);
   if (fault) {
-    return { ran: false, fault: fault.fault, reason: fault.reason };
+    // Caller-fault / no-plan early return (plan 00167). The witness is a FIXED unclaimed
+    // attached WITHOUT reading the registry — a crafted slug drives no filesystem access
+    // and the refusal still fires first (Step 13). It rides EVERY return shape; a field
+    // present on only some paths teaches a reader it is optional and therefore ignorable.
+    return { ran: false, fault: fault.fault, reason: fault.reason, witness: unclaimedWitness() };
   }
   // Safe from here: a bare, path-safe slug (fault === null means proceed).
   const slug = planSlug.replace(/\.md$/i, '');
+
+  // Establish the witness BEFORE completeExecution settles the running task to done
+  // (:1108-1117): it must reflect the pre-completion state and measure elapsed against
+  // the completion moment. This REPORTS whether the work was ever claimed; it never
+  // refuses — today every completion is unclaimed, so refusal would be an outage, and
+  // refusal becomes safe only once the dispatch seat is proven live (a decision for the
+  // human, not a phase this route schedules).
+  const witness = claimWitness(root, slug, { nowMs });
 
   // Resolve the plan: in-progress is the expected home; review means it already moved.
   const plansDir = getPlansDir(root);
@@ -1300,7 +1415,7 @@ function completeTaskPlan(projectPath, planSlug) {
   } else {
     // A real report about the plan (I looked in both folders and found none), NOT a
     // caller fault — fault:null keeps the two answers distinct.
-    return { ran: false, fault: null, reason: `no plan file for "${slug}" in in-progress/ or review/` };
+    return { ran: false, fault: null, reason: `no plan file for "${slug}" in in-progress/ or review/`, witness };
   }
 
   const result = completeExecution(planPath, root);
@@ -1312,7 +1427,8 @@ function completeTaskPlan(projectPath, planSlug) {
       stage,
       newPath: null,
       errors: (result.validation && result.validation.errors) || [],
-      reason: result.message
+      reason: result.message,
+      witness
     };
   }
   return {
@@ -1321,7 +1437,8 @@ function completeTaskPlan(projectPath, planSlug) {
     blocked: false,
     stage,
     newPath: result.newPath,
-    verify: result.verify || null
+    verify: result.verify || null,
+    witness
   };
 }
 
@@ -2353,6 +2470,10 @@ module.exports = {
   completeExecution,
   // R3-D: the live call site of completeExecution (menu `task complete` route)
   completeTaskPlan,
+  // plan 00167: the claim witness carried on every completeTaskPlan return shape.
+  // LIVE via its intra-file caller completeTaskPlan (same code edge that keeps
+  // completeExecution live); exported so a witness can be asked about elsewhere later.
+  claimWitness,
   // Finding C9 wiring: record + hard-escalate an Iron Loop kickback
   recordStepKickback,
   // Agent orchestration functions

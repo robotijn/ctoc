@@ -10,7 +10,9 @@ iron_loop: true
 files:
   - "src/lib/actions.js"
   - "tests/a-completion-says-whether-the-work-was-ever-claimed.test.js"
+  - "tests/actions-coverage.test.js"
   - "CLAUDE.md"
+  - "tests/actions-coverage.test.js"
 approved_by: human
 approved_at: 2026-07-30T19:04:14.746Z
 gate_crossed: implementation → todo
@@ -328,6 +330,7 @@ right. Its implication — that the file is authoritative — is not.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Write `tests/a-completion-says-whether-the-work-was-ever-claimed.test.js` in full and
 run **only that file, before touching `src/`**. Record the starting state verbatim.
 
@@ -342,6 +345,7 @@ run **only that file, before touching `src/`**. Record the starting state verbat
   discriminating.
 
 ### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 
 Read from disk, in full, and let the code win: `src/lib/actions.js` —
 `completeTaskPlan` (`:1275-1326`), `classifyCompletionFault` (`:1251-1273`),
@@ -382,6 +386,7 @@ Then measure, and **report before any code is written**:
    refusal is not shipped. If it is NOT empty, report the running set.
 
 ### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 One step, files as sub-items.
 
 - `src/lib/actions.js` — `claimWitness` (three states that never collapse, never throws,
@@ -394,6 +399,7 @@ One step, files as sub-items.
   cases.
 
 ### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Confirm there is exactly ONE encoding of the claim witness and no second copy anywhere
 in `actions.js`. Confirm **no code path can return `'unclaimed'` from a guarded read
 failure** — read the diff, do not infer it from the tests. Confirm the witness is
@@ -414,6 +420,7 @@ encapsulated `withRegistry` value out of `completeExecution`. Confirm nothing ne
 any path other than a completion. Record the before-and-after timing.
 
 ### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 - Confirm a hostile registry cannot inject text: a task whose `plan`, `label` or
   `result.summary` carries a newline, a terminal escape, `%s`, and a
   10,000-character string. The witness surfaces a fixed-vocabulary state, a bounded
@@ -430,6 +437,7 @@ any path other than a completion. Record the before-and-after timing.
   directory, unreadable plan file.
 
 ### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Targeted run first: the new test file, `tests/actions-scheduler.test.js`,
 `tests/task-registry.test.js`, `tests/task-reconcile.test.js`,
 `tests/e2e-menu-lifecycle.test.js`, `tests/e2e-enforcement-and-gates.test.js`,
@@ -467,6 +475,7 @@ refusal becomes safe only once the dispatch seat is proven live — a decision f
 human, not a phase this plan schedules.
 
 ### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Report, in this order:
 
 1. The Step 9 registry measurement verbatim, and the elapsed-time distribution, with
@@ -553,6 +562,27 @@ live at Step 9 rather than trusting any line number in this plan.
 11. **The planning-time registry count (64) is stated with its value and its measurement
     date, not carried forward as a fact.** Step 9 re-measures verbatim, because a repair
     that carries a wrong number forward is a repair nobody can check.
+12. **`tests/actions-coverage.test.js` was added to the declared files (human-authorized)
+    to update ONE exact-shape assertion, and nothing else in it is touched.** Line 561
+    pinned the caller-fault/no-plan return shape `{ ran:false, fault:null, reason:'task
+    carries no plan' }` with `assert.deepEqual`. Decision 7 mandates the witness on all
+    FOUR return shapes, including that one, so the exact-shape sibling MUST learn the new
+    field or `npm test` goes red on a plan-mandated change. The assertion is TIGHTENED to
+    the full new machine-consumable shape (`witness: { witness:'unclaimed', startedAt:null,
+    elapsedMs:null, implausible:false, taskId:null }`) — it stays an exact `deepEqual`, is
+    NOT switched to field-access, and NOTHING is loosened. The plan author's `files:`
+    omission of this sibling was the defect; the fix is the smaller of the two (per the
+    Gate-2 executor stop-and-report and the human's Option-1 ruling). The other three
+    `completeTaskPlan` sibling assertions (`:565,:573,:579`) field-access and are untouched.
+13. **The `implausible` floor is 120000 ms (2 minutes), chosen at Step 9 from the live
+    distribution.** Measured on this repository: the one genuine `done` slice (`t47`) took
+    882 s with a real start; planning's fabricated records were 6, 6 and 22 s. 120000 ms
+    sits at the log-midpoint (geometric mean of 22 s and 882 s ≈ 139 s), giving ~5.5x
+    margin on each side. Justification: a full Iron Loop slice runs Steps 8-16 including a
+    complete `npm test` gate that alone takes tens of seconds, so a sub-two-minute
+    end-to-end record is not a real slice. The floor is advisory only — it colours the
+    reported interval; it never decides the witness, which turns on `ts.started` being a
+    real instant that precedes the completion (Decision 2).
 
 
 ## Deferred Questions
