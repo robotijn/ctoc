@@ -435,13 +435,23 @@ function precomputedQuestionParts(q, ref, header) {
  * known, and that property is preserved here — a predicate that throws degrades to
  * `enough: false` ('unavailable'), never to a pass.
  *
- * ── IT SHOWS. IT DOES NOT CROSS. ─────────────────────────────────────────────
- * `enough: true` is rendered to the human and nothing more. It must NOT
- * auto-approve, because `approval-ledger.entryKind` classifies any entry whose
- * `advanced_by` it does not recognise as `'human'` — so an automatic crossing
- * would be recorded as the human's own approval. That is a forged approval created
- * by a classifier default. Auto-crossing is safe only once `entryKind` fails
- * closed; until then this is display, deliberately.
+ * ── IT SHOWS, AND AT A PRE-BUILD GATE IT CROSSES. ────────────────────────────
+ * `enough: true` is rendered to the human AND, at a PRE-BUILD gate whose transition
+ * validation passes, it authorises the plan to cross ITSELF — `pendingGateDecisions`
+ * calls `crossBySufficiency`, which records a SUFFICIENCY ledger entry (advanced_by:
+ * 'sufficiency', NO approved_by) and moves the plan. The human approves nothing and
+ * the crossing is never attributed to a human.
+ *
+ * This became safe ONLY once `approval-ledger.entryKind` began FAILING CLOSED. It
+ * once classified any entry whose `advanced_by` it did not recognise as `'human'`,
+ * so an automatic crossing would have been recorded as the human's own approval — a
+ * forged approval created by a classifier default. `entryKind` now returns
+ * `'unknown'` for an unrecognised provenance (it recognises only 'pipeline' and
+ * 'sufficiency'), so the automatic crossing is attributed honestly. That history is
+ * kept here deliberately: it is the reason the design is defensible, and deleting it
+ * would leave the crossing looking unjustified to the next reader. The done/ gate
+ * stays out of scope — a sufficiency verdict cannot answer whether the work was
+ * built correctly.
  *
  * The require is LAZY, mirroring `nextUnansweredQuestion` above (the established
  * idiom in this file). It is not strictly required today — `streaming-precompute`
@@ -453,10 +463,18 @@ function precomputedQuestionParts(q, ref, header) {
  * @param {string} root project root
  * @param {string} ref plan reference ("stage/file.md")
  * @returns {{enough:boolean, reason:string, unansweredQuestionIds:string[],
- *   blockingQuestionIds:string[]}}
+ *   blockingQuestionIds:string[], computed:(number|null),
+ *   answeredQuestionIds:string[], unboundAnswers:number}}
  */
 function sufficiencyFor(root, ref) {
-  const closed = (reason) => ({ enough: false, reason, unansweredQuestionIds: [], blockingQuestionIds: [] });
+  const closed = (reason) => ({
+    enough: false, reason,
+    unansweredQuestionIds: [], blockingQuestionIds: [],
+    // A predicate that could not run knows NEITHER the denominator nor the answered
+    // set — `computed: null` (never 0), empty lists, 0 unbound. The evidence composer
+    // renders `unknown`, so a failed check is never recorded as an empty-list plan.
+    computed: null, answeredQuestionIds: [], unboundAnswers: 0,
+  });
   if (!isNonEmptyStr(root)) return closed('unavailable');
   try {
     const { hasEnoughInformation } = require('./streaming-precompute');
@@ -467,11 +485,78 @@ function sufficiencyFor(root, ref) {
       reason: stripCtl(String(v.reason)),
       unansweredQuestionIds: ids(v.unanswered),
       blockingQuestionIds: ids(v.blocking),
+      // Threaded from the SINGLE verdict `hasEnoughInformation` already computed —
+      // never a second read. `computed` stays null when the predicate could not
+      // establish a count; `answeredQuestionIds` are the bound ids of current questions.
+      computed: Number.isFinite(v.computed) ? v.computed : null,
+      answeredQuestionIds: Array.isArray(v.answered) ? v.answered.map((id) => stripCtl(String(id))) : [],
+      unboundAnswers: Number.isFinite(v.unboundAnswers) ? v.unboundAnswers : 0,
     };
   } catch {
     // The predicate could not run. That is IGNORANCE, not sufficiency — fail closed.
     return closed('unavailable');
   }
+}
+
+// The joined answered-id list is capped so a producer-authored id — untrusted text
+// on a PERMANENT record — cannot inject unbounded content into a ledger entry. Each
+// id is already control-stripped; this bounds the total.
+const MAX_EVIDENCE_ID_LIST = 500;
+
+/**
+ * Compose the SUFFICIENCY evidence string from a threaded verdict — nothing is read
+ * from disk. This is the audit record of a self-crossed gate, and it states the
+ * DENOMINATOR (how many questions existed) alongside the numerator (how many were
+ * answered), so the record can answer the one question an auditor brings to it:
+ * "how much was this plan actually asked?" The old string carried only the answered
+ * count, so an empty questions file and a plan whose many questions were all still
+ * open produced identical bytes.
+ *
+ * Fixed field order, fixed labels (an auditor parses them positionally):
+ *   `sufficiency: <ref> — <N> question(s) computed, <M> answered (<ids>);
+ *    <U> unanswered, <B> blocking; attested by: not recorded[;
+ *    <K> recorded answer(s) did not bind to this revision]; enough (no unanswered fork)`
+ *
+ * A count that is not a finite number renders `unknown`, NEVER `0` — an unavailable
+ * count must be distinct from a genuine zero. A genuine zero (`computed === 0`) gets
+ * an explicit, greppable "no questions were computed" phrase so every historical
+ * empty-list crossing is findable in one text search. The attestation slot is a
+ * fixed `attested by: not recorded` today — there is no attestation data source
+ * until the critique-record work lands — so the format is forward-compatible and an
+ * absent clause never reads as an older record.
+ *
+ * @param {string} ref the plan reference ("stage/file.md")
+ * @param {object} verdict the sufficiency verdict that AUTHORISED the crossing
+ * @returns {string}
+ */
+function composeSufficiencyEvidence(ref, verdict) {
+  const v = verdict && typeof verdict === 'object' ? verdict : {};
+  const safeRef = stripCtl(String(ref));
+  const num = (n) => (Number.isFinite(n) ? String(n) : 'unknown');
+
+  const computed = Number.isFinite(v.computed) ? v.computed : null;
+  const answeredIds = Array.isArray(v.answeredQuestionIds)
+    ? v.answeredQuestionIds.map((id) => stripCtl(String(id)))
+    : [];
+  const unanswered = Array.isArray(v.unansweredQuestionIds) ? v.unansweredQuestionIds.length : null;
+  const blocking = Array.isArray(v.blockingQuestionIds) ? v.blockingQuestionIds.length : null;
+  const unbound = Number.isFinite(v.unboundAnswers) ? v.unboundAnswers : 0;
+
+  let idList = answeredIds.join(', ');
+  if (idList.length > MAX_EVIDENCE_ID_LIST) idList = idList.slice(0, MAX_EVIDENCE_ID_LIST) + '… (list truncated)';
+  const answeredClause = answeredIds.length ? ` (${idList})` : '';
+
+  const head = computed === 0
+    // Explicit, greppable empty-list phrase — distinct from "N computed, N answered".
+    ? `${safeRef} — no questions were computed (0 question(s) computed), ${num(answeredIds.length)} answered${answeredClause}`
+    : `${safeRef} — ${num(computed)} question(s) computed, ${num(answeredIds.length)} answered${answeredClause}`;
+
+  const unboundClause = unbound > 0
+    ? `; ${unbound} recorded answer(s) did not bind to this revision`
+    : '';
+
+  return `sufficiency: ${head}; ${num(unanswered)} unanswered, ${num(blocking)} blocking`
+    + `; attested by: not recorded${unboundClause}; enough (no unanswered fork)`;
 }
 
 /**
@@ -493,9 +578,13 @@ function sufficiencyFor(root, ref) {
  * @param {string} ref the plan reference ("stage/file.md")
  * @param {string} fromStage the gate source stage
  * @param {string} toStage the gate destination stage (a PRE-BUILD destination)
+ * @param {object} verdict the SINGLE sufficiency verdict that authorised the
+ *   crossing (computed once in `pendingGateDecisions`). The evidence is composed from
+ *   THIS verdict — never a second, independent read that could observe a different
+ *   revision than the one that authorised the crossing.
  * @returns {boolean} true iff the plan was crossed (entry written + moved)
  */
-function crossBySufficiency(root, planPath, ref, fromStage, toStage) {
+function crossBySufficiency(root, planPath, ref, fromStage, toStage, verdict) {
   try {
     const ledger = require('./approval-ledger');
     const slug = ledger.slugFromPlanPath(planPath);
@@ -505,18 +594,13 @@ function crossBySufficiency(root, planPath, ref, fromStage, toStage) {
     if (existing && existing.stage_to === toStage) return false;
 
     const content = safeFs.readFileSync(planPath, 'utf8');
-    // Evidence an auditor can reconstruct the decision from: the plan ref, the count
-    // of answered questions, and their ids.
-    // The revision is omitted here (this path holds no status) so the shared
-    // function derives it from planQuestionsStatus itself. The count is therefore
-    // only the answers that BIND to the plan's current text — which is what an
-    // auditor reading this entry would already assume it meant.
-    const result = require('./streaming-precompute').readAnsweredQuestionIds(root, ref);
-    const answered = [...result.ids];
-    const evidence =
-      `sufficiency: ${ref} — ${answered.length} question(s) answered` +
-      `${answered.length ? ` (${answered.join(', ')})` : ''}; enough (no unanswered fork)` +
-      `${result.unbound > 0 ? `; ${result.unbound} recorded answer(s) did not bind to this revision` : ''}`;
+    // The audit record of a self-crossed gate: composed from the SAME verdict that
+    // authorised the crossing, so the numbers describe the exact state the decision
+    // was based on. It states the DENOMINATOR (how many questions existed) as well as
+    // the numerator (how many were answered) — the count that made "0 answered"
+    // meaningful. No second read of its own: a second read could see a different
+    // revision than the verdict, describing a state that was never the decision basis.
+    const evidence = composeSufficiencyEvidence(ref, verdict);
 
     ledger.writeSufficiencyEntry(slug, {
       // SPECIFICATION scope, for the same reason as the human gate crossing in
@@ -602,7 +686,7 @@ function pendingGateDecisions(projectRoot) {
       // stops being a pending decision. Fail-closed conditions are all short-circuited.
       if (sufficiency.enough === true && passesValidation
           && PRE_BUILD_DESTINATIONS.has(meta.toStage)
-          && crossBySufficiency(projectRoot, plan.path, ref, stage, meta.toStage)) {
+          && crossBySufficiency(projectRoot, plan.path, ref, stage, meta.toStage, sufficiency)) {
         continue;
       }
 
@@ -1552,4 +1636,9 @@ module.exports = {
   planDecisionScreen,
   renderDeclaredScope,
   humanPlanName,
+  // Exported as the testable seam for the sufficiency audit record. Both are live
+  // internally: `composeSufficiencyEvidence` is called by `crossBySufficiency`, which
+  // is called by `pendingGateDecisions` on every gate-screen render.
+  composeSufficiencyEvidence,
+  crossBySufficiency,
 };
