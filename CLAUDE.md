@@ -195,6 +195,26 @@ screenshots, no network calls, no multi-step interaction, no warm-up run. Enforc
 
 **Plans must declare `files:`** in YAML frontmatter to be coverage-aware. Pre-v7 plans without this declaration fall through to escape-phrase / block (per the X1 decision: warn-only treatment is logged but not yet block-default for legacy plans).
 
+**The scope-growth third door — a refused write is STOP AND ASK, never a silent edit
+(00123).** A plan's declared `files:` set IS its write permission, so an executor that
+discovers mid-build it must touch a file the set does NOT cover is refused by the
+enforcement hook. The two obvious escapes both arm an auto-revert of the plan out from
+under the running build: amending `files:` moves the byte-hashed frontmatter →
+`hash-mismatch`; moving the plan back to re-ask records the wrong gate edge →
+`wrong-edge`. `src/lib/scope-growth.js` is the third door — WITHOUT touching the plan
+file: `requestScopeGrowth(request, root)` files the growth as a structured question in
+the EXISTING inbox questions stream (`inbox.createQuestion` → the dashboard question
+count → `menu-screens.inboxQuestionsScreen`) and registers the continuation fork so the
+Stop hook permits the halt. A request is REFUSED unless all seven fields (plan, step,
+file, blocked_write, forced_by, acceptance_criterion, if_refused) are non-empty, so it
+can never be a rubber stamp; `forced_by_declared` is three-valued (true / false / **null**
+when the declaration could not be read — "could not look" is not "found nothing").
+`listScopeGrowthRequests(root)` reads them back grouped by plan (a second request on one
+plan is itself a mis-sizing finding). The executor contract is
+`agents/iron-loop/iron-loop-executor.md` (Rule 5). This does NOT auto-widen `files:` —
+only a human crossing the build gate through the menu widens scope. Enforced by
+`tests/scope-growth.test.js`.
+
 ## Continuation Gate — building CONTINUES (Operating Lesson 15 enforcement)
 
 CTOC is autonomous building steered by the human on the MAIN decisions. So building
@@ -273,7 +293,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 510 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 511 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -621,13 +641,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (start, push, update)
     hooks/               17 Claude Code hooks (session start, user-prompt-submit, pre-tool-use, post-tool-use, subagent stop)
-    lib/                 128 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 129 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 510 test files
+  tests/                 511 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
