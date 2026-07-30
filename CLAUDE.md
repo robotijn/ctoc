@@ -269,7 +269,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 501 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 502 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -298,6 +298,26 @@ and `whitelist` is a PERMANENT exemption that starts EMPTY and requires a writte
 justification per entry. Conflating them is what kills a fence. The fixed exemplars are
 the specification: `src/scripts/test-gate.js` (parsers return `null`, never `0`) and
 `src/lib/request-exit.js` (`process.exitCode` + return, so Node drains before exiting).
+
+**The unexecutable-order fence — an order to an agent to run code its tools give it no way
+to run.** An agent definition is a set of orders, and its `tools:` frontmatter is the
+complete list of what it can do. When the body says *call this JavaScript function* —
+`call \`shouldRunGdpr(projectRoot)\`` — and the grant holds no way to execute JavaScript
+(in practice, no `Bash`), the order is IMPOSSIBLE: the agent skips the part it cannot do
+and returns a result that reads like success. Five agent definitions carried exactly this
+(two advisory compliance agents, the web-only recommender, and both planning agents), and
+one of them, `initProductOwnerAgent`, propped up dead exports whose only "caller" was that
+impossible order. `src/lib/unexecutable-instruction-scan.js` finds such orders across
+`agents/**/*.md`, following the same discipline as `src/lib/reachability.js` — **a citation
+is not an invocation**: a bare backticked name, a `file#name` anchor, a third-person
+description, fenced example code, and a callee whose name is itself a granted tool are NOT
+findings. Three signatures fire (an imperative call verb, a second-person sentence, a
+capability manifest); it UNDER-reports by design rather than cry wolf.
+`.ctoc/unexecutable-instruction-baseline.json` holds the same TWO separate structures as
+the false-green baseline — `debt` (real orders being paid down, may only SHRINK) and
+`exemptions` (the detector is wrong, a written reason per entry, ships EMPTY);
+`tests/unexecutable-instruction-fence.test.js` is the ratchet and `iron-loop-enforcer`'s
+`unexecutable-instruction-fence` check (thorough mode) is the live call site.
 
 **A check with zero detected tools reports NOT VERIFIED and FAILS its tier — it does not
 pass.** In the quality agent (`src/lib/quality-agent.js`), `runLint`/`runTypecheck` carry a
@@ -583,13 +603,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (start, push, update)
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use, subagent stop)
-    lib/                 125 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 126 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 501 test files
+  tests/                 502 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

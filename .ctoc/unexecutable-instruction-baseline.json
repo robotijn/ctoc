@@ -1,0 +1,6 @@
+{
+  "comment": "THE UNEXECUTABLE-ORDER FENCE baseline (plan 00110). A finding here is an agent body that ORDERS the agent to execute JavaScript its own tools: grant gives it no way to execute. A CITATION IS NOT AN INVOCATION: a bare backticked name, a file#name anchor, a third-person description, fenced example code, and a callee whose name is itself a granted tool are NOT findings. This follows the reconciled src/lib/reachability.js, whose exportedNames (:731-732) and edgesFrom (:271-273) BOTH strip comments/fences first and credit only a real call. RATCHET: maxDebt may only ever be LOWERED and debt entries only ever REMOVED (by correcting the order or granting the capability). EXEMPTIONS ARE NOT DEBT: an exemption asserts the detector is WRONG, requires a written reason of at least 20 characters, and the list SHIPS EMPTY. This slice fixed all five named agents in the same pass that seeds the baseline, so the seeded debt is what remains AFTER the corrections: zero.",
+  "maxDebt": 0,
+  "debt": [],
+  "exemptions": []
+}

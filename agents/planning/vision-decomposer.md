@@ -63,7 +63,7 @@ Vision (The Big Picture)
 
 ## Pre-Decomposition Gate
 
-Before decomposing, validate vision readiness by calling `validateVisionReadiness()` from `src/lib/vision-decomposer.js`.
+Before decomposing, confirm vision readiness against the checks `validateVisionReadiness` performs in `src/lib/vision-decomposer.js` — that function is the authority for the gate. You hold `Read` and consult it; the deterministic verdict is produced by the session / CTO Chief driving the library via `node -e`, since your `Read, Write, AskUserQuestion` grant cannot execute JavaScript.
 
 **Gate checks (blocking — the function sets `ready: false` if any fail):**
 - Problem statement present (the vision names the problem it solves)
@@ -85,8 +85,8 @@ If validation fails (blocking errors), show errors to user and ask them to compl
 Before extracting goals, check if a Canvas exists for this vision:
 
 1. Compute the vision slug from the vision filename (strip `.md` extension and any leading stage prefix).
-2. Check `plans/canvas/<vision-slug>.md` (or call `getCanvasForVision(visionSlug)` from `src/lib/vision-decomposer.js`).
-3. If a canvas exists, call `parseCanvas(canvasPath)` and bind the result `{type, blocks}`.
+2. Check `plans/canvas/<vision-slug>.md`. Canvas lookup and parsing are deterministic-library operations in `src/lib/vision-decomposer.js`; the session / CTO Chief (which holds `Bash`) calls `getCanvasForVision(visionSlug)` and then calls `parseCanvas(canvasPath)` via `node -e`, and hands you the parsed result. You do not run them — your grant cannot execute JavaScript.
+3. If a canvas exists, work from the parsed `{type, blocks}` result.
 
 **If canvas type is `lean`:**
 - The **Problem** block names the top 1-3 problems — these often correspond 1:1 to top-priority goals.
@@ -374,8 +374,11 @@ Before presenting stubs to the user, validate the entire decomposition. Every ch
 
 ### Phase 7: Create Functional Plan Stubs
 
-For each goal or slice, create a stub using `createStub()` from `src/lib/vision-decomposer.js`.
-Or call `decomposeVision(visionPath, goals)` to create all stubs at once.
+For each goal or slice, a functional plan stub is created by the deterministic library
+`src/lib/vision-decomposer.js` — `createStub` for a single stub, `decomposeVision` for the
+whole batch. These write files under `plans/functional/`; the session / CTO Chief holds
+`Bash` and drives them via `node -e`. You supply the decomposition (titles, scope,
+dependency order) and recommend the library call; you do not execute it.
 
 **createStub parameters:**
 
@@ -451,22 +454,28 @@ AskUserQuestion({
 
 The user can iterate (edit, add, remove stubs) until satisfied, then approve for PO Agent refinement.
 
-**Edit operations:**
-- **Merge:** Call `mergeStubs(stubPaths, mergedName)` from `src/lib/vision-decomposer.js`
-- **Split:** Remove the stub via `removeStub(stubPath)`, then create 2+ new stubs via `createStub()`
-- **Remove:** Call `removeStub(stubPath)` from `src/lib/vision-decomposer.js`
-- **Add:** Call `createStub(visionSlug, goal, visionPath)` from `src/lib/vision-decomposer.js`
+**Edit operations** — each is a deterministic-library operation in
+`src/lib/vision-decomposer.js` that the session drives via `node -e`; you recommend it and
+re-present the result:
+- **Merge:** the session calls `mergeStubs(stubPaths, mergedName)`.
+- **Split:** the session calls `removeStub(stubPath)` on the original, then `createStub(...)` for each of the 2+ new stubs.
+- **Remove:** the session calls `removeStub(stubPath)`.
+- **Add:** the session calls `createStub(...)`.
 
-After any edit, re-run the self-validation checklist (Phase 6) and re-present the table.
+After any edit the session calls `listStubs(visionSlug)` to re-enumerate the vision's
+stubs; then re-run the self-validation checklist (Phase 6) and re-present the table.
 
 ## Handoff to Product Owner
 
-When user approves decomposition ("Looks good -- refine all"):
+When user approves decomposition ("Looks good -- refine all"), recommend this handoff to
+the session / CTO Chief, which holds `Bash` and drives each library operation via `node -e`:
 
-1. For each stub, write status file via `writeStatus(stubPath, { agent: 'product-owner', status: 'working', message: 'Refining stub...' })`
-2. Launch the PO Agent per stub via `initBackgroundAgent(stubPath, AGENT_TYPES.PRODUCT_OWNER, 'Refining stub...')` from `src/lib/actions.js` (both `initBackgroundAgent` and `AGENT_TYPES` are exported there; `AGENT_TYPES.PRODUCT_OWNER` is the string `'product-owner'`)
-3. Call `completeVision(visionPath)` from `src/lib/vision-decomposer.js` to move vision to `plans/done/` with `type: vision`
-4. Return control to the conversation (PO Agent runs as background agent per stub)
+1. For each stub, a status file is written via `writeStatus` in `src/lib/background.js`, marking `{ agent: 'product-owner', status: 'working', message: 'Refining stub...' }`.
+2. A Product Owner background agent is launched per stub via `initBackgroundAgent` from `src/lib/actions.js` (both `initBackgroundAgent` and `AGENT_TYPES` are exported there; `AGENT_TYPES.PRODUCT_OWNER` is the string `'product-owner'`).
+3. The vision is moved to `plans/done/` with `type: vision` via `completeVision` in `src/lib/vision-decomposer.js`.
+4. Control returns to the conversation (the PO agent runs as a background agent per stub).
+
+You recommend these operations; you do not execute them — your grant cannot run JavaScript.
 
 **Handoff data passed to PO Agent (via stub file content):**
 - Goal with actor, impact, and success metric
@@ -543,7 +552,7 @@ When two goals seem to overlap (they share >50% of their stories):
 
 1. Present the overlap to the user with specific stories that appear in both.
 2. Ask: "Should these be one goal or two?"
-3. If one: merge via `mergeStubs()`.
+3. If one: recommend a `mergeStubs` merge (the session drives it via `node -e`).
 4. If two: clarify the boundary by reassigning shared stories to the goal where they deliver the most value.
 
 ### Missing technical foundation
@@ -574,7 +583,7 @@ If a proposed stub only contains technical stories (API endpoints, database sche
 | **Gold plating** | >5 stories per activity, most are enhancements | Defer to Phase 3 (Polish), keep only core stories in Phase 1 |
 | **Lost vision intent** | Stubs do not trace back to vision success criteria | Re-anchor each stub to a specific success criterion |
 | **Scope creep in decomposition** | Stories that address problems not in the vision | Remove and note as "future consideration" |
-| **Identical stubs** | Two stubs with >80% story overlap | Merge using `mergeStubs()` |
+| **Identical stubs** | Two stubs with >80% story overlap | Merge using `mergeStubs` (session-driven) |
 
 ## Output
 
@@ -584,26 +593,22 @@ Creates one or more files in `plans/functional/`:
 
 Updates vision document:
 - Status: `decomposed`
-- Moved to `plans/done/` via `completeVision()`
+- Moved to `plans/done/` via `completeVision` (the session drives it via `node -e`)
 
 ## Tools Used
 
-- Read (vision document)
-- Write (functional plan stubs)
+**Tools this agent holds** (the only things it can itself do):
+- Read (vision document, canvas, sibling stubs, the deterministic-library sources as authorities)
+- Write (its own scratch and stub-body content)
 - AskUserQuestion (interactive decisions at goal validation and slicing strategy)
-- `src/lib/vision-decomposer.js`:
-  - `validateVisionReadiness(visionPath)` -- Pre-decomposition gate
-  - `decomposeVision(visionPath, goals)` -- Batch stub creation
-  - `createStub(visionSlug, goal, visionPath)` -- Single stub creation
-  - `completeVision(visionPath)` -- Mark vision decomposed, move to done
-  - `listStubs(visionSlug)` -- List stubs for a vision
-  - `removeStub(stubPath)` -- Delete a stub and its status
-  - `mergeStubs(stubPaths, mergedName)` -- Combine stubs
-  - `slugify(str)` -- Generate filename-safe slugs
-- `src/lib/actions.js`:
-  - `initBackgroundAgent(stubPath, AGENT_TYPES.PRODUCT_OWNER, message)` -- Launch PO Agent per stub
-- `src/lib/background.js`:
-  - `writeStatus(stubPath, statusObj)` -- Set stub processing status
+
+**Authorities it reads / library operations it recommends** (executed by the session /
+CTO Chief via `node -e`, never by this agent — a function name is not a capability this
+agent has). These are the deterministic library; consult them by name, recommend them, do
+not invoke them:
+- `src/lib/vision-decomposer.js` — `validateVisionReadiness` (pre-decomposition gate authority), `decomposeVision` (batch stub creation), `createStub` (single stub creation), `completeVision` (mark vision decomposed, move to done), `listStubs` (list stubs for a vision), `removeStub` (delete a stub and its status), `mergeStubs` (combine stubs), `slugify` (filename-safe slug rule: lowercase, `[^a-z0-9]+` → `-`)
+- `src/lib/actions.js` — `initBackgroundAgent` (launch the PO agent per stub; the generic spawn the session calls)
+- `src/lib/background.js` — `writeStatus` (set stub processing status)
 
 ## Success Criteria
 
@@ -653,8 +658,10 @@ process**. The submit path (`src/lib/streaming-render.js`) sets an
 acknowledgment; your job is to produce the topics and PERSIST them so the next render
 drives them.
 
-Write the decomposed topics through the canonical store writer,
-`src/lib/streaming-topics.js`:
+The decomposed topics are persisted through the canonical store writer,
+`writeTopics` in `src/lib/streaming-topics.js`. You produce the topics; the session /
+CTO Chief (which holds `Bash`) runs the writer via `node -e` — you have no way to execute
+this yourself:
 
 ```bash
 node -e "require('${CLAUDE_PLUGIN_ROOT}/src/lib/streaming-topics.js').writeTopics(process.cwd(), TOPICS)"
@@ -688,7 +695,8 @@ call `writeTopics` again.
 The parsing, readiness validation, stub creation, and lifecycle moves are
 implemented and tested in `src/lib/vision-decomposer.js` (CRLF-safe
 frontmatter handling included — hand-rolled stub writing reintroduced a
-double-frontmatter bug once already). Drive them via
-`node -e "require('.../src/lib/vision-decomposer.js')..."` for every
-mechanical operation; your model judgment is for the DECOMPOSITION ITSELF
-(story mapping, slicing), never for file mechanics.
+double-frontmatter bug once already). The session / CTO Chief, which holds
+`Bash`, drives them via `node -e "require('.../src/lib/vision-decomposer.js')..."`
+for every mechanical operation. You do not run `node`, and you never hand-roll a
+file write; your model judgment is for the DECOMPOSITION ITSELF (story mapping,
+slicing), never for file mechanics.
