@@ -611,6 +611,13 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
     // write target. It must also stay free of ./cache: it sits on the
     // every-tool-call PreToolUse hook path and requires only path + safe-fs.
     ['gate-migration.js', 'writes only .ctoc/approvals/.migration-complete.json (migration marker) and .ctoc/logs/gate-migration-pending.json (pending-notice snapshot); never a counted plan/vision/inbox file'],
+    // Part One (plan 00072): the per-request routing reminder's writeMemo persists
+    // ONLY .ctoc/state/routing-reminder.json (a per-session novelty memo pruned to 20
+    // sessions). Never a counted plan/vision/inbox *.md, so no plan-stage/vision/inbox
+    // count can change and there is nothing to invalidate. It must also stay free of
+    // ./cache: it runs inside the ephemeral UserPromptSubmit hook process, where the
+    // in-process count cache never lives, so invalidate() there would be a no-op lie.
+    ['ctoc-routing-reminder.js', 'writes only .ctoc/state/routing-reminder.json (per-session routing-reminder memo); never a counted plan/vision/inbox file'],
   ]);
 
   // The known count-mutating writers already wired (CF1 + its kickback). These

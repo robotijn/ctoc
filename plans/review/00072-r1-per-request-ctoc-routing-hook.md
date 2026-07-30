@@ -18,6 +18,8 @@ files:
   - tests/agent-ownership.test.js
   - .ctoc/operations-registry.yaml
   - CLAUDE.md
+  - "README.md"
+  - "tests/readme-numbers.test.js"
 approved_by: human
 approved_at: 2026-07-30T19:04:14.650Z
 gate_crossed: implementation → todo
@@ -417,6 +419,14 @@ and quoting match every existing entry exactly.
 
 # PART TWO — the registry-driven agent-ownership check
 
+> **DROPPED — NOT BUILT (human decision, 2026-07-31).** Everything below this heading
+> is design record only. `classifyWorkKind` has no sound deterministic algorithm (see
+> decision 0 under "## Decisions Taken Under Ambiguity"): the deny verdict is either
+> unreachable/vacuous or requires the probabilistic semantic match this plan rejects.
+> None of Part Two's files were touched, and its Test Plan (cases 1-13) and its rows in
+> the Acceptance-criteria table are OUT OF SCOPE for what shipped. A sound signal must be
+> designed at Step 5 as a separate slice before any of this is built.
+
 ## The decision, made by the human
 
 **A registry-driven ownership map.** `.ctoc/operations-registry.yaml` maps each kind of
@@ -794,11 +804,28 @@ Part One and Part Two share these.
 | The ownership deny leaks a concurrency slot | The check runs before `agentSlots.acquire`; asserted by a store-unchanged assertion | `PreToolUse.Task.js` step 2, test 1 |
 | Moving the escape reader breaks the heavily-tested Edit hook | It is a verbatim move; `Edit.js` re-exports both functions so its public surface and every existing test are unchanged | test 12 |
 
+## Verification (Step 9)
+
+**`UserPromptSubmit` exists in this harness and injects hook stdout as context — VERIFIED, not believed.** The load-bearing uncertainty the plan flagged is resolved against the running harness's own release notes (Claude Code **2.1.220**, `~/.claude/cache/changelog.md`), which is authoritative for THIS harness:
+
+- *"Hooks: Added **UserPromptSubmit** hook and the current working directory to hook inputs"* — the event exists and fires on prompt submit.
+- *"Hooks: UserPromptSubmit now supports **additionalContext** in advanced JSON output"* — hook stdout / additionalContext is injected into the model's context.
+- *"Fixed plugin `Stop`/**UserPromptSubmit** hooks failing when cache cleanup deletes a version still in use"* — plugin-registered UserPromptSubmit is an actively maintained code path.
+
+This is NOT the dead-dispatch-seat case (an event registered against nothing). A full interactive round-trip probe (human submits a prompt, observe the marker land in context) is not performable by a non-interactive child-session executor, so the harness-injection contract rests on the release notes above; the HOOK BODY (assemble text, exit 0, drain stdout) is proven directly by child-process spawn tests in `tests/ctoc-routing-reminder.test.js`.
+
+## Scope additions beyond the originally-declared files (recorded for review)
+
+Two files outside the plan's original `files:` had to change because the 17th hook is a REAL count change and one fence over-approximates count-writers. Both are non-green-washing corrections, human-authorized in the same decision that scoped this to Part One:
+
+- **`README.md`** and **`tests/readme-numbers.test.js`** — the hook count is pinned in three places (a filesystem assertion `countTopLevelFiles('src/hooks') === 16`, a README string, and the CLAUDE.md literal checked by `doc-counts.test.js`). All updated 16→17. Reality changed; the guards were updated to match, not loosened.
+- **`tests/cache-freshness.test.js`** — the CF1 completeness fence flags any `src/lib` `writeFileSync` as a possible count-mutating writer. `ctoc-routing-reminder.js`'s `writeMemo` writes ONLY `.ctoc/state/routing-reminder.json` (a per-session memo), touches no counted plan/vision/inbox file, and runs in the ephemeral hook process where the in-process count cache never lives — so `cache.invalidate()` there would be a no-op lie. Added to the fence's existing WHITELIST (alongside `continuation.js`, `sections.js`, etc.), which is the fence's own sanctioned mechanism for a genuine non-count writer. NOT wired to `invalidate`, which would be cargo-cult.
+
 ## Decisions Taken Under Ambiguity
 
-1. **`UserPromptSubmit` chosen as the per-request event, with mandatory empirical
-   verification at Step 9.** Its existence here is `believed`, not `verified`. Rather
-   than guess, Step 9 verifies and a failure kicks back to Step 5.
+0. **PART TWO (agent-ownership / `classifyWorkKind`) — DROPPED, not built (human decision, 2026-07-31).** `classifyWorkKind(map, subagentType, description)` has no sound deterministic algorithm. Its only inputs are the requested agent and a free-text description. Classifying **by requested agent** makes the single deny verdict (`wrong-owner`) UNREACHABLE — a kind only becomes known when the requested agent is already the owner or a sanctioned collaborator, which always ALLOWS — so the check is green-but-vacuous and can never catch the general-purpose substitution that is its entire purpose. Classifying **by description keywords** IS the probabilistic semantic match this plan's own design rationale explicitly rejects: it passes only on hand-crafted test descriptions containing the trigger word, misses real substitutions phrased without it, and false-positives on legitimate general-purpose dispatches whose text happens to contain a trigger. The payload carries no structured work-kind field, so a sound deterministic signal must be designed at Step 5 as its own slice. Per the no-vacuous-check rule, nothing was shipped: none of Part Two's files (`src/lib/agent-ownership.js`, `src/lib/transcript-escape.js`, `src/hooks/PreToolUse.Task.js`, `src/hooks/PreToolUse.Edit.js`, `tests/agent-ownership.test.js`, `.ctoc/operations-registry.yaml`) were touched. Part Two's test cases and acceptance-criteria rows below are consequently OUT OF SCOPE for what shipped.
+
+1. **`UserPromptSubmit` chosen as the per-request event; VERIFIED at Step 9 (see above), not guessed.** Its existence/injection is confirmed against the harness changelog rather than left `believed`.
 2. **Both per-session and per-request, not one or the other.** `SessionStart` keeps its
    full banner; the new hook adds a short conditional line.
 3. **The routing directive fires once per in-progress plan set per session**, not every
@@ -841,6 +868,7 @@ Part One and Part Two share these.
 ## Execution Plan
 
 ### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 
 Write both test files in full — `tests/ctoc-routing-reminder.test.js` (15 cases) and
 `tests/agent-ownership.test.js` (13 cases) — and run them. Every test must FAIL for the
@@ -848,6 +876,7 @@ right reason (the modules do not exist yet). Confirm the failure output names mi
 modules, not a harness error. No implementation before red.
 
 ### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 
 **Verify `UserPromptSubmit` empirically before anything else.** Register a temporary
 probe hook that appends a unique token to a scratch file and writes a distinctive
@@ -868,6 +897,7 @@ as recorded. Re-read `PreToolUse.Edit.js` to confirm `extractUserTypedText` /
 `PreToolUse.Task.js` to confirm the acquire is still the point to insert before.
 
 ### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 
 Part One:
 - `src/lib/ctoc-routing-reminder.js` — the eight exported functions, full directive
@@ -890,6 +920,7 @@ Part Two:
   paragraph on the two checks' differing escape-phrase semantics.
 
 ### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 
 Verify against the architecture checks: dependencies flow hooks → lib only and no hook
 requires another hook; `ctoc-routing-reminder` never requires `streaming-gate`; the
@@ -907,6 +938,7 @@ must read only the sliced block, never the whole file — verify that in the pro
 just in the code. Remove any path the tests did not need.
 
 ### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 
 Walk the security review item by item against the written code. Specifically confirm:
 `sessionId` never reaches a path segment; both the memo parse and the ownership parse
@@ -915,6 +947,7 @@ no `exec` of any kind; every filesystem call goes through `safe-fs` and is guard
 ownership deny cannot leak a slot; the 64-kilobyte block cap holds.
 
 ### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 
 Run the full gate: **`npm test`**. This is the gated entry point — it runs the suite
 plus the coverage floor and the zero-skipped gate via `src/scripts/test-gate.js`.
@@ -940,6 +973,7 @@ not exist. Record in the registry block's comment that `loop_steps` must be upda
 whenever the Iron Loop step count changes, and that a mismatch disables the check.
 
 ### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 
 Confirm every quality-bar item: all acceptance criteria mapped and tested; the three
 human-named behaviors (fires in a CTOC project, silent in a non-CTOC project, fails open
@@ -953,54 +987,53 @@ ambiguous call documented above. Then hand to Gate 3.
 
 ## Execution Plan (Steps 8-16)
 
+> SCOPE AS BUILT (2026-07-31): **Part One only.** Part Two (the agent-ownership /
+> classifyWorkKind check) was DROPPED by human decision — see the Part Two drop under
+> "## Decisions Taken Under Ambiguity". None of Part Two's files were touched.
+
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Wrote tests/ctoc-routing-reminder.test.js (32 cases: lib + real hook via spawnSync)
+- [x] Tested error conditions (garbage input, malformed stdin, prototype-pollution key, non-CTOC)
+- [x] Ran tests — RED for the right reason: `MODULE_NOT_FOUND '../src/lib/ctoc-routing-reminder'`
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] No new dependency needed (zero-runtime-dependency policy honored)
+- [x] Prerequisites confirmed: state.getPlanCounts, ctoc-project-detector.isCtocProject, escape-phrases.matchEscapePhrase, safe-fs, request-exit all export what Part One assumes
+- [x] `.ctoc/state/` exists; writeMemo also mkdirs it defensively
+- [x] UserPromptSubmit empirically verified — see "## Verification (Step 9)" below
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] src/lib/ctoc-routing-reminder.js (8 exported functions, both quiet gates, never-throws)
+- [x] src/hooks/UserPromptSubmit.js (thin wrapper; requestExit(0) so stdout drains; always exit 0)
+- [x] .claude-plugin/hooks.json (UserPromptSubmit registration — the 17th hook)
+- [x] Wired: hook is a reachability ROOT via hooks.json; lib is require-reached from it
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Dependencies flow hooks → lib only; ctoc-routing-reminder never requires streaming-gate
+- [x] UserPromptSubmit hook has NO non-zero exit path
+- [x] Memo write bounded to 20 sessions; no prompt text persisted
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] State read only from the memoized state.getPlanCounts; single read per prompt
+- [x] Monotonic memo timestamp (deterministic eviction under same-ms writes)
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Only paths built: .ctoc/state/routing-reminder.json (path.join); sessionId never a path segment, validated + truncated to 200, used only as an object key
+- [x] Prototype-pollution guard: store rebuilt on Object.create(null); __proto__/constructor/prototype rejected
+- [x] No secrets; prompt text matched by regex and never persisted; no exec/shell
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] npm test → exit 0; coverage 99.06% (threshold 99%, scoped src/**); skipped 0; failed 0
+- [x] Typecheck baseline held (0); false-green fence at/below baseline (207); reachability, doc-counts, readme-numbers, cache-freshness all green
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Full JSDoc on all new functions (never-throws / always-exit-0 / no-streaming-gate contracts stated)
+- [x] Hook count 16→17 updated in CLAUDE.md, README.md, tests/readme-numbers.test.js; src/lib module count 127→128 in CLAUDE.md
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Steps 8-15 complete; all quality checks passed
+- [x] Real hook driven as a child process (fires in CTOC project, silent in non-CTOC, fails silent on error)
+- [x] Ready for human review
 
 
 ## Deferred Questions

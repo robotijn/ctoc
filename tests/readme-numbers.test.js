@@ -180,8 +180,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.equal(countSlashCommandSpecs(), 3);
   });
 
-  it('src/hooks/: 16 hook files (+PreToolUse.Task/SubagentStop — the subagent concurrency fence, 2026-07-16)', () => {
-    assert.equal(countTopLevelFiles('src/hooks'), 16);
+  it('src/hooks/: 17 hook files (+UserPromptSubmit — the per-request CTOC-routing reminder, 2026-07-31)', () => {
+    assert.equal(countTopLevelFiles('src/hooks'), 17);
   });
 
   it('src/tabs/: 4 dashboard tab files (functional removed with assignDirectly in R5-B/C — dead after the assign path was deleted)', () => {
@@ -294,8 +294,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /3 slash commands/);
   });
 
-  it('Project structure: 16 Claude Code hooks', () => {
-    assert.match(README, /16 Claude Code hooks/);
+  it('Project structure: 17 Claude Code hooks', () => {
+    assert.match(README, /17 Claude Code hooks/);
   });
 
   it('Project structure: 104 JS modules in src/lib', () => {
