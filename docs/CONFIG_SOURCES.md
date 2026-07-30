@@ -6,7 +6,7 @@ different layers, so edit the right one.
 | File | Read by | Owns | Format |
 |------|---------|------|--------|
 | `.ctoc/settings.json` | `src/lib/settings.js` (menu-driven store) and `src/lib/deployment.js` | `general.environment` (runtime env), `agents`, `workflow`, `learning`, `git`, `privacy`, and the nested `deployment` engine block | JSON (rich/nested) |
-| `.ctoc/settings.yaml` | the safety-critical PreToolUse hooks and library code (`src/hooks/*`, `src/lib/budget.js`, `src/lib/regulatory-regime.js`, …) | `enforcement.mode`, `regulatory_regime`, `operations` | YAML (flat, dependency-free) |
+| `.ctoc/settings.yaml` | the safety-critical PreToolUse hooks and library code (`src/lib/enforcement-mode.js` reads `enforcement.mode`; also `src/hooks/*`, `src/lib/budget.js`, `src/lib/regulatory-regime.js`, …) | `enforcement.mode`, `regulatory_regime`, `operations` | YAML (flat, dependency-free) |
 
 ## Why two files
 
@@ -22,7 +22,7 @@ YAML reader cannot represent — lives in `settings.json`.
 
 | You want to change… | Edit |
 |---------------------|------|
-| Enforcement strictness (`strict`/`soft`/`off`) | `.ctoc/settings.yaml` → `enforcement.mode` |
+| Enforcement strictness (`strict`/`soft`/`off`) | `.ctoc/settings.yaml` → `enforcement.mode` (read by `src/lib/enforcement-mode.js`; when absent it falls back to `.ctoc/settings.json` → `workflow.enforcementMode`, then the environment profile, in that order) |
 | Regulatory regime profiles | `.ctoc/settings.yaml` → `regulatory_regime` |
 | CTOC runtime environment (dev/staging/prod) | `.ctoc/settings.json` → `general.environment` (or the menu's first-run prompt) |
 | Deployment targets / strategies / `dry_run` | `.ctoc/settings.json` → `deployment` (or run the `deployment-setup` agent) |

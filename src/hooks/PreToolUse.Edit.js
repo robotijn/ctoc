@@ -62,6 +62,12 @@ try { escapePhrases = require('../lib/escape-phrases'); } catch { escapePhrases 
 // catch fails OPEN, so a load-time throw would allow EVERY edit.
 let realPathConfinement = null;
 try { realPathConfinement = require('../lib/real-path-confinement'); } catch { realPathConfinement = null; }
+// Loaded fail-soft like the siblings above: a load failure ⇒ the resolver is
+// unavailable ⇒ enforce() falls back to `strict` (today's behavior). Fail-closed,
+// consistent with the file's fail-soft-sibling convention. The mode is consulted at
+// exactly ONE decision point (step 5); the protected-path guards above it never read it.
+let enforcementMode = null;
+try { enforcementMode = require('../lib/enforcement-mode'); } catch { enforcementMode = null; }
 
 const WHITELIST = [
   '.gitignore',
@@ -504,6 +510,33 @@ function buildBlockMessage(reason, info) {
     + `  - If this change is genuinely small, an escape phrase you type yourself will allow it — see /ctoc:start for the current list.\n\n`;
 }
 
+/**
+ * Build the human-readable WARNING banner written to stderr when an uncovered edit
+ * is ALLOWED because `enforcement.mode: soft` is set. Same shape as
+ * `buildBlockMessage`, but it says plainly that the edit was allowed and names the
+ * resolved source file, so the human sees WHY the usual block did not fire. Pure, so
+ * its content is asserted in-process without a process.exit.
+ *
+ * Like `buildBlockMessage`, it carries NO verbatim escape-phrase list (W08-s1 /
+ * finding H4): this text lands back in the transcript and would otherwise seed the
+ * raw-tail escape matcher and unlock the next edit.
+ *
+ * @param {string} reason - short machine reason (shown after "WARNING:")
+ * @param {object} info - { target_file?, project_root?, mode_source? }
+ * @returns {string} the multi-line stderr banner, containing no canonical phrase
+ */
+function buildSoftWarnMessage(reason, info) {
+  const target = (info && info.target_file) || '(unknown)';
+  const project = (info && info.project_root) || process.cwd();
+  const src = (info && info.mode_source) || 'settings.yaml';
+  return `\n[CTOC v7] Edit ALLOWED (WARNING): ${reason}\n`
+    + `  Target: ${target}\n`
+    + `  Project: ${project}\n\n`
+    + `  This edit is normally blocked, but enforcement.mode is set to soft (from ${src}),\n`
+    + `  so it is allowed and this warning is recorded instead. Set enforcement.mode to\n`
+    + `  strict in .ctoc/settings.yaml to block uncovered edits again.\n\n`;
+}
+
 function block(reason, info) {
   process.stderr.write(buildBlockMessage(reason, info));
   if (info.project_root && enforcementLog) {
@@ -515,6 +548,8 @@ function block(reason, info) {
         plan_matched: null,
         escape_phrase: null,
         outcome: 'block',
+        mode: info.mode || null,
+        mode_source: info.mode_source || null,
       }, info.project_root);
     } catch { /* fail open on log error */ }
   }
@@ -536,6 +571,8 @@ function allow(outcome, info) {
         plan_matched: info.plan_matched || null,
         escape_phrase: info.escape_phrase || null,
         outcome,
+        mode: info.mode || null,
+        mode_source: info.mode_source || null,
       }, info.project_root);
     } catch { /* fail open on log error */ }
   }
@@ -563,6 +600,15 @@ async function enforce(stdinJson) {
     const tool = (stdinJson && stdinJson.tool_name) || 'Edit';
     const targetFile = getTargetFile(stdinJson);
 
+    // Resolve the enforcement mode ONCE per invocation and thread it into EVERY
+    // audit record below (so an audit can separate a permitted edit from an
+    // unenforced one). It is CONSULTED only at step 5 — the protected-path guards
+    // and the whitelist below are absolute at every mode. A missing/broken resolver
+    // ⇒ strict ⇒ today's behavior (fail-closed).
+    const { mode, source: modeSource } = enforcementMode
+      ? enforcementMode.resolveEnforcementMode(root)
+      : { mode: 'strict', source: 'default' };
+
     // 0. Ledger provenance is human-approval truth (finding C4). Deny ANY write
     //    under `.ctoc/approvals/`. This runs BEFORE the Step-1 `.ctoc/` whitelist
     //    below — otherwise the `/^\.ctoc\//` pattern would allow the ledger to be
@@ -570,7 +616,7 @@ async function enforce(stdinJson) {
     //    editing tools (Write delegates here; MultiEdit/NotebookEdit via W01).
     if (targetFile && isProtectedLedgerPath(targetFile)) {
       return block('ledger is human-approval provenance; agent writes to .ctoc/approvals/ are denied', {
-        tool, target_file: targetFile, project_root: root,
+        tool, target_file: targetFile, project_root: root, mode, mode_source: modeSource,
       });
     }
 
@@ -583,7 +629,7 @@ async function enforce(stdinJson) {
     //     not pass through these hooks, so it is unaffected.
     if (targetFile && isProtectedVerifyPath(targetFile)) {
       return block('verify evidence is written by the pipeline (step-13-verify), not by hand; agent writes to .ctoc/state/verify/ are denied', {
-        tool, target_file: targetFile, project_root: root,
+        tool, target_file: targetFile, project_root: root, mode, mode_source: modeSource,
       });
     }
 
@@ -599,20 +645,20 @@ async function enforce(stdinJson) {
     //     hook and is unaffected.
     if (targetFile && targetsStreamingLive(targetFile)) {
       return block('streaming questions/answers are gate provenance; agent writes under .ctoc/streaming/ are denied except the questions/pending/ quarantine', {
-        tool, target_file: targetFile, project_root: root,
+        tool, target_file: targetFile, project_root: root, mode, mode_source: modeSource,
       });
     }
 
     // 1. Whitelist (infrastructure files always allowed)
     if (targetFile && isWhitelisted(targetFile)) {
-      return allow('whitelist', { tool, target_file: targetFile, project_root: root });
+      return allow('whitelist', { tool, target_file: targetFile, project_root: root, mode, mode_source: modeSource });
     }
 
     // 2. CTOC project? If not, silent pass.
     if (!detector) return process.exit(0); // libs missing — fail open
     const detect = detector.isCtocProject(root);
     if (!detect.isCtoc) {
-      return allow('silent-passthrough', { tool, target_file: targetFile, project_root: root, project_is_ctoc: false });
+      return allow('silent-passthrough', { tool, target_file: targetFile, project_root: root, project_is_ctoc: false, mode, mode_source: modeSource });
     }
 
     // 3. Plan-coverage?
@@ -621,7 +667,7 @@ async function enforce(stdinJson) {
       if (match) {
         return allow('allow', {
           tool, target_file: targetFile, project_root: root,
-          project_is_ctoc: true, plan_matched: match.plan,
+          project_is_ctoc: true, plan_matched: match.plan, mode, mode_source: modeSource,
         });
       }
     }
@@ -632,20 +678,37 @@ async function enforce(stdinJson) {
     if (escape) {
       return allow('escape', {
         tool, target_file: targetFile, project_root: root,
-        project_is_ctoc: true, escape_phrase: escape,
+        project_is_ctoc: true, escape_phrase: escape, mode, mode_source: modeSource,
       });
     }
 
-    // 5. Block. On the BLOCK PATH ONLY, ask coverage WHY: a plan may declare this
-    //    file and still grant nothing (unapproved, or its approval no longer matches
-    //    its content). This re-runs the scan, so it must never run on an allow.
-    //    Fail-soft to `null` — an explanation must never change a decision.
+    // 5. Enforcement mode decides — and ONLY here. The guards above (ledger, verify
+    //    evidence, streaming) already returned; they are absolute at every mode.
+    if (mode === 'off') {
+      return allow('off-allow', {
+        tool, target_file: targetFile, project_root: root,
+        project_is_ctoc: true, mode, mode_source: modeSource,
+      });
+    }
+    if (mode === 'soft') {
+      process.stderr.write(buildSoftWarnMessage(
+        'no active plan covers this file and no escape phrase used',
+        { target_file: targetFile, project_root: root, mode_source: modeSource }));
+      return allow('soft-warn', {
+        tool, target_file: targetFile, project_root: root,
+        project_is_ctoc: true, mode, mode_source: modeSource,
+      });
+    }
+    // strict — the BLOCK PATH ONLY. Ask coverage WHY (re-runs the scan): a plan may
+    // declare this file and still grant nothing (unapproved, or its approval no
+    // longer matches its content). Fail-soft to `null` — an explanation must never
+    // change a decision, and it never runs on an allow.
     let denial = null;
     if (coverage && targetFile && typeof coverage.explainDenial === 'function') {
       try { denial = coverage.explainDenial(targetFile, root); } catch { denial = null; }
     }
     return block('no active plan covers this file and no escape phrase used', {
-      tool, target_file: targetFile, project_root: root, denial,
+      tool, target_file: targetFile, project_root: root, mode, mode_source: modeSource, denial,
     });
   } catch (err) {
     // Fail OPEN — never break the user's flow due to a hook bug
@@ -658,7 +721,7 @@ module.exports = {
   enforce, isWhitelisted, isProtectedLedgerPath, isProtectedVerifyPath,
   targetsStreamingLive,
   getTargetFile, readStdinJson,
-  findEscapeInTranscript, extractUserTypedText, buildBlockMessage,
+  findEscapeInTranscript, extractUserTypedText, buildBlockMessage, buildSoftWarnMessage,
 };
 
 // Direct invocation: this file run as a PreToolUse hook on an Edit tool. Read

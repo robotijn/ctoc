@@ -137,17 +137,24 @@ When Claude is inside a CTOC project, the **PreToolUse enforcement hook** (`src/
 
    **Coverage fails CLOSED, and fail-closed means return `null`, never throw.** `PreToolUse.Edit.js` wraps enforcement in a catch that fails OPEN, so a throw out of `plan-coverage.js` becomes an ALLOW — a permission check whose failure mode is "permission granted". An unlistable stage directory used to do exactly that. Enforced by `tests/unapproved-plan-grants-nothing.test.js`. A denial that was caused by an unapproved or invalidated plan NAMES that plan and the reason, because a lockout the human cannot read is what gets reverted.
 4. **Escape phrase in recent user messages** — allow. See `src/lib/escape-phrases.js` for the canonical list (`hotfix`, `trivial fix`, `urgent`, `skip planning`, `skip iron loop`, `quick fix`, `trivial change`). Case-insensitive, word-bounded.
-5. **Otherwise — BLOCK** with a helpful message redirecting to `/ctoc:start`.
+5. **Otherwise — decided by `enforcement.mode`.** `strict` (the default) BLOCKS with a helpful message redirecting to `/ctoc:start`; `soft` allows the edit and writes a WARNING to stderr; `off` allows it silently. This is the ONE decision point the mode governs.
 
-Every decision is logged to `.ctoc/logs/enforcement.json`. Hook fails OPEN on internal error.
+Every decision is logged to `.ctoc/logs/enforcement.json`, now including the resolved `mode` and its `mode_source`, so an audit can tell a PERMITTED edit (`allow` + a covering plan) from an UNENFORCED one (`off-allow`). Hook fails OPEN on internal error.
 
-**Per-project tuning** via `.ctoc/settings.yaml`:
+**Per-project tuning** via `.ctoc/settings.yaml` — read by `src/lib/enforcement-mode.js` and consulted at exactly one point (step 5 of the edit flow above):
 ```yaml
 enforcement:
   mode: strict   # strict | soft | off  (default: strict)
 ```
+- `strict` — an uncovered edit is BLOCKED (the historical, default behavior).
+- `soft` — an uncovered edit is ALLOWED with a WARNING on stderr.
+- `off` — an uncovered edit is ALLOWED silently.
 
-**Runtime environment** — `general.environment` in `.ctoc/settings.json` (`ask | dev | staging | prod`) selects a CTOC behavior profile via `src/lib/settings.js` (`ENVIRONMENT_PROFILES`). Resolution is `explicit user setting > environment profile > schema default`; `ask` (default) applies no profile and makes the menu prompt the user on first open. Profiles tune enforcement strictness, auto-push, default model, and log verbosity — they NEVER weaken a human gate (no profile may set `requireReviewGate: false` or `enforcementMode: off`; enforced by `tests/environment-mode.test.js`).
+Resolution order (highest wins): `.ctoc/settings.yaml` → `enforcement.mode`, then `.ctoc/settings.json` → `workflow.enforcementMode` (explicit), then the environment profile (`dev` → `soft`), then the schema default `strict`. **An unreadable or malformed setting — or an unknown value — resolves to `strict`** (fail-closed), never to `off`.
+
+**The floor: `off` never weakens a human gate.** It relaxes plan-coverage on file edits ONLY. It never relaxes the approval-ledger deny, the Gate-3 verify-evidence deny, or the streaming-questions deny, and it never touches any `PreToolUse.Bash.js` security or human-gate deny — those are absolute at every mode. Asserted by `tests/enforcement-mode.test.js`.
+
+**Runtime environment** — `general.environment` in `.ctoc/settings.json` (`ask | dev | staging | prod`) selects a CTOC behavior profile via `src/lib/settings.js` (`ENVIRONMENT_PROFILES`). Resolution is `explicit user setting > environment profile > schema default`; `ask` (default) applies no profile and makes the menu prompt the user on first open. Profiles tune enforcement strictness (`dev` → `soft`) and the default model (`prod` → `opus`) — they NEVER weaken a human gate (no profile may set `requireReviewGate: false` or `enforcementMode: off`; enforced by `tests/environment-mode.test.js`).
 
 **Declared entry point — "no app to launch" is not "no entry point".** The Step 14
 last-mile check (`src/lib/app-runner.js`) can only recognise an entry point it knows
@@ -262,7 +269,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 494 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 495 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -518,13 +525,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (start, push, update)
     hooks/               16 Claude Code hooks (session start, pre-tool-use, post-tool-use, subagent stop)
-    lib/                 123 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 124 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 494 test files
+  tests/                 495 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

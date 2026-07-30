@@ -23,9 +23,13 @@
  * hard-block exit code. An allow stays exit-0-silent. The human banner goes to
  * STDERR so stdout carries only the decision JSON. Identical to Edit/Write.
  *
- * ENFORCEMENT MODE. The sibling PreToolUse hooks do not read
- * `enforcement.mode` from `.ctoc/settings.yaml` today — no hook does — so this
- * one does not either, rather than inventing a knob its siblings do not honor.
+ * ENFORCEMENT MODE. The sibling editing hooks (Edit/Write/MultiEdit/NotebookEdit)
+ * NOW honor `enforcement.mode` from `.ctoc/settings.yaml` (via
+ * `src/lib/enforcement-mode.js`) — but this hook deliberately does NOT, for the
+ * same reason it has no escape hatch (below): the five-subagent cap is a RESOURCE
+ * limit, not planning ceremony. Setting `mode: off` cannot conjure a sixth
+ * execution context, so honoring it here would grant a launch WITHOUT a slot and
+ * corrupt the slot accounting exactly as an escape phrase would.
  *
  * NO ESCAPE HATCH, DELIBERATELY — and this hook is the ONE PreToolUse hook that
  * differs from its siblings here. An escape phrase ("urgent", "hotfix", "quick

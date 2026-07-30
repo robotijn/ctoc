@@ -66,6 +66,21 @@ Phase 3: IMPLEMENTATION (Steps 8-16)             [Autonomous]
 
 User can bypass planning for trivial changes by saying: "skip planning", "quick fix", "trivial fix", "hotfix", "urgent".
 
+### Enforcement Mode
+
+Plan-coverage enforcement on file edits is tunable in `.ctoc/settings.yaml`:
+
+```yaml
+enforcement:
+  mode: strict   # strict | soft | off  (default: strict)
+```
+
+- `strict` — an edit no active plan covers is BLOCKED.
+- `soft` — such an edit is ALLOWED with a warning.
+- `off` — such an edit is ALLOWED silently.
+
+`off` relaxes plan-coverage on file edits ONLY; the four human gates, the approval ledger, the Gate-3 verify evidence, the streaming-questions store, and the security denies are unaffected at every mode. An unreadable or unknown value resolves to `strict`.
+
 ---
 
 <!-- CTOC:LESSONS v1 START -->

@@ -3,7 +3,13 @@
  *
  * Append-only JSONL log at .ctoc/logs/enforcement.json. Captures every decision
  * the PreToolUse enforcement hook makes: allow, block, escape,
- * silent-passthrough, hook-broken.
+ * silent-passthrough, hook-broken, soft-warn, off-allow.
+ *
+ * Every entry ALSO carries `mode` (the resolved enforcement.mode in force) and
+ * `mode_source` (which config decided it), so an audit can distinguish a PERMITTED
+ * edit (`allow` + a non-null `plan_matched`) from an UNENFORCED one (`off-allow`,
+ * `plan_matched: null`). `logEnforcement` is schema-free (`{ timestamp, ...entry }`),
+ * so the new fields need no code change here.
  *
  * Durability: writes go through the shared `durable-log` primitive, so each
  * record is a single atomic O_APPEND line (no unguarded read-modify-write —
