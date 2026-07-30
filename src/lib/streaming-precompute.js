@@ -750,11 +750,20 @@ function readAnsweredQuestionIds(root, ref, revision) {
  * @param {string} root project root
  * @param {string} ref plan reference ("stage/file.md")
  * @returns {{enough: boolean, reason: string, unanswered: Array<object>,
- *   blocking: Array<object>, unboundAnswers: number}} `unanswered` is EVERY
- *   still-open question (nothing hidden); `blocking` is the subset that is a fork
- *   and therefore fails the gate; `unboundAnswers` is how many recorded answers
- *   could not be tied to this revision of the plan, so a screen can say "3 recorded
- *   answers are being asked again" instead of silently re-asking.
+ *   blocking: Array<object>, unboundAnswers: number, computed: (number|null),
+ *   answered: string[]}} `unanswered` is EVERY still-open question (nothing hidden);
+ *   `blocking` is the subset that is a fork and therefore fails the gate;
+ *   `unboundAnswers` is how many recorded answers could not be tied to this revision
+ *   of the plan, so a screen can say "3 recorded answers are being asked again"
+ *   instead of silently re-asking. `computed` is HOW MANY questions the file held
+ *   (`questions.length`) on the ready path and `null` — never `0` — on every
+ *   fail-closed path, so an unavailable count is honestly distinct from an empty
+ *   list. `answered` is the ids of the CURRENT questions whose answer bound, so
+ *   `answered.length + unanswered.length === computed` always holds. Both are
+ *   derived from the SAME single read this function already performs — no extra disk
+ *   access, no second predicate — so a recorded audit trail can state the
+ *   denominator (how much a plan was asked), not only the numerator (how much was
+ *   answered).
  */
 function hasEnoughInformation(root, ref) {
   const status = planQuestionsStatus(root, ref);
@@ -763,8 +772,9 @@ function hasEnoughInformation(root, ref) {
   // not-knowing is never a pass.
   if (status.status !== 'ready') {
     // Nothing was read, so nothing was evaluated against a revision — 0 unbound is
-    // literally true here and never means "everything bound".
-    return { enough: false, reason: status.status, unanswered: [], blocking: [], unboundAnswers: 0 };
+    // literally true here and never means "everything bound". `computed: null` (not
+    // 0): the count is UNKNOWN here, and writing 0 would forge an empty-list record.
+    return { enough: false, reason: status.status, unanswered: [], blocking: [], unboundAnswers: 0, computed: null, answered: [] };
   }
 
   const questions = status.questions;
@@ -779,6 +789,10 @@ function hasEnoughInformation(root, ref) {
   // answered — the ignorance can only ever move the verdict toward false.
   const unanswered = questions.filter((q) => !answers.ids.has(q.id));
   const blocking = unanswered.filter(isBlockingQuestion);
+  // The count that EXISTED, and the ids that bound — both from the read above, so
+  // only ids of CURRENT questions count (answered.length + unanswered.length === computed).
+  const computed = questions.length;
+  const answered = questions.filter((q) => answers.ids.has(q.id)).map((q) => q.id);
 
   if (blocking.length > 0) {
     return {
@@ -787,10 +801,12 @@ function hasEnoughInformation(root, ref) {
       unanswered,
       blocking,
       unboundAnswers: answers.unbound,
+      computed,
+      answered,
     };
   }
 
-  return { enough: true, reason: 'enough', unanswered, blocking: [], unboundAnswers: answers.unbound };
+  return { enough: true, reason: 'enough', unanswered, blocking: [], unboundAnswers: answers.unbound, computed, answered };
 }
 
 module.exports = {

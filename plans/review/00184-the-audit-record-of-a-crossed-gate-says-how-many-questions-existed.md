@@ -15,6 +15,7 @@ files:
 approved_by: human
 approved_at: 2026-07-30T19:04:14.561Z
 gate_crossed: implementation → todo
+  - "tests/answers-bind-to-plan-revision.test.js"
 ---
 
 # The audit record of a crossed gate says how many questions existed
@@ -259,6 +260,7 @@ deferred to `00183` and `00180` respectively and are not written as skipped test
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Write the buildable cases (1–12) in full FIRST and run only them. Cases 1, 2, 3, 6, 7,
 8 and 12 must be RED. **Record case 2's and case 3's red output side by side** — two
 identical evidence strings from two maximally different inputs is the defect, and
@@ -268,6 +270,7 @@ its dependency (`00180`'s `auditSufficiencyCrossings`) is absent, so it would be
 failing or skipped test either way.
 
 ### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Read from disk: `src/lib/streaming-gate.js:428-642` in full (`sufficiencyFor`, its
 stale comment, `crossBySufficiency`, `pendingGateDecisions`);
 `src/lib/streaming-precompute.js` `planQuestionsStatus:392`, `readAnsweredQuestionIds:636`
@@ -280,6 +283,7 @@ absent (it is, today) so case 13 stays deferred. **Where the code disagrees with
 plan, THE CODE WINS.**
 
 ### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 - `src/lib/streaming-precompute.js` — add `computed` and `answered` to
   `hasEnoughInformation`'s return.
 - `src/lib/streaming-gate.js` — the `composeSufficiencyEvidence` helper; the extra
@@ -288,6 +292,7 @@ plan, THE CODE WINS.**
 - `tests/sufficiency-evidence.test.js` — cases 1–12.
 
 ### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Confirm no count in the evidence string was inferred rather than read from the verdict,
 and that `unknown` appears wherever a count was unavailable (`computed: null`). Confirm
 the single-verdict discipline is preserved — one verdict computed at
@@ -301,6 +306,7 @@ read it already performs, and `crossBySufficiency` now reads nothing of its own.
 disk reads DROP by one per crossing (the deleted `readAnsweredQuestionIds` call).
 
 ### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 The evidence string is written into a ledger entry that an agent may not edit but any
 human may read. Question ids are producer-authored: `stripCtl` them and cap the joined
 list's length so a hostile id cannot inject control characters or unbounded text into a
@@ -308,6 +314,7 @@ permanent record. Confirm the entry write remains inside `.ctoc/approvals/` and 
 the slug derivation is untouched.
 
 ### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 `node --test` on the new file plus every existing streaming-gate, streaming-precompute,
 approval-ledger and approval-residency test, then the full gated run `npm test`. Lint
 at `--max-warnings 0`. No git operations. **Report the full evidence string this code
@@ -321,6 +328,7 @@ Update the documented test-file count in `CLAUDE.md` from the live disk count (t
 slice adds one test file — that is why `CLAUDE.md` is a declared file).
 
 ### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Report the Step 8 side-by-side reds, the verbatim evidence string from Step 14, that
 cases 6 (attested variant) and 13 (auditor round trip) are deferred to `00183` and
 `00180`, and every decision taken under ambiguity.
@@ -387,6 +395,20 @@ cases 6 (attested variant) and 13 (auditor round trip) are deferred to `00183` a
     It needs the corrected blocking semantics for its counts to mean anything; it does
     not need the attestation contract, and it degrades gracefully by writing
     `not recorded` until `00183` supplies a record.
+11. **`tests/answers-bind-to-plan-revision.test.js` case 18 was updated to the new
+    evidence contract.** That case drives the live crossing (`pendingGateDecisions`)
+    and asserted the OLD phrasing `/2 question\(s\) answered/`, which this plan
+    DELIBERATELY replaces with `N question(s) computed, M answered`. The change is a
+    TIGHTENING, not a loosening: the replaced-phrasing assertion became `/2 answered/`
+    (the same numerator, new phrasing) AND a NEW assertion `/2 question\(s\) computed/`
+    was added, so the test now locks in BOTH the numerator and the denominator this
+    slice introduced. The case's three other assertions (`/q10, q11/`, no `q12`, the
+    `/1 recorded answer\(s\) did not bind to this revision/` clause) are UNCHANGED. The
+    file was added to this plan's declared `files:` by the human before the edit.
+    `tests/sufficiency-audit.test.js` was deliberately NOT touched: it builds the old
+    phrasing as its OWN fixture to prove the (future `00180`) auditor tolerates the
+    legacy format, and it must keep passing as-is — the legacy record still exists in
+    history and the auditor must read it.
 
 
 ## Deferred Questions

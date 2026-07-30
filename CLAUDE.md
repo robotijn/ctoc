@@ -269,13 +269,27 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 503 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 504 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
 ```
 
 All tests must show `# fail 0`. If any test fails, fix before committing.
+
+**The sufficiency-crossing audit record states the DENOMINATOR, not only the
+numerator.** When a plan crosses a pre-build gate by ENOUGH INFORMATION (no human
+approval), `streaming-gate.composeSufficiencyEvidence` writes the ledger `evidence`
+in one fixed, greppable order so an auditor reads the arithmetic rather than the
+conclusion: `sufficiency: <ref> — <N> question(s) computed, <M> answered (<ids>);
+<U> unanswered, <B> blocking; attested by: not recorded; enough (no unanswered
+fork)`. `computed` is how many questions the file held — it is what separates
+"asked seven, cleared them" from "asked nothing", which the old answered-only string
+collapsed to identical bytes. A count that could not be established renders `unknown`
+(never `0`); a genuine zero renders the explicit phrase `no questions were computed`;
+the counts are threaded from the SINGLE verdict that authorised the crossing (never a
+second read that could observe a different revision). `attested by: not recorded` is
+a fixed forward-compatible slot until a critique-record source exists.
 
 **The gate FAILS CLOSED when it cannot read its own instrument.** `test-gate.js` strips ANSI before parsing and returns `null` — never `0` — when a counter is unreadable, so an unparseable run is a loud failure instead of a silent green: a parser whose no-match default is the success value cannot tell "everything passed" from "I could not read my input" (it once reported `fail 0` over 8 real failures under `FORCE_COLOR`).
 
@@ -609,7 +623,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 503 test files
+  tests/                 504 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

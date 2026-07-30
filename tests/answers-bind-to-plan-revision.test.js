@@ -432,7 +432,12 @@ describe('the gate-side caller runs the SAME binding matrix', () => {
 
     streamingGate.pendingGateDecisions(root); // sufficiency crosses the plan and writes the entry
     const entry = JSON.parse(fs.readFileSync(path.join(root, '.ctoc', 'approvals', 'c18.json'), 'utf8'));
-    assert.match(entry.evidence, /2 question\(s\) answered/, 'only the answers that bind are counted');
+    // The evidence contract now records the DENOMINATOR (how many questions existed)
+    // alongside the numerator (how many bound) — plan 00184 replaced the old
+    // answered-only phrasing "N question(s) answered" with "N question(s) computed,
+    // M answered". Both are asserted here so a future edit cannot drop either count.
+    assert.match(entry.evidence, /2 question\(s\) computed/, 'the count that EXISTED is recorded');
+    assert.match(entry.evidence, /2 answered/, 'only the answers that bind are counted');
     assert.match(entry.evidence, /q10, q11/);
     assert.equal(/q12/.test(entry.evidence), false, 'an unbound answer is not evidence of sufficiency');
     assert.match(entry.evidence, /1 recorded answer\(s\) did not bind to this revision/,
