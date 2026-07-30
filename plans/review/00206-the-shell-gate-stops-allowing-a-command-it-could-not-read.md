@@ -11,6 +11,7 @@ files:
   - "src/hooks/PreToolUse.Bash.js"
   - "tests/bash-gate-payload-reader.test.js"
   - "CLAUDE.md"
+  - "tests/security-bash-hook.test.js"
 approved_by: human
 approved_at: 2026-07-30T19:04:14.620Z
 gate_crossed: implementation → todo
@@ -270,6 +271,7 @@ reported before Gate 3 rather than settled by this plan.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Write the file in full and run only it. Cases 2, 3, 6, 7, 8, 9, 10 and 12 must be RED.
 **Before anything else, run cases 4 and 5 against the real spawned hook and record the
 observed behaviour verbatim** — whether an empty pipe and an absent pipe are
@@ -277,6 +279,7 @@ distinguishable, and whether `readFileSync(0)` blocks. That measurement is the i
 the empty-stdin decision and this slice must not proceed past Step 10 without it.
 
 ### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Read from disk: `PreToolUse.Bash.js:707-883` (`getCommand` through `main()` and the
 outer catch) **as it stands after `00202` if `00202` has landed, and as-is if it has
 not** — read the ACTUAL shape, not this plan's transcription of it;
@@ -288,12 +291,14 @@ involved), and every existing test that spawns this hook, for case 13. Read
 code disagrees with this plan, THE CODE WINS.**
 
 ### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 - `src/hooks/PreToolUse.Bash.js` — `readPayload` replaces `getCommand`; the regex
   fallback deleted; the two new branches at the top of `main()`; the refusal recorded
   through `emitDeny` + `writeToTerminal` with no payload bytes.
 - `tests/bash-gate-payload-reader.test.js` — the fourteen cases.
 
 ### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Confirm no route through `readPayload` returns a usable command it did not fully parse.
 Confirm the two deny branches run **before** any `loadState`. Confirm no error message or
 banner carries payload bytes. Confirm the reader is still called exactly once — a
@@ -304,6 +309,7 @@ One regex removed from the per-command path; nothing added. No read cap is intro
 capping the read would reintroduce truncate-then-parse in a new spelling.
 
 ### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Confirm the payload is never interpolated into a `RegExp`, a message, or a log field.
 Re-attack: a payload with a `command` key inside a nested string, a payload with two
 `command` keys, a payload using unicode escapes for the redirect character, a payload
@@ -311,6 +317,7 @@ whose JSON is valid but 50 MiB. Report what each does; a hang or an unbounded al
 on the last one is a finding.
 
 ### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 `node --test` on the new file plus **every** existing test that spawns this hook, then
 the full gated run `npm test`. Lint at `--max-warnings 0`. Run `false-green-scan` and
 confirm `src/hooks/PreToolUse.Bash.js` gains **no new** false-green finding and
@@ -326,6 +333,7 @@ inspect, and remove any documentation stating the hook fails open on an unreadab
 payload. Update the documented test-file count from disk (this slice adds one test file).
 
 ### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Report every Step 8 red verbatim, the **case 4 and case 5 measurements in full**, every
 Step 13 re-attack result, the case-13 blast radius, the false-green scan result (no new
 finding, baseline unchanged), and every decision taken under ambiguity. **Name the
@@ -375,6 +383,31 @@ empty-stdin deny explicitly as a decision the human should confirm rather than i
 8. **The payload branches run before `loadState`.** A broken state must not be able to
    turn a payload refusal into a crash, which the outer catch would turn into a
    non-blocking exit 1 — an allow by another name.
+
+### Resolution taken at implementation (supersedes Decisions 3 & 4 above)
+
+The empty-stdin polarity that Decision 4 reserved for the human was resolved by the
+human (via the coordinator) to **ALLOW**, and the fail-closed scope was narrowed to
+genuinely-undecodable input. Implemented accordingly:
+
+9. **Fail closed ONLY on an UNDECODABLE payload (Decision 1).** A NON-EMPTY payload that
+   will not cleanly `JSON.parse` is DENIED, and the quote-truncating regex fallback is
+   DELETED — that fallback captured a prefix (`echo \`) of a command hiding a redirect
+   (`echo "x" > src/uncovered.js`) and cleared it. If it cannot be parsed, it cannot be
+   cleared. A `readFileSync(0)` throw is treated the same (fail closed). This is the
+   security hole named in the brief.
+
+10. **An empty read is a SUCCESS, not a read failure — it ALLOWS (Decision 2, resolving
+    Decision 4 to allow).** `raw === ''` (empty pipe / absent pipe — indistinguishable
+    zero-byte reads; measured: `readFileSync(0)` returns `''` and never blocks), and
+    cleanly-parsed JSON with genuinely no command (missing key, `null`, non-string, or
+    `""`), all return `empty` and are ALLOWED. There is nothing to gate, and denying an
+    empty read would risk denying every Bash command in every install if the harness ever
+    delivered no pipe. This preserves the pre-existing `security-bash-hook.test.js`
+    CONTRACT-5 allow assertions for empty/null/missing/`""`; only the malformed-JSON
+    assertion there was inverted to deny, matching the new fail-closed-on-undecodable rule.
+    The separate `empty` deny status that Decision 3 proposed is therefore NOT built —
+    `empty` is an allow, not a deny.
 
 
 ## Deferred Questions
