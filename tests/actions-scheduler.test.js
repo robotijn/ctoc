@@ -143,7 +143,7 @@ describe('taskSpecFromPlan', () => {
 // 1b. taskSpecFromPlan — path-traversal guard on depends_on (LOW existence-oracle)
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('taskSpecFromPlan — depends_on path-traversal guard', () => {
+describe('taskSpecFromPlan — an unsafe depends_on token REFUSES the plan (reported, not silent)', () => {
   const UNSAFE = [
     ['dotdot traversal', '../../../../etc/passwd'],
     ['NUL byte', 'evil' + String.fromCharCode(0) + 'dep'],
@@ -151,23 +151,26 @@ describe('taskSpecFromPlan — depends_on path-traversal guard', () => {
   ];
 
   for (const [label, token] of UNSAFE) {
-    it(`SKIPS an unsafe depends_on token (${label}) — no out-of-root existsSync oracle, no scheduler throw`, () => {
+    it(`REFUSES the plan on an unsafe depends_on token (${label}) — the refusal precedes every existsSync, so no out-of-root oracle`, () => {
       writePlan('todo', 'guarded', { files: ['src/x.js'], dependsOn: token });
       const rootResolved = path.resolve(root);
 
       const calls = [];
       const orig = safeFs.existsSync;
       safeFs.existsSync = (p) => { calls.push(p); return orig(p); };
-      let spec;
       try {
-        spec = actions.taskSpecFromPlan(todoPlan('guarded'), root);
+        // The plan is now REFUSED (plan 00145): an unreadable dependency list fails
+        // closed rather than starting the work with prerequisites unchecked.
+        assert.throws(
+          () => actions.taskSpecFromPlan(todoPlan('guarded'), root),
+          /dependency list unreadable/,
+          'an unreadable dependency list must refuse the plan, not silently proceed');
       } finally {
         safeFs.existsSync = orig;
       }
 
-      assert.deepEqual(spec.blockedBy, [],
-        'an unsafe depends_on token is ignored — never a scheduler blocker, never a throw');
-
+      // The security fence, kept verbatim and now asserted over a SHORTER call list:
+      // the refusal happens before any dependency probe, so nothing left the root.
       for (const p of calls) {
         const resolved = path.resolve(String(p));
         const inRoot = resolved === rootResolved || resolved.startsWith(rootResolved + path.sep);
@@ -177,7 +180,7 @@ describe('taskSpecFromPlan — depends_on path-traversal guard', () => {
     });
   }
 
-  it('a VALID depends_on beside an unsafe token still resolves and drives ordering (regression)', () => {
+  it('a VALID depends_on beside an unsafe token still REFUSES the whole plan (partial success is the defect in miniature)', () => {
     const dep = taskRegistry.addAndClaim(root, {
       kind: 'implement', plan: 'live-dep', touches: ['src/dep.js']
     });
@@ -186,9 +189,12 @@ describe('taskSpecFromPlan — depends_on path-traversal guard', () => {
     writePlan('todo', 'mixed', {
       files: ['src/w.js'], dependsOn: '../../../../etc/passwd live-dep'
     });
-    const spec = actions.taskSpecFromPlan(todoPlan('mixed'), root);
-    assert.deepEqual(spec.blockedBy, [dep.task.id],
-      'the valid dependency still blocks; the unsafe token is silently skipped');
+    // The premise this slice reverses: honouring the valid half would run the plan with
+    // one prerequisite checked and one unreadable. An unreadable list refuses entirely.
+    assert.throws(
+      () => actions.taskSpecFromPlan(todoPlan('mixed'), root),
+      /dependency list unreadable/,
+      'a valid token beside an unreadable one does not rescue the plan — it refuses');
   });
 
   it('a normal depends_on with no unsafe tokens is unchanged: done dependency → no blocker', () => {
