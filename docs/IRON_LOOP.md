@@ -304,7 +304,36 @@ Future enhancements (not yet implemented):
 
 ### Validation
 
-Step labels are validated programmatically by `src/lib/plan-validator.js` and enforced by `src/hooks/validate-plan-steps.js`. Plans with wrong labels are REJECTED before execution.
+Two modules check Iron Loop step-label **text** against the canonical labels
+(`8:TEST … 16:FINAL-REVIEW`): `src/lib/plan-validator.js` (its `validateStepLabels`)
+and `src/hooks/validate-plan-steps.js`. Both correctly flag a wrong real heading —
+for example `### Step 8: TESTING` instead of `### Step 8: TEST`.
+
+**NOT WIRED — neither label check runs at a live transition today, so a
+present-but-mislabeled step is not auto-rejected at runtime.** Two distinct reasons:
+
+- `src/hooks/validate-plan-steps.js` is **not registered** in the Claude hook
+  manifest (`.claude-plugin/hooks.json`) — it is the only file under `src/hooks/`
+  absent from it (`post-commit.js` is also absent, but that is a **git** hook, run
+  by git, not a Claude hook). It runs only as a standalone command you invoke by
+  hand: `node src/hooks/validate-plan-steps.js <plan-path>`.
+- `src/lib/plan-validator.js` **is** wired, but its `validateStepLabels` is
+  reachable only through `validateForExecution`, which is mapped solely to the
+  `todo → in-progress` edge — and nothing crosses that edge through
+  `validateTransition`. `startExecution` (`src/lib/actions.js`) moves the plan with
+  a bare `movePlan`, so the label check on that edge never fires. (plan-validator
+  DOES still reject a **missing** required step wherever it is invoked; the label
+  and missing-step checks simply share the `validateForExecution` path that no
+  runtime transition reaches.)
+
+Before wiring the hook as a real pre-execution gate, its three recorded
+`exit-with-pending-writes` sites (the `process.exit` calls in its
+`require.main === module` CLI block) must be fixed — an automated caller reading its
+output over a pipe can otherwise lose the message explaining the verdict, installing
+a gate that blocks work without saying why. `tests/step-label-hook-claim-matches-manifest.test.js`
+keeps this section and the two shipped documents (this file and `CLAUDE.md`) telling
+the same story, and fails the moment the hook is registered — demanding the sentence
+be corrected back.
 
 ---
 
