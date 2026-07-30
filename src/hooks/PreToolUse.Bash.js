@@ -725,32 +725,45 @@ function isCommitCommand(command) {
 
 /**
  * Read the PreToolUse payload from STDIN (fd 0). The pipe is single-consumer, so
- * `main()` calls this exactly once and threads the result to every consumer. Returns
- * BOTH the command string AND the parsed payload — the parsed payload carries
- * `transcript_path`, which the new coverage stage's escape-phrase check needs. Fails
- * OPEN (command '') on any read/parse error — a broken pipe cannot crash the gate; an
- * empty command is then allowed by `main()`'s first check. On the regex fallback the
- * payload is null (no transcript is recoverable), so the escape check simply finds
- * nothing — deny-ward, never a crash.
+ * `main()` calls this exactly once and threads the result to every consumer.
  *
- * The reader's fail-open and its truncating fallback are NOT changed here (they are a
- * separate slice, 00206). This change only exposes the already-parsed payload that the
- * single stdin read produced.
- * @returns {{command: string, stdinJson: (object|null)}}
+ * FAILS CLOSED on an UNDECODABLE payload (00206). The old reader failed OPEN on every
+ * route it could not read: a `JSON.parse` failure fell back to a regex whose capture
+ * stopped at the FIRST quote, so a payload hiding `echo "x" > src/uncovered.js` was
+ * evaluated as the prefix `echo \` and ALLOWED — a permission gate reporting a verdict
+ * on input it never received (the truncate-then-parse family this repo fences). The
+ * regex fallback is DELETED: if a NON-EMPTY payload will not cleanly parse, the command
+ * cannot be trusted, so this returns `unreadable` and `main()` DENIES.
+ *
+ * An EMPTY read is a SUCCESS, not a failure (Decision 2): `raw === ''` (an empty pipe or
+ * an absent pipe — indistinguishable zero-byte reads) returns `empty`, and cleanly-parsed
+ * JSON with genuinely no command (missing key, null, non-string, or "") ALSO returns
+ * `empty` — there is nothing to gate, and denying it would risk denying every Bash command
+ * in every install if the harness ever delivers no pipe. `main()` ALLOWS `empty`.
+ *
+ * The parsed `payload` is threaded out for the coverage stage's escape-phrase check,
+ * which reads `transcript_path` from the same single stdin drain.
+ * @returns {{status:'ok', command: string, payload: object}
+ *          |{status:'empty', payload: (object|null)}
+ *          |{status:'unreadable', reason: string}}
  */
-function getPayload() {
-  let raw = '';
-  try { raw = fs.readFileSync(0, 'utf8') || ''; } catch { return { command: '', stdinJson: null }; }
-  if (!raw) return { command: '', stdinJson: null };
+function readPayload() {
+  let raw;
+  try { raw = fs.readFileSync(0, 'utf8'); } catch { return { status: 'unreadable', reason: 'payload could not be read' }; }
+  if (!raw) return { status: 'empty', payload: null };
+  let parsed;
   try {
-    const parsed = JSON.parse(raw);
-    const command = (parsed && parsed.tool_input && parsed.tool_input.command)
-      || (parsed && parsed.command) || '';
-    return { command, stdinJson: parsed };
+    parsed = JSON.parse(raw);
   } catch {
-    const m = raw.match(/command['":\s]+["']?([^"'\n]+)/);
-    return { command: m ? m[1] : '', stdinJson: null };
+    // NO regex fallback — the old one truncated at the first quote and cleared a redirect
+    // hidden behind it. A non-empty payload that will not parse cannot be cleared.
+    return { status: 'unreadable', reason: 'payload was not valid JSON' };
   }
+  let command = '';
+  if (parsed && parsed.tool_input && typeof parsed.tool_input.command === 'string') command = parsed.tool_input.command;
+  else if (parsed && typeof parsed.command === 'string') command = parsed.command;
+  if (!command) return { status: 'empty', payload: parsed }; // readable, nothing to gate
+  return { status: 'ok', command, payload: parsed };
 }
 
 /**
@@ -877,7 +890,26 @@ function formatBlocked(command, state, reason, blockType) {
  */
 async function main() {
   const projectPath = process.cwd();
-  const { command, stdinJson } = getPayload();
+
+  // 00206: read the payload BEFORE any state load, so a broken state cannot turn a
+  // payload refusal into a crash (the outer catch exits 1 = a harness non-block = allow).
+  // An UNDECODABLE payload (non-empty, will not parse) is DENIED — a gate that cannot read
+  // its input must not report a verdict on it. An EMPTY read (empty/absent pipe, or readable
+  // JSON with no command) is ALLOWED: there is nothing to gate, and denying it would deny
+  // every Bash command in every install if the harness ever delivered no pipe.
+  const payload = readPayload();
+  if (payload.status === 'unreadable') {
+    // No payload BYTES reach the banner or the deny reason — an undecodable payload is
+    // untrusted and may carry a secret. Fixed-vocabulary reason only; state is null (not
+    // yet loaded), which formatBlocked reads through optional chaining.
+    writeToTerminal(formatBlocked('(unreadable payload)', null,
+      `the PreToolUse payload could not be inspected (${payload.reason}), so this command `
+      + 'cannot be cleared. A gate that cannot read its input must not report a verdict on it.',
+      'PAYLOAD'));
+    emitDeny(`CTOC: Bash command denied — the payload could not be inspected (${payload.reason}).`);
+  }
+  const command = payload.status === 'ok' ? payload.command : '';
+  const stdinJson = payload.status === 'unreadable' ? null : (payload.payload || null);
 
   if (!command) {
     process.exit(0);

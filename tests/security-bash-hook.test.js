@@ -451,10 +451,13 @@ describe('Bash gate — edge cases do not crash', () => {
     assert.equal(res.status, 0, 'missing command allowed');
   });
 
-  it('malformed JSON payload -> no crash (defined exit code)', () => {
+  it('malformed JSON payload -> DENIED (fail closed on an undecodable payload)', () => {
+    // 00206: a NON-EMPTY payload that will not parse cannot be cleared — the old
+    // regex fallback truncated at the first quote and allowed a hidden redirect. A gate
+    // that cannot read its input must deny (HARNESS_BLOCK_EXIT_CODE = 2), never allow.
     const res = runHookRaw('not-json-at-all');
     assert.equal(res.signal, null, 'no crash on malformed JSON');
-    assert.ok(res.status === 0 || res.status === 1, `defined exit code, got ${res.status}`);
+    assert.equal(isDenied(res), true, `undecodable payload must be denied, got exit ${res.status}`);
   });
 
   it('newline-containing command -> no crash, defined exit code', () => {
