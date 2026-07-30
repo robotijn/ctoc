@@ -218,12 +218,14 @@ are the three ways this auditor could itself commit the defect it is auditing.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Write `tests/sufficiency-audit.test.js` in full FIRST and run only that file. All ten
 cases must be RED before `sufficiency-audit.js` exists. Record the red output
 verbatim. Case 9 runs against the live repository — record what it reports about THIS
 project, because that output is the answer to the question that motivated the slice.
 
 ### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Read from disk (the code is the authority — where it disagrees with this plan, THE
 CODE WINS, and record the disagreement):
 - `src/lib/approval-ledger.js` — `ledgerDir`, `readEntryResult` (the discriminated
@@ -241,11 +243,13 @@ CODE WINS, and record the disagreement):
 edit is required.
 
 ### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 - `src/lib/sufficiency-audit.js` — the auditor, with the three-verdict contract.
 - `tests/sufficiency-audit.test.js` — the ten cases.
 - `src/tabs/tools.js` — the live call site rendering the report.
 
 ### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Confirm no path returns `never-crossed` without having positively established that the
 ledger directory exists and was read. Confirm `null` is used for every unknown count
 and is never rendered as `0` anywhere in the report. Confirm `readEntryResult` and
@@ -256,6 +260,7 @@ One directory listing plus one read per entry; the questions file for a ref is r
 most once. No globbing of the whole project.
 
 ### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 The `evidence` string is subagent-influenced text: strip control characters before
 rendering it in the report. There is no single shared `stripCtl` export — the codebase
 replicates a one-line strip in each module that needs it (e.g. `streaming-gate.js:65`,
@@ -267,6 +272,7 @@ directories. Never echo the contents of an unparseable entry file — name the f
 the parse reason only.
 
 ### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 `node --test tests/sufficiency-audit.test.js`, then the full gated run `npm test`.
 Lint the changed JavaScript at `--max-warnings 0`. No git operations.
 **Report the live verdict for this repository verbatim.**
@@ -285,6 +291,7 @@ dashboard-tab count unchanged, so the FIXED "dashboard tab files" contract is
 unaffected too. CLAUDE.md is therefore correctly ABSENT from this plan's `files:`.
 
 ### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Report every verbatim Step 8 red, the live verdict, the number of ledger entries
 scanned, any unattested crossing found, and every decision taken under ambiguity.
 
@@ -299,6 +306,44 @@ scanned, any unattested crossing found, and every decision taken under ambiguity
   confirmed clean and are deliberately out of scope.
 - It cannot see crossings that happened in a **different checkout** of the project;
   the ledger is per-working-tree.
+
+## Execution Record (Steps 8–16)
+
+### The live finding for THIS repository (Step 14, recomputed live)
+
+The auditor was run against this working tree at build time:
+
+- `verdict`: **never-crossed**
+- `ledgerPresent`: **true**
+- `scanned`: **368** ledger entries
+- `crossings`: **0**
+- `unreadable`: **0**
+
+Report line: `gate crossings: none — scanned 368 ledger entries, no gate was ever
+crossed without a human`.
+
+**The self-crossing has never fired in this repository, and the statement now carries
+weight because `ledgerPresent === true` and `scanned === 368` establish that the
+auditor LOOKED at 368 present entries and found none — not that it failed to look.**
+This is the planning-time hand-probe (319 entries then; 368 now) made mechanical and
+repeatable in any CTOC project.
+
+### Decision recorded during execution — a ratchet baseline outside the declared files
+
+`.ctoc/golden-corpus-baseline.json` was updated (`maxFindings` 15 → 11, and the four
+`approval-ledger::…` finding keys removed). This file is NOT in the plan's declared
+`files:`. It was mechanically FORCED by a correct part of this slice: the golden-corpus
+fence flags any module that reads a persisted contract but has no test driving a REAL
+captured sample. `src/lib/sufficiency-audit.js` reuses `approval-ledger`'s
+`readEntryResult`/`entryKind` (a plan mandate), so test case 15 drives the real captured
+approvals sample from `tests/fixtures/golden-corpus/approvals/` through the auditor. That
+test is the FIRST in the suite to name the approvals corpus, so the fence now counts all
+four pre-existing `approval-ledger` consumers as linked, dropping the live finding count
+15 → 11. The fence's own failure message prescribes exactly this edit ("lower maxFindings
+and drop the fixed keys"). It is a strictly-tightening ratchet-DOWN (the correct
+direction), it is `.ctoc/*` bookkeeping rather than product/source, and the Step 14 gate
+cannot go green without it. Flagged here and in the run report because it is outside the
+declared file set.
 
 ## Decisions Taken Under Ambiguity
 
