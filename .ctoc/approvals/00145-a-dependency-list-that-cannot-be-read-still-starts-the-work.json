@@ -1,0 +1,9 @@
+{
+  "content_sha256": "570f18998ea72e02168fe8e6e2fbc05534aff9b19ebef0aa3b012c065537452b",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T14:47:44.078Z",
+  "approved_by": "human",
+  "plan_basename": "00145-a-dependency-list-that-cannot-be-read-still-starts-the-work"
+}

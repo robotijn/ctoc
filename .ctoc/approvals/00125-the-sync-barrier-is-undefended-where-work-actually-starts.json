@@ -1,0 +1,9 @@
+{
+  "content_sha256": "1895f66bd7eeeb9c720f63ca7df3ad614a2952a6612fb457c8b47786db44f9a2",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T14:47:44.018Z",
+  "approved_by": "human",
+  "plan_basename": "00125-the-sync-barrier-is-undefended-where-work-actually-starts"
+}

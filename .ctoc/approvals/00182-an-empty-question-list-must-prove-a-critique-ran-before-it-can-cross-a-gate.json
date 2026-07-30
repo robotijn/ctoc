@@ -1,0 +1,9 @@
+{
+  "content_sha256": "90ae0d69ff0da5a71b982177a198b8e55c6c688b87ba293018fa96f3145c1075",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T14:47:43.986Z",
+  "approved_by": "human",
+  "plan_basename": "00182-an-empty-question-list-must-prove-a-critique-ran-before-it-can-cross-a-gate"
+}

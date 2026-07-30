@@ -1,0 +1,9 @@
+{
+  "content_sha256": "633e89d42a58f75367bd0c2fcef2d5be030e3bf9fa884704903e38ceecd3c3f3",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T14:47:43.896Z",
+  "approved_by": "human",
+  "plan_basename": "00186-a-shipped-recipe-is-proven-by-running-it"
+}
