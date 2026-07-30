@@ -1511,34 +1511,51 @@ function planDeclaredFiles(plan) {
 }
 
 /**
- * Parse a plan's `depends_on:` into a list of dependency slugs. The scalar
+ * Parse a plan's `depends_on:` into a PARTITION of dependency slugs. The scalar
  * frontmatter reader stores `depends_on` as a single string; a slug list may be
  * comma- or whitespace-separated. `none`/empty resolve to no dependencies.
+ *
+ * `depends_on` is attacker-influenceable YAML frontmatter, and each slug is later
+ * joined into a path (done/ and review/ existence probes). Every token is therefore
+ * partitioned by the `isSafePlanSlug` path-traversal guard: safe tokens become
+ * `slugs`, unsafe tokens (a crafted `../../../../etc/passwd`, a NUL-bearing, or a
+ * separator-bearing entry) become `refused` — VERBATIM, uncleaned; sanitising the
+ * token for display is the message builder's job, at the point of display, not the
+ * parser's.
+ *
+ * The RETURN SHAPE carries the refusal (plan 00145) because the old bare array
+ * dropped it: a plan whose `depends_on` was ENTIRELY unsafe returned `[]`, byte-
+ * indistinguishable from a plan with NO dependencies, so the scheduler treated it as
+ * ready and STARTED building on an unknown dependency state. "I could not read the
+ * dependencies" and "there are no dependencies" must not spell the same. The caller
+ * (`taskSpecFromPlan`) reads `refused` and REFUSES the plan; a refused token is
+ * REPORTED, never accepted and never silently dropped.
+ *
+ * The rejection rule (`isSafePlanSlug`) is a path-traversal / existence-oracle guard
+ * and MUST NOT be widened to "fix" a refusal — widening it reintroduces the oracle it
+ * exists to close (a crafted slug becomes `path.join(root, 'plans', 'done', slug.md)`
+ * probed with `existsSync`). The defect was never that the slug is refused; it was
+ * that the refusal was discarded instead of reported. Do not restore the silent
+ * filter as a simplification.
+ *
+ * Pure: never throws, no filesystem access, no path is built from any token here.
  * @param {{metadata?: object}} plan
- * @returns {string[]}
+ * @returns {{slugs: string[], refused: string[]}}
  */
 function planDependsOn(plan) {
   const raw = plan && plan.metadata ? plan.metadata.depends_on : null;
-  if (raw == null) return [];
+  if (raw == null) return { slugs: [], refused: [] };
   const parts = String(raw).split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
-  // `depends_on` is attacker-influenceable YAML frontmatter, and each slug is later
-  // joined into a path (done/ and review/ existence probes). Drop the `none`
-  // sentinel and REFUSE any unsafe token here — a crafted `../../../../etc/passwd`,
-  // NUL-bearing, or separator-bearing entry is silently ignored rather than allowed
-  // to escape plans/ as an existence oracle (documented choice: an unsafe depends_on
-  // entry is ignored, not fatal — one malformed dependency must not throw the whole
-  // scheduler).
-  //
-  // KNOWN, UNFIXED LOSS (plan 00131, "What this plan does NOT fix", finding 3): a plan
-  // whose `depends_on` is ENTIRELY unsafe tokens returns [] — byte-indistinguishable
-  // from a plan with NO dependencies — so the scheduler treats it as ready and runs
-  // it. "I refused to read the dependencies" and "there are no dependencies" collapse
-  // to the same value. Making the scheduler REFUSE a plan whose declared dependencies
-  // were unreadable is a scheduling decision with its own blast radius and is the
-  // human's to schedule; it is deliberately NOT done here. The loss is pinned by
-  // tests/caller-error-is-not-a-verdict.test.js (case 15) so it is recorded, not
-  // rediscovered.
-  return parts.filter((s) => s.toLowerCase() !== 'none' && isSafePlanSlug(s));
+  const slugs = [];
+  const refused = [];
+  for (const s of parts) {
+    // The `none` sentinel is a declaration of no dependencies, not a refusal — it must
+    // stay indistinguishable from an absent key. Drop it into neither list.
+    if (s.toLowerCase() === 'none') continue;
+    if (isSafePlanSlug(s)) slugs.push(s);
+    else refused.push(s); // verbatim — display sanitises, the parser never mutates it
+  }
+  return { slugs, refused };
 }
 
 /**
@@ -1554,7 +1571,14 @@ function planDependsOn(plan) {
  *     so this REFUSES it (throws) — s1 makes empty touches on an implement a hard
  *     error; this is the action-layer message for it. The own-path alone is not
  *     enough: undeclared edits are the unasked question.
- *   • `blockedBy` resolves each `depends_on` slug against the registry: a
+ *   • An UNREADABLE dependency list REFUSES the plan (throws) BEFORE any resolution
+ *     (plan 00145): if `planDependsOn` reports any `refused` token (an unsafe slug
+ *     the traversal guard rejected), the plan's declared dependencies could not be
+ *     read, and a plan whose prerequisites were never checked must not start. This is
+ *     distinct from "no dependencies" — an unreadable list is a fault, an empty list
+ *     is not. The throw precedes `taskRegistry.load` and every `existsSync`, so no
+ *     refused token can ever reach a filesystem probe.
+ *   • `blockedBy` resolves each SAFE `depends_on` slug against the registry: a
  *     non-terminal task on that plan → its id is a blocker; no task but the dep
  *     plan sits in done/ or review/ → satisfied (no blocker); no task and not
  *     done/review → REFUSE (enqueue the dependency first).
@@ -1562,7 +1586,8 @@ function planDependsOn(plan) {
  * @param {{name:string, path:string, content?:string, metadata?:object}} plan
  * @param {string} projectPath  project root
  * @returns {{kind:'implement', label:string, plan:string, touches:string[], blockedBy:string[]}}
- * @throws {Error} plan lacks a files: declaration, or a dependency cannot be resolved
+ * @throws {Error} plan lacks a files: declaration, its dependency list is unreadable
+ *   (an unsafe slug), or a safe dependency cannot be resolved
  */
 function taskSpecFromPlan(plan, projectPath) {
   const root = projectPath || findProjectRoot();
@@ -1583,10 +1608,32 @@ function taskSpecFromPlan(plan, projectPath) {
   const ownPath = path.relative(root, plan.path).split(path.sep).join('/');
   const touches = Array.from(new Set([...declared, ownPath]));
 
-  // Resolve dependency slugs against the live registry.
+  // Partition the dependency list. REFUSE the plan BEFORE resolving anything (plan
+  // 00145): if any token was refused as unsafe, the dependency list is unreadable and
+  // the plan must not start with prerequisites unchecked. Refusing ahead of the
+  // registry load and every existsSync makes the no-oracle property true by
+  // construction — a refused token cannot reach a probe because no probe has run yet.
+  const { slugs, refused } = planDependsOn(plan);
+  if (refused.length > 0) {
+    // Quote up to three refused tokens back to the human so they can find the offending
+    // frontmatter line — control-stripped (matching the inline strip at :871) and
+    // truncated to 40 chars (matching classifyCompletionFault's .slice(0, 40)) so a
+    // hostile plan file cannot inject escape sequences or blow up the line.
+    const sample = refused.slice(0, 3)
+      .map((t) => `"${String(t).replace(/[\x00-\x1f\x7f-\x9f]/g, ' ').slice(0, 40)}"`)
+      .join(', ');
+    const more = refused.length > 3 ? ` +${refused.length - 3} more` : '';
+    throw new Error(
+      `taskSpecFromPlan: plan "${plan.name}" dependency list unreadable: ` +
+      `${refused.length} token(s) refused as unsafe: ${sample}${more}. Fix the plan's ` +
+      `depends_on (correct the listed slug(s)); do not relax the safety check.`
+    );
+  }
+
+  // Resolve the SAFE dependency slugs against the live registry.
   const registry = taskRegistry.load(root);
   const blockedBy = [];
-  for (const slug of planDependsOn(plan)) {
+  for (const slug of slugs) {
     // ONE terminal encoding (R3-B rework): the registry's exported frozen set, never a
     // local literal — this file already uses taskRegistry.TERMINAL elsewhere.
     const nonTerminal = registry.tasks.find((t) => t.plan === slug && !taskRegistry.TERMINAL.has(t.status));

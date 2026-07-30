@@ -327,16 +327,17 @@ describe('menu task complete — a caller fault renders as a call bug, not a pla
 // ═════════════════════════════════════════════════════════════════════════════
 
 /**
- * KNOWN, UNFIXED LOSS (plan 00131, "What this plan does NOT fix"). `planDependsOn`
- * silently drops unsafe dependency slugs, so a plan whose `depends_on` is ENTIRELY
- * unsafe tokens is byte-indistinguishable from a plan with NO dependencies — the
- * scheduler then treats it as ready and runs it. This test PINS that loss at the
- * real observable boundary (`taskSpecFromPlan.blockedBy`, which consumes
- * `planDependsOn`) and names it; the fix — making the scheduler REFUSE a plan whose
- * dependencies were unreadable — is a scheduling decision the human schedules, and
- * is deliberately out of this slice.
+ * REPAIRED (plan 00145). `planDependsOn` used to silently drop unsafe dependency
+ * slugs, so a plan whose `depends_on` was ENTIRELY unsafe tokens was byte-
+ * indistinguishable from a plan with NO dependencies — the scheduler then treated it
+ * as ready and ran it. Plan 00145 makes an unreadable dependency list FAIL CLOSED:
+ * `taskSpecFromPlan` now THROWS on a refused token before resolving anything, so
+ * "this plan's dependencies could not be read" no longer collapses into "this plan is
+ * unblocked". This test asserts the repair at the real observable boundary; the
+ * `depends_on: none` case still builds a spec with an empty blockedBy — the sentinel
+ * is a declaration of no dependencies, not a fault.
  */
-describe('finding 3 — unreadable dependencies look identical to no dependencies (pinned loss)', () => {
+describe('finding 3 — an unreadable dependency list refuses the plan (repaired by plan 00145)', () => {
   function writePlan(name, { dependsOn }) {
     const p = path.join(root, 'plans', 'todo', `${name}.md`);
     fs.writeFileSync(p,
@@ -346,22 +347,27 @@ describe('finding 3 — unreadable dependencies look identical to no dependencie
     return state.readPlans(path.join(root, 'plans', 'todo')).find((pl) => pl.name === name);
   }
 
-  it('15: an all-unsafe depends_on yields the SAME empty blockedBy as no dependencies — the loss', () => {
+  it('15: an all-unsafe depends_on REFUSES the plan; depends_on: none stays unblocked — the loss repaired', () => {
     for (const s of STAGES) fs.mkdirSync(path.join(root, 'plans', s), { recursive: true });
 
-    const allUnsafe = actions.taskSpecFromPlan(writePlan('all-unsafe', { dependsOn: '../evil ../../etc/passwd' }), root);
+    // An unreadable dependency list now FAILS CLOSED — it throws instead of building a
+    // spec with an empty blockedBy that let the scheduler run it.
+    assert.throws(
+      () => actions.taskSpecFromPlan(writePlan('all-unsafe', { dependsOn: '../evil ../../etc/passwd' }), root),
+      /dependency list unreadable/,
+      'unreadable deps refuse the plan — no longer silently dropped to no blocker',
+    );
+
+    // The none sentinel is a declaration of no dependencies, not a refusal.
     const noDeps = actions.taskSpecFromPlan(writePlan('no-deps', { dependsOn: 'none' }), root);
+    assert.deepEqual(noDeps.blockedBy, [], 'a plan declaring no deps → no blocker');
 
-    assert.deepEqual(allUnsafe.blockedBy, [], 'unreadable deps are silently dropped → no blocker');
-    assert.deepEqual(noDeps.blockedBy, [], 'a plan with no deps → no blocker');
-    assert.deepEqual(allUnsafe.blockedBy, noDeps.blockedBy,
-      'the loss: "this plan has unreadable dependencies" is indistinguishable from "this plan is unblocked"');
-
-    // Triangulation — a SAFE unknown dependency is NOT silently dropped; it REFUSES.
+    // Triangulation — a SAFE unknown dependency is refused with its OWN, distinct
+    // message; only the wording differs, both fail closed.
     assert.throws(
       () => actions.taskSpecFromPlan(writePlan('safe-unknown', { dependsOn: 'ghost-dep' }), root),
       /Enqueue "ghost-dep"|depends on "ghost-dep"/,
-      'a readable-but-unsatisfied dep throws; only the UNREADABLE ones vanish — that asymmetry is the loss',
+      'a readable-but-unsatisfied dep still throws with today\'s wording',
     );
   });
 });

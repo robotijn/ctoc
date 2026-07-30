@@ -55,6 +55,25 @@ function render(app) {
   return out;
 }
 
+// Summarize the scheduler's skip list into a status-line suffix (plan 00145). A plan
+// the FIFO walk refused (e.g. an unreadable dependency list) is recorded in
+// startAgent's `skipped[]` but was invisible to the human — a refusal with no stated
+// reason is a plan blocked in silence. This renders the first skipped plan and its
+// reason so the person who pressed `g` learns what was refused and why.
+//
+// '' when there is nothing to say (some startAgent returns omit the field). The plan
+// name and the reason both go through stripCtl, and the whole suffix is capped at 160
+// characters AFTER stripping so one hostile plan cannot blow up the status line.
+function summarizeSkipped(skipped) {
+  if (!Array.isArray(skipped) || skipped.length === 0) return '';
+  const first = skipped[0] || {};
+  const name = stripCtl(String(first.plan == null ? 'a plan' : first.plan));
+  const reason = stripCtl(String(first.reason == null ? 'no reason given' : first.reason));
+  const more = skipped.length > 1 ? ` +${skipped.length - 1} more` : '';
+  const suffix = ` — ${skipped.length} plan(s) skipped: ${name} (${reason})${more}`;
+  return suffix.length > 160 ? suffix.slice(0, 160) : suffix;
+}
+
 // Owner-approved lowercase bindings: g = start the agent on the next todo plan,
 // x = request a graceful stop. Both are wired to the real actions.js functions and
 // NEVER a silent dead key — an out-of-context press (g while running, x while idle)
@@ -88,17 +107,23 @@ function handleKey(key, app) {
     // Human-initiated menu start: force clears any drain-stop (see startAgent docs).
     const res = actions.startAgent(root, { force: true });
     if (app) {
+      // A refused plan (unreadable dependency list, no files:) is recorded in
+      // res.skipped by the FIFO walk; append it so the human sees what was refused and
+      // why (plan 00145). The suffix is '' when nothing was skipped, so the base
+      // message texts are byte-identical to before on the common path. The drainStopped
+      // branch takes no suffix — nothing was walked, so nothing was skipped.
+      const skips = summarizeSkipped(res && res.skipped);
       if (res && res.started) {
         // R7-A: res.plan.name is the agent-writable plan title/slug; sanitize at the source.
-        app.message = `Agent started on ${stripCtl((res.plan && res.plan.name) || 'the next todo plan')}`;
+        app.message = `Agent started on ${stripCtl((res.plan && res.plan.name) || 'the next todo plan')}${skips}`;
       } else if (res && res.drainStopped) {
         app.message = 'Agent is drain-stopped; nothing new started';
       } else if (res && res.queued) {
-        app.message = `Queued: ${res.reason || 'waiting for a slot'}`;
+        app.message = `Queued: ${res.reason || 'waiting for a slot'}${skips}`;
       } else if (res && res.error) {
-        app.message = res.error;
+        app.message = `${res.error}${skips}`;
       } else {
-        app.message = 'Nothing to start (todo queue empty)';
+        app.message = `Nothing to start (todo queue empty)${skips}`;
       }
     }
     return true;
