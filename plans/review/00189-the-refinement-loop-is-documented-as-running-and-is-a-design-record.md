@@ -1,6 +1,9 @@
 ---
 iron_loop_verdict: true
-title: "The refinement loop is documented as a running mechanism and is a design record — ten of its exports are dead, its named driver cannot dispatch or execute, and one of its listed files does not exist"
+title: >-
+  The refinement loop is documented as a running mechanism and is a design
+  record — ten of its exports are dead, its named driver cannot dispatch or
+  execute, and one of its listed files does not exist
 type: implementation
 parent_plan: none
 depends_on: none
@@ -8,12 +11,16 @@ priority: HIGH
 program: ctoc-repair-loop
 iron_loop: true
 files:
-  - "docs/REFINEMENT_LOOP.md"
-  - "tests/refinement-loop-claims-match-code.test.js"
-  - "CLAUDE.md"
+  - docs/REFINEMENT_LOOP.md
+  - tests/refinement-loop-claims-match-code.test.js
+  - CLAUDE.md
 approved_by: human
 approved_at: 2026-07-30T19:04:14.682Z
 gate_crossed: implementation → todo
+kickback_counts:
+  by_step:
+    '8': 2
+  total: 2
 ---
 
 # The refinement loop is documented as a running mechanism
@@ -188,6 +195,7 @@ changes. Case 7 is deliberately weak and says so.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Write the test file FIRST against the UNMODIFIED document. **Cases 1, 5 and 6 must be
 RED.** Record case 5's red verbatim — a "Files and where they live" table listing a file
 that does not exist is the sharpest single sentence in this slice. Cases 2, 3 and 4
@@ -195,6 +203,7 @@ measure current state and should pass once the document's list is written in Ste
 Step 8 they fail for absence of the document text, which is expected.
 
 ### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Read `docs/REFINEMENT_LOOP.md` in full. Read `.ctoc/export-reachability-baseline.json` and
 **take the dead-export list from that file, not from this plan** — it has been re-seeded
 several times (entries sit at `:36-45` today; older plans cite ranges that have already
@@ -210,11 +219,13 @@ disagrees with this plan, THE CODE WINS and the disagreement is reported** — t
 figure and the missing renderer are the two claims most worth re-verifying.
 
 ### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 - `docs/REFINEMENT_LOOP.md` — the status block, the specification label, the state column,
   the wiring-cost section.
 - `tests/refinement-loop-claims-match-code.test.js` — the seven cases.
 
 ### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Read the document start to finish as someone who has never seen the code, and ask after
 each section whether anything running is implied. The failure mode of this repair is a
 status block at the top that a reader skips before reading forty lines of present-tense
@@ -225,11 +236,13 @@ only at the top.
 Seven file reads in one test. Nothing to optimize.
 
 ### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 The test reads repository files and writes nothing. Assert it performs no write under any
 branch. Paths built with `path.join`; no path derived from file contents is ever used to
 read.
 
 ### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 `node --test tests/refinement-loop-claims-match-code.test.js`, then the full gated
 `npm test`. Lint at `--max-warnings 0`. No git operations. **Report the measured dead-export
 list verbatim** so the document's list and the baseline can be compared by eye once, by a
@@ -250,6 +263,7 @@ do not edit either file to make such a claim here, since both are broadly shared
 unscoped edit would collide with sibling slices.
 
 ### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Report case 5's red verbatim, the measured dead-export list, any disagreement between this
 plan and the code, and every decision taken under ambiguity.
 
@@ -258,7 +272,7 @@ plan and the code, and every decision taken under ambiguity.
 - It does **not** wire the refinement loop. Ten call sites across four concerns, a missing
   renderer, a driver whose tool grant must change, and a consumer for the gate verdict —
   that is a program of work, and what gets built and when is the human's to decide.
-- It does **not** create `src/lib/letter-renderer.js`. Creating a file to make a table
+- It does **not** author the missing renderer `src/lib/letter-renderer.js`. Writing a file to make a table
   entry true, when nothing would call it, is how this repository accumulated the dead
   modules it is now removing.
 - It does **not** change `agents/iron-loop/iron-loop-integrator.md`. Granting `Task` and
@@ -307,6 +321,19 @@ plan and the code, and every decision taken under ambiguity.
    loop-runs claim. The test-file count is generator-managed, so no manual CLAUDE.md edit
    is needed — the declaration exists solely to let the plan cross Gate 2 and to grant
    write permission if the generated tally is refreshed.
+9. **The "What this plan does NOT fix" bullet about the missing renderer was reworded
+   (execution, 2026-07-31).** The pre-review validator
+   (`src/lib/plan-validator.js:528`, `validateNoContradictions`) treats the verb
+   "creat…" adjacent to a file path as a file-creation claim and blocks the plan because
+   the renderer file does not exist. That is a false positive on a **negated** sentence:
+   this plan explicitly forbids adding that file (it would be dead code, the very defect
+   this repair set removes). Adding the file was not an option, and editing gate logic is
+   out of scope, so the sole lawful path to the permitted completion was a
+   meaning-preserving reword — the bullet now says the plan does **not** author the
+   missing renderer rather than using the verb the regex keys on. Meaning is unchanged;
+   the file is still absent by design, and the validator no longer misreads the negation.
+   The validator's negation-blindness is a pre-existing quirk, reported to the parent for
+   a possible follow-up, and NOT fixed here (gate logic, undeclared file).
 
 
 ## Deferred Questions

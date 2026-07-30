@@ -5,6 +5,31 @@
 
 A multi-agent iterative critic-implement-test cycle that converges on a code state with zero critical-severity findings, zero warnings, zero deprecations.
 
+## Status: this is a design record — the loop is **NOT RUNNING** today
+
+Read this document as a **specification and design record**, not as a report of a
+mechanism that runs. As of the last verification (2026-07-30), the loop does not run:
+
+- **The library is implemented and tested.** `src/lib/refinement-loop.js` exists with
+  its heuristics, panel selection, fingerprinting, journal writer and letter format,
+  and `tests/refinement-loop.test.js` exercises them.
+- **The loop does not execute.** Ten of the module's exports have **no live caller** —
+  the whole documented mechanism (panel selection, convergence, escalation, the journal
+  writer, both loop-detection heuristics, the fingerprinting they compare on, and the
+  letter format) is dead code today. See "What running it would cost" below.
+- **The only part that executes is the gate that decides whether the loop _would_ run.**
+  `shouldRunLoop` is called from `src/lib/actions.js` when a plan enters the todo queue,
+  and its verdict is written durably to `.ctoc/state/refinement/<slug>.json` — **where
+  nothing currently reads it.** The write is correct and cheap; there is no consumer.
+- **The named driver cannot drive it.** `agents/iron-loop/iron-loop-integrator.md` is
+  named as the intended driver but its `tools:` grant holds neither Task nor Bash, so it
+  can neither dispatch the parallel critics nor run the module's functions.
+
+`NOT RUNNING` is the marker for this state — a mechanism that is *built but nothing
+drives it* — and is greppable across the repository beside `NOT ENFORCED` (nothing
+evaluates it) and `NOT WIRED` (it exists but is not registered). Everything below is the
+design; what it would take to make it run, and what it would cost, is recorded at the end.
+
 ## Design decisions (the 10-point record)
 
 This loop was designed in a peer-discussion session with explicit decisions on each axis. Citations to research are inline where the choice was informed by published work.
@@ -23,6 +48,11 @@ This loop was designed in a peer-discussion session with explicit decisions on e
 | 10 | Critic dispatch pattern | **Parallel within round; sequential across rounds.** Critics in parallel Task-tool subagents (max independence, isolated contexts). Synthesizer aggregates after critics finish. No critic-to-critic chaining. | MAD literature (ICLR Blogposts 2025): "majority voting accounts for most of the performance gains; debate adds marginal value." Independent parallel samples + good aggregation is the strong pattern. Anthropic's Code Review uses the same architecture. |
 
 ## How a round runs
+
+**This block is the SPECIFICATION of a round — the design of how a round _would_ run
+once the loop is driven. It is not a report of a round running (see the status block
+above: the loop is `NOT RUNNING`). Read the present tense below as the specified
+behaviour, not as reportage of a live mechanism.**
 
 ```
 ROUND R, PHASE P (one of: critical | medium | low | final-sweep)
@@ -174,16 +204,60 @@ Steps 11/12/13 can advance **concurrently** in refinement-eligible plans — the
 
 ## Files and where they live
 
-| File | Purpose |
+State is filled from disk, not from prose: a shipped file is on disk today; a not-yet-built
+entry is marked so a reader can tell the design apart from what exists.
+
+| File | Purpose | State |
+|---|---|---|
+| `docs/REFINEMENT_LOOP.md` | This spec | shipped |
+| `.ctoc/architecture/refinement-loop-schema.json` | JSON Schema for the letter format | shipped |
+| `.ctoc/config/refinement-triggers.yaml` | Risk-surface globs (Decision 7) | shipped |
+| `src/lib/refinement-loop.js` | Orchestrator: phase tracking, journal write, loop detection, escalation | shipped (library implemented + tested; ten exports have no live caller — see "What running it would cost") |
+| `src/lib/letter-renderer.js` | JSON → Markdown renderer for human escalation views | **NOT SHIPPED — this file does not exist.** Nothing would call it today; it is created only when the loop is driven |
+| `.ctoc/loops/<plan_slug>/journal.yaml` | Per-plan append-only journal | template path; written per plan only when the loop runs |
+| `agents/iron-loop/iron-loop-integrator.md` | *Named* as the intended driver of Steps 11-13 via the loop | shipped agent, but its `tools:` grant holds **neither Task nor Bash** — so it can neither dispatch the parallel critics nor run the module's functions; the eventual wiring must change this grant first |
+| `tests/refinement-loop.test.js` | Tests for the orchestrator, journal, loop detection | shipped |
+
+## What running it would cost
+
+This records what it would take to make the loop run — technical facts only. It states
+**no phase, no ordering and no timeline**: what gets built and when is the human's
+decision, and a document that proposed a sequence would be making that call.
+
+**The ten dead exports.** Every export of `src/lib/refinement-loop.js` below has no live
+caller today (measured against `.ctoc/export-reachability-baseline.json`). Wiring the loop
+means giving each a live call site. The name and the concern it belongs to:
+
+<!-- dead-exports:start -->
+
+| Export | Concern it belongs to |
 |---|---|
-| `docs/REFINEMENT_LOOP.md` | This spec |
-| `.ctoc/architecture/refinement-loop-schema.json` | JSON Schema for the letter format |
-| `.ctoc/config/refinement-triggers.yaml` | Risk-surface globs (Decision 7) |
-| `src/lib/refinement-loop.js` | Orchestrator: phase tracking, journal write, loop detection, escalation |
-| `src/lib/letter-renderer.js` | JSON → Markdown renderer for human escalation views |
-| `.ctoc/loops/<plan_slug>/journal.yaml` | Per-plan append-only journal |
-| `agents/iron-loop/iron-loop-integrator.md` | Existing Tier 1 agent; extended to drive Steps 11-13 via the loop |
-| `tests/refinement-loop.test.js` | Tests for the orchestrator, journal, loop detection |
+| `selectPanel` | panel selection — choosing the core plus dynamic critics per project type |
+| `phaseConverged` | convergence detection — deciding a phase has cleared its top-K |
+| `shouldEscalate` | escalation to the user when a phase exceeds its soft-cap round count |
+| `appendRound` | the append-only per-plan journal writer |
+| `detectOscillation` | loop-detection heuristic — an issue fixed then resurfaced |
+| `detectImplementerWall` | loop-detection heuristic — repeated distinct fix attempts that do not hold |
+| `computeFingerprint` | the per-finding fingerprint the heuristics compare on |
+| `fingerprintsMatchFuzzy` | fuzzy fingerprint match across shifted line numbers |
+| `buildLetter` | the JSON letter format (Decision 6) the design argues for over Markdown |
+| `writeLetter` | persisting the round letter to the journal and dispatch record |
+
+<!-- dead-exports:end -->
+
+**The one live export writes a note nothing reads.** `shouldRunLoop` is called from
+`src/lib/actions.js` and writes its verdict to `.ctoc/state/refinement/<slug>.json`. That
+directory has exactly one referrer — the writer — and no reader in any module. Making the
+loop useful means adding a consumer (the integrator, the menu, or a hook) that reads the
+verdict and acts on it.
+
+**The missing renderer.** `src/lib/letter-renderer.js` (JSON → Markdown for human
+escalation views) does not exist and must be created before an escalation is human-readable.
+
+**The driver's tool grant.** `agents/iron-loop/iron-loop-integrator.md` is named as the
+driver but holds `tools: Read, Write, Edit` — neither Task (to dispatch the parallel
+critics) nor Bash (to run the module). Granting those capabilities is the first change any
+wiring must make, and it is a capability decision, not a wiring detail.
 
 ## Open calibration items
 
