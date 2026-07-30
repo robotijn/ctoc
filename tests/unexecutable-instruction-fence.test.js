@@ -205,10 +205,21 @@ describe('unexecutable-instruction fence', () => {
   });
 
   it('16. BASELINE IS HONEST — no dead file, no line number in any key', () => {
+    // A baseline key resolves to a real file. For file-first keys (instruction-tool,
+    // recipe-kind, recipe-kind-reverse) the file is the key's first segment; for the
+    // plan-00073 config-key namespace the first segment is a SURFACE token
+    // (`settings.yaml`, per the mandated key shape) and the real file is the finding's
+    // `.file` (the writer, src/lib/init-project.js). Resolve via the live finding so the
+    // dead-file check keeps full teeth across both namespaces.
+    const liveByKey = new Map(liveFindings.map((f) => [f.key, f]));
+    const SURFACES = new Set(['settings.yaml', 'settings.json']);
     for (const key of baseline.debt) {
-      const file = key.split('::')[0];
-      assert.ok(fs.existsSync(path.join(ROOT, file)), `debt names a file that no longer exists: ${file}`);
       assert.doesNotMatch(key, /:\d+/, `a baseline key must not contain a line number: ${key}`);
+      const live = liveByKey.get(key);
+      const seg0 = key.split('::')[0];
+      const file = live ? live.file : seg0;
+      if (SURFACES.has(seg0)) assert.ok(live, `a config-key debt entry must map to a live finding: ${key}`);
+      assert.ok(fs.existsSync(path.join(ROOT, file)), `debt key references a file that does not exist: ${file} (key ${key})`);
     }
   });
 
@@ -238,5 +249,93 @@ describe('unexecutable-instruction fence', () => {
     const r = scan(empty);
     assert.equal(r.scanned.agents, 0);
     assert.deepEqual(r.findings, []);
+  });
+
+  // ── plan 00073: the two remaining detections ─────────────────────────────
+  // (a) recipe verb vs accepted vocabulary   (c) config key written vs read
+
+  /** Fixture root holding one command doc under src/commands. */
+  function commandFixture(filename, contents) {
+    const root = path.join(tmpRoot, `c${seq++}`);
+    const dir = path.join(root, 'src', 'commands');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, filename), contents);
+    return { root, result: scan(root) };
+  }
+
+  it('20. non-vacuity, extended — a scan reads real command docs and settings keys', () => {
+    const { scanned } = scan(ROOT);
+    assert.ok(scanned.commandDocs >= 1, `expected >=1 command doc scanned, got ${scanned.commandDocs}`);
+    assert.ok(scanned.settingsKeys >= 5, `expected >=5 written settings keys, got ${scanned.settingsKeys}`);
+  });
+
+  it('21. (a) REAL SHAPE — the DISPLACED recipe `menu task add`, kind `X` is caught', () => {
+    // Reproduces start.md:234 verbatim structure with an UNACCEPTED kind (`boguskind`).
+    // A naive `menu task add (\w+)` regex would miss this — the kind is not adjacent to
+    // the verb. This is the single most important design detail in detection (a).
+    const { result } = commandFixture('x.md',
+      'Record a task per ref (`menu task add`, kind `boguskind`, `--touches x`) — do it.');
+    const forward = result.findings.filter((f) => f.detection === 'recipe-kind');
+    assert.equal(forward.length, 1, JSON.stringify(forward));
+    assert.equal(forward[0].file, 'src/commands/x.md');
+    assert.ok(forward[0].key.endsWith('::recipe-kind::boguskind'), forward[0].key);
+  });
+
+  it('22. (a) forward parity is CLEAN on the live repo — precompute is in KINDS', () => {
+    const fresh = scan(ROOT).findings.filter((f) => f.detection === 'recipe-kind');
+    assert.deepEqual(fresh, [], `no live forward recipe-kind finding expected, got ${JSON.stringify(fresh.map((f) => f.key))}`);
+  });
+
+  it('23. (c) REAL INSTANCE — a coverage threshold in settings.yaml that nothing reads', () => {
+    const findings = scan(ROOT).findings;
+    const f = findings.find((x) => x.key === 'settings.yaml::config-key::quality.coverage_threshold');
+    assert.ok(f, 'quality.coverage_threshold must be flagged (the real floor lives in .ctoc/coverage-baseline.json)');
+    assert.equal(f.detection, 'config-key');
+    // No settings VALUE may leak into a message (security): the number 80 must not appear.
+    assert.doesNotMatch(f.message, /\b80\b/, `a config-key message must name the key path, never its value: ${f.message}`);
+    // and it is recorded as debt, not left to block
+    const baseline2 = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+    assert.ok(baseline2.debt.includes(f.key), `${f.key} must be seeded in debt`);
+  });
+
+  it('24. (c) SURFACE SEPARATION — a yaml key is not exonerated by a json-surface reader', () => {
+    // Fixture: init-project writes yaml key `probe.widget`; the only file mentioning
+    // `widget` reads the JSON surface. A name-only global matcher would wrongly certify
+    // it as read; the surface-scoped reader must still flag it.
+    const root = path.join(tmpRoot, `s${seq++}`);
+    const lib = path.join(root, 'src', 'lib');
+    fs.mkdirSync(lib, { recursive: true });
+    fs.writeFileSync(path.join(lib, 'init-project.js'),
+      "function generateSettings() {\n  return [\n    'probe:',\n    '  widget: 1',\n  ].join('\\n');\n}\nmodule.exports = { generateSettings };\n");
+    // a reader on the JSON surface that names the leaf — must NOT satisfy the yaml key
+    fs.writeFileSync(path.join(lib, 'jsonreader.js'),
+      "const s = require('./x');\n// reads .ctoc/settings.json\nfunction f(cfg) { return cfg.widget; } // settings.json surface\nmodule.exports = { f };\n");
+    const findings = scan(root).findings.filter((x) => x.detection === 'config-key');
+    const f = findings.find((x) => x.key === 'settings.yaml::config-key::probe.widget');
+    assert.ok(f, `yaml probe.widget must stay flagged despite a json-surface reader; got ${JSON.stringify(findings.map((x) => x.key))}`);
+    assert.equal(f.surface, 'settings.yaml');
+  });
+
+  it('25. (c) NON-VACUITY CONTROLS — the two live yaml readers are NOT flagged', () => {
+    const keys = new Set(scan(ROOT).findings.map((f) => f.key));
+    assert.ok(!keys.has('settings.yaml::config-key::enforcement.mode'),
+      'enforcement.mode IS read by src/lib/enforcement-mode.js — flagging it means the reader-detection is stuck returning "unread"');
+    assert.ok(!keys.has('settings.yaml::config-key::regulatory_regime.active_profiles'),
+      'regulatory_regime.active_profiles IS read by src/lib/regulatory-regime.js loadActiveProfiles');
+  });
+
+  it('26. ONE FENCE, ONE ENTRY — exactly one CHECKS entry for this invariant family', () => {
+    const enforcerSrc = fs.readFileSync(path.join(ROOT, 'src', 'lib', 'iron-loop-enforcer.js'), 'utf8');
+    const matches = enforcerSrc.match(/id:\s*'unexecutable-instruction-fence'/g) || [];
+    assert.equal(matches.length, 1, `expected exactly one CHECKS entry, found ${matches.length}`);
+  });
+
+  it('27. THE MOVED DETECTION IS NOT DUPLICATED — exactly one instruction-tool code path', () => {
+    const scanSrc = fs.readFileSync(path.join(ROOT, 'src', 'lib', 'unexecutable-instruction-scan.js'), 'utf8');
+    // The agent-tool-grant detection (owned by the five-agents plan) sets
+    // `detection: 'instruction-tool'` in exactly one place; a second would be a
+    // re-implementation this plan's boundary rule forbids.
+    const matches = scanSrc.match(/detection:\s*'instruction-tool'/g) || [];
+    assert.equal(matches.length, 1, `expected exactly one instruction-tool finding path, found ${matches.length}`);
   });
 });

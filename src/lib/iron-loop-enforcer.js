@@ -831,7 +831,11 @@ function checkUnexecutableInstructionFence(root) {
   const safeFs = require('./safe-fs');
 
   const result = scan(root);
-  if (result.scanned.agents === 0) return CLEAN(); // not a CTOC agent corpus — nothing to check
+  // Not a CTOC tree only when there is NOTHING of any detected class to check. A tree
+  // with command docs but no agents (or vice versa) is still checked (plan 00073 widened
+  // the guard from agents-only so a missing agents/ dir never false-cleans the recipe and
+  // config detections).
+  if (result.scanned.agents === 0 && result.scanned.commandDocs === 0) return CLEAN();
 
   const baselineFile = path.join(root, '.ctoc', 'unexecutable-instruction-baseline.json');
   /** @type {Set<string>} */
@@ -850,9 +854,12 @@ function checkUnexecutableInstructionFence(root) {
 
   const fresh = result.findings.filter((f) => !excused.has(f.key));
   if (fresh.length === 0) return CLEAN();
+  // Findings span three detections now (plan 00073): an agent order that cannot execute,
+  // a recipe naming a task kind KINDS rejects, and a settings key written but never read.
+  // Each finding carries its own prescriptive `fix`; the summary names the keys.
   return finding({
     severity: 'block',
-    message: `${fresh.length} agent order(s) that cannot execute — an agent told to run JavaScript its tools: grant gives it no way to run: ${fresh.slice(0, 10).map((f) => f.key).join(', ')}${fresh.length > 10 ? ` (+${fresh.length - 10} more)` : ''} — rewrite the order for the granted tools, name the actor that really performs it, or grant a tool that can; a citation is not an invocation`
+    message: `${fresh.length} unexecutable instruction(s) with no receiver — an order, recipe kind, or config key that nothing on the other end can act on: ${fresh.slice(0, 10).map((f) => f.key).join(', ')}${fresh.length > 10 ? ` (+${fresh.length - 10} more)` : ''} — see each finding's fix; a citation is not an invocation`
   });
 }
 
