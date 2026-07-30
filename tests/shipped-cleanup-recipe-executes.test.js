@@ -234,8 +234,13 @@ describe('00185 — the shipped cleanup recipe actually executes', () => {
     const root = makeFixture();
     seedPlan(root, 'review', 'broken-form-1');
     // The exact call the pre-fix recipe made: root where a proposal belongs, slug
-    // where root belongs, action where deps belongs.
-    const out = cleanup.executeCleanup(root, 'broken-form-1', 'archive-to-done');
+    // where root belongs, action where deps belongs. The no-op comes from the
+    // proposal object having no `.plan` (root is passed as the proposal), NOT from
+    // the second argument — so we pass an ABSOLUTE path there (under the fixture
+    // tmpdir) instead of a bare relative slug, which otherwise made the internal
+    // scan resolve against cwd and leak a `broken-form-1/.ctoc/logs` dir into the
+    // repo root. Same no-op assertion, no working-tree pollution.
+    const out = cleanup.executeCleanup(root, path.join(root, 'broken-form-1'), 'archive-to-done');
     assert.equal(out.action, 'noop', 'broken form should no-op; got ' + JSON.stringify(out));
     assert.equal(out.skipped, true, 'broken form should skip; got ' + JSON.stringify(out));
     assert.ok(exists(planPath(root, 'review', 'broken-form-1')), 'broken form must NOT move the plan');
