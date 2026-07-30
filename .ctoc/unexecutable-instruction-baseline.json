@@ -1,6 +1,22 @@
 {
-  "comment": "THE UNEXECUTABLE-ORDER FENCE baseline (plan 00110). A finding here is an agent body that ORDERS the agent to execute JavaScript its own tools: grant gives it no way to execute. A CITATION IS NOT AN INVOCATION: a bare backticked name, a file#name anchor, a third-person description, fenced example code, and a callee whose name is itself a granted tool are NOT findings. This follows the reconciled src/lib/reachability.js, whose exportedNames (:731-732) and edgesFrom (:271-273) BOTH strip comments/fences first and credit only a real call. RATCHET: maxDebt may only ever be LOWERED and debt entries only ever REMOVED (by correcting the order or granting the capability). EXEMPTIONS ARE NOT DEBT: an exemption asserts the detector is WRONG, requires a written reason of at least 20 characters, and the list SHIPS EMPTY. This slice fixed all five named agents in the same pass that seeds the baseline, so the seeded debt is what remains AFTER the corrections: zero.",
-  "maxDebt": 0,
-  "debt": [],
+  "comment": "THE UNEXECUTABLE-INSTRUCTION FENCE baseline. A finding is an instruction with no receiver: (b, plan 00110) an agent body ORDERING the agent to execute JavaScript its own tools: grant gives it no way to run; (a, plan 00073) a src/commands recipe naming a task kind KINDS rejects (forward, HARD) or a KINDS kind no recipe documents (recipe-kind-reverse, debt-seeded — kinds like `sync` are enqueued programmatically and legitimately have no human-typed recipe); (c, plan 00073) a settings.yaml key generateSettings() writes into a new project that nothing in src/** reads. A CITATION IS NOT AN INVOCATION / A READ: a comment mention, a bare backticked name, a metavariable placeholder, and a same-name key on a DIFFERENT surface are NOT findings — the detector under-reports by design, exactly like src/lib/reachability.js. RATCHET: maxDebt may only ever be LOWERED and debt entries only ever REMOVED (correct the recipe, add the kind to KINDS, wire a reader, or stop writing the key). EXEMPTIONS ARE NOT DEBT: an exemption asserts the detector is WRONG, requires a written reason of at least 20 characters, and the list SHIPS EMPTY. The 15 seeded here are pre-existing debt surfaced by detections (a) and (c) landing: 8 task kinds with no human-typed recipe, and 7 settings.yaml keys written into every new project that no code reads (the real coverage floor lives in .ctoc/coverage-baseline.json, not quality.coverage_threshold).",
+  "maxDebt": 15,
+  "debt": [
+    "src/lib/task-registry.js::recipe-kind-reverse::implement",
+    "src/lib/task-registry.js::recipe-kind-reverse::plan",
+    "src/lib/task-registry.js::recipe-kind-reverse::review",
+    "src/lib/task-registry.js::recipe-kind-reverse::quality",
+    "src/lib/task-registry.js::recipe-kind-reverse::security",
+    "src/lib/task-registry.js::recipe-kind-reverse::decompose",
+    "src/lib/task-registry.js::recipe-kind-reverse::discuss",
+    "src/lib/task-registry.js::recipe-kind-reverse::sync",
+    "settings.yaml::config-key::detected.languages",
+    "settings.yaml::config-key::detected.frameworks",
+    "settings.yaml::config-key::quality.coverage_threshold",
+    "settings.yaml::config-key::quality.flaky_test_retries",
+    "settings.yaml::config-key::quality.flaky_test_action",
+    "settings.yaml::config-key::research.enabled",
+    "settings.yaml::config-key::research.auto_steps"
+  ],
   "exemptions": []
 }

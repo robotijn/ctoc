@@ -56,22 +56,52 @@
  * exec/execSync/shell anywhere.
  */
 
+/*
+ * PLAN 00073 — the two remaining detections, added to THIS scanner (not a new module):
+ *   (a) recipe-kind    — a `src/commands/*.md` recipe naming a task kind that KINDS
+ *                        rejects (forward, HARD), or a KINDS kind no recipe documents
+ *                        (recipe-kind-reverse, debt-seeded: many kinds are enqueued
+ *                        programmatically and legitimately have no human-typed recipe).
+ *   (c) config-key     — a settings key that `generateSettings()` WRITES into a new
+ *                        project's settings.yaml but nothing in `src/**` READS.
+ *
+ * THE MOVED DETECTION (b) — an order to an agent to run code its `tools:` grant cannot
+ * execute — is owned ENTIRELY by the five-agents plan (00110) above; this plan must not
+ * add it back. One fence per invariant, or the two drift and the human trusts neither.
+ *
+ * (c) is deliberately surface-scoped and UNDER-reporting, exactly like reachability.js:
+ *   • a key is keyed `<surface>::config-key::<dotted.path>` (settings.yaml vs settings.json
+ *     are two surfaces with two readers — CONFIG_SOURCES.md — so `enforcement.mode` (yaml)
+ *     is never certified "read" by `workflow.enforcementMode` (json));
+ *   • a key counts as READ when its leaf name or dotted path appears (comments stripped)
+ *     in a `src/**` file that references the SAME surface file, outside the writer;
+ *   • name occurrence, not data-flow (decision 3): the bias is to under-report — a fence
+ *     that cries wolf gets whitelisted into uselessness.
+ * (a)'s displaced shape (verb and kind NOT adjacent) is the whole design point: the real
+ * bug read ``(`menu task add`, kind `precompute` …)`` — a naive `menu task add (\w+)`
+ * regex would have missed it.
+ */
+
 'use strict';
 
 const path = require('path');
 const safeFs = require('./safe-fs');
+const { KINDS } = require('./task-registry');
 
 /**
  * @typedef {Object} Finding
- * @property {'instruction-tool'} detection  the detection kind (a union so plan 00073 can
- *   append its two remaining detections to this same module without a rewrite)
- * @property {string} key       stable baseline key — `<file>::instruction-tool::<callee>`,
- *   NEVER containing a line number (a line number churns the baseline on every edit)
+ * @property {'instruction-tool'|'recipe-kind'|'recipe-kind-reverse'|'config-key'} detection
+ *   the detection kind (a union so plan 00073's detections live in this same module)
+ * @property {string} key       stable baseline key, NEVER containing a line number (a line
+ *   number churns the baseline on every edit): `<file>::instruction-tool::<callee>`,
+ *   `<file>::recipe-kind::<kind>`, `<registry>::recipe-kind-reverse::<kind>`, or
+ *   `<surface>::config-key::<dotted.path>`
  * @property {string} file      repo-relative, path.posix-normalized
- * @property {number} line      1-based, for the human-readable message ONLY
- * @property {'s1'|'s2'|'s3'} signature  which signature fired
- * @property {string} callee    the function name that cannot be invoked
- * @property {string[]} grant   the agent's declared tools
+ * @property {number} [line]    1-based, for the human-readable message ONLY
+ * @property {'s1'|'s2'|'s3'} [signature]  which instruction-tool signature fired
+ * @property {string} [callee]  the function name that cannot be invoked
+ * @property {string[]} [grant] the agent's declared tools
+ * @property {string} [surface] for config-key: 'settings.yaml' | 'settings.json'
  * @property {string} message   one sentence naming what cannot execute and why
  * @property {string} fix       the prescribed fix, naming the file and the safe shapes
  */
@@ -220,24 +250,13 @@ function collectMarkdown(dir) {
 }
 
 /**
- * Scan an agent corpus for orders that can never execute.
- *
- * @param {string} root - absolute project root
- * @returns {{findings: Finding[], scanned: {agents: number, withGrant: number}}}
- *   `scanned` exists for the non-vacuity assertion: a scan that read ZERO agents must
- *   FAIL the fence (the caller asserts `agents >= 100`), never pass silently. A fence
- *   that reports a verdict on input it never received is the false-green class this
- *   repository fences by name.
- * @throws {TypeError} root is not a non-empty string
+ * Detection (b), owned here since plan 00110: agent orders that can never execute.
+ * @param {string} root
+ * @returns {{findings: Finding[], agents: number, withGrant: number}}
  */
-function scan(root) {
-  if (typeof root !== 'string' || root.length === 0) {
-    throw new TypeError('unexecutable-instruction-scan: root must be a non-empty string');
-  }
+function scanAgentOrders(root) {
   const agentsDir = path.join(root, 'agents');
-  if (!safeFs.existsSync(agentsDir)) {
-    return { findings: [], scanned: { agents: 0, withGrant: 0 } };
-  }
+  if (!safeFs.existsSync(agentsDir)) return { findings: [], agents: 0, withGrant: 0 };
 
   const files = collectMarkdown(agentsDir);
   /** @type {Finding[]} */
@@ -281,8 +300,286 @@ function scan(root) {
       }
     }
   }
+  return { findings, agents: files.length, withGrant };
+}
 
-  return { findings, scanned: { agents: files.length, withGrant } };
+// ── (a) recipe verb vs accepted vocabulary ───────────────────────────────────
+
+// inline shape: `menu task add <kind>` where <kind> is a lowercase identifier. A
+// single-uppercase-letter metavariable (`K`, `P`) or a `[…]` / `${…}` placeholder is
+// skipped — it is a stand-in for any kind, not a named one.
+const RECIPE_INLINE = /menu task add\s+([A-Za-z][\w-]*)/g;
+// displaced shape: a `menu task add` mention, then within 200 chars a `` kind `<token>` ``.
+const RECIPE_VERB = /menu task add/g;
+const KIND_PHRASE = /kind\s+`([a-z][\w-]*)`/;
+const RECIPE_WINDOW = 200;
+
+/** True for a placeholder metavariable that names no specific kind. */
+function isKindPlaceholder(tok) {
+  return /^[A-Z]$/.test(tok) || tok.startsWith('[') || tok.includes('$');
+}
+
+/**
+ * Every task kind a command doc instructs, via BOTH the inline and the displaced shapes.
+ * The displaced shape (verb and kind not adjacent) is the shape of the real bug and is
+ * the reason a naive `menu task add (\w+)` regex is insufficient.
+ * @param {string} md
+ * @returns {Array<{kind: string, line: number}>}
+ */
+function recipeKinds(md) {
+  const lines = stripFences(md).split('\n');
+  /** @type {Map<string, number>} */
+  const found = new Map();
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].slice(0, MAX_LINE);
+    if (line.indexOf('menu task add') === -1) continue;
+    RECIPE_INLINE.lastIndex = 0;
+    let m;
+    while ((m = RECIPE_INLINE.exec(line)) !== null) {
+      const tok = m[1];
+      if (!isKindPlaceholder(tok) && /^[a-z]/.test(tok) && !found.has(tok)) found.set(tok, i + 1);
+    }
+    // displaced: look ahead up to RECIPE_WINDOW chars from each verb mention
+    RECIPE_VERB.lastIndex = 0;
+    while ((m = RECIPE_VERB.exec(line)) !== null) {
+      const window = line.slice(m.index, m.index + RECIPE_WINDOW);
+      const k = KIND_PHRASE.exec(window);
+      if (k && !found.has(k[1])) found.set(k[1], i + 1);
+    }
+  }
+  return [...found.entries()].map(([kind, line]) => ({ kind, line }));
+}
+
+/**
+ * Detection (a): recipe kinds vs KINDS, both directions.
+ * @param {string} root
+ * @returns {{findings: Finding[], commandDocs: number}}
+ */
+function scanRecipes(root) {
+  const commandsDir = path.join(root, 'src', 'commands');
+  /** @type {Finding[]} */
+  const findings = [];
+  let entries;
+  try {
+    entries = safeFs.readdirSync(commandsDir, { withFileTypes: true });
+  } catch {
+    return { findings: [], commandDocs: 0 }; // no command docs — nothing to check
+  }
+  const docs = entries.filter((e) => e.isFile() && e.name.endsWith('.md'));
+  /** @type {Set<string>} */
+  const documented = new Set();
+
+  for (const e of docs) {
+    let raw;
+    try {
+      raw = safeFs.readFileSync(path.join(commandsDir, e.name), 'utf8');
+    } catch {
+      continue;
+    }
+    const file = path.posix.join('src', 'commands', e.name);
+    for (const { kind } of recipeKinds(raw)) {
+      documented.add(kind);
+      // forward (HARD): a documented kind KINDS rejects — every such call throws.
+      if (!KINDS.has(kind)) {
+        findings.push({
+          detection: 'recipe-kind',
+          key: `${file}::recipe-kind::${kind}`,
+          file,
+          message: `${file} instructs task kind \`${kind}\`, which KINDS in src/lib/task-registry.js rejects — every such call throws and the recipe silently never runs.`,
+          fix: `Either add \`${kind}\` to KINDS in src/lib/task-registry.js (with a docblock note saying why) or correct the recipe to name an accepted kind.`,
+        });
+      }
+    }
+  }
+
+  // reverse (debt-seeded): a KINDS kind no recipe documents. Weaker by nature — kinds
+  // like `sync` are enqueued programmatically (actions.enqueueWaveSync) and legitimately
+  // have no human-typed recipe. Keyed to the registry that owns the vocabulary.
+  const registry = path.posix.join('src', 'lib', 'task-registry.js');
+  for (const kind of KINDS) {
+    if (documented.has(kind)) continue;
+    findings.push({
+      detection: 'recipe-kind-reverse',
+      key: `${registry}::recipe-kind-reverse::${kind}`,
+      file: registry,
+      message: `KINDS in ${registry} accepts task kind \`${kind}\` but no src/commands recipe documents it.`,
+      fix: `If \`${kind}\` is human-invokable, document a \`menu task add ${kind}\` recipe; if it is only enqueued programmatically, this is expected debt.`,
+    });
+  }
+
+  return { findings, commandDocs: docs.length };
+}
+
+// ── (c) config key written vs read ───────────────────────────────────────────
+
+const LINE_COMMENT = /\/\/[^\n]*/g;
+const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g;
+
+/** Strip JS comments so a name in a comment never counts as a read (a citation is not a read). */
+function stripJsComments(src) {
+  return src.replace(BLOCK_COMMENT, '').replace(LINE_COMMENT, '');
+}
+
+const IDENT_CHAR = /[\w$]/; // literal — the leaf word test below never builds a dynamic RegExp
+
+/**
+ * Whole-word occurrence of `word` in `text`, without a dynamic RegExp (the eslint
+ * security rule forbids `new RegExp(<variable>)`, and a config leaf must match on
+ * identifier boundaries so `enabled` never matches inside `syncEnabled`).
+ * @param {string} text
+ * @param {string} word
+ * @returns {boolean}
+ */
+function containsWord(text, word) {
+  let idx = text.indexOf(word);
+  while (idx !== -1) {
+    const before = idx === 0 ? '' : text[idx - 1];
+    const after = text[idx + word.length] || '';
+    if (!IDENT_CHAR.test(before) && !IDENT_CHAR.test(after)) return true;
+    idx = text.indexOf(word, idx + 1);
+  }
+  return false;
+}
+
+/**
+ * The YAML lines `generateSettings()` emits, extracted from the SOURCE of
+ * src/lib/init-project.js (no execution). Returns the flat 2-level dotted keys it writes.
+ * @param {string} root
+ * @returns {string[]} dotted paths, e.g. ['enforcement.mode', 'quality.coverage_threshold']
+ */
+function writtenYamlKeys(root) {
+  const ipFile = path.join(root, 'src', 'lib', 'init-project.js');
+  let src;
+  try {
+    src = safeFs.readFileSync(ipFile, 'utf8');
+  } catch {
+    return [];
+  }
+  const fn = src.match(/function generateSettings\s*\([^)]*\)\s*\{[\s\S]*?return\s*\[([\s\S]*?)\]\.join\(/);
+  if (!fn) return [];
+  // Pull the inner text of each string literal ('…', "…", `…`) in emission order.
+  const strRe = /(['"`])((?:\\.|(?!\1)[\s\S])*?)\1/g;
+  const emitted = [];
+  let s;
+  while ((s = strRe.exec(fn[1])) !== null) emitted.push(s[2]);
+
+  /** @type {string[]} */
+  const keys = [];
+  let section = null;
+  for (const raw of emitted) {
+    const line = raw.replace(/\s*#.*$/, '');           // drop trailing YAML comment
+    if (line.trim() === '') continue;
+    if (/^\S/.test(line)) {                             // top-level `key:` or `key: val`
+      const top = line.match(/^([A-Za-z_][\w]*):\s*(.*)$/);
+      if (!top) { section = null; continue; }
+      if (top[2].trim() !== '') { keys.push(top[1]); section = null; } // top-level scalar
+      else section = top[1];
+    } else if (section) {                              // nested `  child:`
+      const child = line.match(/^\s+([A-Za-z_][\w]*):/);
+      if (child) keys.push(`${section}.${child[1]}`);
+    }
+  }
+  return keys;
+}
+
+/**
+ * Is a config key READ anywhere in `src/**`? Surface-scoped: only a file that references
+ * the SAME surface file (settings.yaml vs settings.json) can satisfy the key, and the
+ * writer is excluded. Under-reports by design — a leaf mentioned in any same-surface
+ * reader counts (name occurrence, not data-flow).
+ * @param {string} root
+ * @param {'settings.yaml'|'settings.json'} surface
+ * @param {string} dottedPath
+ * @param {string} writerAbs - absolute path of the writer, excluded from the read scan
+ * @returns {boolean}
+ */
+function keyIsRead(root, surface, dottedPath, writerAbs) {
+  const leaf = dottedPath.split('.').pop();
+  for (const abs of collectJs(path.join(root, 'src'))) {
+    if (abs === writerAbs) continue;
+    let src;
+    try {
+      src = safeFs.readFileSync(abs, 'utf8');
+    } catch {
+      continue;
+    }
+    if (src.indexOf(surface) === -1) continue;         // wrong surface — cannot satisfy
+    const code = stripJsComments(src);
+    if (code.indexOf(surface) === -1) continue;         // referenced only in a comment
+    if (containsWord(code, leaf) || code.indexOf(dottedPath) !== -1) return true;
+  }
+  return false;
+}
+
+/** Recursively collect `*.js` files under a directory (via safe-fs). */
+function collectJs(dir) {
+  const out = [];
+  let entries;
+  try {
+    entries = safeFs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...collectJs(p));
+    else if (e.name.endsWith('.js')) out.push(p);
+  }
+  return out;
+}
+
+/**
+ * Detection (c): settings keys written into a new project but read by nothing.
+ * @param {string} root
+ * @returns {{findings: Finding[], settingsKeys: number}}
+ */
+function scanConfig(root) {
+  /** @type {Finding[]} */
+  const findings = [];
+  const writerAbs = path.join(root, 'src', 'lib', 'init-project.js');
+  const yamlKeys = writtenYamlKeys(root);
+  for (const dotted of yamlKeys) {
+    if (keyIsRead(root, 'settings.yaml', dotted, writerAbs)) continue;
+    findings.push({
+      detection: 'config-key',
+      key: `settings.yaml::config-key::${dotted}`,
+      file: path.posix.join('src', 'lib', 'init-project.js'),
+      surface: 'settings.yaml',
+      message: `src/lib/init-project.js writes settings.yaml key \`${dotted}\` but no code in src/ reads it — a visible setting wired to nothing is a placebo.`,
+      fix: `Either wire a reader (and note it in docs/CONFIG_SOURCES.md) or stop writing the key.`,
+    });
+  }
+  return { findings, settingsKeys: yamlKeys.length };
+}
+
+/**
+ * Scan a CTOC tree for instructions with no receiver: agent orders that cannot execute
+ * (b, plan 00110), recipe kinds the accepted vocabulary rejects (a), and settings keys
+ * written but never read (c).
+ *
+ * @param {string} root - absolute project root
+ * @returns {{findings: Finding[], scanned: {agents: number, withGrant: number, commandDocs: number, settingsKeys: number}}}
+ *   `scanned` exists for the non-vacuity assertion: a scan that read ZERO of a class must
+ *   let the caller FAIL the fence, never pass silently. A fence that reports a verdict on
+ *   input it never received is the false-green class this repository fences by name.
+ * @throws {TypeError} root is not a non-empty string
+ */
+function scan(root) {
+  if (typeof root !== 'string' || root.length === 0) {
+    throw new TypeError('unexecutable-instruction-scan: root must be a non-empty string');
+  }
+  const orders = scanAgentOrders(root);
+  const recipes = scanRecipes(root);
+  const config = scanConfig(root);
+  return {
+    findings: [...orders.findings, ...recipes.findings, ...config.findings],
+    scanned: {
+      agents: orders.agents,
+      withGrant: orders.withGrant,
+      commandDocs: recipes.commandDocs,
+      settingsKeys: config.settingsKeys,
+    },
+  };
 }
 
 module.exports = { scan };
