@@ -1,0 +1,9 @@
+{
+  "content_sha256": "e4fe995e0264ba537c920f86ab8351d406fcf5c4e355c3e48f895f440a131de7",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T14:46:35.958Z",
+  "approved_by": "human",
+  "plan_basename": "00069-e1-enforcement-mode-honored-with-a-gate-floor"
+}

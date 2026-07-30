@@ -1,0 +1,9 @@
+{
+  "content_sha256": "06fba7294f36c9625db5ed9d11084f43140c9c5760e263c34addf432f1e5dd68",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T14:47:43.958Z",
+  "approved_by": "human",
+  "plan_basename": "00185-every-stale-plan-cleanup-a-human-approves-does-nothing"
+}

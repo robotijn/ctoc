@@ -1,0 +1,9 @@
+{
+  "content_sha256": "395b1a4e8b9f4f82ed5288eeb0a03470d268db2891b286bf0c48ecf8da98d816",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T14:47:43.929Z",
+  "approved_by": "human",
+  "plan_basename": "00074-gc1-golden-corpus-real-sample-fence"
+}
