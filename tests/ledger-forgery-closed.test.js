@@ -71,6 +71,25 @@ function setState(step = 10, feature = 'r3a-forgery-test') {
   stateManager.saveState(project, state);
 }
 
+/**
+ * Mint an APPROVED plan covering `globs` so the 00202 plan-coverage stage ALLOWS the
+ * write — isolating the guard this file tests (the ledger-forgery deny). Since 00202 a
+ * determinate write to an UNCOVERED file is denied on the shell channel; a non-ledger
+ * write here (`cp a.js b.js`, a post-reset `tee evil.json`) is legitimate and must reach
+ * the LEDGER decision, not be pre-empted by "no covering plan". The ledger deny runs
+ * BEFORE coverage, so covering these targets never un-denies a real ledger write.
+ */
+function coverPlan(globs) {
+  const dir = path.join(project, 'plans', 'todo');
+  fs.mkdirSync(dir, { recursive: true });
+  const body = '---\nfiles:\n' + globs.map((g) => `  - "${g}"`).join('\n') + '\n---\n\n# 00202 coverage fixture\n';
+  const p = path.join(dir, '00202-cover.md');
+  fs.writeFileSync(p, body, 'utf8');
+  ledger.writeEntry(ledger.slugFromPlanPath(p), {
+    content: body, stage_from: 'implementation', stage_to: 'todo', approved_by: 'human',
+  }, project);
+}
+
 /** Run the REAL hook with `command` on STDIN (the harness's real transport). */
 function runHook(command) {
   return spawnSync(process.execPath, [HOOK], {
@@ -243,6 +262,7 @@ describe('R3-A item 1 — raw writes to .ctoc/approvals are DENIED', () => {
 
   test('cd-boundary READS and unrelated cd writes stay ALLOWED (no false positives)', () => {
     fs.writeFileSync(path.join(project, '.ctoc', 'approvals', 'x.json'), '{}');
+    coverPlan(['src/b.js']); // 00202: the unrelated write below is covered, isolating the ledger guard
     assertAllowed('cd .ctoc && cat approvals/x.json', 'reading via cd is not forgery');
     assertAllowed('cd .ctoc/approvals && ls', 'listing via cd is not forgery');
     assertAllowed('cd src && cp a.js b.js', 'unrelated cd + copy is not a ledger write');
@@ -338,6 +358,8 @@ describe('R3-A item 1 — raw writes to .ctoc/approvals are DENIED', () => {
   // Regression net — every one of these MUST keep its pre-fix outcome.
   test('cd option-skip fix preserves all existing cd outcomes (regression)', () => {
     fs.writeFileSync(path.join(project, '.ctoc', 'approvals', 'x.json'), '{}');
+    coverPlan(['evil.json']); // 00202: the post-reset `tee evil.json` (out of the ledger) is covered
+
     // Plain (no options) ledger writes still DENIED.
     assertDenied('cd .ctoc/approvals && tee evil.json', 'plain cd into ledger + tee');
     // Reads via a plain cd still ALLOWED.

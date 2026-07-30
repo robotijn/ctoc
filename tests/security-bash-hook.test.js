@@ -53,6 +53,25 @@ const { spawnSync } = require('child_process');
 const REPO = path.resolve(__dirname, '..');
 const HOOK = path.join(REPO, 'src', 'hooks', 'PreToolUse.Bash.js');
 const stateManager = require(path.join(REPO, 'src', 'lib', 'state-manager'));
+const ledger = require(path.join(REPO, 'src', 'lib', 'approval-ledger'));
+
+/**
+ * Mint an APPROVED plan covering `globs` so the 00202 plan-coverage stage ALLOWS the
+ * write — isolating the guard this file actually tests (the Iron-Loop STEP gate). Since
+ * 00202 the shell channel denies a determinate write to an UNCOVERED file; without a
+ * covering plan that deny would shadow the step-gate assertions here. Only an APPROVED
+ * plan grants coverage, so the fixture mints the real ledger entry over its own bytes.
+ */
+function coverPlan(globs) {
+  const dir = path.join(project, 'plans', 'todo');
+  fs.mkdirSync(dir, { recursive: true });
+  const body = '---\nfiles:\n' + globs.map((g) => `  - "${g}"`).join('\n') + '\n---\n\n# 00202 coverage fixture\n';
+  const p = path.join(dir, '00202-cover.md');
+  fs.writeFileSync(p, body, 'utf8');
+  ledger.writeEntry(ledger.slugFromPlanPath(p), {
+    content: body, stage_from: 'implementation', stage_to: 'todo', approved_by: 'human',
+  }, project);
+}
 
 // --- hermetic project + signed-state harness -------------------------------
 
@@ -295,11 +314,13 @@ describe('Bash gate — write step gate', () => {
 
   it('allows a write at step 8 (>= 8) with feature set', () => {
     setState(8);
+    coverPlan(['foo']); // 00202: a covered write isolates the STEP gate under test
     assertAllowed('touch foo', 'writes allowed at step 8');
   });
 
   it('allows a write at step 16 with feature set', () => {
     setState(16);
+    coverPlan(['f']); // 00202: cover the target so coverage does not shadow the step gate
     assertAllowed('echo x > f', 'writes allowed at step 16');
   });
 

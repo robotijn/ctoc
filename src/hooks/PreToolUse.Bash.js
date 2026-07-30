@@ -83,6 +83,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const safeFs = require('../lib/safe-fs');
 const { loadState, STEP_NAMES } = require('../lib/state-manager');
 const { writeToTerminal, colors } = require('../lib/ui');
 const { emitDeny } = require('../lib/hook-deny-signal');
@@ -107,6 +108,36 @@ try {
 } catch {
   realPathConfinement = null;
 }
+
+// 00202 — the shell channel asks the SAME plan-coverage question the Edit channel
+// asks about DETERMINATE write targets, reusing the Edit channel's whitelist and its
+// ROLE-SCOPED user-typed escape check so the two channels cannot drift (two copies of
+// one policy is the exact defect this slice repairs). All fail-soft: a load failure
+// makes `checkWriteCoverage` fail CLOSED (a determinate uncovered write is denied),
+// never fail-open — this stage has no second layer beneath it. Importing PreToolUse.Edit
+// runs NO enforcement and consumes NO stdin: its execution is guarded by
+// `require.main === module`, and it does not require this file, so there is no cycle.
+//
+// MODE-BLIND BY CONSTRUCTION (plan 00069; the "structural floor — the mode cannot have
+// leaked into a gate path" fence, case 27). This hook NEVER reads the soft/off/strict
+// enforcement setting — the fence forbids the very tokens, because the Bash channel's
+// write gates are ABSOLUTE denies that the soft/off convenience knob must never weaken.
+// A mode-aware Bash gate is exactly the gate-weakening surface that fence prevents. So an
+// uncovered determinate write is denied UNCONDITIONALLY (subject only to the whitelist
+// and a user-typed escape phrase). The soft/off setting relaxes the Edit channel; it
+// never relaxes this one.
+//
+// SCOPE (Option A). This stage acts on the classifier's `writes` verdict ONLY.
+// `indeterminate` commands (npm test, node --test, node -e, npm run lint, node scripts,
+// make, python) and `none` commands pass UNCHANGED — the "refuse indeterminate writes"
+// policy is DEFERRED (it would deny CTOC's own Step-14 `npm test`; see plan 00202's
+// Decisions Taken Under Ambiguity).
+let editHook = null;
+try { editHook = require('./PreToolUse.Edit'); } catch { editHook = null; }
+let coverage = null;
+try { coverage = require('../lib/plan-coverage'); } catch { coverage = null; }
+let enforcementLog = null;
+try { enforcementLog = require('../lib/enforcement-log'); } catch { enforcementLog = null; }
 
 const MINIMUM_STEP_FOR_WRITE = 8;
 const MINIMUM_STEP_FOR_COMMIT = 15;
@@ -649,31 +680,19 @@ function isDestructiveGitCommand(command) {
   return false;
 }
 
-/**
- * Is this a file-writing command that the Iron Loop step gate must judge?
- *
- * PER SEGMENT (00201 — the cd-prefix bypass). The old form tested a whole-string-
- * anchored ALWAYS_ALLOWED list FIRST and returned false on a match, so any command
- * whose FIRST token was cd/ls/node/npm/find/… never reached the write patterns at
- * all: `cd . && echo evil > src/lib/plan-coverage.js` was ALLOWED. The write set is
- * now worked out by shell-write-targets.classifyWrites, which walks segments and
- * cannot be short-circuited by a benign first token.
- *
- * INDETERMINATE counts as a write here: a command whose targets cannot be read has
- * NOT been shown to be harmless, and the classifier's whole point is that "unknown"
- * is sayable rather than silently collapsed into "writes nothing". The step gate is
- * the weaker of the two consequences (a write before step 8 waits until step 8);
- * coverage and the indeterminate-deny are 00202.
- * @param {string} command
- * @returns {boolean}
- */
-function isWriteCommand(command) {
-  if (!command) return false;
-  const result = shellWrites.classifyWrites(command);
-  // A pure-read segment carries no write shape and is already 'none'; reaching a
-  // non-'none' verdict means a real write shape or an unreadable one.
-  return result.verdict !== 'none';
-}
+// THE WRITE DECISION (00201 → 00202). It used to live in a local `isWriteCommand`
+// helper, but `main()` now calls `shellWrites.classifyWrites(command)` ONCE and reads
+// its verdict directly — for BOTH the step gate (`verdict !== 'none'` is a write) and
+// the plan-coverage stage (`verdict === 'writes'` is a determinate write). Classifying
+// once avoids the double scan (Step 12) and keeps the two gates reading one answer.
+//
+// PER SEGMENT (00201 — the cd-prefix bypass): the old whole-string-anchored
+// ALWAYS_ALLOWED list matched cd/ls/node/… FIRST, so `cd . && echo evil > src/x.js`
+// never reached the write patterns and was ALLOWED. `classifyWrites` walks segments and
+// cannot be short-circuited by a benign first token. INDETERMINATE counts as a write for
+// the STEP gate (a command whose targets cannot be read has not been shown harmless),
+// but NOT for the coverage stage — an indeterminate command is passed unchanged there
+// (Option A; the indeterminate-deny is deferred, see plan 00202).
 
 /**
  * Check if a command invokes `git commit` or `git push` anywhere — including
@@ -705,23 +724,118 @@ function isCommitCommand(command) {
 }
 
 /**
- * Read the Bash command from the PreToolUse payload on STDIN (fd 0). The pipe is
- * single-consumer, so `main()` calls this exactly once. Fails OPEN (returns '')
- * on any read/parse error — a broken pipe cannot crash the gate; an empty
- * command is then allowed by `main()`'s first check.
- * @returns {string} the command string, or '' when unreadable/absent.
+ * Read the PreToolUse payload from STDIN (fd 0). The pipe is single-consumer, so
+ * `main()` calls this exactly once and threads the result to every consumer. Returns
+ * BOTH the command string AND the parsed payload — the parsed payload carries
+ * `transcript_path`, which the new coverage stage's escape-phrase check needs. Fails
+ * OPEN (command '') on any read/parse error — a broken pipe cannot crash the gate; an
+ * empty command is then allowed by `main()`'s first check. On the regex fallback the
+ * payload is null (no transcript is recoverable), so the escape check simply finds
+ * nothing — deny-ward, never a crash.
+ *
+ * The reader's fail-open and its truncating fallback are NOT changed here (they are a
+ * separate slice, 00206). This change only exposes the already-parsed payload that the
+ * single stdin read produced.
+ * @returns {{command: string, stdinJson: (object|null)}}
  */
-function getCommand() {
+function getPayload() {
   let raw = '';
-  try { raw = fs.readFileSync(0, 'utf8') || ''; } catch { return ''; }
-  if (!raw) return '';
+  try { raw = fs.readFileSync(0, 'utf8') || ''; } catch { return { command: '', stdinJson: null }; }
+  if (!raw) return { command: '', stdinJson: null };
   try {
     const parsed = JSON.parse(raw);
-    return (parsed && parsed.tool_input && parsed.tool_input.command)
+    const command = (parsed && parsed.tool_input && parsed.tool_input.command)
       || (parsed && parsed.command) || '';
+    return { command, stdinJson: parsed };
   } catch {
     const m = raw.match(/command['":\s]+["']?([^"'\n]+)/);
-    return m ? m[1] : '';
+    return { command: m ? m[1] : '', stdinJson: null };
+  }
+}
+
+/**
+ * Read the raw transcript string from the payload's `transcript_path`, mirroring
+ * PreToolUse.Edit.js:readTranscript. Fail-soft to null (a missing/unreadable
+ * transcript means "no escape phrase found", never a crash).
+ * @param {object|null} stdinJson - the parsed PreToolUse payload
+ * @returns {string|null}
+ */
+function readTranscript(stdinJson) {
+  if (!stdinJson || !stdinJson.transcript_path) return null;
+  // safeFs (like PreToolUse.Edit.js:readTranscript) — validates the path and keeps the
+  // security/detect-non-literal-fs-filename lint clean on this attacker-influenced input.
+  try { return safeFs.readFileSync(stdinJson.transcript_path, 'utf8'); } catch { return null; }
+}
+
+/**
+ * Decide plan coverage for a DETERMINATE-write command (classified.verdict ===
+ * 'writes') that already cleared the step gate. Reuses the Edit channel's exported
+ * whitelist and role-scoped escape check and the shared plan-coverage oracle — never a
+ * second copy of any of them.
+ *
+ * RETURN-NEVER-THROW. Every fault returns the deny-ward value: this gate has no second
+ * layer, so "cannot decide" is `uncovered` (which the caller denies in strict mode).
+ * A missing `plan-coverage` or `PreToolUse.Edit` module therefore fails CLOSED here —
+ * the deliberate inverse of the Edit channel's fail-soft, which has a whitelist,
+ * project detection and an escape phrase underneath it; this stage does not.
+ *
+ * @param {{verdict: string, targets: string[], reason: (string|null)}} classified
+ * @param {string} root - process.cwd()
+ * @param {string|null} transcript - the raw transcript string (for the escape check)
+ * @returns {{result: 'covered'|'whitelist'|'escape'|'uncovered',
+ *            target: (string|null), plan: (string|null), escape_phrase: (string|null)}}
+ */
+function checkWriteCoverage(classified, root, transcript) {
+  try {
+    // 1. A user-TYPED escape phrase allows the write (role-scoped: a phrase in a
+    //    tool_result does not count — findEscapeInTranscript enforces that).
+    if (editHook && typeof editHook.findEscapeInTranscript === 'function') {
+      const escape = editHook.findEscapeInTranscript(transcript);
+      if (escape) return { result: 'escape', target: null, plan: null, escape_phrase: escape };
+    }
+
+    // 2. Every determinate target must be whitelisted or covered by an APPROVED plan.
+    //    A missing oracle/whitelist ⇒ cannot check ⇒ fail closed (uncovered).
+    const canCheck = coverage && typeof coverage.findCoveringPlan === 'function'
+      && editHook && typeof editHook.isWhitelisted === 'function';
+    let coveredPlan = null;
+    let sawNonWhitelist = false;
+    for (const target of classified.targets) {
+      if (canCheck && editHook.isWhitelisted(target)) continue; // infrastructure path
+      sawNonWhitelist = true;
+      if (!canCheck) return { result: 'uncovered', target, plan: null, escape_phrase: null };
+      const match = coverage.findCoveringPlan(target, root);
+      if (!match) return { result: 'uncovered', target, plan: null, escape_phrase: null };
+      if (!coveredPlan) coveredPlan = match.plan; // first covering plan, for the log
+    }
+    if (!sawNonWhitelist) return { result: 'whitelist', target: null, plan: null, escape_phrase: null };
+    return { result: 'covered', target: null, plan: coveredPlan, escape_phrase: null };
+  } catch {
+    // Return-never-throw: a fault fails toward deny, never allow.
+    const target = (classified && classified.targets && classified.targets[0]) || null;
+    return { result: 'uncovered', target, plan: null, escape_phrase: null };
+  }
+}
+
+/**
+ * Record ONE coverage decision to the same store the Edit channel uses. Best-effort:
+ * wrapped in its own try/catch, ignores the return value, and NEVER changes an outcome
+ * (a log failure is not a permission decision — matches PreToolUse.Edit.js allow/block).
+ * The command string is deliberately NOT recorded: a command can carry a secret and this
+ * log is a file people paste into issues; `target_file` plus a fixed-vocabulary `reason`
+ * reconstructs the decision without recording what was typed.
+ * @param {object} entry
+ * @param {string} root
+ */
+function logCoverage(entry, root) {
+  if (!enforcementLog || typeof enforcementLog.logEnforcement !== 'function') return;
+  try {
+    enforcementLog.logEnforcement(entry, root);
+  } catch (err) {
+    // A log-write failure is best-effort and is NOT a permission verdict — the
+    // allow/deny was already decided above and is unaffected. Record it on stderr
+    // (never stdout, which carries only the deny decision JSON) and continue.
+    process.stderr.write(`[CTOC] Bash coverage log write failed (ignored, outcome unchanged): ${err.message}\n`);
   }
 }
 
@@ -763,7 +877,7 @@ function formatBlocked(command, state, reason, blockType) {
  */
 async function main() {
   const projectPath = process.cwd();
-  const command = getCommand();
+  const { command, stdinJson } = getPayload();
 
   if (!command) {
     process.exit(0);
@@ -842,8 +956,14 @@ async function main() {
     process.exit(0);
   }
 
+  // Classify the write set ONCE and thread it to BOTH the step gate and the coverage
+  // stage (Step 12 — never a double scan). A non-'none' verdict is a write for the step
+  // gate; a 'writes' verdict (determinate targets) is what the coverage stage judges.
+  const classified = shellWrites.classifyWrites(command);
+  const isWrite = classified.verdict !== 'none';
+
   // Check for write command
-  if (isWriteCommand(command)) {
+  if (isWrite) {
     // No feature context - block
     if (!state || !state.feature) {
       const reason = 'No feature context - write commands not allowed';
@@ -856,6 +976,42 @@ async function main() {
       const reason = `Step ${currentStep} < ${MINIMUM_STEP_FOR_WRITE} - planning not complete`;
       writeToTerminal(formatBlocked(command, state, reason, 'WRITE'));
       emitDeny(`CTOC: write command blocked — planning not complete (step ${currentStep} < ${MINIMUM_STEP_FOR_WRITE}).`);
+    }
+  }
+
+  // 00202: PLAN-COVERAGE stage — DETERMINATE writes ONLY. Reaching here means the step
+  // gate cleared this command (a pre-step-8 write already emitted its step reason above
+  // and exited), so this is the second question, asked only of writes the step gate let
+  // through. `indeterminate` and `none` verdicts pass unchanged (Option A — the
+  // indeterminate-deny is deferred to its own human-approved slice). MODE-BLIND: an
+  // uncovered determinate write is denied unconditionally (see the require-block note and
+  // plan 00069's mode structural floor, case 27); the whitelist and a user-typed escape
+  // phrase are the only two ways past it, matching the Edit channel's coverage exemptions.
+  if (classified.verdict === 'writes') {
+    const transcript = readTranscript(stdinJson);
+    const cov = checkWriteCoverage(classified, projectPath, transcript);
+
+    let outcome;
+    if (cov.result === 'covered') outcome = 'allow';
+    else if (cov.result === 'whitelist') outcome = 'whitelist';
+    else if (cov.result === 'escape') outcome = 'escape';
+    else outcome = 'block'; // uncovered — always denied on the Bash channel
+
+    logCoverage({
+      tool: 'Bash',
+      target_file: cov.target,
+      plan_matched: cov.plan,
+      escape_phrase: cov.escape_phrase,
+      outcome,
+      reason: cov.result, // fixed vocabulary — never command text
+    }, projectPath);
+
+    if (outcome === 'block') {
+      const reason = `no approved plan covers "${cov.target}" — a shell command may not `
+        + `write a source file the plan queue does not declare. Create or activate a `
+        + `covering plan via /ctoc:start, or use an escape phrase you type yourself.`;
+      writeToTerminal(formatBlocked(command, state, reason, 'COVERAGE'));
+      emitDeny(`CTOC: ${reason}`);
     }
   }
 
