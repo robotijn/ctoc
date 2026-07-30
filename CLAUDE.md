@@ -269,7 +269,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 499 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 500 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -298,6 +298,20 @@ and `whitelist` is a PERMANENT exemption that starts EMPTY and requires a writte
 justification per entry. Conflating them is what kills a fence. The fixed exemplars are
 the specification: `src/scripts/test-gate.js` (parsers return `null`, never `0`) and
 `src/lib/request-exit.js` (`process.exitCode` + return, so Node drains before exiting).
+
+**A check with zero detected tools reports NOT VERIFIED and FAILS its tier — it does not
+pass.** In the quality agent (`src/lib/quality-agent.js`), `runLint`/`runTypecheck` carry a
+`ran` count: `passed:true` requires `ran >= 1` with no command failure, and a zero-tool
+detection returns `{ passed:false, undetermined:true, ran:0, errors:null }` — the same
+false-green class as the parsers above, one field to the left. `errors` is `null` on that
+path, never `0`, because `0` is a measurement and nothing was measured; the not-verified
+message ("lint NOT VERIFIED — ...") is deliberately distinct from the passing message so a
+non-run never reads as a clean run. The two `setCompleted` fallbacks for a missing result
+object are failure-shaped (`notVerifiedLint`/`notVerifiedTypecheck`) for the same reason: a
+check that produced no result did not pass. Enforced by `tests/vacuous-verification.test.js`.
+This makes a project with no linter fail loudly rather than receive a green tick — which
+checks a project treats as optional is a per-project policy decision left to the human, not
+softened here.
 
 **The golden-corpus fence — a synthetic-only test for a module that reads a persisted
 real-world contract.** In the human's words: "the matrix fix passed its own tests while
@@ -558,7 +572,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 499 test files
+  tests/                 500 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

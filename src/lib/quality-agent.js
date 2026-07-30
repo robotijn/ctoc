@@ -581,13 +581,61 @@ function unreadableTestsResult(lang, passCount, skipped) {
 }
 
 /**
- * Run lint check
+ * The NON-pass result for a lint check that could NOT RUN — no tool carrying a lint
+ * command was detected, or no result object was produced at all. A check that did not run
+ * has NOT passed: this is the false-green class (a verification of nothing recorded as a
+ * success), so the verdict is `passed:false` and `errors` is `null`, NEVER 0 — 0 is a
+ * measurement, and this path measured nothing. Mirrors this module's `undetermined` idiom
+ * for undetermined test detection (undeterminedTestsResult) and test-gate.js's parsers,
+ * which return null rather than the success value for exactly this reason. Pure factory
+ * (no console side effect); the caller logs.
+ * @param {string} reason - why the check could not run
+ * @returns {{passed:false, undetermined:true, ran:0, errors:null, warnings:number, output:string}}
+ */
+function notVerifiedLint(reason) {
+  return {
+    passed: false,
+    undetermined: true,
+    ran: 0,
+    errors: null,
+    warnings: 0,
+    output: `lint NOT VERIFIED — ${reason}. A check that did not run is not a pass.`
+  };
+}
+
+/**
+ * The NON-pass result for a type check that could NOT RUN. Same rationale and shape as
+ * {@link notVerifiedLint}, minus the `warnings` field (typecheck results carry no warnings
+ * count, matching the passing shape `{ passed:true, errors:0 }`).
+ * @param {string} reason - why the check could not run
+ * @returns {{passed:false, undetermined:true, ran:0, errors:null, output:string}}
+ */
+function notVerifiedTypecheck(reason) {
+  return {
+    passed: false,
+    undetermined: true,
+    ran: 0,
+    errors: null,
+    output: `type check NOT VERIFIED — ${reason}. A check that did not run is not a pass.`
+  };
+}
+
+/**
+ * Run lint check.
+ *
+ * `ran` counts the tools that actually carried a lint command. When it is ZERO the check
+ * could not run and returns a not-verified result (passed:false) — a detection failure
+ * must fail toward honest, never toward green. `ran >= 1` with no command failure is the
+ * only path to `passed:true`; a run failure returns `passed:false` with `ran` reflecting
+ * what executed, so a non-run (ran:0) and a run failure (ran>=1) are distinguishable.
  */
 async function runLint(tools) {
   console.log('\n  Running lint...');
 
+  let ran = 0;
   for (const [lang, langTools] of Object.entries(tools)) {
     if (!langTools.lint) continue;
+    ran++;
 
     // NO SHELL: langTools.lint is a CONFIGURED string (agent-writable .ctoc config); run
     // it as an argv vector, refusing a shell-operator command as a FAILED check.
@@ -595,6 +643,7 @@ async function runLint(tools) {
     if (!result.success) {
       return {
         passed: false,
+        ran,
         errors: 1,
         warnings: 0,
         output: result.output || result.error
@@ -602,18 +651,27 @@ async function runLint(tools) {
     }
   }
 
-  console.log('   Lint passed');
-  return { passed: true, errors: 0, warnings: 0 };
+  if (ran === 0) {
+    const r = notVerifiedLint('no lint tool was detected');
+    console.log(`   ${r.output}`);
+    return r;
+  }
+
+  console.log(`   Lint passed (${ran} tool(s))`);
+  return { passed: true, ran, errors: 0, warnings: 0 };
 }
 
 /**
- * Run type check
+ * Run type check. Same ran-count discipline as {@link runLint}: a zero-tool detection is
+ * not-verified (passed:false), never a vacuous pass.
  */
 async function runTypecheck(tools) {
   console.log('\n  Running type check...');
 
+  let ran = 0;
   for (const [lang, langTools] of Object.entries(tools)) {
     if (!langTools.typecheck) continue;
+    ran++;
 
     // NO SHELL: configured typecheck string → argv vector; a shell-operator command is a
     // FAILED check, never a shell fallback.
@@ -621,14 +679,21 @@ async function runTypecheck(tools) {
     if (!result.success) {
       return {
         passed: false,
+        ran,
         errors: 1,
         output: result.output || result.error
       };
     }
   }
 
-  console.log('   Type check passed');
-  return { passed: true, errors: 0 };
+  if (ran === 0) {
+    const r = notVerifiedTypecheck('no type check tool was detected');
+    console.log(`   ${r.output}`);
+    return r;
+  }
+
+  console.log(`   Type check passed (${ran} tool(s))`);
+  return { passed: true, ran, errors: 0 };
 }
 
 /**
@@ -1668,8 +1733,11 @@ async function main() {
     qualityState.setCompleted(results.allPassed, {
       tests: tier1.tests || { passed: true, passCount: 0, failed: 0, skipped: 0, flaky: 0 },
       coverage: 0, // TODO: implement coverage
-      lint: tier1.lint || { passed: true, errors: 0, warnings: 0 },
-      typecheck: tier1.typecheck || { passed: true, errors: 0 },
+      // A missing result object means the check produced NO verdict — that is not a pass.
+      // The fallbacks are failure-shaped (notVerified*) so "no result" records honestly
+      // instead of writing the success value into persisted history (the false-green class).
+      lint: tier1.lint || notVerifiedLint('no lint result was produced'),
+      typecheck: tier1.typecheck || notVerifiedTypecheck('no type check result was produced'),
       security: tier1.security || { passed: true, critical: 0, high: 0, medium: 0 }
     });
 
@@ -1708,6 +1776,8 @@ module.exports = {
   parseConfiguredCommand,
   runConfiguredCommand,
   classifySeverity,
+  notVerifiedLint,
+  notVerifiedTypecheck,
   runLint,
   runTypecheck,
   runSpecificTests,

@@ -700,9 +700,16 @@ describe('runTieredChecks', () => {
     const dir = mkTmp('ctoc-tier-pass-');
     try {
       fs.writeFileSync(path.join(dir, 'hello.js'), 'module.exports = 1;\n');
-      const { res } = await withCwd(dir, () => captureLog(() => qualityAgent.runTieredChecks({})));
+      // A "clean project" has DETECTED tools that RAN and PASSED (ran >= 1) — NOT an empty
+      // tools map. An empty map is a zero-tool DETECTION, which plan 00209 makes NOT VERIFIED
+      // (a check that never ran is not a pass), so it now correctly BLOCKS. This case asserts
+      // the real clean-project path: lint + typecheck + tests all present and passing.
+      const cleanProject = { js: { lint: passCmd('lint ok'), typecheck: passCmd('types ok'), test: passCmd('3 passed') } };
+      const { res } = await withCwd(dir, () => captureLog(() => qualityAgent.runTieredChecks(cleanProject)));
       assert.equal(res.allPassed, true);
       assert.equal(res.action, 'push');
+      assert.equal(res.tier1.lint.ran, 1, 'lint actually ran');
+      assert.equal(res.tier1.typecheck.ran, 1, 'typecheck actually ran');
       assert.ok(res.tier2 && typeof res.tier2 === 'object', 'a passing Tier 1 yields a Tier 2 object');
     } finally {
       rm(dir);
