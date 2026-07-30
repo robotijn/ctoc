@@ -96,6 +96,13 @@ const STAGE_FOLDERS = {
  * Anything with a path separator, a ".." segment, an absolute path, or a NUL
  * byte is a directory-traversal attempt and must be refused before the path is
  * joined or read (e.g. "functional/../../etc/passwd").
+ *
+ * It is ALSO refused if it carries whitespace (space, tab, CR, LF, form-feed,
+ * vertical-tab) or any ASCII control character (0x00–0x1F, 0x7F): plan refs are
+ * interpolated into SPACE-DELIMITED, model-interpreted action recipes
+ * (`claude:approve <stage>/<file>`), so a name like `bar --override .md` would
+ * inject a `--override` token onto a CLEAN crossing, defeating the audit property
+ * that a forced crossing is byte-distinguishable from a clean one.
  */
 function isUnsafePlanFile(file) {
   return typeof file !== 'string'
@@ -105,6 +112,7 @@ function isUnsafePlanFile(file) {
     || file.includes('\0')
     || file.split(/[\\/]/).includes('..')
     || file.includes('..')
+    || /[\s\x00-\x1f\x7f]/.test(file)
     || path.isAbsolute(file);
 }
 

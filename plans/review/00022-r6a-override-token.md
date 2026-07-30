@@ -63,6 +63,20 @@ claude:approve recipe) · Step 10 IMPLEMENT · Step 11 REVIEW · Step 14 VERIFY
   failed 0, gate PASS; `npx tsc --noEmit` clean (exit 0).
 - [x] Step 16 REPORT — see the report section below.
 
+### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 ## Decisions Taken Under Ambiguity
 
 - **Exact action string:** the failed-validation "Approve anyway" action emits
@@ -121,14 +135,25 @@ claude:approve recipe) · Step 10 IMPLEMENT · Step 11 REVIEW · Step 14 VERIFY
   enhancement fork the plan deliberately excluded (constraint: touch only
   `menu-screens.js` + its test) — surfaced for a possible follow-up, not built here,
   because it expands the route contract without closing a security gap.
-- **Out-of-scope observation (NOT fixed here):** `isUnsafePlanFile` blocks path
-  separators, `..`, null bytes, and absolute paths, but not spaces — a plan filename
-  containing a space could inject an extra token into ANY `claude:*` action string
-  (e.g. `claude:approve functional/a b.md --override`). This is a pre-existing,
-  file-wide property shared by every `claude:` action in `menu-screens.js`, not a
-  regression introduced by this plan, and the surface is a model-interpreted recipe
-  (no code exec). Fixing it piecemeal on the override action alone would be
-  inconsistent; it belongs in a separate hardening plan covering all action strings.
+- **Whitespace/control-char token injection — NOW FIXED (rework, 2026-07-30).** The
+  earlier note flagged that `isUnsafePlanFile` blocked path separators, `..`, null
+  bytes and absolute paths but NOT spaces or other whitespace/control characters. The
+  security scanner then CONFIRMED this as a live medium-severity defect: action strings
+  are space-delimited, model-interpreted recipes, so a plan filename `bar --override .md`
+  makes the CLEAN "Confirm approve" path emit `claude:approve functional/bar --override .md`
+  — carrying the `--override` audit token on a CLEAN crossing — and the failed path emit
+  a doubled `... --override .md --override`, defeating R6-A's own byte-distinguishability
+  property. Fixed once at the shared guard `isUnsafePlanFile`: it now also rejects any
+  filename containing whitespace (`\s`) or an ASCII control character (`\x00-\x1f`, `\x7f`),
+  which covers every `claude:*`/`plan`/`browse` action across the file in a single place.
+  All prior rejections (`/`, `\`, `..`, NUL, absolute) are preserved; legitimate names
+  (letters, digits, `-`, `_`, `.`) are unaffected. TDD-red first: 8 injection cases in
+  `tests/menu-screens.test.js` (space, tab, CR, LF, form-feed, vertical-tab, a 0x01
+  control char, and the `bar --override .md` exploit) assert `validateScreen` REFUSES the
+  ref (invalidPlanRefScreen) and emits no `claude:` recipe and no `--override` token —
+  all 8 failed on the old guard, all 8 pass after the one-line guard extension. Full
+  `npm test` gate PASS afterward: coverage 99.07% (threshold 99%), skipped 0, failed 0,
+  exit 0.
 
 ## Step 16 — Final Review Report
 
