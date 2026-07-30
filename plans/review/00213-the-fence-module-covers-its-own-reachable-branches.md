@@ -166,33 +166,41 @@ sibling slice uses.
 (Executor continues numbering here, `###` subheadings only, numbers as inline code
 spans never fenced `#` lines.)
 
-## Step 8 — TEST (TDD)
+## Execution Plan (Steps 8-16)
+
+### Step 8 — TEST (TDD)
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Write the new cases and run. They exercise EXISTING branches in a shipped module,
 so each may be green on first run — PROVE each bites by mutating the branch it
 covers (e.g. make the path-escape guard return the entry instead of `available:
 false`) and showing the case goes RED, then revert. Report each mutation. A case
 that does not bite is the coverage theatre this repository forbids.
 
-## Step 9 — PREPARE
+### Step 9 — PREPARE
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Re-read `src/lib/human-facing-scan.js` and confirm the cited line numbers and
 branch shapes against the current file before writing fixtures.
 
-## Step 10 — IMPLEMENT
+### Step 10 — IMPLEMENT
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Add the four reachable-branch cases to `tests/gate-numbers-fence.test.js`. Fixtures
 in a per-test tmpdir, cleaned up. No source change; if a branch turns out to need a
 source change to be reachable, STOP AND ASK.
 
-## Step 11 — REVIEW
+### Step 11 — REVIEW
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Each new case asserts a caller-visible guarantee (confinement, unavailable-on-
 unparseable, degrade-not-crash), not merely that a line executed.
 
-## Step 12 — OPTIMIZE
+### Step 12 — OPTIMIZE
 None.
 
-## Step 13 — SECURE
+### Step 13 — SECURE
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 The fixtures write only under a tmpdir; no path escapes it.
 
-## Step 14 — VERIFY
+### Step 14 — VERIFY
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 `npx eslint tests/gate-numbers-fence.test.js --max-warnings 0`; `node --test
 tests/*.test.js` fail 0; `npm test` real gate must now PASS (exit 0) with
 whole-repo coverage back ABOVE 99 — report the measured figure and the
@@ -204,10 +212,11 @@ issue, not something to paper over by lowering the floor (forbidden) or faking a
 defensive branch. Floor 99 untouched; false-green + both reachability + gate-words
 fences pass; no baseline entry added.
 
-## Step 15 — DOCUMENT
+### Step 15 — DOCUMENT
 The defensive-branch documentation above IS the record; confirm it names each
 uncovered line and why.
 
-## Step 16 — FINAL-REVIEW
+### Step 16 — FINAL-REVIEW
+- [x] Complete — evidence in this step's section and this plan's verification log; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 `npm test` passes reliably (both runs), coverage is back above the floor with
 margin, and every new case was proven to bite.

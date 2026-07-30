@@ -51,6 +51,20 @@ Step 8 TEST red · Step 9 PREPARE (read ui.js#doctor + tools.js#renderDoctor) ·
 Step 10 IMPLEMENT (wire or delete) · Step 11 REVIEW · Step 14 VERIFY (named tests
 + eslint + export fence; no git) · Step 16 REPORT (which resolution + why).
 
+### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 ## Execution Log (R6-C)
 - Step 8 TEST (Red): rewrote `tests/ui.test.js` doctor block into a removal guard
   (`ui.doctor === undefined`), stripped `doctor` from both export-list assertions,

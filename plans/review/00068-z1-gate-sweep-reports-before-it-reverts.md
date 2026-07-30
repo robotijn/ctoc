@@ -545,6 +545,7 @@ must not drop.
 ## Execution Plan
 
 ### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Write `tests/gate-migration.test.js` (cases 1–12) and the new cases in
 `tests/gate-hook-revival.test.js` (13–16) FIRST. Run **only** those two files
 (`node --test tests/gate-migration.test.js tests/gate-hook-revival.test.js`) and
@@ -553,6 +554,7 @@ real hazard — the legacy plan gets moved. Do not write implementation code in 
 step.
 
 ### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Read IN FULL from disk, read-only: `src/hooks/human-gate-check.js`,
 `src/scripts/ledger-backfill.js`, `src/lib/approval-ledger.js`,
 `src/lib/menu-screens.js`, `src/lib/safe-fs.js`,
@@ -566,6 +568,7 @@ in the plan. Create no directories at runtime beyond `mkdirSync(recursive)` insi
 writers.
 
 ### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 One step, files as sub-items, in dependency order:
 - `src/lib/gate-migration.js` (CREATE)
 - `src/hooks/human-gate-check.js` (MODIFY — partition + report + header)
@@ -577,6 +580,7 @@ No stubs, no TODOs. Any ambiguity → a documented choice under
 `## Decisions Taken Under Ambiguity`, appended to THIS file.
 
 ### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Enumerate every failure mode of the new path and confirm each fails toward REPORT:
 marker absent, unreadable, corrupt, wrong-typed, partially written; notice
 unwritable; `gate-migration` require failing. Confirm no path can revert MORE than
@@ -592,6 +596,7 @@ The hook is on the every-tool-call path. Confirm: `gate-migration` requires only
 new work is added to the migrated/clean path beyond a single `existsSync`.
 
 ### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Walk the Security Review checklist above against the shipped code. Additionally
 verify by test or by reading the deny logic that an agent Edit/Write to
 `.ctoc/approvals/.migration-complete.json` is BLOCKED, and that
@@ -600,6 +605,7 @@ ledger deny (it carries no ledger path operand). If the deny does block the scri
 that is a real finding — report it, do not weaken the deny.
 
 ### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Run the **FULL** gate: `npm test` (which runs `src/scripts/test-gate.js`, enforcing
 the `src/**`-scoped coverage floor of **99** from `.ctoc/coverage-baseline.json` and
 the zero-skipped gate). `node --test tests/*.test.js` is **NOT** sufficient — it
@@ -616,6 +622,7 @@ rather than describing behavior that does not exist. Add the `--mark-migrated` l
 to `src/commands/menu.md` if the backfill recipe lives there.
 
 ### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Verify every Quality Bar item. Report: the exact test output for cases 13–16, the
 full `npm test` summary, the six superseded sections in the archived plan, and the
 exact command a user runs to migrate. Confirm the plan crosses no gate and moves no

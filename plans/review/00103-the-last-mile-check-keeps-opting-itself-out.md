@@ -231,6 +231,7 @@ justification, and conflating them is what kills a fence.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Add both groups and run ONLY this file before touching `src/`. Cases 9 and 10 must
 be **RED**, and their red is the evidence — record the verbatim parse error and the
 byte count actually received, because "the verdict was computed and then discarded"
@@ -241,6 +242,7 @@ is proven by pointing it at a document with no such block and watching it fail
 loudly rather than pass.
 
 ### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Read from disk: `src/lib/app-runner.js:100-200` (the declaration reader and its
 constants), `:350-440` (the three opt-out producers), `:1015-1146` (both ladders and
 the synchronous facade), `:1170-1215` (the child entry point and the exports);
@@ -253,6 +255,7 @@ central finding is wrong and that is a discovery to report, not to work around.
 Where the code disagrees with this plan, **the code wins** — record the discrepancy.
 
 ### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 One step, files as sub-items.
 - `src/lib/app-runner.js` — both child exits through `requestExit`, with the comment.
 - `tests/last-mile-drives-entry-point.test.js` — the twelve cases in two groups.
@@ -260,6 +263,7 @@ One step, files as sub-items.
   the live measured count.
 
 ### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Confirm the ladder, the producers and every reason string are byte-identical to
 before. Confirm the child still exits 0 on both branches and that neither handler
 continues past its `requestExit`. Confirm the fail-closed parse behaviour at
@@ -272,6 +276,7 @@ termination and adds nothing. Confirm the large-payload case does not materially
 lengthen the suite, and that the retention bound on captured output is unchanged.
 
 ### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Confirm the verdict written by the child still carries only a byte count and a
 matched flag for a declared entry point's output — never the output itself, which
 may contain secrets and is written to a Gate-3 evidence artifact on disk. Confirm
@@ -280,6 +285,7 @@ fixtures write only under `os.tmpdir()`, are removed on every exit path includin
 failed assertion, and that no fixture command reaches a shell.
 
 ### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Run `node --test` on `tests/last-mile-drives-entry-point.test.js`,
 `tests/last-mile-wired.test.js`, `tests/last-mile-integration.test.js`,
 `tests/false-green-fence.test.js`, `tests/capability-registry.test.js` and
@@ -300,6 +306,7 @@ two from drifting. Add nothing to `CLAUDE.md` — the documented block there is
 already correct and case 7 now guards it.
 
 ### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 Report the three paths, the Step 8 verbatim red for cases 9 and 10 with the measured
 byte counts, the confirmation or refutation of the third reported reason's absence
 from `src/`, the verbatim green from Step 14, the live `maxFindings` movement, the

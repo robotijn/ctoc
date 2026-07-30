@@ -69,6 +69,20 @@ clean. Assert a benign field still renders its visible text unchanged.
 - [x] Step 14 VERIFY — REAL gate re-run on rework (2026-07-27): `npx tsc --noEmit` clean (0 errors); `npm test` (full suite + coverage floor + zero-skipped) = **tests 10523, pass 10523, fail 0, skipped 0, coverage 99.12% (threshold 99%)** → `[CTOC test-gate] PASS`. The original "77/77 narrowed, no full suite" note was insufficient evidence for a security plan; the whole gate is now recorded. `tests/dashboard-injection.test.js` = 13/13.
 - [x] Step 16 REPORT — see rework report at end of file.
 
+### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
+### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; REVIEW (iron-loop-critic) and SECURE (security-scanner) re-confirmed clean 2026-07-30, full suite green (npm test exit 0).
 ## Decisions Taken Under Ambiguity
 1. **Test-assertion shape.** The palette legitimately emits SGR colour escapes
    (`\x1b[…m`), so "output contains no `\x1b`" is literally impossible. The test
