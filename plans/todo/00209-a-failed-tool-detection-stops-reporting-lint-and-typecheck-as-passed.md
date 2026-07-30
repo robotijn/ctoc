@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "A failed tool detection stops reporting lint and typecheck as passed — a verification of nothing is not a pass"
 type: implementation
 parent_plan: none
@@ -9,20 +10,31 @@ iron_loop: true
 files:
   - "src/lib/quality-agent.js"
   - "tests/vacuous-verification.test.js"
+  - "CLAUDE.md"
+approved_by: human
+approved_at: 2026-07-30T14:47:44.084Z
+gate_crossed: implementation → todo
 ---
 
 # A failed tool detection stops reporting lint and typecheck as passed
 
+> Rebased 2026-07-30: every line number below was re-verified against the current tree.
+> The functions moved (the file grew), and the runner `runCommand` is now
+> `runConfiguredCommand` (a no-shell argv runner for agent-writable config strings). The
+> defect itself is present and unchanged. The sibling `00208` has landed (it now sits in
+> review), so `runSmartTests` already carries its own not-verified guard.
+
 ## The defect, read on disk
 
-`src/lib/quality-agent.js:429-448`:
+`src/lib/quality-agent.js:586-607`:
 
 ```js
 async function runLint(tools) {
   console.log('\n  Running lint...');
-  for (const [_lang, langTools] of Object.entries(tools)) {
+  for (const [lang, langTools] of Object.entries(tools)) {
     if (!langTools.lint) continue;
-    const result = runCommand(langTools.lint, { allowFail: true, silent: true });
+    // runConfiguredCommand: a NO-SHELL argv runner for agent-writable config strings.
+    const result = runConfiguredCommand(langTools.lint, { allowFail: true, silent: true, label: `${lang} lint` });
     if (!result.success) { return { passed: false, errors: 1, warnings: 0, … }; }
   }
   console.log('   Lint passed');
@@ -30,10 +42,12 @@ async function runLint(tools) {
 }
 ```
 
-`runTypecheck` at `:453-471` is the same function with a different key.
+`runTypecheck` at `:612-632` is the same function with a different key (`langTools.typecheck`).
+Both now invoke `runConfiguredCommand`, not the old `runCommand` — the vacuous-pass loop
+structure is unchanged; only the runner name moved.
 
 **When `tools` is empty, the loop body never executes, `Lint passed` is printed, and
-`{ passed: true, errors: 0 }` is returned.** The same holds when `tools` is populated
+{ passed: true, errors: 0 } is returned.** The same holds when `tools` is populated
 but no entry carries a `lint` key — every iteration hits `continue`.
 
 `errors: 0` is not a measurement here. It is a literal in a return statement on a path
@@ -41,7 +55,7 @@ where nothing was measured.
 
 ### Composed with its siblings, the whole gate goes green on nothing
 
-`runTieredChecks` at `:1225-1234`:
+`runTieredChecks` at `:1472-1489`:
 
 ```js
 const tier1 = {
@@ -59,20 +73,23 @@ Two further sites in the same file:
 
 - **A zero-language detection is persisted as a passing quality run.** The tier status
   is written via `qualityState.updateTierStatus('tier1', { status: 'pass', … })` at
-  `:1235-1238` with no record that nothing ran, so the *stored* history says this
+  `:1482-1485` with no record that nothing ran, so the *stored* history says this
   project passed its quality gate.
-- **`:1424-1425`** — three success-shaped defaults written into persisted state:
+- **`:1671-1672`** — success-shaped defaults written into persisted state. The full
+  block is `:1668-1674` (`qualityState.setCompleted`); the two lines this slice inverts are:
   ```js
-  lint: tier1.lint || { passed: true, errors: 0, warnings: 0 },
-  typecheck: tier1.typecheck || { passed: true, errors: 0 },
+  lint: tier1.lint || { passed: true, errors: 0, warnings: 0 },       // :1671
+  typecheck: tier1.typecheck || { passed: true, errors: 0 },          // :1672
   ```
   A missing result object becomes a passing one. **The fallback for "this check
   produced no result" is the success value** — the same shape as the defect above,
-  written straight into the record.
+  written straight into the record. The sibling `tests:` default (`:1669`) is
+  `00208`'s and the `security:` default (`:1673`) is out of scope — both are left
+  untouched here.
 
 ## The fix already exists in this codebase
 
-`src/lib/step-13-verify.js:141-158`:
+`src/lib/step-13-verify.js:151-170`:
 
 ```js
 // VERIFY passes ONLY when at least one substantive check actually RAN,
@@ -83,14 +100,17 @@ result.summary = buildSummary(result, substantive);
 ```
 
 The concept is already named, implemented, and shipped: **`errors.length === 0` is
-never sufficient on its own; a check must also have RUN.** `buildSummary` at `:244-263`
-even special-cases `substantive === 0` so the human-readable output says so.
+never sufficient on its own; a check must also have RUN.** `countSubstantiveChecks`
+(defined at `:183`) counts a lint/typecheck/tests check only when its result carries
+`ran === true`; `buildSummary` at `:255` even special-cases `substantive === 0` (at
+`:274`) so the human-readable output says so.
 
 **Reuse the concept.** `countSubstantiveChecks` itself is shaped for the VERIFY
-result object and is not directly callable here, so this slice adopts the *pattern* —
-a ran-count carried alongside the verdict — rather than importing a function that does
-not fit. Step 9 reads that module first and confirms the shape; if it turns out
-importable, importing beats reimplementing and the plan defers to what the code says.
+result object (`result.checks.{lint,types,tests}.ran === true`) and is not directly
+callable here, so this slice adopts the *pattern* — a ran-count carried alongside the
+verdict — rather than importing a function that does not fit. Step 9 reads that module
+first and confirms the shape; if it turns out importable, importing beats reimplementing
+and the plan defers to what the code says.
 
 ## What each function must return instead
 
@@ -109,13 +129,19 @@ which is precisely how this class of defect propagates.
 
 The `errors` field must also stop lying. On the not-verified path it is `null`, never
 `0` — mirroring `test-gate.js`'s parsers, which return `null` rather than the success
-value **specifically so an unreadable input cannot be mistaken for a clean one**.
+value **specifically so an unreadable input cannot be mistaken for a clean one**. To
+match the existing not-verified idiom in this same file (`undeterminedTestsResult` at
+`:360`, `unreadableTestsResult` at `:575`, both of which set `passed: false` plus
+`undetermined: true` and an explanatory `output` string), the not-verified lint/typecheck
+result should carry the same `undetermined: true` marker and a message — the lint/typecheck
+result shape differs from the test shape (`errors`/`warnings` vs `passCount`/`failed`),
+so this is the shared PATTERN, not a byte-identical object.
 
 ### The two persisted-state sites
 
 - `runTieredChecks` records the ran-counts alongside the tier status, so the stored
   history distinguishes "passed four checks" from "ran none".
-- `:1424-1425` — the `|| { passed: true, … }` defaults become
+- `:1671-1672` — the `|| { passed: true, … }` defaults become
   `|| { passed: false, ran: 0, errors: null, reason: 'no result produced' }`. **A
   check that produced no result did not pass.** The presence of a result object is
   the precondition for a verdict, not an optional detail.
@@ -123,21 +149,24 @@ value **specifically so an unreadable input cannot be mistaken for a clean one**
 ## Implementation Details
 
 ### File: `src/lib/quality-agent.js`
-**Action:** MODIFY — `runLint`, `runTypecheck`, the `runTieredChecks` state write, and the `:1424-1425` defaults
+**Action:** MODIFY — `runLint` (`:586-607`), `runTypecheck` (`:612-632`), the
+`runTieredChecks` state write (`:1482-1485`), and the `:1671-1672` defaults
 
 Count the tools that actually carry a command for each check. Return the
 not-verified result when the count is zero, with a message naming which check and why.
-Thread `ran` through into the persisted tier status. Invert the three success-shaped
-defaults.
+Thread `ran` through into the persisted tier status. Invert the two success-shaped
+lint/typecheck defaults.
 
-**`runSecurityScan` is NOT touched.** Whether it has the same shape was not
+**`runSecurityScan` (`:1059`) is NOT touched.** Whether it has the same shape was not
 established, and changing it on suspicion inside a slice about a different function is
 how scope creep enters. If Step 9's reading finds the same defect there, **report it
 as a finding and leave it** — a new plan is the human's to schedule.
 
-**`runSmartTests` is NOT touched** — that is `00208`, which this slice depends on.
-Both edit this file, so they cannot build concurrently, and the dependency makes the
-order explicit rather than leaving it to the scheduler's file-conflict serialisation.
+**`runSmartTests` (`:825`) is NOT touched** — that is `00208`, which this slice depends
+on. It already returns `undeterminedTestsResult(...)` on an undetermined detection, so its
+leg of the tier is already fixed. Both slices edit this file, so they cannot build
+concurrently, and the dependency makes the order explicit rather than leaving it to the
+scheduler's file-conflict serialisation.
 
 ### File: `tests/vacuous-verification.test.js`
 **Action:** CREATE
@@ -153,14 +182,17 @@ order explicit rather than leaving it to the scheduler's file-conflict serialisa
 | 7 | **`errors` is `null` on the not-verified path, never `0`** | asserted explicitly, both functions |
 | 8 | **`tier1Passed` is false when detection is empty** | the composition test: an empty `tools` map must not produce a passing tier |
 | 9 | **the persisted tier status records the ran counts** | a stored run with zero substantive checks is not stored as a plain `pass` |
-| 10 | **the `:1424-1425` defaults are failure-shaped** | a missing `tier1.lint` yields `passed: false`, not `passed: true` |
+| 10 | **the `:1671-1672` defaults are failure-shaped** | a missing `tier1.lint` yields `passed: false`, not `passed: true` |
 | 11 | output distinguishes "no findings" from "did not run" | the two messages differ, and neither reads as the other |
 | 12 | `runSecurityScan` is unmodified | a guard against scope creep into an unread function |
 
 Fixtures pass synthetic `tools` objects directly — no temporary project needed for
 most cases. Where a command must run, use a trivially portable one and assert on the
 result shape rather than the tool's own output. Cross-platform: no shell scripts, no
-assumption that any particular linter is installed.
+assumption that any particular linter is installed. Note that `runLint`/`runTypecheck`
+now shell out through `runConfiguredCommand`, which refuses a shell-operator command as
+a FAILED check — a fixture that must simulate a run failure can use that refusal, and one
+that must simulate success uses a portable single-word command.
 
 ---
 
@@ -168,9 +200,9 @@ assumption that any particular linter is installed.
 
 | change | live call site | root |
 |---|---|---|
-| `runLint`, `runTypecheck` | `runTieredChecks:1228-1229` | `/ctoc:push` quality gate |
-| tier status ran-counts | `qualityState.updateTierStatus:1235` | the persisted quality history |
-| the `:1424` defaults | the persisted-state write in the same module | `/ctoc:push` |
+| `runLint`, `runTypecheck` | `runTieredChecks:1475-1476` | `/ctoc:push` quality gate |
+| tier status ran-counts | `qualityState.updateTierStatus:1482` | the persisted quality history |
+| the `:1671-1672` defaults | the `setCompleted` persisted-state write at `:1668-1674` | `/ctoc:push` |
 
 All three are on the live push path today. Nothing here is reachable only from a test.
 
@@ -189,36 +221,41 @@ must be RED.** Record case 8's red verbatim — a passing tier-1 verdict on an e
 tools map is the evidence, and it is the sentence that lets a push proceed on nothing.
 
 ### Step 9: PREPARE
-Read from disk: `src/lib/quality-agent.js:426-471` (`runLint`, `runTypecheck`),
-`:1220-1250` (`runTieredChecks` and the state write), `:1410-1440` (the defaults),
-`undeterminedTestsResult` and `unreadableTestsResult` (the existing not-verified result
-shapes in this file — **match their shape rather than inventing a third**);
-`src/lib/step-13-verify.js:130-270` (`countSubstantiveChecks`, `buildSummary` — and
-decide whether the function is importable here or only the pattern is);
-`src/lib/quality-state.js` for `updateTierStatus`'s stored shape. Confirm `00208` has
-landed. **Where the code disagrees with this plan, THE CODE WINS — record it.**
+Read from disk: `src/lib/quality-agent.js:583-632` (`runLint`, `runTypecheck`),
+`:1472-1500` (`runTieredChecks` and the `updateTierStatus` write), `:1660-1690` (the
+`setCompleted` defaults), `undeterminedTestsResult` (`:360`) and `unreadableTestsResult`
+(`:575`) (the existing not-verified result shapes in this file — **match their
+`passed:false` + `undetermined:true` + explanatory-`output` pattern rather than inventing
+a third**); `src/lib/step-13-verify.js:150-290` (`countSubstantiveChecks` at `:183`,
+`buildSummary` at `:255` — and decide whether the function is importable here or only the
+pattern is); `src/lib/quality-state.js` for `updateTierStatus` (`:408`) and its stored
+shape. Note the runner is `runConfiguredCommand`, not `runCommand`. Confirm `00208` has
+landed (it is now in review). **Where the code disagrees with this plan, THE CODE
+WINS — record it.**
 
 ### Step 10: IMPLEMENT
 - `src/lib/quality-agent.js` — `ran` counts and the not-verified outcome in `runLint`
-  and `runTypecheck`; ran-counts threaded into the tier status; the three
-  success-shaped defaults inverted.
+  (`:586-607`) and `runTypecheck` (`:612-632`); ran-counts threaded into the tier status
+  (`:1482-1485`); the two success-shaped lint/typecheck defaults inverted (`:1671-1672`).
 - `tests/vacuous-verification.test.js` — the twelve cases.
 
 ### Step 11: REVIEW
 Confirm no path returns `passed: true` without `ran >= 1`. Confirm `errors` is `null`
 and never `0` wherever nothing was measured. Confirm the not-verified result matches
-the shape `undeterminedTestsResult` already uses in this file. **Report whether
-`runSecurityScan` has the same defect — as a finding, without fixing it.**
+the `undetermined:true` pattern `undeterminedTestsResult` already uses in this file.
+**Report whether `runSecurityScan` (`:1059`) has the same defect — as a finding, without
+fixing it.**
 
 ### Step 12: OPTIMIZE
 One counter per loop. No new work on any path.
 
 ### Step 13: SECURE
-`runCommand` output can carry absolute paths and, on a misconfigured project, tokens
-from a tool's own diagnostics. Confirm the not-verified messages contain no command
-output at all — they describe the absence of a tool, so they have nothing legitimate to
-echo. Confirm no detected tool command string is interpolated into a shell in a newly
-added path.
+`runConfiguredCommand` output can carry absolute paths and, on a misconfigured project,
+tokens from a tool's own diagnostics. Confirm the not-verified messages contain no
+command output at all — they describe the absence of a tool, so they have nothing
+legitimate to echo. Confirm no detected tool command string is interpolated into a shell
+in a newly added path (`runConfiguredCommand` already refuses shell-operator strings as a
+failed check — do not add a code path that bypasses it).
 
 ### Step 14: VERIFY
 `node --test tests/vacuous-verification.test.js` plus every existing quality-agent and
@@ -248,8 +285,8 @@ Report every Step 8 red verbatim, the Step 14 result for this repository, the
   keep whatever they recorded; only new runs carry ran-counts. **Rewriting stored
   history to say a past run verified nothing would be inventing a measurement nobody
   took.**
-- It does **not** touch `runFullTests`, whose counter discipline was confirmed correct
-  and is the exemplar.
+- It does **not** touch `runFullTests` (`:734`), whose counter discipline was confirmed
+  correct and is the exemplar.
 
 ## Decisions Taken Under Ambiguity
 
@@ -268,11 +305,12 @@ Report every Step 8 red verbatim, the Step 14 result for this repository, the
    `CLAUDE.md` names that file as the fixed exemplar.
 4. **The `|| { passed: true }` defaults are inverted rather than removed.** Removing
    them would throw on a missing result; inverting them records the absence honestly
-   and keeps the write path total.
+   and keeps the write path total. Only the lint (`:1671`) and typecheck (`:1672`)
+   defaults are inverted; `tests:` is `00208`'s and `security:` is out of scope.
 5. **`countSubstantiveChecks` is adopted as a PATTERN, with importing preferred if
-   Step 9 finds it fits.** It is shaped for the VERIFY result object. The plan states
-   the preference and defers to what the code says rather than pre-committing to a
-   copy.
+   Step 9 finds it fits.** It is shaped for the VERIFY result object
+   (`result.checks.{lint,types,tests}.ran === true`). The plan states the preference
+   and defers to what the code says rather than pre-committing to a copy.
 6. **`runSecurityScan` is reported, not fixed.** It was not read during planning, and
    changing an unread function on suspicion inside a slice about two others is scope
    creep. Naming it in the review output surfaces it for the human to schedule.
@@ -284,3 +322,12 @@ Report every Step 8 red verbatim, the Step 14 result for this repository, the
    separate because `00208` is a scope fix with an in-file exemplar and this one
    changes what "pass" means across three sites — a crash in the larger change must not
    lose the more urgent one.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

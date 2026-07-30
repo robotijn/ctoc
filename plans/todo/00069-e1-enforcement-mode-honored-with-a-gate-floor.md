@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 iron_loop: true
 title: "enforcement.mode is HONORED — soft warns, off allows, and neither can touch a human gate"
 type: implementation
@@ -14,13 +15,24 @@ files:
   - CLAUDE.md
   - .ctoc/templates/CLAUDE.md.template
   - docs/CONFIG_SOURCES.md
+approved_by: human
+approved_at: 2026-07-30T14:46:35.909Z
+gate_crossed: implementation → todo
 ---
 
 # enforcement.mode is HONORED — with a hard floor under the human gates
 
+> **Rebased against the current tree (line numbers re-verified).** Since first drafting,
+> `PreToolUse.Edit.js` grew to 671 lines with a THIRD protected-path guard
+> (`targetsStreamingLive`, `.ctoc/streaming/`) and a block-path denial explanation
+> (`coverage.explainDenial`), and `src/commands/menu.md` was renamed to
+> `src/commands/start.md`. Every cited line number, the Deny table, the step-5 rewrite
+> and the wiring table below have been corrected to today's files; the intent and
+> acceptance criteria are unchanged.
+
 ## Problem — verified by direct reading, three independent confirmations
 
-`CLAUDE.md:140-144` documents:
+`CLAUDE.md:144-148` documents:
 
 ```yaml
 enforcement:
@@ -50,7 +62,7 @@ It is worse than an unread setting. **`src/lib/init-project.js:504-511`
 
 So CTOC ships a visible switch, in a file it authored, wired to nothing — the exact
 placebo shape `R4-B` deleted for `push.auto_push` and `git.commitAndPush`
-(`init-project.js:536-541` records that deletion). `README.md:167` compounds it:
+(`init-project.js:536-539` records that deletion). `README.md:167` compounds it:
 "choosing `dev` softens enforcement" — it does not; `dev` softens nothing.
 
 A user who sets `mode: soft` gets no effect and no warning. A user who sets
@@ -64,7 +76,7 @@ Two keys claim this setting. Reconciling them is this slice's core content.
 | Candidate | Written by | Read by | Has resolution order | Has a safety-invariant test |
 |---|---|---|---|---|
 | `.ctoc/settings.yaml` → `enforcement.mode` | `init-project.js:509` | nothing | no | no |
-| `.ctoc/settings.json` → `workflow.enforcementMode` | the settings menu | nothing | yes (`settings.js:230-246`) | yes (`environment-mode.test.js:148-167`) |
+| `.ctoc/settings.json` → `workflow.enforcementMode` | the settings menu | nothing | yes (`settings.js:230-246`, `loadSettings`) | yes (`environment-mode.test.js:149-156`) |
 
 **Canonical: `.ctoc/settings.yaml` → `enforcement.mode`.** This is not a new call —
 `docs/CONFIG_SOURCES.md:25` already ruled it ("Enforcement strictness
@@ -76,11 +88,12 @@ file for no gain.
 
 **`workflow.enforcementMode` is not deleted — it becomes the lower tiers.** The
 resolver delegates tiers 2-4 to `settings.getSetting('workflow','enforcementMode')`,
-which already implements the documented order internally. Consequences:
+which already implements the documented order internally (via `loadSettings`,
+`settings.js:230-246`). Consequences:
 
 - `README.md:167`'s promise (`dev` softens enforcement) becomes TRUE for the first time.
 - The settings menu's `Enforcement mode` select becomes live instead of a placebo.
-- `tests/environment-mode.test.js:148-167`'s invariant keeps its subject and its teeth.
+- `tests/environment-mode.test.js:149-156`'s invariant keeps its subject and its teeth.
 - Neither key is silently ignored, so this slice does not relocate the defect.
 
 **Resolution order** (highest wins), a strict superset of `settings.js`'s documented order:
@@ -99,29 +112,36 @@ construction rather than duplicated and drifted.
 
 | Deny | Where | Mode-tunable? |
 |---|---|---|
-| No active plan covers this file (step 5) | `PreToolUse.Edit.js:441-444` | **YES** — the only one |
-| Approval-ledger write (`.ctoc/approvals/`) | `PreToolUse.Edit.js:389-393` | NO — human-approval provenance |
-| Gate-3 verify-evidence write (`.ctoc/state/verify/`) | `PreToolUse.Edit.js:402-406` | NO — Gate-3 evidence |
-| Ledger forgery on the Bash channel | `PreToolUse.Bash.js:679-688` | NO — security deny, absolute |
-| Inline-eval that cannot be statically cleared | `PreToolUse.Bash.js:356-388` | NO — security deny, absolute |
-| Irreversible/destructive command | `PreToolUse.Bash.js:694-703` | NO — security deny, absolute |
-| Raw `mv`/`cp` of a plan between stages | `PreToolUse.Bash.js:715-730` | NO — human-gate deny |
+| No active plan covers this file (step 5) | `PreToolUse.Edit.js:639-649` | **YES** — the only one |
+| Approval-ledger write (`.ctoc/approvals/`) | `PreToolUse.Edit.js:571-575` (guard `isProtectedLedgerPath`) | NO — human-approval provenance |
+| Gate-3 verify-evidence write (`.ctoc/state/verify/`) | `PreToolUse.Edit.js:584-588` (guard `isProtectedVerifyPath`) | NO — Gate-3 evidence |
+| Streaming questions/answers write (`.ctoc/streaming/` except `questions/pending/`) | `PreToolUse.Edit.js:600-604` (guard `targetsStreamingLive`) | NO — human-facing gate provenance |
+| Ledger forgery on the Bash channel | `PreToolUse.Bash.js:780-784` | NO — security deny, absolute |
+| Inline-eval that cannot be statically cleared | `PreToolUse.Bash.js:416-442` (`isInlineEval`) | NO — security deny, absolute |
+| Irreversible/destructive command | `PreToolUse.Bash.js:795-799` (`isIrreversibleCommand`) | NO — security deny, absolute |
+| Raw `mv`/`cp` of a plan between stages | `PreToolUse.Bash.js:820-826` | NO — human-gate deny |
 | Gate violation sweep + auto-revert | `src/hooks/human-gate-check.js` | NO — the four human gates |
 | Five-subagent concurrency cap | `PreToolUse.Task.js` | NO — a resource cap, not ceremony |
 
+The streaming-questions deny (guard 0c, `targetsStreamingLive`) is a THIRD protected-path
+deny that landed in `PreToolUse.Edit.js` after this plan was first drafted; it is included
+above and its immunity to `off` is asserted by the added floor test 19b — `mode` is
+consulted only at step 5, which guard 0c returns before ever reaching.
+
 `src/hooks/PreToolUse.Bash.js` and `src/hooks/human-gate-check.js` are **NOT in this
-plan's `files:`** — they are not edited. Their immunity is proven by spawning them
-under `mode: off` and asserting they still deny (Step 8 tests 16-19), not by a comment.
+plan's `files:`** — they are not edited. Their immunity is proven by spawning
+`PreToolUse.Bash.js` under `mode: off` and asserting it still denies (Step 8 tests
+20-21), and by source-scanning both (tests 26-27), not by a comment.
 
 The floor is **structural, not a runtime clamp**: `off` is a legitimate resolved value.
 What makes it safe is that the resolver has exactly ONE production caller and its
-result is consulted at exactly ONE decision point. Test 23 asserts that by source scan.
+result is consulted at exactly ONE decision point. Tests 25-27 assert that by source scan.
 
 ## Wiring — the live call sites (Lesson 16)
 
 | New module | Live call site | Root it is reachable from |
 |---|---|---|
-| `src/lib/enforcement-mode.js` | `src/hooks/PreToolUse.Edit.js` → `enforce()` | `.claude-plugin/hooks.json` registers `PreToolUse.Edit.js` on `Edit`; `PreToolUse.Write.js:303`, `PreToolUse.MultiEdit.js:53` and `PreToolUse.NotebookEdit.js` all delegate to the same exported `enforce()` — one wiring point covers all four editing tools |
+| `src/lib/enforcement-mode.js` | `src/hooks/PreToolUse.Edit.js` → `enforce()` | `.claude-plugin/hooks.json` registers `PreToolUse.Edit.js` on `Edit`; `PreToolUse.Write.js:466`, `PreToolUse.MultiEdit.js:53` and `PreToolUse.NotebookEdit.js:53` all require + call the same exported `enforce()` — one wiring point covers all four editing tools |
 
 The wiring lands in **this slice's Step 10**, not a follow-up. A human reaches it by
 setting `enforcement.mode: soft` in `.ctoc/settings.yaml` and editing an uncovered
@@ -168,7 +188,7 @@ leaf consumer, and no lib module imports a hook.
 
 `readYamlEnforcementMode(content)` (the flat parser) and the tier-2/3/4 helper stay
 **module-private**. Exporting a function whose only caller is a test is a dead export
-by this repo's own rule (`PreToolUse.Bash.js:769-774`); both are exercised through
+by this repo's own rule (`PreToolUse.Bash.js:870`); both are exercised through
 `resolveEnforcementMode` against real temp-dir fixtures instead.
 
 #### Internal: the flat YAML read
@@ -229,9 +249,17 @@ path (log noise on a hook path is itself a defect).
 **Action:** MODIFY
 **Purpose:** Make the documented setting real at the one decision point it governs.
 
+> **Current shape (re-verified, 671 lines).** The file now loads FIVE sibling modules
+> fail-soft (`detector`, `coverage`, `enforcementLog`, `escapePhrases`,
+> `realPathConfinement`, ending ~line 64), has THREE protected-path guards in
+> `enforce()` before the whitelist — ledger (0, ~:571), verify (0b, ~:584), streaming
+> (0c, ~:600) — and its step-5 block path computes a `denial` explanation via
+> `coverage.explainDenial` (the "name the rejected plan" feature). All three are
+> preserved; the changes below are additive.
+
 #### Changes
 
-1. **Add** a fail-soft literal require beside the existing four (after line 56),
+1. **Add** a fail-soft literal require beside the existing five (after ~line 64),
    matching the house style exactly:
    ```js
    let enforcementMode = null;
@@ -241,19 +269,19 @@ path (log noise on a hook path is itself a defect).
    file's fail-soft-sibling convention.
 
 2. **Add** a pure exported `buildSoftWarnMessage(reason, info)` next to
-   `buildBlockMessage` (~line 314). Same shape, `WARNING` not `BLOCKED`, and it says
+   `buildBlockMessage` (~line 505). Same shape, `WARNING` not `BLOCKED`, and it says
    plainly that the edit was **allowed** because `enforcement.mode: soft` is set,
    naming the resolved source file. Pure, so Step 8 asserts its text without
    `process.exit`. Like `buildBlockMessage`, it carries **no verbatim escape-phrase
    list** (W08-s1 / finding H4: this text lands back in the transcript and would
    otherwise seed the raw-tail matcher).
 
-3. **Modify** `allow(outcome, info)` (~line 347) and `block(reason, info)` (~line 325)
+3. **Modify** `allow(outcome, info)` (~line 529) and `block(reason, info)` (~line 507)
    to include `mode: info.mode || null` and `mode_source: info.mode_source || null`
    in the `logEnforcement` payload. Both remain fail-open on a log error.
 
-4. **Modify** `enforce()` (~line 378): immediately after `targetFile` is computed and
-   **before** the ledger guard, resolve once:
+4. **Modify** `enforce()` (~line 560): immediately after `targetFile` is computed
+   (~line 564) and **before** the ledger guard (~line 571), resolve once:
    ```js
    const { mode, source: modeSource } = enforcementMode
      ? enforcementMode.resolveEnforcementMode(root)
@@ -261,13 +289,17 @@ path (log noise on a hook path is itself a defect).
    ```
    Thread `mode, mode_source: modeSource` into the info object of **every**
    `allow(...)` and `block(...)` call in the function (ledger deny, verify deny,
-   whitelist, silent-passthrough, plan-matched, escape, and step 5). One resolution
-   per invocation; every audit record carries the mode in force.
+   **streaming deny**, whitelist, silent-passthrough, plan-matched, escape, and
+   step 5). One resolution per invocation; every audit record carries the mode in force.
 
-5. **Replace** the step-5 tail (lines 441-444) with the three-way decision:
+5. **Replace** the step-5 tail (lines 639-649) with the three-way decision. The
+   current tail computes a `denial` explanation via `coverage.explainDenial` (the
+   "name the rejected plan" feature) and passes it into `block()`; that behavior is
+   PRESERVED on the strict branch — `off`/`soft` ALLOW, so they need no denial
+   explanation:
    ```js
    // 5. Enforcement mode decides — and ONLY here. The guards above (ledger,
-   //    verify evidence) already returned; they are absolute at every mode.
+   //    verify evidence, streaming) already returned; they are absolute at every mode.
    if (mode === 'off') {
      return allow('off-allow', { tool, target_file: targetFile, project_root: root,
        project_is_ctoc: true, mode, mode_source: modeSource });
@@ -279,19 +311,25 @@ path (log noise on a hook path is itself a defect).
      return allow('soft-warn', { tool, target_file: targetFile, project_root: root,
        project_is_ctoc: true, mode, mode_source: modeSource });
    }
+   // strict — the BLOCK PATH ONLY: ask coverage WHY (re-runs the scan), then block.
+   let denial = null;
+   if (coverage && targetFile && typeof coverage.explainDenial === 'function') {
+     try { denial = coverage.explainDenial(targetFile, root); } catch { denial = null; }
+   }
    return block('no active plan covers this file and no escape phrase used', {
-     tool, target_file: targetFile, project_root: root, mode, mode_source: modeSource,
+     tool, target_file: targetFile, project_root: root, mode, mode_source: modeSource, denial,
    });
    ```
    `off` allows silently (that is what the human asked for); `soft` warns on stderr —
    stdout stays free of any decision JSON in both cases, so the harness sees a plain
-   allow.
+   allow. The strict branch is today's behavior (denial explanation intact) plus the
+   `mode`/`mode_source` audit fields.
 
-6. **Update** `module.exports` (line 452) to add `buildSoftWarnMessage`.
+6. **Update** `module.exports` (~line 657) to add `buildSoftWarnMessage`.
 
-**Unchanged:** the ledger deny, the verify-evidence deny, the whitelist, the CTOC
-detection, the coverage match, the escape-phrase path, `emitDeny` signalling, the
-fail-open `catch`, and every exit code.
+**Unchanged:** the ledger deny, the verify-evidence deny, the streaming-questions deny,
+the whitelist, the CTOC detection, the coverage match, the escape-phrase path,
+`emitDeny` signalling, the fail-open `catch`, and every exit code.
 
 ---
 
@@ -319,7 +357,8 @@ Comment-only. No behavior change. No export change.
 
 #### Changes
 
-- **Update** the header comment's outcome list to
+- **Update** the header comment's outcome list (currently `allow, block, escape,
+  silent-passthrough, hook-broken`) to
   `allow, block, escape, silent-passthrough, hook-broken, soft-warn, off-allow`, with
   one line noting that every entry now also carries `mode` and `mode_source` so an
   audit can distinguish a **permitted** edit (`allow` + `plan_matched`) from an
@@ -335,18 +374,19 @@ change is required for the new fields.
 
 #### Changes
 
-- **Rewrite** the `**Per-project tuning**` block (lines 140-144) to state the real
+- **Rewrite** the `**Per-project tuning**` block (lines 144-148) to state the real
   behavior: the resolved mode is consulted at exactly one point — step 5 of the edit
   flow — and describe each value (`strict` blocks, `soft` warns on stderr and allows,
   `off` allows silently). State the four-tier resolution order. State the floor
-  explicitly: **`off` never weakens a human gate, never relaxes the approval-ledger or
-  verify-evidence deny, and never touches any Bash security deny** — asserted by
-  `tests/enforcement-mode.test.js`. State that an unreadable or malformed setting
-  resolves to `strict`.
-- **Amend** step 5 of the numbered flow (line 136) to read "Otherwise — decided by
+  explicitly: **`off` never weakens a human gate, never relaxes the approval-ledger,
+  verify-evidence, or streaming-questions deny, and never touches any Bash security
+  deny** — asserted by `tests/enforcement-mode.test.js`. State that an unreadable or
+  malformed setting resolves to `strict`.
+- **Amend** step 5 of the numbered flow (line 140) to read "Otherwise — decided by
   `enforcement.mode`" rather than an unconditional BLOCK.
-- **Amend** line 138 to note the log now records the mode in force.
-- **Correct** line 146: it claims profiles tune "enforcement strictness, auto-push,
+- **Amend** line 142 (the "Every decision is logged" line) to note the log now
+  records the mode in force.
+- **Correct** line 150: it claims profiles tune "enforcement strictness, auto-push,
   default model, and log verbosity". Enforcement strictness (`dev` → `soft`) and
   default model (`prod` → `opus`) are real; **auto-push is false** — no profile may
   set `git.autoPushEnabled` and `environment-mode.test.js:126-135` forbids it — and
@@ -407,7 +447,7 @@ the original defect stayed invisible for so long.
 8. **Precedence** — `settings.yaml` `soft` + `settings.json` `strict` → `soft` (yaml wins)
 9. `settings.json` `general.environment: 'dev'`, nothing explicit → `{ 'soft', 'environment-profile' }`
 10. `general.environment: 'dev'` + explicit `workflow.enforcementMode: 'strict'` →
-    `{ 'strict', 'settings.json' }` (mirrors `environment-mode.test.js:94-99`)
+    `{ 'strict', 'settings.json' }` (mirrors `environment-mode.test.js:95-98`)
 11. Nested-key rejection — `enforcement:\n  nested:\n    mode: off` → `strict`
 12. Wrong-section rejection — `deployment:\n  mode: off` → `strict`
 13. Unreadable `settings.json` (write a directory at that path) → resolver still
@@ -436,12 +476,16 @@ alone never exercised the stdin/delegate path that shipped broken.
 18. **`off` + write to `.ctoc/approvals/x.json`** → **STILL DENIED**. Asserts the
     deny decision on stdout, not the message text (robust to concurrent edits).
 19. **`off` + write to `.ctoc/state/verify/slug.json`** → **STILL DENIED** (Gate-3 evidence).
+19b. **`off` + write to `.ctoc/streaming/questions/<ref>.json`** (the LIVE store, NOT
+    the `questions/pending/` quarantine) → **STILL DENIED** (guard 0c,
+    `targetsStreamingLive`; human-facing gate provenance). Asserts the deny decision on
+    stdout. The mode is consulted only at step 5, which this guard returns before reaching.
 20. **`off` + `mv plans/todo/a.md plans/done/a.md`** via a spawned
     `src/hooks/PreToolUse.Bash.js` → **STILL DENIED** (a human-gate deny on a channel
     that never reads the mode).
 21. **`off` + a ledger-forgery one-liner** (`node -e "require('./src/lib/approval-ledger')…"`)
     via the spawned Bash hook → **STILL DENIED** (security deny, absolute).
-22. **Same invariant, asserted the same way as `environment-mode.test.js:148-156`** —
+22. **Same invariant, asserted the same way as `environment-mode.test.js:149-156`** —
     for every key of `ENVIRONMENT_PROFILES`, a project set to that environment with
     nothing explicit resolves to a mode that is **never `off`**. The environment-profile
     tier can soften; it can never disable.
@@ -483,15 +527,16 @@ alone never exercised the stdin/delegate path that shipped broken.
 - [x] **Safe file operations** — read-only. This module writes nothing.
 - [x] **Error messages** — the resolver emits none; no path or stack reaches a user.
 - [x] **Prototype pollution** — the parser returns a string, never assigns into an
-  object from file content. `settings.js:275-287` already rejects unsafe names on write.
+  object from file content. `settings.js:275-287` (`UNSAFE_SETTING_NAMES` +
+  `setSetting`) already rejects unsafe names on write.
 - [x] **Command injection** — no `exec`/`execSync`/`spawn` in the module. The test's
   `spawnSync` uses `process.execPath` + an argv array, `shell: false`.
 - [x] **ReDoS** — one linear per-line regex, no nested quantifier, no data-derived
   `RegExp`. Identical shape to the shipped `stop-test-gate.js:57`.
 - [x] **Fail-closed** — every failure path resolves to the RESTRICTIVE value.
 - [x] **Gate integrity** — `off` reaches exactly one decision point; tests 18-22 and
-  25-27 prove the four human gates, the ledger, the verify evidence, and the Bash
-  security denies are untouched at every mode.
+  25-27 prove the four human gates, the ledger, the verify evidence, the streaming
+  store, and the Bash security denies are untouched at every mode.
 
 ### Cross-platform
 
@@ -504,23 +549,28 @@ parser splits on `\n` after the existing `\r?\n`-tolerant handling
 ## Execution Plan
 
 ### Step 8: TEST
-Write `tests/enforcement-mode.test.js` in full (all 27 cases, sections A-E) **before**
-`src/lib/enforcement-mode.js` exists. Run it; confirm it fails RED for the right
-reason (module not found / behavior absent), not on a fixture bug. Tests 14, 20, 21,
-26 and 27 must pass GREEN immediately — they assert today's unchanged behavior and
-are the regression fence.
+Write `tests/enforcement-mode.test.js` in full (all cases, sections A-E, including the
+added floor test 19b) **before** `src/lib/enforcement-mode.js` exists. Run it; confirm
+it fails RED for the right reason (module not found / behavior absent), not on a
+fixture bug. Tests 14, 18, 19, 19b, 20, 21, 26 and 27 must pass GREEN immediately —
+they assert today's unchanged behavior (the block on `strict`, and the three
+protected-path denies + the two Bash denies that never read the mode) and are the
+regression fence.
 
 ### Step 9: PREPARE
 Confirm `src/lib/settings.js` exports `getSetting`, `readRawSettings`,
-`getEnvironment`, `getEnvironmentProfile` (all present, lines 336-353). Confirm
-`.claude-plugin/hooks.json` registers `PreToolUse.Edit.js` and siblings. Confirm
-`.ctoc/coverage-baseline.json` `minPct`. Create no directories — nothing new is needed.
+`getEnvironment`, `getEnvironmentProfile` (all present, module.exports lines 336-353).
+Confirm `.claude-plugin/hooks.json` registers `PreToolUse.Edit.js` and siblings.
+Confirm `.ctoc/coverage-baseline.json` `minPct`. Create no directories — nothing new
+is needed.
 
 ### Step 10: IMPLEMENT
 - `src/lib/enforcement-mode.js` — resolver, private flat parser, frozen mode list.
 - `src/hooks/PreToolUse.Edit.js` — fail-soft require; `buildSoftWarnMessage`;
   `mode`/`mode_source` in `allow`/`block` log payloads; single resolution at the top of
-  `enforce()` threaded through every decision; the three-way step-5 tail; export update.
+  `enforce()` threaded through every decision (including the three protected-path
+  denies); the three-way step-5 tail that PRESERVES the `denial` explanation on the
+  strict branch; export update.
   **This is the wiring — it ships here, not in a follow-up.**
 - `src/hooks/PreToolUse.Task.js` — replace the now-false comment (26-28).
 - `src/lib/enforcement-log.js` — outcome vocabulary + new fields in the header.
@@ -528,8 +578,10 @@ Confirm `src/lib/settings.js` exports `getSetting`, `readRawSettings`,
 ### Step 11: REVIEW
 Verify the dependency direction (lib never imports a hook); that `enforcement-mode`
 has exactly one production caller; that `mode` is read at exactly one decision point
-and the ledger/verify guards still `return` before it can matter; that every failure
-path lands on `strict`; that no export exists solely for a test.
+and the ledger/verify/streaming guards still `return` before it can matter; that every
+failure path lands on `strict`; that no export exists solely for a test; that the
+step-5 strict branch still computes and passes `denial` (no regression of the
+name-the-rejected-plan feature).
 
 ### Step 12: OPTIMIZE
 One resolution per hook invocation (two small reads), not one per decision. Confirm
@@ -540,7 +592,8 @@ matched key rather than scanning the whole file.
 Walk the Security Review checklist above item by item against the written code.
 Re-attack specifically: can any crafted `settings.yaml` yield `off` from an
 unparseable file? Can a `mode:` key under another section be smuggled in? Can `off`
-reach any deny other than step 5? Each answer must be backed by a test, not a comment.
+reach any deny other than step 5 (ledger, verify, streaming, or the Bash channel)?
+Each answer must be backed by a test, not a comment.
 
 ### Step 14: VERIFY
 Run the **FULL gate**: `npm test` (`src/scripts/test-gate.js` — the suite **plus** the
@@ -557,10 +610,10 @@ contract stated in the module header.
 
 ### Step 16: FINAL-REVIEW
 Confirm: the documentation now describes what the code does; the setting a human
-types has a visible effect; `off` cannot touch a human gate (tests 18-22, 25-27); an
-unreadable setting resolves to `strict` (test 4); every log entry names the mode in
-force (tests 23-24); no stub, no TODO; the new module is reachable from a registered
-hook in this same slice.
+types has a visible effect; `off` cannot touch a human gate, the ledger, the verify
+evidence, or the streaming store (tests 18-22, 25-27); an unreadable setting resolves
+to `strict` (test 4); every log entry names the mode in force (tests 23-24); no stub,
+no TODO; the new module is reachable from a registered hook in this same slice.
 
 ## Decisions Taken Under Ambiguity
 
@@ -595,10 +648,10 @@ hook in this same slice.
    denies, absolute at every mode. Immunity is proven by spawning it under `mode: off`
    (tests 20, 21) and by a source scan (test 27) — never by a comment.
 9. **The flat parser stays module-private.** Exporting it for the test alone would be
-   a dead export by this repo's own stated rule (`PreToolUse.Bash.js:769-774`); it is
+   a dead export by this repo's own stated rule (`PreToolUse.Bash.js:870`); it is
    tested through `resolveEnforcementMode` against real temp-dir fixtures, which is
    also the stronger test.
-10. **`CLAUDE.md:146`'s false claims about profiles tuning auto-push and log verbosity
+10. **`CLAUDE.md:150`'s false claims about profiles tuning auto-push and log verbosity
     are corrected in the same edit.** No profile may set `git.autoPushEnabled`
     (`environment-mode.test.js:126-135` forbids it) and no `logVerbosity` key exists in
     `SETTINGS_SCHEMA`. Leaving a false claim in the very paragraph being made honest
@@ -607,18 +660,91 @@ hook in this same slice.
     `enforcement:` block (lines 509-510) becomes correct the moment the resolver
     exists — it writes the canonical key with the canonical default. There is no
     second write path to clean up.
-12. **Plan number 00069, derived manually.** `plan-numbering.nextImplementationPlanNumber`
-    scans **only** `plans/implementation/`, whose highest prefix is `00065`, so it
-    returns `00066` — already claimed by `plans/in-progress/00066-x9-…`. Reported
-    below rather than worked around silently.
+12. **The step-5 strict branch PRESERVES `coverage.explainDenial`.** The current tail
+    (Edit.js:639-649) computes a `denial` explanation on the block path and passes it
+    into `block()` (the "name the rejected plan" feature added after this plan was
+    first drafted). The rebased three-way decision keeps that computation on the strict
+    branch verbatim; `off`/`soft` ALLOW, so they carry no denial explanation. Dropping
+    it would be a silent regression of a shipped feature.
+13. **The streaming-questions deny (guard 0c) is added to the floor.** It is a third
+    protected-path deny (`targetsStreamingLive`, `PreToolUse.Edit.js:600-604`) that
+    landed after the first draft; it is included in the Deny table and proven immune to
+    `off` by floor test 19b, on the same footing as the ledger and verify denies.
+14. **Plan number 00069, derived manually.** `plan-numbering.nextImplementationPlanNumber`
+    scans **only** `plans/implementation/`, whose highest prefix at authoring time was
+    `00065`, so it returned `00066` — already claimed by `plans/in-progress/00066-x9-…`.
+    Reported here rather than worked around silently.
 
 ## Concurrency check
 
 Cross-referenced against the reserved list. This plan declares **none** of
 `src/lib/streaming-gate.js`, `src/lib/streaming-precompute.js`,
-`agents/iron-loop/gate-critic.md`, `src/commands/menu.md`,
+`agents/iron-loop/gate-critic.md`, `src/commands/start.md`,
 `tests/cache-freshness.test.js`, `src/hooks/human-gate-check.js`,
 `src/scripts/ledger-backfill.js`, `src/lib/menu-screens.js`. `human-gate-check.js` and
 `PreToolUse.Bash.js` are **read and spawned** by the test suite but never edited;
 their assertions key on the deny **decision**, not on message text, so a concurrent
 edit to either cannot break this slice.
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

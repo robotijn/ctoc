@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "The sync barrier is undefended where work actually starts — and the fourth instance of one pattern gets a mechanism instead of a fifth discovery"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild
@@ -9,9 +10,26 @@ iron_loop: true
 files:
   - "tests/scheduler-guarantees-under-mutation.test.js"
   - "tests/scheduler-rule-projection-gate.test.js"
+  - "CLAUDE.md"
+approved_by: human
+approved_at: 2026-07-30T14:47:43.991Z
+gate_crossed: implementation → todo
 ---
 
 # The sync barrier is undefended where work actually starts
+
+> **Rebased 2026-07-30 against the current tree — intent and acceptance criteria unchanged.**
+> Every source line number below was re-verified from disk and corrected. Since this plan was
+> authored the scheduler grew a **concurrent-edit belt** in `canRun` (human ruling 2026-07-26),
+> which shifted the whole ladder down by ~85 lines AND added a **seventh** decision-shaped
+> reason, `staleness-orphan-quarantine` (`src/lib/task-registry.js:983`). That seventh reason
+> is now enumerated by the gate and defended by its existing `canRun` cases (`BELT-1` /
+> `BELT-1b` in `tests/task-registry.test.js`) — see the Decision section and the gate's
+> mutation table. The belt is oracle-only by design (`nextRunnable` deliberately does not
+> enforce it; its projection-side reporter is `task-reconcile.applyQuarantine`), so it is the
+> one reason whose named red case lives on the `canRun` path rather than the `nextRunnable`
+> path. Nothing about what this slice builds or asserts has changed; only the technical route
+> is corrected to today's source.
 
 ## The defect, re-verified against the source rather than inherited
 
@@ -19,12 +37,12 @@ The scheduler's two entry points are different code paths:
 
 | Function | Line | What it is |
 |---|---|---|
-| `canRun(candidate, registry)` | `src/lib/task-registry.js:884-889` | the **oracle** — may this one candidate run right now? |
-| `nextRunnable(registry)` | `:904-916` | the **promotion projection** — the set that actually gets started |
+| `canRun(candidate, registry)` | `src/lib/task-registry.js:969-986` | the **oracle** — may this one candidate run right now? |
+| `nextRunnable(registry)` | `:1001-1013` | the **promotion projection** — the set that actually gets started |
 
-Both delegate to `evaluateConcurrency` (`:838-868`), a ladder of
+Both delegate to `evaluateConcurrency` (`:923-953`), a ladder of
 `1 max-concurrent → 2 sync-barrier → 3 git-exclusive → 4 file-conflict → ok`.
-Rule 2 lives at `:845-847`, verbatim from disk:
+Rule 2 lives at `:930-932`, verbatim from disk:
 
 ```js
 if (running.length > 0 && (candidate.kind === 'sync' || running.some(t => t.kind === 'sync'))) {
@@ -40,18 +58,21 @@ believed.
 
 What this plan DID verify by reading the current source:
 
-1. **The vulnerable shape is accepted.** `assertSyncBlockedBy` (`:635-637`) constrains
+1. **The vulnerable shape is accepted.** `assertSyncBlockedBy` (`:664`) constrains
    a `sync` only through its `blockedBy`; it says nothing about `gitOp`. And
-   `addTask` normalises with `gitOp: spec.gitOp === true` (`:708`), as does the load
-   path (`:327`). So **`addTask(r, { kind: 'sync', blockedBy: [...] })` produces a sync
+   `addTask` normalises with `gitOp: spec.gitOp === true` (`:737`), as does the load
+   path (`:340`). So **`addTask(r, { kind: 'sync', blockedBy: [...] })` produces a sync
    with `gitOp: false` by default** — the vulnerable shape is not exotic, it is what you
-   get by not asking for a git flag. Two existing tests already build it that way
-   (`tests/task-registry.test.js:506, :791`), though both are lifecycle tests that never
-   reach `nextRunnable`.
+   get by not asking for a git flag. Two existing lifecycle tests in
+   `tests/task-registry.test.js` already build it that way (exact positions shifted since
+   authoring — Step 9 re-derives them), though both are lifecycle tests that never reach
+   `nextRunnable`.
 2. **Every `sync` that reaches the promotion path in the suite carries `gitOp: true`.**
-   Grepped: `scheduler-guarantees-under-mutation.test.js:224, :251, :277, :289`;
-   `task-registry.test.js:332, :338, :345, :353, :361, :413, :548, :629, :883, :894,
-   :903, :909, :914, :962`. Without exception.
+   Confirmed by grep across `tests/scheduler-guarantees-under-mutation.test.js` and
+   `tests/task-registry.test.js`, without exception. (The specific line numbers recorded at
+   authoring have shifted — the belt rule and the sibling's Group C moved every case in
+   these files. Step 9 re-derives the positions; the **claim**, not the positions, is what
+   Step 9 verifies.)
 
 ### The mutual masking — this is the part worth understanding
 
@@ -73,7 +94,7 @@ through the ladder on the sibling's verified registry — `dep` implement done
 `other` review queued `touches:[]`:
 
 - **Real code** promotes `['barrier']`. `barrier` starts (nothing occupies a slot), is
-  folded into `projected` as running at `:912`, and `other` is then refused because
+  folded into `projected` as running at `:1009`, and `other` is then refused because
   `running.some(t => t.kind === 'sync')` is true.
 - **Mutated code** promotes `['barrier','other']`. With Rule 2 gone, Rule 3 finds
   `candidate.gitOp === false` and `isEditing(other) === false` (empty `touches`), so both
@@ -84,14 +105,15 @@ barrier exists to prevent.
 
 ### What this claim does NOT extend to, stated rather than glossed
 
-The only production creator of a `sync` task is `src/lib/actions.js:1691`, and it sets
-`gitOp: true` explicitly (`:1693`). So on today's shipped call graph the vulnerable shape
-is **not** produced by the running product. The defect is in the scheduler's *guarantee*,
-which is unconditional and is what `nextRunnable`'s own comment (`:897-899`) promises —
-"starting the whole returned set never violates ≤5 / sync-barrier / git-exclusive /
-file-conflict". A registry loaded from disk, a second call site, or any use of `addTask`
-without an explicit flag produces the shape. This slice defends the guarantee; it does
-not claim a live production incident, and it must not be written up as if it did.
+The only production creator of a `sync` task is `src/lib/actions.js:1887`
+(`enqueueWaveSync`), and it sets `gitOp: true` explicitly (`:1889`). So on today's shipped
+call graph the vulnerable shape is **not** produced by the running product. The defect is
+in the scheduler's *guarantee*, which is unconditional and is what `nextRunnable`'s own
+comment (`:995-996`) promises — "so starting the whole returned set never violates ≤5 /
+sync-barrier / git-exclusive / file-conflict". A registry loaded from disk, a second call
+site, or any use of `addTask` without an explicit flag produces the shape. This slice
+defends the guarantee; it does not claim a live production incident, and it must not be
+written up as if it did.
 
 ---
 
@@ -124,7 +146,7 @@ parser can see it.
 lighter mechanism is *reason coverage*: instrument `evaluateConcurrency` to record which
 `reason` it returned during a `nextRunnable` call, then assert every reason has been
 observed on the promotion path. It fails on this exact defect, and the falsification is
-checkable rather than asserted. `tests/task-registry.test.js:359-363` (ST-SYNC-4) calls
+checkable rather than asserted. `tests/task-registry.test.js:350-364` (ST-SYNC-4) calls
 `nextRunnable` on a registry where a queued `sync` is refused with reason
 `'sync-barrier'`, and asserts the resulting promoted set. Reason coverage would therefore
 have reported Rule 2 as **covered on the promotion path** — while Rule 2 was in fact
@@ -136,17 +158,22 @@ mode here.** Line coverage was already 99.91% on this file when all four gaps we
 
 1. **Enumeration (a real mechanism, cheap, unconditional).** The gate extracts from
    `src/lib/task-registry.js` every decision-shaped reason literal — matching only
-   `{ run: true|false, reason: '<literal>' }`, which selects exactly `:840`, `:846`,
-   `:853`, `:864`, `:867`, `:887` and deliberately excludes the unrelated
-   `reason: 'dep-missing' | 'dep-failed' | 'dep-cycle'` sites at `:1031-1045`, which
-   carry no `run:` field. It asserts that set equals the declared set
-   `{max-concurrent, sync-barrier, git-exclusive, file-conflict, blocked-dep, ok}`, and
-   that every member except `ok` has at least one entry in the mutation table.
+   `{ run: true|false, reason: '<literal>' }`, which selects exactly `:925`, `:931`,
+   `:938`, `:949`, `:952`, `:972` and `:983` (the **seventh**,
+   `staleness-orphan-quarantine`, added by the concurrent-edit belt) and deliberately
+   excludes the unrelated `reason: 'dep-missing' | 'dep-failed' | 'dep-cycle'` sites at
+   `:1119-1142` and `reason: 'already-queued'` at `:1201`, which carry no `run:` field.
+   It asserts that set equals the declared set
+   `{max-concurrent, sync-barrier, git-exclusive, file-conflict, blocked-dep,
+   staleness-orphan-quarantine, ok}`, and that every member except `ok` has at least one
+   entry in the mutation table.
    **A future rule that returns a new reason fails the gate immediately**, with a message
-   naming the rule and demanding a projection-side mutation. That is the property the
-   human asked for, and it is genuinely mechanical.
+   naming the rule and demanding a defender. That is the property the human asked for, and
+   it is genuinely mechanical — the belt's arrival after authoring is the first live proof
+   that it works: the extractor picks up the new reason, and the plan had to answer it with
+   a named defender rather than let it slip through.
 2. **Execution (a real mechanism, costly).** For each table entry, the declared
-   projection-side mutation is applied to a copy of the module outside the working tree
+   mutation is applied to a copy of the module outside the working tree
    and the eleven scheduler test files are run against it in place. The entry passes only
    when the **named** case goes red — not merely "something went red". Requiring a named
    case is what stops the confound that produced this whole family of defects: a rule that
@@ -164,6 +191,16 @@ cannot be checked is a wish. So:
 - **Per-clause completeness is not enforced.** Rule 2 has two disjuncts and Rule 3 has two
   clauses. The table is keyed by reason and permits several entries per reason, but the
   gate only requires **at least one**. **Convention, not mechanism.**
+- **`staleness-orphan-quarantine` is defended on the ORACLE path, not the projection.**
+  The belt lives only in `canRun` (`:982-984`) by deliberate design — `nextRunnable`
+  offers the colliding candidate and lets the projection reporter
+  (`task-reconcile.applyQuarantine`) hold it (`BELT-5` in `tests/task-registry.test.js`
+  pins exactly this). So this reason's named red case is a `canRun` case (`BELT-1` /
+  `BELT-1b`), not a `nextRunnable` case. The gate's real mechanism — mutate the source, run
+  the scheduler suite, require a named case to go red — supports that cleanly; the
+  "promotion path" narrative is the general case, and this is the one documented exception.
+  The belt's *projection-side reporter* in `task-reconcile.js` stays out of this gate's
+  scope (see "What this slice does NOT fix", item 5).
 
 That is the honest ledger: enumeration is mechanised, fairness is not. The convention
 half is written into the gate's failure text and the table's header comment, where the
@@ -172,7 +209,7 @@ next author is forced to read it, rather than into a document nobody opens.
 **Where the gate runs — decided, not deferred.** It runs inside `npm test`, the gated
 entry point, unconditionally. A gate that lives behind an environment flag silently stops
 being true, which is the failure this whole family of slices exists to correct. Its
-runtime has **not been measured** and cannot be from this plan (four executors are editing
+runtime has **not been measured** and cannot be from this plan (executors are editing
 `src/` and `tests/` concurrently; running the suite now would contend and would produce an
 uninterpretable result). Step 12 measures it. If the measured cost exceeds 60 seconds,
 that is **reported to the human as a scheduling decision** — it is not resolved by quietly
@@ -191,7 +228,8 @@ tests/scheduler-guarantees-under-mutation.test.js  (Group D appended)
 tests/scheduler-rule-projection-gate.test.js       (NEW)
     ├── reads (as text) ──> src/lib/task-registry.js     [UNCHANGED]
     ├── spawns ──> node --require <shim> --test <11 scheduler test files>
-    └── names ──> Group D case ids in tests/scheduler-guarantees-under-mutation.test.js
+    └── names ──> Group D case ids in tests/scheduler-guarantees-under-mutation.test.js,
+                  and BELT-1/BELT-1b in tests/task-registry.test.js
 ```
 
 No production file is created or modified. Nothing under `src/` is edited by this slice.
@@ -209,7 +247,7 @@ both unchanged, and extends the header with Group D's subject and the mutual-mas
 explanation above.
 
 Registries are built with the file's existing `mkReg`, `task` and `ago` helpers
-(`:61-90`), which bypass `addTask` — required here, because `addTask` refuses an
+(`:50-94`), which bypass `addTask` — required here, because `addTask` refuses an
 `implement` task with empty `touches` and refuses a `sync` with an empty `blockedBy`.
 
 **Every case below uses a `sync` with `gitOp: false`.** A `sync` carrying `gitOp: true` is
@@ -218,15 +256,15 @@ masking this group exists to break.
 
 | # | Case | Registry (order matters — `nextRunnable` is FIFO over queued) | Assertion | Mutation it kills |
 |---|---|---|---|---|
-| D1 | **a `sync` candidate is NOT promoted while a real task runs** | `t1` implement **running** `touches:['a.js']` `gitOp:false`; `t2` sync queued `gitOp:false` `touches:[]` `blockedBy:[]` | promoted set is exactly `[]` | deleting the `candidate.kind === 'sync'` disjunct from `:845` |
-| D2 | **no candidate is promoted while a real `sync` runs** | `t1` sync **running** `gitOp:false` `touches:[]`; `t2` review queued `touches:[]` `gitOp:false` | promoted set is exactly `[]` | deleting the `running.some(t => t.kind === 'sync')` disjunct from `:845` |
-| D3 | **headline — a barrier promoted in THIS pass blocks the follower behind it** | `dep` implement `status:'done'` `touches:['a.js']`; `barrier` sync queued `gitOp:false` `touches:[]` `blockedBy:['dep']`; `other` review queued `touches:[]` `gitOp:false` | promoted set is exactly `['barrier']` | deleting Rule 2 (`:845-847`) entirely; and separately, dropping `kind` from the fold at `:912` (`projected.push({ ...cand, kind: 'review', status: 'running' })`) |
+| D1 | **a `sync` candidate is NOT promoted while a real task runs** | `t1` implement **running** `touches:['a.js']` `gitOp:false`; `t2` sync queued `gitOp:false` `touches:[]` `blockedBy:[]` | promoted set is exactly `[]` | deleting the `candidate.kind === 'sync'` disjunct from `:930` |
+| D2 | **no candidate is promoted while a real `sync` runs** | `t1` sync **running** `gitOp:false` `touches:[]`; `t2` review queued `touches:[]` `gitOp:false` | promoted set is exactly `[]` | deleting the `running.some(t => t.kind === 'sync')` disjunct from `:930` |
+| D3 | **headline — a barrier promoted in THIS pass blocks the follower behind it** | `dep` implement `status:'done'` `touches:['a.js']`; `barrier` sync queued `gitOp:false` `touches:[]` `blockedBy:['dep']`; `other` review queued `touches:[]` `gitOp:false` | promoted set is exactly `['barrier']` | deleting Rule 2 (`:930-932`) entirely; and separately, dropping `kind` from the fold at `:1009` (mutate `projected.push({ ...cand, status: 'running' })` to `projected.push({ ...cand, kind: 'review', status: 'running' })`) |
 | D4 | **control — the barrier itself IS promoted when nothing occupies a slot** | `dep` implement `status:'done'` `touches:['a.js']`; `barrier` sync queued `gitOp:false` `touches:[]` `blockedBy:['dep']` | promoted set is exactly `['barrier']` | over-tightening Rule 2 into "never promote a sync", which would pass D1-D3 and deadlock every wave |
 | D5 | **control — two ordinary non-sync tasks with disjoint files DO both promote** | `t1` implement queued `touches:['a.js']`; `t2` implement queued `touches:['b.js']` | both promoted | over-tightening Rule 2 into "one task at a time", which would pass D1-D4 and destroy concurrency |
 | D6 | **the reason is `sync-barrier`, through the oracle, on D2's shapes** | D2's registry — note `t1` is **running**, deliberately | `canRun(t2, r)` → `{ run:false, reason:'sync-barrier' }` | pins that D1-D3's refusals are Rule 2 and not Rule 1, 3 or 4 firing by accident |
 
 **D6 carries an explicit warning in its own comment, because the sibling slice got this
-wrong once.** `canRun` builds its opposition from `runningTasks(registry, id)` (`:800-802`),
+wrong once.** `canRun` builds its opposition from `runningTasks(registry, id)` (`:829-831`),
 which filters on `isOccupying` — status `running` or `cancelling`. A registry whose tasks
 are all `queued` gives `canRun` an EMPTY running set, and the correct answer is then
 `{ run:true, reason:'ok' }`. D6's opposition must therefore be genuinely `running`. Writing
@@ -235,7 +273,7 @@ D6 against an all-queued registry produces a case that fails against correct cod
 exists to prevent.
 
 **Why D1/D2 and D3 are not redundant.** `projected` is seeded from the real running set at
-`:905` and grown by the fold at `:912`. D1 and D2 exercise the **seeded** path; D3 exercises
+`:1002` and grown by the fold at `:1009`. D1 and D2 exercise the **seeded** path; D3 exercises
 the **fold** path, where the blocking sync did not exist as a running task when the pass
 began. A mutation that drops `kind` from the fold leaves D1 and D2 green and kills only D3.
 
@@ -245,23 +283,23 @@ A case that passes because an earlier rule caught the candidate has proven nothi
 sits second in the ladder, so only Rule 1 precedes it; Rules 3 and 4 follow and would mask
 it by producing the same refusal. The arithmetic is written out rather than assumed.
 
-- **Rule 1 (max-concurrent, `:840`) cannot fire.** `MAX_CONCURRENT` is 5 (`:109`). No case
+- **Rule 1 (max-concurrent, `:925`) cannot fire.** `MAX_CONCURRENT` is 5 (`:122`). No case
   in Group D puts more than two tasks in the projected set.
-- **Rule 3 (git-exclusive, `:851-852`) cannot fire.** First clause needs
+- **Rule 3 (git-exclusive, `:936-938`) cannot fire.** First clause needs
   `candidate.gitOp` — every candidate in Group D has `gitOp: false`, explicitly, and this
   is the single load-bearing choice in the whole group. Second clause needs
   `isEditing(candidate) && running.some(t => t.gitOp)`; `isEditing` is `touches.length > 0`
-  (`:788`), and no task in any Group D case carries `gitOp: true`, so the right-hand side is
-  false regardless of the candidate's files.
-- **Rule 4 (file-conflict, `:858-865`) cannot fire.** In D1 the candidate's `touches` is
-  empty, so the fast path at `:859` skips the rule entirely. In D2 and D3 the *blocking*
+  (`:817-819`), and no task in any Group D case carries `gitOp: true`, so the right-hand side
+  is false regardless of the candidate's files.
+- **Rule 4 (file-conflict, `:940-950`) cannot fire.** In D1 the candidate's `touches` is
+  empty, so the fast path at `:944` skips the rule entirely. In D2 and D3 the *blocking*
   task's `touches` is empty, so the `occupied` union is empty and `touchesOverlap` has
   nothing to match. In D5 the two files are disjoint by construction, which is what makes
   D5 a control rather than a coincidence.
-- **Rule 0 (the dependency gate, `:908`) cannot fire for the wrong reason.** Every queued
-  task in Group D either declares an empty `blockedBy` or names a dependency whose status
-  is `done`, which satisfies both the sync branch (TERMINAL) and the non-sync branch
-  (done-only) of `depsSatisfied` (`:817-825`).
+- **Rule 0 (the dependency gate, `nextRunnable`'s `continue` at `:1005`) cannot fire for the
+  wrong reason.** Every queued task in Group D either declares an empty `blockedBy` or names
+  a dependency whose status is `done`, which satisfies both the sync branch (TERMINAL) and
+  the non-sync branch (done-only) of `depsSatisfied` (`:857-872`).
 
 Proof rather than argument: under the single-disjunct mutations the refusal must disappear
 **entirely**, which it could not do if another rule were carrying it. Step 8 records that.
@@ -273,8 +311,8 @@ path that starts work. If any production behaviour changes, this slice is wrong.
 
 ### File: `tests/scheduler-rule-projection-gate.test.js`
 **Action:** CREATE
-**Purpose:** Assert that every scheduler rule is exercised on the promotion path, so a
-rule added to the oracle without a projection-side defender fails immediately.
+**Purpose:** Assert that every scheduler rule is exercised by a named case in the scheduler
+suite, so a rule added to the scheduler without a defender fails immediately.
 
 #### Structure
 
@@ -282,7 +320,8 @@ rule added to the oracle without a projection-side defender fails immediately.
 
 ```js
 const DECLARED_REASONS = Object.freeze([
-  'max-concurrent', 'sync-barrier', 'git-exclusive', 'file-conflict', 'blocked-dep', 'ok'
+  'max-concurrent', 'sync-barrier', 'git-exclusive', 'file-conflict',
+  'blocked-dep', 'staleness-orphan-quarantine', 'ok'
 ]);
 ```
 
@@ -293,11 +332,12 @@ matches only decision-shaped returns:
 /\{\s*run:\s*(?:true|false)\s*,\s*reason:\s*'([a-z-]+)'\s*\}/g
 ```
 
-This selects `:840`, `:846`, `:853`, `:864`, `:867`, `:887` and excludes the
-`reason: 'dep-missing' | 'dep-failed' | 'dep-cycle'` sites at `:1031-1045`, which have no
-`run:` field. **If the extractor finds zero matches it FAILS** — a scanner whose no-match
-result is indistinguishable from success is the exact false-green signature this repository
-fences. Never default to the passing value.
+This selects `:925`, `:931`, `:938`, `:949`, `:952`, `:972` and `:983` and excludes the
+`reason: 'dep-missing' | 'dep-failed' | 'dep-cycle'` sites at `:1119-1142` and
+`reason: 'already-queued'` at `:1201`, which have no `run:` field. **If the extractor finds
+zero matches it FAILS** — a scanner whose no-match result is indistinguishable from success
+is the exact false-green signature this repository fences. Never default to the passing
+value.
 
 **3. The mutation table.** One entry per rule, several permitted per reason:
 
@@ -310,13 +350,21 @@ exactly once in the source FAILS the gate** — a mutation that silently applies
 would report "no red" and be read as an undefended rule, or worse, apply in two places.
 Initial entries:
 
-| reason | mutation (projection side) | must turn red |
+| reason | mutation | must turn red |
 |---|---|---|
-| `sync-barrier` | delete Rule 2's body at `:845-847` | D1, D2, D3 |
-| `git-exclusive` | delete Rule 3's body at `:851-854` | Group C cases (the sibling's) |
-| `max-concurrent` | `running.length >= MAX_CONCURRENT` → `false` | the existing max-concurrency promotion cases |
-| `file-conflict` | `touchesOverlap(candTouches, occupied)` → `false` | the existing file-conflict promotion cases |
-| `blocked-dep` | delete `if (!depsSatisfied(cand, registry)) continue;` at `:908` | Group B cases |
+| `sync-barrier` | delete Rule 2's body at `:930-932` | D1, D2, D3 |
+| `git-exclusive` | delete Rule 3's body at `:936-938` | Group C cases (the sibling's) |
+| `max-concurrent` | `running.length >= MAX_CONCURRENT` → `false` at `:925` | the existing max-concurrency promotion cases |
+| `file-conflict` | `touchesOverlap(candTouches, occupied)` → `false` at `:949` | the existing file-conflict promotion cases |
+| `blocked-dep` | delete `if (!depsSatisfied(cand, registry)) continue;` at `:1005` | Group B cases |
+| `staleness-orphan-quarantine` | delete the concurrent-edit belt in `canRun` at `:982-984` (`if (overlapsStaleOrphanReservation(candidate, registry)) { return { run: false, reason: 'staleness-orphan-quarantine' }; }`) | `BELT-1`, `BELT-1b` in `tests/task-registry.test.js` |
+
+The `staleness-orphan-quarantine` entry is the one **oracle-side** mutation in the table:
+its rule lives only in `canRun` by design (see the Decision section and `BELT-5`), so its
+named red cases are `canRun` cases rather than `nextRunnable` cases. That is not a weakness
+in the gate — mutating the source and requiring a named suite case to go red proves the
+rule is defended regardless of which entry point exercises it. A header comment states this
+so a later author does not "fix" the entry by chasing a non-existent `nextRunnable` case.
 
 `ok` is declared explicitly as the non-rule terminal with a written reason, so its absence
 from the table is a stated decision rather than an omission.
@@ -361,8 +409,8 @@ never written, so there is nothing to revert and nothing to self-attest.
 
 | # | Case | Assertion |
 |---|---|---|
-| G1 | the extractor finds the decision reasons | the extracted set is non-empty and equals `DECLARED_REASONS` |
-| G2 | every rule has a projection-side mutation | every declared reason except `ok` has ≥1 table entry; failure message names the reason and demands one |
+| G1 | the extractor finds the decision reasons | the extracted set is non-empty and equals `DECLARED_REASONS` (seven reasons) |
+| G2 | every rule has a defender | every declared reason except `ok` has ≥1 table entry; failure message names the reason and demands one |
 | G3 | every mutation applies exactly once | each entry's `find` occurs exactly once in the source |
 | G4 | the no-op control is green | control run: `fail 0`, `skipped 0`; otherwise the gate fails with "the harness is invalid" |
 | G5 | every declared mutation is caught by its named case | for each entry, the mutated run is red AND every id in `expectRedCases` appears among the failures |
@@ -375,14 +423,14 @@ G5 believable.
 
 | change | live call site | root |
 |---|---|---|
-| Group D | `reg.nextRunnable` / `reg.canRun`, the real exported scheduler functions, called by `src/lib/task-reconcile.js` on every dashboard render | `npm test`, and `node src/commands/menu.js` |
+| Group D | `reg.nextRunnable` / `reg.canRun`, the real exported scheduler functions, called by `src/lib/task-reconcile.js` on every dashboard render | `npm test`, and `node src/commands/start.js` |
 | the gate | it IS a test file, executed by `node --test tests/*.test.js` and by `src/scripts/test-gate.js` | `npm test` |
 
 Both files drive the real module through its real exports. Nothing is mocked, and the
 ladder is not re-implemented in any test.
 
 **Why the gate is a test file and not a module under `src/lib/`.** Two reasons, both
-decisive. First, `src/lib/reachability.js:312` records that `tests/` is deliberately not a
+decisive. First, `src/lib/reachability.js:314` records that `tests/` is deliberately not a
 caller surface — a scan module under `src/lib/` whose only caller is a test would trip the
 reachability fence, and its second root would have to be
 `src/lib/iron-loop-enforcer.js`. Second, that file is declared right now by two in-flight
@@ -405,6 +453,9 @@ legitimate root is the gated test run, so it lives where that root reaches it.
 5. **It does not extend the gate to `src/lib/task-reconcile.js`.** The quarantine and the
    terminal-retention sweep are defended by existing cases (the sibling's hunt confirmed
    both go red under projection-side mutation), but they are not enumerated by this gate.
+   In particular, `staleness-orphan-quarantine`'s *projection-side reporter*
+   (`task-reconcile.applyQuarantine`) is out of scope; the gate defends that reason through
+   the `canRun` belt only.
 6. **It does not build a general mutation-testing framework.** The table is hand-written,
    scheduler-specific, and deliberately small.
 7. **It does not touch `src/lib/task-registry.js`, `src/lib/task-reconcile.js`, or any
@@ -414,16 +465,17 @@ legitimate root is the gated test run, so it lives where that root reaches it.
 
 ## What could NOT be verified from this plan, and must be at Step 8
 
-Four executors are editing `src/` and `tests/` concurrently. Running the suite from here
-would contend with them and produce an uninterpretable result, so it was not run. The
-following are therefore **inherited or reasoned, not measured**, and each is a Step 8
-obligation:
+Executors are editing `src/` and `tests/` concurrently. Running the suite from here would
+contend with them and produce an uninterpretable result, so it was not run. The following
+are therefore **inherited or reasoned, not measured**, and each is a Step 8 obligation:
 
 1. **That disabling Rule 2 on the promotion path leaves all 410 assertions green.** The
    sibling's recorded measurement. Reproduce it before writing a line of Group D; if it does
    not reproduce, stop and report — the premise is gone.
 2. **The count of scheduler-touching test files (eleven) and assertions (410).** Re-derive
-   both; do not restate the sibling's numbers as if freshly measured.
+   both; do not restate the sibling's numbers as if freshly measured. (The suite grew since
+   authoring — the belt rule alone added BELT-1..BELT-5 — so the assertion count in
+   particular is expected to differ; re-derive it, do not assume 410.)
 3. **That `spawnSync` with `--require <shim>` correctly redirects module resolution for
    node's test runner in a child process.** Reasoned from the sibling's in-process shim,
    not executed. G4, the no-op control, is what proves it; if the control is not green the
@@ -447,23 +499,32 @@ obligation:
       as INSUFFICIENT evidence
 - [ ] Apply each named mutation to a COPY and observe each case go RED under its own
       mutation. Record a per-mutation table with verbatim counters and the case ids
-- [ ] Write `tests/scheduler-rule-projection-gate.test.js` and observe G2 fail when a table
-      entry is removed, and G5 fail when a table entry's `expectRedCases` is pointed at a
-      case that does not defend it — a gate never seen failing is not a gate
+- [ ] Write `tests/scheduler-rule-projection-gate.test.js` and observe G1 fail if the
+      declared reason set omits `staleness-orphan-quarantine`, G2 fail when a table entry is
+      removed, and G5 fail when a table entry's `expectRedCases` is pointed at a case that
+      does not defend it — a gate never seen failing is not a gate
+- [ ] Confirm deleting the `canRun` belt (`:982-984`) reddens `BELT-1`/`BELT-1b` in
+      `tests/task-registry.test.js`, and that those cases appear in that file's scheduler
+      run — the gate's only oracle-side entry depends on it
 - [ ] No case is rewritten to pass. If the plan specifies something impossible against
       correct code, record the correction here rather than adjusting silently
 
 ### Step 9: PREPARE
-- [ ] Read `src/lib/task-registry.js:780-930` from disk — `isEditing`, `isOccupying`,
-      `runningTasks`, `depsSatisfied`, `evaluateConcurrency`, `canRun`, `nextRunnable`
-- [ ] Confirm from the current source: `MAX_CONCURRENT` (`:109`), the kind vocabulary
-      (`:137`), `assertSyncBlockedBy` (`:635-637`), `addTask`'s `gitOp: spec.gitOp === true`
-      (`:708`), and the load-path normalisation (`:327`)
-- [ ] Confirm the decision-reason sites (`:840, :846, :853, :864, :867, :887`) and that the
-      `dep-missing`/`dep-failed`/`dep-cycle` sites (`:1031-1045`) carry no `run:` field
+- [ ] Read `src/lib/task-registry.js:800-1013` from disk — `isOccupying`, `isEditing`,
+      `runningTasks`, `depsSatisfied`, `overlapsStaleOrphanReservation`,
+      `evaluateConcurrency`, `canRun` (including the concurrent-edit belt), `nextRunnable`
+- [ ] Confirm from the current source: `MAX_CONCURRENT` (`:122`), the kind vocabulary
+      `KINDS` (`:149`), `assertSyncBlockedBy` (`:664`), `addTask`'s `gitOp: spec.gitOp === true`
+      (`:737`), and the load-path normalisation `gitOp: t.gitOp === true` (`:340`)
+- [ ] Confirm the SEVEN decision-reason sites (`:925, :931, :938, :949, :952, :972, :983`)
+      and that the `dep-missing`/`dep-failed`/`dep-cycle` sites (`:1119-1142`) and
+      `already-queued` (`:1201`) carry no `run:` field. Confirm the seventh reason
+      `staleness-orphan-quarantine` (`:983`) is the `canRun` belt and is defended by
+      `BELT-1`/`BELT-1b`
 - [ ] Read the whole of `tests/scheduler-guarantees-under-mutation.test.js`, including
-      Groups A, B and C and the helper block at `:50-90`
-- [ ] Enumerate the scheduler-touching test files from disk; do not inherit the list
+      Groups A, B and C and the helper block at `:50-94`
+- [ ] Enumerate the scheduler-touching test files from disk; do not inherit the list. Confirm
+      `tests/task-registry.test.js` (which carries BELT-1/BELT-1b) is among them
 - [ ] Re-grep every `kind: 'sync'` in `tests/` and confirm the premise still holds — that no
       promotion-path sync carries `gitOp: false`. Concurrent executors may have added one
 - [ ] Record every place the code disagrees with this plan, and prefer the code
@@ -472,7 +533,8 @@ obligation:
 - [ ] `tests/scheduler-guarantees-under-mutation.test.js` — Group D appended; header extended
       with Group D's subject and the mutual-masking explanation; Groups A, B, C untouched
 - [ ] `tests/scheduler-rule-projection-gate.test.js` — created, with G1-G6, the frozen reason
-      set, the mutation table, the no-op control and the harness
+      set (seven reasons), the mutation table (six entries, one per non-`ok` reason), the
+      no-op control and the harness
 - [ ] `path.join` and `os.tmpdir()` throughout; no hardcoded separator, no `~`, no shell
 - [ ] No production file edited; no file outside this plan's `files:` list touched
 - [ ] No stub, no TODO, no skipped case
@@ -484,7 +546,8 @@ obligation:
       nothing and its presence is a defect in the case
 - [ ] The masking analysis is re-checked against the cases as written, not as planned
 - [ ] The gate's failure messages state the convention half plainly — that a rule reusing an
-      existing reason string is not caught, and that mutation fairness is a human judgement
+      existing reason string is not caught, that mutation fairness is a human judgement, and
+      that `staleness-orphan-quarantine` is defended on the `canRun` oracle path by design
 - [ ] The gate was observed FAILING for each of its own reasons before being accepted
 
 ### Step 12: OPTIMIZE
@@ -525,7 +588,8 @@ obligation:
       paragraph: every promotion-path git candidate was a sync, and every sync was a git op,
       so each rule hid the other's absence
 - [ ] The gate file's header states, in its own words, what it mechanises and what it does
-      not — the reason-reuse blind spot and the mutation-fairness judgement
+      not — the reason-reuse blind spot, the mutation-fairness judgement, and that
+      `staleness-orphan-quarantine` is an oracle-only rule defended through `canRun`
 - [ ] The header records why reason coverage was rejected, with the ST-SYNC-4 falsification,
       so the cheap option is not re-proposed
 - [ ] No CHANGELOG entry — this slice changes no product behaviour
@@ -546,8 +610,10 @@ obligation:
 **`depends_on: 00102-git-exclusivity-is-undefended-where-work-actually-starts`.** That
 sibling adds Group C to `tests/scheduler-guarantees-under-mutation.test.js`, which this
 slice also modifies. Same file, so this slice must not start until that one has settled.
-The sibling also produced the finding this slice acts on, and its Group C cases are named in
-this gate's mutation table — the table would be unsatisfiable without them.
+(The sibling is currently in `plans/review/` — built and awaiting the human's sign-off — so
+Group C is present in the file today.) The sibling also produced the finding this slice acts
+on, and its Group C cases are named in this gate's mutation table — the table would be
+unsatisfiable without them.
 
 `tests/scheduler-rule-projection-gate.test.js` is new and declared by no other plan.
 
@@ -555,7 +621,7 @@ this gate's mutation table — the table would be unsatisfiable without them.
 and `00110` both declare it and are in flight. That is the reason the gate is a test file
 rather than a scan module, recorded above under Wiring.
 
-No production file is declared, so this slice cannot collide with the four executors
+No production file is declared, so this slice cannot collide with the executors
 currently editing `src/`.
 
 ---
@@ -569,7 +635,7 @@ currently editing `src/`.
    answered by removing the condition and observing whether an assertion notices. Static
    analysis cannot express that; mutation is its definition.
 3. **Reason coverage was considered and rejected on evidence, not taste.** `ST-SYNC-4` at
-   `tests/task-registry.test.js:359-363` returns `'sync-barrier'` from a `nextRunnable`
+   `tests/task-registry.test.js:350-364` returns `'sync-barrier'` from a `nextRunnable`
    call and asserts the promoted set, so a reason-coverage instrument would have reported
    Rule 2 as covered while it was undefended. Coverage cannot see masking; masking is the
    defect. Recorded so the cheaper option is not re-proposed later.
@@ -579,13 +645,14 @@ currently editing `src/`.
    a wish; so the wishes are labelled as wishes and written where the next author meets
    them, rather than dressed up as enforcement.
 5. **The enumeration keys on decision-shaped reason literals, not on rule count.** Matching
-   `{ run: true|false, reason: '<literal>' }` selects exactly the six decision sites and
-   excludes the three unrelated `reason:` sites at `:1031-1045`. Counting `if` statements
-   or parsing the function body would be more fragile and no more complete.
+   `{ run: true|false, reason: '<literal>' }` selects exactly the seven decision sites and
+   excludes the unrelated `reason:` sites at `:1119-1142` (`dep-missing`/`dep-failed`/
+   `dep-cycle`) and `:1201` (`already-queued`). Counting `if` statements or parsing the
+   function body would be more fragile and no more complete.
 6. **The gate runs inside `npm test` unconditionally, and its cost is reported rather than
    hidden.** A gate behind an environment flag silently stops being true. If the measured
    runtime is unacceptable, that is the human's scheduling decision, not the executor's.
-7. **The gate is a test file, not a module under `src/lib/`.** `reachability.js:312` records
+7. **The gate is a test file, not a module under `src/lib/`.** `reachability.js:314` records
    that a test is never a caller, so a scan module would need `iron-loop-enforcer.js` as a
    second root — and that file is declared by two in-flight plans. The gate's only
    legitimate root is the gated test run.
@@ -603,7 +670,7 @@ currently editing `src/`.
     own comment rather than left in this plan.
 11. **Both the seeded path and the fold path are covered.** D1/D2 build the blocking task as
     really running; D3 has the barrier promoted within the same pass. A mutation that drops
-    `kind` from the fold at `:912` kills only D3, which is why D3 exists separately.
+    `kind` from the fold at `:1009` kills only D3, which is why D3 exists separately.
 12. **The no-op control is a required STEP, and its failure invalidates every result.** The
     sibling's first harness returned four failures with zero mutations applied, and every red
     it produced was uninterpretable. The control is written as a gate case (G4) with that
@@ -617,15 +684,34 @@ currently editing `src/`.
     is brittleness when a case is renamed, which is accepted, and which is itself a signal
     worth receiving.
 15. **The claim is scoped to the scheduler's guarantee, not to a live production incident.**
-    `actions.js:1691` is the only production creator of a `sync` and it sets `gitOp: true`.
-    The guarantee `nextRunnable` documents at `:897-899` is unconditional and is broken; the
-    running product does not currently produce the shape. Both facts are stated rather than
-    the stronger one alone.
+    `actions.js:1887` (`enqueueWaveSync`) is the only production creator of a `sync` and it
+    sets `gitOp: true`. The guarantee `nextRunnable` documents at `:995-996` is unconditional
+    and is broken; the running product does not currently produce the shape. Both facts are
+    stated rather than the stronger one alone.
 16. **Nothing was measured from this plan, and the four unmeasured items are listed rather
-    than assumed.** Four executors are editing `src/` and `tests/` concurrently; running the
+    than assumed.** Executors are editing `src/` and `tests/` concurrently; running the
     suite would contend and produce an uninterpretable result. Step 8 reproduces the premise
     before anything is built on it.
 17. **The sibling's asymmetry hunt is treated as complete and is not repeated.** Eight
     predicates across eleven test files, seven already defended and this one open. Repeating
     it would cost a full mutation sweep to re-derive a result already recorded; the gate is
     what replaces the hunt going forward.
+18. **The seventh reason `staleness-orphan-quarantine` (rebase, 2026-07-30) is enumerated and
+    defended, not deferred.** The concurrent-edit belt (human ruling 2026-07-26) added a
+    decision-shaped reason in `canRun` (`:983`) after this plan was authored. The gate's own
+    ratchet requires it in `DECLARED_REASONS` and in the mutation table, so it is added:
+    the mutation deletes the belt (`:982-984`) and the named red cases are `BELT-1`/`BELT-1b`
+    in `tests/task-registry.test.js`. It is the one oracle-side entry — `nextRunnable`
+    deliberately does not enforce the belt (`BELT-5`), and its projection-side reporter
+    (`task-reconcile.applyQuarantine`) is out of this gate's scope. Its arrival is the first
+    live confirmation that the enumeration mechanism catches a rule the plan's author never
+    saw.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

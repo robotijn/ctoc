@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "A claim outlives the executor that made it"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild
@@ -10,9 +11,28 @@ files:
   - "src/lib/agent-slots.js"
   - "src/lib/task-reconcile.js"
   - "tests/a-dead-claimant-does-not-hold-its-files.test.js"
+  - "CLAUDE.md"
+approved_by: human
+approved_at: 2026-07-30T14:47:44.023Z
+gate_crossed: implementation → todo
 ---
 
 # A claim outlives the executor that made it
+
+> **Rebased 2026-07-30 onto the current tree.** Verified against today's code:
+> `agent-slots.js` line citations hold; `task-reconcile.js` line numbers were
+> refreshed; the quoted `reconcileState` comment now reads `/ctoc:start` (the
+> `menu`→`start` rename). The one MATERIAL change: the reserved-set membership test
+> the plan wanted to widen ("`applyQuarantine` … that test becomes a two-value
+> membership check") no longer lives in `applyQuarantine`. The 2026-07-26 "one
+> predicate, every promote route" rework moved it into
+> `task-registry.staleOrphanReservedFiles`, and the same `'staleness'` marker now
+> ALSO gates the sync-barrier rule (`depsSatisfied`) and the across-passes release
+> branch. The rebase REUSES the `'staleness'` marker for the new orphaning instead
+> of inventing a `'no-live-subagent'` one, so all three machinery sites inherit the
+> correct behaviour with ZERO change and the declared `files:` stay correct (no
+> `task-registry.js` edit). See Decision 13. Intent and every acceptance-criteria
+> test case are unchanged.
 
 ## The answer is mostly REUSE, and that is the finding
 
@@ -34,8 +54,8 @@ claimant with more care than a second encoding would:
 | file quarantine | one pass, then bounded | an age-only orphan's files are NOT handed to a rival, since the agent may still be alive |
 | cancel deadline | 30 min | a hung-but-live agent still releases its files eventually |
 
-Every one of those is documented with its reasoning at `task-reconcile.js:19-71` and
-`:108-130`. **The correct answer to "what if the claim is stale" is: this, unchanged.
+Every one of those is documented with its reasoning at `task-reconcile.js:10-77` and
+`:89-130`. **The correct answer to "what if the claim is stale" is: this, unchanged.
 Do not invent a parallel liveness notion.** A second encoding of "is the claimant
 alive" is precisely the defect this repair set was convened to prevent.
 
@@ -46,8 +66,9 @@ in the existing one**, and it is small.
 
 `reconcile` releases a claim on confirmed death when three things hold: a live-agent
 list is present, the task has a recorded `agentTaskId`, and that id is absent from the
-list (`task-reconcile.js:322`, `:428`). Two measurements say that path is dead in
-practice.
+list (the `running`-branch confirmed-absent path at `task-reconcile.js:360`, and the
+across-passes `confirmedDead` definition at `:430`). Two measurements say that path is
+dead in practice.
 
 **First — the recorded identity is self-referential.** Read from `tasks.json`:
 
@@ -64,10 +85,11 @@ staleness backstop instead. **In neither case does the confirmed-dead path do an
 work.** `00166` fixes this going forward by recording the real slot token; this plan is
 what makes that recorded token useful.
 
-**Second — no live list is ever supplied.** `reconcileState`'s own comment says it
-plainly (`:120-125`): *"the default `/ctoc:menu` path passes NO `--live-agent-ids`, so
-`liveAgentIds` is null on EVERY pass and the confirmed-dead signal can NEVER fire."*
-That is why the presumed-dead time bound exists at all.
+**Second — no live list is ever supplied.** The presumed-dead bound's own comment says
+it plainly (`:117-130`, echoed inside the across-passes branch at `:418`): *"the default
+`/ctoc:start` path passes NO `--live-agent-ids`, so `liveAgentIds` is null on EVERY pass
+and the confirmed-dead signal can NEVER fire."* That is why the presumed-dead time bound
+exists at all.
 
 **Consequence, stated plainly:** with `00166` landed and nothing else, a crashed
 executor holds its declared files for **two hours** before orphaning and **four hours**
@@ -90,7 +112,7 @@ positive statement that nothing is in flight.
 **It is sound only under a stated assumption, and the assumption is checkable.** The
 store is maintained only if the dispatch seat actually runs — the subject of `00165`.
 And `agent-slots` **fails open**: when the store cannot be written, `acquire` still
-hands out a token (`agent-slots.js:227-231`), so a live subagent can exist with no
+hands out a token (`agent-slots.js:226-231`), so a live subagent can exist with no
 entry recorded. Reading "empty" as "nothing alive" in that situation would orphan a
 living agent mid-write, which is far worse than waiting two hours.
 
@@ -128,11 +150,11 @@ src/lib/task-reconcile.js  [MODIFY — consume the new signal in reconcileState]
 `task-reconcile → agent-slots` does not close a loop today, because `agent-slots`
 requires neither `task-reconcile` nor `plan-coverage`. **The require is nevertheless
 LAZY** — inside the function, in a guard — mirroring the pattern justified at
-`plan-coverage.js:295`, so a future edge cannot turn this into a load-time cycle
+`plan-coverage.js:302-305`, so a future edge cannot turn this into a load-time cycle
 silently, and a failed require degrades to `unknown` rather than throwing.
 **Step 11 verifies this by reading the require graph.**
 
-`task-reconcile.js` has a strict house rule stated in its header (`:74-77`): **no raw
+`task-reconcile.js` has a strict house rule stated in its header (`:73-77`): **no raw
 `fs` and no regex literal**, so the promoted-to-error security lint rules cannot fire
 in that file. The new code must honour it — all filesystem access stays behind
 `agent-slots`, which already routes through `safe-fs`.
@@ -168,27 +190,42 @@ fence's behaviour is byte-for-byte unchanged.
 The signal is consumed in `reconcileState`, which is already the only function that
 touches disk, and is passed into the PURE `reconcile` as an option. **`reconcile` stays
 pure** — it must not learn to read a file, or its purity (and the safety of re-running
-it on a compare-and-swap retry, `:581-585`) is lost.
+it on a compare-and-swap retry, `:583-587`) is lost.
 
 - `reconcileState` calls `agentSlots.liveSlotState(root, now)` behind a guard and passes
   the result to `reconcile` as `opts.subagentLiveness`.
 - `reconcile` consults it **only** in the `running` branch, and **only** when:
   - `subagentLiveness.state === 'empty'`, AND
   - the task is not `young` (the grace window is untouched), AND
+  - the task is `running` (NOT `cancelling` — cancelling keeps its own deadline), AND
   - the task's `kind` is `implement` — a dispatch-seated claim. Other kinds are not
     necessarily subagent-backed and must not inherit this inference.
-- The resulting orphaning is recorded with `orphanReason: 'no-live-subagent'` and is
-  reported in a new `report.noLiveSubagentOrphaned` array with the same shape as
-  `stalenessOrphaned` — a loud, separately-named event, never folded into an existing
-  bucket.
-- **The file quarantine treats `'no-live-subagent'` exactly like `'staleness'`.**
-  `applyQuarantine` (`:711-716`) reserves the files of every orphan carrying
-  `orphanReason === 'staleness'`; that test becomes a two-value membership check. The
-  across-passes release branch (`:404`) gets the same treatment, so such an orphan is
-  released by the identical confirmed-dead or presumed-dead logic and the quarantine
-  stays bounded.
+- **The orphaning REUSES the existing machinery marker.** It records
+  `orphanReason: 'staleness'` on the task's `result` — the SAME durable marker an
+  age-only orphaning uses — so it inherits the quarantine, the sync-barrier
+  confirm-liveness rule, and the bounded across-passes release WHOLESALE, with no new
+  membership check anywhere. It carries a DISTINCT `result.summary` naming the empty
+  slot store (honesty is preserved in the human-readable text, not in a second enum).
+- **The loud event is separately named.** It is pushed to a new
+  `report.noLiveSubagentOrphaned` array (same shape as `stalenessOrphaned`), and is
+  deliberately NOT pushed to `report.stalenessOrphaned` — because the inbox's "orphaned
+  on staleness alone — may still be alive" message is derived differently from this
+  empty-store signal and must not misdescribe it (Decision 9).
+- **No membership check is widened — that is the point of the rebase.** The reserved-set
+  derivation moved OUT of `applyQuarantine` into the single predicate
+  `task-registry.staleOrphanReservedFiles` (`:884-894`, the 2026-07-26 "one predicate,
+  every promote route" ruling), which both the scheduler belt
+  (`overlapsStaleOrphanReservation`, `:904-910`) and the projection reporter
+  (`applyQuarantine`, via its call at `task-reconcile.js:721`) now read. Because the new
+  orphaning is marked `'staleness'`, the file quarantine (`staleOrphanReservedFiles`,
+  the test at `:888`), the sync-barrier confirm-liveness rule (`depsSatisfied`, `:868`),
+  and the across-passes release branch (`task-reconcile.js:406`, keyed on
+  `orphanReason === 'staleness'`) ALL treat it identically with ZERO change. Teaching
+  three sites a new `'no-live-subagent'` enum would be exactly the second-encoding-of-
+  liveness this repair set exists to prevent, and would drag `task-registry.js` into a
+  plan that declares two source files.
 - **`cancelling` is NOT affected.** A cancelling task resolves to `cancelled` under its
-  own deadline (`:328-348`), and that path is deliberately untouched.
+  own deadline (`:330-350`), and that path is deliberately untouched.
 
 **What must NOT change:** the grace window, the kind-aware staleness floors, the
 presumed-dead multiple, the cancel deadline, the retention sweep, the live-edge
@@ -216,7 +253,7 @@ injected via `now`, never slept.
 | 8 | **an expired entry counts as empty** — one entry older than `SLOT_TTL_MS` | `state === 'empty'`; orphaned |
 | 9 | **only `implement` inherits the inference** — a `running` `review` task, store empty | **NOT** orphaned by this signal |
 | 10 | **a `cancelling` task is untouched** — store empty | resolves under its own deadline, not this signal |
-| 11 | **the orphan is quarantined** — its files are NOT promoted to a rival queued task in the same pass | the rival appears in `report.quarantined` |
+| 11 | **the orphan is quarantined** — its files are NOT promoted to a rival queued task in the same pass | the rival appears in `report.quarantined` (inherited via the `'staleness'` marker) |
 | 12 | **the quarantine is bounded** — the same orphan aged past the presumed-dead bound | released; the rival promotes |
 | 13 | **the event is separately named** | it appears in `report.noLiveSubagentOrphaned`, NOT silently inside `stalenessOrphaned` |
 | 14 | **`reconcile` stays PURE** — called twice with the same input and the same `now` | identical output; the input object is not mutated; no filesystem access from `reconcile` itself |
@@ -236,17 +273,19 @@ anything.
 | change | live call site | root |
 |---|---|---|
 | `agentSlots.liveSlotState` | `reconcileState` in `task-reconcile.js` | the menu-open reconcile pass |
-| the `no-live-subagent` orphaning | `reconcile`, via `reconcileState` | the dashboard's task plane, on every menu open |
-| the quarantine membership change | `applyQuarantine`, already called by `reconcileState` **and** by `menu-screens.computePromote` | both promote routes, unchanged |
+| the `'staleness'`-marked orphaning | `reconcile`, via `reconcileState` | the dashboard's task plane, on every menu open |
+| the file quarantine of that orphan | `task-registry.staleOrphanReservedFiles`, read by `applyQuarantine` (via `reconcileState`) **and** by `menu-screens.computePromote` (`:2175`) | both promote routes, unchanged — the marker is already recognized |
 | the test file | the suite | `npm test` |
 
 Nothing here is reachable only from a test. `reconcileState` is the on-menu-open entry
 point, so the root is a human opening the dashboard.
 
-**`src/lib/menu-screens.js` calls `applyQuarantine` and is NOT declared or modified
-here.** The membership change is inside `applyQuarantine` itself, so that route inherits
-it through the existing call with no edit. **Step 9 confirms that call's shape has not
-moved**; a concurrent executor is editing that file.
+**Neither `src/lib/menu-screens.js` nor `src/lib/task-registry.js` is declared or
+modified here.** Because the orphaning reuses the `'staleness'` marker, both promote
+routes quarantine it through the UNCHANGED `staleOrphanReservedFiles` predicate — no edit
+to either file, and no dependence on the SHAPE of `menu-screens.computePromote` (which a
+concurrent executor may be editing). **Step 9 confirms `staleOrphanReservedFiles` still
+keys on `orphanReason === 'staleness'`**, which is the only fact this reuse depends on.
 
 ## What this does NOT fix
 
@@ -272,6 +311,14 @@ moved**; a concurrent executor is editing that file.
    timeout on plan residency, which is a different decision and is named, not taken.
 7. **It does not touch `.ctoc/state/agent.json`**, still stale from 2026-07-18. See the
    correction recorded in `00167`.
+8. **A queued dependent of a no-live-subagent orphan is FAILED this pass, not deferred.**
+   The one-pass deferral (a dependent whose dead deps are all staleness-orphans is held
+   because an age-orphaned agent may still complete) keys on `report.stalenessOrphaned`,
+   which — by Decision 9 — this orphaning deliberately does NOT join. Since the empty
+   slot store signals the agent is gone, failing the dependent is defensible; whether a
+   no-live-subagent orphan should ALSO defer its dependents is a separate decision, named
+   here and not taken. (This property is inherited from Decision 9 and is not introduced
+   by the marker reuse.)
 
 ## Execution Plan (Steps 8-16)
 
@@ -293,11 +340,14 @@ that file, before touching `src/`**. Record the starting state verbatim.
 
 Read from disk, in full, and let the code win: `src/lib/task-reconcile.js` (the whole
 file — the branch structure, `applyQuarantine`, the report shape, the header's no-raw-
-`fs`/no-regex rule); `src/lib/agent-slots.js` (`readSlots`, `liveSlots`, `activeCount`,
-`reap`, `acquire`, `release`, `SLOT_TTL_MS`); `src/lib/task-registry.js` (the status
-sets, `nextRunnable`, `withRegistry`); `src/lib/menu-screens.js` **READ ONLY — a
-concurrent executor is editing it; do not modify it, and stop and ask if its call to
-`computePromote`/`applyQuarantine` has changed shape**.
+`fs`/no-regex rule, and specifically the across-passes release branch at `:406`);
+`src/lib/agent-slots.js` (`readSlots`, `liveSlots`, `activeCount`, `reap`, `acquire`,
+`release`, `SLOT_TTL_MS`); `src/lib/task-registry.js` (the status sets, `nextRunnable`,
+`withRegistry`, and — load-bearing for this plan's reuse — `staleOrphanReservedFiles`
+(`:884`) and the sync-barrier rule in `depsSatisfied` (`:857-872`), CONFIRMING both key
+on `orphanReason === 'staleness'`); `src/lib/menu-screens.js` **READ ONLY — a concurrent
+executor is editing it; do not modify it, and stop and ask if its `computePromote`
+(`:2174`) call into `applyQuarantine` has changed shape**.
 
 Then measure, and **report before any code is written**:
 
@@ -310,10 +360,16 @@ Then measure, and **report before any code is written**:
 3. **Confirm `reconcile` has no filesystem access today**, so case 14's purity
    assertion is meaningful before the change as well as after.
 4. **Confirm `applyQuarantine`'s callers.** Planning read two: `reconcileState` and
-   `menu-screens.computePromote`. If a third exists, it inherits the membership change
-   and must be named.
+   `menu-screens.computePromote` (`:2175`). If a third exists, it inherits the reused
+   marker through the same `staleOrphanReservedFiles` predicate and must be named.
 5. **Timing.** `reconcileState` before and after — it runs on every menu open. **Above
    roughly 10 milliseconds of added cost, stop and report.**
+6. **Confirm the reused marker routes.** `staleOrphanReservedFiles` (`:888`),
+   `depsSatisfied` (`:868`) and the across-passes release branch
+   (`task-reconcile.js:406`) must all still key on `orphanReason === 'staleness'`. If any
+   of the three has changed its key, **stop and report** — the whole reuse depends on it,
+   and a distinct marker (with a `task-registry.js` edit and a widened `files:`) would be
+   required instead.
 
 Where the code disagrees with this plan, **the code wins and the discrepancy is
 recorded.**
@@ -325,9 +381,13 @@ One step, files as sub-items.
   write; never throws; `readSlots` and the fence untouched.
 - `src/lib/task-reconcile.js` — `reconcileState` reads the signal behind a lazy guard
   and passes it into the pure `reconcile`; the `running`-branch consumption gated on
-  `empty` + not-young + `kind === 'implement'`; `orphanReason: 'no-live-subagent'`;
-  `report.noLiveSubagentOrphaned`; the quarantine and across-passes release membership
-  widened to both reasons. No raw `fs`, no regex literal.
+  `empty` + not-young + `running` (not `cancelling`) + `kind === 'implement'`; the
+  orphaning marks `orphanReason: 'staleness'` (REUSING the existing quarantine / release
+  / sync-barrier machinery) with a DISTINCT `result.summary` naming the empty slot store,
+  and pushes to the new `report.noLiveSubagentOrphaned` (NOT `report.stalenessOrphaned`).
+  No new membership check — `staleOrphanReservedFiles`, `depsSatisfied` and the
+  across-passes release branch already key on `'staleness'`. No raw `fs`, no regex
+  literal.
 - `tests/a-dead-claimant-does-not-hold-its-files.test.js` — the nineteen cases.
 
 ### Step 11: REVIEW
@@ -339,8 +399,10 @@ graph that no load-time cycle exists** between `task-reconcile`, `agent-slots` a
 Confirm `readSlots` still returns `[]` on every fault and that `acquire`, `release`,
 `reap` and `activeCount` are untouched. Confirm no code path can return `'empty'` from
 a failed read. Confirm the grace window, every threshold, the retention sweep and the
-live-edge protection are unchanged. Confirm the quarantine membership is spelled ONCE
-and consulted by both the this-pass reservation and the across-passes release.
+live-edge protection are unchanged. **Confirm `task-registry.js` was NOT edited** — the
+reuse of the `'staleness'` marker is what keeps the reserved-set predicate, the
+sync-barrier rule and the across-passes release spelled ONCE each and consulted by every
+route unchanged.
 
 ### Step 12: OPTIMIZE
 Confirm `liveSlotState` is called **at most once per reconcile pass**, not once per
@@ -366,8 +428,9 @@ signal is `unknown`. Record the before-and-after `reconcileState` timing.
 ### Step 14: VERIFY
 Targeted run first: the new test file, `tests/task-reconcile.test.js`,
 `tests/agent-slots.test.js`, `tests/task-registry.test.js`,
-`tests/task-concurrency-fence.test.js` (or whatever Step 9 finds covering the Task
-hook), `tests/actions-scheduler.test.js`, `tests/scheduler-guarantees-under-mutation.test.js`,
+`tests/pretooluse-task-coverage.test.js` (the Task-hook slot fence — confirm at Step 9
+this is the covering suite), `tests/actions-scheduler.test.js`,
+`tests/scheduler-guarantees-under-mutation.test.js`,
 `tests/e2e-menu-lifecycle.test.js`, `tests/architecture-invariants.test.js`,
 `tests/export-reachability.test.js`, `tests/false-green-fence.test.js`,
 `tests/doc-counts.test.js`, `tests/readme-numbers.test.js`.
@@ -391,12 +454,14 @@ compare-and-swap must not be a second writer); and that `readSlots`'s fail-open 
 is deliberately left alone because the concurrency fence depends on it.
 
 A comment in `task-reconcile.js` at the new branch recording: that this is a SHORTCUT
-on the existing staleness machinery and not a parallel liveness notion; the exact
-inference and its assumption (the seat maintains the store); why `acquire`'s fail-open
-grant is the reason the orphaning is quarantined rather than treated as confirmed
-death; why only `implement` inherits it; and the measurement that motivated it — every
-existing `agentTaskId` is self-referential or null, so the confirmed-dead path could
-never fire.
+on the existing staleness machinery and not a parallel liveness notion; that it REUSES
+the `'staleness'` marker (so no machinery site learns a new enum) while carrying its
+distinct event in `report.noLiveSubagentOrphaned` and a distinct `result.summary`; the
+exact inference and its assumption (the seat maintains the store); why `acquire`'s
+fail-open grant is the reason the orphaning is quarantined rather than treated as
+confirmed death; why only `implement` inherits it; and the measurement that motivated it
+— every existing `agentTaskId` is self-referential or null, so the confirmed-dead path
+could never fire.
 
 ### Step 16: FINAL-REVIEW
 Report, in this order:
@@ -411,8 +476,9 @@ Report, in this order:
 4. The Step 14 by-hand verification, or a plain statement that it could not be
    performed and why.
 5. Both `reconcileState` timings.
-6. The seven things this does NOT fix, the absent live-agent list first.
-7. Every decision taken under ambiguity.
+6. That `task-registry.js` was NOT edited (the marker-reuse invariant).
+7. The eight things this does NOT fix, the absent live-agent list first.
+8. Every decision taken under ambiguity.
 
 ## Ordering and file conflicts
 
@@ -423,13 +489,14 @@ that matters, and because `00166` is what records the identity case 18 exercises
 
 **A concurrent executor is finishing a slice touching `src/lib/project-root.js` and
 `src/lib/menu-screens.js`.** This plan declares NEITHER. It **reads** `menu-screens.js`
-at Step 9 and must not modify it; if its call into the quarantine has changed shape,
-**stop and ask**.
+at Step 9 and must not modify it; if its `computePromote` (`:2174`) call into the
+quarantine has changed shape, **stop and ask**.
 
 `src/lib/agent-slots.js` and `src/lib/task-reconcile.js` are declared by no other plan
-in this set. `00166` modifies `src/hooks/PreToolUse.Task.js`, which calls `agent-slots`
-but is not modified here. Plans build sequentially, so there is no concurrent-edit
-hazard; the executor reads live at Step 9.
+in this set. **`src/lib/task-registry.js` is READ, never written** — the marker reuse is
+what keeps it out of the blast radius. `00166` modifies `src/hooks/PreToolUse.Task.js`,
+which calls `agent-slots` but is not modified here. Plans build sequentially, so there is
+no concurrent-edit hazard; the executor reads live at Step 9.
 
 ## Decisions Taken Under Ambiguity
 
@@ -463,7 +530,7 @@ hazard; the executor reads live at Step 9.
    supports it is how a sound signal becomes a wrong one.
 8. **`reconcile` stays PURE and the signal is passed in as an option.** Letting it read
    a file would break the property that makes re-running it safe on a compare-and-swap
-   retry (`:581-585`) — a subtle, load-bearing invariant that a convenience read would
+   retry (`:583-587`) — a subtle, load-bearing invariant that a convenience read would
    quietly destroy. Case 14 pins it.
 9. **The new event gets its own report array rather than joining `stalenessOrphaned`.**
    Folding a differently-derived orphaning into an existing bucket would make the
@@ -479,4 +546,28 @@ hazard; the executor reads live at Step 9.
     claim whose task is later orphaned stays resident. Bounding that means putting a
     liveness timeout on plan residency, which would make write access expire mid-build —
     a different decision, and the human's to schedule.
-</content>
+13. **REBASE (2026-07-30): the orphaning reuses the `'staleness'` marker, not a distinct
+    `'no-live-subagent'` one.** When this plan was written, the reserved-set membership
+    test lived inline in `applyQuarantine` as `orphanReason === 'staleness'`, so widening
+    it to a two-value check was one local edit — exactly what the plan described. The
+    2026-07-26 "one predicate, every promote route" rework moved that derivation into
+    `task-registry.staleOrphanReservedFiles`, and the SAME marker now also gates the
+    sync-barrier rule (`depsSatisfied`) and the across-passes release branch. A distinct
+    `'no-live-subagent'` marker would therefore force edits to THREE machinery sites
+    across `task-registry.js` and `task-reconcile.js` — spreading a second liveness enum
+    (the precise defect Decision 1 forbids) and requiring `task-registry.js` in `files:`.
+    Marking the orphaning `'staleness'` inherits every one of those behaviours unchanged;
+    the distinct, honest event is carried by `report.noLiveSubagentOrphaned` and a
+    distinct `result.summary`. This keeps the declared `files:` (agent-slots.js,
+    task-reconcile.js, the test) correct and the blast radius to two source files. No
+    acceptance-criteria test asserts the on-disk marker string (case 13 asserts the
+    report array), so intent and every test case are unchanged.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
