@@ -704,6 +704,7 @@ const CHECKS = [
   { id: 'reachability-fence',          scope: 'architecture', mode: 'thorough', fn: checkReachabilityFence },
   { id: 'dead-export-fence',           scope: 'architecture', mode: 'thorough', fn: checkDeadExportFence },
   { id: 'false-green-fence',           scope: 'architecture', mode: 'thorough', fn: checkFalseGreenFence },
+  { id: 'golden-corpus-fence',         scope: 'architecture', mode: 'thorough', fn: checkGoldenCorpusFence },
   { id: 'recipe-execution-fence',      scope: 'architecture', mode: 'thorough', fn: checkRecipeExecutionFence },
   { id: 'gate-words-fence',            scope: 'architecture', mode: 'thorough', fn: checkGateWordsFence },
   { id: 'claim-census',                scope: 'architecture', mode: 'thorough', fn: checkClaimCensus },
@@ -909,6 +910,67 @@ function checkFalseGreenFence(root) {
     severity: 'block',
     message: `${fresh.length} NEW false-green site(s) — a check that can report a verdict on input it never received: ` +
       `${shown.join(' | ')}${fresh.length > 5 ? ` (+${fresh.length - 5} more)` : ''}`
+  });
+}
+
+/**
+ * Golden-corpus fence invariant (plan 00074). The defect class, in the human's words:
+ * "the matrix fix passed its own tests while your screen was still unreadable. It only
+ * broke when rendered against the real question files in your store." A test that
+ * exercises only SYNTHETIC input, for a module whose real job is to read a file the
+ * pipeline actually WROTE. This surfaces the STATIC half — a module that consumes a
+ * persisted contract with no test linked to a real captured sample — mirroring
+ * checkFalseGreenFence exactly. The load-bearing half (driving every real sample through
+ * its canonical reader, and the extremes ratchet) lives in tests/golden-corpus-fence.js
+ * and tests/real-question-file-render.test.js.
+ *
+ * Compares the live scan against `.ctoc/golden-corpus-baseline.json`: `findings` is
+ * pre-existing DEBT which may only SHRINK, `exemptions` is a PERMANENT exemption
+ * requiring a written justification. Anything in neither is a NEW unlinked consumer and
+ * blocks. A malformed baseline excuses NOTHING — an unreadable baseline must never read
+ * as "all clear". Thorough mode only.
+ *
+ * @param {string} root - Project root
+ * @returns {{clean: boolean, severity?: string, message?: string}} { clean: true } when
+ *   clean or when this is not a CTOC source tree.
+ */
+function checkGoldenCorpusFence(root) {
+  const { scanGoldenCorpus } = require('./golden-corpus-scan');
+  const path = require('path');
+  const safeFs = require('./safe-fs');
+
+  const result = scanGoldenCorpus(root);
+  if (result.filesScanned === 0) return CLEAN(); // not a CTOC source tree — nothing to check
+  // No corpus present means this fence cannot assess linkage (which contracts a test
+  // exercises with a real sample) — e.g. a tree copied WITHOUT tests/, or a fresh clone
+  // mid-checkout. The corpus's PRESENCE is itself guarded by tests/golden-corpus-fence.js
+  // (its non-vacuous test asserts samplesExercised > 0), so this can never silence the
+  // gated suite; it only stops the self-check inventing findings on a tree with no corpus.
+  if (result.samplesExercised === 0) return CLEAN();
+
+  const baselineFile = path.join(root, '.ctoc', 'golden-corpus-baseline.json');
+  /** @type {Set<string>} */
+  const excused = new Set();
+  if (safeFs.existsSync(baselineFile)) {
+    try {
+      const parsed = JSON.parse(safeFs.readFileSync(baselineFile, 'utf8'));
+      for (const key of (parsed && parsed.findings) || []) if (typeof key === 'string') excused.add(key);
+      for (const key of Object.keys((parsed && parsed.exemptions) || {})) excused.add(key);
+    } catch {
+      excused.clear(); // malformed baseline excuses NOTHING — an unreadable baseline must never read as "all clear"
+    }
+  }
+
+  const fresh = result.findings.filter((f) => !excused.has(f.key));
+  if (fresh.length === 0) return CLEAN();
+
+  const shown = fresh.slice(0, 5).map((f) => `${f.module} → ${f.contract} [${f.signal}]`);
+  return finding({
+    severity: 'block',
+    message: `${fresh.length} NEW consumer(s) of a persisted contract with no test driving a real ` +
+      `captured sample — a synthetic-only test for a module that reads a file the pipeline wrote: ` +
+      `${shown.join(' | ')}${fresh.length > 5 ? ` (+${fresh.length - 5} more)` : ''}. ` +
+      `Add a test that drives a real sample from tests/fixtures/golden-corpus/, or exempt with a justification.`
   });
 }
 

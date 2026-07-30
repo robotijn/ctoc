@@ -1,0 +1,96 @@
+{
+  "maxFindings": 15,
+  "findings": [
+    "approval-ledger::src/hooks/human-gate-check.js",
+    "approval-ledger::src/lib/approval-residency.js",
+    "approval-ledger::src/lib/gate-migration.js",
+    "approval-ledger::src/scripts/ledger-backfill.js",
+    "plan-frontmatter::src/lib/inbox.js",
+    "plan-frontmatter::src/lib/iron-loop-enforcer.js",
+    "plan-frontmatter::src/lib/plan-coverage.js",
+    "plan-frontmatter::src/lib/stale-detector.js",
+    "plan-frontmatter::src/lib/vision-decomposer.js",
+    "task-registry::src/lib/actions.js",
+    "task-registry::src/lib/menu-screens.js",
+    "task-registry::src/lib/plan-recovery.js",
+    "task-registry::src/lib/state.js",
+    "task-registry::src/lib/task-reconcile.js",
+    "verify-evidence::src/lib/plan-validator.js"
+  ],
+  "exemptions": {},
+  "extremes": {
+    "streaming-questions": {
+      "totalBytes": 25923,
+      "maxFieldLen": 1136,
+      "maxDepth": 5,
+      "maxArrayLen": 10
+    },
+    "verify-evidence": {
+      "totalBytes": 67831,
+      "maxFieldLen": 63247,
+      "maxDepth": 3,
+      "maxArrayLen": 0
+    },
+    "approval-ledger": {
+      "totalBytes": 750,
+      "maxFieldLen": 395,
+      "maxDepth": 1,
+      "maxArrayLen": 0
+    },
+    "task-registry": {
+      "totalBytes": 18555,
+      "maxFieldLen": 218,
+      "maxDepth": 4,
+      "maxArrayLen": 23
+    },
+    "plan-frontmatter": {
+      "totalBytes": 26584,
+      "maxFieldLen": 595,
+      "maxDepth": 0,
+      "maxArrayLen": 0
+    }
+  },
+  "floors": {
+    "streaming-questions": {
+      "status": "met",
+      "totalBytes": 25923,
+      "maxFieldLen": 1136,
+      "maxDepth": 5,
+      "maxArrayLen": 10
+    },
+    "verify-evidence": {
+      "status": "met",
+      "totalBytes": 67831,
+      "maxFieldLen": 63247,
+      "maxDepth": 3,
+      "maxArrayLen": 0
+    },
+    "approval-ledger": {
+      "status": "met",
+      "totalBytes": 750,
+      "maxFieldLen": 395,
+      "maxDepth": 1,
+      "maxArrayLen": 0
+    },
+    "task-registry": {
+      "status": "met",
+      "totalBytes": 18555,
+      "maxFieldLen": 218,
+      "maxDepth": 4,
+      "maxArrayLen": 23
+    },
+    "plan-frontmatter": {
+      "status": "met",
+      "totalBytes": 167197,
+      "maxFieldLen": 2252,
+      "maxDepth": 0,
+      "maxArrayLen": 0
+    }
+  },
+  "coverageGaps": [
+    {
+      "contract": "plan-frontmatter",
+      "reason": "the global production extreme for this contract lives in a file outside the fixed declared fixture set (e.g. a longer plan body line in plans/done/); corpus captures the extreme of the declared samples, and the larger production instance is recorded here rather than pretended into coverage"
+    }
+  ]
+}

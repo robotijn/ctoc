@@ -1,0 +1,598 @@
+{
+  "version": 1,
+  "generation": 70,
+  "seq": 65,
+  "tasks": [
+    {
+      "id": "t43",
+      "kind": "precompute",
+      "label": "",
+      "plan": "review/00003-r2a-scheduler-lifecycle-honesty.md",
+      "status": "queued",
+      "agentTaskId": null,
+      "touches": [
+        ".ctoc/streaming/questions/review/00003-r2a-scheduler-lifecycle-honesty.md"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": null,
+      "ts": {
+        "created": "2026-07-18T08:53:41.013Z",
+        "started": null,
+        "cancelRequested": null,
+        "done": null
+      }
+    },
+    {
+      "id": "t44",
+      "kind": "precompute",
+      "label": "",
+      "plan": "review/00004-r2b-actions-drain-and-shipgate.md",
+      "status": "queued",
+      "agentTaskId": null,
+      "touches": [
+        ".ctoc/streaming/questions/review/00004-r2b-actions-drain-and-shipgate.md"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": null,
+      "ts": {
+        "created": "2026-07-18T08:53:41.047Z",
+        "started": null,
+        "cancelRequested": null,
+        "done": null
+      }
+    },
+    {
+      "id": "t45",
+      "kind": "precompute",
+      "label": "",
+      "plan": "review/00005-r2c-menu-doors-and-persisted-answers.md",
+      "status": "queued",
+      "agentTaskId": null,
+      "touches": [
+        ".ctoc/streaming/questions/review__00005-r2c.json"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": null,
+      "ts": {
+        "created": "2026-07-18T09:19:08.409Z",
+        "started": null,
+        "cancelRequested": null,
+        "done": null
+      }
+    },
+    {
+      "id": "t46",
+      "kind": "implement",
+      "label": "00021-r5c-delete-dead-functional-tab",
+      "plan": "00021-r5c-delete-dead-functional-tab",
+      "status": "done",
+      "agentTaskId": null,
+      "touches": [
+        "src/tabs/functional.js",
+        "tests/tab-modules.test.js",
+        "plans/todo/00021-r5c-delete-dead-functional-tab.md"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "plan reached review"
+      },
+      "ts": {
+        "created": "2026-07-18T11:11:04.404Z",
+        "started": "2026-07-18T11:11:04.404Z",
+        "cancelRequested": null,
+        "done": "2026-07-18T11:14:18.861Z"
+      }
+    },
+    {
+      "id": "t47",
+      "kind": "implement",
+      "label": "00066-x9-gate-critic-writes-its-own-questions",
+      "plan": "00066-x9-gate-critic-writes-its-own-questions",
+      "status": "done",
+      "agentTaskId": null,
+      "touches": [
+        "src/lib/streaming-questions-sweeper.js",
+        "src/lib/streaming-precompute.js",
+        "src/lib/streaming-gate.js",
+        "tests/streaming-questions-sweeper.test.js",
+        "tests/cache-freshness.test.js",
+        "agents/iron-loop/gate-critic.md",
+        "src/commands/menu.md",
+        "plans/todo/00066-x9-gate-critic-writes-its-own-questions.md"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "plan reached review"
+      },
+      "ts": {
+        "created": "2026-07-18T11:11:19.539Z",
+        "started": "2026-07-18T11:11:19.540Z",
+        "cancelRequested": null,
+        "done": "2026-07-18T11:26:01.452Z"
+      }
+    },
+    {
+      "id": "t48",
+      "kind": "implement",
+      "label": "00067-y1-ctoc-start-entry-point",
+      "plan": "00067-y1-ctoc-start-entry-point",
+      "status": "queued",
+      "agentTaskId": null,
+      "touches": [
+        "src/commands/start.md",
+        "src/commands/menu.md",
+        "src/commands/menu.js",
+        "src/lib/start-screen.js",
+        "src/lib/decision-matrix.js",
+        "src/lib/streaming-gate.js",
+        "src/hooks/SessionStart.js",
+        "src/hooks/PreToolUse.Edit.js",
+        "src/hooks/PreToolUse.Bash.js",
+        ".ctoc/templates/operating-lessons.md",
+        "README.md",
+        "CLAUDE.md",
+        "docs/AGENT_ARCHITECTURE.md",
+        "tests/start-screen.test.js",
+        "tests/decision-matrix.test.js",
+        "tests/ctoc-start-flow.test.js",
+        "tests/streaming-gate.test.js",
+        "tests/readme-numbers.test.js",
+        "tests/slash-command-no-model-pin.test.js",
+        "tests/e2e-menu-lifecycle.test.js",
+        "plans/todo/00067-y1-ctoc-start-entry-point.md"
+      ],
+      "gitOp": false,
+      "blockedBy": [
+        "t47"
+      ],
+      "result": null,
+      "ts": {
+        "created": "2026-07-18T11:11:19.590Z",
+        "started": null,
+        "cancelRequested": null,
+        "done": null
+      }
+    },
+    {
+      "id": "t49",
+      "kind": "implement",
+      "label": "00068-z1-gate-sweep-reports-before-it-reverts",
+      "plan": "00068-z1-gate-sweep-reports-before-it-reverts",
+      "status": "done",
+      "agentTaskId": null,
+      "touches": [
+        "src/lib/gate-migration.js",
+        "src/hooks/human-gate-check.js",
+        "src/scripts/ledger-backfill.js",
+        "src/lib/menu-screens.js",
+        "plans/review/00008-r2f-gate-hook-revival.md",
+        "tests/gate-migration.test.js",
+        "tests/gate-hook-revival.test.js",
+        "tests/human-gate-check-coverage.test.js",
+        "plans/todo/00068-z1-gate-sweep-reports-before-it-reverts.md"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "plan reached review"
+      },
+      "ts": {
+        "created": "2026-07-18T11:12:18.217Z",
+        "started": "2026-07-18T11:12:18.219Z",
+        "cancelRequested": null,
+        "done": "2026-07-18T11:28:41.527Z"
+      }
+    },
+    {
+      "id": "t50",
+      "kind": "implement",
+      "label": "00071-fg1-false-green-fence",
+      "plan": "00071-fg1-false-green-fence",
+      "status": "done",
+      "agentTaskId": null,
+      "touches": [
+        "src/lib/false-green-scan.js",
+        "src/lib/iron-loop-enforcer.js",
+        "tests/false-green-fence.test.js",
+        ".ctoc/false-green-baseline.json",
+        "CLAUDE.md",
+        "plans/todo/00071-fg1-false-green-fence.md"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "plan reached review"
+      },
+      "ts": {
+        "created": "2026-07-18T13:23:02.241Z",
+        "started": "2026-07-18T13:23:02.242Z",
+        "cancelRequested": null,
+        "done": "2026-07-18T13:39:18.242Z"
+      }
+    },
+    {
+      "id": "t51",
+      "kind": "implement",
+      "label": "quarantine guard fails safe",
+      "plan": "00076-quarantine-fault-fails-safe.md",
+      "status": "done",
+      "agentTaskId": "t51",
+      "touches": [
+        "src/lib/task-reconcile.js",
+        "tests/task-reconcile-quarantine-fault.test.js"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "The concurrent-edit guard fails safe: a fault is recorded on the report and the unchecked candidates are dropped instead of promoted"
+      },
+      "ts": {
+        "created": "2026-07-18T20:52:52.500Z",
+        "started": "2026-07-18T20:52:54.744Z",
+        "cancelRequested": null,
+        "done": "2026-07-18T20:54:32.044Z"
+      }
+    },
+    {
+      "id": "t52",
+      "kind": "implement",
+      "label": "",
+      "plan": "00075-wedge-reports-get-a-reader",
+      "status": "done",
+      "agentTaskId": "t52",
+      "touches": [
+        "src/lib/menu-screens.js",
+        "tests/dashboard-wedge-reports.test.js",
+        "tests/dashboard-wedge-fault.test.js",
+        "CLAUDE.md"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "The dashboard reads all five reconcile wedge reports — a permanent dependency cycle is now visually distinct from a one-off failure, and a safety check that did not run says so"
+      },
+      "ts": {
+        "created": "2026-07-18T21:19:25.868Z",
+        "started": "2026-07-18T21:19:27.903Z",
+        "cancelRequested": null,
+        "done": "2026-07-18T21:19:31.304Z"
+      }
+    },
+    {
+      "id": "t53",
+      "kind": "implement",
+      "label": "Answers bind to the plan revision they were given for",
+      "plan": "00079-answers-bind-to-plan-revision",
+      "status": "done",
+      "agentTaskId": "t53",
+      "touches": [
+        "src/lib/streaming-precompute.js",
+        "src/lib/streaming-gate.js",
+        "tests/answers-bind-to-plan-revision.test.js"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "Answers now bind to the plan revision they were given for; the duplicate reader is deleted and both callers share one revision-aware, fail-closed encoding."
+      },
+      "ts": {
+        "created": "2026-07-19T07:51:44.002Z",
+        "started": "2026-07-19T07:51:46.065Z",
+        "cancelRequested": null,
+        "done": "2026-07-19T07:52:01.470Z"
+      }
+    },
+    {
+      "id": "t54",
+      "kind": "implement",
+      "label": "dashboard says so when the reconcile pass failed",
+      "plan": "00080-dashboard-says-when-reconcile-failed",
+      "status": "done",
+      "agentTaskId": "t54",
+      "touches": [
+        "src/lib/menu-screens.js",
+        "src/commands/menu.md",
+        "tests/dashboard-reconcile-failure.test.js",
+        "CLAUDE.md",
+        ".ctoc/false-green-baseline.json"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "The dashboard now refuses to present stale task state as live: a thrown, unreadable or unpersisted reconcile pass renders its own line above every finding."
+      },
+      "ts": {
+        "created": "2026-07-19T08:05:33.365Z",
+        "started": "2026-07-19T08:05:35.347Z",
+        "cancelRequested": null,
+        "done": "2026-07-19T08:05:39.348Z"
+      }
+    },
+    {
+      "id": "t55",
+      "kind": "implement",
+      "label": "last mile drives the real entry point",
+      "plan": "00083-last-mile-drives-the-real-entry-point",
+      "status": "done",
+      "agentTaskId": "t55",
+      "touches": [
+        "src/lib/app-runner.js",
+        "tests/last-mile-drives-entry-point.test.js"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "The last-mile check drives a DECLARED entry point; a declared entry point that fails, is silent, or hangs now FAILS verification instead of reporting applicable:false"
+      },
+      "ts": {
+        "created": "2026-07-19T08:21:20.866Z",
+        "started": "2026-07-19T08:21:23.089Z",
+        "cancelRequested": null,
+        "done": "2026-07-19T08:21:29.994Z"
+      }
+    },
+    {
+      "id": "t56",
+      "kind": "implement",
+      "label": "",
+      "plan": "00095-a-skipped-test-is-counted-as-a-skipped-test",
+      "status": "done",
+      "agentTaskId": "t56",
+      "touches": [
+        "tests/stack-detector.test.js",
+        "tests/update.test.js",
+        "tests/version.test.js",
+        "tests/quality-state-coverage.test.js",
+        "tests/skip-visibility.test.js",
+        "CLAUDE.md"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "Zero-skip gate made true: 9 invisible skips removed across 4 test files, plus a 3-carrier corpus fence"
+      },
+      "ts": {
+        "created": "2026-07-19T15:45:21.901Z",
+        "started": "2026-07-19T15:45:24.055Z",
+        "cancelRequested": null,
+        "done": "2026-07-19T15:47:19.817Z"
+      }
+    },
+    {
+      "id": "t57",
+      "kind": "implement",
+      "label": "scheduler guarantees under mutation",
+      "plan": "00096-two-scheduler-guarantees-that-no-test-defends",
+      "status": "done",
+      "agentTaskId": "t57",
+      "touches": [
+        "tests/scheduler-guarantees-under-mutation.test.js",
+        "CLAUDE.md"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "Two undefended scheduler guarantees now have mutation-verified tests; a third gap (git-exclusive on the promotion path) found and reported"
+      },
+      "ts": {
+        "created": "2026-07-19T16:40:23.494Z",
+        "started": "2026-07-19T16:40:25.832Z",
+        "cancelRequested": null,
+        "done": "2026-07-19T16:41:15.846Z"
+      }
+    },
+    {
+      "id": "t58",
+      "kind": "implement",
+      "label": "the plan checker stops reading a quoted word as a declaration",
+      "plan": "00100-the-plan-checker-reads-a-quoted-word-as-a-declaration",
+      "status": "done",
+      "agentTaskId": "t58",
+      "touches": [
+        "src/lib/plan-validator.js",
+        "tests/escalation-word-boundary.test.js"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "A status word inside code or quotes is a mention, not a declaration: masking added ahead of the boundary rules"
+      },
+      "ts": {
+        "created": "2026-07-19T18:47:17.098Z",
+        "started": "2026-07-19T18:47:19.035Z",
+        "cancelRequested": null,
+        "done": "2026-07-19T18:47:22.212Z"
+      }
+    },
+    {
+      "id": "t59",
+      "kind": "implement",
+      "label": "",
+      "plan": "00101-a-checker-whose-clean-answer-is-falsy",
+      "status": "done",
+      "agentTaskId": "t59",
+      "touches": [
+        "src/lib/iron-loop-enforcer.js",
+        "tests/iron-loop-enforcer.test.js",
+        "tests/ship-gate-real.test.js",
+        "tests/approveplan-validates.test.js"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "Every check in iron-loop-enforcer now reports a readable verdict; a clean answer can no longer crash its caller, and a check that answers nothing is an ERROR, not a pass"
+      },
+      "ts": {
+        "created": "2026-07-19T20:37:10.787Z",
+        "started": "2026-07-19T20:37:12.894Z",
+        "cancelRequested": null,
+        "done": "2026-07-19T20:37:22.166Z"
+      }
+    },
+    {
+      "id": "t60",
+      "kind": "implement",
+      "label": "",
+      "plan": "--plan",
+      "status": "cancelled",
+      "agentTaskId": null,
+      "touches": [
+        "tests/scheduler-guarantees-under-mutation.test.js"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": null,
+      "ts": {
+        "created": "2026-07-19T20:48:29.125Z",
+        "started": null,
+        "cancelRequested": null,
+        "done": "2026-07-19T20:48:45.702Z"
+      }
+    },
+    {
+      "id": "t61",
+      "kind": "implement",
+      "label": "",
+      "plan": "00102-git-exclusivity-is-undefended-where-work-actually-starts",
+      "status": "done",
+      "agentTaskId": "t61",
+      "touches": [
+        "tests/scheduler-guarantees-under-mutation.test.js"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "Group C: six mutation-proven defenders for git-exclusivity on the promotion path; hunt found a fourth asymmetry (Rule 2) reported not fixed"
+      },
+      "ts": {
+        "created": "2026-07-19T20:48:45.737Z",
+        "started": "2026-07-19T20:48:47.723Z",
+        "cancelRequested": null,
+        "done": "2026-07-19T20:48:51.032Z"
+      }
+    },
+    {
+      "id": "t62",
+      "kind": "implement",
+      "label": "",
+      "plan": "00103-the-last-mile-check-keeps-opting-itself-out",
+      "status": "done",
+      "agentTaskId": "t62",
+      "touches": [
+        "src/lib/app-runner.js",
+        "tests/last-mile-drives-entry-point.test.js",
+        ".ctoc/false-green-baseline.json"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "The --drive child no longer discards the verdict it just printed: requestExit replaces process.exit at both exits, plus a 12-case pin on the one-ladder opt-out and the pipe delivery. false-green maxFindings 213 -> 211."
+      },
+      "ts": {
+        "created": "2026-07-19T20:58:08.079Z",
+        "started": "2026-07-19T20:58:10.365Z",
+        "cancelRequested": null,
+        "done": "2026-07-19T20:58:14.276Z"
+      }
+    },
+    {
+      "id": "t63",
+      "kind": "implement",
+      "label": "",
+      "plan": "00128-a-link-inside-the-repository-reaches-outside-it-and-the-check-is-pure-arithmetic",
+      "status": "done",
+      "agentTaskId": "t63",
+      "touches": [
+        "src/lib/real-path-confinement.js",
+        "tests/a-link-cannot-leave-the-repository.test.js",
+        "src/lib/plan-coverage.js",
+        "src/hooks/PreToolUse.Edit.js"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "Real-path confinement: a symbolic link inside the repository can no longer reach outside it, nor into the approval ledger"
+      },
+      "ts": {
+        "created": "2026-07-19T21:44:58.345Z",
+        "started": "2026-07-19T21:45:00.159Z",
+        "cancelRequested": null,
+        "done": "2026-07-19T21:45:20.488Z"
+      }
+    },
+    {
+      "id": "t64",
+      "kind": "implement",
+      "label": "",
+      "plan": "00140-a-link-that-points-at-nothing-yet-is-reported-as-a-path-inside-the-tree",
+      "status": "done",
+      "agentTaskId": "t64",
+      "touches": [
+        "src/lib/real-path-confinement.js",
+        "tests/a-dangling-link-is-not-a-path-inside-the-tree.test.js",
+        "CLAUDE.md"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "Dangling-link hole in real-path resolution closed: a link pointing at a not-yet-existing file no longer reports as inside the tree"
+      },
+      "ts": {
+        "created": "2026-07-20T08:51:16.469Z",
+        "started": "2026-07-20T08:51:18.813Z",
+        "cancelRequested": null,
+        "done": "2026-07-20T08:51:25.589Z"
+      }
+    },
+    {
+      "id": "t65",
+      "kind": "implement",
+      "label": "",
+      "plan": "00156-the-menu-never-claims-it-set-up-a-project-it-did-not",
+      "status": "done",
+      "agentTaskId": "t65",
+      "touches": [
+        "src/commands/menu.js",
+        "tests/menu-reports-what-init-did.test.js",
+        "tests/menu-auto-init.test.js",
+        "tests/menu-coverage.test.js",
+        "tests/fresh-repository-is-its-own-project.test.js",
+        "CLAUDE.md"
+      ],
+      "gitOp": false,
+      "blockedBy": [],
+      "result": {
+        "ok": true,
+        "summary": "The menu's setup claim is now a read-back through the readers of record; it never announces initialization it did not perform"
+      },
+      "ts": {
+        "created": "2026-07-20T10:52:50.390Z",
+        "started": "2026-07-20T10:52:53.044Z",
+        "cancelRequested": null,
+        "done": "2026-07-20T10:52:56.243Z"
+      }
+    }
+  ]
+}

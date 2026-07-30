@@ -1,0 +1,68 @@
+# GOLDEN CORPUS MANIFEST — machine-readable inventory of captured real-world samples.
+#
+# Every sample is REAL production data captured BYTE-FOR-BYTE. Nothing is hand-written,
+# reformatted, redacted or shortened: a sanitised sample rebuilds the exact defect the
+# corpus exists to prevent (LENGTH is what broke the renderer). The extremes below are
+# MEASURED by src/lib/golden-corpus-scan.js, never typed by hand, and may only ever GROW
+# (the ratchet lives in tests/golden-corpus-fence.test.js). Shape follows
+# tests/fixtures/compliance/fixture-manifest.yaml.
+captured_at: 2026-07-30
+contracts:
+  streaming-questions:
+    location: ".ctoc/streaming/questions/*.json"
+    canonical_reader: streaming-precompute.loadPlanQuestions
+    samples:
+      - file: review__00003-r2a-scheduler-lifecycle-honesty.md.json
+        captured_from: ".ctoc/streaming/questions/review__00003-r2a-scheduler-lifecycle-honesty.md.json (the worked example: longest field 1136 chars; this is the file whose real shape broke the renderer)"
+      - file: review__00004-r2b-actions-drain-and-shipgate.md.json
+        captured_from: ".ctoc/streaming/questions/review__00004-r2b-actions-drain-and-shipgate.md.json (a second real instance, guards against fitting the fence to one file)"
+    extremes:   { totalBytes: 25923, maxFieldLen: 1136, maxDepth: 5, maxArrayLen: 10 }
+    production_floor: { status: met, totalBytes: 25923, maxFieldLen: 1136, maxDepth: 5, maxArrayLen: 10 }
+  verify-evidence:
+    location: ".ctoc/state/verify/*.json"
+    canonical_reader: step-13-verify.readVerifyEvidence
+    samples:
+      - file: ctoc-audit-w05-s1-verify-evidence.json
+        captured_from: "SUBSTITUTED from .ctoc/state/verify/ctoc-audit-w01-s3-multiedit-notebookedit-parity.json — the real byte-size extreme (67831 bytes); the plan-named file did not exist on disk (Step 9 substitution)"
+      - file: menu-critique-first.json
+        captured_from: "SUBSTITUTED from .ctoc/state/verify/ctoc-audit-w01-enforcement-blocks.json — the real longest-field extreme (a 63247-char embedded run in one field); the plan-named file did not exist on disk (Step 9 substitution)"
+    extremes:   { totalBytes: 67831, maxFieldLen: 63247, maxDepth: 3, maxArrayLen: 0 }
+    production_floor: { status: met, totalBytes: 67831, maxFieldLen: 63247, maxDepth: 3, maxArrayLen: 0 }
+  approval-ledger:
+    location: ".ctoc/approvals/*.json"
+    canonical_reader: approval-ledger.readEntry
+    samples:
+      - file: ctoc-audit-w02-s1-approval-ledger.json
+        captured_from: ".ctoc/approvals/00010-r2c2-persisted-answers-unblocked.json — a second real approved_by: human entry"
+      - file: ctoc-audit-w05-s1-verify-evidence.json
+        captured_from: "SUBSTITUTED from .ctoc/approvals/00005-r2c-menu-doors-and-persisted-answers.json — the real approval extreme (395-char backfill_reason, 750 bytes); approved_by: human"
+    extremes:   { totalBytes: 750, maxFieldLen: 395, maxDepth: 1, maxArrayLen: 0 }
+    production_floor: { status: met, totalBytes: 750, maxFieldLen: 395, maxDepth: 1, maxArrayLen: 0 }
+  task-registry:
+    location: ".ctoc/state/tasks.json"
+    canonical_reader: task-registry.load
+    samples:
+      - file: tasks.json
+        captured_from: ".ctoc/state/tasks.json (the only production instance; nested touches[]/result{}/ts{} sequences)"
+    extremes:   { totalBytes: 18555, maxFieldLen: 218, maxDepth: 4, maxArrayLen: 23 }
+    production_floor: { status: met, totalBytes: 18555, maxFieldLen: 218, maxDepth: 4, maxArrayLen: 23 }
+  plan-frontmatter:
+    location: "plans/**/*.md"
+    canonical_reader: state.parseMetadata
+    samples:
+      - file: implementation__00073-ui1-unexecutable-instruction-fence.md
+        captured_from: "plans/implementation/00073-ui1-unexecutable-instruction-fence.md (long title, multi-entry files: list)"
+      - file: review__00003-r2a-scheduler-lifecycle-honesty.md
+        captured_from: "plans/review/00003-r2a-scheduler-lifecycle-honesty.md (a real gate-stage plan)"
+    extremes:   { totalBytes: 26584, maxFieldLen: 595, maxDepth: 0, maxArrayLen: 0 }
+    production_floor: { status: met, totalBytes: 167197, maxFieldLen: 2252, maxDepth: 0, maxArrayLen: 0 }
+uncaptured_variants:
+  - contract: approval-ledger
+    variant: sufficiency-crossing (advanced_by: sufficiency)
+    reason: "No advanced_by entry has ever been written to .ctoc/approvals/ — there is no real instance to capture. Inventing one would be this exact defect class committed by the fence built to catch it. This gap IS the capture instruction for the first real sufficiency crossing."
+  - contract: plan-frontmatter
+    variant: stacked leading frontmatter blocks
+    reason: "The review-stage stacked approval-marker blocks were already collapsed by src/scripts/collapse-stacked-frontmatter.js, so neither declared plan fixture exhibits stacked blocks today. parseMetadata survives both captured samples; the case is noted here rather than faked."
+coverage_gaps:
+  - contract: plan-frontmatter
+    reason: "The declared plan-frontmatter fixtures are the samples the plan pinned; the GLOBAL production extreme (longest line across all plans/**, ~2252 chars, in plans/done/) lives outside the fixed declared fixture set. Recorded here rather than pretended into coverage; re-capture a longer plan when the fixture set can grow."
