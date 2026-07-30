@@ -1,0 +1,9 @@
+{
+  "content_sha256": "cf72a0bc53821ce3cc1801ea049565d078b70c76c811e89900ff925361231695",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T19:04:14.644Z",
+  "approved_by": "human",
+  "plan_basename": "00206-the-shell-gate-stops-allowing-a-command-it-could-not-read"
+}

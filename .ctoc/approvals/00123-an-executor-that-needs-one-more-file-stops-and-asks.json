@@ -1,0 +1,9 @@
+{
+  "content_sha256": "3bc759447fd8bcea730137e662fce7c0d407db6d83f0b0f7bfcc296f8984ac3b",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T19:04:14.803Z",
+  "approved_by": "human",
+  "plan_basename": "00123-an-executor-that-needs-one-more-file-stops-and-asks"
+}

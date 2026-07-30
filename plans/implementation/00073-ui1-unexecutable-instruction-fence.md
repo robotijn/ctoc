@@ -63,6 +63,38 @@ The earlier build conflict with the false-green fence over `src/lib/iron-loop-en
 has **cleared**: that fence has landed (`.ctoc/false-green-baseline.json` is live and
 `CLAUDE.md` documents it). It is no longer a reason to serialize anything.
 
+## Refresh note — rebased against the tree on 2026-07-30
+
+Two facts changed since this plan was last verified, and both are folded into the body
+below. Nothing about this plan's **intent** changed — it still adds detections (a) and (c)
+to the scanner the five-agents plan ships.
+
+1. **`src/commands/menu.md` was renamed to `src/commands/start.md`** (and `menu.js` to
+   `start.js`). Detection (a)'s live target survived the rename intact: the displaced
+   recipe ``Record a task per ref (`menu task add`, kind `precompute` …)`` now sits at
+   `src/commands/start.md:234`, and the inline metavariable `menu task add K` at
+   `start.md:114`. Every stale `menu.md` / `menu.js` reference in this plan is corrected.
+
+2. **Plan 00069 has SHIPPED, and it wired `enforcement.mode`.** `src/lib/enforcement-mode.js`
+   now reads the yaml-surface `enforcement.mode` key directly (`readYamlEnforcementMode`,
+   line 75, off `.ctoc/settings.yaml`) and is threaded into `PreToolUse.Edit.js` step 5.
+   `src/hooks/PreToolUse.Task.js:26-28` now states the inverse of what this plan once quoted:
+   the sibling editing hooks *"NOW honor `enforcement.mode` from `.ctoc/settings.yaml` (via
+   `src/lib/enforcement-mode.js`)"*. So detection (c)'s **headline live instance is now
+   fixed** — `enforcement.mode` is read. This is exactly what decision 6 predicted.
+   `enforcement.mode` therefore moves from a seeded debt finding to a reader-detection
+   **control** (alongside `regulatory_regime.active_profiles`), and detection (c)'s live
+   instance is now the `quality.*` / `research.*` / `detected.*` keys `generateSettings()`
+   writes that nothing in `src/` reads (verified 2026-07-30: `coverage_threshold`,
+   `flaky_test_retries`, `flaky_test_action`, `auto_steps` occur only in the writer
+   `src/lib/init-project.js`).
+
+**Dependency status, stated plainly:** the five-agents plan
+(`00110-agents-told-to-run-code-they-cannot-run`) this plan `depends_on` is **still at
+Gate 2, unbuilt**, as of this refresh. That is the correct, designed state for a dependency
+pair — 00110 builds first, then this plan. This plan's Step 9 STOP-guard already enforces
+it. No human decision is required; the pipeline builds them in dependency order.
+
 ## Problem — a defect class that fails in total silence
 
 In plain words: **something is documented, registered, or instructed, and nothing on
@@ -76,17 +108,26 @@ is an instrument reporting a verdict on input it never received. This class is a
 instruction with no receiver at all. They need different detectors, which is why this
 is its own plan and not a section of that one.
 
-### The confirmed instances in this plan's remaining scope (verified against disk, 2026-07-18)
+### The confirmed instances in this plan's remaining scope (verified against disk, 2026-07-30)
 
 | # | Site | What is instructed | What is on the other end | State |
 |---|---|---|---|---|
-| 1 | `src/commands/menu.md:232` documented the recipe "Record a task per ref (`menu task add`, kind `precompute`…)" | a task of kind `precompute` | `KINDS` in `src/lib/task-registry.js` did not contain `precompute`; `addTask` threw on every call | **FIXED** — `precompute` now sits in `KINDS` at `task-registry.js:136-139` with the post-mortem in its docblock |
-| 3 | `src/lib/init-project.js:509-510` writes `enforcement:\n  mode: strict` into every new project's `settings.yaml`, and `CLAUDE.md` documents it as live per-project tuning | an enforcement-strictness setting | nothing in `src/` reads it. `src/hooks/PreToolUse.Task.js:27` says so outright: *"`enforcement.mode` from `.ctoc/settings.yaml` today — no hook does"*. The similarly-named `workflow.enforcementMode` at `src/lib/settings.js:59` is a **different key on a different surface** (`settings.json`) | **STILL LIVE** (plan 00069 wires it; the fence must catch the general case regardless) |
+| 1 | `src/commands/start.md:234` documents the recipe "Record a task per ref (`menu task add`, kind `precompute`…)" | a task of kind `precompute` | `KINDS` in `src/lib/task-registry.js` did not contain `precompute`; `addTask` threw on every call | **FIXED** — `precompute` now sits in `KINDS` at `task-registry.js:149-152` with the post-mortem in its docblock |
+| 3 | `src/lib/init-project.js:504-542` (`generateSettings()`) writes `quality.coverage_threshold`, `quality.flaky_test_retries`, `quality.flaky_test_action`, `research.enabled`, `research.auto_steps`, `detected.languages`, `detected.frameworks` into every new project's `settings.yaml`, and `CLAUDE.md` documents them as project tuning | project-tuning settings | nothing in `src/` reads any of them (verified 2026-07-30: `coverage_threshold`, `flaky_test_retries`, `flaky_test_action`, `auto_steps` occur only in the writer `init-project.js`) — a visible setting wired to nothing | **STILL LIVE** — these are detection (c)'s real live findings |
+
+**`enforcement.mode` was this instance's original headline example and it is now FIXED, not
+by this plan.** Plan 00069 landed `src/lib/enforcement-mode.js`, which reads the yaml
+`enforcement.mode` key on its own surface. So `enforcement.mode` is no longer a finding; it
+is the detector's live reader-side **control** — the key that must come back CLEAN, proving
+the reader-detection is not stuck returning "unread". The similarly-named
+`workflow.enforcementMode` at `src/lib/settings.js` is a **different key on a different
+surface** (`settings.json`), which is exactly why the scanner keys every finding by
+`<surface>::<dotted.path>` (see detection (c)).
 
 Instance 1's blast radius is the argument for urgency: every `menu task add precompute`
 call threw, so the record-first step failed, so **no critic was ever dispatched, no
 questions file was ever written**, and the streaming screen silently fell back to a
-bare prompt for all 64 pending plans. Nothing was red. Nobody was told.
+bare prompt for all pending plans. Nothing was red. Nobody was told.
 
 **Instance 2 — agents instructed to call JavaScript functions they cannot execute — has
 MOVED to the five-agents plan** and is not this plan's work. It is deliberately left out of
@@ -126,18 +167,19 @@ Two genuinely different mechanics, added to the one scanner.
 **Instruction side.** Parse `src/commands/*.md` for references to the task-add verb.
 Two textual shapes both occur in the live file and both must be extracted:
 
-1. inline — `menu task add <kind>` (the shape at `menu.md:112` uses the metavariable
+1. inline — `menu task add <kind>` (the shape at `start.md:114` uses the metavariable
    `K`, which is skipped as a placeholder, not read as a kind);
 2. **displaced** — a `menu task add` mention followed within 200 characters by a
    `` kind `<token>` `` phrase. This is the shape of the *actual instance*:
-   `menu.md:232` reads ``Record a task per ref (`menu task add`, kind `precompute` …)``.
+   `start.md:234` reads ``Record a task per ref (`menu task add`, kind `precompute` …)``.
    A naive `menu task add (\w+)` regex would **not** have caught the real bug. This is
    the single most important design detail in detection (a).
 
 **Accepted side.** `require('./task-registry').KINDS`.
 
-**Both directions**, following the bidirectional pattern already proven at
-`tests/menu-task-wiring.test.js:636-664`:
+**Both directions**, following the bidirectional pattern already proven in
+`tests/menu-task-wiring.test.js` (the reverse-parity case that fences a recipe the docs
+document for a key nothing emits, currently near line 678):
 
 - *forward* (**hard**) — a kind the docs instruct that `KINDS` rejects. This is
   instance 1 and it is a hard failure: any new one blocks.
@@ -159,40 +201,45 @@ different readers and conflating them produces false results in both directions.
 
 | File | Read by | Owns |
 |---|---|---|
-| `.ctoc/settings.yaml` | the PreToolUse hooks and library code (`src/hooks/*`, `src/lib/budget.js`, `src/lib/regulatory-regime.js`) | `enforcement.mode`, `regulatory_regime`, `operations` |
+| `.ctoc/settings.yaml` | the PreToolUse hooks and library code (`src/hooks/*`, `src/lib/enforcement-mode.js`, `src/lib/regulatory-regime.js`) | `enforcement.mode`, `regulatory_regime`, `operations` |
 | `.ctoc/settings.json` | `src/lib/settings.js` and `src/lib/deployment.js` | `general.environment`, `agents`, `workflow`, `learning`, `git`, `privacy`, `deployment` |
 
 `enforcement.mode` (yaml) and `workflow.enforcementMode` (json) are **different keys on
-different surfaces**. A name-only matcher would see "enforcement" in `settings.js:59`
-and wrongly certify the yaml key as read. The scanner therefore keys every finding by
+different surfaces**. A name-only matcher would see "enforcement" in `settings.js` and
+wrongly certify the yaml key as read. The scanner therefore keys every finding by
 `<surface>::<dotted.path>` and only credits a reader that reads the **same** surface.
 
 **Written side.** The keys emitted by `generateSettings()` in `src/lib/init-project.js`
-(the yaml surface) and the schema defaults in `src/lib/settings.js` (the json surface).
+(the yaml surface, `:504-542`) and the schema defaults in `src/lib/settings.js` (the json
+surface).
 
 **Read side.** A key counts as read when its leaf name, or its dotted path, appears in
 `src/**` **outside** the writer that emits it and outside a comment. Deliberately
 generous: this detector must **under**-report, exactly like the export fence. The bias is
-stated in the header comment governing the export-level analysis at
-`src/lib/reachability.js:333-335`. A fence that cries wolf gets whitelisted into
-uselessness.
+stated in the header comment governing the export-level analysis inside `exportedNames` in
+`src/lib/reachability.js` (declared at line 731; see the under-report note near line 807).
+A fence that cries wolf gets whitelisted into uselessness.
 
-**A trap the five-agents plan documented and this plan inherits:** `src/lib/reachability.js`
-contains **both** the exemplar and the counter-example for "a citation is not an
-invocation". `exportedNames` (declared `:499`) calls `stripComments` as its first statement
-(`:500`) and is the model to follow. `edgesFrom` (declared `:126`) does the opposite twenty
-lines earlier — at `:145` any string literal ending in `.js` becomes a call edge, and at
-`:231` any `src/…` path merely mentioned in any markdown becomes a reachability root, with
-no comment stripping and no call syntax required. Follow `exportedNames`. A reader who
-opens the file and lands on the wrong function concludes the opposite of the truth.
+**Comment stripping is not optional — follow `exportedNames`, not `edgesFrom`:**
+`src/lib/reachability.js` contains **both** the exemplar and the counter-example for "a
+citation is not an invocation". `exportedNames` (declared at line 731) calls
+`stripComments` as its **first** statement (line 732) and is the model to follow — it
+never credits a name that appears only in a comment. `edgesFrom` (declared at line 271)
+historically did the opposite, crediting bare mentions as edges; that fence has since been
+**hardened** (per `CLAUDE.md`: "a path is an edge only when something SPAWNS it… `node
+<path>` / `require('<path>')`"), so its current patterns require a real run/require rather
+than any `.js` mention. The principle this plan inherits is unchanged and now uncontested:
+**strip comments before matching and under-report**, exactly as `exportedNames` does.
 
 **Expected seed for the yaml surface**, from the live `generateSettings()` at
-`init-project.js:504-535`: `enforcement.mode`, `quality.coverage_threshold`,
-`quality.flaky_test_retries`, `quality.flaky_test_action`, `research.enabled`,
-`research.auto_steps`, `detected.languages`, `detected.frameworks` — grepping `src/`
-found no reader for any of them. `regulatory_regime.active_profiles` **is** read
-(`src/lib/regulatory-regime.js` `loadActiveProfiles`) and must come back clean; that is
-the detector's own non-vacuity control.
+`init-project.js:504-542`: `quality.coverage_threshold`, `quality.flaky_test_retries`,
+`quality.flaky_test_action`, `research.enabled`, `research.auto_steps`, `detected.languages`,
+`detected.frameworks` — grepping `src/` (2026-07-30) found no reader for any of them.
+**Two keys must come back CLEAN as the detector's own non-vacuity controls:**
+`enforcement.mode` **is** read (`src/lib/enforcement-mode.js` `readYamlEnforcementMode`, on
+the yaml surface) and `regulatory_regime.active_profiles` **is** read
+(`src/lib/regulatory-regime.js` `loadActiveProfiles`, line 199). If either is flagged, the
+reader-detection is broken.
 
 ## Implementation Details
 
@@ -221,7 +268,7 @@ No cycle: the scanner requires `task-registry`, which requires only `safe-fs` an
 
 | Module | Live call site | Root it is reachable from |
 |---|---|---|
-| `src/lib/unexecutable-instruction-scan.js` | the `CHECKS` entry `{ id: 'unexecutable-instruction-fence', … }` in `src/lib/iron-loop-enforcer.js`, **shipped by the five-agents plan** | `iron-loop-enforcer.checkAllInvariants`, reached from the shipped `src/commands/menu.js` self-check route |
+| `src/lib/unexecutable-instruction-scan.js` | the `CHECKS` entry `{ id: 'unexecutable-instruction-fence', … }` in `src/lib/iron-loop-enforcer.js`, **shipped by the five-agents plan** | `iron-loop-enforcer.checkAllInvariants`, reached from the shipped `src/commands/start.js` self-check route |
 
 This plan adds detections to a scanner that is **already reachable**. It must **not** add a
 second `CHECKS` entry — one fence, one entry. If a second entry appears, the human sees two
@@ -252,15 +299,15 @@ key makes the baseline churn on every unrelated edit and turns the fence into no
 the same namespace the five-agents plan established:
 
 ```
-recipe-kind          src/commands/menu.md::recipe-kind::precompute
+recipe-kind          src/commands/start.md::recipe-kind::precompute
 recipe-kind-reverse  src/lib/task-registry.js::recipe-kind-reverse::sync
-config-key           settings.yaml::config-key::enforcement.mode
+config-key           settings.yaml::config-key::quality.coverage_threshold
 ```
 
 **Failure-message contract** — every finding's `fix` **prescribes**, naming the file and
 the safe shape. Vague messages are how a fence gets ignored:
 
-- `recipe-kind` → *"`src/commands/menu.md` instructs kind `X`, which `KINDS` in
+- `recipe-kind` → *"`src/commands/start.md` instructs kind `X`, which `KINDS` in
   `src/lib/task-registry.js` rejects — every such call throws and the recipe silently
   never runs. Either add `X` to `KINDS` (with a docblock note saying why) or correct the
   recipe to name an accepted kind."*
@@ -304,11 +351,11 @@ code changes, not the test.
 | # | Test | Drives |
 |---|---|---|
 | 20 | **Non-vacuity, extended** — `scanned.commandDocs >= 1` and `scanned.settingsKeys >= 5`. A scan that read nothing must fail, never pass silently (the false-green trap this fence must not fall into itself). | the analyzer |
-| 21 | **(a) REAL INSTANCE, historical** — a fixture reproducing `menu.md:232` verbatim (``Record a task per ref (`menu task add`, kind `precompute`…)``) scanned against a `KINDS` set lacking `precompute` yields exactly one `recipe-kind` finding keyed `…::recipe-kind::precompute`. Asserts the **displaced** shape is caught — a naive `menu task add (\w+)` regex would miss the real bug. | instance 1 |
+| 21 | **(a) REAL INSTANCE, historical** — a fixture reproducing `start.md:234` verbatim (``Record a task per ref (`menu task add`, kind `precompute`…)``) scanned against a `KINDS` set lacking `precompute` yields exactly one `recipe-kind` finding keyed `…::recipe-kind::precompute`. Asserts the **displaced** shape is caught — a naive `menu task add (\w+)` regex would miss the real bug. | instance 1 |
 | 22 | **(a) forward parity is clean today** — the live repo produces zero fresh `recipe-kind` findings, because `precompute` was added to `KINDS`. | the fix holds |
-| 23 | **(c) REAL INSTANCE, live** — the live scan contains `settings.yaml::config-key::enforcement.mode`, and that key is in `debt`. | instance 3 |
-| 24 | **(c) surface separation** — `workflow.enforcementMode` on the json surface does **not** satisfy `enforcement.mode` on the yaml surface. | the `CONFIG_SOURCES.md` split |
-| 25 | **(c) non-vacuity control** — `regulatory_regime.active_profiles` is **not** flagged, because `regulatory-regime.js` `loadActiveProfiles` reads it. Proves the reader-detection is not stuck returning false. | the detector |
+| 23 | **(c) REAL INSTANCE, live** — the live scan contains `settings.yaml::config-key::quality.coverage_threshold` (a coverage-threshold literal in `settings.yaml` that no code reads — the real floor lives in `.ctoc/coverage-baseline.json`), and that key is in `debt`. | instance 3 |
+| 24 | **(c) surface separation** — a fixture yaml key whose leaf name also appears in a **json-surface** reader is **still flagged**: a json-surface occurrence does not satisfy a yaml-surface key. (`enforcement.mode` is now read on its own yaml surface, so it is no longer the illustrative example; the keyer's `<surface>::<path>` discipline is what this drives.) | the `CONFIG_SOURCES.md` split |
+| 25 | **(c) non-vacuity controls** — neither `enforcement.mode` (read by `enforcement-mode.js` `readYamlEnforcementMode` on the yaml surface) nor `regulatory_regime.active_profiles` (read by `regulatory-regime.js` `loadActiveProfiles`) is flagged. Proves the reader-detection is not stuck returning "unread". | the detector |
 | 26 | **ONE FENCE, ONE ENTRY** — `src/lib/iron-loop-enforcer.js` contains **exactly one** `CHECKS` entry whose `id` is `unexecutable-instruction-fence`, and no second entry for any detection in this family. | the boundary rule |
 | 27 | **THE MOVED DETECTION IS NOT DUPLICATED** — this plan's added code introduces no second implementation of the agent-tool-grant detection; `scan` still exposes exactly one code path producing `detection === 'instruction-tool'`. | the boundary rule |
 
@@ -347,9 +394,13 @@ per detection in this plan and the resulting `maxDebt` rise.
 **First, confirm the five-agents plan has landed:**
 `src/lib/unexecutable-instruction-scan.js` must exist and export `scan`, and
 `src/lib/iron-loop-enforcer.js` must already contain the `unexecutable-instruction-fence`
-`CHECKS` entry. **If either is absent, STOP and report — do not create them here.** Then
-read `docs/CONFIG_SOURCES.md`, `src/lib/task-registry.js` `KINDS`, and
-`tests/menu-task-wiring.test.js` before writing the parity code.
+`CHECKS` entry. **If either is absent, STOP and report — do not create them here.** (As of
+the 2026-07-30 refresh they do not yet exist; the five-agents plan is still at Gate 2. This
+plan builds only after it lands.) Then read `docs/CONFIG_SOURCES.md`,
+`src/lib/task-registry.js` `KINDS`, `src/lib/enforcement-mode.js` (the shipped yaml
+`enforcement.mode` reader, the detector's control), `src/lib/regulatory-regime.js`
+`loadActiveProfiles`, and the reverse-parity case in `tests/menu-task-wiring.test.js`
+before writing the parity code.
 
 ### Step 10: IMPLEMENT
 - `src/lib/unexecutable-instruction-scan.js` — the three added private helpers, the widened
@@ -398,7 +449,7 @@ own documentation so the next reader inherits it.
    enqueued programmatically and legitimately has no human-typed recipe. Treating
    reverse findings as instant failures would have forced a false exemption on day one.
    Forward parity — the direction of the real instance — stays hard.
-2. **The `claude:` action-key parity is not re-implemented.** `tests/menu-task-wiring.test.js:636-664`
+2. **The `claude:` action-key parity is not re-implemented.** `tests/menu-task-wiring.test.js`
    already fences it bidirectionally. The scanner records it as already-fenced and skips
    it: **one fence per invariant, or the two drift and the human trusts neither.** This is
    the rule the human applied on 2026-07-19 when he moved the agent-tool-grant detection
@@ -412,10 +463,13 @@ own documentation so the next reader inherits it.
    surfaces would have falsely certified `enforcement.mode` as read via
    `workflow.enforcementMode`.
 5. **`scan` remains the only export.** The dead-export fence would flag any second export.
-6. **Plan 00069 (wiring enforcement mode) will make the ratchet fail on purpose.** When that
-   plan lands, `enforcement.mode` stops being a finding, the live count drops below
-   `maxDebt`, and the "claim your progress" test fails with an instruction to lower the
-   baseline. That is the ratchet working as designed, not a conflict.
+6. **Plan 00069 (wiring enforcement mode) has landed, and `enforcement.mode` is now read.**
+   This plan's earlier text anticipated 00069 as a *future* that would make the ratchet fail
+   on purpose. It is now the *present*: `src/lib/enforcement-mode.js` reads the yaml
+   `enforcement.mode` key, so that key is **not** seeded as a finding — it is the detector's
+   reader-side control (test 25), and detection (c)'s live debt is the `quality.*` /
+   `research.*` / `detected.*` keys instead. That is the ratchet working as designed, not a
+   conflict.
 7. **After the narrowing this plan creates nothing and extends everything** — four modified
    files, no new ones. The alternative, its own scanner and baseline and test file and
    `CHECKS` entry alongside the five-agents plan's, is precisely what decision 2 forbids.

@@ -10,6 +10,7 @@ files:
   - "src/lib/streaming-questions-sweeper.js"
   - "agents/iron-loop/gate-critic.md"
   - "tests/attestation-round-trip.test.js"
+  - "CLAUDE.md"
 ---
 
 # The critique fleet records that it ran, so a clean plan can cross again
@@ -20,6 +21,96 @@ files:
 > is safe to sit in indefinitely — a plan with no questions simply waits for a human
 > instead of crossing itself. This slice supplies the missing evidence so a genuinely
 > fork-free plan can cross again, **on a record rather than on silence.**
+
+## Refresh Blocked
+
+A rebase against the current tree cannot make this plan sound as written. The two
+mechanical corrections below were applied (they hold regardless of how the design
+question resolves), but the plan's **central mechanism contradicts the actual
+`gate-critic` contract**, and reconciling it is a design decision the human must make —
+not something a mechanical rebase may fabricate.
+
+### Mechanical corrections already applied
+
+1. **`files:` now declares `CLAUDE.md`.** Step 15 edits `CLAUDE.md` (records the
+   attestation contract and updates the documented test-file count), and this slice
+   CREATES a new `tests/` file — both require `CLAUDE.md` to be a declared, coverage-
+   aware target so the count-ratchet passes. The sibling `00182` already declares it;
+   this plan omitted it.
+2. **The wiring root was wrong** and is corrected in the "Wiring — the live call sites"
+   table. The plan claimed `gate-critic` is "dispatched by the SessionStart directive
+   in `src/hooks/SessionStart.js`". It is not. `gate-critic` is dispatched by the
+   `/ctoc:start` command prose (`src/commands/start.md:298-306`), AFTER the three
+   prosecution lenses return. The SessionStart directive
+   (`src/hooks/SessionStart.js:225-242`) dispatches a DIFFERENT set — the stage
+   producers (product-owner / vision-advisor / implementation-planner) and the three
+   prosecution critics — none of which is `gate-critic`.
+
+### The design contradiction (kill-claim, verified against the current tree)
+
+The plan's mechanism (path diagram, the "two ends of one contract", Test Plan case 1,
+and the opening premise) assumes **`gate-critic` emits an EMPTY `questions` array that
+the sweeper promotes, and that this attested-empty array makes a fork-free plan cross.**
+`gate-critic` never emits an empty array:
+
+- `agents/iron-loop/gate-critic.md:124` — *"Never emit `questions: []` — an empty array
+  is indistinguishable from 'this plan is clean'."*
+- The clean-plan degraded row `:119` — *"Emit exactly one question: the gate ruling,
+  with Approve recommended."* A fork-free plan therefore yields the NON-empty array
+  `[q99-gate-ruling]`, never `[]`.
+
+Three consequences follow, each checkable without believing the others:
+
+1. **`00182`'s empty-list fence never fires on `gate-critic`'s output.** `00182` refuses
+   only an EMPTY list lacking a valid attestation (`writePlanQuestions`'s fifth
+   parameter; the writer today takes four — `src/lib/streaming-precompute.js:319`).
+   `gate-critic`'s output is never empty, so `00182` suspended NO `gate-critic` crossing,
+   so there is nothing for this slice to "restore" on that path.
+
+2. **The empty-list path `00182` actually fenced belongs to the STAGE PRODUCERS**, which
+   the SessionStart directive (`src/hooks/SessionStart.js:225-242`) tells to write
+   questions — INCLUDING an empty array for "asked, nothing to ask" — DIRECTLY through
+   `writePlanQuestions` (four positional args), bypassing `gate-critic` and the sweeper
+   entirely. This slice touches neither those producers nor the SessionStart directive,
+   and a stage producer structurally cannot emit a four-LENS attestation — it is not the
+   adversarial fleet. So a genuinely fork-free plan whose only producer was a stage
+   producer emitting `[]` STILL cannot cross after this slice. The capability the header
+   claims to restore is not restored for the one path that lost it.
+
+3. **This slice therefore changes NO crossing behaviour.** It decorates a non-empty
+   payload that `00182` never fenced. Its only real consumer is the audit reader
+   `00180` (`plans/implementation/00180-…`, itself unbuilt), so its actual value is
+   auditability — which directly contradicts the plan's own header ("so a clean plan can
+   cross again") and Test Plan case 1 (`hasEnoughInformation → enough:true` on an
+   attested EMPTY list that `gate-critic` never produces).
+
+Compounding, but secondary: the plan hard-depends on **`00182` (in `todo`, approved,
+NOT yet built)** for the fifth `writePlanQuestions` parameter and the four-lens module
+constant, and its payoff is not realized until **`00180` (unbuilt)** consumes the
+records. The build-order dependency on `00182` alone is normal and declared; the
+contradiction above is not.
+
+### The decision the human must make
+
+Presented flat — this is an owner/design decision, not a quality one:
+
+- **A. Make the mechanism real.** Redesign `gate-critic` so a fork-free plan emits
+  `questions: []` PLUS a clean four-lens attestation — superseding the "never emit `[]`"
+  rule (`:124`) and the always-emit-`q99-gate-ruling` clean-plan row (`:119`) — so the
+  sweeper promotes an attested empty list and `00182`'s attested-empty crossing fires.
+  This is a substantive change to `gate-critic`'s output contract that this plan does
+  not currently specify.
+- **B. Redefine this slice as AUDIT-ONLY.** A clean plan already crosses today via
+  `gate-critic`'s non-empty `q99-gate-ruling` (non-blocking), no attestation needed.
+  Keep the attestation solely as the record `00180` reads, drop the "restore crossing"
+  framing, and accept `00182`'s empty-list fence as a permanent block on the
+  stage-producer direct-`[]` path (which becomes intentionally dead — stage producers
+  stop writing `[]` and defer the clean verdict to `gate-critic`).
+- **C. Restore the stage-producer empty-list crossing** with a DIFFERENT (non-four-lens)
+  attestation, touching the stage producers and the SessionStart directive — outside
+  this slice's current declared scope and files.
+
+Everything below is left intact for whichever direction is chosen.
 
 ## The path the attestation has to travel
 
@@ -170,12 +261,12 @@ Fixtures under `os.tmpdir()`, `path.join`, teardown with
 
 | change | live call site | root |
 |---|---|---|
-| sweeper attestation pass-through | the sweeper's existing promotion loop | the questions store → every gate screen |
-| `gate-critic` output contract | the agent dispatched by the SessionStart directive in `src/hooks/SessionStart.js` | a live Claude session start |
+| sweeper attestation pass-through | the sweeper's existing promotion loop (`streaming-questions-sweeper.promotePendingFile`, reached from `streaming-gate.nextUnansweredQuestion` at menu render) | the questions store → every gate screen |
+| `gate-critic` output contract | the agent dispatched by the `/ctoc:start` command prose (`src/commands/start.md:298-306`), AFTER the three prosecution lenses return | a live `/ctoc:start` gate render |
 
-`gate-critic` is dispatched by an already-shipped hook; the sweeper already runs on
-the promotion path. Both are live roots today, and neither is reached only from a
-test.
+`gate-critic` is dispatched by the `/ctoc:start` command flow (NOT the SessionStart
+directive — see Refresh Blocked, correction 2); the sweeper already runs on the
+promotion path. Both are live roots today, and neither is reached only from a test.
 
 ## Test Plan
 
@@ -197,7 +288,7 @@ it does with a `writePlanQuestions` failure today, and whether it surfaces or di
 the reason; `src/lib/streaming-precompute.js`'s `writePlanQuestions` **as changed by
 `00182`**, to confirm the fifth parameter's exact name and position; `agents/iron-loop/gate-critic.md`
 sections "Input — the four lens critiques", the three-state classification table, and
-the degraded-input table; `agents/iron-loop/premortem-critic.md:175-220` for the
+the degraded-input table; `agents/iron-loop/premortem-critic.md:197-220` for the
 `self_assessment` field names being copied. Confirm `00182` has landed — this slice's
 tests cannot pass without it. **Where the code disagrees with this plan, THE CODE
 WINS — record it.**
