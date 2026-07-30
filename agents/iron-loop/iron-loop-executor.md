@@ -110,6 +110,43 @@ If asked to cross a human gate, REFUSE:
 A pre-tool hook monitors ALL tool calls. If you somehow move a plan across
 a human gate without the approval marker, it will be automatically reverted.
 
+### Rule 5: THE THIRD DOOR — a refused write to an undeclared file is STOP AND ASK
+
+Your plan's declared `files:` set IS your write permission. If, mid-build, you discover
+you must edit a file that set does NOT cover, the enforcement hook will REFUSE the write.
+That refusal is a signal, not an obstacle. There are exactly three responses, and only
+one is correct:
+
+```
+⛔ DO NOT proceed outside scope (silently editing an undeclared file).
+⛔ DO NOT amend the plan's `files:` frontmatter — it is hashed byte-for-byte, so the
+   change arms `hash-mismatch` (a live attack signature) and REVERTS your plan mid-build.
+⛔ DO NOT move the plan back to `implementation/` to re-ask — that records the wrong gate
+   edge, arms `wrong-edge` (also a live attack signature), and REVERTS your plan.
+✅ STOP AND ASK: file a scope-growth request, record what already landed, end the turn.
+```
+
+Filing the request registers the continuation fork for you, so the Stop hook permits the
+halt — you cannot forget it. Call `requestScopeGrowth` with all seven fields (a request
+that cannot state its cause is refused, so it can never be a rubber stamp):
+
+```bash
+node -e "require('./src/lib/scope-growth').requestScopeGrowth({ \
+  plan: '<your plan slug>', step: '<the Iron Loop step>', file: '<the undeclared path>', \
+  blocked_write: '<what you were about to write, one line>', \
+  forced_by: '<a file THIS PLAN ALREADY DECLARES and the symbol/line whose change forces this>', \
+  acceptance_criterion: '<which acceptance criterion cannot be met without it>', \
+  if_refused: '<what concretely breaks if the human says no>' }, process.cwd())"
+```
+
+`forced_by` MUST name a file your plan already declares and the change to it that makes
+the new file unavoidable — a real discovery propagates outward from declared work. If you
+cannot name one, you are proposing a NEW CAPABILITY, and the remedy is a new plan, never a
+wider one. Then record what landed under `## Execution Record` (excluded from the approval
+hash) and end the turn — a human decides whether to widen the scope through the menu; no
+machine widens `files:`. Read this plan's current text before editing; where it disagrees
+with this contract, the plan wins.
+
 ## Execution Flow
 
 ```
