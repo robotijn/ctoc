@@ -78,7 +78,7 @@ The Action Priority drives the order in which mitigations are applied. **High** 
 
 ## Iron Loop process Failure Modes and Effects table
 
-Each row scores one credible failure mode for one Iron Loop step. The scores reflect CTOC's current controls as of version 6.9.27. They are intentionally conservative — assume the failure is plausible and the detection is imperfect unless evidence proves otherwise. Scores are reviewed quarterly per the `capa_register` control.
+Each row scores one credible failure mode for one Iron Loop step. The scores reflect CTOC's current controls as of version 6.9.27. They are intentionally conservative — assume the failure is plausible and the detection is imperfect unless evidence proves otherwise. Scores are reviewed quarterly per the `capa_register` control. **NOT ENFORCED**: no evaluator consults the `capa_register` control; the quarterly review is a human practice, not a gated behaviour.
 
 ### Step 1 — IDEATE
 
@@ -150,10 +150,10 @@ Each row scores one credible failure mode for one Iron Loop step. The scores ref
 |---|---|---|
 | Severity | 8 | Major rework, schedule slip beyond one sprint. Production integration bugs are expensive to diagnose. |
 | Occurrence | 6 | Moderate. Integration-boundary failures are a documented pattern in software engineering at large; CTOC's coverage of the boundary catalogue is incomplete for new platforms. |
-| Detection | 6 | Low. Static analysis at Step 9 catches some but not all integration mismatches; the Hardware-in-the-Loop ladder (`hil_test_ladder`) catches more, but only when the active profile requires it. |
+| Detection | 6 | Low. Static analysis at Step 9 catches some but not all integration mismatches; the Hardware-in-the-Loop ladder (`hil_test_ladder`) catches more, but only where a caller dispatches it — NOT ENFORCED (no evaluator consults the control). |
 | Action Priority | High | Severity eight with Occurrence six. |
 
-**Mitigation**: the implementation-planner MUST enumerate integration boundaries explicitly in the `## Integration Boundaries` section. The `architecture/dependency-analyzer` skill is ALWAYS dispatched at Step 6 to cross-check. When the active profile requires `hil_test_ladder`, the Hardware-in-the-Loop ladder runs at Step 14.
+**Mitigation**: the implementation-planner MUST enumerate integration boundaries explicitly in the `## Integration Boundaries` section. The `architecture/dependency-analyzer` skill is ALWAYS dispatched at Step 6 to cross-check. **NOT ENFORCED**: nothing evaluates the `hil_test_ladder` control, so no Hardware-in-the-Loop ladder runs at Step 14 today; it is a present skill invoked only where a caller dispatches it.
 
 ### Step 6 — DESIGN
 
@@ -168,7 +168,7 @@ Each row scores one credible failure mode for one Iron Loop step. The scores ref
 | Detection | 5 | Moderate. The picker emits `kind: undefended_diversity` when activated; the gap is that activation depends on the FMEDA having run first. |
 | Action Priority | High | Severity ten triggers High regardless. |
 
-**Mitigation**: when the active profile requires `fmeda_design`, the picker is dispatched immediately after the FMEDA. When the active profile does not require `fmeda_design` but the plan declares `criticality: high`, CTO Chief still dispatches the picker. The trigger is OR, not AND.
+**Mitigation**: when the plan declares `criticality: high`, CTO Chief dispatches the picker (an agent-recipe trigger, not a control evaluation). **NOT ENFORCED**: nothing evaluates the `fmeda_design` control, so the profile-required branch does not fire today — only the `criticality: high` recipe path does.
 
 ### Step 6.5 — THREAT MODEL
 
@@ -305,7 +305,7 @@ Each row scores one credible failure mode for one Iron Loop step. The scores ref
 | Detection | 6 | Low. The continuous-integration runner is not always faithful to production. |
 | Action Priority | High | Severity eight with Occurrence five and Detection six. |
 
-**Mitigation**: the cross-platform rules in CLAUDE.md are non-negotiable. When the active profile requires `hil_test_ladder`, the Hardware-Processor-Software-Model-in-the-Loop ladder runs at Step 14.
+**Mitigation**: the cross-platform rules in CLAUDE.md are non-negotiable. **NOT ENFORCED**: nothing evaluates the `hil_test_ladder` control, so no Hardware-Processor-Software-Model-in-the-Loop ladder runs at Step 14 today.
 
 ### Step 15 — DOCUMENT
 
@@ -335,16 +335,16 @@ Each row scores one credible failure mode for one Iron Loop step. The scores ref
 | Detection | 4 | Moderately high. The dashboard surfaces the gap when it exists. |
 | Action Priority | High | Severity nine triggers High regardless. |
 
-**Mitigation**: CTO Chief is the final approver before Gate 3 per the CLAUDE.md architecture. CTO Chief verifies the fourteen quality dimensions AND the human-approval marker AND the production-readiness gate (when SaaS template is active). When the active profile requires `four_eyes_gate3`, two distinct approvers are required.
+**Mitigation**: CTO Chief is the final approver before Gate 3 per the CLAUDE.md architecture. CTO Chief verifies the fourteen quality dimensions AND the human-approval marker AND the production-readiness gate (when SaaS template is active). **NOT ENFORCED**: nothing evaluates the `four_eyes_gate3` control, so two distinct approvers are NOT required at the final gate today.
 
 ## Review cadence
 
 The Process Failure Modes and Effects Analysis itself is reviewed:
 
-- Quarterly by the user (the human Chief Technology Officer commanding CTOC) under the `capa_register` control, with score updates based on observed incidents.
+- Quarterly by the user (the human Chief Technology Officer commanding CTOC) under the `capa_register` control, with score updates based on observed incidents. (`capa_register` NOT ENFORCED — a human cadence, no evaluator consults the control.)
 - On every Iron Loop change (a new step, a removed step, a changed agent) — the affected row is re-scored before the change merges.
 - On every new regulatory profile (a new control catalogue entry) — the rows it touches are re-scored.
-- On every Eight Disciplines incident (per `eight_d_incident_template`) — the row that corresponds to the failed step is re-scored.
+- On every Eight Disciplines incident (per `eight_d_incident_template`) — the row that corresponds to the failed step is re-scored. (`eight_d_incident_template` NOT ENFORCED — a human cadence, no evaluator consults the control.)
 
 The table is the living surface; it is checked into the repository at `docs/PROCESS_FMEA.md`. Changes are reviewed via pull request. The next quarterly review date is recorded in `.ctoc/capa-register.yaml` under `pfmea_review_due`.
 

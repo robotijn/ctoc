@@ -12,18 +12,18 @@ This document is the entry point for everything in Cluster 7. It cross-reference
 
 | Control | Activated by | Operationalized by | Output location |
 |---|---|---|---|
-| `dsar_handler` | `hipaa`, any profile that opts in | [[legal/dsar-handler]] skill | `.ctoc/dsar/<request-id>.yaml` |
-| `cra_incident_clocks` | `eu-cra`, `dora` | [[security/cra-incident-clocks]] skill | `.ctoc/incidents/cra/<incident-id>/` |
-| `nydfs_dora_incident_class` | `nydfs-500`, `dora` | [[security/incident-responder]] (existing skill, additional reporting branch in operations) | `.ctoc/incidents/nydfs-dora/<incident-id>/` |
-| `business_continuity_plan` | `eu-cra`, `dora`, `nydfs-500`, `hipaa` | `.ctoc/resilience/bcp.yaml` template | `.ctoc/resilience/bcp.yaml` |
-| `proportionality_test` | opt-in (recommended whenever the refinement loop is active) | `src/lib/proportionality.js` library | `.ctoc/proportionality-log/<date>.yaml` |
-| `clm_obligations_tracker` | `hipaa`; recommended for `dora`, `nydfs-500` | [[legal/clm-obligations]] skill | `.ctoc/contracts/*.yaml` plus `clause-library/` |
+| `dsar_handler` | `hipaa`, any profile that opts in | [[legal/dsar-handler]] skill | `.ctoc/dsar/<request-id>.yaml` — NOT ENFORCED |
+| `cra_incident_clocks` | `eu-cra`, `dora` | [[security/cra-incident-clocks]] skill | `.ctoc/incidents/cra/<incident-id>/` — NOT ENFORCED |
+| `nydfs_dora_incident_class` | `nydfs-500`, `dora` | [[security/incident-responder]] (existing skill, additional reporting branch in operations) | `.ctoc/incidents/nydfs-dora/<incident-id>/` — NOT ENFORCED |
+| `business_continuity_plan` | `eu-cra`, `dora`, `nydfs-500`, `hipaa` | `.ctoc/resilience/bcp.yaml` template | `.ctoc/resilience/bcp.yaml` — NOT ENFORCED |
+| `proportionality_test` | opt-in (recommended whenever the refinement loop is active) | `src/lib/proportionality.js` library | `.ctoc/proportionality-log/<date>.yaml` — NOT ENFORCED |
+| `clm_obligations_tracker` | `hipaa`; recommended for `dora`, `nydfs-500` | [[legal/clm-obligations]] skill | `.ctoc/contracts/*.yaml` plus `clause-library/` — NOT ENFORCED |
 
 ## Profile coverage matrix
 
 The table below shows which profile activates which Cluster 7 control. See the profile files under `.ctoc/regulatory-regimes/` for full required-controls lists.
 
-| Profile | `dsar_handler` | `cra_incident_clocks` | `nydfs_dora_incident_class` | `business_continuity_plan` | `proportionality_test` | `clm_obligations_tracker` |
+| Profile (every control below is recorded by the profile but NOT ENFORCED) | `dsar_handler` | `cra_incident_clocks` | `nydfs_dora_incident_class` | `business_continuity_plan` | `proportionality_test` | `clm_obligations_tracker` |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
 | `eu-cra` (European Union Cyber Resilience Act) | — | yes | — | yes | — | — |
 | `dora` (Digital Operational Resilience Act) | — | yes | yes | yes | — | — |
@@ -33,6 +33,8 @@ The table below shows which profile activates which Cluster 7 control. See the p
 When multiple profiles are stacked (the framework supports union-merge — see `src/lib/regulatory-regime.js`), any control required by any profile is active.
 
 ## Data Subject Access Request (DSAR) handler — `dsar_handler`
+
+> **NOT ENFORCED.** The `dsar_handler` control is recorded by its profile, but no evaluator consults it and no step is gated on it. The workflow below is a present skill invoked only where a caller dispatches it; wiring the control is unbuilt work.
 
 **Why:** General Data Protection Regulation Articles 12, 15, 17, 20 — and the parallel rights under California Consumer Privacy Act, Quebec Law 25, Brazil Lei Geral de Proteção de Dados, Health Insurance Portability and Accountability Act 45 Code of Federal Regulations §164.524 — all carry firm response clocks (one month, 30 days, 45 days, 15 days, 30 days respectively). Missing the clock is the single most common cause of supervisory-authority enforcement.
 
@@ -46,6 +48,8 @@ When multiple profiles are stacked (the framework supports union-merge — see `
 **Schema:** see `.ctoc/dsar/_README.md`.
 
 ## Cyber Resilience Act (CRA) incident clocks — `cra_incident_clocks`
+
+> **NOT ENFORCED.** The `cra_incident_clocks` control is recorded by its profile, but no evaluator consults it and no step is gated on it. The clocks below are a present skill invoked only where a caller dispatches it; wiring is unbuilt work.
 
 **Why:** Regulation (EU) 2024/2847 Article 14 obliges manufacturers of products with digital elements to file three reports with the European Union Agency for Cybersecurity (ENISA) single reporting platform when an actively exploited vulnerability or severe incident is observed:
 
@@ -61,6 +65,8 @@ When multiple profiles are stacked (the framework supports union-merge — see `
 **Effective dates:** reporting obligation binding from 11 September 2026. Conformity assessment binding from 11 December 2027.
 
 ## New York Department of Financial Services / Digital Operational Resilience Act incident classification — `nydfs_dora_incident_class`
+
+> **NOT ENFORCED.** The `nydfs_dora_incident_class` control is recorded by its profile, but no evaluator consults it and no step is gated on it. The classification below is intended behaviour, not wired behaviour.
 
 **Why:** Both 23 New York Codes Rules and Regulations Part 500 §500.17 and Digital Operational Resilience Act Article 19 oblige covered entities to **classify** an incident before notifying — material vs non-material under 23 New York Codes Rules and Regulations Part 500; major vs significant under Digital Operational Resilience Act, with separate clocks for each class.
 
@@ -100,6 +106,8 @@ When multiple profiles are stacked (the framework supports union-merge — see `
 
 ## Business Continuity Plan — `business_continuity_plan`
 
+> **NOT ENFORCED.** The `business_continuity_plan` control is recorded by its profile, but no evaluator consults it and no step is gated on it. The template below is present; nothing today requires it.
+
 **Why:** Digital Operational Resilience Act Article 11 obliges covered entities to maintain an Information and Communication Technology Business Continuity Policy with documented Recovery Time Objective and Recovery Point Objective per critical or important function. Health Insurance Portability and Accountability Act 45 Code of Federal Regulations §164.308(a)(7) and 23 New York Codes Rules and Regulations Part 500 §500.16 carry parallel obligations.
 
 **What it does:** `.ctoc/resilience/bcp.yaml` is the operational Business Continuity Plan for the CTOC pipeline itself. It declares per-phase Recovery Time Objective and Recovery Point Objective:
@@ -119,6 +127,8 @@ Plus: offline fallback procedures per phase, alternative-provider list (primary 
 
 ## Proportionality test — `proportionality_test`
 
+> **NOT ENFORCED.** The `proportionality_test` control is recorded by its profile, but no evaluator consults it and no kickback is gated on it. The library below runs only where a caller invokes it; wiring is unbuilt work.
+
 **Why:** the refinement loop (see `docs/REFINEMENT_LOOP.md`) is a multi-round critic-implement-test cycle. A kickback from a critic to the implementer is a discovery request in the Federal Rules of Civil Procedure sense — the critic is asking for additional work to be produced. Federal Rules of Civil Procedure Rule 26(b)(1) as amended in 2015 requires that discovery be "proportional to the needs of the case" weighed across six factors. Applying the same discipline inside the refinement loop catches runaway kickbacks before the circuit breaker has to.
 
 **What it does:** `src/lib/proportionality.js` exposes `logProportionalityDecision(kickbackId, factors, decision)`. On every kickback, the CTO Chief weighs:
@@ -137,6 +147,8 @@ Each factor carries a weight 1..5 and a rationale string. The decision is one of
 **Why this matters operationally:** under-using the test means the refinement loop will churn on low-severity findings against high-effort budgets; over-using it means high-severity findings get deferred. The log itself is the audit trail — when the user asks "why did this take so many rounds?" the answer is in the log.
 
 ## Contract Lifecycle Management (CLM) obligations tracker — `clm_obligations_tracker`
+
+> **NOT ENFORCED.** The `clm_obligations_tracker` control is recorded by its profile, but no evaluator consults it and no step is gated on it. The tracker below is a present skill invoked only where a caller dispatches it; wiring is unbuilt work.
 
 **Why:** signing a contract creates continuing obligations — renewal dates, non-renewal notice deadlines, audit windows, service-level review dates, sub-processor review dates, Transfer Impact Assessment refresh deadlines, attestation renewal dates. A privacy policy template plus a terms-of-service template (handled by [[saas/legal-scaffold]]) is the **starting point**, not the operational steady state. Cluster 7 fills the gap.
 

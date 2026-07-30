@@ -25,13 +25,13 @@
 
 | HACCP principle | CTOC equivalent |
 |---|---|
-| 1. Conduct a hazard analysis | Failure Mode and Effects Analysis at Step 6 DESIGN (`fmeda_design`) |
+| 1. Conduct a hazard analysis | Failure Mode and Effects Analysis at Step 6 DESIGN (`fmeda_design`) — NOT ENFORCED (no evaluator consults the control) |
 | 2. Determine the Critical Control Points | This document — six CCP steps |
 | 3. Establish critical limits | Per-CCP table below |
 | 4. Establish monitoring procedures | Per-CCP table below |
 | 5. Establish corrective actions | Per-CCP table below + CAPA register at `.ctoc/capa/` |
 | 6. Establish verification procedures | Refinement loop + Step 14 VERIFY + Gate 3 review |
-| 7. Establish record-keeping and documentation | `audit_hash_chain` control + `.ctoc/audit/dispatches/` |
+| 7. Establish record-keeping and documentation | `audit_hash_chain` control + `.ctoc/audit/dispatches/` — NOT ENFORCED (no evaluator consults the control) |
 
 ## CCP map of the Iron Loop
 
@@ -70,7 +70,7 @@ The defect is invisible until Gate 3 (or worse, until production).
 | **Monitoring procedure** | The human reads the plan at Gate 2, and the plan file carries the integrator's own `not-evaluated` verdict so the reader knows nothing machine-checked it. Implementation-plan-reviewer (opus) reviews the plan when dispatched. A real automated critic is separate work, not yet built. |
 | **Corrective action when exceeded** | Kickback to Step 5. Author re-investigates alternatives, including stack-chooser if the project is template-based. Maximum three kickbacks before circuit-breaker escalates to user. |
 | **Records kept** | `.ctoc/audit/dispatches/<date>/<dispatch_id>.yaml` for each implementation-planner dispatch. Plan file frontmatter `decisions_taken_under_ambiguity:`. |
-| **Linked controls** | `process_fmea_loop`, `requirements_traceability_matrix`, `fmeda_design` |
+| **Linked controls** | `process_fmea_loop`, `requirements_traceability_matrix`, `fmeda_design` — NOT ENFORCED (linked controls are recorded, not evaluated) |
 
 ---
 
@@ -84,10 +84,10 @@ defect class at DESIGN compounds through every later step.
 | Field | Entry |
 |---|---|
 | **Critical limit** | Every component must have an entry in the FMEA table with: failure mode, effect, severity (1-10), occurrence (1-10), detection (1-10), and Risk Priority Number = S × O × D. RPN > 100 requires explicit mitigation. RPN > 200 is a blocker until reduced. |
-| **Monitoring procedure** | `fmeda_design` control auto-scans for missing FMEA entries at Gate 2. Process-FMEA-loop critic (when active) reviews the Iron Loop's own design products. |
+| **Monitoring procedure** | The `fmeda_design` skill scans for missing FMEA entries where a caller dispatches it; Process-FMEA-loop critic reviews the Iron Loop's own design products when dispatched. **NOT ENFORCED**: no evaluator consults the `fmeda_design` control, so nothing auto-scans at Gate 2 today. |
 | **Corrective action when exceeded** | Kickback to Step 6. Author adds the missing failure modes, computes RPNs, and lists mitigations. If RPN remains above 200 after mitigation, escalate to user. Open a CAPA recording the FMEA gap. |
 | **Records kept** | FMEA table in the implementation plan body. Dispatch logs for fmeda-design agent. |
-| **Linked controls** | `fmeda_design`, `fault_tree_analysis`, `graceful_degradation_matrix` |
+| **Linked controls** | `fmeda_design`, `fault_tree_analysis`, `graceful_degradation_matrix` — NOT ENFORCED (linked controls are recorded, not evaluated) |
 
 ---
 
@@ -105,7 +105,7 @@ catching it at Step 14 is a full Iron Loop re-run.
 | **Monitoring procedure** | `src/lib/iron-loop.js` `refineLoop()` appends the execution section and returns the single status `not-evaluated`, which is written into the plan file so the human at Gate 2 reads that nothing evaluated it. Persistent-issue and oscillation detectors in `refinement-loop.js` flag stuck plans when that loop is driven by agents. |
 | **Corrective action when exceeded** | The `deferredQuestions` entry in the plan states plainly that no critique ran; the user resolves the plan's open questions at Gate 2 by reading it. If oscillation is detected in an agent-driven loop, kickback to Step 6 — the design is itself ambiguous. |
 | **Records kept** | `.ctoc/loops/<plan-slug>/journal.yaml`, `.ctoc/loops/<plan-slug>/letters/*.json`. |
-| **Linked controls** | `requirements_traceability_matrix`, `spec_code_reconciliation`, `irac_compliance_output` |
+| **Linked controls** | `requirements_traceability_matrix`, `spec_code_reconciliation`, `irac_compliance_output` — NOT ENFORCED (linked controls are recorded, not evaluated) |
 
 ---
 
@@ -122,7 +122,7 @@ no-stub rule (CLAUDE.md, Pipeline Philosophy 2) is enforced here.
 | **Monitoring procedure** | PreToolUse hooks scan for stub markers (`TODO`, `FIXME`, `XXX`, empty function bodies returning `null` or `pass`). Self-reviewer at Step 11 flags any new stub. Refinement loop runs after IMPLEMENT for high-effort plans. |
 | **Corrective action when exceeded** | Kickback to Step 10. Stubs are replaced with documented choices. If the implementer hits the same stub three times (implementer-wall detection in `refinement-loop.js`), kickback to Step 5 or 6 — the plan itself is incomplete. File a CAPA tagging the stub-inducing pattern. |
 | **Records kept** | Git diff. Step 11 self-review record. Refinement loop journal entries with `fixes_applied`. |
-| **Linked controls** | `data_lineage`, `defect_density_target`, `spec_code_reconciliation` |
+| **Linked controls** | `data_lineage`, `defect_density_target`, `spec_code_reconciliation` — NOT ENFORCED (linked controls are recorded, not evaluated) |
 
 ---
 
@@ -139,7 +139,7 @@ at this step as a blocker.
 | **Monitoring procedure** | Step 13 agent (opus) runs `src/lib/sast-runner.js`, `src/lib/secrets-scanner.js`, and `src/lib/dependency-auditor.js`. Refinement loop adds `security/sast-scanner` as a core critic. |
 | **Corrective action when exceeded** | Kickback to Step 10 with the security findings. If the finding is architectural (e.g. the chosen auth mechanism is fundamentally weak), kickback to Step 5 PLAN. Open a CAPA. If severity is `critical`, also open a full 8D report at `.ctoc/templates/8d-incident.md`. |
 | **Records kept** | `.ctoc/security/` scan output. Refinement loop journal entries from security critics. |
-| **Linked controls** | All security-relevant controls; especially `cra_incident_clocks` if the defect was reported externally. |
+| **Linked controls** | All security-relevant controls; especially `cra_incident_clocks` if the defect was reported externally. **NOT ENFORCED** (linked controls are recorded, not evaluated). |
 
 ---
 
@@ -156,7 +156,7 @@ loss of trust in the entire pipeline.
 | **Monitoring procedure** | `src/lib/step-13-verify.js`, `src/lib/test-runner.js`, `src/lib/coverage-checker.js`. Test results are recorded in the dispatch audit log. Flaky-test detection runs against the trailing thirty runs in CI. |
 | **Corrective action when exceeded** | Kickback to the step that owns the failure. Failed test → Step 10 (or Step 8 if the test itself is wrong). Coverage gap → Step 8 with explicit edge-case list. Type error → Step 10. Lint warning treated as a critical-tier finding per CTOC's warnings-are-bugs policy. Open a CAPA if the same test fails on three or more consecutive plans (a flaky test is a process defect). |
 | **Records kept** | Test run output in `.ctoc/audit/dispatches/<date>/`. Coverage reports. |
-| **Linked controls** | `defects_per_million`, `process_capability_index`, `control_chart_variance` |
+| **Linked controls** | `defects_per_million`, `process_capability_index`, `control_chart_variance` — NOT ENFORCED (linked controls are recorded, not evaluated) |
 
 ---
 
@@ -206,4 +206,6 @@ Remove a CCP only when:
 The six CCPs above are the current designation as of CTOC v6.4.x.
 Changes to this list require an entry in the CAPA register and an update
 to `src/lib/regulatory-regime.js` if the change affects the
-`critical_control_points` control.
+`critical_control_points` control. **NOT ENFORCED**: no evaluator consults the
+`critical_control_points` control; this document is the CCP map, and nothing gates
+on the control today.

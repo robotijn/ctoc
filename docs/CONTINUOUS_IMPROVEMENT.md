@@ -13,17 +13,17 @@ CTOC ships in Cluster 5 of the regulatory-regime profile system:
 | Manufacturing primitive | CTOC equivalent | File / control |
 |---|---|---|
 | Plan-Do-Check-Act (PDCA) cycle | Iron Loop's 16 steps + Gate 3 review | `docs/IRON_LOOP.md` |
-| Corrective and Preventive Action | CAPA register | `.ctoc/capa/` (`capa_register` control) |
-| Eight Disciplines (8D) | Incident response report | `.ctoc/templates/8d-incident.md` (`eight_d_incident_template` control) |
-| Statistical Process Control chart | Shewhart 3-sigma over loop metrics | `src/lib/metrics-loop.js` `controlChart()` (`control_chart_variance` control) |
-| Defects Per Million Opportunities | DPMO across assertion-bearing tests | `src/lib/metrics-loop.js` `defectsPerMillion()` (`defects_per_million` control) |
-| Process Capability Index (Cpk) | Cpk of refinement-loop convergence | `src/lib/metrics-loop.js` `processCapabilityIndex()` (`process_capability_index` control) |
-| Defect density (defects per KLOC) | Defects per thousand lines per plan | `src/lib/metrics-loop.js` `defectDensity()` (`defect_density_target` control) |
-| Andon cord | Pre-tool-use halt on threshold breach | `src/hooks/andon-halt.js` (`andon_cord_halt` control) |
-| Critical Control Points (HACCP) | Six designated Iron Loop steps | `docs/CRITICAL_CONTROL_POINTS.md` (`critical_control_points` control) |
-| Kaizen — continuous small improvement | Throttled loop-improvement backlog | `plans/loop-improvement/` (`kaizen_backlog` control) |
-| Lessons learned at job close | Mandatory one-line lesson at Gate 3 | `lessons_learned_closure` control |
-| Graceful degradation | Fail-operational / fail-safe / fail-silent matrix | `graceful_degradation_matrix` control |
+| Corrective and Preventive Action | CAPA register | `.ctoc/capa/` (`capa_register` control) — NOT ENFORCED |
+| Eight Disciplines (8D) | Incident response report | `.ctoc/templates/8d-incident.md` (`eight_d_incident_template` control) — NOT ENFORCED |
+| Statistical Process Control chart | Shewhart 3-sigma over loop metrics | `src/lib/metrics-loop.js` `controlChart()` (`control_chart_variance` control) — NOT ENFORCED |
+| Defects Per Million Opportunities | DPMO across assertion-bearing tests | `src/lib/metrics-loop.js` `defectsPerMillion()` (`defects_per_million` control) — NOT ENFORCED |
+| Process Capability Index (Cpk) | Cpk of refinement-loop convergence | `src/lib/metrics-loop.js` `processCapabilityIndex()` (`process_capability_index` control) — NOT ENFORCED |
+| Defect density (defects per KLOC) | Defects per thousand lines per plan | `src/lib/metrics-loop.js` `defectDensity()` (`defect_density_target` control) — NOT ENFORCED |
+| Andon cord | Pre-tool-use halt on threshold breach | `src/hooks/andon-halt.js` (`andon_cord_halt` control) — NOT ENFORCED |
+| Critical Control Points (HACCP) | Six designated Iron Loop steps | `docs/CRITICAL_CONTROL_POINTS.md` (`critical_control_points` control) — NOT ENFORCED |
+| Kaizen — continuous small improvement | Throttled loop-improvement backlog | `plans/loop-improvement/` (`kaizen_backlog` control) — NOT ENFORCED |
+| Lessons learned at job close | Mandatory one-line lesson at Gate 3 | `lessons_learned_closure` control — NOT ENFORCED |
+| Graceful degradation | Fail-operational / fail-safe / fail-silent matrix | `graceful_degradation_matrix` control — NOT ENFORCED |
 
 ## Authoritative sources
 
@@ -80,7 +80,8 @@ Act   ──► Steps 15-16 (DOCUMENT, FINAL-REVIEW + Gate 3 human approval)
 
 Each pass through the Iron Loop is one PDCA cycle. The *Act* phase
 includes lessons learned (`lessons_learned_closure` control) that feed
-back into the next cycle's *Plan* — closing the loop.
+back into the next cycle's *Plan* — closing the loop. **NOT ENFORCED**:
+no evaluator consults the `lessons_learned_closure` control today.
 
 When PDCA is incomplete — when a defect escapes Gate 3 — the system
 opens a CAPA register entry. The CAPA is itself a sub-PDCA: plan a
@@ -121,7 +122,7 @@ gets; 8D is the structured root-cause analysis reserved for defects that
 | `low` | CAPA only |
 | `medium` | CAPA only |
 | `high` | CAPA + full 8D report at `.ctoc/templates/8d-incident.md` |
-| `critical` | CAPA + full 8D + incident escalation per active regulatory regime (e.g. EU CRA 24h/72h clocks if `cra_incident_clocks` is active) |
+| `critical` | CAPA + full 8D + incident escalation per active regulatory regime (e.g. EU CRA 24h/72h clocks if `cra_incident_clocks` is active) — NOT ENFORCED (no evaluator consults the control) |
 
 The eight disciplines map directly onto the structured response a CTO
 takes after a production outage: contain immediately (D3), find root
@@ -211,7 +212,8 @@ The Andon control is **off by default**. It activates only when an
 ISO 9001, ISO 26262, or DORA-class regulatory regime profile is active
 (or the user explicitly enables `andon_cord_halt` in
 `.ctoc/settings.yaml`). CTOC stays lean for projects that do not need
-this discipline.
+this discipline. **NOT ENFORCED**: nothing evaluates the `andon_cord_halt`
+control, so selecting a profile does not switch Andon on today.
 
 ---
 
@@ -226,9 +228,11 @@ crowd out actual production.
 CTOC's `plans/loop-improvement/` stage is the kaizen backlog. Per the
 DevOps Research and Assessment 2025 *State of DevOps Report*, healthy
 teams cap continuous-improvement work at 10 percent of total plan
-throughput. The `kaizen_backlog` control enforces this cap; the
+throughput. The `kaizen_backlog` control is intended to cap this; the
 `src/lib/quality-state.js` would refuse to advance an 11th loop-
 improvement plan while ten regular plans were still in flight.
+**NOT ENFORCED**: nothing evaluates the `kaizen_backlog` control, so no cap is
+applied today.
 
 A kaizen plan is a normal Iron Loop plan whose target is the loop
 itself: a new critic, a tighter threshold, a clarified agent prompt, a
@@ -240,10 +244,12 @@ themselves quality-controlled.
 
 ## Lessons learned at closure
 
-The `lessons_learned_closure` control mandates a single-line lesson at
+The `lessons_learned_closure` control is intended to require a single-line lesson at
 Gate 3 for every plan, written to the plan's frontmatter as
 `lesson_learned:`. The lesson is one sentence in present tense,
-identifying what the next plan should do differently.
+identifying what the next plan should do differently. **NOT ENFORCED**:
+nothing evaluates the `lessons_learned_closure` control, so the lesson is
+not required at the final gate today.
 
 ```yaml
 lesson_learned: "Always include a malformed-input test case at Step 8 when the plan touches webhooks."
@@ -261,8 +267,9 @@ stopped reflecting; that itself is a CAPA trigger.
 
 ## Graceful degradation — fail modes are design decisions
 
-The `graceful_degradation_matrix` control requires every component to
-declare its failure mode in the implementation plan's design section:
+The `graceful_degradation_matrix` control describes how every component should
+declare its failure mode in the implementation plan's design section.
+**NOT ENFORCED**: no evaluator consults the `graceful_degradation_matrix` control today.
 
 | Failure mode | Meaning | Example |
 |---|---|---|
@@ -334,11 +341,14 @@ profile that requires them. As of CTOC v6.4.x:
 - `iso-9001` requires: `capa_register`, `eight_d_incident_template`,
   `lessons_learned_closure`, `process_fmea_loop`, `defects_per_million`,
   `process_capability_index`, `control_chart_variance`, `kaizen_backlog`.
+  **NOT ENFORCED** (recorded by the profile; no evaluator consults these controls).
 - `iso-26262-asil-d` adds: `defect_density_target`,
   `graceful_degradation_matrix`, `capa_register`,
   `eight_d_incident_template`.
+  **NOT ENFORCED** (recorded by the profile; no evaluator consults these controls).
 - `dora` adds: `process_capability_index`, `capa_register`,
   `eight_d_incident_template`.
+  **NOT ENFORCED** (recorded by the profile; no evaluator consults these controls).
 
 Edit `.ctoc/settings.yaml`:
 
@@ -348,9 +358,9 @@ regulatory_regime:
     - iso-9001
 ```
 
-The Andon hook is registered in `.claude-plugin/hooks.json` and
-activates automatically once `andon_cord_halt` is in the effective
-control set.
+The Andon hook file is present at `src/hooks/andon-halt.js`. **NOT ENFORCED**:
+nothing evaluates the `andon_cord_halt` control, so the hook does not activate
+from the effective control set today — wiring it is unbuilt work.
 
 To disable individual controls (e.g. for early development), use the
 override block:

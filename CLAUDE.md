@@ -269,7 +269,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 500 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 501 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -416,6 +416,23 @@ hooks manifest became `''`, killing every hook root at once), so one unreadable 
 could have nominated live code for deletion. Unreadable now throws and names the path;
 ABSENT keeps its own meaning, and `analyze()` returns `readErrors` so a seeding run can
 prove it read everything it judged (`seedReadErrors: 0`).
+
+**The compliance-claims fence — a claim of active enforcement requires a real
+evaluator.** A false claim that the product ENFORCES a regulatory control it does not
+enforce is the one defect that can hurt a user legally.
+`tests/compliance-claims-match-code.test.js` makes it mechanical: a control is ENFORCED
+only where its name is a string-literal argument to a real `isControlEnabled(` call (in
+comment-stripped `src/**/*.js` or a FENCED code block of a shipped instruction surface —
+a comment and a prose citation are not callers, the same discipline the reachability
+fence uses). Every naming of a NOT-enforced control across the WHOLE claim surface
+(`agents/**/*.md`, `docs/*.md`, `README.md`, this file) must carry the literal marker
+`NOT ENFORCED`: a table row and a list item are marked in place, a heading or prose
+paragraph is covered by a marker in its section, and a marker must never sit on an
+enforced control's own block (a stale marker is removed when the control is finally
+wired). Fenced code and settings examples are not claim surface; a zero-controls,
+zero-files, empty-ENFORCED or unreadable-doc scan FAILS rather than reporting "honest".
+Today the one enforced control is Independent Verification and Validation (the IV&V
+chief's activation call); every other named control carries the marker.
 
 **The recipe-execution fence — a shipped recipe is proven by RUNNING it.** A static
 check cannot catch the defect class this fence exists for: the broken `cleanup-exec`
@@ -572,7 +589,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 500 test files
+  tests/                 501 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

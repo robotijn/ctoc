@@ -90,16 +90,21 @@ function attachComplianceQuestion(result, projectPath) {
     '⚖ No EU compliance regime chosen yet — pick one (gdpr = processes EU ' +
     'personal data under Regulation (EU) 2016/679 · eu-ai-act = deploys AI ' +
     'systems in the EU market under Regulation (EU) 2024/1689). The four human ' +
-    'gates stay mandatory. Changeable later in settings.yaml.\n\n' +
+    'gates stay mandatory. Changeable later in settings.yaml.\n' +
+    'Choosing a regime is RECORDED in settings and switches on the advisory ' +
+    'GDPR / EU AI Act review that runs during planning. It does NOT enforce the ' +
+    "profile's regulatory controls (audit hash-chain, four-eyes at the final " +
+    'gate, legal hold and the rest are present as libraries but NOT ENFORCED). ' +
+    'Do not treat a chosen regime as compliance coverage.\n\n' +
     result.text;
   result.ask.questions.push({
     question: 'Which EU compliance regime applies to this project?',
     header: 'Compliance',
     options: [
       { label: 'None', description: 'No EU compliance regime — skip the GDPR / EU AI Act controls' },
-      { label: 'GDPR', description: 'Processes EU personal data — Regulation (EU) 2016/679' },
-      { label: 'EU AI Act', description: 'Deploys AI systems in the EU market — Regulation (EU) 2024/1689' },
-      { label: 'Both', description: 'GDPR and the EU AI Act both apply' }
+      { label: 'GDPR', description: 'Processes EU personal data — Regulation (EU) 2016/679 — advisory review only; the profile controls are NOT ENFORCED' },
+      { label: 'EU AI Act', description: 'Deploys AI systems in the EU market — Regulation (EU) 2024/1689 — advisory review only; the profile controls are NOT ENFORCED' },
+      { label: 'Both', description: 'GDPR and the EU AI Act both apply — advisory review only; the profile controls are NOT ENFORCED' }
     ]
   });
   Object.assign(result.actions, {
