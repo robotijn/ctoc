@@ -1,0 +1,9 @@
+{
+  "content_sha256": "674780b8992bcef908202b039aa5d16fc69e7ccba0fe6f4405f774f2516b902b",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T19:04:14.706Z",
+  "approved_by": "human",
+  "plan_basename": "00189-the-refinement-loop-is-documented-as-running-and-is-a-design-record"
+}

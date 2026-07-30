@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 iron_loop: true
 title: "Every request is routed through CTOC by hooks, not by paragraphs — a per-prompt routing hook and a registry-driven agent-ownership check"
 type: implementation
@@ -16,6 +17,10 @@ files:
   - src/hooks/PreToolUse.Edit.js
   - tests/agent-ownership.test.js
   - .ctoc/operations-registry.yaml
+  - CLAUDE.md
+approved_by: human
+approved_at: 2026-07-30T19:04:14.650Z
+gate_crossed: implementation → todo
 ---
 
 # Every request is routed through CTOC by hooks, not by paragraphs
@@ -52,19 +57,27 @@ below it.
 ## Why a hook and not documentation — the design rationale
 
 This project has been bitten repeatedly, and recently, by rules that live only in
-prose. Five confirmed instances, each verified by direct reading:
+prose. The instances below are each verified by direct reading of the CURRENT tree:
 
-1. **`enforcement.mode` is written but never read.** `src/lib/init-project.js:504-511`
-   writes an `enforcement: mode: strict | soft | off` block into every new project's
-   settings file. Nothing in `src/` reads it. `src/hooks/PreToolUse.Task.js:26-28`
-   contains a comment that says so outright: *"The sibling PreToolUse hooks do not
-   read `enforcement.mode` … so this one does not either."* CTOC ships a visible
-   switch wired to nothing. (Subject of a separate in-flight plan.)
+1. **`enforcement.mode` was written but not read for a long time — a shipped switch
+   wired to nothing, since made live.** `src/lib/init-project.js:509-510` still writes
+   an `enforcement: mode: strict | soft | off` block into every new project's settings
+   file. For most of the project's life nothing in `src/` read it. That gap has SINCE
+   been closed: `src/lib/enforcement-mode.js` now resolves the mode and the four editing
+   hooks consult it (`PreToolUse.Edit.js:608-610` and `:687-701`).
+   `src/hooks/PreToolUse.Task.js:26-32` records the change in its own header — *"The
+   sibling editing hooks NOW honor `enforcement.mode` … but this hook deliberately does
+   NOT"* — the exact inversion of the comment that stood there when this plan was first
+   drafted. It is kept here as a FORMER instance because its cure is the whole point: a
+   prose-only switch stayed dead until someone made it executable.
 
-2. **`src/hooks/SessionStart.js:199-201` instructs agents to call a function they
-   cannot invoke.** The injected directive tells each subagent to write "via
-   `src/lib/streaming-precompute.js → writePlanQuestions(...)`". A subagent cannot
-   call a JavaScript function; it can only be told to, and hope.
+2. **`src/hooks/SessionStart.js` (the `questionDispatchDirective`, ~line 199)
+   instructs subagents to write via a JavaScript function they cannot themselves call.**
+   The injected directive tells each dispatched subagent to write "via
+   `streaming-precompute.writePlanQuestions(...)`". A subagent cannot call a JavaScript
+   function; it can only be told to, and hope. This is now the ACCEPTED session-driven
+   mechanism (X7), not a defect — but it still makes the point: the directive holds only
+   for as long as the model keeps following it.
 
 3. **A `precompute` task kind was documented in the menu recipe and rejected by the
    registry.** The whole streaming-question subsystem never ran. Fixed in commit
@@ -74,7 +87,7 @@ prose. Five confirmed instances, each verified by direct reading:
 4. **`.ctoc/operations-registry.yaml` is described in `CLAUDE.md` as the "Agent
    registry, kanban config" and NOTHING IN `src/` READS IT.** A grep for
    `operations-registry` across `src/` returns exactly one hit, in a comment in
-   `src/scripts/release.js:59`. A 500-line hand-maintained single source of truth,
+   `src/scripts/release.js:60`. A 500-line hand-maintained single source of truth,
    consulted by no code. Part Two of this plan makes it live for the first time.
 
 5. **Instruction-following decays over a long session.** This is not a theory about
@@ -91,10 +104,10 @@ inflating it would be the failure mode.
 
 | Behavior | Enforced today? | Where |
 |---|---|---|
-| Editing a file no active plan covers is blocked | **YES, deterministically** | `src/hooks/PreToolUse.Edit.js` + `Write` / `MultiEdit` / `NotebookEdit` siblings. Whitelist → CTOC-project detect → plan coverage → escape phrase → deny via `hook-deny-signal.emitDeny`. |
+| Editing a file no active plan covers is blocked | **YES, deterministically** (at the default `enforcement.mode: strict`) | `src/hooks/PreToolUse.Edit.js` + `Write` / `MultiEdit` / `NotebookEdit` siblings. Protected-path guards → whitelist → CTOC-project detect → plan coverage → escape phrase → enforcement-mode → deny via `hook-deny-signal.emitDeny`. |
 | The four human gates cannot be self-crossed | **YES** | `src/hooks/human-gate-check.js`, on the `*` PreToolUse matcher. |
 | More than five concurrent background subagents | **YES** | `src/hooks/PreToolUse.Task.js` via `agent-slots.acquire`. |
-| Escape phrases count only when the human typed them | **YES** | `PreToolUse.Edit.js:240-300` — role-scoped transcript extraction excludes tool results. |
+| Escape phrases count only when the human typed them | **YES** | `PreToolUse.Edit.js:369-429` — role-scoped transcript extraction excludes tool results. |
 | CTOC context injected once per session | **YES** | `src/hooks/SessionStart.js`, with a streaming directive that is **empty when nothing is pending**. |
 | **A per-request reminder to route work through CTOC** | **NO — does not exist** | No `UserPromptSubmit` hook is registered. A grep for `UserPromptSubmit` across the entire repository returns zero matches. → **Part One** |
 | **"Use CTOC's own agents; never substitute a stand-in"** | **NO — documented only** | `PreToolUse.Task.js` enforces the concurrency cap and nothing else. The rule lives only in `CLAUDE.md` prose. → **Part Two** |
@@ -134,8 +147,9 @@ event that never fires is precisely the placebo this plan exists to stop shippin
 ## The decision — how it stays quiet
 
 A reminder repeating identical text every prompt will be tuned out and will burn
-context. `SessionStart.js:173-207` already models the discipline: its streaming
-directive returns `''` when nothing is pending. Two independent quiet gates apply here.
+context. `SessionStart.js:209-218` already models the discipline: its
+`questionDispatchDirective` returns `''` when nothing is pending. Two independent quiet
+gates apply here.
 
 The injected text is assembled from two blocks, each with its own firing rule. If both
 are empty, the hook writes **nothing at all** to stdout and exits 0.
@@ -176,12 +190,13 @@ Fingerprint and last-emission memo are stored per session id in
 
 `streaming-gate.pendingGateDecisions(root)` looks like the natural source for "plans
 awaiting a decision". **It must not be called from this hook.** Its own documentation
-(`src/lib/streaming-gate.js:417-443`) states it "is no longer a pure read": it CROSSES
-qualifying gates as a side effect before listing. Calling it once per prompt would run
-gate-crossing machinery on the hottest path in the system.
+(`src/lib/streaming-gate.js:551-601`, the `pendingGateDecisions` function at line 576)
+states, under the "X6 — THE GATE CROSSES ITSELF" heading, that it "is no longer a pure
+read": it CROSSES qualifying gates as a side effect before listing. Calling it once per
+prompt would run gate-crossing machinery on the hottest path in the system.
 
 This hook reads **only** `state.getPlanCounts(root)` — pure, memoized, per-stage counts
-— and points the human at `/ctoc:menu` for the decision detail. The hook never touches
+— and points the human at `/ctoc:start` for the decision detail. The hook never touches
 gate logic at all.
 
 ## The injected text — drafted in full
@@ -197,7 +212,7 @@ real text, not a placeholder.
 This request looks like work (build, change, fix, add). No CTOC plan is currently
 driving it. Before editing any file:
 
-1. Run /ctoc:menu and create or activate a plan whose `files:` list covers what you
+1. Run /ctoc:start and create or activate a plan whose `files:` list covers what you
    are about to touch. Edits to files no active plan covers are BLOCKED by the
    PreToolUse hook — the write will be denied, not warned about.
 2. Use CTOC's own agents for pipeline work: vision-advisor, product-owner,
@@ -222,7 +237,7 @@ type an escape phrase. Do not route around the pipeline silently.
 - Todo queue: 4 plans ready to build
 - Awaiting a gate decision: 6 in implementation, 12 in review
 
-Open /ctoc:menu to see which decisions are open and answer them.
+Open /ctoc:start to see which decisions are open and answer them.
 ```
 
 Every line is conditional. Zero true lines produces `''`, not an empty heading.
@@ -235,10 +250,10 @@ asks for it:
 
 - Claude Code reads a plugin's hook registrations from `.claude-plugin/hooks.json` at
   the installed plugin root, so every fresh install has it.
-- `/ctoc:update` (`src/commands/update.js:250-257`) copies **every file** from the
-  fetched clone into the new cache version directory, excluding only `.git`.
-  `.claude-plugin/hooks.json` is included. `update.js:311` already tells the user to
-  restart, which is when the registration takes effect.
+- `/ctoc:update` (`src/commands/update.js`) refreshes the marketplace clone
+  (`git reset --hard origin/main`) and syncs it into the active cache version directory;
+  `.claude-plugin/hooks.json` is part of that sync, and the command already tells the
+  user to restart, which is when the registration takes effect.
 
 Nothing in `init-project.js` changes — hooks are plugin-level, not project-level.
 
@@ -373,11 +388,14 @@ if (require.main === module) { run(readStdinJson()); }
 Payload fields consumed: `prompt` and `session_id`, both defended. A missing
 `session_id` falls back to `'unknown-session'`, degrading the novelty gate to "always
 novel" rather than crashing. The library is required inside a try/catch (matching
-`PreToolUse.Edit.js:49-56`), so a broken library degrades to silence.
+`PreToolUse.Edit.js:49-70`), so a broken library degrades to silence.
 
 ### File: `.claude-plugin/hooks.json`
 
-**Action:** MODIFY — add a top-level `UserPromptSubmit` array:
+**Action:** MODIFY — add a `UserPromptSubmit` key inside the existing top-level `hooks`
+object (a sibling of `SessionStart`, `PreToolUse`, `PostToolUse`, `SubagentStop`,
+`Stop`). The current file wraps every event under a single top-level `"hooks"` object;
+the new key goes there, not at the document root:
 
 ```json
 "UserPromptSubmit": [
@@ -410,10 +428,10 @@ Why this shape was chosen over the alternatives:
 - It is the only option that catches **one CTOC agent standing in for another**, not
   merely a generic stand-in. A deny-list of generic agent names would catch the common
   habit but say nothing about which agent was actually right.
-- **The dispatch hook already reads the agent type.** `src/hooks/PreToolUse.Task.js:90`
-  reads `input.subagent_type`. The input it needs is in hand.
-- The registry already names agents in 42 places, so the mapping surface exists rather
-  than being invented.
+- **The dispatch hook already reads the agent type.** `src/hooks/PreToolUse.Task.js:94`
+  (inside `getLabel`) reads `input.subagent_type`. The input it needs is in hand.
+- The registry already names agents in dozens of places, so the mapping surface exists
+  rather than being invented.
 - A **semantic-match** approach was rejected as probabilistic: a false block at dispatch
   time stops legitimate work with no override path, and a check that misfires gets
   switched off within a week.
@@ -427,11 +445,11 @@ mapping in a usable shape, say so plainly and plan the minimal addition rather t
 pretending it is already there.* It does not, on two counts.
 
 **First: nothing reads the registry at all.** A grep for `operations-registry` across
-`src/` returns exactly one hit, and it is a comment in `src/scripts/release.js:59`.
+`src/` returns exactly one hit, and it is a comment in `src/scripts/release.js:60`.
 This plan makes the registry executable for the first time in its life.
 
 **Second: the mapping it does contain is STALE RIGHT NOW.** The `iron_loop:` block
-(`.ctoc/operations-registry.yaml:170-251`) maps steps to agents — but it is a
+(`.ctoc/operations-registry.yaml:170-248`) maps steps to agents — but it is a
 **15-step** map, and the live Iron Loop is **16 steps**. Read the two side by side:
 
 | Registry `iron_loop:` block | Live Iron Loop (`CLAUDE.md`, `plan-validator.js`) |
@@ -497,7 +515,8 @@ override.** Reasoning:
 
 - **A warning nothing acts on is documentation again.** That is the precise failure
   this entire plan exists to end. Shipping a stderr line that no mechanism consumes
-  would be finding number six on the list above, authored by this plan.
+  would be one more instance of the defect class on the list above, authored by this
+  plan.
 - **Every sibling hook blocks.** `PreToolUse.Edit.js` denies an uncovered edit;
   `PreToolUse.Task.js` denies a sixth subagent; `human-gate-check.js` reverts a
   crossed gate. A warn-only fence in the same file would be inconsistent and inert.
@@ -515,7 +534,7 @@ override.** Reasoning:
 
 ### The escape phrase lifts this check — and deliberately differs from its neighbour
 
-`PreToolUse.Task.js:36-43` documents, at length, that the concurrency cap honors **no**
+`PreToolUse.Task.js:34-47` documents, at length, that the concurrency cap honors **no**
 escape phrase, because five slots is a **resource** limit and no phrase conjures a
 sixth execution context. That reasoning is correct and it **does not transfer**. Agent
 ownership is process, not resource — exactly the ceremony escape phrases exist to skip.
@@ -529,7 +548,7 @@ same path `PreToolUse.Edit.js` already uses. No phrase is added, removed, or cha
 
 ### Ordering — the ownership check runs BEFORE the slot is acquired
 
-`PreToolUse.Task.js:199` calls `agentSlots.acquire()` and the block path at line 217
+`PreToolUse.Task.js:203` calls `agentSlots.acquire()` and the block path at line 221
 returns without releasing. If the ownership check ran after the acquire, every denied
 dispatch would **leak a slot** — the store would count a subagent that never launched,
 and the five-slot cap would silently tighten to four, then three. The ownership check
@@ -559,9 +578,12 @@ No cycles. No hook requires another hook — the shared escape reader is extract
 so both hooks share one implementation.
 
 `extractUserTypedText(transcript)` and `findEscapeInTranscript(transcript)` are moved
-here **verbatim** from `PreToolUse.Edit.js:240-300`, including their JSDoc and the
-`slice(-5000)` bound. Behavior is byte-for-byte unchanged; this is a move, not a
-rewrite.
+here **verbatim** from `PreToolUse.Edit.js:369-429` (extractUserTypedText at 369-414,
+findEscapeInTranscript at 425-429), including their JSDoc and the `slice(-5000)` bound
+at line 428. Behavior is byte-for-byte unchanged; this is a move, not a rewrite. Because
+`findEscapeInTranscript` calls `escapePhrases.matchEscapePhrase`, the new module loads
+`../lib/escape-phrases` fail-soft (its own try/catch, module null on failure → returns
+null), preserving the Edit hook's existing degrade-to-no-escape behavior exactly.
 
 ### File: `src/hooks/PreToolUse.Edit.js`
 
@@ -570,10 +592,11 @@ rewrite.
 - Remove the two moved function bodies.
 - `const { extractUserTypedText, findEscapeInTranscript } = require('../lib/transcript-escape');`
   loaded fail-soft in its own try/catch, matching the existing sibling-loading style at
-  lines 49-56.
+  lines 49-70.
 - **`module.exports` keeps `extractUserTypedText` and `findEscapeInTranscript`
-  unchanged**, so the existing test files that import them from this path continue to
-  pass untouched. This is the whole reason for the re-export: no existing test changes.
+  unchanged** (they are exported today at `PreToolUse.Edit.js:724`), so the existing
+  test files that import them from this path continue to pass untouched. This is the
+  whole reason for the re-export: no existing test changes.
 
 ### File: `src/lib/agent-ownership.js`
 
@@ -641,7 +664,10 @@ module.exports = {
 
 **Action:** MODIFY — insert the ownership check as step 2, **before** the slot acquire.
 
-New flow:
+The current flow (verified) is: (1) CTOC project? no → silent pass (`enforce`, ~line
+194-199); (2) take a slot via `agentSlots.acquire` (line 203); (3) got one → allow;
+(4) full → block, FINAL (line 221). The new check inserts between the current CTOC-project
+check and the slot acquire:
 
 1. CTOC project? No → silent pass. *(unchanged)*
 2. **NEW — ownership check.** `checkOwnership(...)`. Allowed → continue. Denied →
@@ -669,8 +695,11 @@ and the fact that a typed escape phrase lifts it:
   yourself does lift it — unlike the five-slot concurrency cap in this same hook.
 ```
 
-The module header gains a paragraph explaining why the two checks in this file have
-different escape-phrase semantics.
+Note the current `PreToolUse.Task.js` imports NO escape-phrase reader (its header at
+lines 73-75 says so explicitly, because the cap ignores escape phrases). Part Two adds
+the `../lib/transcript-escape` require for the ownership check's override only; the
+concurrency block below it still consults no phrase. The module header gains a paragraph
+explaining why the two checks in this file have different escape-phrase semantics.
 
 ## Part Two test plan — `tests/agent-ownership.test.js`
 
@@ -760,7 +789,7 @@ Part One and Part Two share these.
 | Calling `pendingGateDecisions` would cross gates on every prompt | Explicitly forbidden; the module never requires `streaming-gate` | `collectState` |
 | The memo store grows unbounded | Pruned to 20 sessions on every write | `writeMemo` |
 | A hook bug breaks the human's session | Never throws, never exits non-zero, library required in try/catch | `UserPromptSubmit.js` |
-| **The ownership map goes STALE and enforces a pipeline that no longer exists** | `loop_steps` stamp compared against `LIVE_LOOP_STEPS`; a mismatch disables enforcement entirely (allow-all) rather than enforcing an outdated map. Test 7 proves it. **This is a mitigation, not a cure — the map's ongoing honesty depends on the unexecutable-instruction fence being built by the separate plan at `plans/implementation/00073-ui1-unexecutable-instruction-fence.md`, which is NOT built here.** The `iron_loop:` block being off by a full step-numbering revision today is the proof that this risk is live, not theoretical. | `loadOwnershipMap`, `LIVE_LOOP_STEPS` |
+| **The ownership map goes STALE and enforces a pipeline that no longer exists** | `loop_steps` stamp compared against `LIVE_LOOP_STEPS`; a mismatch disables enforcement entirely (allow-all) rather than enforcing an outdated map. Test 7 proves it. **This is a mitigation, not a cure — the map's ongoing honesty is helped by the unexecutable-instruction fence planned separately at `plans/implementation/00073-ui1-unexecutable-instruction-fence.md`, which is NOT built here and is NOT a build-time dependency of this plan (the `loop_steps` stamp stands on its own).** The `iron_loop:` block being off by a full step-numbering revision today is the proof that this risk is live, not theoretical. | `loadOwnershipMap`, `LIVE_LOOP_STEPS` |
 | A false ownership block stops legitimate work, so the check gets switched off | Absence of knowledge never blocks — six distinct allow-on-ignorance paths, each tested. The single deny requires positive knowledge of both the kind and the owner. A typed escape phrase lifts it. | `checkOwnership`, tests 4-11 |
 | The ownership deny leaks a concurrency slot | The check runs before `agentSlots.acquire`; asserted by a store-unchanged assertion | `PreToolUse.Task.js` step 2, test 1 |
 | Moving the escape reader breaks the heavily-tested Edit hook | It is a verbatim move; `Edit.js` re-exports both functions so its public surface and every existing test are unchanged | test 12 |
@@ -779,7 +808,7 @@ Part One and Part Two share these.
 5. **A typed escape phrase suppresses the routing directive and lifts the ownership
    check.** Both compose with `src/lib/escape-phrases.js` rather than duplicating it.
 6. **No installer change.** `.claude-plugin/hooks.json` already ships on install and is
-   copied wholesale by `/ctoc:update`.
+   synced by `/ctoc:update`.
 7. **Prompt text is never persisted.**
 8. **The ownership map is a NEW `agent_ownership:` block, not the existing `iron_loop:`
    block.** The existing block is a 15-step map of a 16-step loop and is wrong today.
@@ -798,7 +827,7 @@ Part One and Part Two share these.
 | Criterion | Implemented in | Test |
 |---|---|---|
 | Every request routes through CTOC | `UserPromptSubmit.js` + `buildRoutingDirective` | Part One test 1 |
-| Installed as a hook, automatically on install and update | `.claude-plugin/hooks.json`, copied by `update.js:250-257` | Part One test 1 plus a registration-shape assertion |
+| Installed as a hook, automatically on install and update | `.claude-plugin/hooks.json`, synced by `update.js` | Part One test 1 plus a registration-shape assertion |
 | Not documentation | Both hooks execute; tests drive them as child processes | Part One 1-3, Part Two 1-3 |
 | Fails open on internal error | `buildReminder` catch; `checkOwnership` error path; both hooks | Part One 3, Part Two 9 |
 | Not noisy | Work-intent gate + novelty gate; `''` by default | Part One 4-9 |
@@ -833,7 +862,10 @@ Then confirm the existing module surface: `ctoc-project-detector.isCtocProject`,
 `state.getPlanCounts`, `escape-phrases.matchEscapePhrase`, `agent-slots.acquire`,
 `hook-deny-signal.emitDeny`, and `safe-fs` all export what this plan assumes. Re-read
 `.ctoc/operations-registry.yaml` to confirm the `iron_loop:` staleness described above
-is still exactly as recorded.
+(15-step, ASSESS at step 1, QUALITY at step 8, FINAL-REVIEW at step 15) is still exactly
+as recorded. Re-read `PreToolUse.Edit.js` to confirm `extractUserTypedText` /
+`findEscapeInTranscript` are still the two functions to move and are still exported, and
+`PreToolUse.Task.js` to confirm the acquire is still the point to insert before.
 
 ### Step 10: IMPLEMENT
 
@@ -842,18 +874,20 @@ Part One:
   text, both quiet gates.
 - `src/hooks/UserPromptSubmit.js` — `readStdinJson` and `run`, fail-soft library load,
   always exit 0.
-- `.claude-plugin/hooks.json` — the `UserPromptSubmit` registration.
+- `.claude-plugin/hooks.json` — the `UserPromptSubmit` registration, added as a key
+  inside the existing top-level `hooks` object.
 
 Part Two:
 - `.ctoc/operations-registry.yaml` — the new `agent_ownership:` block. Leave the stale
   `iron_loop:` block untouched; correcting it is a different piece of work and is not
   this plan's to schedule.
-- `src/lib/transcript-escape.js` — the verbatim move.
+- `src/lib/transcript-escape.js` — the verbatim move, with a fail-soft `escape-phrases`
+  require.
 - `src/hooks/PreToolUse.Edit.js` — require the moved functions, keep exports identical.
 - `src/lib/agent-ownership.js` — parser, loader, classifier, decision.
 - `src/hooks/PreToolUse.Task.js` — the ownership check inserted before the slot acquire,
-  the deny message builder, and the module-header paragraph on the two checks' differing
-  escape-phrase semantics.
+  the deny message builder, the `transcript-escape` require, and the module-header
+  paragraph on the two checks' differing escape-phrase semantics.
 
 ### Step 11: REVIEW
 
@@ -888,20 +922,22 @@ plus the coverage floor and the zero-skipped gate via `src/scripts/test-gate.js`
 
 Required: `# fail 0`, zero skipped, coverage at or above the
 `.ctoc/coverage-baseline.json` floor (**99**, scoped to `src/**`), and 100% line and
-branch coverage on all three new library files. Confirm the existing hook tests
-(`gate-hook-revival`, `pretooluse-task-coverage`, `installer-paths`) still pass with the
-new `hooks.json` entry, the modified `Task.js`, and the re-exporting `Edit.js`.
+branch coverage on all three new library files. Confirm the existing hook tests that
+touch these files (the `PreToolUse.Task` coverage tests, the escape-phrase / transcript
+tests that import `extractUserTypedText` from `PreToolUse.Edit.js`, and the installer /
+hooks-manifest tests) still pass with the new `hooks.json` entry, the modified
+`Task.js`, and the re-exporting `Edit.js`.
 
 ### Step 15: DOCUMENT
 
-Update the hook inventory line in `CLAUDE.md` (16 → 17) and the module count. Full JSDoc
-on all new functions, including the "never exits non-zero" contract, the reason
-`streaming-gate` is deliberately not used, and the reason the two checks in
-`PreToolUse.Task.js` treat escape phrases differently. Note in both module headers that
-`.claude-plugin/hooks.json` is the install-and-update wiring, so a future reader does not
-hunt for installer code that does not exist. Record in the registry block's comment that
-`loop_steps` must be updated whenever the Iron Loop step count changes, and that a
-mismatch disables the check.
+Update the hook inventory line in `CLAUDE.md` (16 → 17 Claude Code hooks) and the JS
+module count (three new `src/lib` modules). Full JSDoc on all new functions, including
+the "never exits non-zero" contract, the reason `streaming-gate` is deliberately not
+used, and the reason the two checks in `PreToolUse.Task.js` treat escape phrases
+differently. Note in both module headers that `.claude-plugin/hooks.json` is the
+install-and-update wiring, so a future reader does not hunt for installer code that does
+not exist. Record in the registry block's comment that `loop_steps` must be updated
+whenever the Iron Loop step count changes, and that a mismatch disables the check.
 
 ### Step 16: FINAL-REVIEW
 
@@ -911,3 +947,66 @@ on error) each driven through the real hook as a child process; the ownership de
 proven not to leak a slot; the stale-map path proven to allow rather than enforce; the
 Step 9 verification result recorded honestly in this file; no stub, no TODO; every
 ambiguous call documented above. Then hand to Gate 3.
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [ ] Write tests for the implementation
+- [ ] Test error conditions
+- [ ] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [ ] Install dependencies if needed
+- [ ] Check prerequisites
+- [ ] Verify dev environment ready
+- [ ] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [ ] Implement the feature according to requirements
+- [ ] Add error handling
+- [ ] Wire up integration points
+
+### Step 11: REVIEW
+- [ ] Self-review all new code
+- [ ] Verify integration points work together
+- [ ] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [ ] Remove redundant operations
+- [ ] Optimize critical paths
+- [ ] Simplify complex code
+
+### Step 13: SECURE
+- [ ] Validate inputs (no path traversal)
+- [ ] Sanitize outputs
+- [ ] No secrets in code
+- [ ] Safe file operations
+
+### Step 14: VERIFY
+- [ ] Run lint + type check
+- [ ] Run ALL tests (TDD Green)
+- [ ] Check coverage >= 80%
+- [ ] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [ ] Update relevant documentation
+- [ ] Add JSDoc comments to new functions
+- [ ] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [ ] Verify steps 8-15 completed correctly
+- [ ] All quality checks passed
+- [ ] Manual verification if needed
+- [ ] Ready for human review
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

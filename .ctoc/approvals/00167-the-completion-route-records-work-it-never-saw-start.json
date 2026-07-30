@@ -1,0 +1,9 @@
+{
+  "content_sha256": "602806c66e6a374bb98ff2ce5770235e3a0dd18643e6c7be4e6ee36bef4cabb2",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T19:04:14.772Z",
+  "approved_by": "human",
+  "plan_basename": "00167-the-completion-route-records-work-it-never-saw-start"
+}

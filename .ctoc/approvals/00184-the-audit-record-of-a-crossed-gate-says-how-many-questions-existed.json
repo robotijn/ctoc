@@ -1,0 +1,9 @@
+{
+  "content_sha256": "927cc4bc7c7293adc19f9f917f0523d3b9fb2d3c036c1c0df643c760a7f74b5f",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T19:04:14.585Z",
+  "approved_by": "human",
+  "plan_basename": "00184-the-audit-record-of-a-crossed-gate-says-how-many-questions-existed"
+}

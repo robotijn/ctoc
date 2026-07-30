@@ -1,0 +1,9 @@
+{
+  "content_sha256": "83d0bde7c37929392fadfcd5342face185012e007dd4b66549f530f2d1d3ca61",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T19:04:14.677Z",
+  "approved_by": "human",
+  "plan_basename": "00072-r1-per-request-ctoc-routing-hook"
+}

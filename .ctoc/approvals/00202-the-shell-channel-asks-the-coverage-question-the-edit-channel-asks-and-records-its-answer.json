@@ -1,0 +1,9 @@
+{
+  "content_sha256": "9f9e9e4606f85e04a385e59ce47accd792be477e5c2467c72a4741d46f19a5aa",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T19:04:14.616Z",
+  "approved_by": "human",
+  "plan_basename": "00202-the-shell-channel-asks-the-coverage-question-the-edit-channel-asks-and-records-its-answer"
+}

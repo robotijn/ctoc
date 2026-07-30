@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "The refinement loop is documented as a running mechanism and is a design record — ten of its exports are dead, its named driver cannot dispatch or execute, and one of its listed files does not exist"
 type: implementation
 parent_plan: none
@@ -9,6 +10,10 @@ iron_loop: true
 files:
   - "docs/REFINEMENT_LOOP.md"
   - "tests/refinement-loop-claims-match-code.test.js"
+  - "CLAUDE.md"
+approved_by: human
+approved_at: 2026-07-30T19:04:14.682Z
+gate_crossed: implementation → todo
 ---
 
 # The refinement loop is documented as a running mechanism
@@ -25,12 +30,14 @@ Verifier confirms…"
 A reader — a human evaluating CTOC, or an agent instructed to read the specification —
 concludes this loop runs.
 
-## What is on disk, verified 2026-07-20
+## What is on disk, verified 2026-07-30
 
 ### Ten of the module's exports have no caller
 
 `.ctoc/export-reachability-baseline.json` lists exactly ten dead exports from
-`src/lib/refinement-loop.js`:
+`src/lib/refinement-loop.js` (entries at `:36-45` in the baseline today — the file was
+re-seeded again since this plan was first written, so take the list from the file, never
+from a cited line range):
 
 ```
 appendRound · buildLetter · computeFingerprint · detectImplementerWall
@@ -44,16 +51,22 @@ compare on, and the letter format the document argues for over Markdown at Decis
 
 ### The one live export writes a note nothing reads
 
-`shouldRunLoop` is genuinely called — `src/lib/actions.js:691`, inside
-`recordRefinementGate`, itself called at `:619` when a plan enters the todo queue. Its
-docblock at `:682` says the verdict is written to
-`<root>/.ctoc/state/refinement/<slug>.json` "for the integrator/menu to read."
+`shouldRunLoop` is genuinely called — `src/lib/actions.js:766` (required at `:753`),
+inside `recordRefinementGate` (defined at `:751`), itself called at `:681` from
+`applyIronLoop` when a plan enters the todo queue. Its docblock at `:744` says the verdict
+is written to `<root>/.ctoc/state/refinement/<slug>.json` "for the integrator/menu to
+read."
 
-Grepped across all of `src/`: **that path is written at `actions.js:707` and read
-nowhere.** Not by the integrator, not by the menu, not by any hook. The gate computes a
-correct decision, persists it durably, and no consumer exists. The write is additionally
-wrapped in a bare `catch {}` at `:714`, so a failure to record it is invisible — defensible
-as advisory-and-fail-open, and worth knowing given nothing reads the result either way.
+Grepped across all of `src/`: **that path is built via
+`path.join(root, '.ctoc', 'state', 'refinement')` at `actions.js:769` and written at
+`:772`, and it is read nowhere.** Not by the integrator, not by the menu, not by any hook.
+The gate computes a correct decision, persists it durably, and no consumer exists. Because
+the path is assembled from `path.join` segments, the only place the literal string
+`state/refinement` appears is the docblock comment at `:744` — a grep for that literal will
+NOT land on the write site, which is why the test below (Case 4) matches the `path.join`
+segment form as well. The write is additionally wrapped in a bare `catch {}` at `:776`, so
+a failure to record it is invisible — defensible as advisory-and-fail-open, and worth
+knowing given nothing reads the result either way.
 
 ### The named driver cannot dispatch agents or execute code
 
@@ -147,7 +160,7 @@ Bidirectional, so the document cannot go stale in either direction.
 | 1 | the marker is present | `docs/REFINEMENT_LOOP.md` contains `NOT RUNNING` |
 | 2 | **the dead-export claim is measured, not stated** | read `.ctoc/export-reachability-baseline.json`; collect every entry beginning `src/lib/refinement-loop.js#`; assert the document's list names exactly that set. **If an export is wired later, the sets diverge and this FAILS**, demanding the document be updated — the good-news direction |
 | 3 | `shouldRunLoop` is still the live one | it is absent from the dead-export set, and `src/lib/actions.js` still requires `./refinement-loop`. If the live caller disappears, the document must say so |
-| 4 | **the gate verdict still has no reader** | grep `src/` for `state/refinement`: exactly one write site, zero read sites. **When a reader is added this FAILS**, and the document's claim about the unread note must go |
+| 4 | **the gate verdict still has no reader** | search `src/**/*.js` for references to the refinement gate-state directory, matching BOTH the string-literal form `state/refinement` AND the `path.join` segment form `'state', 'refinement'` (the write assembles the path from segments, so a bare `state/refinement` grep hits only the docblock comment). Assert (a) the only module that references that directory is `src/lib/actions.js`, and (b) actions.js WRITES it (a `writeFileSync` into the `state/refinement` dir inside `recordRefinementGate`) and performs NO read (no `readFileSync`/`readFile`/`readdirSync`/`readdir` against that dir). **When a reader is added in any module this FAILS**, and the document's claim about the unread note must go |
 | 5 | every file in the table exists, or is marked | for each path in the "Files and where they live" table, either the file is on disk or its row carries the not-existing marker. `letter-renderer.js` is the live instance; a future file that vanishes is caught the same way |
 | 6 | the driver's tool grant matches the claim | parse `tools:` from `agents/iron-loop/iron-loop-integrator.md`; if it lacks `Task` or `Bash`, the table row must say so; **if it gains both, this FAILS** and the row must be corrected |
 | 7 | the round description is not read as reportage | the "How a round runs" section carries its specification label. A weak assertion by nature — asserted on the label's presence, not on prose — and it is stated as such in the test's comment rather than dressed up as stronger than it is |
@@ -183,11 +196,15 @@ Step 8 they fail for absence of the document text, which is expected.
 
 ### Step 9: PREPARE
 Read `docs/REFINEMENT_LOOP.md` in full. Read `.ctoc/export-reachability-baseline.json` and
-**take the dead-export list from that file, not from this plan** — it was re-seeded on
-2026-07-19 and line numbers cited in older plans (`00110` cites `:66-75`; the entries sit
-at `:39-48` today) have already drifted. Read `src/lib/actions.js:676-717` and
-`src/lib/refinement-loop.js:598-640` (the export block). Confirm by grep that
-`state/refinement` has one writer and no reader. Check each path in the file table for
+**take the dead-export list from that file, not from this plan** — it has been re-seeded
+several times (entries sit at `:36-45` today; older plans cite ranges that have already
+drifted). Read `src/lib/actions.js:674-687` (the `recordRefinementGate` call inside
+`applyIronLoop`) and `:739-779` (`recordRefinementGate` itself — docblock, the
+`path.join(root, '.ctoc', 'state', 'refinement')` build, the write, and the fail-open bare
+`catch {}`). Read `src/lib/refinement-loop.js:645-690` (the `module.exports` block).
+Confirm by grep that the refinement gate-state directory has one writer and no reader,
+searching BOTH the literal `state/refinement` (docblock only) and the `path.join` segment
+form `'state', 'refinement'` (the write site). Check each path in the file table for
 existence. Read `agents/iron-loop/iron-loop-integrator.md:1-11`. **Where the code
 disagrees with this plan, THE CODE WINS and the disagreement is reported** — the ten-export
 figure and the missing renderer are the two claims most worth re-verifying.
@@ -219,9 +236,18 @@ list verbatim** so the document's list and the baseline can be compared by eye o
 human, before the test is trusted to do it forever.
 
 ### Step 15: DOCUMENT
-The document IS the change. Additionally check whether `CLAUDE.md` or `README.md` asserts
-the refinement loop runs; if either does, report it — **do not edit either file here**,
-since both are broadly shared and an unscoped edit would collide with sibling slices.
+The document IS the change. `CLAUDE.md` is declared in this plan's `files:` ONLY to satisfy
+the count-mover declaration fence (`tests/plan-declares-count-moving-ratchets.test.js`):
+creating a new `tests/*.test.js` file moves the documented test-file tally, and a plan that
+creates a counted artifact must declare `CLAUDE.md` to cross Gate 2. The test-file count is
+a GENERATED growing tally (`src/lib/doc-counts.js` `computeDocCounts.testFiles`, written into
+CLAUDE.md by `release.js`), policed by an independent disk walk in `tests/doc-counts.test.js`,
+so adding a test file does NOT break that test and needs no hand edit here; if the CLAUDE.md
+literal is refreshed at all it is via the generator, never a prose edit. **Do NOT add any
+prose to `CLAUDE.md` or `README.md` asserting the refinement loop runs.** Additionally check
+whether `CLAUDE.md` or `README.md` already asserts the loop runs; if either does, report it —
+do not edit either file to make such a claim here, since both are broadly shared and an
+unscoped edit would collide with sibling slices.
 
 ### Step 16: FINAL-REVIEW
 Report case 5's red verbatim, the measured dead-export list, any disagreement between this
@@ -243,7 +269,7 @@ plan and the code, and every decision taken under ambiguity.
   different owner.
 - It does **not** add a reader for `.ctoc/state/refinement/<slug>.json`, and does not
   remove the writer. The verdict is correct and cheap; a future consumer will want it.
-- It does **not** touch the bare `catch {}` at `actions.js:714`. That belongs to the
+- It does **not** touch the bare `catch {}` at `actions.js:776`. That belongs to the
   false-green ratchet.
 - It does **not** delete or shorten the design record. The ten decisions and their
   citations are the value in the file.
@@ -257,7 +283,7 @@ plan and the code, and every decision taken under ambiguity.
 2. **Nothing is deleted from the document.** A design record with citations is an asset;
    the defect is the tense, not the content.
 3. **The state column is filled from disk at Step 9, never from this plan.** The baseline
-   was re-seeded the day before this plan was written and older plans already cite line
+   is re-seeded whenever the reachability fence moves and older plans already cite line
    numbers that have moved. A plan that hands the executor stale facts to transcribe
    manufactures the next false claim.
 4. **The wiring-cost section names no phase and no order.** Recording what it would take
@@ -275,3 +301,18 @@ plan and the code, and every decision taken under ambiguity.
    `:185` integrator claim is defective. Writing "the agent said to drive it cannot
    dispatch" without that distinction would make this document's correction as loose as
    the sentence it corrects.
+8. **`CLAUDE.md` is declared but not prose-edited (rebase 2026-07-30).** The count-mover
+   declaration fence hard-blocks a plan that creates a `tests/*.test.js` file without
+   declaring `CLAUDE.md`; declaring it is the fence's requirement, not a licence to add a
+   loop-runs claim. The test-file count is generator-managed, so no manual CLAUDE.md edit
+   is needed — the declaration exists solely to let the plan cross Gate 2 and to grant
+   write permission if the generated tally is refreshed.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.

@@ -21,29 +21,41 @@ plan — the same two steps the menu path already performs correctly. That gives
 later question an honest answer: which plan is building, what it may write, whether it
 is still alive.
 
-The sanctioned path already does this and does it well. Verified by reading:
+The sanctioned path already does this and does it well. Verified by reading (line
+numbers re-checked against the current tree, which has grown since planning):
 
 ```
-actions.startAgent   (actions.js:1466-1481)   addAndClaim → status 'running'
-                                              → startExecution → plans/in-progress/
-actions.advanceAgent (actions.js:1579-1591)   the same two steps, same order
+actions.startAgent  (actions.js:1698)  taskSpecFromPlan → addAndClaim({uniquePlan})
+                                        → on a successful claim only, startExecution
+                                        → plans/in-progress/
 ```
 
-Both claim FIRST and move only on a successful claim, so the two witnesses are one
-event rather than two independent ones. A third caller of `addAndClaim` exists —
-`actions.enqueueWaveSync` (`:1698`) — but it creates a `sync` task, not an
-`implement` one, so it is not a build witness and is not touched here.
+`startAgent` claims FIRST and moves only on a successful claim (`actions.js:1749`
+addAndClaim, then `:1761` startExecution — read live), so its two steps are one event
+rather than two independent ones. The second sanctioned witness the earlier draft
+cited, `actions.advanceAgent`, **no longer exists in the tree** — it was removed and
+is not a live reference, so `startAgent` is now the sole claim-then-move witness, and
+it is enough because this plan mirrors exactly its ordering. A third caller of
+`addAndClaim` exists — `actions.enqueueWaveSync` (`actions.js:1922`) — but it creates
+a `sync` task, not an `implement` one, so it is not a build witness and is not touched
+here.
 
-**Nothing else calls either function.** The way work actually happens — the session
-model dispatching an executor subagent — sets neither witness. Measured on this
-repository today: `plans/in-progress/` holds **zero** plan files, and of **64** task
-records **zero** are `running` or `cancelling`.
+**Nothing else calls `startAgent` on the real dispatch path.** The way work actually
+happens — the session model dispatching an executor subagent — sets no witness.
+Measured on this repository at the last read: `plans/in-progress/` holds **zero** plan
+files, and of the **5** task records now in the store (4 `queued`, 1 `done`) **zero**
+are `running` or `cancelling`. (The store has been pruned since planning, which
+measured 64 records — the count is re-taken live at Step 9, and the code wins over any
+number written here.)
 
 ## THE HARD PRECONDITION — this plan does not proceed on a dead seat
 
-`00165` measures whether `src/hooks/PreToolUse.Task.js` has ever run in this project.
-Planning's measurement says it has not: no `.ctoc/state/agent-slots.json` despite that
-file being written on every allowed dispatch, and zero `Task` entries in the
+`00165` measures whether `src/hooks/PreToolUse.Task.js` has ever run in this project,
+and it has since SHIPPED that instrument: `src/lib/dispatch-seat-liveness.js` exports
+`seatLiveness(root)` → `{ state: 'live' | 'not-live' | 'unknown', ... }` and
+`describeLiveness(result)` (the plan is now in review). Planning's measurement said the
+seat has not run: no `.ctoc/state/agent-slots.json` despite that file being written on
+every allowed dispatch (still absent at the last read), and zero `Task` entries in the
 enforcement log, observed from inside a real live dispatch.
 
 **Step 9 re-runs that measurement, and if the seat reads `not-live` or `unknown`, this
@@ -85,8 +97,8 @@ Written into the executor agent's markdown definition.
 
 ### Candidate 3 — the completion route refuses a plan with no claim
 
-Real code (`actions.completeTaskPlan`), guaranteed to run, since it is what writes the
-records today.
+Real code (`actions.completeTaskPlan`, `actions.js:1275`), guaranteed to run, since it
+is what writes the records today.
 
 - **Missing claim → surfaces at the END, after all the work is done.** Late, but never
   never.
@@ -154,7 +166,7 @@ the agent type is what discriminates.
 ```
 src/lib/dispatch-claim.js  (NEW)
   ├─LAZY requires→ src/lib/actions.js        [existing, unchanged — taskSpecFromPlan, startExecution]
-  ├─LAZY requires→ src/lib/task-registry.js  [existing, unchanged — addAndClaim, load]
+  ├─LAZY requires→ src/lib/task-registry.js  [existing, unchanged — addAndClaim, findActivePlanTask]
   ├─requires→ src/lib/safe-fs.js             [existing, unchanged]
   └─requires→ path                           [node builtin]
 
@@ -162,15 +174,17 @@ src/hooks/PreToolUse.Task.js ──fail-soft requires→ src/lib/dispatch-claim.
 ```
 
 **The `actions` and `task-registry` requires are LAZY** — performed inside the
-function, in a guard — mirroring the pattern already used and justified at
-`plan-coverage.js:295` and `streaming-gate.js:265`. `actions.js` is a large module
-that pulls in much of the library, and a PreToolUse hook must stay cheap and must not
-acquire a load-time cycle. **Step 11 verifies no load-time cycle exists** by reading
-the require graph, not by trusting this paragraph.
+function, in a guard — mirroring the in-function-require pattern already used and
+justified in `streaming-gate.js` (`require('./plan-coverage')` at `:271`,
+`require('./streaming-precompute')` at `:369`, with the "lazy require + try/catch
+mirrors" rationale at `:347`). `actions.js` is a large module that pulls in much of the
+library, and a PreToolUse hook must stay cheap and must not acquire a load-time cycle.
+**Step 11 verifies no load-time cycle exists** by reading the require graph, not by
+trusting this paragraph.
 
 The hook's require of this module is **fail-soft**, in its own `try`/`catch`, exactly
 matching how `PreToolUse.Task.js` already loads `detector`, `agentSlots` and
-`enforcementLog` (`:63-68`). A module that fails to load degrades enforcement rather
+`enforcementLog` (`:67-72`). A module that fails to load degrades enforcement rather
 than crashing the hook — the file's stated fail-open contract.
 
 ### File: `src/lib/dispatch-claim.js`
@@ -195,16 +209,26 @@ Exports:
   - **Never throws.**
 
 - `claimForDispatch(root, payload, opts)` → `{ claimed, plan, task, reason, moved }`
-  - Composes: `requiresClaim` → `resolvePlanRef` → `taskSpecFromPlan` →
-    `addAndClaim` → on a successful claim only, `startExecution`.
-  - **The order is claim-then-move, matching `startAgent` exactly.** A move without a
-    claim would manufacture a residency witness for work that never started.
-  - Records `opts.agentTaskId` (the slot token from the hook) onto the claimed task so
-    the identity is a REAL correlatable value. Today's records set `agentTaskId` to the
-    task's own id (`t61`, `t62`, `t63` — verified by reading `tasks.json`), which is
-    self-referential and can never match a harness live-agent list, so reconcile's
-    confirmed-dead path could never fire for any of them. This plan stops adding to
-    that pile; it does not repair the existing records.
+  - Composes: `requiresClaim` → `resolvePlanRef` → `taskSpecFromPlan`
+    (`actions.js:1592`) → `addAndClaim(root, spec, { agentTaskId: opts.agentTaskId,
+    uniquePlan: true })` (`task-registry.js:1184`) → on a successful claim only,
+    `startExecution` (`actions.js:997`).
+  - **The order is claim-then-move, matching `startAgent` exactly** (`actions.js:1749`
+    addAndClaim, then `:1761` startExecution). A move without a claim would manufacture
+    a residency witness for work that never started.
+  - Passes `opts.agentTaskId` (the slot token from the hook) through `addAndClaim`,
+    which threads it onto the claimed task (`task-registry.js:1188-1207`), so the
+    identity is a REAL correlatable value rather than a self-referential one. Planning
+    observed then-existing records setting `agentTaskId` to the task's own id — a value
+    that can never match a harness live-agent list, so reconcile's confirmed-dead path
+    could never fire for them. Those records have since been pruned; the store now holds
+    5 records, all with `agentTaskId: null` (re-measured at Step 9). New claims record a
+    real token; this plan does not repair pre-existing records.
+  - Passes `uniquePlan: true` so a second dispatch for an already-claimed plan reuses
+    the existing non-terminal task via `addAndClaim`'s atomic compare-and-swap
+    (`task-registry.js:1197-1202`), never a duplicate — the same guard `startAgent` now
+    relies on, since the former standalone `findActivePlanTask` pre-check was folded
+    inside `addAndClaim`.
   - **Never throws.** A refused claim is a returned reason, never an exception, because
     the caller is a hook whose contract is to decide rather than to crash.
 
@@ -216,8 +240,8 @@ would make the whole mechanism decorative.
 ### File: `src/hooks/PreToolUse.Task.js`
 **Action:** MODIFY — one new step, after the slot, before the allow
 
-Current flow (read live, `:184-223`): CTOC project? → `agentSlots.acquire` → allow, or
-block on `max-concurrent`.
+Current flow (read live — `enforce` at `:188-227`): CTOC project? → `agentSlots.acquire`
+→ allow, or block on `max-concurrent`.
 
 New flow inserts exactly one step between the successful acquire and the allow:
 
@@ -280,7 +304,7 @@ the schema moves.
 | 16 | **the hook does NOT release on a successful claim** | the slot stays held — the subagent is about to run |
 | 17 | **the refusal message names the action** | for `none`, it says to name the plan; for `ambiguous`, it names the candidates; for `unreadable`, it says the plans directory could not be read — three DIFFERENT messages |
 | 18 | **no leak** — a payload whose prompt holds an absolute path, a newline, a terminal escape | the message carries no absolute path, no stack trace, no forged line |
-| 19 | **a second dispatch for an already-claimed plan does not double-claim** | the existing non-terminal task is reused, mirroring `startAgent`'s `findActivePlanTask` guard (`actions.js:1461`) |
+| 19 | **a second dispatch for an already-claimed plan does not double-claim** | the existing non-terminal task is reused via `addAndClaim`'s atomic `uniquePlan` guard (`task-registry.js:1197-1202`, `findActivePlanTask` at `:704`) — the same guard `startAgent` relies on |
 | 20 | **the fence is not vacuous** — case 3's assertion applied to case 1's payload | FAILS, proving case 3 discriminates on a real absence |
 
 Cases 2, 5, 15 and 20 are the plan. Case 2 pins the ordering the ruling names; case 5
@@ -302,8 +326,9 @@ defect in what happens when the world is not. Three layers, in increasing honest
    test cannot reach. Cross-platform: `process.execPath`, `path.join`, no shell.
 3. **A genuine dispatch — NOT testable from inside the suite.** The suite cannot make
    Claude dispatch a subagent. Stated plainly rather than faked. What is done instead:
-   - `00165` ships the runtime check that reports whether the seat has EVER run, so
-     the gap is instrumented rather than assumed;
+   - `00165` ships the runtime check (`dispatch-seat-liveness.seatLiveness`) that
+     reports whether the seat has EVER run, so the gap is instrumented rather than
+     assumed;
    - **Step 14 performs a live-fire verification by hand**: dispatch one trivial
      subagent, then read `.ctoc/state/tasks.json` and `plans/in-progress/`. If a build
      dispatch did not produce a claim, this plan has not landed, whatever the suite
@@ -330,16 +355,19 @@ is precisely the thing `00165` must first prove executes.
 
 ## What this does NOT fix
 
-1. **It does not narrow the write surface.** `00129` Part B stays blocked by its own
-   precondition. This plan is what could eventually unblock it — by making the building
-   set non-empty — but it does not touch `plan-coverage` and changes no allow or deny
-   for any edit. **The cross-plan write surface remains open after this plan.**
-2. **It does not repair the 64 existing bookkeeping records**, six of which report
-   `done` with no start timestamp and one of which (`t60`) carries `"--plan"` where a
-   slug belongs. Reported, not fixed; a separate decision already before the human.
-3. **It does not fix `.ctoc/state/agent.json`**, still reporting an active build from
-   2026-07-18. See the correction in `00167` about what that file does and does not
-   control.
+1. **It does not narrow the write surface.** This plan does not touch `plan-coverage`
+   and changes no allow or deny for any edit; making the building set non-empty is what
+   could eventually let a plan-scoped write surface bind, but that is separate work
+   (`00129`, which has since built and sits in review). **The cross-plan write surface
+   is unchanged by this plan.**
+2. **It does not repair pre-existing bookkeeping records.** Planning noted anomalies in
+   the then-existing records (self-referential `agentTaskId`, a `"--plan"` slug, `done`
+   with no start timestamp); those records have since been pruned and the store now
+   holds 5. Whatever Step 9 measures, this plan stops ADDING bad records; it repairs no
+   existing one. A separate decision on repair is already before the human.
+3. **It does not fix `.ctoc/state/agent.json`**, still reporting an active build
+   (`00071-fg1-false-green-fence`, `active: true`, started 2026-07-18) at the last read.
+   See the correction in `00167` about what that file does and does not control.
 4. **It cannot bind a dispatch that does not name its plan.** It refuses one, which is
    the honest response, but a refusal is not a binding. If the dispatcher habitually
    omits the plan name, this converts silent wrongness into loud friction — better, and
@@ -372,8 +400,9 @@ that file, before touching `src/`**. Record the starting state verbatim.
 
 **9a — THE PRECONDITION GATE. This decides whether the plan exists.**
 
-1. Run `00165`'s `dispatch-seat-liveness` check on this repository and record the
-   state verbatim.
+1. Run `require('./dispatch-seat-liveness').seatLiveness(root)` on this repository
+   (shipped by `00165`, now in review) and record `state` and `sources` verbatim; use
+   `describeLiveness(result)` for the human line.
    - **`not-live` or `unknown` → STOP HERE.** Report the measurement, build nothing,
      and put the finding to the human: the only mechanical seat does not execute, so
      what remains is an instruction. **This is a successful run of this plan.**
@@ -390,17 +419,18 @@ that file, before touching `src/`**. Record the starting state verbatim.
    copy a list out of this plan.** Record the set; a misspelled agent type silently
    makes `requiresClaim` false and the whole mechanism decorative — this repository's
    false-green class wearing a helpful face.
-4. Read live, in full: `src/hooks/PreToolUse.Task.js`; `src/lib/agent-slots.js`
-   (`acquire`, `release`, the exact-token semantics); `src/lib/actions.js`
-   (`taskSpecFromPlan` `:1332-1380`, `startExecution` `:852`, `startAgent`
-   `:1415-1500` — **read only; another plan in this set declares `actions.js`, so do
-   not modify it here, and stop and ask if its shape has changed**);
-   `src/lib/task-registry.js` (`addAndClaim`, `findActivePlanTask`).
-5. **Re-measure the live picture**: plan files in `plans/in-progress/` (planning
-   measured zero), and registry totals by status (planning measured 64 records / 59
-   `done` / 4 `queued` / 1 `cancelled` / **0 running** / **0 cancelling** — note this
-   is 64, one MORE than the 63 `00129` measured a day earlier, itself evidence that
-   the bookkeeping pattern continued).
+4. Read live, in full: `src/hooks/PreToolUse.Task.js` (`enforce` at `:188-227`,
+   fail-soft requires at `:67-72`); `src/lib/agent-slots.js` (`acquire`, `release`
+   `:253-272`, the exact-token semantics); `src/lib/actions.js` (`taskSpecFromPlan`
+   `:1592`, `startExecution` `:997`, `startAgent` `:1698` — **read only; `00167` in
+   this set declares `actions.js`, so do not modify it here, and stop and ask if its
+   shape has changed**); `src/lib/task-registry.js` (`addAndClaim` `:1184`,
+   `findActivePlanTask` `:704`).
+5. **Re-measure the live picture**: plan files in `plans/in-progress/` (last read:
+   zero), and registry totals by status (last read: **5** records / 1 `done` / 4
+   `queued` / **0 running** / **0 cancelling** — the store has been pruned since
+   planning measured 64, so take the count live and let the code win over any number
+   written here).
 6. **Timing.** The hook's added cost per dispatch. **Above roughly 50 milliseconds,
    stop and report** — this runs on every subagent launch.
 
@@ -440,7 +470,7 @@ before-and-after per-dispatch timing.
 - **A crafted plan slug cannot escape `plans/`**: a dispatch prompt naming
   `../../../etc/passwd`, a NUL-bearing slug, a separator-bearing slug. The vocabulary
   is built from real directory entries and every candidate is validated with the
-  existing `isSafePlanSlug` shape (`actions.js:1049-1053`) before any `path.join`.
+  existing `isSafePlanSlug` shape (`actions.js:1218`) before any `path.join`.
   Confirm none reaches the filesystem.
 - **A hostile prompt cannot inject the message**: a newline, a terminal escape, `%s`,
   and a 10,000-character prompt. Confirm the message carries a fixed-vocabulary reason,
@@ -452,8 +482,8 @@ before-and-after per-dispatch timing.
   unwritable registry.
 
 ### Step 14: VERIFY
-Targeted run first: the new test file, `tests/task-concurrency-fence.test.js` (or
-whatever Step 9 finds covering `PreToolUse.Task.js`), `tests/agent-slots.test.js`,
+Targeted run first: the new test file, `tests/pretooluse-task-coverage.test.js` (the
+current coverage suite for `PreToolUse.Task.js`), `tests/agent-slots.test.js`,
 `tests/task-registry.test.js`, `tests/task-reconcile.test.js`,
 `tests/actions-scheduler.test.js`, `tests/architecture-invariants.test.js`,
 `tests/export-reachability.test.js`, `tests/false-green-fence.test.js`,
@@ -484,7 +514,7 @@ refuse and neither guesses; why `unreadable` is a separate state from `none`; wh
 claim strictly precedes the move (a residency witness without a claim is a lie);
 why the agent type rather than the slug match decides that a claim is required, and
 that "unclaimed is allowed" is deliberately NOT the rule; and that `agentTaskId` now
-carries a real correlatable token because the existing records set it to the task's own
+carries a real correlatable token because pre-existing records set it to the task's own
 id and could never match a live-agent list.
 
 A comment in `PreToolUse.Task.js` at the refusal path recording that the slot MUST be
@@ -506,17 +536,16 @@ Report, in this order:
 
 ## Ordering and file conflicts
 
-**This plan builds SECOND**, after `00165`, which is named in `depends_on` because its
-answer is this plan's precondition. Prose does not constrain the scheduler; the field
-does.
-
-**A concurrent executor is finishing a slice touching `src/lib/project-root.js` and
-`src/lib/menu-screens.js`.** This plan declares NEITHER and modifies neither.
+**This plan builds after `00165`**, named in `depends_on` because its answer is this
+plan's precondition. `00165` has since built (its instrument
+`src/lib/dispatch-seat-liveness.js` is on disk; the plan is in review), so the
+precondition instrument is available to consume. Prose does not constrain the
+scheduler; the field does.
 
 `src/lib/actions.js` is declared by `00167` in this set and is **read but not modified
-here**. `src/hooks/PreToolUse.Task.js` is declared by no other plan in this set. Plans
-build sequentially, so there is no concurrent-edit hazard; the executor reads live at
-Step 9.
+here** (verified: `00167`'s `files:` declares `src/lib/actions.js`).
+`src/hooks/PreToolUse.Task.js` is declared by no other plan in this set. Plans build
+sequentially, so there is no concurrent-edit hazard; the executor reads live at Step 9.
 
 ## Decisions Taken Under Ambiguity
 
@@ -547,9 +576,9 @@ Step 9.
    off. Cases 9 and 10 pin it. **This is the weakest point in the design and is named
    as such**: a build dispatch under an unrecognised type slips through unclaimed, and
    `00167`'s completion backstop is what catches it.
-8. **The claim strictly precedes the move**, matching `startAgent` and `advanceAgent`.
-   A plan moved into `in-progress/` without a claim manufactures a residency witness
-   for work that never started — a new lie in place of the old silence. Case 2 pins it.
+8. **The claim strictly precedes the move**, matching `startAgent`. A plan moved into
+   `in-progress/` without a claim manufactures a residency witness for work that never
+   started — a new lie in place of the old silence. Case 2 pins it.
 9. **No escape phrase on the claim refusal**, unlike the editing hooks and matching
    this hook's existing posture. The remedy — name the plan and re-dispatch — costs one
    sentence, which is cheaper than an escape, and adding a transcript reader to this
@@ -558,15 +587,17 @@ Step 9.
 10. **The slot is released with its EXACT token on a refusal.** The oldest-entry
     release that `SubagentStop` uses would free a different, live subagent's slot and
     silently over-subscribe the cap from then on. Case 15 and Step 13 pin it.
-11. **`agentTaskId` records a real token.** Verified by reading `tasks.json`: `t61`,
-    `t62` and `t63` each set `agentTaskId` to their own task id, a self-referential
-    value that can never appear in a harness live-agent list, so reconcile's
-    confirmed-dead path could never fire for any existing record. New claims stop
-    adding to that pile; the existing records are reported, not repaired.
-12. **The registry count is 64, not the 63 `00129` measured.** One further `done`
-    record appeared between the two measurements — itself evidence that the after-the-
-    fact bookkeeping pattern continued. Stated with its value rather than carried
-    forward as a stale number.
+11. **`agentTaskId` records a real token** — passed through `addAndClaim`'s
+    `opts.agentTaskId` (`task-registry.js:1188-1207`). Planning observed then-existing
+    records setting `agentTaskId` to their own task id, a self-referential value that
+    can never appear in a harness live-agent list, so reconcile's confirmed-dead path
+    could never fire for them. Those records have since been pruned (the store now holds
+    5, all `agentTaskId: null`, re-measured at Step 9). New claims record a real token;
+    existing records are reported, not repaired.
+12. **The registry count is measured live at Step 9, never carried forward.** Planning
+    measured 64 records; the store has since been pruned to 5 (1 `done`, 4 `queued`, 0
+    `running`, 0 `cancelling`, all `agentTaskId: null`). The count is volatile, so the
+    plan reads it live and the code wins over any number written here.
 13. **A genuine dispatch is NOT testable from inside the suite, and that is stated
     rather than faked.** Three layers are shipped instead — in-process logic, the real
     hook binary driven as a child process, and a by-hand live-fire at Step 14 — plus
@@ -574,4 +605,3 @@ Step 9.
 14. **The build-agent vocabulary is read from `agents/` at Step 9, not copied from this
     plan.** A misspelled agent type would make `requiresClaim` silently false and the
     entire mechanism decorative while every test still passed.
-</content>

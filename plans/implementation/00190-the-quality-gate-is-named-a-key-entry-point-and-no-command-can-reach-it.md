@@ -25,21 +25,21 @@ files:
 no command anyone can type that enters this module.
 
 `src/lib/quality-gate.js:169` defines `class QualityGate`. Grepped across all of `src/`,
-its only appearance outside its own file is `src/lib/iron-loop-enforcer.js:76`, inside the
-`REQUIRED_LIBS` array — **a list of paths handed to `existsSync`**. The re-seed comment at
-`.ctoc/reachability-baseline.json:2` names that array by name as the specific thing that
-manufactured false call edges: "a list of paths handed to existsSync … kept quality-gate.js,
-v8-dispatcher.js and product-loop.js 'live' on the strength of a presence check". Its
-presence is checked. It is never constructed and never called. `quality-gate.js` sits in
-the unreachable baseline at `:32`.
+its only appearance outside its own file is `src/lib/iron-loop-enforcer.js:77`, inside the
+`REQUIRED_LIBS` array (the array opens at `:74`) — **a list of paths handed to `existsSync`**.
+The re-seed comment at `.ctoc/reachability-baseline.json:2` names that array by name as the
+specific thing that manufactured false call edges: "a list of paths handed to existsSync …
+kept quality-gate.js, v8-dispatcher.js and product-loop.js 'live' on the strength of a
+presence check". Its presence is checked. It is never constructed and never called.
+`quality-gate.js` sits in the unreachable baseline at `:33`.
 
 An entry point is, by the plain meaning of the phrase, where execution enters. Nothing
 enters here.
 
 ## The larger instance, in a shipped instruction surface
 
-This is not one line in `CLAUDE.md`. `src/commands/push.md:239-248` ships a table of four
-commands:
+This is not one line in `CLAUDE.md`. `src/commands/push.md:243-248` ships a table of four
+commands (the section header sits at `:239`, the four command rows at `:245-248`):
 
 | Command | Purpose |
 |---|---|
@@ -68,15 +68,15 @@ fallback line beside it is the only one that works.
 
 ### The consequence inside the verification step
 
-`src/lib/step-13-verify.js:116` opens Step 14 VERIFY with:
+`src/lib/step-13-verify.js:127` opens Step 14 VERIFY with:
 
 ```js
 const gateResult = tryCommand('ctoc quality --tier=1', projectPath);
 ```
 
 That command can never succeed, so `gatePassed` is always false and verification **always**
-takes the `fallback-direct` path at `:127-132`. The fallback is real — it runs lint,
-typecheck and tests, and the fail-closed contract at `:140-149` refuses to pass on zero
+takes the `fallback-direct` path at `:137-143`. The fallback is real — it runs lint,
+typecheck and tests, and the fail-closed contract at `:151-168` refuses to pass on zero
 substantive checks — so nothing is falsely green here. What is false is `CLAUDE.md`'s
 claim that the module named as the quality entry point has anything to do with it.
 
@@ -92,7 +92,7 @@ something calls it.
 So the claims are corrected. Two things are deliberately **not** done, each for a stated
 reason:
 
-- **`src/lib/step-13-verify.js:113-124` is not touched.** The attempt-then-fall-back shape
+- **`src/lib/step-13-verify.js:124-135` is not touched.** The attempt-then-fall-back shape
   is correct: it costs one failed spawn on a cold path, and if a user ever does have a
   `ctoc` on their path it is the right behaviour. Deleting a correct branch to tidy a
   documentation defect is scope creep, and the branch is not a false-green — the fallback
@@ -104,7 +104,7 @@ reason:
 ## Implementation Details
 
 ### File: `src/commands/push.md`
-**Action:** MODIFY — the `:239-248` table and the `:233` retry line
+**Action:** MODIFY — the `:243-248` table and the `:233` retry line
 
 The command table is replaced by the invocations that exist. The `ctoc quality` rows have
 no equivalent, and this must be said rather than silently dropped: the checks they
@@ -117,18 +117,30 @@ cannot be followed is worse than no recovery instruction.
 retry line are the two found by inspection, not a proof there are only two.
 
 ### File: `CLAUDE.md`
-**Action:** MODIFY — the "Key entry points" table row only
+**Action:** MODIFY — the "Key entry points" table row only (the `src/lib/quality-gate.js`
+row, at `CLAUDE.md:606`)
 
 The `src/lib/quality-gate.js` row is corrected to state what is true: the module
 implements the quality-gate logic, **no command or caller reaches it today**, and it
-carries the marker `NOT WIRED` in the convention `00188` uses for the same state. It is
-not removed from the table — a reader looking for quality enforcement should find it and
-learn its status in the same place, and deleting the row would make the module harder to
-find than it is now.
+carries the marker `NOT WIRED` — the same marker sibling `00188` adopts for the same
+"present-but-unreachable" state (`00089` uses `NOT ENFORCED` for its analogous claim). The
+marker is self-explanatory and this slice defines its own use of it; it does **not** depend
+on `00188` shipping first. The row is not removed from the table — a reader looking for
+quality enforcement should find it and learn its status in the same place, and deleting the
+row would make the module harder to find than it is now.
 
-**Nothing else in `CLAUDE.md` is edited by this slice.** The file is in `00089`'s `files:`
-list, so the two plans will serialize on it; this slice touches one table row and no other
-line, which keeps the overlap trivially reviewable.
+**Nothing else in `CLAUDE.md` is edited by this slice.** The documented `test files` count
+is a GROWING tally generated by `release.js` and policed by `tests/doc-counts.test.js`
+against a live disk walk (never against the hand-edited literal since plan `00215`), so
+adding this slice's new test file does **not** require touching that number — `npm test`
+will not go red on it. `CLAUDE.md` is nonetheless correctly declared in this slice's
+`files:` because the count-mover declaration fence
+(`tests/plan-declares-count-moving-ratchets.test.js`) requires any plan that CREATES a
+`tests/*.test.js` file to declare `CLAUDE.md` so a build that moves a documented count has
+permission to update it. This slice touches exactly one `CLAUDE.md` line: the entry-point
+row. `CLAUDE.md` is also in `00089`'s and `00188`'s `files:` lists, so those plans will
+serialize on it; this slice touching one row and no other line keeps the overlap trivially
+reviewable.
 
 ### File: `tests/no-phantom-command-family.test.js`
 **Action:** CREATE
@@ -136,7 +148,7 @@ line, which keeps the overlap trivially reviewable.
 | # | Case | Assertion |
 |---|---|---|
 | 1 | the binary state is read, not assumed | parse `package.json`; record whether a `bin` field exists. Every other case branches on it |
-| 2 | **no shipped instruction tells a human to type a command that does not exist** | scan `src/commands/*.md` and `CLAUDE.md` for `ctoc <word>` outside a slash-command reference (`/ctoc:menu`, `/ctoc:push`, `/ctoc:update`) and outside a fenced block explicitly marked as historical. Any hit FAILS, naming file, line and the exact text. **This is the general fence, not a fix of the two known lines** |
+| 2 | **no shipped instruction tells a human to type a command that does not exist** | scan `src/commands/*.md` and `CLAUDE.md` for `ctoc <word>` outside a slash-command reference (`/ctoc:start`, `/ctoc:push`, `/ctoc:update`) and outside a fenced block explicitly marked as historical. Any hit FAILS, naming file, line and the exact text. **This is the general fence, not a fix of the two known lines** |
 | 3 | a `bin` field appearing flips the rule | when case 1 is true, case 2's assertion inverts: the documented commands must match the declared binary's name. The good-news direction, caught rather than left stale |
 | 4 | the entry-point claim matches reachability | `CLAUDE.md`'s row for `src/lib/quality-gate.js` carries `NOT WIRED` for exactly as long as the file appears in `.ctoc/reachability-baseline.json`. **When it is wired and leaves the baseline, this FAILS** and the row must be corrected |
 | 5 | the `class QualityGate` is still unconstructed | grep `src/` for `new QualityGate`: zero hits. If one appears, case 4's marker must go, and this case says so first |
@@ -147,7 +159,14 @@ Case 2 needs a careful exclusion list, and getting it wrong in the permissive di
 makes the fence useless while getting it wrong in the strict direction makes the suite
 noisy. Build the exclusions from what Step 9's grep actually finds, keep each one
 justified in a comment beside it, and **prefer a failing case that needs a human's
-judgment over a broad pattern that quietly permits the next phantom command**.
+judgment over a broad pattern that quietly permits the next phantom command**. Note that
+the three real slash commands are `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — the file
+formerly reached as `menu` is `src/commands/start.md` and the surface is `/ctoc:start`.
+
+**A missing or empty target must FAIL, never pass.** If `package.json`, `push.md`,
+`CLAUDE.md` or `.ctoc/reachability-baseline.json` cannot be read or is empty, the affected
+case fails loudly naming the unreadable path — a fence that reads nothing and reports
+green is the false-green shape this repository fences elsewhere.
 
 Case 6 runs `runVerify` against a temporary fixture under `os.tmpdir()`, never against the
 real repository — a verification run in the real root would execute the full test suite
@@ -185,12 +204,14 @@ and 6 pass immediately and are the guards.
 Read `package.json` in full and confirm the absence of `bin` by enumeration rather than by
 grep. Grep `src/commands/*.md`, `CLAUDE.md` and `README.md` for `ctoc ` followed by a word
 and **tabulate every hit**, classifying each as a real slash command, a phantom command,
-or a historical reference. Read `src/lib/step-13-verify.js:104-160` and `:700-760`
-(`tryCommand`). Read `src/lib/quality-gate.js:160-200` and `:880-900`, and
-`src/lib/iron-loop-enforcer.js:60-90` to confirm `REQUIRED_LIBS` is a presence check and
-not a call. **Where the code disagrees with this plan, THE CODE WINS.** If Step 9 finds
-phantom commands in `README.md`, report them and **do not edit that file** — it is not in
-this slice's scope and an unscoped edit collides with sibling work.
+or a historical reference. Read `src/lib/step-13-verify.js:104-170` (`runVerify`) and
+`:740-790` (`tryCommand`, which is defined at `:751`). Read `src/lib/quality-gate.js:160-200`
+(the `class QualityGate` declaration at `:169`) and `:880-893` (the `module.exports`), and
+`src/lib/iron-loop-enforcer.js:60-90` to confirm `REQUIRED_LIBS` (opening at `:74`, with the
+`quality-gate.js` entry at `:77`) is a presence check and not a call. **Where the code
+disagrees with this plan, THE CODE WINS.** If Step 9 finds phantom commands in `README.md`,
+report them and **do not edit that file** — it is not in this slice's scope and an unscoped
+edit collides with sibling work.
 
 ### Step 10: IMPLEMENT
 - `src/commands/push.md` — the command table and the retry line.
@@ -236,7 +257,7 @@ scope, and every decision taken under ambiguity.
 - It does **not** wire or delete `src/lib/quality-gate.js`. It stays in the unreachable
   baseline, correctly. Whether Step 14 VERIFY should route through it is a real design
   question and the human's to schedule.
-- It does **not** remove the `ctoc quality` attempt at `step-13-verify.js:116`. The
+- It does **not** remove the `ctoc quality` attempt at `step-13-verify.js:127`. The
   attempt-then-fall-back shape is correct, costs one failed spawn on a cold path, and is
   right for any user who does have such a command. The reasoning is recorded so a future
   reviewer does not read the branch as an oversight.
@@ -265,7 +286,8 @@ scope, and every decision taken under ambiguity.
    this class reaches people rather than only readers.
 5. **The exclusion list is built from Step 9's actual findings, and errs strict.** A
    permissive pattern makes the fence decorative; a strict one makes a person read a
-   failure and decide. This repository's stated preference is the loud direction.
+   failure and decide. This repository's stated preference is the loud direction. The
+   allowed slash commands are `/ctoc:start`, `/ctoc:push`, `/ctoc:update`.
 6. **Case 6 asserts on the reported `method` rather than on the internal branch.** The
    claim under test is about what verification actually does, and asserting on an internal
    flag would be a test of the implementation's shape instead of its behaviour.

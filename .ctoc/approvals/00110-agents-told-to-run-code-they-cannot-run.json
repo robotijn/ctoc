@@ -1,0 +1,9 @@
+{
+  "content_sha256": "3aa7fc8afecb8d1f4aca2eee1431c60251b3bd44977dba392873081545ab5cc0",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T19:04:14.519Z",
+  "approved_by": "human",
+  "plan_basename": "00110-agents-told-to-run-code-they-cannot-run"
+}
