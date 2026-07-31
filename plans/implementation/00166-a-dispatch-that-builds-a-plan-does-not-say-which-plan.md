@@ -605,3 +605,6 @@ sequentially, so there is no concurrent-edit hazard; the executor reads live at 
 14. **The build-agent vocabulary is read from `agents/` at Step 9, not copied from this
     plan.** A misspelled agent type would make `requiresClaim` silently false and the
     entire mechanism decorative while every test still passed.
+
+## HELD — dead foundation (human-delegated decision, 2026-07-31)
+NOT built by decision. The dispatch seat this plan builds on is provably NOT LIVE in this harness: the PreToolUse.Task hook never fires on real subagent dispatches (measured repeatedly this session), so a claim/dispatch mechanism seated on it is well-tested DEAD CODE — which the no-dead-code rule forbids. Building it can only confirm-and-report the dead seat, not deliver a working mechanism. This is held pending an UPSTREAM fix (why the Task hook does not fire — a harness/plugin Task-matcher wiring question outside CTOC and outside this plan), OR a deliberate decision to retire the seat chain and rely on the session-model dispatch protocol that actually executes today. 00167 (completion records whether work was claimed) and 00182/00183 (attestation audit) already deliver the honest VISIBILITY half without depending on the dead seat.
