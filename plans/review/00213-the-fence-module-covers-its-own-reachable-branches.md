@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-21T13:00:00.000Z
 gate_crossed: implementation → todo
----
-
----
 iron_loop: true
 title: "The gate-number fence module covers its own reachable branches — the margin it ate today, restored honestly"
 type: implementation
@@ -27,6 +24,7 @@ scope_extension:
     settled below. This is coverage of a NEW module's reachable edge-case
     branches — real behavior, not theatre — that did not exist when the earlier
     "no untested code to add" finding was made. Test-only; no source change.
+---
 
 # The fence module covers its own reachable branches
 

@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-21T12:00:00.000Z
 gate_crossed: implementation → todo
----
-
----
 iron_loop: true
 title: "The command is ctoc:start, not ctoc:menu — a rename, nothing else"
 type: implementation
@@ -113,6 +110,7 @@ scope_extension:
     fix them in one pass, never half-rename. The false-green baseline entry for
     src/commands/menu.js is RENAMED in place to src/commands/start.js (same
     finding, moved file) — never a new finding, count unchanged.
+---
 
 # The command is ctoc:start, not ctoc:menu
 

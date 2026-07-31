@@ -217,6 +217,54 @@ describe('mergeStackedFrontmatter (FR-3)', () => {
     const { changed } = mergeStackedFrontmatter('# no frontmatter\n');
     assert.equal(changed, false);
   });
+
+  // The real on-disk corruption (00067/00213/00214/00215): a terminated marker
+  // block, a BLANK line, then a real frontmatter block whose CLOSING `---` fence
+  // was lost — so the plan's fields run straight into the markdown body. The old
+  // split required every block to be terminated, discarded the unterminated real
+  // block, saw only the marker block, and reported nothing to collapse.
+  const LOST_FENCE =
+    '---\napproved_by: human\napproved_at: 2026-07-19T21:28:21.097Z\ngate_crossed: implementation → todo\n---\n\n' +
+    '---\n' +
+    'iron_loop: true\n' +
+    'title: "A slice that keeps its name"\n' +
+    'type: implementation\n' +
+    'parent_plan: feature-x\n' +
+    'depends_on: slice-a, slice-b\n' +
+    'files:\n  - "src/lib/x.js"\n  - "tests/x.test.js"\n' +
+    '\n' + // separator blank, NO closing fence
+    '# A slice\n\nBody stays intact.\n';
+
+  it('collapses a real block whose CLOSING fence was lost into one correct block', () => {
+    const { changed, content } = mergeStackedFrontmatter(LOST_FENCE);
+    assert.equal(changed, true, 'the lost-fence variant IS recognized as stacked');
+    assert.equal(leadingBlockCount(content), 1, 'exactly one block after collapse');
+    const fm = parseFrontmatter(content);
+    // The single leading block the PRIMITIVE reads carries the marker AND every plan field.
+    assert.match(fm.raw, /approved_by: human/, 'marker present');
+    assert.match(fm.raw, /title: "A slice that keeps its name"/, 'title lifted into the one block');
+    assert.match(fm.raw, /type: implementation/, 'type lifted into the one block');
+    assert.match(fm.raw, /files:/, 'files: lifted into the one block');
+    assert.match(fm.raw, /- "src\/lib\/x.js"/, 'declared file preserved');
+    assert.match(fm.raw, /depends_on: slice-a, slice-b/, 'depends_on preserved');
+    // No data loss, no duplicate keys.
+    assert.equal((content.match(/approved_at:/g) || []).length, 1, 'no duplicate marker key');
+    assert.equal((content.match(/^title:/gm) || []).length, 1, 'no duplicate title key');
+    // Body preserved, NOT swallowed into the frontmatter.
+    assert.match(fm.body, /# A slice/);
+    assert.match(fm.body, /Body stays intact\./);
+    // The dashboard reader now sees the real fields.
+    const meta = parseMetadata(content);
+    assert.equal(meta.title, 'A slice that keeps its name');
+    assert.equal(meta.type, 'implementation');
+  });
+
+  it('is idempotent on the lost-fence variant (second run is a no-op)', () => {
+    const once = mergeStackedFrontmatter(LOST_FENCE).content;
+    const twice = mergeStackedFrontmatter(once);
+    assert.equal(twice.changed, false, 'already collapsed: nothing to do');
+    assert.equal(twice.content, once, 'running twice equals running once');
+  });
 });
 
 // ── FR-3 / FR-4(c): the migration file writer + residency guard ────────────────
