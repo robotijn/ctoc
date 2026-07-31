@@ -226,3 +226,7 @@ metadata:
 | Inverted ladder — most effort at the wrong rung | WARN — fix within the cycle |
 | Hand-written code skipped the software-level rung and went straight to hardware | WARN — fix within the cycle |
 | Lowest-rung coverage short of complete on a non-safety-relevant subset | WARN — backlog |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

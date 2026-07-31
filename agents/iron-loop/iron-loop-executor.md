@@ -307,3 +307,7 @@ Completed: {plan-name}
 ```
 
 Then STOP. Do not look for more work — the scheduler promotes the next plan.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

@@ -162,3 +162,7 @@ key list, the evaluative-price patterns, the ranking comparator, or any
 enforcement-date or price literal into this file. Dates and prices are web-
 verified at runtime, never baked in. If you catch yourself about to restate a
 rule, stop and reference the authority instead.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

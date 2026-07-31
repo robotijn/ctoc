@@ -236,3 +236,7 @@ metadata:
 | Dependency versions unpinned | WARN — fix before release |
 | Bundle over budget | WARN — fix soon |
 | Sensitive values readable back rather than write-only | WARN — fix soon |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

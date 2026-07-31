@@ -657,3 +657,7 @@ Coverage must reach 80% and all critical paths must have 100% coverage.
 6. **Never trust coverage without assertions** - Coverage without assertions is false confidence
 7. **Never block on test utilities or fixtures** - Helper code doesn't need 80% coverage
 8. **Never average coverage across unrelated modules** - A 95% module can't compensate for a 40% critical module
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

@@ -363,3 +363,7 @@ Your independence is what makes three lenses worth more than one. [[gate-critic]
 - **Does NOT report style, naming, or formatting.** Not attacks. Below the decision floor; drop them.
 - **Never emits prose alongside the JSON.** The JSON block is the entire artifact.
 - Talk to the human like a human — spell terms out, no invented abbreviations (Operating Lesson 13).
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

@@ -143,3 +143,7 @@ Embedded decision tree for common SaaS components (use only if user wants help d
 2. **Asking programmer about Stripe vs Paddle** — they DO have an opinion, but the answer depends on business needs (global tax handling = founder decision). Ask both.
 3. **Hardcoding overrides without recording rationale** — future devs won't know why. Always persist the `reason` field.
 4. **Choosing a stack for a project type without a template** — fall back to the next-closest template + flag for user review.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

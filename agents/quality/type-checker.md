@@ -127,3 +127,7 @@ Type checking should:
 - Run on every PR
 - Block merge on errors
 - Treat warnings as blocking too — under the warnings-are-critical rule a type-checker warning emits as `severity: critical` and blocks phase advancement (a warning today is a runtime crash after the next refactor). There is no soft "allow with threshold" tier.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

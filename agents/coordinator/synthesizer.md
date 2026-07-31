@@ -243,3 +243,7 @@ This is the difference between:
 - "Here are 3 changes that fix 31 issues" (developer fixes 3)
 
 Same 31 fixes either way. The synthesis path produces them. The enumeration path produces 5.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

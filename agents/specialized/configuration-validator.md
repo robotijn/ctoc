@@ -101,3 +101,7 @@ debug: true  # In production.yaml!
 3. Add missing cache.ttl to production
 4. Document API_KEY in README
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

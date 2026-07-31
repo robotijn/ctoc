@@ -708,6 +708,7 @@ const CHECKS = [
   { id: 'golden-corpus-fence',         scope: 'architecture', mode: 'thorough', fn: checkGoldenCorpusFence },
   { id: 'recipe-execution-fence',      scope: 'architecture', mode: 'thorough', fn: checkRecipeExecutionFence },
   { id: 'gate-words-fence',            scope: 'architecture', mode: 'thorough', fn: checkGateWordsFence },
+  { id: 'agent-honesty-fence',         scope: 'architecture', mode: 'thorough', fn: checkAgentHonestyFence },
   { id: 'claim-census',                scope: 'architecture', mode: 'thorough', fn: checkClaimCensus },
   { id: 'dispatch-seat-liveness',      scope: 'system',       mode: 'thorough', fn: checkDispatchSeatLiveness },
 ];
@@ -1235,6 +1236,64 @@ function checkGateWordsFence(root) {
   }
   if (problems.length === 0) return CLEAN();
   return finding({ severity: 'block', message: problems.join(' — ') });
+}
+
+/**
+ * Agent-honesty fence (plan 00160). An agent, asked for status with no data,
+ * invented "your session's compliance gate is at 11:15" — a fluent sentence with
+ * an invented time, an invented schedule, and a subsystem (`isControlEnabled`,
+ * zero callers in src/) named as running. No fence can reach agent OUTPUT — it
+ * streams straight to the terminal. The only lever is the instruction the model
+ * carries BEFORE it speaks: `skills/agent-fragments/honest-status.md`, referenced
+ * by every dispatchable definition. This is the LIVE call site for the census
+ * that the reference is present and the fragment is substantive — reachable from
+ * the enforcer a human runs, not only from its own test (a test is not a caller).
+ *
+ * Verdict mapping (unavailable is FAILURE, never a pass or a skip):
+ *   • fragment unreadable/absent → BLOCK, naming the reason.
+ *   • fragment present but hollow → BLOCK, naming the absent sections.
+ *   • census unavailable (an unreadable def, or the non-vacuity floor)  → BLOCK.
+ *   • any definition missing the reference → BLOCK, naming the file(s).
+ *   • otherwise → CLEAN (silent, like every sibling fence).
+ *
+ * Thorough mode only (walks the whole agent corpus).
+ *
+ * @param {string} root - Project root
+ * @returns {{clean: boolean, severity?: string, message?: string}} not-clean, or { clean: true }
+ */
+function checkAgentHonestyFence(root) {
+  const { censusAgents, fragmentIsSubstantive } = require('./agent-honesty-scan');
+  const path = require('path');
+  const safeFs = require('./safe-fs');
+
+  // Not a CTOC agent corpus — nothing to check.
+  if (!safeFs.existsSync(path.join(root, 'agents'))) return CLEAN();
+
+  const frag = fragmentIsSubstantive(root);
+  if (!frag.available) {
+    const reason = /** @type {{ reason: string }} */ (frag).reason;
+    return finding({ severity: 'block', message: `the honest-status fragment could not be read: ${reason}` });
+  }
+  if (!frag.ok) {
+    return finding({
+      severity: 'block',
+      message: `the honest-status fragment is present but hollow — missing section(s): ${frag.missingSections.join(', ')}`,
+    });
+  }
+
+  const census = censusAgents(root);
+  if (!census.available) {
+    const reason = /** @type {{ reason: string }} */ (census).reason;
+    return finding({ severity: 'block', message: `the agent-honesty census could not run: ${reason}` });
+  }
+  if (census.missing.length > 0) {
+    const shown = census.missing.slice(0, 10).map((p) => path.relative(root, p)).join(', ');
+    return finding({
+      severity: 'block',
+      message: `${census.missing.length} agent definition(s) do not reference skills/agent-fragments/honest-status.md — assert only what you verified: ${shown}${census.missing.length > 10 ? ` (+${census.missing.length - 10} more)` : ''}`,
+    });
+  }
+  return CLEAN();
 }
 
 // ─────────────────────────────────────────────────────────────────────

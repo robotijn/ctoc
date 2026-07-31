@@ -203,3 +203,7 @@ wrong-for-context, never as non-existent.
 3. Be suspicious of "convenient" APIs that seem too good
 4. Verify against official documentation
 5. Run TypeScript/linter before committing
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

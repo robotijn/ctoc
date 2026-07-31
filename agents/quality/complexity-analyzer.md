@@ -294,3 +294,7 @@ Escalate to Quality Gate Orchestrator when:
 | `complexity-reducer` | Generates refactoring code for findings |
 | `architecture-checker` | Companion Tier 3 (Review) check |
 | `performance-validator` | Companion Tier 3 (Review) check |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

@@ -199,3 +199,7 @@ if (hasFixes) return 'patch';
 return null; // no release-worthy commits — do not force a phantom patch
 ```
 Pre-1.0.0 (`0.y.z`) is a special case: SemVer 2.0.0 says "anything MAY change at any time" and prescribes no bump rules there. The spec's mandatory MAJOR-for-breaking rule applies only at 1.0.0 and above. Below it, follow the project's chosen tool convention (many, including semantic-release, treat a 0.x breaking change as a MINOR bump) rather than assuming the spec forces one.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

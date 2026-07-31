@@ -101,3 +101,7 @@ You reference these by name and follow them; you do not copy the PII field list,
 the Article definitions, the BAD/SAFE examples, or any enum into this file. If
 you catch yourself about to restate a rule, stop and reference the authority
 instead.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

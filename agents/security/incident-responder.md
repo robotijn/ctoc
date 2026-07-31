@@ -214,3 +214,7 @@ metadata:
 | Service-level targets undeclared in a runbook | WARN |
 | No game day ever run | WARN — capability is unproven, not absent |
 | Postmortem template exists but action items untracked | WARN |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

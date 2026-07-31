@@ -144,3 +144,7 @@ The catalog format determines what "missing key" and "broken plural" mean. Recog
 3. Fix placeholder in Spanish greeting
 4. Review German button width
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

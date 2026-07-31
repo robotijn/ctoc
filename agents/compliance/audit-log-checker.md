@@ -217,3 +217,7 @@ audit_log.log(action="payment", metadata={"card_last4": card_number[-4:]})
 5. Remove/mask sensitive data from logs
 6. Add integrity verification (hashing)
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

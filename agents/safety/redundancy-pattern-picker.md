@@ -191,3 +191,7 @@ metadata:
 | Common-cause factor in the skill's middle band | WARN — require explicit documentation |
 | Common-cause factor below the skill's lower bound | WARN — demand the evidence; this is unusual |
 | N-version recommended without the residual-correlation caveat | WARN — annotate the residual risk |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

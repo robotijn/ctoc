@@ -164,3 +164,7 @@ docker compose -f docker-compose.test.yml down -v
    - These are not skips, they are failures that need fixing
 
 **If a test cannot run due to missing infrastructure, it must FAIL. Period.**
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

@@ -700,3 +700,7 @@ double-frontmatter bug once already). The session / CTO Chief, which holds
 for every mechanical operation. You do not run `node`, and you never hand-roll a
 file write; your model judgment is for the DECOMPOSITION ITSELF (story mapping,
 slicing), never for file mechanics.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

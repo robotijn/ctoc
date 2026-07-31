@@ -104,3 +104,7 @@ npx playwright test
 - Tests run in Chromium, Firefox, WebKit
 - Screenshots on failure in `test-results/`
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

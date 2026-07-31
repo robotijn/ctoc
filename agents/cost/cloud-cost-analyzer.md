@@ -236,3 +236,7 @@ and instance rates change continually and vary by region and account.
 | + Cleanup | $6,710 | $6,448 | $262 |
 | **Optimized** | - | **$6,448** | **$3,552** |
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

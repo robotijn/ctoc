@@ -191,3 +191,7 @@ def detect_drift(current_data, baseline_data, threshold=0.05):
 3. **Update products table** - 48h stale, check ETL pipeline
 4. **Fix invalid emails** - 45 records need cleanup
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

@@ -149,3 +149,7 @@ def test_user_properties(user):
 - `max_examples=100` for CI
 - `max_examples=1000` for thorough testing
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

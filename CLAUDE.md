@@ -318,7 +318,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 516 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 517 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -361,6 +361,22 @@ and `whitelist` is a PERMANENT exemption that starts EMPTY and requires a writte
 justification per entry. Conflating them is what kills a fence. The fixed exemplars are
 the specification: `src/scripts/test-gate.js` (parsers return `null`, never `0`) and
 `src/lib/request-exit.js` (`process.exitCode` + return, so Node drains before exiting).
+
+**The agent-honesty fence — what an agent is TOLD, not what it SAID.** An agent asked for
+status with no data invented "your session's compliance gate is at 11:15" — an invented
+time, an invented schedule, and a subsystem (`isControlEnabled`, zero callers in `src/`)
+named as running, none of it produced by any string in the repository. No fence can reach
+that surface: a model's prose streams straight to the terminal, past every hook. The lever
+is the instruction the model carries BEFORE it speaks. `skills/agent-fragments/honest-status.md`
+states it (assert only what you verified; when you have no data say you have none; never
+invent a time, a deadline or a subsystem's activity), every dispatchable agent references
+it, and `src/lib/agent-honesty-scan.js` fences that the reference is present and the fragment
+is substantive — wired as the `agent-honesty-fence` check in `iron-loop-enforcer.js`. Like
+`stale-detector.js`, the census FAILS CLOSED: an unreadable definition or a dispatchable
+count below the non-vacuity floor (100) returns `available: false`, never a passing empty
+`missing` list, and a hollow fragment (marker present, sections gone) FAILS. **It proves a
+reference, never obedience** — it cannot reach into a generation, and Operating Lesson 18 is
+the only thing that touches the session model's own prose.
 
 **The unexecutable-order fence — an order to an agent to run code its tools give it no way
 to run.** An agent definition is a set of orders, and its `tools:` frontmatter is the
@@ -679,13 +695,13 @@ ctoc/
   src/                   Source code directory
     commands/            3 slash commands (start, push, update)
     hooks/               17 Claude Code hooks (session start, user-prompt-submit, pre-tool-use, post-tool-use, subagent stop)
-    lib/                 129 JS modules (state, quality, security, planning, UI, analysis)
+    lib/                 130 JS modules (state, quality, security, planning, UI, analysis)
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
   agents/                124 agent definitions across 24 categories
-  skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 516 test files
+  skills/                428 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
+  tests/                 517 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
@@ -950,6 +966,16 @@ CTOC improves itself. When implementing features:
     tilt an owner decision with a "(Recommended)" tag, a "risk" wrapped around
     the option you disfavor, or loaded pros and cons. The full format is in
     [`.ctoc/ask-me-questions.md`](./.ctoc/ask-me-questions.md).
+18. **Say only what you verified; when you have no data, say you have none.**
+    Asked where something stands, an agent with no data must say so — naming what
+    it has not read is a complete answer. A fluent status line with an invented
+    number, time or subsystem in it is a fabrication, and it reads exactly like a
+    fact. Nothing in CTOC is scheduled against a wall clock, so no status line
+    contains a time. Never name a subsystem as running without confirming it has a
+    caller. This is an instruction, not a fence: no hook sees an agent's prose
+    before the human does. `skills/agent-fragments/honest-status.md` carries it for
+    every dispatchable agent; `src/lib/agent-honesty-scan.js` fences that the
+    reference is present, never that a generation obeyed it.
 
 **Methodology reference:** CTOC runs a **16-step** Iron Loop across **4 human gates**
 (Gate 0 vision→functional, Gate 1 functional→implementation, Gate 2

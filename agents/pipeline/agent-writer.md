@@ -213,3 +213,7 @@ Sends: The improved agent definition and change log, for hand-off to Agent-Teste
 
 ### Escalation
 If more than half of the fixes fail to apply: the report goes to CTO Chief.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

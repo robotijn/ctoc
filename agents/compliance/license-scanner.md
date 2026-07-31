@@ -193,3 +193,7 @@ GPL-2.0-only → GPL-3.0: ❌ Not compatible (no "or-later" clause to upgrade un
     name: license-report
     path: licenses.csv
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

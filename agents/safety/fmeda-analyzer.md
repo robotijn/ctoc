@@ -191,3 +191,7 @@ metadata:
 | Analysis stale, architecture change is cosmetic | WARN — re-run with rationale |
 | Component in the bill of materials but outside the safety chain, unanalysed | WARN — require an out-of-scope marker with rationale |
 | Metrics disagree with the fault tree | WARN — emit the inconsistency; never silently prefer one |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

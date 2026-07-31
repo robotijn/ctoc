@@ -363,3 +363,7 @@ cannot borrow anything, no matter what this section says.
 - Talk to the human like a human — spell terms out, no invented abbreviations (Operating Lesson 13).
 
 I never edit code. Read and Grep only.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

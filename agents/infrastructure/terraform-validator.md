@@ -148,3 +148,7 @@ resource "aws_s3_bucket_public_access_block" "data" {
 2. Run `terraform fmt -recursive` to fix formatting
 3. Consider reserved instances for EC2 (-40% cost)
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.
