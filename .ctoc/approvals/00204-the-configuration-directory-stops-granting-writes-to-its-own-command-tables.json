@@ -1,0 +1,9 @@
+{
+  "content_sha256": "d08d3f3488c831c0049e9932f01f481a07b227116f1421cc7265e084e2099b37",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-31T01:33:33.524Z",
+  "approved_by": "human",
+  "plan_basename": "00204-the-configuration-directory-stops-granting-writes-to-its-own-command-tables"
+}
