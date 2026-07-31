@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T09:18:54.015Z
 gate_crossed: implementation → todo
----
-
----
 title: "A fence that fails when a gate number reaches a human — and that says out loud what it cannot see"
 type: implementation
 parent_plan: none

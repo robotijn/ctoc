@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T21:33:26.633Z
 gate_crossed: implementation → todo
----
-
----
 title: "A cited source is fetched and reports three states — verified, refuted, or could-not-look"
 type: implementation
 parent_plan: corpus-claim-verification

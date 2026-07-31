@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-22T12:10:26.396Z
 gate_crossed: implementation → todo
----
-
----
 iron_loop: true
 title: "The approved build queue counts as continuation work without an explicit startBatch — and the human sees how much waits at session start"
 type: implementation

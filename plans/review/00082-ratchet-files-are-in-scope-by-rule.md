@@ -2,15 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T16:47:51.539Z
 gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-19T11:58:15.071Z
-gate_crossed: implementation → todo
----
-
----
 title: "A build that trips a ratchet can move it — ratchet files are in scope by rule, and a MECHANISM checks it"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

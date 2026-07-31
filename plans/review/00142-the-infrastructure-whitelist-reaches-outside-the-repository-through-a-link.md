@@ -2,15 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T09:39:54.720Z
 gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-20T08:40:32.419Z
-gate_crossed: implementation → todo
----
-
----
 title: "The infrastructure whitelist reaches outside the repository through a link — the one door left that is still pure arithmetic"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

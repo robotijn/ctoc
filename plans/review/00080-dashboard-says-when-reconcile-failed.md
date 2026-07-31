@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T07:40:42.747Z
 gate_crossed: implementation → todo
----
-
----
 title: "The dashboard says so when the reconcile pass failed — stale state is never presented as live"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

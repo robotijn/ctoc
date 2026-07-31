@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-18T11:12:18.169Z
 gate_crossed: implementation → todo
----
-
----
 iron_loop: true
 title: "The residency sweep REPORTS on an unmigrated project — it does not move 172 plans on a user's first tool call"
 type: implementation

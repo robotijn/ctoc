@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T21:23:46.332Z
 gate_crossed: implementation → todo
----
-
----
 title: "The approval boundary blames a forgery when an executor invents a heading"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

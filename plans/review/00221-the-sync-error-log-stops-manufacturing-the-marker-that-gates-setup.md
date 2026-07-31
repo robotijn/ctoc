@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-22T12:10:26.339Z
 gate_crossed: implementation → todo
----
-
----
 title: "The plan-index sync error log stops manufacturing the marker that gates setup — the fourth of four producers, error path only"
 type: implementation
 parent_plan: none

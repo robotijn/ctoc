@@ -2,15 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T09:39:54.680Z
 gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-19T21:31:41.220Z
-gate_crossed: implementation → todo
----
-
----
 title: "The permission check does not know which plan is being built — and the witness that would tell it is not set on the dispatch path actually in use"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

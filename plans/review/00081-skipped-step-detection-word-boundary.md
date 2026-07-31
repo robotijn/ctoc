@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T07:27:00.495Z
 gate_crossed: implementation → todo
----
-
----
 title: "A plan that mentions zero-skipped in its prose is not a plan with a skipped step"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

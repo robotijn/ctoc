@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T11:56:02.816Z
 gate_crossed: implementation → todo
----
-
----
 title: "A log directory manufactures the marker that gates setup"
 type: implementation
 parent_plan: none

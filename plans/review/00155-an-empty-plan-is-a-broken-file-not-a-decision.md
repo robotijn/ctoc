@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T09:18:53.897Z
 gate_crossed: implementation → todo
----
-
----
 title: "An empty plan is a broken file to be told about, not a decision with four options"
 type: implementation
 parent_plan: none

@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T11:56:02.738Z
 gate_crossed: implementation → todo
----
-
----
 title: "A session that cannot identify a project invents one, and its guess becomes tomorrow's fact"
 type: implementation
 parent_plan: none

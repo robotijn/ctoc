@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T10:17:33.167Z
 gate_crossed: implementation → todo
----
-
----
 title: "A session records which build of CTOC it is actually running"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

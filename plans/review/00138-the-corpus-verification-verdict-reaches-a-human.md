@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T21:33:26.685Z
 gate_crossed: implementation → todo
----
-
----
 title: "The corpus verification verdict reaches a human, and the scheduled check has a place to run"
 type: implementation
 parent_plan: corpus-claim-verification

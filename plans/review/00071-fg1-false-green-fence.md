@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-18T13:23:02.190Z
 gate_crossed: implementation → todo
----
-
----
 iron_loop: true
 title: "A ratcheting fence against checks that report a verdict on input they never received — the false-green defect class that has shipped five times"
 type: implementation

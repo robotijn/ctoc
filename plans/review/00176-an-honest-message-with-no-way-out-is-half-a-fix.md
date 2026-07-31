@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T11:56:02.787Z
 gate_crossed: implementation → todo
----
-
----
 title: "An honest message with no way out is half a fix — setup retries instead of narrating"
 type: implementation
 parent_plan: none

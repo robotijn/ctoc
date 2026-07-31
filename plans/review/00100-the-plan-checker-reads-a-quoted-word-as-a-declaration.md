@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T18:15:13.863Z
 gate_crossed: implementation → todo
----
-
----
 title: "The plan checker stops reading a quoted word as a declared step status — three builds were blocked by prose that was never a claim"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

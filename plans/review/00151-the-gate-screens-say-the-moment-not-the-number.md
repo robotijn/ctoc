@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T09:18:53.924Z
 gate_crossed: implementation → todo
----
-
----
 title: "The gate screens say what the moment is, instead of a number the human cannot decode"
 type: implementation
 parent_plan: none

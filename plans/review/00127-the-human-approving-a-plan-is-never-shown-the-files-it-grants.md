@@ -2,15 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T09:39:54.629Z
 gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-19T21:31:41.164Z
-gate_crossed: implementation → todo
----
-
----
 title: "The human approving a plan is never shown the files it grants — the gate screen strips the frontmatter, and the file list IS the write permission"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-22T12:10:26.255Z
 gate_crossed: implementation → todo
----
-
----
 title: "An orphaned in-progress plan is recovered to todo when its builder is gone — the reconciler orphans the task, but nothing re-queues the plan"
 type: implementation
 parent_plan: none

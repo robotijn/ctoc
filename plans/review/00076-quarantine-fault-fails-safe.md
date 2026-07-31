@@ -7,9 +7,6 @@ kickback_counts:
     '8': 1
     '14': 1
   total: 2
----
-
----
 title: "The concurrent-edit guard stops failing silently — a fault drops the candidates instead of promoting them"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

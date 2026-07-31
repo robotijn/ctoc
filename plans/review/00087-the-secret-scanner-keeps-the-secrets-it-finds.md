@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T15:21:51.987Z
 gate_crossed: implementation → todo
----
-
----
 title: "The secret scanner keeps the secrets it finds — a non-zero exit carrying verified findings is parsed, not discarded"
 type: implementation
 parent_plan: ctoc-honest-instruments

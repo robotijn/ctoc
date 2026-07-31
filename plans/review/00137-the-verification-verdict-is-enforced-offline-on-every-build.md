@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T21:33:26.659Z
 gate_crossed: implementation → todo
----
-
----
 title: "The verification verdict is enforced offline on every build, so a scheduled check nobody watches becomes a build failure"
 type: implementation
 parent_plan: corpus-claim-verification

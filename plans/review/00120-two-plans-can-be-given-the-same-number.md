@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T18:29:04.141Z
 gate_crossed: implementation → todo
----
-
----
 title: "Two plans can be given the same number — the allocator looks in one directory out of seven, returns the first number on a directory it cannot read, and nothing refuses the colliding write"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

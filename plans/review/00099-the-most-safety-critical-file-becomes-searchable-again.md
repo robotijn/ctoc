@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T18:15:13.808Z
 gate_crossed: implementation → todo
----
-
----
 title: "The approval machinery becomes searchable again — one raw control byte hid the most safety-critical file from every content search"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

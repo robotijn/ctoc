@@ -2,15 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T16:47:51.572Z
 gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-19T11:58:15.149Z
-gate_crossed: implementation → todo
----
-
----
 title: "Rejection sends a plan back one stage, not four — and withdraws the approval it no longer has"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

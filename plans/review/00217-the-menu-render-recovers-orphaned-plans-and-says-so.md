@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-23T17:28:47.522Z
 gate_crossed: implementation → todo
----
-
----
 title: "The menu render recovers orphaned plans and says so — the recovery projection reaches the screen the human opens"
 type: implementation
 parent_plan: none

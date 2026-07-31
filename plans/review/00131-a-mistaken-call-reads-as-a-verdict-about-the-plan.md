@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T21:23:46.383Z
 gate_crossed: implementation → todo
----
-
----
 title: "A mistaken call reads as a verdict about the plan"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild
