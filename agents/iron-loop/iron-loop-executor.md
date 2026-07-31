@@ -303,7 +303,7 @@ Completed: {plan-name}
   Steps: 9/9 complete
   Tests: 24 passed, 0 failed
   Completion: menu task complete t7 → plan in review, VERIFY passed, evidence recorded
-  Gate 3 is ready for the human.
+  The built work is waiting for the human's OK to call it done.
 ```
 
 Then STOP. Do not look for more work — the scheduler promotes the next plan.
@@ -311,3 +311,4 @@ Then STOP. Do not look for more work — the scheduler promotes the next plan.
 ## Honest status (shared rule)
 
 - [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.
+- [`skills/agent-fragments/plain-gate-words.md`](../../skills/agent-fragments/plain-gate-words.md) — never emit a gate NUMBER to a human; say what the MOMENT is in plain words. `src/lib/gate-words.js` is the phrasing.

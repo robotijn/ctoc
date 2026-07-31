@@ -976,6 +976,16 @@ CTOC improves itself. When implementing features:
     before the human does. `skills/agent-fragments/honest-status.md` carries it for
     every dispatchable agent; `src/lib/agent-honesty-scan.js` fences that the
     reference is present, never that a generation obeyed it.
+19. **Never say a gate number to a human — say the moment.** "Gate 3" is an internal
+    code; the owner never carries a numbered map of the pipeline and being handed one
+    reads as evasive. In text a person reads — a report, an inbox notice, a question,
+    a status line — say what the MOMENT IS in plain words ("built and waiting for your
+    OK to call it done"), never the number. The number stays legal in code, comments,
+    file formats, directory names, and the `--gate N` flag — audience is the test: a
+    number a machine reads stays, a number a person reads goes. `src/lib/gate-words.js`
+    is the phrasing; `skills/agent-fragments/plain-gate-words.md` carries the rule for
+    agents; `src/lib/instruction-gate-words-scan.js` fences the instruction surfaces
+    (wired as `instruction-gate-words-fence` in `iron-loop-enforcer.js`).
 
 **Methodology reference:** CTOC runs a **16-step** Iron Loop across **4 human gates**
 (Gate 0 vision→functional, Gate 1 functional→implementation, Gate 2

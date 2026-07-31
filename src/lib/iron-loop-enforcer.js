@@ -708,6 +708,7 @@ const CHECKS = [
   { id: 'golden-corpus-fence',         scope: 'architecture', mode: 'thorough', fn: checkGoldenCorpusFence },
   { id: 'recipe-execution-fence',      scope: 'architecture', mode: 'thorough', fn: checkRecipeExecutionFence },
   { id: 'gate-words-fence',            scope: 'architecture', mode: 'thorough', fn: checkGateWordsFence },
+  { id: 'instruction-gate-words-fence', scope: 'architecture', mode: 'thorough', fn: checkInstructionGateWordsFence },
   { id: 'agent-honesty-fence',         scope: 'architecture', mode: 'thorough', fn: checkAgentHonestyFence },
   { id: 'claim-census',                scope: 'architecture', mode: 'thorough', fn: checkClaimCensus },
   { id: 'dispatch-seat-liveness',      scope: 'system',       mode: 'thorough', fn: checkDispatchSeatLiveness },
@@ -1236,6 +1237,50 @@ function checkGateWordsFence(root) {
   }
   if (problems.length === 0) return CLEAN();
   return finding({ severity: 'block', message: problems.join(' — ') });
+}
+
+/**
+ * Instruction-surface gate-number fence (2026-07-31). The sibling of the gate-number
+ * fence above, for the surface the JavaScript parser cannot see: the Markdown
+ * instruction surfaces (the `.md` files under `src/commands` and `agents`). Those told the session
+ * model to EMIT a gate number to a human — `report "Gate N ready"`, `User outcome:
+ * Gate 0 — …`, `Gate 1/2/3` — and the model echoed the number, which is exactly the
+ * "no numbers" rule the owner has restated repeatedly. `src/lib/gate-words.js` holds
+ * the plain-moment phrasing the instructions should use instead; the shared rule for
+ * agents lives in `skills/agent-fragments/plain-gate-words.md`.
+ *
+ * NARROW / under-report by design (see the scan's header): it fires only on the
+ * output-INSTRUCTION shapes, never on the internal gate table, the `--gate N` flag, or
+ * a machinery description like "crosses Gate 1 (functional → implementation)".
+ *
+ * UNAVAILABLE IS A FAILURE, never a pass and never a skip — a scan that could not read
+ * a surface has no verdict to give. A tree with no `agents/` and no `src/commands/` is
+ * not a CTOC surface tree and is CLEAN (nothing to check). Thorough mode only.
+ *
+ * @param {string} root - Project root
+ * @returns {{clean: boolean, severity?: string, message?: string}}
+ */
+function checkInstructionGateWordsFence(root) {
+  const scan = require('./instruction-gate-words-scan');
+  const res = scan.scanInstructionSurfaces(root);
+  if (!res.available) {
+    // checkJs does not narrow this union on `!available`; the cast is safe — the
+    // unavailable branch IS the { available:false, reason } shape.
+    const reason = /** @type {{ reason: string }} */ (res).reason;
+    return finding({ severity: 'block', message: `the instruction-surface gate-number scan could not run: ${reason}` });
+  }
+  if (res.findings.length === 0) return CLEAN();
+  const shown = res.findings.slice(0, 5).map(
+    (f) => `${f.file}:${f.line} [${f.pattern}] "${f.text}"`
+  );
+  return finding({
+    severity: 'block',
+    message:
+      `${res.findings.length} instruction(s) tell the model to emit a gate number to a human — ` +
+      `say what the moment is (src/lib/gate-words.js; skills/agent-fragments/plain-gate-words.md), ` +
+      `not the number: ${shown.join(' | ')}` +
+      `${res.findings.length > 5 ? ` (+${res.findings.length - 5} more)` : ''}`,
+  });
 }
 
 /**

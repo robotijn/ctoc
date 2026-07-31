@@ -180,11 +180,17 @@ describe('SPEC-A — DC-FAIL (failure surfaced)', () => {
 });
 
 describe('SPEC-A — DC-GATE (gates never auto-crossed)', () => {
-  it('gate section forbids auto-crossing, names Gate N ready, and keeps --gate/--next', () => {
+  it('gate section forbids auto-crossing, says the moment in plain words (no gate number), and keeps --gate/--next', () => {
+    // The old assertion REQUIRED the instruction to say "Gate N ready" — the exact
+    // human-facing gate-number leak the owner ordered removed (project CLAUDE.md
+    // Operating Lesson 19; src/lib/gate-words.js). The contract was replaced, so this
+    // now asserts the plain-moment wording and that NO gate number reaches the human,
+    // while keeping the machinery flags — strictly stronger than the wording it pinned.
     const body = sectionBody(readMenuMd(), /^### Human gates stay foreground/m);
     assert.match(body, /never.{0,20}(auto-cross|cross)/i, 'never auto-cross a gate');
-    assert.match(body, /Gate N ready/, 'names the Gate N ready inbox item');
-    assert.match(body, /--gate/, 'names the --gate marker');
+    assert.match(body, /waiting for the human's OK|waiting-for-your-OK/i, 'says the moment in plain words');
+    assert.doesNotMatch(body, /"Gate N ready"|Gate N ready/, 'no gate-number output instruction remains');
+    assert.match(body, /--gate/, 'still names the --gate machinery flag');
     assert.match(body, /--next/, 'names the --next nav route');
   });
 });
