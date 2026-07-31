@@ -253,6 +253,8 @@ ESCAPABLE (`CTOC_SKIP_CONTINUATION=1`). Enforced by `tests/resume-watchdog.test.
 
 CTOC is a plugin inside the Claude command-line interface: plain code cannot dispatch a CTOC subagent, and it must never spawn a second Claude (no `claude -p`, no online API calls). Generation is SESSION-DRIVEN. On start, `src/hooks/SessionStart.js` computes `streaming-precompute.plansNeedingQuestions(root)` and, when it is non-empty, appends a directive to the injected context telling the SESSION MODEL to dispatch up to 5 subagents (the stage producers `product-owner`/`vision-advisor`/`implementation-planner` plus the adversarial critics) to find open issues and generate questions, each writing through `streaming-precompute.writePlanQuestions(root, ref, questions, planMtimeMs)`. When nothing is pending the directive is empty — no session-start noise. `/ctoc:start` only READS that store (instant, fail-soft); the human never waits for a critique.
 
+**The critique fleet RECORDS that it ran — an audit attestation, never a licence to cross.** The adversarial `gate-critic` may add an `attestation` block to its quarantined pending object: per expected lens (`premortem`, `devils-advocate`, `red-team`, `advocate`), the `state` it classified (`clean-pass` | `partial` | `failed` | `absent`), a `coverage` DERIVED from that state (`full`/`partial`/`none` — the critic's input is `{ ref, lens, findings }` and it does NOT receive a lens's own coverage, so it never copies one), and the post-dedup `findings` count. `streaming-questions-sweeper.promotePendingFile` threads that block through `writePlanQuestions`'s optional fifth parameter into the live store, where the sufficiency auditor and the Doctor screen read it via `planQuestionsStatus.attested` / `.attestation`. This is a RECORD for audit, NOT a crossing-enabler: it changes no gate behaviour, the empty→ready/enough contract is unchanged, and `gate-critic` still NEVER emits `questions: []`. Honesty is preserved at both ends — the sweeper validates and fabricates nothing (an absent block passes straight through), and the reader (`validateAttestation`) fails toward NOT-ATTESTED on an absent or malformed block, so a missing or broken attestation is always safe and only a fabricated clean one would lie. Round-tripped by `tests/attestation-round-trip.test.js`.
+
 **An empty question list MAY carry an attestation that a critique ran — recorded, not
 enforced (yet).** A well-formed empty `questions: []` is honest — "the critique ran and
 found nothing to ask" — but on disk it is byte-identical to "a producer errored and
@@ -316,7 +318,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 514 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 515 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -670,7 +672,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 514 test files
+  tests/                 515 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)

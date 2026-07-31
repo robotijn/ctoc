@@ -192,7 +192,24 @@ function promotePendingFile(root, absFile) {
   // 11. The real writer re-validates the whole contract independently.
   // The `=== true` test (rather than a bare truthiness check) is what lets the
   // discriminated-union return type narrow under `tsc --checkJs`.
-  const written = precompute.writePlanQuestions(root, ref, payload.questions, currentMtimeMs);
+  //
+  // AUDIT-ONLY attestation pass-through (plan 00183): forward the quarantined
+  // object's `attestation` as the fifth argument so the critique fleet's
+  // machine-consumable "we ran, and in what state" RECORD rides through into the
+  // live store, where the sufficiency auditor and the Doctor screen read it via
+  // `planQuestionsStatus.attested` / `.attestation`. This carries a RECORD; it does
+  // NOT change any crossing behaviour and does NOT gate an empty list.
+  //
+  // The sweeper VALIDATES nothing about it and FABRICATES nothing: `writePlanQuestions`
+  // is the single validation authority (`validateAttestation`), so a second check
+  // here would be two rules about one field waiting to disagree, and synthesising a
+  // missing block would forge the very evidence this record exists to require. An
+  // absent `attestation` is `undefined` and passes straight through — the writer then
+  // leaves the file byte-identical to a four-argument call, so the record reads
+  // honestly NOT-ATTESTED rather than clean.
+  const written = precompute.writePlanQuestions(
+    root, ref, payload.questions, currentMtimeMs, payload.attestation,
+  );
   if (written.ok === true) return { ok: true, ref };
   return { ok: false, reason: 'invalid-questions', errors: written.errors };
 }
