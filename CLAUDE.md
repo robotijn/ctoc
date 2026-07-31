@@ -318,7 +318,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 515 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 516 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -517,6 +517,19 @@ zero-files, empty-ENFORCED or unreadable-doc scan FAILS rather than reporting "h
 Today the one enforced control is Independent Verification and Validation (the IV&V
 chief's activation call); every other named control carries the marker.
 
+**The compliance seam is EXECUTABLE, not merely named.** At the
+functional→implementation transition CTO Chief dispatches the compliance seam through
+two shipped `node -e` recipes in `agents/coordinator/cto-chief.md` (the coordinator
+holds `Bash`): the first RUNS `src/lib/iron-loop-compliance-trigger.js`'s
+`evaluateComplianceTrigger`, the second — only when the trigger reports a regime on —
+RUNS `src/lib/compliance-integration.js`'s `runComplianceForTransition`, passing the
+agents' findings argv-JSON (never string-interpolated). A named function in a prose
+sentence is a citation the reachability fence does not credit; a literal program is an
+invocation it does, so converting the two calls to recipes moved the seam's seven-file
+closure out of the dead list (24→17). The seam remains ADVISORY: findings attach to the
+Inbox, it moves no plan and adds no human gate. Proven by RUNNING both recipes as child
+processes in `tests/compliance-seam-is-executable.test.js`.
+
 **The recipe-execution fence — a shipped recipe is proven by RUNNING it.** A static
 check cannot catch the defect class this fence exists for: the broken `cleanup-exec`
 recipe (00185) passed a string where a proposal OBJECT belonged — three arguments to
@@ -672,7 +685,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 515 test files
+  tests/                 516 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
