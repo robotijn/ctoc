@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-21T14:00:00.000Z
 gate_crossed: implementation → todo
----
-
----
 iron_loop: true
 title: "The setup-completeness check honors the declined anchor CTOC itself wrote, instead of calling a valid project unset"
 type: implementation
@@ -33,6 +30,7 @@ scope_extension:
     active_profiles: line — so CTOC rejects the exact value CTOC wrote. Two
     predicates for one fact, disagreeing. Fix: the completeness check honors
     what the reader honors.
+---
 
 # The setup check rejects the declined anchor CTOC itself wrote
 

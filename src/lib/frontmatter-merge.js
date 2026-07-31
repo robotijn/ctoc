@@ -72,7 +72,21 @@ function splitLeadingFrontmatter(text) {
       body.push(strip(lines[j]));
       j++;
     }
-    if (!closed) break; // unterminated block: do NOT consume it
+    if (!closed) {
+      // Unterminated block. In the stacked-marker corruption the real
+      // frontmatter block's CLOSING fence was lost, so the plan's fields run
+      // straight into the markdown body: the block FOLLOWS an already-consumed
+      // marker block and its first content line is a top-level YAML key. Recover
+      // the YAML prefix as a block and hand the rest back as the body. In every
+      // other case leave it unconsumed — a lone top-of-file `---`, or a `---`
+      // horizontal rule with prose after it, is body, never lost frontmatter.
+      const recovered = recoverUnterminatedBlock(blocks, body);
+      if (recovered) {
+        blocks.push(recovered.blockLines);
+        i = i + 1 + recovered.bodyStartOffset;
+      }
+      break;
+    }
     blocks.push(body);
     i = j + 1;
     // Peek past blank lines: consume them only if ANOTHER block follows.
@@ -101,6 +115,41 @@ function topLevelKey(line) {
   if (/^\s/.test(line)) return null; // indented → belongs to a parent key's sub-tree
   const m = line.match(/^([^\s:#][^:]*):(?:\s|$)/);
   return m ? m[1].trim() : null;
+}
+
+/**
+ * Recover a real frontmatter block whose closing `---` fence was lost (the
+ * stacked-marker corruption). Only fires when the block FOLLOWS an already-consumed
+ * block AND its first content line is a top-level YAML key — the signature of lost
+ * frontmatter, never a markdown horizontal rule. The frontmatter portion is the
+ * maximal prefix of blank / indented / top-level-key lines; the first line that is
+ * none of those is the body start. Trailing blank lines before the body are the
+ * separator and stay with the body (matching the well-formed `---\n\n<body>` shape).
+ *
+ * @param {string[][]} priorBlocks blocks already consumed this scan
+ * @param {string[]} body the unterminated block's lines (`\r`-stripped), running to EOF
+ * @returns {{ blockLines: string[], bodyStartOffset: number }|null} null = do not recover
+ */
+function recoverUnterminatedBlock(priorBlocks, body) {
+  if (priorBlocks.length === 0) return null; // a lone top-of-file `---` is not lost frontmatter
+  if (body.length === 0) return null;
+  if (topLevelKey(body[0]) === null) return null; // first line is body/horizontal-rule, not YAML
+
+  let boundary = -1;
+  for (let x = 0; x < body.length; x++) {
+    const ln = body[x];
+    if (ln.trim() === '') continue;         // blank: frontmatter interior or separator
+    if (/^\s/.test(ln)) continue;           // indented: a key's sub-tree
+    if (topLevelKey(ln) !== null) continue; // a top-level key
+    boundary = x; break;                    // first markdown/body line
+  }
+  if (boundary === -1) return null; // no body boundary — refuse to swallow everything
+
+  let fmEnd = boundary;
+  while (fmEnd > 0 && body[fmEnd - 1].trim() === '') fmEnd--; // trim trailing separator blanks
+  if (fmEnd === 0) return null; // no actual frontmatter content
+
+  return { blockLines: body.slice(0, fmEnd), bodyStartOffset: fmEnd };
 }
 
 /**

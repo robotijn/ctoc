@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-22T00:00:00.000Z
 gate_crossed: implementation → todo
----
-
----
 iron_loop: true
 title: "The growing doc counts generate themselves at release, instead of taxing every test-first build with a hand-edited literal"
 type: implementation
@@ -32,6 +29,7 @@ scope_extension:
     rather than policing a hand-edited literal. This plan touches release.js and
     the two count tests and CLAUDE.md — declared here up front so this fix does
     not itself pay the tax it removes.
+---
 
 # The growing counts generate themselves; the fixed contracts still get policed
 
