@@ -571,6 +571,3 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
-
-## HELD — dead foundation (human-delegated decision, 2026-07-31)
-NOT built by decision. Depends on 00166, whose dispatch seat is provably NOT LIVE (the PreToolUse.Task hook never fires in this harness). A claim that "outlives the executor" is meaningless when no claim is ever seated. Held until the upstream Task-matcher wiring is fixed or the seat chain is retired. The honest visibility half already shipped: 00167 records whether a completion was ever claimed; 00182/00183 record the critique attestation.

@@ -255,7 +255,15 @@ When a plan crosses Gate 1 (functional → implementation):
    `src/lib/iron-loop-compliance-trigger.js` — call
    `evaluateComplianceTrigger(projectRoot)`, or read the `compliance_trigger:`
    frontmatter block if `writeComplianceTrigger(planPath, projectRoot)` has
-   already persisted it into the plan. The trigger is a plain descriptor:
+   already persisted it into the plan. You hold `Bash`, so RUN the descriptor
+   rather than reconstruct the call — this is the executable recipe (it passes
+   `process.cwd()` and interpolates no value, so there is no injection surface):
+
+   ```js
+   node -e "const t=require('${CLAUDE_PLUGIN_ROOT}/src/lib/iron-loop-compliance-trigger.js');console.log(JSON.stringify(t.evaluateComplianceTrigger(process.cwd())))"
+   ```
+
+   The trigger is a plain descriptor:
    `{ runGdpr, runEuAiAct, dispatcher: "cto-chief" }`. The `dispatcher` field is
    ALWAYS the literal `"cto-chief"` — it is NEVER `iron-loop`; that field is the
    machine-checkable proof that dispatch is delegated to you and never performed
@@ -265,11 +273,21 @@ When a plan crosses Gate 1 (functional → implementation):
    `runEuAiAct` is `true`, dispatch the compliance seam
    `src/lib/compliance-integration.js` — call
    `runComplianceForTransition(projectRoot, { gdprFindings, euAiActFindings })`.
+   RUN this seam recipe (with `Bash`) ONLY when the trigger above reported a
+   regime on, passing the findings your dispatched GDPR / EU-AI-Act agents
+   returned as a SINGLE JSON argument — argv-passed (`process.argv[1]`), never
+   string-interpolated into the program, so a finding's text can never alter the
+   program:
+
+   ```js
+   node -e "const s=require('${CLAUDE_PLUGIN_ROOT}/src/lib/compliance-integration.js');const f=JSON.parse(process.argv[1]||'{}');console.log(JSON.stringify(s.runComplianceForTransition(process.cwd(),f)))" '<findings-json>'
+   ```
+
    The seam runs each opted-in regime runner, cross-dedups overlapping plan-stage
    findings so a cross-regime duplicate is written ONCE (never the sum), and
    attaches the survivors to the Inbox. If both `runGdpr` and `runEuAiAct` are
-   `false` (no compliance profile active), you dispatch NOTHING — the seam is a
-   provable no-op.
+   `false` (no compliance profile active), you dispatch NOTHING — you do not run
+   the seam recipe at all — the seam is a provable no-op.
 
 3. **Findings are ADVISORY.** They attach to the Inbox before Gate 2 is
    presented so morning review sees them alongside the plan. They do NOT

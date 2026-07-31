@@ -37,13 +37,42 @@
 'use strict';
 
 const { shouldRunGdpr } = require('./compliance-regime');
-const { validateFindingSchema, normalizeSeverity, routeFinding } = require('./gdpr-helpers');
+const { validateFindingSchema, normalizeSeverity, routeFinding, mapPiiFieldToArticles } = require('./gdpr-helpers');
 const inbox = require('./inbox');
+
+/**
+ * Enrich a finding that names a `pii_field` with the COMPLETE set of GDPR
+ * Articles that field triggers, via the deterministic gdpr-helpers table — the
+ * executable half of the GDPR agent's documented contract
+ * (agents/compliance/gdpr-agent.md: "`mapPiiFieldToArticles` … the GDPR Articles
+ * that field triggers"). A finding about `email` retention may be flagged under
+ * one Article (`GDPR-17`) while that same field also implicates lawful-basis
+ * (`GDPR-6`) and info-at-collection (`GDPR-13`); surfacing the full set in the
+ * Inbox `gdpr_articles` line gives morning review the complete picture rather
+ * than the single flagged Article. When the finding carries a `pii_field` but no
+ * `gdpr_article` at all, the primary (first) mapped Article is also filled so the
+ * finding validates and routes. A finding with no mappable `pii_field` is
+ * returned unchanged (and, lacking an Article, still throws loudly in the schema
+ * guard, exactly as before). Never mutates the input.
+ *
+ * @param {object} finding
+ * @returns {object} the finding, or a copy carrying the mapped Article set
+ */
+function enrichFromPiiField(finding) {
+  if (finding === null || typeof finding !== 'object' || Array.isArray(finding)) return finding;
+  const articles = mapPiiFieldToArticles(finding.pii_field);
+  if (articles.length === 0) return finding;
+  const out = { ...finding, gdpr_articles: articles };
+  if (!out.gdpr_article) out.gdpr_article = articles[0];
+  return out;
+}
 
 /**
  * Build the human-facing context blob attached to an Inbox question. Names the
  * Article, the model's confidence, and the finding kind so morning review has
- * the machine-checkable facts alongside the prose question.
+ * the machine-checkable facts alongside the prose question. When the Article was
+ * derived from a PII field, the field and the full triggered-Article list are
+ * surfaced too.
  * @param {object} finding - a schema-valid, severity-normalized finding
  * @returns {string}
  */
@@ -54,6 +83,8 @@ function buildContext(finding) {
   ];
   if (finding.confidence) parts.push(`confidence: ${finding.confidence}`);
   if (finding.kind) parts.push(`kind: ${finding.kind}`);
+  if (finding.pii_field) parts.push(`pii_field: ${finding.pii_field}`);
+  if (Array.isArray(finding.gdpr_articles)) parts.push(`gdpr_articles: ${finding.gdpr_articles.join(', ')}`);
   return parts.join('\n');
 }
 
@@ -86,10 +117,13 @@ function runGdprFindings(projectRoot, findings) {
   const letter = [];
 
   for (const finding of list) {
-    // 3. Validate (throws loudly on an unknown gdpr_article, BEFORE any emission),
-    //    then normalize severity to critical, then route.
-    validateFindingSchema(finding);
-    const nf = normalizeSeverity(finding);
+    // 3. Enrich with the full triggered-Article set when the finding names a
+    //    pii_field (executable mapping), then validate (throws loudly on an
+    //    unknown gdpr_article, BEFORE any emission), then normalize severity to
+    //    critical, then route.
+    const enriched = enrichFromPiiField(finding);
+    validateFindingSchema(enriched);
+    const nf = normalizeSeverity(enriched);
     const { route } = routeFinding(nf);
 
     if (route === 'inbox') {
