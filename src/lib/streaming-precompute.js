@@ -305,18 +305,105 @@ function validatePlanQuestions(raw) {
 }
 
 /**
+ * The critique lenses this store EXPECTS, named by THIS module and never read from
+ * the payload — mirroring agents/iron-loop/gate-critic.md's "match by EXPECTATION,
+ * never by claim". Three PROSECUTION lenses (whose clean pass is evidence the plan
+ * survived attack) and one DEFENSE lens (`advocate`, which argues FOR crossing).
+ * A payload cannot add, remove, or rename an expected lens; an unrecognised extra
+ * lens key is simply ignored.
+ */
+const PROSECUTION_LENSES = ['premortem', 'devils-advocate', 'red-team'];
+const EXPECTED_LENSES = [...PROSECUTION_LENSES, 'advocate'];
+/** Closed vocabularies, matched by EXACT string equality — never prefix/substring. */
+const LENS_STATES = ['clean-pass', 'partial', 'failed', 'absent'];
+const LENS_COVERAGES = ['full', 'partial', 'none'];
+
+/**
+ * Validate a per-plan questions file's optional `attestation` block — the
+ * machine-consumable RECORD that a critique fleet ran, projected from the lenses'
+ * own `self_assessment` vocabulary (agents/iron-loop/premortem-critic.md) and
+ * gate-critic's clean/partial/failed classification. PURE and NON-throwing.
+ *
+ * The attestation is subagent-authored, therefore UNTRUSTED: every value is matched
+ * by exact string equality against the module's closed vocabularies, and the four
+ * expected lens names come from THIS module. FAIL TOWARD NOT-ATTESTED — any absent,
+ * malformed, or unrecognised value makes the whole block invalid; nothing here reads
+ * an unknown value as a known-good one.
+ *
+ * An attestation is VALID when it is an object carrying `generated_by` (a non-empty
+ * string), `generated_at` (a finite number), and a `lenses` object that holds ALL
+ * FOUR expected lenses, each an object with a `state` from LENS_STATES, a `coverage`
+ * from LENS_COVERAGES, and a non-negative integer `findings`.
+ *
+ * NOTE ON SCOPE: this is the ADDITIVE half of plan 00182 — validity means "a
+ * well-formed critique record is present". It does NOT decide whether the record is
+ * a CLEAN PASS good enough to license a gate crossing; that enforcement (three
+ * prosecution lenses clean-pass at full coverage) is deferred with an
+ * attestation-producing path — see the plan's Decisions Taken Under Ambiguity.
+ *
+ * @param {*} attestation
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+function validateAttestation(attestation) {
+  const errors = [];
+  if (!attestation || typeof attestation !== 'object' || Array.isArray(attestation)) {
+    return { valid: false, errors: ['attestation must be an object'] };
+  }
+  if (!isNonEmptyString(attestation.generated_by)) {
+    errors.push('attestation.generated_by must be a non-empty string');
+  }
+  if (!Number.isFinite(attestation.generated_at)) {
+    errors.push('attestation.generated_at must be a finite number');
+  }
+  const lenses = attestation.lenses;
+  if (!lenses || typeof lenses !== 'object' || Array.isArray(lenses)) {
+    errors.push('attestation.lenses must be an object');
+    return { valid: false, errors };
+  }
+  for (const name of EXPECTED_LENSES) {
+    const lens = lenses[name];
+    if (!lens || typeof lens !== 'object' || Array.isArray(lens)) {
+      errors.push(`attestation.lenses.${name} must be an object`);
+      continue;
+    }
+    if (!LENS_STATES.includes(lens.state)) {
+      errors.push(`attestation.lenses.${name}.state must be one of ${LENS_STATES.join('|')}`);
+    }
+    if (!LENS_COVERAGES.includes(lens.coverage)) {
+      errors.push(`attestation.lenses.${name}.coverage must be one of ${LENS_COVERAGES.join('|')}`);
+    }
+    if (!Number.isInteger(lens.findings) || lens.findings < 0) {
+      errors.push(`attestation.lenses.${name}.findings must be a non-negative integer`);
+    }
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+/**
  * Atomically write the per-plan questions file for `ref`. Validates the questions
  * FIRST (a malformed set is refused and NO file is written), then commits via a
  * temp-file + rename so a reader never observes a half-written file. NEVER throws:
  * every failure path returns `{ ok:false, errors }`.
  *
+ * ── The optional `attestation` (ADDITIVE) ──────────────────────────────────────
+ * A fifth, OPTIONAL, positional parameter. When it is an object it is CARRIED and
+ * RECORDED verbatim into the file as `attestation`, so a reader (the sufficiency
+ * audit, the Doctor screen) can tell "a critique ran" from "no record either way".
+ * It is deliberately NOT validated at the write — the reader is the single
+ * validation authority (`validateAttestation`), so there is one encoding of the rule
+ * and no drift, and even a malformed-but-present record stays visible to an audit of
+ * a broken producer. A non-object fifth argument is IGNORED, and an omitted one
+ * leaves the file's byte shape EXACTLY as before (`{ ref, planMtimeMs, questions }`),
+ * so every existing four-argument caller is unchanged.
+ *
  * @param {string} root project root
  * @param {string} ref plan reference ("stage/file.md")
  * @param {Array<object>} questions the decision questions (Question contract)
  * @param {number} planMtimeMs the plan file's mtime (ms) at generation time
+ * @param {object} [attestation] optional critique-ran record (see validateAttestation)
  * @returns {{ ok: true } | { ok: false, errors: string[] }}
  */
-function writePlanQuestions(root, ref, questions, planMtimeMs) {
+function writePlanQuestions(root, ref, questions, planMtimeMs, attestation) {
   const file = questionsPath(root, ref);
   if (file === null) {
     return { ok: false, errors: [`invalid ref: ${typeof ref === 'string' ? JSON.stringify(ref) : typeof ref}`] };
@@ -328,7 +415,13 @@ function writePlanQuestions(root, ref, questions, planMtimeMs) {
   // An unusable mtime (non-finite) stamps as 0 → the file reads as STALE against
   // any real plan mtime, forcing regeneration. Safer than storing a bad stamp.
   const mtime = Number.isFinite(planMtimeMs) ? planMtimeMs : 0;
-  const payload = JSON.stringify({ ref, planMtimeMs: mtime, questions }, null, 2);
+  const record = { ref, planMtimeMs: mtime, questions };
+  // Carry the attestation ONLY when it is an object — never a stray string/number,
+  // and never an `attestation` key at all for a four-arg call (byte-shape unchanged).
+  if (attestation && typeof attestation === 'object' && !Array.isArray(attestation)) {
+    record.attestation = attestation;
+  }
+  const payload = JSON.stringify(record, null, 2);
 
   const tmp = `${file}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   try {
@@ -387,7 +480,8 @@ function writePlanQuestions(root, ref, questions, planMtimeMs) {
  * @param {string} root project root
  * @param {string} ref plan reference ("stage/file.md")
  * @returns {{status:string, questions?:Array<object>, questionsRevisionMs?:number,
- *   planMtimeMs?:number, errors?:string[], reason:string}}
+ *   planMtimeMs?:number, attested?:boolean, attestation?:(object|null),
+ *   errors?:string[], reason:string}}
  */
 function planQuestionsStatus(root, ref) {
   const shownRef = typeof ref === 'string' ? ref : typeof ref;
@@ -464,11 +558,23 @@ function planQuestionsStatus(root, ref) {
     };
   }
 
+  // ATTESTATION (additive, read-only exposure). `attested` is the reader-facing
+  // verdict — TRUE only when a well-formed critique record is present — so a consumer
+  // can tell "a critique ran" from "no record either way" without re-encoding the
+  // rule. FAIL TOWARD NOT-ATTESTED: an absent or malformed block is `attested:false`.
+  // The raw `attestation` block is exposed for a reader to render, but it is
+  // subagent-authored and UNTRUSTED — a renderer MUST stripCtl and length-cap
+  // `generated_by`/lens names before displaying them. This does NOT gate: an
+  // unattested empty set still reads 'ready' (enforcement is a separate, deferred
+  // slice), so the empty→ready/enough contract is unchanged.
+  const attested = validateAttestation(parsed.attestation).valid;
   return {
     status: 'ready',
     questions: parsed.questions,
     questionsRevisionMs: storedMtimeMs, // the stamp the question set was generated against
     planMtimeMs: currentMtimeMs,        // the plan file's CURRENT mtime
+    attested,
+    attestation: parsed.attestation === undefined ? null : parsed.attestation,
     reason: `${shownRef} has fresh precomputed questions`,
   };
 }

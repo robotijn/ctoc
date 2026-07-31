@@ -253,6 +253,29 @@ ESCAPABLE (`CTOC_SKIP_CONTINUATION=1`). Enforced by `tests/resume-watchdog.test.
 
 CTOC is a plugin inside the Claude command-line interface: plain code cannot dispatch a CTOC subagent, and it must never spawn a second Claude (no `claude -p`, no online API calls). Generation is SESSION-DRIVEN. On start, `src/hooks/SessionStart.js` computes `streaming-precompute.plansNeedingQuestions(root)` and, when it is non-empty, appends a directive to the injected context telling the SESSION MODEL to dispatch up to 5 subagents (the stage producers `product-owner`/`vision-advisor`/`implementation-planner` plus the adversarial critics) to find open issues and generate questions, each writing through `streaming-precompute.writePlanQuestions(root, ref, questions, planMtimeMs)`. When nothing is pending the directive is empty — no session-start noise. `/ctoc:start` only READS that store (instant, fail-soft); the human never waits for a critique.
 
+**An empty question list MAY carry an attestation that a critique ran — recorded, not
+enforced (yet).** A well-formed empty `questions: []` is honest — "the critique ran and
+found nothing to ask" — but on disk it is byte-identical to "a producer errored and
+emitted nothing", and the permissive reading is the one wired to auto-crossing. So a
+questions file MAY now carry an OPTIONAL `attestation` block: `writePlanQuestions(root,
+ref, questions, planMtimeMs, attestation?)` takes a fifth optional parameter that CARRIES
+and RECORDS a machine-consumable proof a critique fleet ran — projected from the lenses'
+own `self_assessment` vocabulary (`{ generated_by, generated_at, lenses: { premortem,
+devils-advocate, red-team, advocate → { state, coverage, findings } } }`). The four
+expected lens names and the closed `state`/`coverage` vocabularies are owned by
+`streaming-precompute.js` and matched by EXACT string equality — the attestation is
+subagent-authored, therefore untrusted, so validation FAILS TOWARD NOT-ATTESTED (an
+absent, unreadable, or malformed block reads `attested:false`, never attested).
+`planQuestionsStatus(...)` exposes the verdict on its `ready` result (`attested` boolean
++ the raw `attestation` block) so a reader — the sufficiency audit, the Doctor screen —
+can tell "a critique ran" from "no record either way". **This is ADDITIVE and does NOT
+gate:** an unattested empty list still reads `ready`/`enough:true`, so auto-crossing for
+clean plans is unchanged. Every existing four-argument caller is byte-for-byte unaffected
+(no `attestation` key is written). Making an unattested empty list read `enough:false`
+(the enforcement / refusal) is a high-stakes gate change deferred until an
+attestation-PRODUCING path exists, and is the human's decision. Enforced by
+`tests/questions-attestation.test.js`.
+
 ---
 
 ## Critical Rules
@@ -293,7 +316,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 513 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 514 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -647,7 +670,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                427 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 513 test files
+  tests/                 514 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
