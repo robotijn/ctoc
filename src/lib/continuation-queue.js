@@ -192,7 +192,7 @@ function effectiveBlocks(state, depth) {
  * gate fails open.
  *
  * @param {string} root - the project root
- * @returns {{continue: boolean, reason: string, depth?: number, refs?: string[], fork?: boolean, exhausted?: boolean}}
+ * @returns {{continue: boolean, reason: string, depth?: number, refs?: string[], fork?: boolean, exhausted?: boolean, buildOrder?: ReturnType<typeof nextBuildable>}}
  */
 function shouldContinueQueue(root) {
   const state = readQueueState(root) || {};
@@ -216,7 +216,18 @@ function shouldContinueQueue(root) {
       depth,
     };
   }
-  return { continue: true, reason: `${depth} approved plan(s) waiting to be built`, depth, refs };
+  // ADDITIVE `buildOrder`: the SAME decision object the Stop hook already consumes now
+  // also answers "which approved plan next, in what order" — dependency-and-criticality
+  // ordered, with the blocked/inversion/missing diagnostics. Existing consumers read
+  // only `continue`/`depth`; this field is extra, never a behaviour change. It is what
+  // makes `nextBuildable` reachable on a live path (it runs on every gate evaluation).
+  return {
+    continue: true,
+    reason: `${depth} approved plan(s) waiting to be built`,
+    depth,
+    refs,
+    buildOrder: nextBuildable(root),
+  };
 }
 
 /**
@@ -282,6 +293,163 @@ function resolveQueueFork(root) {
 }
 
 /**
+ * Criticality tiers — LOWER rank builds sooner. Case-insensitive; an unset or
+ * unrecognised priority ranks LAST (rank 4), so a plan that declares nothing never
+ * jumps ahead of one that declares a real tier.
+ * @type {Readonly<Record<string, number>>}
+ */
+const PRIORITY_RANK = Object.freeze({ critical: 0, high: 1, medium: 2, low: 3 });
+
+/**
+ * @param {*} p - a raw `priority` frontmatter value
+ * @returns {number} 0..4, unknown/unset -> 4
+ */
+function priorityRank(p) {
+  const s = String(p == null ? '' : p).trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(PRIORITY_RANK, s) ? PRIORITY_RANK[s] : 4;
+}
+
+/**
+ * Normalize a `depends_on` frontmatter value into predecessor slugs. Handles every
+ * real shape: an array (block-style list), the literal `none`, a single slug, or a
+ * comma-separated list. Each slug is trimmed and stripped of a trailing `.md`; empty
+ * and `none` entries are dropped.
+ * @param {*} raw
+ * @returns {string[]}
+ */
+function normalizeDeps(raw) {
+  const items = Array.isArray(raw) ? raw : String(raw == null ? '' : raw).split(',');
+  const out = [];
+  for (const it of items) {
+    const slug = String(it).trim().replace(/\.md$/i, '');
+    if (slug && slug.toLowerCase() !== 'none') out.push(slug);
+  }
+  return out;
+}
+
+/** Stages whose residents count as SATISFIED predecessors: built-and-waiting for the
+ *  human (review) or shipped (done). */
+const SATISFYING_STAGES = ['review', 'done'];
+/** Stages whose residents are UNBUILT predecessors — the dep must be built first. */
+const UNBUILT_STAGES = ['todo', 'in-progress', 'implementation'];
+
+/**
+ * Locate a predecessor plan by slug (basename, no extension) across the stage dirs and
+ * classify its build-state. Fault-isolated: an unreadable located file yields a null
+ * priority, never a throw.
+ * @param {string} plansDir
+ * @param {string} slug
+ * @returns {{state: ('satisfied'|'unbuilt'|'missing'), priority?: *}}
+ */
+function locatePredecessor(plansDir, slug) {
+  for (const stage of SATISFYING_STAGES) {
+    if (safeFs.existsSync(path.join(plansDir, stage, `${slug}.md`))) return { state: 'satisfied' };
+  }
+  for (const stage of UNBUILT_STAGES) {
+    const p = path.join(plansDir, stage, `${slug}.md`);
+    if (!safeFs.existsSync(p)) continue;
+    let priority = null;
+    try {
+      priority = require('./state').parseMetadata(safeFs.readFileSync(p, 'utf8')).priority;
+    } catch {
+      // Located but unreadable: state is still UNBUILT (it blocks), priority unknown.
+      priority = null;
+    }
+    return { state: 'unbuilt', priority };
+  }
+  return { state: 'missing' };
+}
+
+/**
+ * THE SELECTOR. Order the approved build queue for building: BUILDABLE plans (every
+ * `depends_on` predecessor satisfied) most-critical first, plus the diagnostics an
+ * engine needs to keep moving. PURE READ — no writes. FAIL-OPEN and fault-isolated
+ * exactly like `approvedFreeQueue`: a bad root or unreadable stage contributes zero,
+ * an unreadable plan is skipped, nothing throws.
+ *
+ * SATISFACTION: a predecessor in `plans/review/` (built, awaiting the human) or
+ * `plans/done/` (shipped) is satisfied; one still in `todo`/`in-progress`/
+ * `implementation` is not (build it first); one that resolves to NO plan file is
+ * treated satisfied (a missing/external dep never blocks) but recorded in
+ * `missingDeps`.
+ *
+ * INVERSION (surfaced, NEVER reordered): a `critical` plan blocked behind a
+ * lower-criticality unbuilt predecessor is added to `inversions` so a human can
+ * re-prioritise; the engine keeps building the predecessor regardless.
+ *
+ * @param {string} root - the project root
+ * @returns {{ buildable: string[], blocked: Array<{ref: string, blockedBy: string[]}>,
+ *   inversions: Array<{ref: string, blockedBy: string, reason: string}>,
+ *   missingDeps: Array<{ref: string, dep: string}> }}
+ *   `buildable` are `stage/file.md` refs in build order.
+ */
+function nextBuildable(root) {
+  const result = { buildable: [], blocked: [], inversions: [], missingDeps: [] };
+  const { refs } = approvedFreeQueue(root);
+  if (refs.length === 0) return result;
+
+  let plansDir;
+  let parseMetadata;
+  try {
+    const state = require('./state');
+    plansDir = state.getPlansDir(root);
+    parseMetadata = state.parseMetadata;
+  } catch {
+    return result;
+  }
+
+  const ranked = []; // { ref, rank, queueIndex } for the buildable set
+  refs.forEach((ref, queueIndex) => {
+    const slash = ref.indexOf('/');
+    const stage = ref.slice(0, slash);
+    const file = ref.slice(slash + 1);
+    let meta;
+    try {
+      meta = parseMetadata(safeFs.readFileSync(path.join(plansDir, stage, file), 'utf8'));
+    } catch {
+      // Race guard: a plan approvedFreeQueue enumerated then became unreadable is
+      // SKIPPED, never a throw — same fault-isolation as the enumerator.
+      return;
+    }
+    const selfRank = priorityRank(meta.priority);
+    const unsatisfied = [];
+    let invBlocker = null; // first lower-criticality unbuilt predecessor
+    for (const dep of normalizeDeps(meta.depends_on)) {
+      let loc;
+      try {
+        loc = locatePredecessor(plansDir, dep);
+      } catch {
+        loc = { state: 'missing' };
+      }
+      if (loc.state === 'missing') {
+        result.missingDeps.push({ ref, dep });
+        continue; // a missing/external dep never blocks
+      }
+      if (loc.state === 'satisfied') continue;
+      unsatisfied.push(dep);
+      if (invBlocker === null && priorityRank(loc.priority) > selfRank) invBlocker = dep;
+    }
+
+    if (unsatisfied.length === 0) {
+      ranked.push({ ref, rank: selfRank, queueIndex });
+    } else {
+      result.blocked.push({ ref, blockedBy: unsatisfied });
+      if (selfRank === 0 && invBlocker !== null) {
+        result.inversions.push({
+          ref,
+          blockedBy: invBlocker,
+          reason: 'critical plan blocked behind a lower-criticality unbuilt predecessor',
+        });
+      }
+    }
+  });
+
+  ranked.sort((a, b) => a.rank - b.rank || a.queueIndex - b.queueIndex);
+  result.buildable = ranked.map((r) => r.ref);
+  return result;
+}
+
+/**
  * THE LIVE CONSUMER for THIS slice. Fail-open wrapper: names the approved-queue
  * depth for the session-start banner, or '' for a falsy/invalid root or an empty
  * queue — so the banner is unchanged for a project with no approved work (purely
@@ -313,4 +481,8 @@ module.exports = {
   registerQueueFork,
   resolveQueueFork,
   approvedQueueBannerLine,
+  priorityRank,
+  normalizeDeps,
+  locatePredecessor,
+  nextBuildable,
 };
