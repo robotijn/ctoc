@@ -450,6 +450,81 @@ describe('parseMetadata', () => {
     assert.deepStrictEqual(md, {});
   });
 
+  test('collects a block-style list (`key:` then indented `- item` lines) into an array', () => {
+    const content = [
+      '---',
+      'title: Block Plan',
+      'type: bug',
+      'files:',
+      '  - "src/foo.js"',
+      '  - src/bar.js',
+      "  - 'src/baz.js'",
+      'priority: high',
+      '---',
+      '',
+      'body',
+    ].join('\n');
+
+    const md = state.parseMetadata(content);
+
+    // Block list becomes an array, quotes stripped, order + values intact.
+    assert.deepStrictEqual(md.files, ['src/foo.js', 'src/bar.js', 'src/baz.js']);
+    // A block list must not swallow the following top-level scalar keys.
+    assert.strictEqual(md.title, 'Block Plan');
+    assert.strictEqual(md.type, 'bug');
+    assert.strictEqual(md.priority, 'high');
+  });
+
+  test('block-style list matches the inline-array items (roundtrip sense-check)', () => {
+    const block = state.parseMetadata(
+      ['---', 'files:', '  - "a.js"', '  - b.js', '---', 'body'].join('\n')
+    );
+    // Re-parsing is stable (idempotent): same input → same array.
+    const block2 = state.parseMetadata(
+      ['---', 'files:', '  - "a.js"', '  - b.js', '---', 'body'].join('\n')
+    );
+    assert.deepStrictEqual(block.files, ['a.js', 'b.js']);
+    assert.deepStrictEqual(block.files, block2.files);
+  });
+
+  test('block-style list is CRLF-safe and handles a general key (depends_on)', () => {
+    const content = ['---', 'depends_on:', '  - one', '  - two', '---', 'body'].join('\r\n');
+
+    const md = state.parseMetadata(content);
+
+    assert.deepStrictEqual(md.depends_on, ['one', 'two']);
+  });
+
+  test('does not regress inline-array or scalar forms (empty-value block trigger only)', () => {
+    const content = [
+      '---',
+      'title: Inline',
+      'files: ["a.js", b.js]',
+      'depends_on: x, y',
+      'priority: 5',
+      '---',
+      'body',
+    ].join('\n');
+
+    const md = state.parseMetadata(content);
+
+    // Inline array stays the raw string it was before this change (downstream
+    // readers do the array conversion); scalar coercion unchanged.
+    assert.strictEqual(md.files, '["a.js", b.js]');
+    assert.strictEqual(md.depends_on, 'x, y');
+    assert.strictEqual(md.title, 'Inline');
+    assert.strictEqual(md.priority, 5);
+  });
+
+  test('empty `key:` with no following dash items stays an empty string (no false block)', () => {
+    const content = ['---', 'title: E', 'notes:', 'status: todo', '---', 'body'].join('\n');
+
+    const md = state.parseMetadata(content);
+
+    assert.strictEqual(md.notes, '');
+    assert.strictEqual(md.status, 'todo');
+  });
+
   test('fails OPEN to the single-block reader when extractFrontmatterRegion throws', () => {
     // Fault-inject the lazily-required collaborator to throw, exercising the
     // documented catch (region = null) + fallback path. Restored in finally.

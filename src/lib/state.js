@@ -158,22 +158,56 @@ function applyTodoOrder(files, dirPath) {
 // Booleans and non-negative integers are coerced; surrounding quotes stripped.
 function parseFrontmatterLines(lines) {
   const metadata = {};
-  lines.forEach(line => {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const colonIndex = line.indexOf(':');
-    if (colonIndex > 0) {
-      const key = line.slice(0, colonIndex).trim();
-      /** @type {any} */ // a frontmatter value is a string, then coerced to boolean/number below
-      let value = line.slice(colonIndex + 1).trim();
-      // Remove quotes
-      value = value.replace(/^["']|["']$/g, '');
-      // Parse booleans
-      if (value === 'true') value = true;
-      if (value === 'false') value = false;
-      // Parse numbers
-      if (/^\d+$/.test(value)) value = parseInt(value, 10);
-      metadata[key] = value;
+    if (colonIndex <= 0) continue;
+    const key = line.slice(0, colonIndex).trim();
+    /** @type {any} */ // a frontmatter value is a string, then coerced to boolean/number/array below
+    let value = line.slice(colonIndex + 1).trim();
+
+    // Block-style YAML list: a key whose inline value is EMPTY (`key:` on its own
+    // line) followed by indented `  - item` lines. Collect those items into an
+    // array. This mirrors stale-detector.parseFilesField's block walk — blank
+    // lines and full-line `#` comments are skipped (not terminators); the sequence
+    // ends at the next non-indented top-level key or the `---` delimiter — but is
+    // GENERAL over any key (files, depends_on, …), not files-only. Only an empty
+    // inline value triggers it, so scalar and inline-array (`files: [...]`) forms
+    // are untouched. Each raw line is CRLF-normalized before matching so a Windows
+    // checkout (region split on '\n' leaves a trailing '\r') parses identically.
+    if (value === '') {
+      const items = [];
+      let j = i + 1;
+      for (; j < lines.length; j++) {
+        const raw = lines[j].replace(/\r$/, '');
+        const trimmed = raw.trim();
+        if (trimmed === '') continue; // blank line within the block
+        if (trimmed === '---') break; // frontmatter delimiter ends the block
+        if (trimmed.startsWith('#')) continue; // full-line YAML comment within the block
+        const dash = raw.match(/^[ \t]*-[ \t]*(.+?)[ \t]*$/);
+        if (dash) {
+          const item = dash[1].replace(/^["']|["']$/g, '');
+          if (item.length > 0) items.push(item);
+          continue;
+        }
+        if (/^\S/.test(raw)) break; // a new non-indented top-level key ends the block
+        // Indented non-dash line: not an item and not a terminator — skip it.
+      }
+      if (items.length > 0) {
+        metadata[key] = items;
+        i = j - 1; // resume after the consumed block lines
+        continue;
+      }
+      // No items collected → fall through to the scalar (empty-string) behavior.
     }
-  });
+
+    // Scalar value.
+    value = value.replace(/^["']|["']$/g, ''); // remove surrounding quotes
+    if (value === 'true') value = true;
+    if (value === 'false') value = false;
+    if (/^\d+$/.test(value)) value = parseInt(value, 10);
+    metadata[key] = value;
+  }
   return metadata;
 }
 
