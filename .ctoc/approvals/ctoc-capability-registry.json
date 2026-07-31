@@ -1,0 +1,11 @@
+{
+  "content_sha256": "08a3fdf91b3548bc4f13932957c6bb84c4a8c60cd115bf0150de0ed21b75be85",
+  "hash_scope": "file",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-07-31T07:47:47.254Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "Capability Registry vision superseded by shipped code (src/lib/capability-registry.js + .ctoc/capabilities/); archived as built, never decomposed.",
+  "plan_basename": "ctoc-capability-registry"
+}
