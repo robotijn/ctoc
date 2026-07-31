@@ -22,7 +22,7 @@ The command outputs JSON: `{ text, ask, actions }`.
 
 | Command | Screen |
 |---------|--------|
-| (no args) | **Streaming gate-decision screen** — ASKS the pending gate decisions ONE AT A TIME (the plans at Gate 1/2/3 ARE the questions); the "nothing pending" screen when none wait |
+| (no args) | **Streaming gate-decision screen** — ASKS the pending gate decisions ONE AT A TIME (the plans awaiting your OK ARE the questions); the "nothing pending" screen when none wait |
 | `stream approve {stage}/{file}.md` | The human's gate approval — crosses via the gate-safe `approvePlan` (validates + stamps `approved_by: human`; refuses an invalid transition), then shows the next decision |
 | `stream skip {stage}/{file}.md` | Advance to the next pending decision (writes nothing) |
 | `stream comment {stage}/{file}.md {text}` | Record a free-text comment to `.ctoc/streaming/comments.jsonl` (never edits the plan or crosses a gate), then advance |
@@ -115,7 +115,7 @@ Resolve the user's reply to an action string `A`, then classify:
 2. **Dispatch only on `run`.** If `decision === "run"`: launch `Agent(run_in_background)` with a self-contained brief, THEN `menu task start <taskId>`. If `decision === "queue"`: record only — **do not** launch an agent; show the queued task and its `reason`.
 3. **Render now.** `node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js"` and display the dashboard with a one-line status. **Never `await`** the agent's completion.
 
-**Never launch a background agent before `menu task add` + the `canRun` decision** — the vision §8 split-brain rule forbids an unrecorded agent. The agent brief is self-contained: the `taskId`, the plan path, the ancestry to read (vision → canvas → functional → implementation), and the completion contract — return a one-line summary, STOP at any human gate reporting "Gate N ready" plus a nav route, never cross a gate, and make documented reasonable choices (no stubs, no TODOs).
+**Never launch a background agent before `menu task add` + the `canRun` decision** — the vision §8 split-brain rule forbids an unrecorded agent. The agent brief is self-contained: the `taskId`, the plan path, the ancestry to read (vision → canvas → functional → implementation), and the completion contract — return a one-line summary, STOP at any human gate reporting that the work is waiting for the human's OK (in plain-moment words per [`skills/agent-fragments/plain-gate-words.md`](../../skills/agent-fragments/plain-gate-words.md), never a gate number) plus a nav route, never cross a gate, and make documented reasonable choices (no stubs, no TODOs).
 
 ### COMPLETION (turn recipe)
 
@@ -199,8 +199,11 @@ renders.
 ### Human gates stay foreground
 
 The four human gates are **never** auto-crossed by a background task. A background
-agent that reaches a gate STOPS there, returns "Gate N ready" plus a nav route, and
-becomes a gate-ready inbox item. A completion records the stop with `--gate N`, and
+agent that reaches a gate STOPS there, reports that the work is waiting for the
+human's OK in plain-moment words (never a gate number — see
+[`skills/agent-fragments/plain-gate-words.md`](../../skills/agent-fragments/plain-gate-words.md))
+plus a nav route, and becomes a waiting-for-your-OK inbox item. A completion records
+the stop with the `--gate N` flag, and
 any `--next` route is navigation-only — never a gate transition. Crossing the gate
 is a foreground NAV action the user takes deliberately. No completion, promotion, or
 `--next` may ever perform a gate transition.
@@ -384,7 +387,7 @@ yet. Cancelling never crosses a human gate.
 
 12. **WORK dispatch is record-first (split-brain rule).** A WORK turn calls `menu task add` FIRST and reads the scheduler's `canRun` decision BEFORE any `Agent` launch: `run` → dispatch `Agent(run_in_background)` + `menu task start`; `queue` → record only, no agent. Then render immediately — never `await` the agent. Claude NEVER launches a background agent that has not been recorded and cleared by the scheduler (the vision §8 split-brain rule: never route around the scheduler).
 
-13. **Completions pull, promote via the scheduler, and never auto-cross a gate.** A completion turn calls `menu task complete` (or `menu task fail`), emits ONE compact pull-based inbox notice without hijacking the current screen, and promotes ONLY the tasks the scheduler returns in `promote[]` (its `nextRunnable` set) — dispatching each as background work. Human gates are never auto-crossed: a gate-reached task becomes a "Gate N ready" inbox item and the user crosses the gate deliberately in the foreground (Rule 4 stays sacred — no background work weakens a human gate).
+13. **Completions pull, promote via the scheduler, and never auto-cross a gate.** A completion turn calls `menu task complete` (or `menu task fail`), emits ONE compact pull-based inbox notice without hijacking the current screen, and promotes ONLY the tasks the scheduler returns in `promote[]` (its `nextRunnable` set) — dispatching each as background work. Human gates are never auto-crossed: a gate-reached task becomes a waiting-for-your-OK inbox item and the user crosses the gate deliberately in the foreground (Rule 4 stays sacred — no background work weakens a human gate).
 
 14. **Compliance question rides along, never gates:** when neither EU compliance profile is active (`regulatory_regime.active_profiles` contains neither `gdpr` nor `eu-ai-act-high-risk`), `start.js` attaches a **second/third** question (`header: 'Compliance'`) alongside Pipeline (and Environment when Rule 8 is also active). Present all in one AskUserQuestion call (≤4 questions). Apply the compliance side-effect (`claude:set-compliance-regime {profile}`) — after any environment side-effect (Rule 8) and before falling through to the pipeline-section answer. The dashboard is **NEVER** replaced by the compliance question; activating a compliance profile only writes `active_profiles` and the four human gates stay mandatory.
 

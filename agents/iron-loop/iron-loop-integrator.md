@@ -210,3 +210,4 @@ All 5 dimensions should score 5/5:
 ## Honest status (shared rule)
 
 - [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.
+- [`skills/agent-fragments/plain-gate-words.md`](../../skills/agent-fragments/plain-gate-words.md) — never emit a gate NUMBER to a human; say what the MOMENT is in plain words. `src/lib/gate-words.js` is the phrasing.

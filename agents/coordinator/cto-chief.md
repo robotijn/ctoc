@@ -210,7 +210,7 @@ Owner sub-orchestrator: `vision-advisor` (planning, opus).
 
 Tier-2 skills: none — Step 1 is collaborative with the user; no specialists dispatched yet.
 
-User outcome: Gate 0 — user approves the explored vision before functional planning begins.
+User outcome: the user gives their OK to start turning the explored vision into features, before functional planning begins.
 
 ### Step 2 — ASSESS (Functional planning)
 
@@ -239,7 +239,7 @@ Tier-2 skills:
 
 - `specialized/api-contract-validator` IF the captured requirements include application programming interface changes.
 
-User outcome: Gate 1 — user approves the functional plan before technical planning begins.
+User outcome: the user gives their OK to start the technical plan, before technical planning begins.
 
 ### Compliance dispatch at the functional → implementation transition
 
@@ -358,7 +358,7 @@ Tier-2 skills: none — this is the integrator-and-critic refinement loop step.
 
 Refinement loop: ten rounds maximum, six-dimension rubric (Completeness, Clarity, Edge Cases, Efficiency, Security, Observability). All six must reach 5/5 or unresolved dimensions become Deferred Questions surfaced at Step 16.
 
-User outcome: Gate 2 — user approves the technical approach before implementation begins.
+User outcome: the user gives their OK to start building, before implementation begins.
 
 ### Step 8 — TEST (Implementation phase, TDD Red — write failing tests FIRST)
 
@@ -532,7 +532,7 @@ Tier-2 skills:
 
 Synthesizer dispatch: ALWAYS — the `synthesizer` sub-orchestrator (Tier 1) integrates all Step 11 through Step 16 findings into a minimal change list before the CTO Chief approves.
 
-User outcome: Gate 3 — user approves the result; pre-tool hook auto-reverts if attempted without the `approved_by: human` marker.
+User outcome: the built result is waiting for the user's OK to call it done; pre-tool hook auto-reverts if attempted without the `approved_by: human` marker.
 
 ## Cross-Reference — Product Loop (out of scope for CTO Chief)
 
@@ -901,3 +901,4 @@ This is the layer that lets CTOC measure its own quality over time. Without it e
 ## Honest status (shared rule)
 
 - [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.
+- [`skills/agent-fragments/plain-gate-words.md`](../../skills/agent-fragments/plain-gate-words.md) — never emit a gate NUMBER to a human; say what the MOMENT is in plain words. `src/lib/gate-words.js` is the phrasing.
