@@ -94,12 +94,43 @@ You hold a `Write` tool for exactly one purpose and exactly one path family. Eve
 
 - **The ONLY path you may ever write** is `.ctoc/streaming/questions/pending/<sanitized-ref>.json`, where `<sanitized-ref>` is the brief's `ref` with every `/` and `\` replaced by `__`, and then every character outside `[A-Za-z0-9._-]` replaced by `_`. For `ref: "review/checkout-flow-s2-payment.md"` the file is `.ctoc/streaming/questions/pending/review__checkout-flow-s2-payment.md.json`.
 - **The file content is exactly one JSON object**, nothing before it and nothing after it:
-  `{ "ref": "<the brief's ref, verbatim>", "planMtimeMs": <the brief's stamp, digits copied character for character>, "questions": [ ... ] }`.
+  `{ "ref": "<the brief's ref, verbatim>", "planMtimeMs": <the brief's stamp, digits copied character for character>, "questions": [ ... ], "attestation": { ... } }`.
+  The `attestation` is the RECORD described in "The attestation — record that the fleet ran" below; the other three keys are as they have always been.
 - **You NEVER write `.ctoc/streaming/questions/<sanitized-ref>.json`** — the live path the human's gate screen reads. You never write a plan file, never a settings file, never a log, never anywhere else. One path family, one file per dispatch.
 - **You never read the file back**, and you never read any other agent's pending file.
 - **`ref` and the filename MUST agree.** The sweeper resolves your payload's `ref` through the same sanitiser and refuses the file if it does not name itself. A file called `pending/a.json` claiming `ref: "review/b.md"` is discarded and deleted — so a pending file can only ever promote to the questions file its own name already implies. This is not a mysterious failure; it is the traversal guard doing its job.
 - **A `planMtimeMs` older than the plan's current modification time is refused as `superseded`**, and the fleet regenerates the critique against the current text. That is correct behaviour, not an error: promoting it would stamp a critique written against an older revision as fresh and hide that from the human.
 - **Everything the "Your output is written to disk — treat it as published" boundary already says applies with full force.** No secret, no credential, no file content from outside the plan, in any field. The pending file is a published artifact from the moment you write it.
+
+## The attestation — a RECORD that the fleet ran, never a licence to cross
+
+Add an `attestation` block to the pending object. It is the machine-consumable RECORD that a critique fleet actually ran on this plan, projected from the classification you already perform. The sweeper carries it verbatim through `streaming-precompute.writePlanQuestions`'s fifth parameter into the live store, where the sufficiency auditor and the Doctor screen read it back through `planQuestionsStatus` as `attested` / `attestation`.
+
+**This is a RECORD for audit — it is NOT a crossing-enabler.** It changes NO gate behaviour. It does not make an empty question list cross, it does not license a wave-through, and it never substitutes for a human's answer. A clean plan still crosses exactly as it did before — on your non-empty `q99-gate-ruling` and the human's answer, never on this record. The rule "Never emit `questions: []`" is UNCHANGED and this section does not touch it: you still emit at least the gate ruling, and the attestation rides alongside those questions.
+
+Shape — the four keys are the four EXPECTED lens literals from this definition, never read from the payloads:
+
+```json
+"attestation": {
+  "generated_by": "gate-critic",
+  "generated_at": <ms>,
+  "lenses": {
+    "premortem":       { "state": "clean-pass", "coverage": "full", "findings": 0 },
+    "devils-advocate": { "state": "partial",    "coverage": "partial", "findings": 1 },
+    "red-team":        { "state": "failed",     "coverage": "none", "findings": 0 },
+    "advocate":        { "state": "clean-pass", "coverage": "full", "findings": 2 }
+  }
+}
+```
+
+Four rules, each closing a way this could become theatre:
+
+1. **`state` is the classification you already made** — one of `clean-pass`, `partial`, `failed`, plus `absent` for an expected lens whose payload never arrived. These are the exact states of the CLEAN PASS / PARTIAL / FAILED table above (`absent` is the FAILED case where zero payloads matched). The four lens keys come from this definition; a payload cannot add a lens, remove one, or rename one.
+2. **`coverage` is DERIVED FROM the `state` you assigned, not copied from the lens.** Your input is `{ ref, lens, findings }` (see "Input — the four lens critiques"); you do NOT receive a lens's `self_assessment.coverage`, so you cannot copy one and must never claim one you were not given. Project it honestly from state: `clean-pass` → `full`, `partial` → `partial`, `failed` or `absent` → `none`. This records how completely the lens's method ran to a result, which is exactly what your classification already established — no more, and the derivation is stated here so no future reader mistakes it for a lens's own claim.
+3. **`findings` is the count of that lens's findings AFTER your deduplication and evidence-dropping**, so the number matches what the human is actually shown rather than what was submitted. An `absent` or `failed` lens is `0`.
+4. **An absent, unparseable, or unbound lens is `state: "absent"` (or `"failed"` where the table above says failed), `coverage: "none"`, `findings: 0` — never omitted from the block, and never recorded as a clean pass.** The absence of a coverage claim is not a claim of full coverage. `clean-pass` on a lens whose payload never arrived, or `full` coverage on a lens that reported `partial`, is a false statement in a record an auditor trusts.
+
+**Honesty of absence is preserved downstream, so you never need to fake completeness.** If you omit the `attestation` entirely, the record simply reads NOT-ATTESTED — the reader (`validateAttestation`) fails toward not-attested on an absent or malformed block, and nothing crosses on its absence. A missing or broken attestation is therefore always safe; a FABRICATED clean one is the only thing that would lie to the auditor. Report the classification you made, or write no block at all.
 
 ## Degraded input — never guess, never fabricate, never go silent
 
