@@ -178,7 +178,17 @@ async function main() {
   // "drive the next unit" directive so the run picks up exactly where it stalled. Empty
   // (quiet start) for no batch / complete / forked / fresh / the kill-switch.
   const resume = resumeInjection(projectPath);
-  console.log(context + (directive || '') + (resume || ''));
+  // The Loop-B tick (plan 00226): one plain-language line describing the build loop's
+  // state — what just auto-crossed on sufficiency, which plans still need questions, and
+  // the next plan to build. Purely ADDITIVE and fail-open ('' when there is nothing to
+  // report), so the injected context is byte-for-byte unchanged for an idle project.
+  let loopB = '';
+  try {
+    loopB = require('../lib/loop-b-driver').loopBDirective(projectPath);
+  } catch {
+    loopB = ''; // the loop status must never break session start
+  }
+  console.log(context + (directive || '') + (resume || '') + (loopB || ''));
 }
 
 /**
