@@ -18,7 +18,7 @@ node "${CLAUDE_PLUGIN_ROOT}/src/commands/push.js" [options]
 
 ## Overview
 
-The `ctoc push` command manually triggers the background quality agent. Use this when:
+The `/ctoc:push` command manually triggers the background quality agent. Use this when:
 
 - Auto-push on commit is disabled
 - You want to push without making a new commit
@@ -41,7 +41,7 @@ The `ctoc push` command manually triggers the background quality agent. Use this
 ## How It Works
 
 ```
-ctoc push
+/ctoc:push
     │
     ▼
 ┌─────────────────────────────────────┐
@@ -124,14 +124,14 @@ Quality Status: ✅ PASS
 Would push to: origin/main
 Commits: 3 ahead
 
-Dry run complete. Use 'ctoc push' to actually push.
+Dry run complete. Use '/ctoc:push' to actually push.
 ```
 
 ---
 
 ## Background Agent Behavior
 
-When `ctoc push` is run:
+When `/ctoc:push` is run:
 
 1. **Check for running agent** - If quality agent is already running, show status
 2. **Start quality checks** - Run Tier 1 + 2 checks
@@ -145,7 +145,7 @@ When `ctoc push` is run:
 
 ## Comparison: Auto vs Manual Push
 
-| Feature | Auto (post-commit) | Manual (ctoc push) |
+| Feature | Auto (post-commit) | Manual (/ctoc:push) |
 |---------|-------------------|-------------------|
 | Trigger | Every commit | Explicit command |
 | Background | Yes | No (foreground) |
@@ -206,7 +206,7 @@ Blocking issues:
     - state.test.js: timeout in beforeEach
     - workflow.test.js: assertion failed
 
-Fix these issues and run 'ctoc push' again.
+Fix these issues and run '/ctoc:push' again.
 ```
 
 ### Tier 2 Failure (Warning)
@@ -218,7 +218,7 @@ Warnings:
   • coverage: 78% (threshold: 80%)
   • complexity: checkoutFlow() has cyclomatic complexity 12 (max: 10)
 
-To push anyway: ctoc push --force
+To push anyway: /ctoc:push --force
 To fix warnings first: address issues above
 ```
 
@@ -230,22 +230,25 @@ To fix warnings first: address issues above
 Quality checks passed, but git push failed:
   fatal: Could not read from remote repository.
 
-Retry with: ctoc push
+Retry with: node "${CLAUDE_PLUGIN_ROOT}/src/commands/push.js"
 Or manually: git push origin main
 ```
 
 ---
 
-## Integration with ctoc quality
+## Integration with the quality checks
 
-`ctoc push` builds on `ctoc quality`:
+`/ctoc:push` runs the same quality checks that gate a commit, then pushes on success.
+CTOC ships no `ctoc` command-line executable, so there is no command-line quality
+subcommand to run on its own — the checks that such a subcommand would "report" run
+through `npm test` and the Step 14 verification path, and no installed command surfaces
+them by name. The invocations that exist are:
 
-| Command | Purpose |
-|---------|---------|
-| `ctoc quality` | Run checks, report status |
-| `ctoc quality status` | Show cached quality state |
-| `ctoc push` | Run checks AND push on success |
-| `ctoc push --dry-run` | Same as `ctoc quality --full` |
+| Invocation | Purpose |
+|------------|---------|
+| `/ctoc:push` | Run quality checks and push on success |
+| `node "${CLAUDE_PLUGIN_ROOT}/src/commands/push.js" --dry-run` | Run the checks without pushing |
+| `npm test` | Run the full gated quality suite locally |
 
 ---
 
