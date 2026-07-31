@@ -1,0 +1,9 @@
+{
+  "content_sha256": "51278aab382934af6b8f85396690d35ad34f695eacb0954a88b7a995dc22865c",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-30T23:42:42.356Z",
+  "approved_by": "human",
+  "plan_basename": "00188-the-step-label-checker-is-documented-as-a-hook-that-rejects-plans"
+}

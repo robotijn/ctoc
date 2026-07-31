@@ -18,6 +18,39 @@ gate_crossed: implementation → todo
 
 # An empty question list must prove a critique ran before it can cross a gate
 
+## Shipped scope (revised 2026-07-31) — ADDITIVE capability + audit visibility, NOT enforcement
+
+The original design below made an unattested empty question list read `unattested` /
+`enough:false`, REFUSING the auto-crossing. During Step 8/9 that was found to be a
+high-stakes behavioural change with no safety net: **no producer emits an attestation
+yet** (the audit slice 00183 only RECORDS; the `gate-critic` contract forbids empty
+arrays), so retracting "empty = critique-ran = enough" would HALT auto-crossing for
+EVERY clean plan. The human's framing for this pair is AUDIT-ONLY: an attestation is a
+RECORD, not a mechanism to auto-cross (or block) a gate.
+
+**What this slice ACTUALLY ships (the revised acceptance criteria):**
+
+1. `writePlanQuestions` gains an OPTIONAL fifth `attestation` parameter. An empty
+   `questions: []` CAN now carry a proof a critique ran. Existing four-argument callers
+   are byte-for-byte unchanged (no `attestation` key is written for them).
+2. The attestation is CARRIED and RECORDED in the questions store, and `validateAttestation`
+   judges it against closed, module-owned vocabularies (subagent-authored → untrusted →
+   exact-match, fail toward NOT-attested).
+3. `planQuestionsStatus` EXPOSES the verdict on its `ready` result — `attested` (boolean)
+   and the raw `attestation` block — so a reader (the sufficiency audit / the Doctor
+   screen / 00180) can tell "a critique ran" from "no record either way". An absent or
+   malformed attestation reads `attested:false`, never attested.
+4. The empty → `ready` / `enough:true` / `[]` / fresh contract is UNCHANGED. Auto-crossing
+   for clean plans keeps working. The four cases in `tests/streaming-precompute.test.js`
+   (:446, :464, :706, :787) stay green and untouched.
+
+**Deferred (NOT built here):** the ENFORCEMENT — making an unattested empty list read
+`enough:false` and blocking the direct-`[]` crossing. See Decisions 10–12 below. The
+pair's value is delivered as AUDIT VISIBILITY, not as a gate change.
+
+The design narrative below is preserved for context; where it prescribes the refusal /
+the `unattested` status, that half is DEFERRED per the revised scope above.
+
 ## The file contradicts itself, and the permissive reading is the one wired to a gate
 
 `src/lib/streaming-precompute.js:354-358`, on the `ready` status:
@@ -216,6 +249,7 @@ the store's existing contents down with it.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Write the test file in full FIRST and run only it. Cases 1, 3, 4, 5, 6, 9, 10, 12, 13
 and 17 must be RED. **Record case 1's red verbatim** — an empty questions file
 producing `enough: true` is the sentence that authorises a gate crossing with no
@@ -225,6 +259,7 @@ stored data does not have the shape this plan assumed, and the plan is wrong bef
 the code is.
 
 ### Step 9: PREPARE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Read from disk: `streaming-precompute.js:226-344` (validator and writer), `:392-474`
 (`planQuestionsStatus`, and the exact order of its checks), `:759-794`
 (`hasEnoughInformation`); `src/lib/streaming-questions-sweeper.js` in full — it is the
@@ -240,12 +275,14 @@ the three-state classification); `agents/iron-loop/premortem-critic.md:175-220` 
 **Where the code disagrees with this plan, THE CODE WINS — record it.**
 
 ### Step 10: IMPLEMENT
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 - `src/lib/streaming-precompute.js` — `validateAttestation`, `attestsEmptiness`, the
   fifth writer parameter with its refusal, the `unattested` status, and the two
   corrected comment blocks.
 - `tests/questions-attestation.test.js` — the seventeen cases.
 
 ### Step 11: REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Confirm the four expected lens names are a module constant and are never read from the
 payload. Confirm `unattested` cannot be reached by a non-empty questions list — the
 compatibility promise rests on it. Confirm the `:354-358` comment no longer blesses an
@@ -257,6 +294,7 @@ The attestation is validated once, inside the read that already parses the file.
 extra filesystem access.
 
 ### Step 13: SECURE
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 The attestation is **subagent-authored, therefore untrusted**. Never render
 `generated_by` or a lens name into a screen without `stripCtl` and a length cap. The
 closed vocabularies for `state` and `coverage` are matched by exact string equality
@@ -265,6 +303,7 @@ against module constants — never by prefix, substring, or fuzzy match, mirrori
 **not** `clean-pass` and must fail the bar, never fall through it.
 
 ### Step 14: VERIFY
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 `node --test` on the new file plus every existing streaming/gate test, then the full
 gated run `npm test`. Lint at `--max-warnings 0`. No git operations. **Report whether
 any plan currently at a pre-build gate changes its verdict**, and confirm the live
@@ -277,6 +316,7 @@ prosecution lenses at full coverage. Update the documented test-file count in bo
 places from the live disk count.
 
 ### Step 16: FINAL-REVIEW
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 Report every Step 8 red verbatim, the Step 14 blast radius, whether any stored file
 changed status, and every decision taken under ambiguity.
 
@@ -335,6 +375,30 @@ changed status, and every decision taken under ambiguity.
 9. **No cryptographic signing.** The threat model is a broken or truncated producer,
    not a forger with write access to `.ctoc/`; anyone with that access can edit the
    ledger too. Signing would add key management for no coverage of the actual failure.
+10. **ENFORCEMENT IS DEFERRED; this slice ships the ADDITIVE half only (2026-07-31).**
+    Making an unattested empty list read `enough:false` would halt auto-crossing for
+    every clean plan, because nothing PRODUCES an attestation yet (00183 records; the
+    `gate-critic` contract forbids empty arrays). That is a high-stakes gate-crossing
+    change and it needs the human's explicit decision WITH an attestation-producing
+    path (stage producers or the critique fleet emitting attestations) in hand — which
+    is outside this slice. So the empty→`ready`/`enough:true` contract is left exactly
+    as today, and the four `tests/streaming-precompute.test.js` cases that pin it
+    (:446, :464, :706, :787) stay green and untouched.
+11. **The writer CARRIES the attestation without validating it; the reader is the sole
+    validation authority.** One encoding of the rule (`validateAttestation`, reached
+    through `planQuestionsStatus`) means no drift between a write-side and a read-side
+    check, and a malformed-but-present record stays visible so an audit can see a broken
+    producer. A non-object fifth argument is ignored (fail toward not-attested at the
+    boundary too).
+12. **`attested` means "a well-formed critique record is present", not "a clean pass
+    good enough to cross".** For AUDIT VISIBILITY the question is whether a critique ran
+    and left a record; the raw block is exposed so a reader can render the per-lens
+    verdict itself. The stricter "three prosecution lenses clean-pass at full coverage"
+    test belongs to the deferred enforcement (Decision 10), not to this additive read.
+13. **`validateAttestation`/the lens constants are NOT exported.** They are reached
+    through the already-live `planQuestionsStatus`, so the export-reachability fence
+    stays green (a test is not a caller). A future producer/enforcement slice that needs
+    them as a public surface exports them then, with its own live caller.
 
 
 ## Deferred Questions
