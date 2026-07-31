@@ -146,3 +146,7 @@ cargo +nightly miri test
 3. Use WeakMap for object caches
 4. Profile memory in CI to catch regressions
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

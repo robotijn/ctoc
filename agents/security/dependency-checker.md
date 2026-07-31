@@ -128,3 +128,7 @@ npm update typescript  # Breaking changes possible
 - **Licenses**: 1 incompatible, 1 unknown
 - **Updates**: 5 major, 23 minor, 45 patch
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

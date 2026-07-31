@@ -347,3 +347,7 @@ benchmark('everything', () => {
 3. Isolate from system noise (CI runners)
 4. Compare means AND percentiles
 5. Track standard deviation for flakiness
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

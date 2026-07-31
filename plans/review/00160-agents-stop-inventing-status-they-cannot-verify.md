@@ -401,19 +401,26 @@ past them — and here the largest limit is the incident's own surface.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST — write `tests/agent-honest-status-fence.test.js` in full, run ONLY that file, record the red output verbatim. Case 13 MUST be red today (103 of 124 definitions carry no such instruction) and case 17 MUST be red (`CLAUDE.md` has 16 lessons). Cases 1–4 are red because the fragment does not exist. Cases 5–12, 14, 15 and 18 must be GREEN from the start — they prove the scanner's own mechanics and the separation from 00089, and any of them red at the start means the fixture is wrong, not the product. Case 16 must be green from the start; if it is red, the four critics do NOT already carry the discipline this plan claims to generalise, and that finding invalidates a premise — STOP and report it rather than proceeding.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 ### Step 9: PREPARE — re-read from disk, because this plan's counts are claims: re-run the `name:` frontmatter census and record the true dispatchable count; re-run the "never guess" grep and record which definitions already comply, so the append does not duplicate an existing rule; re-read `iron-loop-enforcer.js` to copy the `false-green-fence` registration shape exactly. Confirm 00154 has landed (`src/lib/human-facing-scan.js` and `src/lib/gate-words.js` exist) — if not, STOP: the status-line vocabulary this fragment points at does not exist yet. Confirm 00089 has landed, or that `cto-chief.md` and `CLAUDE.md` are not held by an in-flight plan. **Where this plan's numbers disagree with disk, DISK WINS — record every discrepancy.**
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 ### Step 10: IMPLEMENT — one step, files as sub-items.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
   - `skills/agent-fragments/honest-status.md` — the six points, the marker, the worked example.
   - `src/lib/agent-honesty-scan.js` — the census, the non-vacuity floor, the limit in the header.
   - `src/lib/iron-loop-enforcer.js` — the `agent-honesty-fence` check.
   - `agents/**/*.md` — the identical reference line, appended to every dispatchable definition; definitions already carrying a stronger rule keep it AND gain the reference.
   - `CLAUDE.md` — Operating Lesson 17.
 ### Step 11: REVIEW — confirm no code path returns an empty `missing` list when a file could not be read. Confirm the enforcer treats unavailable as FAILURE. Confirm the non-vacuity floor fires before any pass is reported. Confirm the four critics' existing sections were ADDED TO, never replaced — a uniform floor must not overwrite a stronger rule. Read the fragment back and ask: would an agent holding no data, asked for status, now know that saying "I have none" is the correct answer? If not, the fragment failed at its one job.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 ### Step 12: OPTIMIZE — 124 files, one read each, one frontmatter slice and one literal search per file. Read each file once; share the fragment content across all checks; no regex backtracking on file-sized input.
 ### Step 13: SECURE — the scan reads files beneath the project root only. Confirm every path is resolved and confined under `root` before reading, so a crafted glob cannot escape. Confirm findings pass through a control-character strip before printing, since a definition's text reaches a terminal. Confirm no definition content beyond a file path and a boolean enters the output — an agent definition may quote a credential in an example, and the census must never echo file bodies.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 ### Step 14: VERIFY — run the new test plus `tests/agent-modernization.test.js`, `tests/critic-warnings-are-critical.test.js`, `tests/agent-shared-not-dispatchable.test.js`, `tests/agent-contract-load.test.js`, `tests/gate-words.test.js` and `tests/compliance-claims-match-code.test.js`, then the full gated run `npm test`. Lint the changed JavaScript. Do not lower the coverage floor. No git operations.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 ### Step 15: DOCUMENT — the module header carries the limit VERBATIM and FIRST: this checks definitions, never output, and proves nothing about what any agent said. Add the fence to `CLAUDE.md`'s quality section beside the false-green fence. Update the documented agent-file count if the census disagrees with it.
 ### Step 16: FINAL-REVIEW — report the true census from Step 9, the verbatim red and green evidence, the seven limits above, and every decision taken under ambiguity. State explicitly whether case 16 was green, since a red there would have invalidated the plan's premise.
+- [x] Complete — evidence in this plan's Execution Log / Executor Verification section; the executor ran Steps 8-16 and the full gate is green (npm test exit 0).
 
 ## Decisions Taken Under Ambiguity
 
@@ -462,3 +469,41 @@ past them — and here the largest limit is the incident's own surface.
 11. **The wiring is in THIS plan, not a follow-up.** Shipping a scanner reachable
     only from its own test, inside a plan about agents asserting things they never
     verified, would be self-refuting.
+
+### Discrepancies found at execution — DISK WON (recorded per Step 9/16)
+
+12. **CLAUDE.md already had a lesson 17, so the new lesson is 18 — not 17 as the
+    plan claimed.** The plan states "CLAUDE.md has 16 lessons" and predicts case 17
+    would be red on that basis. On disk, CLAUDE.md carried **17** lessons: a lesson
+    17 ("A foregone answer is not a question — presenting it as a choice is
+    manipulation") was added since this plan was written. The honest-status lesson
+    was therefore added as **Operating Lesson 18**. Case 17 of the test does not
+    count lessons — it asserts the no-data-say-so rule text is present — so it was
+    red before and green after regardless. No number was overwritten.
+13. **The clean enforcer verdict is SILENT, not "stating how many checked".** The
+    plan text says a clean pass should state how many definitions were checked. On
+    disk, every sibling fence (`false-green-fence`, `gate-words-fence`) returns a
+    bare `CLEAN()` with no message, and `checkAllInvariants` records any clean
+    verdict carrying a message as an informational finding — today only
+    `plan-counts` is info. Emitting a count on every run would add permanent noise
+    and break that convention, so `checkAgentHonestyFence` returns silent `CLEAN()`.
+    Consistency with the established shape won.
+14. **The "unavailable file" fixtures use a no-frontmatter file, not chmod.** Cases
+    10/11/15 need an "unavailable" definition. A permission-based unreadable file is
+    not cross-platform (no-op on Windows, and root bypasses it), which would make the
+    test lie on those platforms. A file with no YAML frontmatter is deterministically
+    `available:false` everywhere, so it is the unavailable fixture. This matches the
+    scanner's real contract: "no frontmatter" is one of its unavailable reasons.
+15. **Four extra enforcer sub-cases (15b–15e) were added for branch coverage.** The
+    plan named enforcer cases 14 and 15. `checkAgentHonestyFence` has six branches
+    (not-a-tree, fragment-unavailable, fragment-hollow, census-unavailable,
+    census-missing, clean); leaving three uncovered would sink the 99% src floor.
+    Cases 15b (fragment absent), 15c (fragment hollow), 15d (no agents dir → clean),
+    and 15e (real repo → clean) cover the rest. No branch is proved only by its
+    own module's test.
+16. **The reference is appended under a uniform `## Honest status (shared rule)`
+    heading at end-of-file of every dispatchable definition.** All 124 agents carry
+    `name:` in frontmatter and none previously referenced the fragment, so all 124
+    received the identical block — no per-file judgement, no curated subset. The
+    relative link target is computed per file (115 at depth two → `../../`, 9 at
+    depth three → `../../../`).

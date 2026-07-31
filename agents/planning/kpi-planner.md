@@ -151,3 +151,7 @@ response:
 2. **Targets without rationale** — every custom target needs a 1-line `rationale:` field.
 3. **Missing review cadence** — without `next_review.first_review_date`, the loop never starts.
 4. **Forgetting events** — every KPI must trace to a wired event. The implementation-planner verifies this.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

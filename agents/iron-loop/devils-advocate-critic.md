@@ -312,3 +312,7 @@ Escalation is a FIELD in your JSON, never a peer dispatch and never an edit. Add
 An honest `"findings": []` on a COMPLETE plan is a clean pass and escalates nothing. Escalate only when the plan is structurally empty by the test above — the distinction is whether the plan has substance you failed to fault, or has no substance to fault. Do not escalate your own clean result.
 
 Escalating does not replace your findings. Emit the full JSON contract as well; `escalate` is additive.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

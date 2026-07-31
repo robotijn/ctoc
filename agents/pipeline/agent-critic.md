@@ -858,3 +858,7 @@ This critic's methodology draws from:
 - Does NOT evaluate business logic, requirements, or user stories
 - Does NOT make architectural decisions about agent design (defers to CTO Chief)
 - Does NOT evaluate agents in interaction (evaluates definitions in isolation)
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

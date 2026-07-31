@@ -137,3 +137,7 @@ CREATE INDEX idx_users_email ON users(email);
 2. Fix N+1 query (high impact, medium effort)
 3. Add caching layer (medium impact, high effort)
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

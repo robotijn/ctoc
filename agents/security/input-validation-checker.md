@@ -141,3 +141,7 @@ Tag every finding with its OWASP Top 10 2025 code and a CWE id, taken from the s
 2. Add path sanitization middleware
 3. Add file upload validation middleware
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

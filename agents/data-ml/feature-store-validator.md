@@ -203,3 +203,7 @@ lineage:
 5. **Investigate bimodal distribution** - user_score may need review
 6. **Fix consistency issues** - Ensure online store is materialized after offline updates
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

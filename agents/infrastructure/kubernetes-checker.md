@@ -210,3 +210,7 @@ into a real report.
 4. Create NetworkPolicy to restrict pod communication
 5. Add PodDisruptionBudget for high-availability
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

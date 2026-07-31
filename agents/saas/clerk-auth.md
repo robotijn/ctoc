@@ -215,3 +215,7 @@ metadata:
 | Calling party not pinned | WARN — fix soon |
 | Email verification not enforced | WARN — fix soon |
 | Organisation switcher missing from the interface | WARN — backlog |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

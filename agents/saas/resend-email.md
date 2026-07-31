@@ -233,3 +233,7 @@ metadata:
 | Unsubscribe header missing on marketing-shaped mail | WARN — fix before release |
 | Suppression list not consulted | WARN — fix before release |
 | No per-recipient limit | WARN — fix soon |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

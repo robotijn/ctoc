@@ -225,3 +225,7 @@ metadata:
 | Verification unresolved beyond its bound | WARN — resolve or decline, and record it |
 | Backup erasure strategy undocumented | WARN — the mechanics are deferred; the answer is not |
 | Export machine-readable but sparsely documented | WARN |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

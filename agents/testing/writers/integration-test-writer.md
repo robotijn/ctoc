@@ -119,3 +119,7 @@ async def db():
   unmarked `async def test_` is NOT collected as a coroutine test, so it silently
   never runs; mark each with `@pytest.mark.asyncio` or set the auto mode.
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

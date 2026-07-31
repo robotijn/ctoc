@@ -219,3 +219,7 @@ metadata:
 | Contact details present but stale | WARN |
 | Scope genuinely ambiguous — exploitation evidence is thin | WARN — record the determination and its reasoning |
 | Bill of materials exists but predates the shipped artifact | WARN — escalate to `sbom-cra-checker` |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

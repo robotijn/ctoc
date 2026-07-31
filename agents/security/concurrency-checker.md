@@ -163,3 +163,7 @@ spotbugs -include threads.xml
 2. Establish lock ordering convention
 3. Use atomic types for counters
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

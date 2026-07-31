@@ -156,3 +156,7 @@ unit_economics:
 2. **Asking founder about churn before they have customers** — accept "unknown, use 5% default" and revisit at 50 customers.
 3. **Ignoring infrastructure cost per user** — Postgres + Vercel + Resend + PostHog at scale is not free. Approximately fifty cents per user per month is a sensible floor.
 4. **No payback constraint on customer-acquisition-cost budget** — founders overspend on paid acquisition; if payback is greater than eighteen months, kill the campaign.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

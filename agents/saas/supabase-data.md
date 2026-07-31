@@ -240,3 +240,7 @@ metadata:
 | One project across several environments | WARN — fix before release |
 | Policy column unindexed | WARN — performance cliff at scale |
 | No restore drill on record | WARN — the backup is unproven |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

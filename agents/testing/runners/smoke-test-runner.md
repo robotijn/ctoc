@@ -131,3 +131,7 @@ build SHA, and the rollback command the pipeline should invoke.
 - **Pre-traffic-ramp on a canary** — smoke must pass against the canary slice before promoting 1% → 10% → 100%.
 - **First step in any CI job that touches an environment** — gate everything slower behind it.
 - **NOT during the development inner loop** — that is what unit tests are for.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

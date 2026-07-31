@@ -238,3 +238,7 @@ The skill's own severity table maps its critical findings to blocking Gate 3 adv
 | First review writing hypotheses with no baseline | WARN — fix next cycle |
 | Single red metric not drilled by segment | WARN — fix next cycle |
 | Metric naming inconsistent; notebook unversioned | WARN — backlog |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

@@ -453,3 +453,7 @@ Before presenting any refactoring:
 - `complexity-analyzer` - Identifies what needs refactoring
 - `code-reviewer` - Validates refactoring quality
 - `unit-test-writer` - Creates tests for extracted functions
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

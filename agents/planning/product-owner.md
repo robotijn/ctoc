@@ -599,3 +599,7 @@ Write your questions through the real store-writer, never by hand:
 If the plan has no real fork, write an EMPTY array — the honest "asked, nothing to ask".
 NEVER invent a question. `writePlanQuestions` validates the set and refuses a malformed
 one; it is fail-soft and never throws.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

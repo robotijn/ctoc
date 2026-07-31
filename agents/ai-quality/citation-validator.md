@@ -138,3 +138,7 @@ exists is `agents/ai-quality/hallucination-detector.md`'s job, and I cede it
 cleanly. I do NOT rewrite anything: the executor applies the edits my verdicts
 recommend, in its own linear step. I do NOT judge prose style, tone, or
 readability. I never edit — Read, Grep, and read-only web retrieval only.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

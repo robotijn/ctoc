@@ -121,3 +121,7 @@ Illustrative template — the numbers are placeholders, replaced by real product
 2. Lazy-load /admin — -110 KB off landing
 3. Switch lodash → lodash-es — re-enables tree-shaking for the rest of the graph
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

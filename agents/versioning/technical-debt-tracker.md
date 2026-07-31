@@ -271,3 +271,7 @@ To prevent debt growth, allocate **20% of sprint capacity** to debt reduction:
 - This clears: ~8 items/month
 - Net result: -2 items/month (debt decreasing)
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

@@ -145,3 +145,7 @@ EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'test@example.com';
 2. Create missing index on `orders.user_id`
 3. Change price column to DECIMAL
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

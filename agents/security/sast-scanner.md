@@ -783,3 +783,7 @@ mvn com.github.spotbugs:spotbugs-maven-plugin:spotbugs
 ---
 
 *"Security is not a feature, it's a requirement. Every vulnerability you miss is one an attacker will find."*
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

@@ -1124,3 +1124,7 @@ comment:
 | go test | (check manually) | `-coverprofile=c.out` |
 | cargo tarpaulin | `--fail-under 80` | (default) |
 | nyc | `--check-coverage --lines 80` | `--reporter=text` |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

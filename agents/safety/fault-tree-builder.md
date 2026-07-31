@@ -186,3 +186,7 @@ metadata:
 | Common-cause factor unsourced | WARN — fix before review |
 | Tree stale, architecture change is cosmetic | WARN — re-run with rationale |
 | Top event on a qualitative-only path has no quantified tree | WARN — record the rationale |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

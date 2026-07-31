@@ -243,3 +243,7 @@ const deprecationPatterns = [
 | 4 | moment → dayjs | 4h | Bundle size |
 | 5 | enzyme → RTL | 2d | Test reliability |
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

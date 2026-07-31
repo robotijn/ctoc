@@ -94,3 +94,7 @@ MyModule.processBatch(items);
 2. Batch bridge calls in OrderList
 3. Migrate to Turbo Modules for better perf
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

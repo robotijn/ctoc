@@ -247,3 +247,7 @@ metadata:
 | Third party in another inventory with no tracked agreement | WARN — fix before the next cycle |
 | Audit window past with no audit invoked | WARN — the right is expiring unexercised |
 | Liability cap extracted with no referenced clause | WARN |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

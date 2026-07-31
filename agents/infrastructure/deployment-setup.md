@@ -600,3 +600,7 @@ Fast pipelines increase deployment frequency and developer satisfaction:
 - **Ephemeral runners with warm caches** — pre-bake runner images with common dependencies
 - **Skip unchanged targets** — if only the staging config changed, do not redeploy production
 - **Measure pipeline duration** — set a target (e.g., < 10 min for full pipeline) and alert when it degrades
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

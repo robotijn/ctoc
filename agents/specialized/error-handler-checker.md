@@ -125,3 +125,7 @@ Uses the target skill's `error_kind` closed enum (empty_catch, broad_catch, log_
 ```
 
 When emitting via the Iron Loop refinement loop, every finding is `severity: critical` (warnings-are-bugs); the triage tiers above are report-body prioritization only. See the target skill for the full letter schema.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

@@ -104,3 +104,7 @@ field (critical | high | medium | low) is how CTO Chief and the integrator weigh
 ---
 
 *"One verdict per change — noise reduced to a decision, zero critical signal lost."*
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

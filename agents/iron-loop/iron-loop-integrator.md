@@ -206,3 +206,7 @@ All 5 dimensions should score 5/5:
 - **Edge Cases**: Error handling, timeouts, empty states covered
 - **Efficiency**: No redundant steps, parallelizable where possible
 - **Security**: Input validation, no secrets, safe file operations
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

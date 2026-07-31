@@ -284,3 +284,7 @@ Include the specific changes to undo in the report. CTO Chief re-dispatches Agen
 
 ### On ESCALATE
 The report goes to CTO Chief for human review.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

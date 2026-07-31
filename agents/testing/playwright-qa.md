@@ -657,3 +657,7 @@ npx playwright show-report
 6. **Never hardcode test credentials** - Use environment variables or secure vaults
 7. **Never test third-party services directly** - Mock external dependencies
 8. **Never run E2E tests without cleanup** - Always restore system state
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

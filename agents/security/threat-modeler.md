@@ -203,3 +203,7 @@ metadata:
 | Threats without owners | WARN — fix within the current cycle |
 | Privacy gap where personal data is incidental only | WARN — fix within the current cycle |
 | Model complete but not exercised in continuous integration | WARN — backlog |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

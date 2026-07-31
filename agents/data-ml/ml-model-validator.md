@@ -184,3 +184,7 @@ cannot be re-executed is a liability, not a passing check.
 3. **Test the fallback path** - A kill-switch to an unrun code path is not a safety net
 4. **Add a jailbreak regression suite** - Track injection failure rate across prompt versions
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

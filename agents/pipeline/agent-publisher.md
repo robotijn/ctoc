@@ -290,3 +290,7 @@ git commit -m "agent: batch update ${count} agents"
 ```
 
 Return one `publish_result` per agent plus the shared batch commit hash.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

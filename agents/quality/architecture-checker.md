@@ -295,3 +295,7 @@ architecture-checker:
 | Blast radius > 50 | BLOCK |
 | Blast radius 15-50 | WARN |
 | Import depth > 7 | WARN |
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

@@ -157,3 +157,7 @@ Forbidden label patterns (memory bomb): `user_id` on a metric, raw `url` / `path
 5. Add continuous profiling to payment-worker
 6. Define an SLI/SLO and error-budget policy for payment-worker
 ```
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

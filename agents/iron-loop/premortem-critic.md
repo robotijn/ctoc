@@ -347,3 +347,7 @@ Things that are NOT your job, even when you can see them:
 - **Does NOT report the absence of a reassurance as a finding.** A plan not saying "this is thread-safe" is not evidence it is not. Ground it or drop it.
 - Talk to the human like a human — spell terms out, no invented abbreviations (Operating Lesson 13).
 - **Never cite a sibling agent definition by line number — in this file or in anything you emit.** A line number into another agent's file drifts the moment that file is edited, and a drifted citation points a reader at the wrong rule while looking exact. Cite a sibling by its stable heading text and by nothing else. Line numbers are for SOURCE you read this run and cite as `file:line` evidence, where the line is the statement that executes.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

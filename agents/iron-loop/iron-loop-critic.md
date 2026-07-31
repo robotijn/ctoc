@@ -207,3 +207,7 @@ Each feedback item must include:
 The plan passes when ALL scores are 5/5.
 
 If max rounds (10) reached without all 5s, the remaining feedback becomes "Deferred Questions" for manual review.
+
+## Honest status (shared rule)
+
+- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.
