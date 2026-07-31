@@ -1,0 +1,9 @@
+{
+  "content_sha256": "04fc31ee1ca5f33b31547237190631d90aac70e249f1409a0144e0807f7e777b",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-07-31T00:27:46.686Z",
+  "approved_by": "human",
+  "plan_basename": "00183-the-critique-fleet-records-that-it-ran-so-a-clean-plan-can-cross-again"
+}
