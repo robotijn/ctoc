@@ -94,6 +94,14 @@ function isWhitelisted(filePath) {
   if (norm === '' || norm === '..' || norm.startsWith('../') || norm.includes('/../')) return false;
   norm = path.posix.normalize(norm);
   if (norm.startsWith('../')) return false;
+  // A command table is NOT whitelisted, even though it lives under `.ctoc/`: its
+  // contents become a subprocess (an argv program run by quality-agent on /ctoc:push
+  // and on the detached git post-commit hook). It falls through to plan coverage like
+  // any other source file, so changing what runs on every commit needs the same
+  // approval as changing what ships. Pass the ORIGINAL filePath — isCommandTablePath
+  // does its own normalization and its confinement check needs the raw path to resolve
+  // links.
+  if (isCommandTablePath(filePath)) return false;
   for (const pattern of WHITELIST) {
     const matched = typeof pattern === 'string'
       ? (norm === pattern || path.basename(norm) === pattern)
@@ -303,6 +311,47 @@ function targetsStreamingLive(filePath) {
   return isUnderProtectedDir(norm, STREAMING_DIR)
     || (realPathConfinement !== null
       && realPathConfinement.resolvesUnder(filePath, STREAMING_DIR, process.cwd()));
+}
+
+/**
+ * Configuration files whose CONTENTS BECOME A SUBPROCESS. `.ctoc/quality-config.yaml`
+ * and `.ctoc/capabilities/**` supply the lint/typecheck/test/cmd strings that
+ * `tool-detector` hands to `quality-agent`, which runs them on `/ctoc:push` and on the
+ * detached git post-commit hook. Since sibling plan 00203 shipped, those strings run
+ * through `runConfiguredCommand` as an ARGV vector (`shell:false`) — NOT a shell — so
+ * this is no longer a shell-injection surface. But an argv subprocess of an
+ * agent-written program string is STILL arbitrary-PROGRAM execution: defense in depth
+ * beyond 00203's shell fix. The ledger is BELIEVED and the verify evidence is BELIEVED;
+ * a command table is OBEYED. So these leave the `/^\.ctoc\//` blanket whitelist and fall
+ * through to ordinary plan coverage — a plan that genuinely needs to change a project's
+ * toolchain declares the file and is approved like any other change (unlike the ledger,
+ * verify and streaming guards, which DENY outright: editing a lint command is
+ * legitimate work, so this is an approval requirement, not a ban).
+ */
+const COMMAND_TABLE_PATHS = [
+  '.ctoc/quality-config.yaml',
+  '.ctoc/quality-config.yml',
+  '.ctoc/capabilities',
+];
+
+/**
+ * Whether `filePath` is one of the configuration COMMAND TABLES — a file whose strings
+ * are executed as a subprocess by quality-agent. Same two-check shape as
+ * `isProtectedLedgerPath`: name arithmetic OR real-path confinement, with the
+ * confinement check returning TRUE (excluded from the whitelist) on every fault and
+ * never throwing — the failing direction the file already established. Unlike the three
+ * DENY guards, a TRUE here only REMOVES the whitelist grant; the target still falls
+ * through to coverage.
+ *
+ * @param {string} filePath - the tool-call target (relative or absolute)
+ * @returns {boolean} true iff the normalized/real path is a command table or under one
+ */
+function isCommandTablePath(filePath) {
+  const norm = normalizeForProtection(filePath);
+  return COMMAND_TABLE_PATHS.some((dir) =>
+    isUnderProtectedDir(norm, dir)
+    || (realPathConfinement !== null
+      && realPathConfinement.resolvesUnder(filePath, dir, process.cwd())));
 }
 
 function readStdinJson() {
@@ -719,7 +768,7 @@ async function enforce(stdinJson) {
 
 module.exports = {
   enforce, isWhitelisted, isProtectedLedgerPath, isProtectedVerifyPath,
-  targetsStreamingLive,
+  targetsStreamingLive, isCommandTablePath,
   getTargetFile, readStdinJson,
   findEscapeInTranscript, extractUserTypedText, buildBlockMessage, buildSoftWarnMessage,
 };

@@ -129,7 +129,7 @@ Opus 4.7 follows instructions literally. Vague prompts produce silent drift. Eve
 
 When Claude is inside a CTOC project, the **PreToolUse enforcement hook** (`src/hooks/PreToolUse.Edit.js` and siblings for Write/MultiEdit/NotebookEdit) intercepts every file-edit operation. Flow:
 
-1. **Whitelist** — `.gitignore`, `.ctoc/*`, `.local/*`, `plans/*.md`, `VERSION` always pass.
+1. **Whitelist** — `.gitignore`, `.ctoc/*`, `.local/*`, `plans/*.md`, `VERSION` always pass, EXCEPT four carve-outs under `.ctoc/` that are removed from the blanket grant: the approval ledger (`.ctoc/approvals/`), the Gate-3 verify evidence (`.ctoc/state/verify/`), the streaming gate store (`.ctoc/streaming/`, bar its `pending/` quarantine) — all three DENIED outright — and the configuration **command tables** (`.ctoc/quality-config.yaml`, `.ctoc/capabilities/**`), which fall through to plan coverage. The first three protect files whose contents are BELIEVED by a gate; the command tables are different — their contents are OBEYED, not believed: they supply the lint/typecheck/test/cmd strings `quality-agent` runs (as an argv program, `shell:false`, since 00203) on every `/ctoc:push` and on the detached git post-commit hook. An agent that writes them makes CTOC run an arbitrary program, so changing what runs on every commit needs the same approval as changing what ships — an approval requirement, not a ban (`isCommandTablePath` in `PreToolUse.Edit.js`, `tests/config-command-tables-protected.test.js`).
 2. **Non-CTOC project** — silent pass; the hook treats this project as out of scope.
 3. **Plan-covered target** — allow, **only if a human APPROVED that plan**. The hook checks each active plan's `files:` declaration (in stages `in-progress`, `todo`) and matches the target via minimatch-style globs. Stage priority: in-progress > todo. Within a stage, most-specific glob wins — among the plans that are approved.
 
@@ -318,7 +318,7 @@ NEVER modify `installed_plugins.json`, `installPath`, or plugin paths to use loc
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 517 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 518 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -701,7 +701,7 @@ ctoc/
     data/                Static data files
   agents/                124 agent definitions across 24 categories
   skills/                428 skill files (101 SKILL.md bodies = 99 Tier-2 specialists + 1 ambient format skill + 1 preloaded lens skill; + 326 reference)
-  tests/                 517 test files
+  tests/                 518 test files
   .ctoc/                 Config, templates, operations
   .claude-plugin/        Plugin metadata (plugin.json, marketplace.json, hooks.json)
   plans/                 Plan files by stage (vision/, functional/, implementation/, todo/, review/, done/)
