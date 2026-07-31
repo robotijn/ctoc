@@ -6,9 +6,6 @@ kickback_counts:
   by_step:
     '8': 1
   total: 1
----
-
----
 title: "The approval hash survives its own pipeline — bind the approval to the specification, not to the execution log"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T09:18:53.959Z
 gate_crossed: implementation → todo
----
-
----
 title: "The dashboard's last two gate numbers become sentences a human can act on"
 type: implementation
 parent_plan: none

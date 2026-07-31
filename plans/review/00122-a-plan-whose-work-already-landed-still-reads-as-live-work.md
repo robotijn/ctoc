@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T18:29:04.221Z
 gate_crossed: implementation → todo
----
-
----
 title: "A plan whose work already landed still reads as live work — nothing asks whether the code arrived, so twelve finished plans were reported as contending and three killed by a successor were reported as nothing at all"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

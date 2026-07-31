@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T08:40:32.343Z
 gate_crossed: implementation → todo
----
-
----
 title: "A link that points at nothing yet is reported as a path inside the tree — the resolver's missing-path walk steps straight over a dangling link"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

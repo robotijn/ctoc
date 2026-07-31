@@ -2,15 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T09:39:54.544Z
 gate_crossed: implementation → todo
----
-
----
-approved_by: human
-approved_at: 2026-07-19T21:31:41.193Z
-gate_crossed: implementation → todo
----
-
----
 title: "One character separates a normal declaration from the whole repository — a declared pattern must be anchored somewhere, or say out loud that it is not"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

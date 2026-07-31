@@ -6,9 +6,6 @@ kickback_counts:
   by_step:
     '14': 1
   total: 1
----
-
----
 title: "Git exclusivity is undefended on the one path that starts work — and the third instance of an oracle tested exhaustively while the projection beside it is tested thinly"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

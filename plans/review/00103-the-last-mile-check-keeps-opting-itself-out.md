@@ -6,9 +6,6 @@ kickback_counts:
   by_step:
     '14': 1
   total: 1
----
-
----
 title: "The last-mile check stops losing its own verdict — one ladder, three honest opt-outs, and a child process that threw away the answer it had just printed"
 type: implementation
 parent_plan: ctoc-capability-registry

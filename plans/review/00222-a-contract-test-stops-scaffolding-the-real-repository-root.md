@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-22T12:10:26.367Z
 gate_crossed: implementation → todo
----
-
----
 title: "A contract test stops scaffolding the real repository root — the full suite leaks an unrendered IRON_LOOP.md into the working tree"
 type: implementation
 parent_plan: none

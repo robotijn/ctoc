@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T09:18:54.046Z
 gate_crossed: implementation → todo
----
-
----
 title: "Agents stop inventing status they cannot verify — a fence over what an agent is TOLD to say, and a stated limit about what cannot be fenced at all"
 type: implementation
 parent_plan: none

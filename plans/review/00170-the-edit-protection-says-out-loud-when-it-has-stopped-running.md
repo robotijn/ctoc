@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T10:17:33.118Z
 gate_crossed: implementation → todo
----
-
----
 title: "The edit protection says out loud when it has stopped running"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

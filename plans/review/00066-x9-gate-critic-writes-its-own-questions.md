@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-18T11:11:00.143Z
 gate_crossed: implementation → todo
----
-
----
 title: "X9 — the gate critic persists its own questions: a quarantined write plus a render-time sweeper, so the payload never passes through the session model"
 type: implementation
 parent_plan: none

@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T09:18:53.869Z
 gate_crossed: implementation → todo
----
-
----
 title: "Two dead settings templates are deleted — the settings format has one encoding again"
 type: implementation
 parent_plan: none

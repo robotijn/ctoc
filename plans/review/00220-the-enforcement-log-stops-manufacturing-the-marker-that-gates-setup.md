@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-22T12:10:26.309Z
 gate_crossed: implementation → todo
----
-
----
 title: "The enforcement log stops manufacturing the marker that gates setup — the third of four producers, on the live whitelist path"
 type: implementation
 parent_plan: none

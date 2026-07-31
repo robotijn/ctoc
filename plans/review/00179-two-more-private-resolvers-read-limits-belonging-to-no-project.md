@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T11:56:02.868Z
 gate_crossed: implementation → todo
----
-
----
 title: "Two more private resolvers read limits belonging to no project, and nothing stops a sixth"
 type: implementation
 parent_plan: none

@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-18T20:44:41.856Z
 gate_crossed: implementation → todo
----
-
----
 title: "The quarantine covers all three promote paths — one guard, one encoding, every route"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

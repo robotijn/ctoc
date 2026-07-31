@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T07:40:42.773Z
 gate_crossed: implementation → todo
----
-
----
 title: "The last-mile check drives the real entry point instead of looking for an app to launch"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

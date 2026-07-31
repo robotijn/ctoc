@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T21:31:41.110Z
 gate_crossed: implementation → todo
----
-
----
 title: "A link inside the repository reaches outside it — root confinement is pure path arithmetic and cannot see through a symbolic link"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

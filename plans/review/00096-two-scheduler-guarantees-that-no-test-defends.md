@@ -7,9 +7,6 @@ kickback_counts:
     '8': 1
     '14': 1
   total: 2
----
-
----
 title: "Two scheduler guarantees get a test that goes red when they are removed — both can be deleted today and the whole suite stays green"
 type: implementation
 parent_plan: ctoc-audit-w06-truthful-tests

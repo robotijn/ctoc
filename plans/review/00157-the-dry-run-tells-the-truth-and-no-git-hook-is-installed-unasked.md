@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T09:18:53.841Z
 gate_crossed: implementation → todo
----
-
----
 title: "The setup preview stops listing files it did not write, and nothing installs a git hook without being asked"
 type: implementation
 parent_plan: none

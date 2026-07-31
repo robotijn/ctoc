@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T18:15:13.892Z
 gate_crossed: implementation → todo
----
-
----
 title: "The self-check reports a clean result you can read — a checker whose success value is falsy crashes the caller that asks it anything"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

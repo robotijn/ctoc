@@ -6,9 +6,6 @@ kickback_counts:
   by_step:
     '8': 2
   total: 2
----
-
----
 title: "A skipped test is counted as a skipped test — the zero-skip gate can currently see neither half of the skips it forbids"
 type: implementation
 parent_plan: ctoc-audit-w06-truthful-tests

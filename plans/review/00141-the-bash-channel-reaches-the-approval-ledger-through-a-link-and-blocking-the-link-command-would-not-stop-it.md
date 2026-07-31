@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T08:40:32.392Z
 gate_crossed: implementation → todo
----
-
----
 title: "The Bash channel reaches the approval ledger through a link — and adding the link command to the write list would not stop it"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild

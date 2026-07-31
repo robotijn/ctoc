@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T21:33:26.583Z
 gate_crossed: implementation → todo
----
-
----
 title: "Guides declare their checkable claims, and the corpus reports honestly how many it has"
 type: implementation
 parent_plan: corpus-claim-verification

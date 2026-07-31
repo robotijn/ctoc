@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T09:18:53.986Z
 gate_crossed: implementation → todo
----
-
----
 title: "Five screen builders nobody calls are deleted — re-wording dead code would have been polish on a corpse"
 type: implementation
 parent_plan: none

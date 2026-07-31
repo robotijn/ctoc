@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-20T11:56:02.842Z
 gate_crossed: implementation → todo
----
-
----
 title: "The refinement loop writes its journals to the home directory, invisible to the project"
 type: implementation
 parent_plan: none

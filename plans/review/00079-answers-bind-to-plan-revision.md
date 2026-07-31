@@ -2,9 +2,6 @@
 approved_by: human
 approved_at: 2026-07-19T07:40:42.717Z
 gate_crossed: implementation → todo
----
-
----
 title: "Answers bind to the plan revision they were given for"
 type: implementation
 parent_plan: ctoc-background-engine-rebuild
