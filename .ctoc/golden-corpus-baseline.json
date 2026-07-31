@@ -1,11 +1,6 @@
 {
-  "maxFindings": 11,
+  "maxFindings": 6,
   "findings": [
-    "plan-frontmatter::src/lib/inbox.js",
-    "plan-frontmatter::src/lib/iron-loop-enforcer.js",
-    "plan-frontmatter::src/lib/plan-coverage.js",
-    "plan-frontmatter::src/lib/stale-detector.js",
-    "plan-frontmatter::src/lib/vision-decomposer.js",
     "task-registry::src/lib/actions.js",
     "task-registry::src/lib/menu-screens.js",
     "task-registry::src/lib/plan-recovery.js",
