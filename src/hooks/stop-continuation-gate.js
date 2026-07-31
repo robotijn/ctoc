@@ -42,6 +42,27 @@ function writeStderr(msg) {
   try { process.stderr.write(msg); } catch { /* swallow */ }
 }
 
+/**
+ * The question-dispatch directive to APPEND to a continue-path (block) injection —
+ * the SAME text SessionStart injects once at session open, reused verbatim so a
+ * mid-session gate crossing does not leave its child slices with no question
+ * generation until the next open (the "one-shot-at-open" gap). Returns '' when no
+ * plan needs questions.
+ *
+ * FAIL-OPEN: any error yields '' so the keep-going injection and the exit code are
+ * never affected by a failure here. Required lazily to match this module's
+ * convention and to keep SessionStart's heavier require off the no-batch hot path.
+ */
+function questionDirectiveSuffix(projectRoot) {
+  try {
+    const { questionDispatchDirective } = require('./SessionStart');
+    const d = questionDispatchDirective(projectRoot);
+    return typeof d === 'string' ? d : '';
+  } catch {
+    return '';
+  }
+}
+
 function main() {
   // 1. Per-session escape.
   if (process.env.CTOC_SKIP_CONTINUATION === '1') process.exit(0);
@@ -79,7 +100,8 @@ function main() {
       `fork-free work waits. Drive the next approved plan to completion, checkpointing at ` +
       `each boundary. Stop ONLY when the approved queue is empty or a genuine fork needs ` +
       `the human (register it with continuationQueue.registerQueueFork). ` +
-      `Escape: CTOC_SKIP_CONTINUATION=1.\n`
+      `Escape: CTOC_SKIP_CONTINUATION=1.\n` +
+      questionDirectiveSuffix(projectRoot)
     );
     process.exit(2);
   }
@@ -96,7 +118,8 @@ function main() {
     `CTOC is autonomous building — do NOT stop mid-batch. Drive the next unit to ` +
     `completion, checkpointing at each boundary. Stop ONLY when the batch is complete ` +
     `or a genuine fork needs the human's decision (register it with ` +
-    `continuation.registerFork). Escape: CTOC_SKIP_CONTINUATION=1.\n`
+    `continuation.registerFork). Escape: CTOC_SKIP_CONTINUATION=1.\n` +
+    questionDirectiveSuffix(projectRoot)
   );
   process.exit(2);
 }
