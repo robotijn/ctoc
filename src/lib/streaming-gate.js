@@ -1621,9 +1621,34 @@ function streamAnswer(ref, questionId, optionKey, projectRoot) {
   } catch (err) {
     status = `Could not record the answer for ${parsed.file}: ${stripCtl((err && err.message) || String(err))}`;
   }
+  // LOOP-A → LOOP-B COUPLING (slice 3). The moment the human answers a fork, the SAME
+  // return also surfaces the Loop-B tick — what just auto-crossed on sufficiency (now
+  // that this answer is recorded) and what is next to build — so the session model
+  // re-runs the tick with no further human action. It is computed BEFORE the screen
+  // render so its own before/after snapshot straddles the sufficiency cross and can
+  // name what THIS answer moved (the screen render's own pendingGateDecisions call is
+  // idempotent). We add NO crossing logic here: the cross is `pendingGateDecisions`'
+  // documented side effect, invoked verbatim inside `loopBDirective`. `loopBDirective`
+  // already guarantees plain-moment language (no gate number, no raw stage word).
+  //
+  // FAIL-OPEN: any fault omits the directive but NEVER loses the recorded answer or
+  // breaks the screen. `loopBDirective` is itself fail-open and returns '' for a bad
+  // root; the try/catch is the belt-and-braces the slice mandates.
+  let directive = '';
+  try {
+    directive = require('./loop-b-driver').loopBDirective(projectRoot);
+  } catch {
+    directive = '';
+  }
   // Stay on the SAME plan (answering never moves it): re-render → next unanswered
-  // question, or the final Approve when all are answered.
-  return streamingGateScreen(projectRoot, status);
+  // question, or the final Approve when all are answered. The directive is APPENDED to
+  // the screen's human-facing `.text`; `.ask` and `.actions` are untouched, so an empty
+  // directive leaves the screen object byte-for-byte unchanged for existing consumers.
+  const screen = streamingGateScreen(projectRoot, status);
+  if (directive && screen && typeof screen.text === 'string') {
+    screen.text += directive;
+  }
+  return screen;
 }
 
 module.exports = {
