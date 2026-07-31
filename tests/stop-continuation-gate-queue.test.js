@@ -49,6 +49,19 @@ The specification the human ruled on.
 `;
 }
 
+/**
+ * A plan sitting at a pre-build/review gate whose decision questions have NOT been
+ * computed — exactly the shape `streaming-precompute.plansNeedingQuestions` reports.
+ * A `review/` plan is used because review→done is never auto-crossed, so the plan
+ * stays a pending decision with no fresh questions regardless of validation.
+ */
+function planNeedingQuestions(root, slug) {
+  const p = path.join(root, 'plans', 'review', `${slug}.md`);
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, planText(slug));
+  return p;
+}
+
 /** Real approved todo plan (Gate-2 ledger entry, specification-bound). */
 function approveTodoPlan(root, slug) {
   const content = planText(slug);
@@ -188,5 +201,75 @@ test('BOUNDED: an undrainable approved queue blocks at most MAX_QUEUE_BLOCKS tim
     assert.equal(blocks, q.MAX_QUEUE_BLOCKS, `must block at most MAX_QUEUE_BLOCKS times, blocked ${blocks}`);
     // Stays exit 0 while the queue is unchanged (idempotent at the ceiling).
     assert.equal(runHook(dir).status, 0, 'stays allow-stop while the queue does not drain');
+  } finally { cleanup(dir); }
+});
+
+// ── SLICE 4: continue-path ALSO re-injects the question-dispatch directive ────────
+// When the gate BLOCKS a premature stop (exit 2) it already re-injects a keep-going
+// message; it must ALSO re-inject the SAME "dispatch subagents to generate questions"
+// directive whenever a plan still needs questions — closing the one-shot-at-open gap
+// where mid-session gate crossings left child slices with no question generation until
+// the next session open. The directive text is `SessionStart.questionDispatchDirective`,
+// reused verbatim; its stable marker is "dispatch UP TO 5 CTOC subagents".
+const DIRECTIVE_MARK = /dispatch UP TO 5 CTOC subagents/;
+
+test('SLICE4 explicit-batch block + a plan needing questions -> stderr ALSO carries the question directive', () => {
+  const dir = mkProject();
+  try {
+    continuation.startBatch(dir, { label: '5-round repair', total: 5 });
+    planNeedingQuestions(dir, 'needs-qs');
+    const r = runHook(dir);
+    assert.equal(r.status, 2, 'the explicit batch still blocks — decision unchanged');
+    assert.match(r.stderr, /remaining/, 'the keep-going message is still present');
+    assert.match(r.stderr, DIRECTIVE_MARK, 'the question-dispatch directive must be appended on the continue path');
+  } finally { cleanup(dir); }
+});
+
+test('SLICE4 derived-queue block + a plan needing questions -> stderr ALSO carries the question directive', () => {
+  const dir = mkProject();
+  try {
+    approveTodoPlan(dir, 'alpha');       // makes the derived queue block (exit 2)
+    planNeedingQuestions(dir, 'needs-qs'); // a review plan with no computed questions
+    const r = runHook(dir);
+    assert.equal(r.status, 2, 'the derived queue still blocks — decision unchanged');
+    assert.match(r.stderr, /approved plan\(s\) are waiting to be built/, 'keep-going message intact');
+    assert.match(r.stderr, DIRECTIVE_MARK, 'the question-dispatch directive must be appended on the continue path');
+  } finally { cleanup(dir); }
+});
+
+test('SLICE4 block but NOTHING needs questions -> keep-going only, NO question directive appended', () => {
+  const dir = mkProject();
+  try {
+    continuation.startBatch(dir, { label: 'x', total: 3 });
+    const r = runHook(dir);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /remaining/);
+    assert.doesNotMatch(r.stderr, DIRECTIVE_MARK, 'no directive when no plan needs questions');
+  } finally { cleanup(dir); }
+});
+
+test('SLICE4 FAIL-OPEN: a corrupt streaming-questions state still yields keep-going + exit 2', () => {
+  const dir = mkProject();
+  try {
+    continuation.startBatch(dir, { label: 'y', total: 4 });
+    planNeedingQuestions(dir, 'needs-qs');
+    // Put a FILE where the streaming questions directory would live so any read of the
+    // store errors; questionDispatchDirective is fail-soft (returns '') and the wrapper
+    // in the hook must never let it change the block decision.
+    fs.mkdirSync(path.join(dir, '.ctoc', 'streaming'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.ctoc', 'streaming', 'questions'), 'not a directory');
+    const r = runHook(dir);
+    assert.equal(r.status, 2, 'the block decision is unchanged even when the question directive cannot be computed');
+    assert.match(r.stderr, /remaining/, 'the keep-going message still injects');
+  } finally { cleanup(dir); }
+});
+
+test('SLICE4 allow-stop (exit 0) path is unchanged: no block, no injected directive', () => {
+  const dir = mkProject();
+  try {
+    planNeedingQuestions(dir, 'needs-qs'); // questions pending, but no authorized work
+    const r = runHook(dir);
+    assert.equal(r.status, 0, 'no authorized batch/queue -> allow the stop');
+    assert.doesNotMatch(r.stderr || '', DIRECTIVE_MARK, 'an allowed stop injects nothing');
   } finally { cleanup(dir); }
 });
