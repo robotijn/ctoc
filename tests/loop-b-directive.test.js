@@ -212,6 +212,97 @@ test('a buildable ref whose plan file is missing is named by its slug (read faul
   }
 });
 
+// ── SPLIT + CAP: the review-backlog wall is bounded and correctly labelled ───────
+//
+// The defect this guards: on the real repository plansNeedingQuestions returns the
+// ENTIRE review backlog (~134 plans), all review→done with empty fork arrays, and the
+// old directive dumped every one of them onto a single line UNDER the "still working
+// out what to ask you about" phrasing. Both are wrong: it is a wall, and those plans
+// are BUILT AND WAITING FOR THE HUMAN'S OK, not plans CTOC is working out questions for.
+// These fixtures use a REALISTIC LARGE set (30+ real plan files), because a 2-plan
+// fixture is exactly the gap that let the wall ship.
+
+/** Make N real review-stage plans (built, waiting for the human's OK — no forks). */
+function makeManyReview(dir, n, prefix = 'Waiting item') {
+  const names = [];
+  for (let i = 0; i < n; i++) {
+    const title = `${prefix} ${i}`;
+    makePlan(dir, 'review', `${String(i).padStart(5, '0')}-waiting-${i}`, { title });
+    names.push(title);
+  }
+  return names;
+}
+
+test('a large review backlog is BOUNDED and labelled "waiting for your OK", never dumped under "working out"', () => {
+  const dir = mkProject();
+  try {
+    makeManyReview(dir, 32);
+    const out = driver.loopBDirective(dir);
+    // labelled as waiting for the human's OK, NOT as questions being worked out
+    assert.ok(/waiting for your ok/i.test(out), `expected a "waiting for your OK" line, got: ${JSON.stringify(out)}`);
+    assert.ok(!/still working out what to ask you about/i.test(out),
+      `review-backlog plans must NOT be under "still working out what to ask you about": ${JSON.stringify(out)}`);
+    // BOUNDED: at most 5 titles named, then "and K more" — never all 32.
+    assert.ok(/and \d+ more/.test(out), `expected an "and K more" summary, got: ${JSON.stringify(out)}`);
+    const namedCount = (out.match(/Waiting item \d+/g) || []).length;
+    assert.ok(namedCount <= 5, `expected at most 5 titles named, got ${namedCount}: ${JSON.stringify(out)}`);
+    assert.ok(/and 27 more/.test(out), `expected "and 27 more" (32 - 5), got: ${JSON.stringify(out)}`);
+    assertPlainLanguage(out);
+  } finally { cleanup(dir); }
+});
+
+test('a review→done plan carrying an OPEN FORK is "working out", not "waiting for your OK"', () => {
+  const dir = mkProject();
+  const orig = streamingPrecompute.plansNeedingQuestions;
+  try {
+    // The real pipeline cannot emit a fork on a stale/missing questions file, so the
+    // discriminating case (a review→done descriptor WITH an unresolved fork) is injected
+    // as a controlled descriptor, the same way the fault-isolation tests inject one.
+    streamingPrecompute.plansNeedingQuestions = () => ([
+      { ref: 'review/00090-forky.md', slug: '00090-forky', title: 'Forky decision',
+        fromStage: 'review', toStage: 'done', moment: 'nothing is finished until you say so',
+        blockingQuestionIds: ['q1'], unansweredQuestionIds: ['q1'] },
+    ]);
+    const out = driver.loopBDirective(dir);
+    assert.ok(/still working out what to ask you about: Forky decision/i.test(out),
+      `a review→done plan with an open fork must be "working out", got: ${JSON.stringify(out)}`);
+    assert.ok(!/waiting for your ok[^]*Forky decision/i.test(out),
+      `a plan with an open fork must NOT be "waiting for your OK": ${JSON.stringify(out)}`);
+    assertPlainLanguage(out);
+  } finally {
+    streamingPrecompute.plansNeedingQuestions = orig;
+    cleanup(dir);
+  }
+});
+
+test('a mixed backlog renders BOTH bounded lines, cleanly separated', () => {
+  const dir = mkProject();
+  try {
+    makeManyReview(dir, 30);                                             // waiting for OK
+    makePlan(dir, 'implementation', '90001-inline-help', { title: 'Inline help panel' }); // working out (pre-build)
+    makePlan(dir, 'implementation', '90002-usage-graph', { title: 'Usage graph' });       // working out (pre-build)
+    const out = driver.loopBDirective(dir);
+    assert.ok(/still working out what to ask you about:/i.test(out), `expected the working-out line: ${JSON.stringify(out)}`);
+    assert.ok(/waiting for your ok/i.test(out), `expected the waiting-for-OK line: ${JSON.stringify(out)}`);
+    assert.ok(out.includes('Inline help panel'));
+    assert.ok(/and \d+ more/.test(out), `the waiting line must still be bounded: ${JSON.stringify(out)}`);
+    // the two groups are distinct lines
+    assert.ok(out.split('\n').filter((l) => l.trim()).length >= 2, `expected >=2 lines: ${JSON.stringify(out)}`);
+    assertPlainLanguage(out);
+  } finally { cleanup(dir); }
+});
+
+test('the cap names EXACTLY the default of 5 when the group is larger', () => {
+  const dir = mkProject();
+  try {
+    makeManyReview(dir, 12);
+    const out = driver.loopBDirective(dir);
+    const namedCount = (out.match(/Waiting item \d+/g) || []).length;
+    assert.strictEqual(namedCount, 5, `expected exactly 5 named, got ${namedCount}: ${JSON.stringify(out)}`);
+    assert.ok(/and 7 more/.test(out), `expected "and 7 more", got: ${JSON.stringify(out)}`);
+  } finally { cleanup(dir); }
+});
+
 // ── (a) real cross detection: a plan that LEAVES its pre-build stage is named ────
 
 test('a sufficiency auto-cross (plan leaves its pre-build stage) is named in plain moment language', () => {
