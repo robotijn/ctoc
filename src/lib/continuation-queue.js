@@ -187,12 +187,76 @@ function effectiveBlocks(state, depth) {
 }
 
 /**
- * THE DECISION the Stop hook (slice 2) will consume. PURE READ, writes nothing
- * (mirrors `continuation.shouldContinue`). Coerces numerics toward ALLOW — a safety
- * gate fails open.
+ * The plan's name AS A HUMAN READS IT, from a `stage/file.md` ref — the plan's
+ * `# Heading`, else its frontmatter `title`, else its slug, run through
+ * `streaming-gate.humanPlanName` (which drops any leading internal code and keeps only
+ * the sentence a person would say). FAIL-OPEN: a missing/unreadable plan or any fault
+ * falls back to the slug, never a throw. This is the SINGLE naming encoding for the
+ * driver, shared by the named-next field and the fork reason, so the two never drift.
  *
  * @param {string} root - the project root
- * @returns {{continue: boolean, reason: string, depth?: number, refs?: string[], fork?: boolean, exhausted?: boolean, buildOrder?: ReturnType<typeof nextBuildable>}}
+ * @param {string} ref - a `stage/file.md` reference
+ * @returns {string} a plain-language plan name (no gate number, no internal code)
+ */
+function refHumanName(root, ref) {
+  const slash = String(ref).indexOf('/');
+  const file = slash >= 0 ? String(ref).slice(slash + 1) : String(ref);
+  const stage = slash >= 0 ? String(ref).slice(0, slash) : '';
+  const slug = file.replace(/\.md$/i, '');
+  try {
+    const state = require('./state');
+    const { humanPlanName } = require('./streaming-gate');
+    let content = '';
+    try {
+      content = safeFs.readFileSync(path.join(state.getPlansDir(root), stage, file), 'utf8');
+    } catch {
+      content = ''; // missing/mid-move plan: name it from the slug alone (not a verdict)
+    }
+    const heading = typeof content === 'string' ? content.match(/^#[ \t]+(.+)$/m) : null;
+    let title = heading ? heading[1].trim() : '';
+    if (!title) {
+      try { title = String((state.parseMetadata(content) || {}).title || '').trim(); } catch { title = ''; }
+    }
+    return humanPlanName(title, slug);
+  } catch {
+    return slug;
+  }
+}
+
+/**
+ * Whether the next buildable plan carries a REAL unanswered BLOCKING fork — a
+ * decision that is the human's, never the engine's to guess. Reuses the SINGLE
+ * fork predicate `streaming-precompute.hasEnoughInformation` (its `blocking[]` is the
+ * unanswered questions that are forks). Returns the plan's human name when it does,
+ * else null. FAIL-OPEN toward BUILDING: any fault reading questions is NOT evidence of
+ * a fork — fabricating one from a read error would strand the human — so a fault
+ * yields null (keep building), and only a fork we actually detected stops the queue.
+ *
+ * @param {string} root - the project root
+ * @param {string} ref - the next buildable `stage/file.md` reference
+ * @returns {string|null} the human name of the forked plan, or null when there is none
+ */
+function blockingForkName(root, ref) {
+  try {
+    const { hasEnoughInformation } = require('./streaming-precompute');
+    const info = hasEnoughInformation(root, ref);
+    if (info && Array.isArray(info.blocking) && info.blocking.length > 0) {
+      return refHumanName(root, ref);
+    }
+    return null;
+  } catch {
+    return null; // a questions-store fault is not a fork — keep building (not a verdict)
+  }
+}
+
+/**
+ * THE DECISION the Stop hook (slice 2) consumes. A READ that fails OPEN (mirrors
+ * `continuation.shouldContinue`, coercing numerics toward ALLOW). It writes nothing
+ * on the ordinary paths; the ONE exception is the defensive real-fork path below,
+ * where it registers the human's fork before returning the stop.
+ *
+ * @param {string} root - the project root
+ * @returns {{continue: boolean, reason: string, depth?: number, refs?: string[], fork?: boolean, exhausted?: boolean, buildOrder?: ReturnType<typeof nextBuildable>, nextName?: (string|null)}}
  */
 function shouldContinueQueue(root) {
   const state = readQueueState(root) || {};
@@ -221,12 +285,34 @@ function shouldContinueQueue(root) {
   // ordered, with the blocked/inversion/missing diagnostics. Existing consumers read
   // only `continue`/`depth`; this field is extra, never a behaviour change. It is what
   // makes `nextBuildable` reachable on a live path (it runs on every gate evaluation).
+  const buildOrder = nextBuildable(root);
+  const nextRef = buildOrder.buildable[0];
+
+  // REAL-FORK STOP (build on knowledge, never a guess). An approved plan crossed on
+  // sufficiency, so it normally has no unanswered fork — this is DEFENSIVE — but if the
+  // next plan we are about to auto-build carries one, it is the human's to answer.
+  // Register it (so the very next decision reads `forkPending` and also stops) and stop
+  // NOW rather than build past a live question. This is one of the two legitimate stops.
+  if (nextRef) {
+    const forkName = blockingForkName(root, nextRef);
+    if (forkName) {
+      const reason = `${forkName} has an unanswered question that only you can settle`;
+      registerQueueFork(root, reason);
+      return { continue: false, reason, fork: true };
+    }
+  }
+
+  // ADDITIVE `nextName`: the correct dependency-and-criticality-ordered next BUILDABLE
+  // plan, named by its HUMAN TITLE, so the Stop hook's auto-build directive targets THAT
+  // plan (never a blocked one). Existing consumers read `continue`/`depth`/`refs`/
+  // `buildOrder`; this field is extra naming, never a behaviour change.
   return {
     continue: true,
     reason: `${depth} approved plan(s) waiting to be built`,
     depth,
     refs,
-    buildOrder: nextBuildable(root),
+    buildOrder,
+    nextName: nextRef ? refHumanName(root, nextRef) : null,
   };
 }
 

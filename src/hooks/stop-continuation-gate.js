@@ -94,9 +94,16 @@ function main() {
     try { qPersisted = continuationQueue.recordQueueBlock(projectRoot, qDecision.depth); } catch { process.exit(0); }
     if (!qPersisted) process.exit(0);
 
+    // NAME the correct dependency-and-criticality-ordered next BUILDABLE plan so the
+    // auto-build directive targets THAT plan (never a blocked one). `nextName` is
+    // already computed by shouldContinueQueue; render it only when present (a queue with
+    // work but nothing currently buildable has no next name — keep the message generic).
+    const nextLine = typeof qDecision.nextName === 'string' && qDecision.nextName
+      ? ` Build next: ${qDecision.nextName}.`
+      : '';
     writeStderr(
       `\n[CTOC] continuation-gate BLOCKED stop: ${qDecision.depth} approved plan(s) ` +
-      `are waiting to be built. CTOC is autonomous building — do NOT stop while approved, ` +
+      `are waiting to be built.${nextLine} CTOC is autonomous building — do NOT stop while approved, ` +
       `fork-free work waits. Drive the next approved plan to completion, checkpointing at ` +
       `each boundary. Stop ONLY when the approved queue is empty or a genuine fork needs ` +
       `the human (register it with continuationQueue.registerQueueFork). ` +
