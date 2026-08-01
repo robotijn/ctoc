@@ -73,6 +73,7 @@ const safeFs = require('./safe-fs');
 const { parseFrontmatter } = require('./frontmatter');
 const approvalResidency = require('./approval-residency');
 const realPathConfinement = require('./real-path-confinement');
+const protectedPaths = require('./protected-paths');
 const path = require('path');
 
 // SCANNED STAGES, IN PRIORITY ORDER. `implementation` is deliberately ABSENT: it is
@@ -597,6 +598,24 @@ function scanForCoverage(targetFile, root) {
           // outranks an unanchored-declaration (severity 2) even on a broader glob.
           denial = rankDenial(denial, {
             plan: ref, stage, glob, reason: approval.reason, score,
+          }, declaredBreadth.REFUSAL_REASON);
+          continue;
+        }
+        // PROTECTED ENFORCEMENT SURFACE. An AUTONOMOUS coverage grant — a
+        // sufficiency/pipeline ledger entry, crossed with NO human — must never
+        // confer write access over CTOC's own gate-enforcement code. Those files
+        // require a positively-HUMAN covering plan. FAIL-CLOSED: any kind that is not
+        // `human`/`backfilled` (autonomous, unknown, or unresolved null) is refused
+        // for a protected target. Ordinary source and human-approved hook edits
+        // (dogfooding) are unaffected. The check reads the target file AND the
+        // covering plan's kind, both known only here — so it lives in this shared
+        // oracle, inherited by BOTH write channels, never duplicated per hook.
+        if (
+          protectedPaths.isProtectedEnforcementPath(relTarget) &&
+          !protectedPaths.isHumanCoverageKind(approval.kind)
+        ) {
+          denial = rankDenial(denial, {
+            plan: ref, stage, glob, reason: 'autonomous-coverage-over-enforcement-denied', score,
           }, declaredBreadth.REFUSAL_REASON);
           continue;
         }
