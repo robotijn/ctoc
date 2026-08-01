@@ -39,21 +39,61 @@ const safeFs = require('./safe-fs');
  */
 const SUFFICIENCY_SOURCE_STAGES = ['functional', 'implementation'];
 
+/**
+ * At most this many plan titles are named in any one summary line before it collapses
+ * to "and K more". Mirrors increment-feed's cap-and-summarize so a large backlog reads
+ * as a legible directive, not a wall. 5, tighter than increment-feed's 10, because this
+ * runs THREE such lines at session start and terseness is the point.
+ */
+const NAME_CAP = 5;
+
 /** Wire the three composed sources + the plan readers. Its require failure fails open. */
 function buildDeps() {
   const state = require('./state');
   const { pendingGateDecisions, humanPlanName } = require('./streaming-gate');
   const { plansNeedingQuestions } = require('./streaming-precompute');
   const { nextBuildable } = require('./continuation-queue');
+  const gateWords = require('./gate-words');
   return {
     getPlansDir: state.getPlansDir,
     readPlans: state.readPlans,
     parseMetadata: state.parseMetadata,
     humanPlanName,
+    moment: gateWords.moment,
     pendingGateDecisions,
     plansNeedingQuestions,
     nextBuildable,
   };
+}
+
+/**
+ * Cap a list of human names to at most `cap`, then "and K more". The one place the
+ * wall becomes a summary — every group line routes through it.
+ * @param {string[]} names
+ * @param {number} [cap]
+ * @returns {string}
+ */
+function summarize(names, cap = NAME_CAP) {
+  const n = cap > 0 ? cap : NAME_CAP;
+  if (names.length <= n) return names.join(', ');
+  return `${names.slice(0, n).join(', ')}, and ${names.length - n} more`;
+}
+
+/** A decision descriptor still carries an unresolved fork the human must answer. */
+function hasOpenForks(d) {
+  return (Array.isArray(d.blockingQuestionIds) && d.blockingQuestionIds.length > 0)
+    || (Array.isArray(d.unansweredQuestionIds) && d.unansweredQuestionIds.length > 0);
+}
+
+/**
+ * A plan is BUILT AND WAITING FOR THE HUMAN'S OK — not one CTOC is still working out
+ * questions for — when its next move is the final human sign-off and it has no open
+ * fork. `toStage === 'done'` is that final edge (only `review → done`); everything else
+ * in `plansNeedingQuestions` is a pre-build plan whose sufficiency is not yet computed,
+ * i.e. genuinely still being worked out.
+ */
+function isWaitingForOk(d) {
+  return !!d && d.toStage === 'done' && !hasOpenForks(d);
 }
 
 /**
@@ -121,20 +161,43 @@ function crossedLines(root, deps) {
       if (!after.has(ref)) crossed.push(name);
     }
     return crossed.length
-      ? [`Moved forward on their own — enough was known to proceed without your OK: ${crossed.join(', ')}.`]
+      ? [`Moved forward on their own — enough was known to proceed without your OK: ${summarize(crossed)}.`]
       : [];
   } catch {
     return [];
   }
 }
 
-/** (b) plans whose decision questions still need generating. */
+/**
+ * (b) the pending set, SPLIT by what each plan actually needs and each list CAPPED:
+ *   - WORKING OUT: plans with an open fork, or pre-build plans whose sufficiency is not
+ *     yet computed — a real question CTOC is still generating.
+ *   - WAITING FOR YOUR OK: built plans at the final sign-off with no open fork.
+ * The descriptor already carries `title`/`slug`, so names come from it directly — no
+ * per-plan file read (the old wall re-read ~134 files here). Moment phrasing via
+ * gate-words keeps the waiting line free of any raw stage word.
+ */
 function needQuestionLines(root, deps) {
   try {
     const needing = deps.plansNeedingQuestions(root);
     if (!Array.isArray(needing) || !needing.length) return [];
-    const names = needing.map((d) => d && nameForRef(root, d.ref, deps)).filter(Boolean);
-    return names.length ? [`Still working out what to ask you about: ${names.join(', ')}.`] : [];
+    const working = [];
+    const waiting = [];
+    for (const d of needing) {
+      if (!d) continue;
+      const name = deps.humanPlanName(d.title, d.slug);
+      if (!name) continue;
+      (isWaitingForOk(d) ? waiting : working).push({ name, fromStage: d.fromStage });
+    }
+    const lines = [];
+    if (working.length) {
+      lines.push(`Still working out what to ask you about: ${summarize(working.map((w) => w.name))}.`);
+    }
+    if (waiting.length) {
+      const moment = deps.moment(waiting[0].fromStage) || 'nothing is finished until you say so';
+      lines.push(`Waiting for your OK — ${moment}: ${summarize(waiting.map((w) => w.name))}.`);
+    }
+    return lines;
   } catch {
     return [];
   }
