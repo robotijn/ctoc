@@ -188,7 +188,18 @@ async function main() {
   } catch {
     loopB = ''; // the loop status must never break session start
   }
-  console.log(context + (directive || '') + (resume || '') + (loopB || ''));
+  // The "while you were away" increment feed (slice 6): one plain-language line naming
+  // what the build loop has PRODUCED since you last looked (built-and-waiting-for-OK and
+  // shipped increments), most-recent-first. Purely ADDITIVE and fail-open ('' when there
+  // is nothing recent), so the injected context is byte-for-byte unchanged for an idle
+  // project. Kept a DISTINCT section from the Loop-B tick above.
+  let away = '';
+  try {
+    away = require('../lib/increment-feed').whileYouWereAway(projectPath);
+  } catch {
+    away = ''; // the increment feed must never break session start
+  }
+  console.log(context + (directive || '') + (resume || '') + (loopB || '') + (away || ''));
 }
 
 /**
