@@ -521,6 +521,13 @@ const DENIAL_REMEDIES = Object.freeze({
   'not-building':
     '       This plan is approved and bounded; approval is not what is blocking it. '
     + 'Start it building via /ctoc:start, or type an escape phrase yourself.\n\n',
+  // Protected enforcement surface: this file guards CTOC's own gates, so an AUTONOMOUS
+  // (sufficiency / pipeline) coverage grant is refused for it. Only a HUMAN-approved
+  // plan may cover it — the pipeline crossing that admitted this plan does not count.
+  'autonomous-coverage-over-enforcement-denied':
+    '       This file is part of CTOC\'s own gate-enforcement surface, so an autonomous '
+    + '(pipeline / enough-information) crossing cannot grant write access to it. A HUMAN '
+    + 'must approve a plan covering this file via /ctoc:start.\n\n',
 });
 
 // A denial reference reaches this message from `plan-coverage` as a repository-relative
