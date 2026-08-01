@@ -273,3 +273,43 @@ test('SLICE4 allow-stop (exit 0) path is unchanged: no block, no injected direct
     assert.doesNotMatch(r.stderr || '', DIRECTIVE_MARK, 'an allowed stop injects nothing');
   } finally { cleanup(dir); }
 });
+
+// ── SLICE 5: the derived-queue block NAMES the next plan to auto-build ─────────
+// The auto-build directive must target the correct dependency-and-criticality-ordered
+// next BUILDABLE plan, named by its HUMAN TITLE — additive to the existing keep-going
+// + question-directive text; the exit code is unchanged.
+
+/** An approved todo plan whose HUMAN TITLE differs from its filename slug. */
+function approveTitledTodo(root, slug, title) {
+  const content = `---
+title: "${title}"
+type: implementation
+files:
+  - "src/lib/${slug}.js"
+---
+
+# ${title}
+
+The specification the human ruled on.
+`;
+  const p = path.join(root, 'plans', 'todo', `${slug}.md`);
+  fs.writeFileSync(p, content);
+  ledger.writeEntry(
+    ledger.slugFromPlanPath(p),
+    { content, stage_from: 'implementation', stage_to: 'todo', approved_by: 'human' },
+    root,
+  );
+  return p;
+}
+
+test('SLICE5 (b): derived-queue block stderr NAMES the next plan by human title (exit 2 unchanged)', () => {
+  const dir = mkProject();
+  try {
+    approveTitledTodo(dir, 'alpha-slug', 'Wire the auto-build driver');
+    const r = runHook(dir);
+    assert.equal(r.status, 2, 'the derived queue still blocks — decision unchanged');
+    assert.match(r.stderr, /approved plan\(s\) are waiting to be built/, 'keep-going message intact');
+    assert.match(r.stderr, /Wire the auto-build driver/, 'the injection must NAME the next plan to auto-build');
+    assert.doesNotMatch(r.stderr, /alpha-slug/, 'named by human title, not the filename slug');
+  } finally { cleanup(dir); }
+});
