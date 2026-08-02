@@ -1274,3 +1274,81 @@ describe('humanPlanName — the topic line a human can read', () => {
     assert.ok(ms < 100, `took ${ms}ms — the pattern is backtracking`);
   });
 });
+
+// ── THE ENGINE STATUS BANNER on the DEFAULT /ctoc:start screen ──────────────────
+//
+// The defect (the human: "it's not on the desktop"): the two-loop engine's human-
+// facing status — increment-feed.whileYouWereAway ("Built since you last looked …")
+// and loop-b-driver.loopBDirective ("Waiting for your OK …", "Next up to build …") —
+// was wired ONLY into SessionStart's injected context (the session MODEL reads it)
+// and into streamAnswer (only AFTER answering). It was NOT on the screen the human
+// opens with `/ctoc:start`, so on open the engine's status was invisible. These cases
+// pin that the DEFAULT screen (nothing-pending AND pending-decision) now carries both
+// lines, that an empty engine adds no banner, and that a throwing source fails open.
+describe('streamingGateScreen — the engine status banner on the default screen', () => {
+  const BUILT = /Built since you last looked/;
+  const WAITING = /Waiting for your OK/;
+
+  it('(a) nothing-pending screen with a recent shipped increment shows the "Built since you last looked" line', () => {
+    const root = makeSandbox();
+    // A done/ plan is a produced increment (increment-feed reads review/ + done/) but
+    // is NOT a pending gate decision, so the screen is the nothing-pending screen.
+    writePlan(root, 'done', '00001-shipped', `# Ship the export button\n\nBody.\n`);
+
+    const text = streamingGate.streamingGateScreen(root).text;
+    assert.match(text, BUILT, 'the on-open screen names what was built since you last looked');
+    assert.match(text, /Ship the export button/, 'named by its human title');
+    assert.match(text, /No gate decisions pending/, 'still the nothing-pending screen underneath the banner');
+  });
+
+  it('(b) pending-decision screen with a plan built and waiting shows the "Waiting for your OK" line', () => {
+    const root = makeSandbox();
+    // A review/ plan is BOTH a produced increment and a pending review→done decision,
+    // and loop-b-driver classifies it as waiting-for-your-OK (no open fork).
+    writePlan(root, 'review', '00002-waiting', `# Add the dark theme\n\nBody.\n`);
+
+    const text = streamingGate.streamingGateScreen(root).text;
+    assert.match(text, WAITING, 'the on-open pending screen surfaces what is waiting for the human OK');
+    assert.match(text, BUILT, 'and names it as a built increment');
+    assert.match(text, /Add the dark theme/, 'named by its human title');
+    // Plain-moment language only — no gate number leaks into the banner.
+    assert.doesNotMatch(text, NO_GATE_NUMBER, 'the banner carries no gate number');
+  });
+
+  it('(c) both engine sources empty → no banner text is added (screen is the bare nothing-pending screen)', () => {
+    const root = makeSandbox(); // empty project: nothing built, nothing pending
+    const text = streamingGate.streamingGateScreen(root).text;
+    assert.doesNotMatch(text, BUILT, 'no built-increment line when nothing was built');
+    assert.doesNotMatch(text, WAITING, 'no waiting line when nothing is waiting');
+    assert.doesNotMatch(text, /Moved forward on their own|Next up to build|Still working out/,
+      'no other engine line either');
+    assert.match(text, /^No gate decisions pending/, 'text begins with the bare screen — no banner prepended');
+  });
+
+  it('(d) the engine line appears exactly ONCE on the default screen (no double-render)', () => {
+    const root = makeSandbox();
+    writePlan(root, 'review', '00003-once', `# Rename the widget\n\nBody.\n`);
+    const text = streamingGate.streamingGateScreen(root).text;
+    const count = (text.match(/Waiting for your OK/g) || []).length;
+    assert.equal(count, 1, 'the waiting line renders once, never duplicated');
+  });
+
+  it('(e) fail-open: a throwing engine source still renders the screen without the banner', () => {
+    const root = makeSandbox();
+    writePlan(root, 'done', '00004-boom', `# A shipped thing\n\nBody.\n`);
+    const incMod = require('../src/lib/increment-feed.js');
+    const loopMod = require('../src/lib/loop-b-driver.js');
+    const origAway = incMod.whileYouWereAway;
+    const origLoop = loopMod.loopBDirective;
+    incMod.whileYouWereAway = () => { throw new Error('boom-away'); };
+    loopMod.loopBDirective = () => { throw new Error('boom-loop'); };
+    try {
+      const text = streamingGate.streamingGateScreen(root).text;
+      assert.match(text, /No gate decisions pending/, 'the screen still renders through a throwing source');
+      assert.doesNotMatch(text, BUILT, 'the banner is omitted, never crashed');
+    } finally {
+      incMod.whileYouWereAway = origAway;
+      loopMod.loopBDirective = origLoop;
+    }
+  });
+});

@@ -1447,10 +1447,46 @@ function gateScreenAt(decisions, index, statusLine, root) {
  * (instant, fail-soft) — the human never waits for a critique.
  * @param {string} projectRoot
  * @param {string} [statusLine]
+ * @param {{banner?: boolean}} [opts] - `banner:false` suppresses the on-open engine
+ *   banner (streamAnswer sets this because it appends loopBDirective itself).
  */
-function streamingGateScreen(projectRoot, statusLine) {
+function streamingGateScreen(projectRoot, statusLine, opts) {
+  // THE ON-OPEN ENGINE BANNER. Compute it BEFORE pendingGateDecisions so
+  // loopBDirective's own before/after snapshot straddles the sufficiency cross (the
+  // same ordering streamAnswer uses at its call site). The banner is added ONCE, here
+  // at the top-level default-screen assembly, so every default entry path shows it and
+  // no path double-renders. streamAnswer passes `{ banner: false }` because it appends
+  // loopBDirective itself — without the flag its screen would carry loopB twice.
+  const withBanner = !opts || opts.banner !== false;
+  const banner = withBanner ? engineStatusBanner(projectRoot) : '';
   const decisions = pendingGateDecisions(projectRoot);
-  return gateScreenAt(decisions, 0, statusLine, projectRoot);
+  const screen = gateScreenAt(decisions, 0, statusLine, projectRoot);
+  if (banner && screen && typeof screen.text === 'string') {
+    screen.text = banner + screen.text;
+  }
+  return screen;
+}
+
+/**
+ * The engine's human-facing status, prepended to the DEFAULT `/ctoc:start` screen so the
+ * human SEES it on open — not only in SessionStart's injected context (which the session
+ * MODEL reads) and streamAnswer (which fires only after answering). Composes the two
+ * existing plain-words sources, in order: what was produced since you last looked
+ * (`increment-feed.whileYouWereAway`) then the build-loop state
+ * (`loop-b-driver.loopBDirective`). Both return a leading-newline string or '' (already
+ * capped, gate-number-clean, plain-title) — used verbatim. FAIL-OPEN per source: a throw
+ * yields '' so the screen always renders (mirrors SessionStart's try/catch-to-'' shape).
+ * @param {string} root
+ * @returns {string} '' or "line(s)\n\n"
+ */
+function engineStatusBanner(root) {
+  if (!isNonEmptyStr(root)) return '';
+  let away = '';
+  try { away = require('./increment-feed').whileYouWereAway(root) || ''; } catch { away = ''; }
+  let loopB = '';
+  try { loopB = require('./loop-b-driver').loopBDirective(root) || ''; } catch { loopB = ''; }
+  const body = `${away}${loopB}`.replace(/^\n+/, '');
+  return body ? `${body}\n\n` : '';
 }
 
 /**
@@ -1644,7 +1680,10 @@ function streamAnswer(ref, questionId, optionKey, projectRoot) {
   // question, or the final Approve when all are answered. The directive is APPENDED to
   // the screen's human-facing `.text`; `.ask` and `.actions` are untouched, so an empty
   // directive leaves the screen object byte-for-byte unchanged for existing consumers.
-  const screen = streamingGateScreen(projectRoot, status);
+  // `{ banner: false }`: streamAnswer appends `directive` (loopBDirective) itself just
+  // below, so the on-open banner (which also carries loopBDirective) must NOT fire here
+  // — otherwise this rendered screen would show the loop state twice.
+  const screen = streamingGateScreen(projectRoot, status, { banner: false });
   if (directive && screen && typeof screen.text === 'string') {
     screen.text += directive;
   }

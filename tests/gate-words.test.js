@@ -350,9 +350,14 @@ describe('the rendered gate screen — what a person actually reads', () => {
       assert.doesNotMatch(s, /[\x00-\x09\x0b-\x1f\x7f-\x9f]/,
         `a control byte survived into a rendered string: ${JSON.stringify(s)}`);
     }
-    // The header is exactly ONE line — the hostile text did not add a row.
-    const header = screen.text.split('\n')[0];
-    assert.match(header, /decision 1 of 1/, `the real counter is on the header line: ${header}`);
+    // The header is exactly ONE line — the hostile text did not add a row. The on-open
+    // engine banner may legitimately precede it (a review plan is a built increment), so
+    // the header is the "Topic:" line, not blindly line 0.
+    const headerLines = screen.text.split('\n').filter((l) => l.includes('Topic:'));
+    assert.equal(headerLines.length, 1, `exactly one header row (no forged row): ${JSON.stringify(headerLines)}`);
+    assert.match(headerLines[0], /decision 1 of 1/, `the real counter is on the header line: ${headerLines[0]}`);
+    // The forged "decision 9 of 9" was neutralized — the only counter is the real one.
+    assert.equal((screen.text.match(/decision \d+ of \d+/g) || []).length, 1, 'exactly one decision counter');
   });
 });
 
