@@ -117,6 +117,25 @@ function renderRelatedPanel(app) {
   }
 }
 
+/**
+ * The engine status banner rendered at the top of the classic dashboard: what the
+ * build engine produced since you last looked (`increment-feed.whileYouWereAway`) and
+ * its current state (`loop-b-driver.loopBDirective`), in that order. Both return a
+ * leading-newline plain-words string or '' (already capped, gate-number-clean, plain
+ * title) — used verbatim, never re-phrased. FAIL-OPEN per source: a throw yields '' so
+ * a banner fault NEVER breaks the dashboard render (the readIndexStatus precedent).
+ * @param {string} projectPath
+ * @returns {string} '' or "line(s)\n\n"
+ */
+function engineStatusBanner(projectPath) {
+  let away = '';
+  try { away = require('../lib/increment-feed').whileYouWereAway(projectPath) || ''; } catch { away = ''; }
+  let loopB = '';
+  try { loopB = require('../lib/loop-b-driver').loopBDirective(projectPath) || ''; } catch { loopB = ''; }
+  const body = `${away}${loopB}`.replace(/^\n+/, '');
+  return body ? `${body}\n\n` : '';
+}
+
 // Release mode state
 let releaseMode = false;
 let releaseTypeIndex = 0;
@@ -131,6 +150,13 @@ function render(app) {
 
   let output = '\n';
   output += `${c.bold}CTOC${c.reset} ${c.dim}v${version}${c.reset}\n\n`;
+
+  // The engine status banner: what the two-loop build engine produced since you last
+  // looked and its current state — the same plain-words lines SessionStart injects for
+  // the session model, now SHOWN on the dashboard the human opens (the "it's not on the
+  // desktop" fix). Fail-open per source, so a throw omits the banner and NEVER breaks
+  // the dashboard (the readIndexStatus precedent).
+  output += engineStatusBanner(projectPath);
 
   // Release section - prominent at the top
   output += renderReleaseSection(version);

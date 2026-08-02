@@ -605,3 +605,60 @@ describe('renderReleaseSection() normal view + handleKey() state machine', () =>
     assert.match(out, /press r/);
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Cluster — the engine status banner (the human "it's not on the desktop" fix).
+// The classic dashboard must SHOW, on open, what the two-loop engine produced since
+// you last looked (increment-feed.whileYouWereAway) and its current state
+// (loop-b-driver.loopBDirective) — the same lines SessionStart injects for the model.
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Write a plan with a `# Heading` title into plans/<stage>/. */
+function seedTitledPlan(dir, stage, slug, title) {
+  const d = path.join(dir, 'plans', stage);
+  fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(d, `${slug}.md`), `---\ntitle: "${title}"\n---\n\n# ${title}\n\nBody.\n`);
+}
+
+describe('render() engine status banner', () => {
+  test('shows the "Built since you last looked" line when the engine produced an increment', () => {
+    const dir = makeProject();
+    seedTitledPlan(dir, 'done', '00001-shipped', 'Ship the export button');
+    const out = clean(overview.render({ projectPath: dir }));
+    assert.match(out, /Built since you last looked/);
+    assert.match(out, /Ship the export button/);
+  });
+
+  test('shows the "Waiting for your OK" line for a plan built and awaiting sign-off', () => {
+    const dir = makeProject();
+    seedTitledPlan(dir, 'review', '00002-waiting', 'Add the dark theme');
+    const out = clean(overview.render({ projectPath: dir }));
+    assert.match(out, /Waiting for your OK/);
+    assert.match(out, /Add the dark theme/);
+  });
+
+  test('adds no banner line when the engine has nothing to report', () => {
+    const dir = makeProject();
+    const out = clean(overview.render({ projectPath: dir }));
+    assert.doesNotMatch(out, /Built since you last looked|Waiting for your OK|Next up to build/);
+  });
+
+  test('fail-open: a throwing engine source never breaks the dashboard render', () => {
+    const dir = makeProject();
+    seedTitledPlan(dir, 'done', '00003-boom', 'A shipped thing');
+    const incMod = require('../src/lib/increment-feed');
+    const loopMod = require('../src/lib/loop-b-driver');
+    const origAway = incMod.whileYouWereAway;
+    const origLoop = loopMod.loopBDirective;
+    incMod.whileYouWereAway = () => { throw new Error('boom-away'); };
+    loopMod.loopBDirective = () => { throw new Error('boom-loop'); };
+    try {
+      const out = clean(overview.render({ projectPath: dir }));
+      assert.match(out, /Pipeline/, 'the dashboard still renders through a throwing source');
+      assert.doesNotMatch(out, /Built since you last looked/, 'banner omitted, never crashed');
+    } finally {
+      incMod.whileYouWereAway = origAway;
+      loopMod.loopBDirective = origLoop;
+    }
+  });
+});
