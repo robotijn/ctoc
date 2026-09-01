@@ -10,6 +10,11 @@
  * Usage:
  *   node src/scripts/evidence-pack.js [--since=YYYY-MM-DD] [--until=YYYY-MM-DD]
  *
+ * Environment:
+ *   CTOC_EVIDENCE_ROOT  the project the pack is ABOUT. Unset (the default and
+ *                       the shipped behaviour) the pack covers the repository
+ *                       this script lives in.
+ *
  * Cross-platform Node 18+. On Windows, falls back to .zip via the built-in
  * archive logic (tar may not be available). Pure JS, no native dependencies.
  *
@@ -23,7 +28,18 @@ const path = require('path');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 
-const ROOT = path.resolve(__dirname, '..', '..');
+// The project the evidence pack is ABOUT. It defaults to the repository this
+// script ships in — byte-for-byte the behaviour this command has always had.
+// CTOC_EVIDENCE_ROOT names a different project explicitly, and is the only way
+// to run the command against a project that is not the one the file lives in
+// (the script's own location, not the working directory, has always decided).
+// Unset, the variable changes nothing.
+function resolveRoot() {
+  const override = process.env.CTOC_EVIDENCE_ROOT;
+  return override ? path.resolve(override) : path.resolve(__dirname, '..', '..');
+}
+
+const ROOT = resolveRoot();
 const EVIDENCE_DIR = path.join(ROOT, '.ctoc', 'evidence-packs');
 
 function parseArgs(argv) {
