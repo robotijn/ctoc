@@ -1,0 +1,9 @@
+{
+  "content_sha256": "cf816f50b1e023f54ed0f33488064d1540e7a1c6b6467d5cafce7fd40dfbc21d",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.548Z",
+  "approved_by": "human",
+  "plan_basename": "00237-close-the-coverage-holes-s3-fail-open-contracts"
+}

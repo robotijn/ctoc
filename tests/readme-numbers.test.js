@@ -107,6 +107,12 @@ function countQualityConfigs() {
   return walk(path.join(ROOT, 'skills', 'quality-configs'), p => p.endsWith('.md')).length;
 }
 
+// Disk-derived values the README must state. The README's counts are a claim ABOUT
+// this tree, so the contract comes from the tree — never from a literal a growing
+// project silently falsifies. Read once, used by section 2's pins below.
+const counts = computeDocCounts(ROOT);
+const skillBodies = countSpecialistSkillBodies();
+
 // ─────────────────────────────────────────────────────────────────────
 // 1. Sanity — reality matches expected ranges
 // ─────────────────────────────────────────────────────────────────────
@@ -238,8 +244,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /agents-124-orange/);
   });
 
-  it('badge: skills-422 (v6.10.3+)', () => {
-    assert.match(README, /skills-426-blue/);
+  it('badge: skills-<count> (derived from disk)', () => {
+    assert.match(README, new RegExp(`skills-${counts.skills}-blue`));
   });
 
   it('lead paragraph: 124 agents across 24 categories', () => {
@@ -254,8 +260,8 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /\*\*124 agents\*\* across 24 categories/);
   });
 
-  it('Key Features: 426 skill files (v6.10.3+)', () => {
-    assert.match(README, /\*\*426 skill files\*\*/);
+  it('Key Features: skill-file total (derived from disk)', () => {
+    assert.match(README, new RegExp(`\\*\\*${counts.skills} skill files\\*\\*`));
   });
 
   it('Key Features: 14 languages auto-detected', () => {
@@ -298,29 +304,29 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, /17 Claude Code hooks/);
   });
 
-  it('Project structure: 104 JS modules in src/lib', () => {
-    assert.match(README, /104 JS modules/);
+  it('Project structure: JS modules in src/lib (derived from disk)', () => {
+    assert.match(README, new RegExp(`${counts.libModules} JS modules`));
   });
 
   it('Project structure: 124 agent definitions across 24 categories', () => {
     assert.match(README, /124 agent definitions across 24 categories/);
   });
 
-  it('Project structure: 426 skill files (v6.10.3+)', () => {
-    assert.match(README, /426 skill files/);
+  it('Project structure: skill files (derived from disk)', () => {
+    assert.match(README, new RegExp(`${counts.skills} skill files`));
   });
 
   it('Agents intro: 124 agents across 24 categories', () => {
     assert.match(README, /\*\*124 agents across 24 categories\*\*/);
   });
 
-  it('Skills intro: 426 skill files (v6.10.3+)', () => {
-    assert.match(README, /\*\*426 skill files\*\*/);
+  it('Skills intro: skill-file total (derived from disk)', () => {
+    assert.match(README, new RegExp(`\\*\\*${counts.skills} skill files\\*\\*`));
   });
 
-  it('Skills section names two kinds — Tier-2 (99) and Knowledge (322)', () => {
-    assert.match(README, /Tier-2 specialist skill bodies \(100\)/);
-    assert.match(README, /Knowledge skills \(326\)/);
+  it('Skills section names two kinds — specialist bodies and knowledge files (derived from disk)', () => {
+    assert.match(README, new RegExp(`Tier-2 specialist skill bodies \\(${skillBodies}\\)`));
+    assert.match(README, new RegExp(`Knowledge skills \\(${counts.skills - skillBodies}\\)`));
   });
 });
 

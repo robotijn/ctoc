@@ -1,0 +1,9 @@
+{
+  "content_sha256": "a249b9e5bbd5a8cc73607981b37a8e13cb790f8b4398c3cec4272415025e16d5",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.483Z",
+  "approved_by": "human",
+  "plan_basename": "00252-close-the-coverage-holes-s18-remainder-hooks-commands"
+}

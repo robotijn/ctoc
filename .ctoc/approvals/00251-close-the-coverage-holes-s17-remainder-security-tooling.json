@@ -1,0 +1,9 @@
+{
+  "content_sha256": "d229bcf41e39ddfeb209e9de3aa3d81e786107724a6ff0b8ccb3c0a1cfc1e220",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.456Z",
+  "approved_by": "human",
+  "plan_basename": "00251-close-the-coverage-holes-s17-remainder-security-tooling"
+}

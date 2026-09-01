@@ -1,0 +1,9 @@
+{
+  "content_sha256": "64920366209830cafb85dd76a38dfae8420b1091fb45ebefe9e94a4a9d5516bb",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.159Z",
+  "approved_by": "human",
+  "plan_basename": "00235-close-the-coverage-holes-s1-evidence-pack-main"
+}

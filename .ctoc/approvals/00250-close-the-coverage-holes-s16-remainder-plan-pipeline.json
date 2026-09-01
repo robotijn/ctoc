@@ -1,0 +1,9 @@
+{
+  "content_sha256": "092eb67cbf10219f1788228a9b558bdc3f368de1692397689a7101d280213f56",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.419Z",
+  "approved_by": "human",
+  "plan_basename": "00250-close-the-coverage-holes-s16-remainder-plan-pipeline"
+}

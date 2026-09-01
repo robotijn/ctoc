@@ -1,0 +1,9 @@
+{
+  "content_sha256": "bfe768e7626f50acd1d5fe49b84cb5f7210fd38cfd5c314cae1a2b26b9a3b7d7",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.271Z",
+  "approved_by": "human",
+  "plan_basename": "00246-close-the-coverage-holes-s12-verify-claims"
+}

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "455be49037414beed42ed65e3e68c7d13a07c19ef1d2d6d6d449a50d637e9707",
+  "hash_scope": "specification",
+  "stage_from": "functional",
+  "stage_to": "implementation",
+  "approved_at": "2026-08-31T14:14:05.931Z",
+  "approved_by": "human",
+  "plan_basename": "readme-as-a-course"
+}

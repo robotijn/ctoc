@@ -1,0 +1,9 @@
+{
+  "content_sha256": "d1b60a09cec54d0a4c2e38e1ca69665f83b527bf34acf58557c8906de312a92c",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.302Z",
+  "approved_by": "human",
+  "plan_basename": "00236-close-the-coverage-holes-s2-enforcement-fault-arms"
+}

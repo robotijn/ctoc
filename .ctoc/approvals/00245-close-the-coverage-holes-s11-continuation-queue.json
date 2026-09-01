@@ -1,0 +1,9 @@
+{
+  "content_sha256": "183190d7ecbda4973e49194df342a3f3fd3530702b3379658dfb24a581fbb23c",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.242Z",
+  "approved_by": "human",
+  "plan_basename": "00245-close-the-coverage-holes-s11-continuation-queue"
+}
