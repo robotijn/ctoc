@@ -150,53 +150,53 @@ direction differed from the table above.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
 
 
 ## Deferred Questions
@@ -206,3 +206,87 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record (Steps 8–16)
+
+**Step 8 TEST.** Wrote `tests/continuation-queue-coverage-holes.test.js` — 11 named cases, one
+per dark range plus a control-character case. First run: **11 pass, 0 fail**. No case was red,
+which is the expected shape for a coverage slice that changes no behaviour, so red provenance
+was taken from MUTATION instead of banked: 11 mutants, one per arm, each applied to
+`src/lib/continuation-queue.js`, the single matching case run under `--test-name-pattern`, and
+the file restored and SHA-256-verified byte-for-byte after every run. Every mutant was killed by
+exactly one case (cases run 1, fail 1, restored true, 11/11). The mutants: each fault arm made to
+throw instead of returning its safe value; the fork-check arm made to FABRICATE a fork
+(`return refHumanName(...)` in place of `return null`); and the naming call made to bypass the
+sanitiser (`return title || slug` in place of `return humanPlanName(title, slug)`).
+
+**Step 9 PREPARE.** Re-derived from the gate. The seven ranges the planner mapped sat exactly
+where the table said. The three unread ranges classified as (a) REACHABLE BEHAVIOUR:
+
+- `484-485` — `nextBuildable`, the `state` load / `getPlansDir` arm: a fault authorises NOTHING
+  (the empty `{buildable, blocked, inversions, missingDeps}`).
+- `496-499` — `nextBuildable`, per-plan read/parse: a plan enumerated and then gone is SKIPPED,
+  and the healthy plans still build. This is the documented race, reproduced by really deleting
+  the file between enumeration and the build-order read.
+- `553-554` — `approvedQueueBannerLine`, outer catch. Reachable only through a CONTRACT
+  VIOLATION by `state.getPlansDir` (a non-string return makes `path.join` throw outside the
+  enumerator’s own try — every other fault inside the enumerator is already isolated). Injected
+  as such and named in the test-file header, since it is defence in depth for a session-start
+  path that must never crash a session.
+
+**Step 10 IMPLEMENT.** One test file. `src/lib/continuation-queue.js` was NOT changed — no test
+exposed a defect, and every arm behaved exactly as the plan’s table said. Confirmed clean by
+`git status` and by the mutation harness’s post-run hash check.
+
+**Step 11 REVIEW.** No existing test touched, no assertion weakened, no baseline or exemption
+entry added, no function under test stubbed. Faults are injected only at true boundaries — the
+module loader (restored in a `finally`), the `state` / `approval-residency` / `streaming-gate` /
+`streaming-precompute` module objects via `t.mock.method` (auto-restored), and the real
+filesystem. All 11 cases were green before any change; every one is accounted for by its killed
+mutant above, and none is banked as evidence of new behaviour.
+
+**Step 12 OPTIMIZE.** One fixture builder (`makeApprovedPlan`, minting a real Gate-2 ledger
+entry), one loader-patch helper (`failLoadOf`), one arming helper (`afterForkCheck`). No sleeps,
+no retries, no timing dependence.
+
+**Step 13 SECURE.** Fixtures under `os.tmpdir()`, removed in every `finally`; nothing in the
+repository is read or written and no approval is minted outside each fixture’s own ledger; no
+shell, no network, no secret. The control-character case asserts that a bell character in a plan
+heading never survives into the name a human reads, and its mutant (bypassing the sanitising
+naming call) is killed.
+
+**Step 14 VERIFY.** `npm test` from the repository root, output captured to a file and its last
+lines read directly:
+
+```
+[CTOC test-gate] coverage 99.21% (threshold 99%), skipped 0, failed 0
+[CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+[CTOC test-gate] PASS
+```
+
+`src/lib/continuation-queue.js`: **96.52 % → 100.00 %** line coverage, no uncovered ranges left.
+No new module, so the reachability and export fences are unaffected.
+
+**Step 15 DOCUMENT.** The test-file header states the three opposite fault directions and why
+they must stay opposite, lists every range with the direction it pins, and records that no range
+is left uncovered. `CLAUDE.md`’s documented test-file count moved 526 → 527 in both places (the
+only reason that file is declared).
+
+**Step 16 FINAL-REVIEW.** Coverage before 96.52 %, after 100.00 %. No range left uncovered. No
+arm’s real direction differed from the planner’s table.
+
+## Decisions Taken During Execution
+
+1. **Red provenance by mutation, not by weakening.** Every case was green on the first run
+   because this slice adds no behaviour. Rather than bank that, each case was proven to fail
+   against a mutated module and the module restored with a verified hash. The harness is a
+   scratch script; it is not shipped.
+2. **`553-554` is covered through a contract violation, and says so.** The banner’s outer catch
+   cannot be reached by any ordinary filesystem fault, because the enumerator beneath it already
+   isolates them. Rather than call the range dead or fake it, the case injects the one thing that
+   can reach it — `getPlansDir` returning a non-string — and the header names that classification.
+3. **The naming step is observed through a marker, not by its return value.** A dropped inner
+   catch in the naming path returns the same slug as the working code, so a value assertion alone
+   would have missed the mutant. `humanPlanName` is temporarily replaced with an observable
+   marker at the `streaming-gate` boundary, which makes “the naming step ran with an empty title”
+   distinguishable from “the fault escaped to the outer catch”.
