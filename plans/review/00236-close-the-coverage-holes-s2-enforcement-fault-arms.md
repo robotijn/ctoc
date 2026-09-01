@@ -197,6 +197,27 @@ Mutation intent, stated per case so no case is a line-toucher:
    arm 5, the wrapper table for arm 10, the tokenizer for arm 9). Step 9 locates them in the
    code; if the code disagrees with the table above, the code wins and the drift is reported.
 
+5. **Arm 2 is UNREACHABLE and is reported as unreached, never faked.** The plan expected
+   `globToRegex` to be required from a sibling module, so that a loader patch could make it throw.
+   It is not: it is defined INSIDE `src/lib/plan-coverage.js` (line 206), and `tokenizeGlob` /
+   `matchTokens` are total functions over every string — the module's own docblock says so and
+   calls the `touchesOverlap` catch "documented-unreachable defense in depth". Both non-string and
+   empty entries are filtered before the `try`, so no input reaches it either. Reaching it would
+   require stubbing the module under test, which this slice forbids. The case written instead pins
+   the PREMISE the unreachability rests on (totality over adversarial globs), and the test file's
+   header names lines 245-247 as deliberately left with that reason. Under a mutation that breaks
+   `globToRegex`'s totality, `touchesOverlap` returns `true` (block) — the documented conservative
+   direction — and the premise case reddens, so the arm's correctness is not merely assumed.
+6. **The red provenance is a mutation matrix, because a slice that changes no source cannot have a
+   failing-first run.** Thirteen mutations, one arm at a time, each flipping the arm to its
+   allow-ward value; each reddened exactly one case and no other; each file restored byte-for-byte
+   with a sha256 check and a clean `git status src/`. No mutation was left on disk.
+7. **Two extra cases beyond the twelve arms.** `approval-residency` line 279
+   (`stage-not-coverable`) is asserted alongside arm 1 because it is the same fail-closed contract
+   one branch over, as the plan directed; and arm 5 is split into two cases because its two
+   deny-ward returns (walk exhaustion at line 165, outer catch at 168) are different code with the
+   same value, and one case would leave the other dark.
+
 ## Execution Plan
 
 ### Step 8: TEST
@@ -247,53 +268,53 @@ named as unreached, never faked.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation — `tests/enforcement-fault-arms.test.js`, 14 named cases across 5 modules
+- [x] Test error conditions — every case IS an error condition — a fault injected at a true boundary
+- [x] Run tests - expect RED (failing) — RED PROVENANCE BY MUTATION (this slice changes no source, so a healthy tree is green by design): 13 mutations, one arm at a time, each flipping the arm to its allow-ward value, each reddening EXACTLY ONE case — its own — and each file restored byte-for-byte (sha256 + clean `git status src/`). Full matrix in Verification Evidence below. One genuine first-run RED was a defect in the TEST, not the code: the deny-JSON parser took the innermost `{` rather than the whole document, so a real DENY read as an allow. Fixed in the test; the hook was never touched.
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none — `node:test`, `node:assert/strict` and stdlib only
+- [x] Check prerequisites — all four places the planner had not read were located and read: `plan-coverage.js` `scanForCoverage` 467-469 and `explainDenial` 664-672; `MAX_ANCESTOR_WALK = 4096` (real-path-confinement line 103); the `WRAPPERS` table and `skipWrapperArgs` (shell-write-targets 118-201) plus `tokenize`/`splitSegments`/`classifySegment`; and `tests/bash-gate-plan-coverage.test.js`'s state setup (read, NOT modified)
+- [x] Verify dev environment ready — `node --test` and `npm test` both run from the repository root
+- [x] Create directories/config if needed — none — every fixture is a temp project under `os.tmpdir()`, removed in `afterEach`
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — 14 cases — arms 1, 1b (stage-not-coverable), 3, 4, 5a (outer catch), 5b (walk exhaustion), 6, 7, 8, 9, 10, 11, 12, plus the arm-2 premise case
+- [x] Add error handling — every mock is sentinel-guarded so only the case's own input faults; the spawned cases mutate only a CHILD's module cache and remove their preload files
+- [x] Wire up integration points — the file is reached by the gated suite (`npm test` -> `src/scripts/test-gate.js` -> `node --test tests/*.test.js`); no module and no export was added, so there is nothing new to wire
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — no function under test is stubbed — the boundaries used are the `approval-ledger` exports object, `node:path` (`isAbsolute`, `join`, `resolve`, `posix.normalize`), `safe-fs` (`realpathSync`, `lstatSync`) and a child's module cache seeded through `--require`. No existing test file modified, no assertion weakened, no baseline/whitelist/exemption entry added anywhere.
+- [x] Verify integration points work together — the two spawned cases drive the REAL hook end to end and read the harness-visible verdict (the deny decision JSON, the exit code, stderr)
+- [x] Check error handling completeness — every case that admits a meaningful control asserts the control too (arms 1, 3, 4, 5a, 8, 9, 11, 12), so no case can pass on an input that never reached the arm. GREEN-BEFORE-IMPLEMENTATION ACCOUNTING: all 14 were green on the first healthy run, which is expected of a slice that changes no source — none is banked; their value rests on the mutation matrix, in which each case is the unique detector of its own arm's inversion.
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — one `makeProject`, one `writePlan`, one `runHook`, one `writePreload` helper shared across the file
+- [x] Optimize critical paths — no sleeps, no retries, no polling; the slowest case is the 4096-deep ancestor walk at ~44 ms and the whole file runs in ~210 ms
+- [x] Simplify complex code — each fixture is the minimum its case needs; nothing is shared across describes in a way that couples two cases
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — every fixture path is built with `path.join` under `os.tmpdir()` and realpath'd; nothing is written outside the temp project or the temp preload file
+- [x] Sanitize outputs — no command string appears in any assertion or assertion message (a command can carry a secret — the hook's own log records a fixed-vocabulary reason for the same reason); the arm-11 assertion matches only the fixture TARGET path
+- [x] No secrets in code — no credential, no token, no high-entropy fixture value
+- [x] Safe file operations — every child is spawned with an argument array and NO shell; temp projects and preload files are removed in `afterEach`
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — run as part of the gated suite
+- [x] Run ALL tests (TDD Green) — `npm test` -> `[CTOC test-gate] PASS`, failed 0
+- [x] Check coverage >= 80% — measured 99.25 %, against the enforced floor of 99 in `.ctoc/coverage-baseline.json`
+- [x] 0 skipped, 0 flaky tests — `skipped 0`; no case has a sleep, a retry or a wall-clock dependency
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — the test file's header states in plain words what these arms are, that each case asserts the deny-ward value, every range covered, and the ONE range deliberately left with its reason
+- [x] Add JSDoc comments to new functions — every helper in the test file carries one
+- [x] Update CHANGELOG if needed — `CLAUDE.md`'s test-file count moved 528 -> 529 in both places it appears — the only reason `CLAUDE.md` is declared by this slice
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly — each step above carries its evidence
+- [x] All quality checks passed — see Verification Evidence below
+- [x] Manual verification if needed — the mutation matrix is the manual verification
+- [x] Ready for human review — the built work is waiting for a human's OK to call it done
 
 
 ## Deferred Questions
@@ -303,3 +324,72 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Verification Evidence
+
+### The mutation matrix — the red provenance
+
+Each row: one arm flipped to its allow-ward value, the whole test file re-run, the source restored
+byte-for-byte (sha256 verified, `git status src/` clean afterwards). Every mutation reddened
+**exactly one** case — its own — and no other, so no case is a line-toucher and no case is a
+duplicate detector.
+
+| arm | file · line | mutated to | cases reddened |
+|---|---|---|---|
+| 1 | `approval-residency.js` 287 | `approved: true` | 1 (only) |
+| 1b | `approval-residency.js` 279 | `approved: true` | 1 (only) |
+| 3 | `plan-coverage.js` 468 | a fabricated covering match | 1 (only) |
+| 4 | `plan-coverage.js` 671 | a fabricated denial | 1 (only) |
+| 5a | `real-path-confinement.js` 168 | `ok: true` | 1 (only) |
+| 5b | `real-path-confinement.js` 165 | `ok: true` | 1 (only) |
+| 6 | `real-path-confinement.js` 197 | `ok: true` | 1 (only) |
+| 7 | `real-path-confinement.js` 258 | `escapes: false` | 1 (only) |
+| 8 | `real-path-confinement.js` 305 | `false` | 1 (only) |
+| 9 | `shell-write-targets.js` 527 | `verdict: 'none'` | 1 (only) |
+| 10 | `shell-write-targets.js` 187 | `true` (always suppress) | 1 (only) |
+| 11 | `PreToolUse.Bash.js` 829 | `result: 'covered'` | 1 (only) |
+| 12 | `PreToolUse.Bash.js` 1070 | `process.exit(0)` | 1 (only) |
+| 2 | `plan-coverage.js` 207 | `globToRegex` made non-total | the premise case (plus 3 collateral cases that use the same matcher); `touchesOverlap` returned `true` — block — the documented conservative direction |
+
+
+`npm test` (the gated entry point — the only run that enforces the coverage floor and the
+zero-skipped gate), run from the repository root on 2026-09-01:
+
+```
+[CTOC test-gate] coverage 99.25% (threshold 99%), skipped 0, failed 0
+[CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+[CTOC test-gate] PASS
+```
+
+Measured line coverage for the five modules this slice targets:
+
+| module | line coverage | lines still uncovered |
+|---|---|---|
+| `src/lib/approval-residency.js` | 100.00 % | none |
+| `src/lib/real-path-confinement.js` | 100.00 % | none |
+| `src/lib/shell-write-targets.js` | 100.00 % | none |
+| `src/hooks/PreToolUse.Bash.js` | 100.00 % | none |
+| `src/lib/plan-coverage.js` | 99.56 % | 245-247 — the unreachable overlap catch (Decision 5) |
+
+The single remaining uncovered range across all five modules is exactly the one arm named as
+unreachable in the test file's header. Every other arm in the parent plan's table is now asserted
+by a named case, and every one returned its documented deny-ward value.
+
+## Execution Record
+
+Landed: `tests/enforcement-fault-arms.test.js` (new, 14 cases) and a one-word count change in
+`CLAUDE.md` (528 -> 529 test files, in both places it appears). No source file was changed; none is
+declared by this slice, and none needed changing — every one of the eleven reachable fail-closed
+arms plus the behavioural branch already returned its documented value under an injected fault. No
+scope-growth request was needed and none was filed.
+
+Drift between the approved plan and the code, reported rather than silently absorbed:
+
+1. `globToRegex` is module-local, not required from a sibling — so arm 2's planned loader seam does
+   not exist and the arm is unreachable (Decision 5 above).
+2. `resolveExisting` and `resolveBasis` are not exported, so arms 5 and 6 are asserted through their
+   public callers `escapesRoot` / `resolvesUnder`. The deny-ward values are unchanged; the reason
+   string observed at the public boundary for arm 6 is `root-resolve-failed`, which is
+   `resolve-failed` as the plan's table states, prefixed by the caller to say WHICH side failed.
+3. The walk bound the plan asked to be read is `MAX_ANCESTOR_WALK = 4096`; the exhaustion case
+   builds a 4200-segment path from it rather than guessing a depth.
