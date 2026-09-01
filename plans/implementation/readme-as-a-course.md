@@ -9,9 +9,28 @@ files:
   - README.md
   - tests/readme-numbers.test.js
   - .ctoc/drafts/README.course.md
+approved_by: human
+approved_at: 2026-08-31T14:14:05.880Z
+gate_crossed: functional → implementation
 ---
 
 # The README teaches CTOC as a course — every step a human takes, with real screens
+
+**This file is an INDEX of its implementation slices, not a buildable plan.** It
+carries no `## Execution Plan`; build the slice below, never this file.
+
+## Slices (dependency-ordered)
+
+| # | Slice file | Scope (one line) | depends_on |
+|---|---|---|---|
+| 1 | `00234-readme-as-a-course-s1-readme-and-guard-pins.md` | Replace `README.md` with the verified course draft, derive the six drifted pins in `tests/readme-numbers.test.js` from `computeDocCounts` and a walk of `skills/`, delete the draft. | – |
+
+One slice only: the guard test pins the README's numbers, so the two files cannot be
+green separately — they are one unit of work (three files, one of them a deletion).
+
+---
+
+## Original functional plan
 
 ## 1. ASSESS — Problem Understanding
 

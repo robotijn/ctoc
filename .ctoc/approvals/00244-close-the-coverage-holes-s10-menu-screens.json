@@ -1,0 +1,9 @@
+{
+  "content_sha256": "82b584191936d38f7b42c65f537f7b8c7b83a8622c9c9886a652d661684c966f",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.204Z",
+  "approved_by": "human",
+  "plan_basename": "00244-close-the-coverage-holes-s10-menu-screens"
+}

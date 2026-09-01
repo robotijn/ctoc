@@ -1,0 +1,9 @@
+{
+  "content_sha256": "805d83159d20907fa17f5ee064d95e2b42a724873a7d6571a0cb58e4dfbef10c",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.637Z",
+  "approved_by": "human",
+  "plan_basename": "00240-close-the-coverage-holes-s6-iron-loop-enforcer"
+}

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "6796d94f5e0e83bcf561ac75e1770c67707a7af1012aea278f5aa150d303925a",
+  "hash_scope": "specification",
+  "stage_from": "functional",
+  "stage_to": "implementation",
+  "approved_at": "2026-08-31T14:14:04.383Z",
+  "approved_by": "human",
+  "plan_basename": "close-the-coverage-holes"
+}

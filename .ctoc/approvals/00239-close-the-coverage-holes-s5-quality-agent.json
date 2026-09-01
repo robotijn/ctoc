@@ -1,0 +1,9 @@
+{
+  "content_sha256": "3433be821e03924aa52a95b9d4b00b1427f884e385fc68897a1713cc20330aeb",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.608Z",
+  "approved_by": "human",
+  "plan_basename": "00239-close-the-coverage-holes-s5-quality-agent"
+}

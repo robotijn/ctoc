@@ -1,0 +1,9 @@
+{
+  "content_sha256": "aad549cc9a3af0f6d13c243ffe41a4fc53c6398e399cd4dbf188d5e97b03cfca",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.576Z",
+  "approved_by": "human",
+  "plan_basename": "00238-close-the-coverage-holes-s4-actions"
+}

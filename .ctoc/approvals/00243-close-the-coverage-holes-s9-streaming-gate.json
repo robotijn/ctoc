@@ -1,0 +1,9 @@
+{
+  "content_sha256": "2a7368ee82c96754d8851b25c187e7e8c475f63bd9003374f554445f95f9d0ca",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.721Z",
+  "approved_by": "human",
+  "plan_basename": "00243-close-the-coverage-holes-s9-streaming-gate"
+}

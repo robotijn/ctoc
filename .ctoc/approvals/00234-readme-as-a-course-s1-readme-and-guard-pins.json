@@ -1,0 +1,9 @@
+{
+  "content_sha256": "623cc0365853880392b36ac68e415226a27f242ee38ca4b85c93376d72488560",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.077Z",
+  "approved_by": "human",
+  "plan_basename": "00234-readme-as-a-course-s1-readme-and-guard-pins"
+}

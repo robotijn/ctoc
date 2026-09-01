@@ -1,0 +1,9 @@
+{
+  "content_sha256": "3d11d2ab738924354de6603e459901c97dd668325e952db499df1dad8f69ebaa",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.332Z",
+  "approved_by": "human",
+  "plan_basename": "00247-close-the-coverage-holes-s13-session-start"
+}

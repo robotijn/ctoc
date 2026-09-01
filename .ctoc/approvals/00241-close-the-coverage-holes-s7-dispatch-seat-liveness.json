@@ -1,0 +1,9 @@
+{
+  "content_sha256": "2985328102846fb6d99dc1d4ecced1c83043c923cdf081e499da2523e8c50a6d",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.667Z",
+  "approved_by": "human",
+  "plan_basename": "00241-close-the-coverage-holes-s7-dispatch-seat-liveness"
+}

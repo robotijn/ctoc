@@ -1,0 +1,9 @@
+{
+  "content_sha256": "7bffb7d971175836793049c3f8011ed7b5f8dc46ad7e11307738eeb42d540b64",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-08-31T14:59:34.363Z",
+  "approved_by": "human",
+  "plan_basename": "00248-close-the-coverage-holes-s14-start-command"
+}
