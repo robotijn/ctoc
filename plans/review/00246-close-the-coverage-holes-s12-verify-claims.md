@@ -166,53 +166,53 @@ because covering it would have meant fetching (named, with the reason).
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
 
 
 ## Deferred Questions
@@ -222,3 +222,86 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record
+
+**What landed:** one new test file, `tests/verify-claims-coverage-holes.test.js` (five cases), plus
+the two test-file count lines in `CLAUDE.md` (527 → 528). **`src/scripts/verify-claims.js` was NOT
+changed** — it was restored byte-for-byte after mutation testing and verified against its sha256
+(`7866703c13c5d6fe8831ae48d10556cedc557533901c2bc90ad9497473cb48d4`); `git status` reports it
+unmodified. No test was weakened, no case deleted, no baseline or exemption touched, no existing
+test file edited.
+
+**Step 8 — TEST.** Five cases written first and run: all five GREEN on the first run. That is
+expected and is a finding, not a pass to bank — this slice adds coverage over behaviour that is
+already correct, so there is no source change for a case to be red against. Red provenance was
+taken from mutation instead: each mutation was applied to the source, the suite re-run, the named
+case observed failing, and the source restored byte-for-byte with a sha256 check.
+
+| mutation applied to `src/scripts/verify-claims.js` | case that went RED |
+|---|---|
+| `main()` drops `{ gate: true }` | both ledger writes failing … (exit 0, not 1) |
+| the gate-ledger merge catch rethrows instead of absorbing | both ledger writes failing … ; a gate-ledger merge failure is absorbed … |
+| `writeLedger`'s catch rethrows instead of absorbing | both ledger writes failing … ; a verification-ledger write failure is absorbed … |
+| the `unverifiable` count is dropped from the report line | all four report-asserting cases |
+| the entry `.catch` requests exit 0 instead of 1 | a failure inside the verification run … |
+| the entry `.catch` stops naming the failure on stderr | a failure inside the verification run … |
+
+Two earlier attempts at the catch-arm mutations deleted the `catch` block outright, which left a
+dangling `try` and a syntax error — that is a broken file, not a mutant, so it proves nothing. They
+were redone as rethrows, which is the semantic change the arm exists to prevent.
+
+**Step 9 — PREPARE.** Re-derived from the gate and from reading the code, not assumed:
+- `verifyClaims([], {})` issues no request — the single worker's cursor is already past the end
+  of an empty claim list (`src/lib/claim-fetcher.js`), and `collectCorpusClaims` returns early when
+  `skills/` is absent (`src/lib/corpus-claims.js`). The empty-corpus fixture is therefore a real
+  network guard, not a hope.
+- The exit code for the clean fixture was DERIVED, not guessed: `runVerification` writes the gate
+  ledger (line 102) *before* it reads it (line 114), so `gateLedger` finds the file this very run
+  wrote, an empty corpus produces no failures, `pass` is true, and the run exits 0.
+- Measured before: `verify-claims.js` 89.27 %, uncovered `104-107 · 156-159 · 163-168 · 171-175` —
+  matching the plan's ranges.
+
+**Step 10 — IMPLEMENT.** No production module added or changed. The fixture builder, the
+argument-array spawn helper, the five cases and the header all live in the one new test file.
+
+**Step 11 — REVIEW.** Every case GREEN before implementation is accounted for above (there is no
+implementation to precede — this is a coverage slice over correct behaviour, and each case is
+anchored by a mutation that breaks it). Nothing under test is mocked: the two in-process faults are
+injected at true boundaries (`safeFs.writeFileSync`, guarded to this fixture's `ledger.json` only,
+and `claimLedger.writeLedgerFile`), both restored automatically by `node:test`'s mock tracker.
+
+**Step 12 — OPTIMIZE.** One root builder, one spawn helper, one shared expected-report constant.
+No sleeps, no retries, no warm-up run.
+
+**Step 13 — SECURE.** No case can reach the network: three cases run the real command against a
+temp root with no corpus, and the two in-process cases pass `claims: []`. Every path is under
+`os.tmpdir()`; the repository's own `.ctoc/verification/` ledgers are unmodified (`git status`
+confirms). Argument arrays throughout, no shell, no credential in any fixture, no permission bits
+(the ledger-directory fault is a plain file planted where a directory belongs, so it behaves
+identically under root and on Windows).
+
+**Step 14 — VERIFY.** `npm test` from the repository root, captured in full, exit 0:
+`[CTOC test-gate] coverage 99.23% (threshold 99%), skipped 0, failed 0` then
+`[CTOC test-gate] PASS`. `src/scripts/verify-claims.js` moved **89.27 % → 100.00 %** line coverage
+with **no uncovered ranges left**; the whole repository moved 99.04 % → 99.23 %.
+
+**Step 15 — DOCUMENT.** The test file's header states in its first lines that it drives the only
+network path in the repository offline, why the empty-corpus fixture makes that true, which ranges
+it covers, and that none is left uncovered.
+
+**Step 16 — FINAL-REVIEW.** The empty-corpus route held exactly as the plan predicted. No range was
+left uncovered for network reasons, so there is nothing to name under that heading.
+
+### Decisions Taken Under Ambiguity (taken during execution)
+
+4. **One spawned case covers three of the four ranges together.** Planting a plain FILE where
+   `.ctoc/verification/` belongs makes *both* ledger writes fail in the same child, which exercises
+   the `writeLedger` catch, the gate-ledger merge catch, and `main()`'s gate-fold in one run — and
+   it does so while asserting the property that matters to a human: the report still prints and the
+   unwritten ledger is reported rather than hidden. The two in-process cases were kept anyway, each
+   isolating one catch, because the combined case cannot tell the two arms apart.
+5. **The entry-point failure is injected by seeding `require.cache`, not by throwing at load
+   time.** `corpus-claims` is required at the top of the script, so a load-time throw would abort
+   before `main()` ever ran and would prove nothing about the `.catch` handler. The preload installs
+   a collector that throws *when called*, so the rejection travels the real path.
