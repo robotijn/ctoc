@@ -168,53 +168,53 @@ was found to leak text into the injected context.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
 
 
 ## Deferred Questions
@@ -224,3 +224,108 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record
+
+**Slice:** every optional session-start subsystem degrades to silence, provably.
+**Landed:** `tests/session-start-coverage-holes.test.js` (new, 10 cases). **No source
+change** — `src/hooks/SessionStart.js` is byte-for-byte the file this slice started with
+(sha256 `76a972d529e539ab02dcad3f916e08549046faaac5a8067345c771382f90edf9`, verified after
+every mutation). `CLAUDE.md`'s two test-file counts moved 529 → 530 (the count fences
+`doc-counts`, `doc-counts-generated` and `plan-declares-count-moving-ratchets` are green).
+
+### Step 9 PREPARE — the ranges, re-derived and classified
+
+All nine ranges named in the plan were read at their current line numbers and confirmed
+present and unchanged. Every one is a catch arm. **All nine are reachable; none is
+permission-gated, terminal-only, or dead**, so nothing is left uncovered and nothing had
+to be reported as unreachable.
+
+| lines | subsystem | class | route |
+|---|---|---|---|
+| 138-139 | plan-index backfill kick | reachable | in-process `main()` |
+| 166-168 | Iron Loop self-check | reachable | in-process `main()` |
+| 189-190 | build-loop tick | reachable | in-process `main()` |
+| 200-201 | while-you-were-away increment feed | reachable | in-process `main()` |
+| 237-238 | question-dispatch directive | reachable | exported `questionDispatchDirective` |
+| 318-319 | durable-watchdog resume injection | reachable | exported `resumeInjection` |
+| 345-346 | CTOC-repo identity detector | reachable | exported `shouldInjectLessons` |
+| 371-372 | operating-lessons injection | reachable | exported `maybeInjectLessons` |
+| 568-569 | `main().catch` under `require.main === module` | reachable only as MAIN module | spawned child with a `--require` preload written into the temp fixture |
+
+The five ranges the planner had not read turned out to be the same shape as the four it
+had, as it expected — but they were read, not assumed. The entry function **is** exported
+(`main`, plus four of the five helpers), so eight of nine cases run in-process; only the
+`require.main === module` arm needs a child.
+
+`tests/session-start-does-not-fabricate-a-project.test.js` and
+`tests/hooks-do-not-manufacture-the-project-marker.test.js` were read and **not modified**.
+They pin the *unidentified-root* path (nothing is scaffolded where no project exists);
+this file adds the disjoint case that a *failed lessons injection inside an identified
+project* also creates no `CLAUDE.md`.
+
+### Step 8 / Step 11 — every case was GREEN before the change, and none was banked
+
+This is a coverage slice with no intended source change, so no case could be red against
+correct code. Red provenance was taken from **mutation** instead: each arm was mutated in
+turn, the suite run, and the mutant confirmed to kill **exactly one** case — then
+`src/hooks/SessionStart.js` was restored and its sha256 re-checked against the pristine
+hash above (nine restorations, nine matches).
+
+| mutant | case that went red |
+|---|---|
+| backfill catch made silent | a broken plan-index backfill kick is reported on stderr … |
+| self-check reason dropped (`selfCheckSummary = null`) | a broken self-check is reported as skipped, with the reason … |
+| broken tick leaks `'MUTANT-LEAK'` | a broken build-loop tick contributes nothing — byte-for-byte … |
+| broken feed leaks `'MUTANT-LEAK'` | a broken increment feed contributes nothing — byte-for-byte … |
+| directive catch returns text | a broken question-dispatch precompute yields no directive at all |
+| resume catch returns text | a broken continuation state never resumes … |
+| identity catch returns `true` | an undecidable project identity refuses to inject … |
+| lessons catch made silent | a broken lessons injector is reported on stderr … |
+| rejecting main exits 0 | a rejecting main, run as the hook, exits 1 … |
+
+No mutant survived. No existing test was touched, no assertion weakened, no baseline or
+exemption entry added, no file excluded from the coverage scope, and the function under
+test is never mocked — every fault is injected at the exported reader of the module the
+arm requires, and restored in a `finally`. The tenth case asserts all eight boundaries are
+their original function objects again.
+
+### Step 13 SECURE
+
+Every run uses a temp fixture under the system temp directory, removed in `after`, and the
+global Iron Loop state file each run writes under `~/.ctoc/state/` is removed with it. The
+child-process preload is written into the fixture, never into this repository. No shell
+(argument array), no secret, no absolute host path asserted. `git status --porcelain src/`
+was empty after the mutation run.
+
+### Step 14 VERIFY — `npm test`, from the repository root
+
+```
+[CTOC test-gate] coverage 99.28% (threshold 99%), skipped 0, failed 0
+[CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+[CTOC test-gate] PASS
+```
+
+Suite totals: tests 11764, pass 11764, **fail 0**, **skipped 0**.
+`npm run lint` exit 0. `npm run typecheck` exit 0.
+
+**`src/hooks/SessionStart.js`: 96.68 % → 100.00 % line coverage, no uncovered lines
+remaining** (branch 97.01 %, function 100 %). Whole-repository line coverage moved
+99.04 % → **99.28 %**, above the floor of 99. The floor itself was not touched — raising
+it is the human's decision and belongs to the final slice of this set.
+
+### Step 16 FINAL-REVIEW — what this carries to the human
+
+- Coverage before / after for this file: **96.68 % → 100.00 %**, all nine dark ranges now
+  exercised by behavioural cases a mutation kills.
+- **Ranges left uncovered: none.** No range was permission-gated, terminal-only or dead.
+- **No subsystem was found to leak text into the injected context.** All four
+  contribute-nothing arms behave as documented, and the self-check's deliberate
+  "Self-check skipped: <reason>" line is the only thing a fault adds to what the model
+  reads.
+- One observation, reported and **not** acted on (out of this slice's scope): the
+  `main().catch` arm at 568-569 calls `process.exit(1)` immediately after `console.error`,
+  which is the `exit-with-pending-writes` shape this repository fences elsewhere. On a
+  piped stderr the message can be lost. It is pre-existing behaviour, no test depends on
+  it being lost, and changing it would be a behaviour change a coverage slice must not
+  make — it is named here so the human can decide whether it wants its own slice.
