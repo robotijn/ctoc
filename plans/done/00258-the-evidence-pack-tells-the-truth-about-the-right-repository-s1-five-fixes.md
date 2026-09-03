@@ -13,8 +13,8 @@ files:
   - tests/evidence-pack-collect.test.js
   - tests/evidence-pack-security.test.js
 approved_by: human
-approved_at: 2026-09-03T11:25:07.679Z
-gate_crossed: implementation → todo
+approved_at: 2026-09-03T11:43:00.476Z
+gate_crossed: review → done
 ---
 
 # The evidence pack tells the truth about the right repository — the five fixes and the six tightened pins

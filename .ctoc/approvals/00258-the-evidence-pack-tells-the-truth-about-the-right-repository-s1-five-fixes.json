@@ -1,9 +1,9 @@
 {
-  "content_sha256": "c0e0882e2dc3ba84f753138ec8b7ff57a703286674803e3292afc9c1dd20319c",
+  "content_sha256": "433e2c89f18a23abfd7a166c91910866bebc3d877f3787cca5c97e308a22a043",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T11:25:07.726Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-09-03T11:43:00.523Z",
   "approved_by": "human",
   "plan_basename": "00258-the-evidence-pack-tells-the-truth-about-the-right-repository-s1-five-fixes"
 }
