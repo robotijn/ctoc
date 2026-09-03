@@ -476,3 +476,7 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Stop note (session, 2026-09-03 22:19)
+
+The human ordered the running build stopped mid-flight. The executor was killed after its Step 8-10 work: the three parser-fix files carry edits in the working tree (uncommitted), its last report said the AFTER sweep was clean of member-expression misreads but its OWN plan prose still tripped a different misread shape — unresolved at the stop. Task t105 is cancelling in the registry. Resume = HANDOFF.md step 3: relaunch an executor for this plan; it must re-run Step 8 against the current tree state and finish from the ticks recorded below.
