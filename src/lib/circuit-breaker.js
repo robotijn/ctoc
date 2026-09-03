@@ -15,11 +15,31 @@
  *   - per-plan escalation fires when total > 5           (the 6th total kickback)
  * Same-step takes precedence when both trip on a single call.
  *
- * Persistence: the counter lives in the plan file's first YAML frontmatter block
- * (per the parent decision — it travels with the plan, is visible on open, and
- * needs no separate state directory). The module is STATELESS: every call does a
- * read-modify-write against disk, so a "process restart" is indistinguishable
- * from any two sequential calls — the count lives only on disk (satisfies M9).
+ * Persistence: the counter lives in a SIDECAR, `.ctoc/state/kickbacks/<slug>.json`,
+ * written atomically (temp file + rename) — the same pattern and residency as the
+ * Step-14 verify evidence beside it. THE PLAN FILE IS NEVER WRITTEN.
+ *
+ * Why the counter left the plan file. It used to live in the plan's first YAML
+ * frontmatter block, and the approval ledger hashes that frontmatter IN FULL —
+ * deliberately, because it carries `files:`, the write-surface grant. So every
+ * kickback moved the hashed bytes, `approval-ledger.contentMatches` read
+ * `hash-mismatch`, and `approval-residency.isApprovedForCoverage` answered NOT
+ * approved: the build's own quality gate revoked the build's own write permission
+ * and the plan read as forged to every audit. A counter that must change during a
+ * build cannot live inside the region whose whole purpose is to prove the build
+ * changed nothing.
+ *
+ * Migration: an existing frontmatter `kickback_counts` is still READ, folded in as
+ * an element-wise MAXIMUM (see maxCounts) — so no live count is lost — but it is
+ * never written back, and the stale block is left in place on existing plans
+ * because deleting it would itself change their hash. Nothing can raise that
+ * frontmatter value again, so once the sidecar passes it the fold is a no-op;
+ * while the sidecar is missing or corrupt it is a FLOOR that stops a silent reset
+ * to zero.
+ *
+ * The module is STATELESS: every call does a read-modify-write against disk, so a
+ * "process restart" is indistinguishable from any two sequential calls — the count
+ * lives only on disk (satisfies M9).
  *
  * Concurrency: CLAUDE.md mandates plans are processed SEQUENTIALLY ("Never
  * parallelize plan implementation"). The plan currently executing is the sole
@@ -46,9 +66,6 @@ const safeFs = require('./safe-fs');
 const SAME_STEP_MAX = 3;
 // Per-plan escalates when the total EXCEEDS this (i.e. on the 6th).
 const PER_PLAN_MAX = 5;
-
-// Matches a leading YAML frontmatter block, tolerant of CRLF line endings.
-const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---/;
 
 /**
  * Step keys that would pollute Object.prototype if used as map keys. Rejected.
@@ -96,24 +113,6 @@ function normalizeCounts(raw) {
   let total = raw && typeof raw === 'object' ? Number(raw.total) : 0;
   if (!Number.isFinite(total) || total < 0) total = 0;
   return { by_step: byStep, total: Math.floor(total) };
-}
-
-/**
- * Split a plan's raw text into `{ fmText, rest }` where `fmText` is the YAML of
- * the first frontmatter block (or null when there is no leading block) and
- * `rest` is everything after it (the block delimiters included in the boundary).
- *
- * @param {string} raw - the full plan file text
- * @returns {{ fmText: string|null, rest: string, hadBlock: boolean }}
- */
-function splitFrontmatter(raw) {
-  const match = raw.match(FRONTMATTER_RE);
-  if (!match) {
-    return { fmText: null, rest: raw, hadBlock: false };
-  }
-  const fmText = match[1];
-  const rest = raw.slice(match[0].length); // text after the closing `---`
-  return { fmText, rest, hadBlock: true };
 }
 
 /**
@@ -177,77 +176,163 @@ function maxCountsAcrossBlocks(raw) {
 }
 
 /**
- * Read the persisted kickback counts from a plan file. Never throws — a plan
- * with no counter, no frontmatter, or a malformed counter reads as all zeros.
- * Robust to human-gate block-prepend: scans every leading frontmatter block and
- * returns the max per-step count and max total (see maxCountsAcrossBlocks).
+ * Fold two count records into their element-wise MAXIMUM. Max (not sum, not
+ * "whichever is newer") is the correct fold across the sidecar and the legacy
+ * frontmatter: neither source can ever lower the other, so a missing or corrupt
+ * sidecar cannot silently reset a plan's running total, and a stale frontmatter
+ * value is a no-op the moment the sidecar overtakes it. Monotone, one rule, no
+ * migration flag and no extra state.
+ *
+ * @param {{ by_step: Object<string,number>, total: number }} a
+ * @param {{ by_step: Object<string,number>, total: number }} b
+ * @returns {{ by_step: Object<string,number>, total: number }} null-proto by_step
+ */
+function maxCounts(a, b) {
+  const merged = Object.create(null);
+  for (const source of [a.by_step, b.by_step]) {
+    for (const k of Object.keys(source)) {
+      const v = source[k];
+      if (!(k in merged) || v > merged[k]) merged[k] = v;
+    }
+  }
+  return { by_step: merged, total: Math.max(a.total, b.total) };
+}
+
+/**
+ * Absolute path of a plan's kickback sidecar.
+ *
+ * `planSlug` MUST be a BARE slug (`planSlug()` returns `path.basename(p, '.md')`,
+ * so no path separator can survive) — the directory root is fixed here, so a bare
+ * key cannot escape `.ctoc/state/kickbacks/`. Pure: touches no filesystem.
+ *
+ * @param {string} projectPath - project root
+ * @param {string} planSlugValue - the plan's bare slug, no separators
+ * @returns {string}
+ */
+function kickbackStatePath(projectPath, planSlugValue) {
+  return path.join(projectPath, '.ctoc', 'state', 'kickbacks', `${planSlugValue}.json`);
+}
+
+/**
+ * Read a plan's kickback sidecar.
+ *
+ * The three statuses are DISTINCT facts and callers act on the difference:
+ * `absent` (nothing has been counted yet) is not `unreadable` (a record we cannot
+ * trust). A malformed-but-parseable record classifies `unreadable`, never
+ * `ok`-with-zeros — reporting a count of zero for input we never actually read is
+ * the false-green shape this repository fences, and here it would suppress every
+ * future escalation for that plan. Never throws.
+ *
+ * @param {string} projectPath - project root
+ * @param {string} planSlugValue - the plan's bare slug
+ * @returns {{ status: 'ok'|'absent'|'unreadable', counts: { by_step: Object<string,number>, total: number } }}
+ */
+function readKickbackState(projectPath, planSlugValue) {
+  const zeros = { by_step: Object.create(null), total: 0 };
+  let raw;
+  try {
+    raw = safeFs.readFileSync(kickbackStatePath(projectPath, planSlugValue), 'utf8');
+  } catch (err) {
+    // A file that is not there has nothing wrong with it; anything else is a
+    // record we could not read, and that difference is reported, not flattened.
+    if (err && err.code === 'ENOENT') return { status: 'absent', counts: zeros };
+    return { status: 'unreadable', counts: zeros };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { status: 'unreadable', counts: zeros };
+  }
+  const wellFormed = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    && parsed.by_step && typeof parsed.by_step === 'object' && !Array.isArray(parsed.by_step)
+    && Number.isFinite(Number(parsed.total)) && Number(parsed.total) >= 0;
+  if (!wellFormed) return { status: 'unreadable', counts: zeros };
+  return { status: 'ok', counts: normalizeCounts(parsed) };
+}
+
+/**
+ * Persist a plan's kickback counts atomically: write a uniquely-named temp file
+ * beside the target, then rename it over the target (a rename within one directory
+ * is atomic, so no reader ever sees a half-written count).
+ *
+ * RETHROWS on failure, deliberately. The throw propagates to
+ * `actions.recordStepKickback`, which reports `{ recorded: false }`, prints the
+ * loud console error and appends a durable `breaker-failure` escalation. A breaker
+ * that cannot persist its count must never report success.
+ *
+ * @param {string} projectPath - project root
+ * @param {string} planSlugValue - the plan's bare slug
+ * @param {{ by_step: Object<string,number>, total: number }} counts
+ * @throws {Error} a wrapped persist error naming the plan (`cause` carries the
+ *   original filesystem error), after a best-effort cleanup of the temp file
+ */
+function writeKickbackState(projectPath, planSlugValue, counts) {
+  const target = kickbackStatePath(projectPath, planSlugValue);
+  const tmp = `${target}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const record = {
+    plan: planSlugValue,
+    // Plain objects so the JSON carries no null-prototype artifacts.
+    by_step: Object.assign({}, counts.by_step),
+    total: counts.total,
+    updated_at: new Date().toISOString()
+  };
+  try {
+    safeFs.mkdirSync(path.dirname(target), { recursive: true });
+    safeFs.writeFileSync(tmp, JSON.stringify(record, null, 2) + '\n', 'utf8');
+    safeFs.renameSync(tmp, target);
+  } catch (err) {
+    // Best-effort cleanup of the temp file. A cleanup failure is NOT a verdict about
+    // the count — the persist failure is what the caller must act on — so it is
+    // RECORDED into the rethrown message rather than discarded. Swallowing it would
+    // hide a directory quietly filling with orphaned temp files.
+    let cleanupNote = '';
+    try {
+      safeFs.unlinkSync(tmp);
+    } catch (cleanupErr) {
+      const code = cleanupErr && cleanupErr.code ? cleanupErr.code : 'unknown error';
+      cleanupNote = ` (the temp file could not be removed either: ${code})`;
+    }
+    const cause = err && err.message ? err.message : String(err);
+    throw new Error(`could not persist the kickback counter for ${planSlugValue}: ${cause}${cleanupNote}`, { cause: err });
+  }
+}
+
+/**
+ * Read the persisted kickback counts for a plan: the sidecar when it is readable,
+ * otherwise the legacy frontmatter counter as a floor (see maxCounts).
+ *
+ * `projectPath` is REQUIRED. Without a root the sidecar cannot be located, and
+ * answering `0` for a plan that has been kicked back six times is a number we did
+ * not read — the false-zero class `src/scripts/test-gate.js` documents against. A
+ * missing argument is a PROGRAMMING error and throws; the module's "never throws
+ * on bad DATA" contract is untouched (an absent, unreadable or malformed plan file
+ * still reads as zeros, and a malformed sidecar still falls back to the plan).
  *
  * @param {string} planPath - absolute path to the plan `.md` file
+ * @param {string} projectPath - project root (REQUIRED — locates the sidecar)
  * @returns {{ by_step: Object<string,number>, total: number }}
+ * @throws {Error} `projectPath required` when no project root is supplied
  */
-function readKickbackCounts(planPath) {
+function readKickbackCounts(planPath, projectPath) {
+  if (typeof projectPath !== 'string' || projectPath === '') {
+    throw new Error('projectPath required: the kickback counter lives in a sidecar under the project root');
+  }
+  const state = readKickbackState(projectPath, planSlug(planPath));
+  if (state.status === 'ok') {
+    return { by_step: Object.assign({}, state.counts.by_step), total: state.counts.total };
+  }
+  // No trustworthy sidecar: fall back to the legacy frontmatter counter so a plan
+  // mid-migration (or one whose sidecar is corrupt) never reads as a false zero.
   let raw;
   try {
     raw = safeFs.readFileSync(planPath, 'utf8');
   } catch {
     return { by_step: {}, total: 0 };
   }
-  const counts = maxCountsAcrossBlocks(raw);
+  const counts = maxCounts(state.counts, maxCountsAcrossBlocks(raw));
   // Return a plain object (drop the null prototype) for ergonomic caller use.
   return { by_step: Object.assign({}, counts.by_step), total: counts.total };
-}
-
-/**
- * Serialize the updated frontmatter (with kickback_counts) back into the plan
- * text, preserving every other key and the body byte-for-byte.
- *
- * @param {string} raw - original plan text
- * @param {{ by_step: Object<string,number>, total: number }} counts - new counts
- * @returns {string} the rewritten plan text
- * @throws {Error} if the frontmatter cannot be re-serialized (throws BEFORE any write)
- */
-function writeCountsIntoText(raw, counts) {
-  const { fmText, rest, hadBlock } = splitFrontmatter(raw);
-
-  // Plain-object counts for a clean YAML dump (no null-prototype artifacts).
-  const cleanCounts = {
-    by_step: Object.assign({}, counts.by_step),
-    total: counts.total
-  };
-
-  if (!hadBlock) {
-    // No leading frontmatter: create a block containing only the counter and
-    // prepend it, keeping the original body untouched.
-    const block = yaml.dump({ kickback_counts: cleanCounts });
-    return `---\n${block}---\n${raw}`;
-  }
-
-  // The WRITE path must tolerate EXACTLY what the READ path (readKickbackCounts /
-  // recordKickback's read) already tolerates: malformed YAML (unterminated quote →
-  // yaml.load THROWS) and valid-but-scalar frontmatter (a bare string → assigning
-  // `.kickback_counts` throws "Cannot create property on string" in strict mode).
-  // If either happens we DISCARD the unparseable/non-object frontmatter and rebuild
-  // a minimal valid block carrying only the counter. Tradeoff (deliberate): a
-  // tripping circuit breaker OUTRANKS preserving a user's already-broken YAML — the
-  // breaker keeps counting so an overnight loop can still escalate to the human,
-  // instead of throwing here (which froze the counter at 0 and suppressed every
-  // escalation forever). Preserving broken frontmatter is worthless if it costs the
-  // safety mechanism.
-  let fmObject;
-  try {
-    const parsed = yaml.load(fmText);
-    fmObject = (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
-      ? parsed
-      : { kickback_counts: cleanCounts };
-  } catch {
-    fmObject = { kickback_counts: cleanCounts };
-  }
-  fmObject.kickback_counts = cleanCounts;
-  // yaml.dump throws before we write, so a serialize failure never leaves a
-  // half-written plan on disk.
-  const newFmText = yaml.dump(fmObject);
-  // yaml.dump ends with a trailing newline; the block is `---\n<yaml>---<rest>`.
-  return `---\n${newFmText}---${rest}`;
 }
 
 /**
@@ -290,47 +375,64 @@ function planSlug(planPath) {
 
 /**
  * Record one kickback for `(plan, step)`: increment the per-step and per-plan
- * counters, persist them into the plan's first frontmatter block, and compute an
- * escalation signal when a documented maximum is exceeded.
+ * counters, persist them to the plan's SIDECAR, and compute an escalation signal
+ * when a documented maximum is exceeded. THE PLAN FILE IS NEVER WRITTEN — see the
+ * module header for why the counter cannot live in the hashed frontmatter.
  *
  * @param {string} planPath - absolute path to the plan `.md` file
  * @param {string|number} step - the Iron Loop step being kicked back to
- * @param {string} projectPath - project root (for the escalations log)
+ * @param {string} projectPath - project root (holds the sidecar + escalations log)
  * @returns {{ recorded: true, byStep: number, total: number, escalation: Object|null }}
  * @throws {Error} `step required` on a falsy or prototype-polluting step
+ * @throws {Error} when the plan cannot be read or the sidecar cannot be persisted
  */
 function recordKickback(planPath, step, projectPath) {
   const stepKey = normalizeStep(step); // throws before any file read/write
+  const slug = planSlug(planPath);
 
+  const state = readKickbackState(projectPath, slug);
+
+  // The plan read is UNGUARDED and happens on every call, deliberately: a plan
+  // file that does not exist must throw and hard-escalate through
+  // actions.recordStepKickback. Dropping this read would turn a ghost plan into a
+  // silent, permanently-quiet success.
   const raw = safeFs.readFileSync(planPath, 'utf8');
-  // Read the MAX across every leading frontmatter block, not just the first —
-  // otherwise a human-gate prepend of a counter-less block resets the running
-  // total and the per-plan escalation is silently defeated. Incrementing from the
-  // true max keeps the (first-block) write >= any stale deeper value, so a later
-  // max-across read never regresses.
-  const counts = maxCountsAcrossBlocks(raw);
+  // The MIGRATION read: an existing frontmatter counter is honoured, in whichever
+  // leading block it now sits (a human-gate crossing PREPENDS a counter-less block,
+  // which would otherwise orphan the real count and reset the per-plan escalation).
+  const counts = maxCounts(state.counts, maxCountsAcrossBlocks(raw));
 
   const nextByStep = (counts.by_step[stepKey] || 0) + 1;
   counts.by_step[stepKey] = nextByStep;
   counts.total += 1;
 
-  // Serialize BEFORE writing (throws leave the plan untouched).
-  const newText = writeCountsIntoText(raw, counts);
-  safeFs.writeFileSync(planPath, newText, 'utf8');
+  // Throws on failure — a breaker that cannot persist must not report success.
+  writeKickbackState(projectPath, slug, counts);
+
+  if (state.status === 'unreadable') {
+    // The breaker keeps counting AND says it was degraded. Returning zeros quietly
+    // would suppress every future escalation for this plan; counting silently from
+    // the frontmatter floor would hide that the real count may be low.
+    recordBreakerFailure(projectPath, {
+      plan: slug,
+      step: stepKey,
+      error: 'kickback state unreadable — the count was rebuilt from the plan file and may be low'
+    });
+  }
 
   let escalation = null;
   if (nextByStep > SAME_STEP_MAX) {
     // Same-step takes precedence when both thresholds trip on one call.
     escalation = {
       type: 'same-step',
-      plan: planSlug(planPath),
+      plan: slug,
       step: stepKey,
       count: nextByStep
     };
   } else if (counts.total > PER_PLAN_MAX) {
     escalation = {
       type: 'per-plan',
-      plan: planSlug(planPath),
+      plan: slug,
       total: counts.total
     };
   }

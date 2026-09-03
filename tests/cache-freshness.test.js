@@ -554,11 +554,12 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
     // moves a plan file, so the counts are invariant), but a true justification for
     // an exemption nothing needs is still dead weight, and dead weight on a
     // whitelist is what masks a real writer later. Removing it TIGHTENS the fence.)
-    // Records kickback counters by rewriting the plan's own frontmatter back to
-    // the SAME planPath (recordKickback: readFileSync → writeFileSync(planPath)).
-    // Never creates/deletes/moves a plan file, so the plan-stage counts are
-    // invariant — an in-place body edit changes content, not the count.
-    ['circuit-breaker.js', 'edits an existing plan body in place (rewrites kickback counters into the plan frontmatter); never creates/deletes/moves a plan file, so counts are invariant'],
+    // Writes ONLY .ctoc/state/kickbacks/<slug>.json (atomic temp+rename) and
+    // .ctoc/logs/escalations.json. It no longer writes a plan file AT ALL — the
+    // counter moved out of the plan's hashed frontmatter, where it had been
+    // revoking the build's own write permission — so the plan-stage counts are
+    // invariant by construction, not merely by the edit staying in place.
+    ['circuit-breaker.js', 'writes only .ctoc/state/kickbacks/<slug>.json (atomic temp+rename) and .ctoc/logs/escalations.json; never writes, creates, deletes or moves a plan file, so the plan-stage counts are invariant'],
     // Writes bg-status sidecar JSON in .ctoc/ keyed by plan path — not a *.md in
     // a stage dir; getPlanCounts/getInboxCounts do not count status sidecars.
     ['background.js', 'writes .ctoc/ background-status sidecar JSON, not a counted *.md plan file'],

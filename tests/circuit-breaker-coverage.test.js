@@ -9,9 +9,11 @@
  * the "no escalation reached the human before the exact trip" guard. This suite
  * closes exactly those gaps:
  *
- *   - readKickbackCounts on an ABSENT plan file        → src line 131-132 (read fail-safe)
- *   - readKickbackCounts on MALFORMED frontmatter YAML → src line 139-140 (yaml fail-safe,
- *       hit DIRECTLY — not via recordKickback's own separate yaml guard at 255-259)
+ *   - readKickbackCounts on an ABSENT plan file        (read fail-safe: zeros, never a throw)
+ *   - readKickbackCounts on MALFORMED frontmatter YAML (yaml fail-safe, hit DIRECTLY —
+ *       not via recordKickback's own separate yaml guard)
+ *   - the SIDECAR write failing (its directory is a file) → temp-unlink-and-rethrow
+ *   - an `ok` sidecar read alongside a plan whose YAML will not parse
  *   - appendEscalation when `.ctoc/logs` is a FILE     → src line 222-223 (mkdir catch)
  *   - recordBreakerFailure swallowing that write throw → src line 323-324 (fail-safe-of-fail-safe)
  *
@@ -69,7 +71,7 @@ describe('Circuit breaker readKickbackCounts: fail-safe reads never throw, zero 
     const missing = path.join(root, 'plans', 'in-progress', 'does-not-exist.md');
 
     // Act
-    const counts = circuitBreaker.readKickbackCounts(missing);
+    const counts = circuitBreaker.readKickbackCounts(missing, root);
 
     // Assert — the read-error catch (src 131-132) returns clean zeros, never throws.
     // A mutant that drops the try/catch would throw here instead of returning zeros.
@@ -85,7 +87,7 @@ describe('Circuit breaker readKickbackCounts: fail-safe reads never throw, zero 
     const planPath = writePlan(root, 'bad-yaml.md', '---\ntitle: "unterminated\n---\n\n# body\n');
 
     // Act
-    const counts = circuitBreaker.readKickbackCounts(planPath);
+    const counts = circuitBreaker.readKickbackCounts(planPath, root);
 
     // Assert — malformed YAML reads as zeros (fail-safe), NEVER a non-zero count
     // that could suppress a future escalation, and never a throw.
@@ -200,5 +202,63 @@ describe('Circuit breaker recordKickback: trip decisions at the exact boundary',
     assert.equal(entry.count, 4);
     assert.ok(typeof entry.at === 'string' && !Number.isNaN(Date.parse(entry.at)),
       'the escalation carries a parseable ISO timestamp');
+  });
+});
+
+// ── Sidecar failure + read-precedence branches ──────────────────────────────
+
+describe('Circuit breaker: the SIDECAR is the counter store, and its failures are loud', () => {
+  it('a sidecar write that cannot even create its directory reports recorded:false and escalates', () => {
+    // Arrange — `.ctoc/state/kickbacks` exists as a FILE, so mkdirSync throws
+    // ENOTDIR/EEXIST inside writeKickbackState. A breaker that cannot persist its
+    // count must never report success: the rethrow reaches recordStepKickback's
+    // catch, which is what makes the failure durable and loud.
+    const root = makeRoot();
+    fs.mkdirSync(path.join(root, '.ctoc', 'state'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.ctoc', 'state', 'kickbacks'), 'i am a file, not a directory');
+    const planPath = writePlan(root, 'unwritable-sidecar.md', VALID_FM);
+
+    // Act — through the LIVE caller, not the module in isolation.
+    const actions = require('../src/lib/actions');
+    const originalError = console.error;
+    console.error = () => {};
+    let res;
+    try { res = actions.recordStepKickback(planPath, 14, root); } finally { console.error = originalError; }
+
+    // Assert — no false success, and exactly one durable breaker-failure record.
+    assert.equal(res.recorded, false, 'a breaker that cannot persist its count must not report success');
+    const failures = circuitBreaker.getEscalations(root)
+      .filter((e) => e.type === 'breaker-failure' && e.plan === 'unwritable-sidecar');
+    assert.equal(failures.length, 1, 'the persistence failure reaches the human exactly once');
+  });
+
+  it('readKickbackCounts_returns_zeros_when_BOTH_the_plan_and_the_sidecar_are_absent', () => {
+    // Arrange — neither store exists. The plan-read catch stays live under the new
+    // storage, so this must still be zeros rather than a throw.
+    const root = makeRoot();
+    const missing = path.join(root, 'plans', 'in-progress', 'nothing-anywhere.md');
+
+    // Act + Assert
+    assert.deepStrictEqual(circuitBreaker.readKickbackCounts(missing, root), { by_step: {}, total: 0 });
+  });
+
+  it('readKickbackCounts prefers a READABLE sidecar over a plan whose YAML will not parse', () => {
+    // Arrange — the plan's frontmatter throws in yaml.load (contributing zeros),
+    // but the sidecar is intact. The count must come from the sidecar, NOT read as
+    // zero: a false zero here would suppress every future escalation.
+    const root = makeRoot();
+    const planPath = writePlan(root, 'ok-sidecar-bad-plan.md', '---\ntitle: "unterminated\n---\n\n# body\n');
+    const dir = path.join(root, '.ctoc', 'state', 'kickbacks');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'ok-sidecar-bad-plan.json'), JSON.stringify({
+      plan: 'ok-sidecar-bad-plan', by_step: { 10: 4 }, total: 4, updated_at: '2026-09-03T00:00:00.000Z'
+    }));
+
+    // Act
+    const counts = circuitBreaker.readKickbackCounts(planPath, root);
+
+    // Assert
+    assert.equal(counts.total, 4, 'the sidecar answers even when the plan text is unparseable');
+    assert.equal(counts.by_step['10'], 4);
   });
 });

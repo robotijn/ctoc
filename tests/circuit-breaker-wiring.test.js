@@ -102,11 +102,18 @@ describe('Circuit-breaker wiring: completeExecution records kickbacks + escalate
     assert.strictEqual(sameStep[0].step, '10');
     assert.strictEqual(sameStep[0].count, 4);
 
-    // The counter is physically persisted in the plan's frontmatter (survives a
-    // process restart — the module holds no in-memory state).
-    const counts = circuitBreaker.readKickbackCounts(planPath);
+    // The counter is physically persisted in `.ctoc/state/kickbacks/<slug>.json`
+    // (it survives a process restart — the module holds no in-memory state).
+    const counts = circuitBreaker.readKickbackCounts(planPath, root);
     assert.strictEqual(counts.by_step['10'], 4);
     assert.strictEqual(counts.total, 4);
+
+    // End-to-end proof through the REAL completeExecution path: four live kickbacks
+    // left no counter in the plan's frontmatter. The frontmatter is hashed by the
+    // approval ledger, so a counter written here revoked the build's own permission.
+    const rawPlan = fs.readFileSync(planPath, 'utf8');
+    assert.ok(!rawPlan.includes('kickback_counts'),
+      'no kickback counter is written into the plan after four live kickbacks');
   });
 
   it('6th TOTAL kickback escalates (per-plan) with no single step reaching 4', () => {

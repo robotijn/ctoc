@@ -558,7 +558,7 @@ test('completeExecution: a validation failure with EVERY step complete is kicked
 
     assert.equal(res.blocked, true, 'the completion is refused');
     assert.equal(res.kickback.recorded, true, 'the refusal is counted by the circuit breaker');
-    const counts = circuitBreaker.readKickbackCounts(planPath);
+    const counts = circuitBreaker.readKickbackCounts(planPath, root);
     assert.deepEqual(counts.by_step, { 14: 1 },
       'the kickback is keyed on step 14 — the default when no step is itself incomplete');
   } finally {

@@ -16,6 +16,12 @@
  * an empty escalations log. Plus a regression that valid frontmatter still trips
  * at the documented boundaries (by_step > 3, total > 5) — thresholds unchanged.
  *
+ * The write-path-versus-read-path tolerance gap these cases were written for is now
+ * structurally impossible: the counter lives in `.ctoc/state/kickbacks/<slug>.json`
+ * and there is no frontmatter WRITE path left to be less tolerant than the read. These
+ * cases stay because the property they pin — broken frontmatter never freezes the
+ * counter — must survive the storage move, and they now prove it end to end.
+ *
  * Zero doubles: real temp files, the real recordKickback/getEscalations code path.
  */
 
@@ -58,7 +64,7 @@ describe('Circuit breaker: the WRITE path tolerates what the READ path tolerates
     }
 
     // The counter is physically persisted — NOT frozen at 0.
-    const counts = circuitBreaker.readKickbackCounts(planPath);
+    const counts = circuitBreaker.readKickbackCounts(planPath, root);
     assert.strictEqual(counts.by_step['10'], 6, 'per-step counter persisted');
     assert.strictEqual(counts.total, 6, 'per-plan counter persisted');
 
@@ -80,7 +86,7 @@ describe('Circuit breaker: the WRITE path tolerates what the READ path tolerates
     assert.strictEqual(res.byStep, 1);
     assert.strictEqual(res.total, 1);
 
-    const counts = circuitBreaker.readKickbackCounts(planPath);
+    const counts = circuitBreaker.readKickbackCounts(planPath, root);
     assert.strictEqual(counts.by_step['12'], 1, 'counter persisted through a scalar block');
     assert.strictEqual(counts.total, 1);
   });

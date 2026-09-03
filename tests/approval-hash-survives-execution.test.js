@@ -699,3 +699,68 @@ test('computeContentHash is KEPT and unchanged — legacy entries verify under i
     require('node:crypto').createHash('sha256').update('abc', 'utf8').digest('hex'),
   );
 });
+
+// --- 6. A KICKBACK MUST NOT REVOKE THE BUILD'S OWN PERMISSION -----------------
+//
+// The circuit breaker used to persist `kickback_counts` INSIDE the plan's first
+// frontmatter block — the region `computeSpecHash` hashes in full, because it
+// carries `files:`, the write-surface grant. So the build's own quality gate
+// moved the hashed bytes and `isApprovedForCoverage` answered NOT approved: a
+// normal, documented kickback revoked the permission it was authorised by, and
+// the plan read as forged to every audit. The counter now lives in
+// `.ctoc/state/kickbacks/<slug>.json` and the plan file is never written.
+
+/** Read the kickback sidecar for a slug, or null when it does not exist. */
+function readKickbackSidecar(slug) {
+  const p = path.join(projectDir, '.ctoc', 'state', 'kickbacks', `${slug}.json`);
+  if (!fs.existsSync(p)) return null;
+  return JSON.parse(fs.readFileSync(p, 'utf8'));
+}
+
+test('a kickback does NOT revoke the approval it was authorised by', () => {
+  const actions = require('../src/lib/actions');
+  const slug = 'kickback-keeps-approval';
+  approve(slug, SPEC_PLAN);
+  const planPath = writePlan('todo', slug, SPEC_PLAN);
+  const before = fs.readFileSync(planPath);
+
+  const res = actions.recordStepKickback(planPath, 14, projectDir);
+  assert.equal(res.recorded, true, 'the kickback is counted');
+
+  assert.equal(
+    gateHook.classifyResidency(planPath, 'todo', projectDir).accepted, true,
+    'the plan is STILL approved for coverage after its own gate kicked it back',
+  );
+  assert.equal(
+    ledger.verify(slug, fs.readFileSync(planPath, 'utf8'), 'todo', projectDir), true,
+    'the recorded specification hash still verifies',
+  );
+  assert.deepEqual(
+    fs.readFileSync(planPath), before,
+    'the plan file is byte-identical — the breaker wrote no part of it',
+  );
+
+  const sidecar = readKickbackSidecar(slug);
+  assert.ok(sidecar, 'the count is persisted in .ctoc/state/kickbacks/<slug>.json');
+  assert.equal(sidecar.total, 1);
+  assert.equal(sidecar.by_step['14'], 1);
+});
+
+test('the same plan after SIX kickbacks — through an escalation — is still approved', () => {
+  const actions = require('../src/lib/actions');
+  const slug = 'kickback-six-times';
+  approve(slug, SPEC_PLAN);
+  const planPath = writePlan('todo', slug, SPEC_PLAN);
+  const before = fs.readFileSync(planPath);
+
+  let last;
+  for (let i = 0; i < 6; i++) last = actions.recordStepKickback(planPath, 14, projectDir);
+  assert.ok(last.escalation, 'six kickbacks to one step escalate — the breaker still trips');
+
+  assert.equal(
+    gateHook.classifyResidency(planPath, 'todo', projectDir).accepted, true,
+    'the approval survives an ESCALATION, not merely one quiet kickback',
+  );
+  assert.deepEqual(fs.readFileSync(planPath), before, 'still byte-identical after six kickbacks');
+  assert.equal(readKickbackSidecar(slug).total, 6);
+});
