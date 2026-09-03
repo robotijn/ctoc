@@ -13,6 +13,12 @@
  * blocks and take the MAX per-step count and the MAX total found in any block, so a
  * prepended counter-less block can no longer hide the real count in a deeper block.
  *
+ * Since the counter moved to `.ctoc/state/kickbacks/<slug>.json`, this max-across-blocks
+ * fold is the MIGRATION read: it seeds the sidecar from whichever leading block still
+ * carries a legacy counter, and it is a floor that stops a missing or corrupt sidecar
+ * silently resetting the count to zero. The breaker never writes a plan file, so these
+ * fixtures' bytes are invariant — asserted below.
+ *
  * Zero doubles: real os.tmpdir() fixtures, the real shipped code path. The approval
  * marker format mirrors actions.addApprovalMarker byte-for-byte (a prepended
  * `---…---\n\n` block) without importing actions.js.
@@ -76,7 +82,7 @@ describe('Circuit breaker readKickbackCounts: reads counts from a DEEPER block',
     const planPath = writePlan(root, 'deep-counts.md', raw);
 
     // Act
-    const counts = circuitBreaker.readKickbackCounts(planPath);
+    const counts = circuitBreaker.readKickbackCounts(planPath, root);
 
     // Assert — the real count in the deeper block must surface, NOT the first
     // block's zero. Against the first-block-only read this returns total 0 → RED.
@@ -108,7 +114,7 @@ describe('Circuit breaker readKickbackCounts: reads counts from a DEEPER block',
     const planPath = writePlan(root, 'max-across.md', shallow + deep);
 
     // Act
-    const counts = circuitBreaker.readKickbackCounts(planPath);
+    const counts = circuitBreaker.readKickbackCounts(planPath, root);
 
     // Assert — MAX per step and MAX total across every block.
     assert.equal(counts.total, 6, 'max total across blocks');
@@ -163,12 +169,18 @@ describe('Circuit breaker recordKickback: survives a re-approval cycle', () => {
     const planPath = writePlan(root, 'monotonic.md', raw);
 
     // Act
+    const before = fs.readFileSync(planPath);
     circuitBreaker.recordKickback(planPath, 10, root); // 6th total, 6th on step 10
-    const after = circuitBreaker.readKickbackCounts(planPath);
+    const after = circuitBreaker.readKickbackCounts(planPath, root);
 
     // Assert — the read never regresses below the true count; step 10 is now 6.
     assert.equal(after.total, 6, 'total stays at least the true prior max after a write');
     assert.equal(after.by_step['10'], 6, 'per-step stays at least the true prior max after a write');
+
+    // The monotonicity now comes from the SIDECAR, so the plan file must be
+    // untouched — otherwise the count would still be moving the hashed frontmatter.
+    assert.deepStrictEqual(fs.readFileSync(planPath), before,
+      'the plan file is byte-identical: monotonicity comes from the sidecar, not a rewrite');
   });
 });
 
@@ -181,14 +193,14 @@ describe('Circuit breaker: single-block behavior unchanged', () => {
     const root = makeRoot();
     const planPath = writePlan(root, 'single.md', VALID_FM);
 
-    assert.deepStrictEqual(circuitBreaker.readKickbackCounts(planPath), { by_step: {}, total: 0 });
+    assert.deepStrictEqual(circuitBreaker.readKickbackCounts(planPath, root), { by_step: {}, total: 0 });
 
     const first = circuitBreaker.recordKickback(planPath, 10, root);
     assert.equal(first.byStep, 1);
     assert.equal(first.total, 1);
     assert.equal(first.escalation, null);
 
-    const read = circuitBreaker.readKickbackCounts(planPath);
+    const read = circuitBreaker.readKickbackCounts(planPath, root);
     assert.equal(read.total, 1);
     assert.equal(read.by_step['10'], 1);
   });
@@ -204,7 +216,7 @@ describe('Circuit breaker: single-block behavior unchanged', () => {
       '---\n\n# body\n';
     const planPath = writePlan(root, 'first-only.md', raw);
 
-    const counts = circuitBreaker.readKickbackCounts(planPath);
+    const counts = circuitBreaker.readKickbackCounts(planPath, root);
     assert.equal(counts.total, 2);
     assert.equal(counts.by_step['10'], 2);
   });

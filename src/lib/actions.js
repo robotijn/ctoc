@@ -1477,12 +1477,14 @@ function failingStepFrom(validation) {
  * — max 3 kickbacks to the same step, max 5 total, then escalate — was enforced
  * NOWHERE and an overnight pipeline could loop forever, unseen.
  *
- * The circuit breaker persists the counter in the plan frontmatter and, on an
- * escalation, appends a durable record to `<root>/.ctoc/logs/escalations.json`
- * (read back via `circuit-breaker.getEscalations(root)`). A counter/IO error
- * never breaks the plan transition — it is reported, not swallowed.
+ * The circuit breaker persists the counter in `<root>/.ctoc/state/kickbacks/<slug>.json`
+ * — NOT in the plan file, whose frontmatter is hashed by the approval ledger, so a
+ * counter written there revoked the build's own write permission. On an escalation
+ * it appends a durable record to `<root>/.ctoc/logs/escalations.json` (read back via
+ * `circuit-breaker.getEscalations(root)`), a path this change does not touch. A
+ * counter/IO error never breaks the plan transition — it is reported, not swallowed.
  *
- * @param {string} planPath - the plan .md path (counter lives in its frontmatter)
+ * @param {string} planPath - the plan .md path (the counter lives in a sidecar keyed by this path's slug)
  * @param {number|string} step - the Iron Loop step being kicked back to
  * @param {string} root - project root (for the escalations log)
  * @returns {{recorded: boolean, byStep?: number, total?: number, escalation?: Object|null, error?: string}}

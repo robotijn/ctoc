@@ -413,59 +413,102 @@ remain broad-flagged — verify by running the file, not by reasoning about the 
    needed to go green — it is needed for the whitelist not to carry a false claim about
    what `circuit-breaker.js` writes.
 
+8. **The three replaced assertions, each justified.** A test may be changed only with a
+   stated, disputable justification: the contract must come from OUTSIDE the test, the
+   test (not the code) must be the wrong one, and the change must TIGHTEN toward real
+   behaviour. All three replaced assertions pinned the DEFECT — the counter's presence in
+   the hashed frontmatter — as the contract.
+
+   - *"counter is persisted in the plan frontmatter on disk"* (was case 3). **Contract
+     from outside the test:** the approved functional plan moves the counter out of the
+     hashed region. **Why the test was wrong:** it asserted the storage LOCATION that
+     revoked the build's own write permission, so it would have gone red on the fix and
+     green on the bug — inverted. **What newly fails:** the whole plan file must now be
+     byte-identical after two kickbacks. The old assertion permitted any rewrite that
+     left a `kickback_counts` key behind; the new one permits no write at all.
+
+   - *"preserves the plan body and other frontmatter keys byte-for-byte"* (was case 7).
+     **Contract from outside:** same ruling. **Why the test was wrong:** its name promised
+     byte-for-byte but it compared only the BODY plus two hand-picked frontmatter keys, so
+     a full frontmatter re-serialisation — key reordering, requoting, the exact change that
+     moves the specification hash — passed it. **What newly fails:** `fs.readFileSync`
+     equality over the entire file, plus `fm.kickback_counts === undefined`.
+
+   - *"prepends a frontmatter block when the plan has none"* (was case 9). **Contract from
+     outside:** same ruling — the breaker writes no plan file. **Why the test was wrong:**
+     it required the breaker to FABRICATE a frontmatter block in a plan that had none,
+     which is a write to a file the breaker has no business editing. **What newly fails:**
+     the file must still equal `'# Plain plan\n\nNo frontmatter here.\n'` exactly, and the
+     count must be found in the sidecar instead.
+
+   No assertion was weakened, no case deleted, no range widened. Every other case in all
+   six declared test files kept its assertions unchanged.
+
+9. **Scope growth: a SEVENTH call site the plan's call graph missed.** The plan verified
+   that `readKickbackCounts` has no `src/` caller and enumerated six test call sites;
+   there are seven. `tests/actions-coverage-holes.test.js:561` calls
+   `readKickbackCounts(planPath)` with no root, which Decision 1's required-`projectPath`
+   throw turns into a failure. That file is NOT in `files:`, so it was not written: a
+   scope-growth request is filed instead (`.ctoc/inbox/questions/1788430043421-o577vs.md`).
+   Amending `files:` would move the byte-hashed frontmatter and revert this plan
+   mid-build — the exact harm this slice exists to stop — and re-asking through the wrong
+   stage edge would do the same. Weakening Decision 1 to make the seventh call site pass
+   was rejected: it would reinstate the false zero the decision exists to prevent, and it
+   is a human-approved decision, not mine to overturn.
+
 
 ---
 
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing) — 11 failed / 27 passed across the five circuit-breaker suites, plus 2 failed in the approval-hash suite
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed — none needed; no new dependency
+- [x] Check prerequisites — `.ctoc/state/` is gitignored (.gitignore:6), so the sidecar is local per-developer
+- [x] Verify dev environment ready — Node v24.14.1
+- [x] Create directories/config if needed — none; `writeKickbackState` creates `.ctoc/state/kickbacks/` on demand
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements — sidecar store in `src/lib/circuit-breaker.js`; `writeCountsIntoText`, `splitFrontmatter` and `FRONTMATTER_RE` deleted, so the plan-write path is structurally impossible
+- [x] Add error handling — three-valued sidecar read, atomic write that rethrows, degraded-read `breaker-failure`
+- [x] Wire up integration points — no new module; the storage under the existing live call site (`actions.recordStepKickback` → `completeExecution`) changed, proven end to end by tests/circuit-breaker-wiring.test.js
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code — found and corrected a stale `@throws` on `writeKickbackState` (it now throws a wrapped error, not the raw filesystem one)
+- [x] Verify integration points work together — the live `completeExecution` path drives four real kickbacks and leaves no counter in the plan
+- [x] Check error handling completeness — the false-green fence caught a genuine empty catch in the new temp-cleanup path; the code was fixed, nothing was baselined or whitelisted
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations — `readKickbackCounts` reads the plan file ONLY when the sidecar is absent or untrustworthy
+- [x] Optimize critical paths — one small JSON read replaces a full plan parse on the common path
+- [x] Simplify complex code — one `maxCounts` fold replaces a migration flag and a second code path; three functions deleted, none added beyond the store itself
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal) — probed by RUNNING it, not by reasoning: plan paths `../../../../escape.md`, `a/../../b.md` and `sub/../../../out.md` all collapsed to bare basenames and every sidecar landed inside `.ctoc/state/kickbacks/`
+- [x] Sanitize outputs — a hostile sidecar carrying `__proto__`/`constructor` in `by_step` had those keys dropped and left `Object.prototype` untouched
+- [x] No secrets in code — the sidecar holds a slug, step keys, integer counts and a timestamp
+- [x] Safe file operations — `safeFs` throughout, `path.join` throughout, no shell; atomic temp-then-rename
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check — `npm run lint` clean, `npm run typecheck` pass 1 / fail 0
+- [ ] Run ALL tests (TDD Green) — `npm test` is **fail 1**. The single failure is `tests/actions-coverage-holes.test.js:561`, a SEVENTH call site of `readKickbackCounts` that this plan's `files:` does not declare. Not written; a scope-growth request is filed.
+- [x] Check coverage >= 80% — 99.9% against the enforced floor of 99
+- [x] 0 skipped, 0 flaky tests — skipped 0
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation — the module header states the sidecar, the migration fold and the never-write; `src/lib/actions.js` and the `tests/cache-freshness.test.js` whitelist justification corrected
+- [x] Add JSDoc comments to new functions — all four new functions documented
+- [x] Update CHANGELOG if needed — no CHANGELOG exists at the repository root
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
+- [ ] Verify steps 8-15 completed correctly — NOT REACHED: Step 14 is incomplete
+- [ ] All quality checks passed — `npm test` is fail 1 (see Step 14)
 - [ ] Manual verification if needed
-- [ ] Ready for human review
+- [ ] Ready for human review — NO: a scope-growth decision is open
 
 
 ## Deferred Questions
@@ -475,3 +518,91 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record
+
+**Status: Steps 8–13 and 15 complete. Step 14 is INCOMPLETE and Step 16 was not
+reached — the build is stopped on a scope-growth decision that belongs to the human.**
+
+### What landed (all nine declared files, and nothing else)
+
+- `src/lib/circuit-breaker.js` — the counter now lives in
+  `.ctoc/state/kickbacks/<slug>.json`, written atomically (temp file + rename).
+  Added `maxCounts`, `kickbackStatePath`, `readKickbackState` (three-valued:
+  `ok` / `absent` / `unreadable`) and `writeKickbackState`. Deleted
+  `writeCountsIntoText`, `splitFrontmatter` and `FRONTMATTER_RE`, so no code path
+  that writes a plan file remains. `recordKickback` keeps its signature; its plan
+  read stays unguarded so a ghost plan still hard-escalates. `readKickbackCounts`
+  now takes a REQUIRED `projectPath` and throws without one.
+- `src/lib/actions.js` — documentation only; the JSDoc no longer claims the counter
+  lives in the plan frontmatter. No signature and no call site moved.
+- `tests/approval-hash-survives-execution.test.js` — two new cases (the headline
+  regression, and the same property through an escalation). No existing case touched.
+- `tests/ctoc-audit-w05-circuit-breaker.test.js` — three defect-pinning assertions
+  replaced by strictly stronger ones (justified in Decision 8), one signature update,
+  five new cases (migration, migration through a prepended block, an unparseable
+  sidecar, a wrongly-shaped sidecar, the missing-root throw).
+- `tests/circuit-breaker-coverage.test.js` — two signature updates, three new cases.
+- `tests/circuit-breaker-block-prepend.test.js` — six signature updates plus a
+  byte-identity assertion on the monotonicity case.
+- `tests/circuit-breaker-malformed-frontmatter.test.js` — two signature updates.
+- `tests/circuit-breaker-wiring.test.js` — one signature update plus the end-to-end
+  assertion that four live kickbacks leave no `kickback_counts` in the plan.
+- `tests/cache-freshness.test.js` — the whitelist justification corrected to what the
+  module actually writes.
+
+### What is NOT done, and why
+
+`npm test` is **fail 1**. `tests/actions-coverage-holes.test.js:561` is a seventh
+call site of `readKickbackCounts` that this plan does not declare. The write was not
+made and the plan's `files:` was not amended. See Decision 9 and the filed request
+at `.ctoc/inbox/questions/1788430043421-o577vs.md`.
+
+### A mistake made and corrected during this build, disclosed
+
+Writing the Step 14 status into the step HEADING (`### Step 14: VERIFY — INCOMPLETE…`)
+broke this plan's own specification hash: step headings are hashed, and only the
+checkbox STATE and the excluded record sections are not. `classifyResidency` read
+`hash-mismatch` — the very failure this slice exists to stop, reproduced by the
+executor writing its own status in the wrong place. The headings were restored
+verbatim and the status moved onto the checkbox lines; the plan verifies again and
+`classifyResidency` reads `accepted: true`. Recorded because the next executor will
+reach for the same shortcut.
+
+### Not touched
+
+The approval ledger, the streaming question store and the Step-14 verify store were
+hashed before and after this build and are byte-identical
+(`7383a74d4b9916ba32dad5e30ac1edaa982d3360`). No baseline, no whitelist and no
+coverage floor was changed. The stale `kickback_counts` block on existing plans was
+left in place, as ruled.
+
+## Verification Evidence
+
+Run from the repository root, `npm test`, output captured to a file and read from the
+last lines. Not piped through anything that could hide the exit status.
+
+```
+[CTOC test-gate] coverage 99.9% (threshold 99%), skipped 0, failed 1
+[CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+[CTOC test-gate] FAIL:
+  - # fail 1 > 0
+```
+
+- Lint: `npm run lint` — clean, `--max-warnings 0`.
+- Typecheck: `npm run typecheck` — pass 1, fail 0, skipped 0.
+- Coverage: 99.9%, against the enforced floor of 99. Not lowered.
+- Skipped: 0.
+- The one failure is named above and is outside this plan's declared write surface.
+- The six declared circuit-breaker suites plus the approval-hash suite: **78 pass,
+  0 fail, 0 skipped.**
+- Step 8 red, recorded before any implementation existed: 11 failed / 27 passed across
+  the five circuit-breaker suites, and the headline case failed on
+  `classifyResidency(planPath, 'todo', projectDir).accepted` being `false` — the
+  approval that the kickback had revoked.
+
+One case, `readKickbackCounts_returns_zeros_when_BOTH_the_plan_and_the_sidecar_are_absent`,
+was GREEN before the implementation and is accounted for rather than banked: JavaScript
+ignores the extra argument, so it duplicated the existing absent-plan case until the
+signature changed. It is kept because it now pins that the fail-safe survived the
+storage move, but it proved nothing at Step 8 and is not counted as red-then-green.
