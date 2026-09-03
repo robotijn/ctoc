@@ -1,10 +1,11 @@
 {
-  "content_sha256": "f74d8589560194dc08f2052378cc3e22ec0045012593a719f148f49658d7d347",
-  "stage_from": "backfill",
-  "stage_to": "review",
-  "approved_at": "2026-07-14T08:30:31.739Z",
+  "content_sha256": "4cdd87e0bf71608065271130371e2a36b4d70d5bcc15016fc5a9e9426a837bd9",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-03T10:23:20.812Z",
   "approved_by": "human",
   "backfilled": true,
-  "backfill_reason": "2026-07-14: coordinator staged plan into a gate destination via hand-stamped approved_by:human frontmatter instead of a real approvePlan crossing (the forgery R3 closed). WORK ordered by the human; provenance path was wrong. Recorded backfilled so it stays distinguishable from a clicked approval.",
+  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00019-r5b-approveplan-validates-one-gate-encoding"
 }

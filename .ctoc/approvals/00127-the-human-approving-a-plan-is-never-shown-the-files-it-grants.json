@@ -1,9 +1,11 @@
 {
-  "content_sha256": "fa6328a42e69e8889b09c8d1287d2aa6cfe2b86e2b9837d415f24cd4dec7b77e",
+  "content_sha256": "fa986127f24a626c9e86d026232a846e76af324a1602c7da90f23d7de376605c",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-20T09:39:54.677Z",
+  "approved_at": "2026-09-03T10:23:23.206Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00127-the-human-approving-a-plan-is-never-shown-the-files-it-grants"
 }

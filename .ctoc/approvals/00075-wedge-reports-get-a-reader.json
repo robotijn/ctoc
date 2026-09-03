@@ -1,8 +1,11 @@
 {
-  "content_sha256": "143efb91e7220f17022c5b2c2ff64e23bc5592a81115032c254a7798e2fc1715",
+  "content_sha256": "577ed730ced8b7df8e761869754c156e59c9223d68069ac0b480bff7435a411d",
+  "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-18T21:08:04.252Z",
+  "approved_at": "2026-09-03T10:23:21.768Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00075-wedge-reports-get-a-reader"
 }

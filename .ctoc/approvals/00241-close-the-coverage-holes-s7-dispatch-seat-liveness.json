@@ -1,11 +1,9 @@
 {
-  "content_sha256": "8da69e4e97c38df6c1674a443ee3b028156399ed596d92c92c354b4be2458c2a",
+  "content_sha256": "dc4d7d8e4aa6003933d15a56fedf014633a98a16a382dd1ab100a8330febf7cd",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T09:49:35.795Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-09-03T10:22:51.286Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00241-close-the-coverage-holes-s7-dispatch-seat-liveness"
 }

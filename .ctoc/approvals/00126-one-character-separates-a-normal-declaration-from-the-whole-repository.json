@@ -1,9 +1,11 @@
 {
-  "content_sha256": "c6f8a495ced492b015346905f9fc299eff1e397d215cc9015eacd09445c71d96",
+  "content_sha256": "b2bb75685beefb9c80fe55306bcd1d2e2a7133ffe42c3d2a24746ac668d56dd7",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-20T09:39:54.625Z",
+  "approved_at": "2026-09-03T10:23:23.155Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00126-one-character-separates-a-normal-declaration-from-the-whole-repository"
 }

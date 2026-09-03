@@ -1,10 +1,11 @@
 {
-  "content_sha256": "6e1359cafe4af6dd6642c4acfe6967ad076c299ab974441bae52f65493ded48a",
-  "stage_from": "backfill",
-  "stage_to": "review",
-  "approved_at": "2026-07-14T12:51:52.175Z",
+  "content_sha256": "61dbe4a0e33026967a57288305bc4e1b1810efe641b09cbc2d9c23db6fc77692",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-03T10:23:21.324Z",
   "approved_by": "human",
   "backfilled": true,
-  "backfill_reason": "2026-07-14 CR2: sibling slice of the human-authorized capability-registry program (parent ctoc-capability-registry; the human approved the program via \"combine 1 and 3\" then \"go\"). Mirrors CR1 (00027) backfilled review entry. Forgeable hand-stamped frontmatter marker removed; ledger is the sole approval record. Work human-ordered; awaiting human Gate 3.",
+  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00028-cr2-top20-language-data"
 }

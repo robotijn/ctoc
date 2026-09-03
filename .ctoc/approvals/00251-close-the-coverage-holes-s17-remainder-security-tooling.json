@@ -1,11 +1,9 @@
 {
-  "content_sha256": "0dd36a2f22503e0fa935eea014588cd58b070a7a1dae3950878a876642c91cb7",
+  "content_sha256": "bd22a10610f6e2df731c3e35bc9890af4b39540b1707a0624d0024b6d11ab9d3",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T09:49:36.048Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-09-03T10:22:50.800Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00251-close-the-coverage-holes-s17-remainder-security-tooling"
 }

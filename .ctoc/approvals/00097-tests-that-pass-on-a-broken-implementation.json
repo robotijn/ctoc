@@ -1,9 +1,11 @@
 {
-  "content_sha256": "3b60023285edd805824d475db5e722e245abec68b90183e576472c6f67a02b68",
+  "content_sha256": "1e7a136e5c03c1a7b3dd21049f3f420b226f310fcdb89ac26f8624c619629717",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-19T16:48:06.303Z",
+  "approved_at": "2026-09-03T10:23:22.675Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00097-tests-that-pass-on-a-broken-implementation"
 }

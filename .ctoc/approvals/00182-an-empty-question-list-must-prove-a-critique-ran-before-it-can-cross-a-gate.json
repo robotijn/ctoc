@@ -1,9 +1,11 @@
 {
-  "content_sha256": "90ae0d69ff0da5a71b982177a198b8e55c6c688b87ba293018fa96f3145c1075",
+  "content_sha256": "ac07fdbf6a864fb18d977a9e09289bb38cd492bf01492817750c651a464dd75c",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-30T14:47:43.986Z",
+  "approved_at": "2026-09-03T10:23:23.773Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00182-an-empty-question-list-must-prove-a-critique-ran-before-it-can-cross-a-gate"
 }

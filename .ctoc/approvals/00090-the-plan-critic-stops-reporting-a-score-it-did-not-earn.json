@@ -1,9 +1,11 @@
 {
-  "content_sha256": "83699bb47025f274e9334d36e38d5f8e5aab5f6ce87b1d7c5335a1bad7c87452",
+  "content_sha256": "981a229886033dbf35f9a271874844d4a428dd9e607723232a6de2aa6b0e8228",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-19T21:28:21.144Z",
+  "approved_at": "2026-09-03T10:23:22.512Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00090-the-plan-critic-stops-reporting-a-score-it-did-not-earn"
 }

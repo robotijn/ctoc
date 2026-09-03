@@ -1,9 +1,9 @@
 {
-  "content_sha256": "ca0dc04686c14f5173972be5ce17793ad41c916aa82bcd74d294799061ce6805",
+  "content_sha256": "dc1447e9a52902035910edf97ba01f97ab5acd0b2a42cfb072e9092b07861cda",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-08-31T14:59:34.749Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-09-03T10:22:51.499Z",
   "approved_by": "human",
   "plan_basename": "00254-close-the-coverage-holes-s20-floor-raise-decision"
 }

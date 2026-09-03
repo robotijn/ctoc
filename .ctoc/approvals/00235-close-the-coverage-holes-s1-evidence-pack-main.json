@@ -1,11 +1,9 @@
 {
-  "content_sha256": "34c3dac80baf94e60f788e3a326646bbf16742bdace9abfced54eb68817ff09b",
+  "content_sha256": "8d89bc351ec05bdbe30da59b99b12739c25dbe9435fd108a368b0a7ad597aefe",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T09:49:35.672Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-09-03T10:22:50.239Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00235-close-the-coverage-holes-s1-evidence-pack-main"
 }

@@ -1,11 +1,9 @@
 {
-  "content_sha256": "015a859b9bf2bfc5c2b9bed62efca5a9a70a8bd94e8ec2dc9b0ad71d3c8ce19b",
+  "content_sha256": "4160c1ef918ec5fd96faa97725432ce9126aaecba196741aa67b3911ab8ecb3a",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T09:49:35.196Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-09-03T10:22:52.221Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00256-a-kickback-must-not-revoke-the-builds-own-permission-s1-sidecar-counter"
 }
