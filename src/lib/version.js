@@ -168,16 +168,24 @@ function syncToPluginJson() {
 /**
  * Sync VERSION to README.md.
  *
- * Updates the two README targets that reflect the product version — the same
+ * Updates the three README targets that reflect the product version — the same
  * targets the release script (src/scripts/release.js) rewrites:
  *   1. the version line at the start of a line: `**X.Y.Z**` (whatever separator
  *      or text follows — em-dash, middle-dot, etc.);
- *   2. the shields.io version badge: `version-X.Y.Z-blue`.
+ *   2. the shields.io version badge: `version-X.Y.Z-blue`;
+ *   3. the dashboard capture's first line: `CTOC vX.Y.Z` at column 0 (a version
+ *      inside a fenced block, invisible to targets 1 and 2).
  *
  * FAIL LOUD: if the version line token is absent (e.g. the README format drifted
  * so no `**X.Y.Z**` appears at a line start), the sync cannot do its job and
  * returns `{ success: false, matched: false }` instead of a phantom success — so
  * a future format drift surfaces loudly rather than silently disabling the sync.
+ *
+ * The capture line is rewritten when present; its absence is not a fail-loud
+ * condition here (a README with no capture is still a syncable README). Drift of
+ * that line is caught red by `tests/readme-numbers.test.js`, which pins the
+ * capture's version against the VERSION file — a pin that also catches a stale
+ * capture pasted by hand, which no sync ever could.
  *
  * @param {string} [root] - Repo root (defaults to the resolved plugin root).
  *   An explicit root lets a test drive a fixture README without touching the
@@ -198,6 +206,8 @@ function syncToReadme(root = getPluginRoot()) {
   const versionLine = /^\*\*\d+\.\d+\.\d+\*\*/m;
   // shields.io version badge.
   const badge = /version-\d+\.\d+\.\d+-blue/g;
+  // The dashboard capture's first line: `CTOC vX.Y.Z` at column 0.
+  const captureLine = /^CTOC v\d+\.\d+\.\d+$/m;
 
   if (!versionLine.test(content)) {
     return { success: false, matched: false, version, error: 'README version line not found' };
@@ -205,7 +215,8 @@ function syncToReadme(root = getPluginRoot()) {
 
   content = content
     .replace(versionLine, `**${version}**`)
-    .replace(badge, `version-${version}-blue`);
+    .replace(badge, `version-${version}-blue`)
+    .replace(captureLine, `CTOC v${version}`);
 
   safeFs.writeFileSync(readmeFile, content);
 

@@ -24,6 +24,7 @@ const IRON_LOOP = fs.readFileSync(path.join(ROOT, 'docs', 'IRON_LOOP.md'), 'utf8
 const MENU_MD = fs.readFileSync(path.join(ROOT, 'src', 'commands', 'start.md'), 'utf8');
 const ASK_CANONICAL = fs.readFileSync(path.join(ROOT, '.ctoc', 'ask-me-questions.md'), 'utf8');
 const ASK_SKILL = fs.readFileSync(path.join(ROOT, 'skills', 'ask-me-questions', 'SKILL.md'), 'utf8');
+const VERSION = fs.readFileSync(path.join(ROOT, 'VERSION'), 'utf8').trim();
 
 // ─────────────────────────────────────────────────────────────────────
 // Filesystem-derived ground truth
@@ -308,6 +309,21 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, new RegExp(`${counts.libModules} JS modules`));
   });
 
+  // C-1 — the structure block's test-file count is DERIVED, not a literal. The
+  // README said 524 while disk held 543; release.js now rewrites this line, and
+  // this pin is what goes red if the sync ever stops matching it.
+  it('Project structure: test-file count (derived from disk)', () => {
+    assert.match(README, new RegExp(`tests/\\s+${counts.testFiles} test files`));
+  });
+
+  // C-2 — the Lesson 2 dashboard capture's version line. A version inside a
+  // fenced block is invisible to the badge/headline patterns, so it re-rotted on
+  // every release. This pin fires whether the sync stopped matching or a human
+  // pasted a stale capture — the sync itself can never catch the latter.
+  it('Lesson 2 capture: the version line equals the VERSION file', () => {
+    assert.match(README, new RegExp(`^CTOC v${VERSION.replace(/\./g, '\\.')}$`, 'm'));
+  });
+
   it('Project structure: 124 agent definitions across 24 categories', () => {
     assert.match(README, /124 agent definitions across 24 categories/);
   });
@@ -446,6 +462,13 @@ describe('R2-D — instruction-surface truth', () => {
     assert.match(ASK_CANONICAL, /single AskUserQuestion call/);
     // Discussion/design questions still stay one-per-turn.
     assert.match(ASK_CANONICAL, /One question per turn/);
+  });
+
+  // C-3 — the staging environment row claimed "auto-move to review". R4-B DELETED
+  // autoMoveToReview (it drove an evidence-less rename into review/); the staging
+  // profile sets nothing but strict enforcement. The claim must not come back.
+  it('Environments: the staging row no longer claims auto-move to review', () => {
+    assert.doesNotMatch(README, /auto-move to review/i);
   });
 
   // grep-zero: "plan-serial" must not appear on any instruction surface.
