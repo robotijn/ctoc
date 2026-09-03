@@ -1,0 +1,9 @@
+{
+  "content_sha256": "6580873c3854dc550759f058295fe916bbc6f248282485e4bf69b6a3cde8d9fe",
+  "hash_scope": "specification",
+  "stage_from": "functional",
+  "stage_to": "implementation",
+  "approved_at": "2026-09-03T11:09:33.386Z",
+  "approved_by": "human",
+  "plan_basename": "the-evidence-pack-tells-the-truth-about-the-right-repository"
+}

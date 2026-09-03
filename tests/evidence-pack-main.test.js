@@ -28,37 +28,49 @@
 //   157-206  main — manifest, archive, the tar-absent fallback, the empty guard
 //   208-221  yamlify
 //
-// RANGES THIS FILE DELIBERATELY LEAVES (measured after this slice: the file is
-// at 98.76 % line coverage, up from 59.56 %; two lines remain, both named here
-// rather than faked):
-//   160-161  `readActiveRegimes`' catch arm. It is entered only when requiring
+// RANGES THIS FILE DELIBERATELY LEAVES (re-measured after the five fixes: the
+// file is at 99.05 % line coverage, up from 98.76 %; the SAME two lines remain,
+// at their new numbers, both named here rather than faked):
+//   205-206  `readActiveRegimes`' catch arm. It is entered only when requiring
 //            ../lib/regulatory-regime THROWS. A fixture cannot make a
 //            first-party module fail to load without mocking the loader inside
 //            the child, and the arm returns [] — exactly what the success path
 //            returns for a project with no regime settings — so a case there
 //            would assert nothing a mutation would break.
-//   236      `yamlify`'s scalar arm (`return String(obj)`). yamlify is not
+//   311      `yamlify`'s scalar arm (`return String(obj)`). yamlify is not
 //            exported and `main` only ever hands it the manifest object, so no
 //            caller can reach it: DEAD within this file's reachable surface.
 //            Reported to the human, never deleted here — removing a line is its
 //            own decision with its own plan.
 //
-// WHAT THIS FILE PINS RATHER THAN FIXES — four behaviours the command really
-// has, which differ from what the approved plan describes. They are asserted as
-// they are and carried to the human as decisions (see the plan's Decisions
-// Taken Under Ambiguity):
-//   1. the pack's root is the repository the SCRIPT lives in, not the project
-//      the human is in ('defaults to the repository the script ships in' pins
-//      that default);
-//   2. the archive does NOT contain the manifest ('packs an archive whose
-//      members are exactly the collected artifacts' asserts the absence);
-//   3. with `tar` unavailable the command does NOT fail — it writes a JSON
-//      bundle and exits 0 ('falls back to a JSON bundle' asserts it);
-//   4. the file it names `.manifest.yaml` is not valid YAML — the nested window
-//      map is written on its parent's line and an empty list carries no space
-//      after the colon, so a real parser refuses the document. Found by running
-//      the command; pinned, not fixed, because the format of a compliance
-//      artifact is the human's call.
+// WHAT THIS FILE USED TO PIN, AND NOW ASSERTS FIXED. Five behaviours were once
+// asserted here exactly as the command really had them, and reported to the
+// human as findings rather than changed. The human ordered the fix; that order
+// is a contract change from OUTSIDE the tests, so each pin is replaced by a
+// STRICTLY STRONGER assertion of the fixed contract (Operating Lesson 14 — no
+// assertion is widened, deleted, or relaxed):
+//   1. the pack's root was the repository the SCRIPT lives in, not the project
+//      the human is in. Now: CTOC_EVIDENCE_ROOT, else a working directory that
+//      holds a .ctoc/ DIRECTORY, else a loud refusal that writes nothing
+//      ('packs the working directory…' and 'refuses a working directory…');
+//   2. the archive did NOT contain the manifest. Now the manifest is its FIRST
+//      member, and the member's bytes equal the manifest on disk ('puts its own
+//      manifest first in the archive');
+//   3. with `tar` unavailable the command exited 0. Now it exits non-zero and
+//      the message names the degradation, with the salvage bundle still written
+//      ('exits non-zero and names the degradation…');
+//   4. the file it names `.manifest.yaml` was not valid YAML. Now js-yaml — a
+//      real parser, not one of the repository's never-throwing hand-rolled
+//      readers — loads it and the parsed window equals the requested window
+//      ('the manifest parses, and the parsed window…');
+//   5. three of the eight collectors ignored the --since/--until window (the
+//      audit chain log, the provenance event log, and each version's baseline
+//      manifest). Now every collector honours the same bounds ('the window
+//      binds every collector', 'a 1970 window collects nothing').
+//
+// The provenance event log is seeded by buildFixture BECAUSE of finding 5: no
+// fixture ever wrote .ctoc/ai-provenance.jsonl, so that collector's push line
+// had never executed under any test and its window-blindness was invisible.
 // ===========================================================================
 
 const { describe, it, after } = require('node:test');
@@ -114,6 +126,7 @@ function buildFixture() {
   write(['.ctoc', 'threat-models', 'nested', 't.json'], '{"threat":"spoofing"}\n');
   write(['.ctoc', 'baselines', '6.14.36', 'manifest.yaml'], 'version: 6.14.36\nfiles: []\n');
   write(['.ctoc', 'capa', 'c1.yaml'], 'capa_id: c1\nstatus: open\n');
+  write(['.ctoc', 'ai-provenance.jsonl'], '{"event":"generation","model":"opus"}\n');
   return fix;
 }
 
@@ -125,14 +138,18 @@ const FIXTURE_ARTIFACTS = [
   path.join('.ctoc', 'threat-models', 'nested', 't.json'),
   path.join('.ctoc', 'baselines', '6.14.36', 'manifest.yaml'),
   path.join('.ctoc', 'capa', 'c1.yaml'),
+  path.join('.ctoc', 'ai-provenance.jsonl'),
 ];
 
-function run({ root, since = SINCE, until = UNTIL, env = {} }) {
+// `cwd` defaults to undefined, which spawnSync reads as "inherit this process's
+// working directory" — byte-for-byte what every pre-existing call did.
+function run({ root, since = SINCE, until = UNTIL, env = {}, cwd = undefined }) {
   const childEnv = { ...process.env, ...env };
   if (root === null) delete childEnv.CTOC_EVIDENCE_ROOT;
   else childEnv.CTOC_EVIDENCE_ROOT = root;
   return spawnSync(process.execPath, [SCRIPT, `--since=${since}`, `--until=${until}`], {
     env: childEnv,
+    cwd,
     encoding: 'utf8',
   });
 }
@@ -184,7 +201,7 @@ after(() => {
 });
 
 describe('evidence-pack main() — the shipped command, executed', () => {
-  it('writes a manifest describing the window it was given', () => {
+  it('writes the manifest with a nested, parseable window block', () => {
     const fix = buildFixture();
     const res = run({ root: fix });
     assert.equal(res.status, 0, `command must exit 0; stderr: ${res.stderr}`);
@@ -192,14 +209,13 @@ describe('evidence-pack main() — the shipped command, executed', () => {
     const text = fs.readFileSync(manifestPath(fix), 'utf8');
     const top = topLevel(text);
     assert.equal(top.pack_id, `${SINCE}_${UNTIL}`);
-    // Pinned drift, NOT a fix (finding 4): the writer never breaks the line
-    // before a nested map, so the window's first key lands on its parent's
-    // line — `window:  since: <date>` — and the next line is indented under a
-    // scalar. The bytes are asserted exactly as they are; the case below shows
-    // a real parser refusing the file.
+    // Tightened (was: the malformed `window:  since: <date>` bytes, pinned as
+    // finding 4). The human ordered the fix, so the byte assertion moves to the
+    // correct shape — same exactness, the fixed bytes instead of the broken
+    // ones: the parent key ends its line and both children sit one level in.
     assert.ok(
-      text.includes(`window:  since: ${SINCE}\n  until: ${UNTIL}\n`),
-      `the window is written as the command really writes it. Manifest was:\n${text}`
+      text.includes(`window:\n  since: ${SINCE}\n  until: ${UNTIL}\n`),
+      `the window is a nested block map. Manifest was:\n${text}`
     );
 
     const entries = artifactEntries(text);
@@ -283,7 +299,11 @@ describe('evidence-pack main() — the shipped command, executed', () => {
     assert.deepEqual(sweepRepoEvidenceDir(), []);
   });
 
-  it('packs an archive whose members are exactly the collected artifacts — and NOT the manifest', () => {
+  it('puts its own manifest first in the archive, and the member is the manifest verbatim', () => {
+    // Tightened (was: 'packs an archive whose members are exactly the collected
+    // artifacts — and NOT the manifest', which asserted the ABSENCE of the
+    // manifest as finding 2). An absence assertion becomes presence + position +
+    // byte-identical content, and the artifact member list stays exact.
     const fix = buildFixture();
     assert.equal(run({ root: fix }).status, 0);
 
@@ -292,15 +312,26 @@ describe('evidence-pack main() — the shipped command, executed', () => {
 
     const listing = spawnSync('tar', ['-tzf', archive], { encoding: 'utf8' });
     assert.equal(listing.status, 0, `tar must list the archive; stderr: ${listing.stderr}`);
-    const members = listing.stdout.split('\n').map((s) => s.trim()).filter(Boolean).sort();
+    const members = listing.stdout.split('\n').map((s) => s.trim()).filter(Boolean);
+
+    const manifestRel = path.relative(fix, manifestPath(fix));
+    assert.equal(members[0], manifestRel, 'the manifest is the FIRST member of the archive it describes');
 
     const listed = artifactEntries(fs.readFileSync(manifestPath(fix), 'utf8')).map((e) => e.path).sort();
-    assert.deepEqual(members, listed, 'the archive members are exactly the manifest artifact list');
+    assert.deepEqual(
+      members.slice(1).sort(),
+      listed,
+      'the remaining archive members are exactly the manifest artifact list'
+    );
 
-    // Pinned drift, NOT a fix: the manifest is written beside the archive, never
-    // into it. Asserted so the omission is visible instead of assumed.
-    const manifestRel = path.relative(fix, manifestPath(fix));
-    assert.ok(!members.includes(manifestRel), 'the manifest is not a member of the archive it describes');
+    // The archive stands alone: its manifest member is the manifest on disk.
+    const extracted = spawnSync('tar', ['-xzOf', archive, manifestRel], { encoding: 'utf8' });
+    assert.equal(extracted.status, 0, `tar must extract the manifest member; stderr: ${extracted.stderr}`);
+    assert.equal(
+      extracted.stdout,
+      fs.readFileSync(manifestPath(fix), 'utf8'),
+      'the manifest inside the archive is byte-for-byte the manifest beside it'
+    );
 
     assert.ok(
       !fs.existsSync(path.join(packDir(fix), `.pack-${SINCE}.list`)),
@@ -309,17 +340,29 @@ describe('evidence-pack main() — the shipped command, executed', () => {
     assert.deepEqual(sweepRepoEvidenceDir(), []);
   });
 
-  it('falls back to a JSON bundle and still exits 0 when tar cannot be found', () => {
+  it('exits non-zero and names the degradation when tar cannot be found', () => {
+    // Tightened (was: 'falls back to a JSON bundle and still exits 0…', which
+    // pinned finding 3 with `assert.equal(res.status, 0, 'the documented
+    // behaviour is a FALLBACK, not a failure')`). A compliance artifact that
+    // degraded its promised format must not report success. Every bundle
+    // assertion below is kept verbatim; only the exit code and the message
+    // wording are tightened.
     const fix = buildFixture();
     const emptyPathDir = mkTemp('ctoc-evpack-nopath-');
     const res = run({ root: fix, env: { PATH: emptyPathDir, Path: emptyPathDir } });
 
-    assert.equal(res.status, 0, 'the documented behaviour is a FALLBACK, not a failure');
+    assert.equal(res.status, 1, `a degraded format must exit non-zero; stderr: ${res.stderr}`);
     assert.ok(
       res.stderr.includes('tar failed ('),
       `the fallback must announce itself on stderr — if this platform still resolved a tar ` +
         `binary the case did not test what it claims. stderr was: ${JSON.stringify(res.stderr)}`
     );
+    assert.match(
+      res.stderr,
+      /archive was NOT produced in the promised format/,
+      'the message names the degradation, not just the underlying tar error'
+    );
+    assert.match(res.stdout, /Archive: {2}NOT PRODUCED/, 'the final line must not name a .tar.gz that does not exist');
     assert.ok(!fs.existsSync(tarPath(fix)), 'no archive is produced when tar is unavailable');
 
     const bundle = JSON.parse(fs.readFileSync(jsonPath(fix), 'utf8'));
@@ -343,61 +386,152 @@ describe('evidence-pack main() — the shipped command, executed', () => {
     assert.deepEqual(sweepRepoEvidenceDir(), []);
   });
 
-  it('pins which collectors ignore the window: the chain log and the baseline manifest', () => {
-    // Six of the eight collectors filter by mtime. Two do not: the audit chain
-    // log and every version's baseline manifest are pushed whenever they exist.
-    // A 1970 window over the full fixture therefore yields exactly those two.
-    // Pinned as current behaviour, and reported — a "window" two collectors do
-    // not honour is a finding for the human, not this slice's to change.
+  it('the window binds every collector — a 1970 window collects nothing', () => {
+    // Tightened (was: 'pins which collectors ignore the window: the chain log
+    // and the baseline manifest', whose exact set was those two files for this
+    // very window — finding 5). The same 1970 window over the same full fixture
+    // must now yield the EMPTY set: an exact set of two becomes an exact set of
+    // zero, which is a strictly stronger claim about the same input.
     const fix = buildFixture();
     assert.equal(run({ root: fix, since: OLD_SINCE, until: OLD_UNTIL }).status, 0);
 
     const text = fs.readFileSync(manifestPath(fix, OLD_SINCE, OLD_UNTIL), 'utf8');
+    assert.deepEqual(artifactEntries(text).map((e) => e.path).sort(), []);
+    assert.equal(topLevel(text).artifact_count, '0');
+    assert.ok(!fs.existsSync(tarPath(fix, OLD_SINCE, OLD_UNTIL)), 'no archive for an empty window');
+    assert.ok(!fs.existsSync(jsonPath(fix, OLD_SINCE, OLD_UNTIL)), 'and no salvage bundle either');
+    assert.deepEqual(sweepRepoEvidenceDir(), []);
+  });
+
+  it('the window binds every collector — the three formerly unconditional ones included', () => {
+    // The audit chain log, the provenance event log and each version's baseline
+    // manifest were pushed whenever they existed, whatever their mtime. Age
+    // exactly those three out of the window and leave the other four inside it:
+    // a mixed fixture proves the bound EXCLUDES without proving only that
+    // everything is excluded.
+    const fix = buildFixture();
+    const aged = [
+      path.join('.ctoc', 'audit', 'chain.jsonl'),
+      path.join('.ctoc', 'ai-provenance.jsonl'),
+      path.join('.ctoc', 'baselines', '6.14.36', 'manifest.yaml'),
+    ];
+    const old = new Date('2020-01-01T00:00:00Z');
+    for (const rel of aged) fs.utimesSync(path.join(fix, rel), old, old);
+
+    assert.equal(run({ root: fix }).status, 0);
+
+    const listed = artifactEntries(fs.readFileSync(manifestPath(fix), 'utf8')).map((e) => e.path).sort();
     assert.deepEqual(
-      artifactEntries(text).map((e) => e.path).sort(),
-      [path.join('.ctoc', 'audit', 'chain.jsonl'), path.join('.ctoc', 'baselines', '6.14.36', 'manifest.yaml')].sort()
+      listed,
+      FIXTURE_ARTIFACTS.filter((p) => !aged.includes(p)).sort(),
+      'only the artifacts whose mtime falls inside the window are collected'
     );
     assert.deepEqual(sweepRepoEvidenceDir(), []);
   });
 
-  it('pins a manifest.yaml that no YAML parser will read', () => {
-    // Finding 4, discovered by running the command: `yamlify` emits a nested
-    // map with no line break after its parent key (`window:  since: ...`) and
-    // an empty list with no space after the colon
-    // (`active_regulatory_regimes:[]`). The file the command names
-    // `.manifest.yaml` is therefore not YAML — js-yaml, already used by
-    // src/lib/circuit-breaker.js and three sibling test files, refuses it.
-    // Whether a compliance manifest must be machine-readable is the human's
-    // decision, so this slice pins the behaviour and reports it rather than
-    // quietly changing the format of a regulatory artifact.
+  it('the manifest parses, and the parsed window is the window that was asked for', () => {
+    // Tightened (was: 'pins a manifest.yaml that no YAML parser will read',
+    // whose assertions were `assert.throws(() => yaml.load(text),
+    // /bad indentation/)` and `text.includes('active_regulatory_regimes:[]')` —
+    // finding 4). A refutation becomes a positive round-trip: the document
+    // loads, and every field is asserted against what the command was told.
+    //
+    // The oracle is js-yaml deliberately. The repository's two hand-rolled YAML
+    // readers (src/lib/budget.js, src/lib/v8-dispatcher.js) never throw — they
+    // would "parse" the broken manifest into a garbage object and refute
+    // nothing, which is the false-green shape this repository fences.
     const yaml = require('js-yaml');
     const fix = buildFixture();
     assert.equal(run({ root: fix }).status, 0);
 
     const text = fs.readFileSync(manifestPath(fix), 'utf8');
-    assert.ok(text.includes('active_regulatory_regimes:[]'), 'an empty list is written with no space after the colon');
-    assert.throws(
-      () => yaml.load(text),
-      /bad indentation/,
-      'the manifest is not parseable YAML — pinned as current behaviour, reported to the human'
+    assert.ok(text.includes('active_regulatory_regimes: []'), 'an empty list carries a space after the colon');
+
+    const parsed = yaml.load(text);
+    // js-yaml's default schema resolves an unquoted ISO date to a Date (YAML
+    // 1.1 timestamps), so compare calendar days, not object identity — that is
+    // what --since/--until name.
+    const day = (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v);
+    assert.deepEqual(
+      { since: day(parsed.window.since), until: day(parsed.window.until) },
+      { since: SINCE, until: UNTIL },
+      'the parsed window is exactly the window the command was given'
     );
+    assert.deepEqual(parsed.active_regulatory_regimes, [], 'an empty regime list parses as an empty sequence');
+    assert.equal(parsed.artifact_count, parsed.artifacts.length, 'the count matches the parsed list length');
+    assert.deepEqual(
+      parsed.artifacts.map((a) => a.path).sort(),
+      [...FIXTURE_ARTIFACTS].sort(),
+      'the parsed artifact list is exactly the seeded artifacts'
+    );
+    for (const a of parsed.artifacts) {
+      const bytes = fs.readFileSync(path.join(fix, a.path));
+      assert.equal(a.sha256, crypto.createHash('sha256').update(bytes).digest('hex'), `${a.path} hash survives parsing`);
+    }
+    assert.equal(parsed.chain_head_at_pack_time, 'abc123');
     assert.deepEqual(sweepRepoEvidenceDir(), []);
   });
 
-  it('defaults to the repository the script ships in when no root is named', () => {
-    // The guard on the seam: with CTOC_EVIDENCE_ROOT unset the command must
-    // behave exactly as it always has — pack the repository the file lives in.
-    // This is the one case that deliberately writes into the repository tree,
-    // so its cleanup is unconditional.
-    try {
-      const res = run({ root: null, since: OLD_SINCE, until: OLD_UNTIL });
-      assert.equal(res.status, 0, `stderr: ${res.stderr}`);
-      const written = manifestPath(REPO_ROOT, OLD_SINCE, OLD_UNTIL);
-      assert.ok(fs.existsSync(written), 'the pack lands under the repository, not anywhere else');
-      assert.equal(topLevel(fs.readFileSync(written, 'utf8')).pack_id, `${OLD_SINCE}_${OLD_UNTIL}`);
-    } finally {
-      const removed = sweepRepoEvidenceDir();
-      assert.ok(removed.length > 0, 'the default-root run wrote into the repository and was cleaned up');
-    }
+  it('packs the working directory when it holds .ctoc and no root is named', () => {
+    // Replaces 'defaults to the repository the script ships in when no root is
+    // named', which asserted finding 1 — the wrong-repository default — by
+    // name. With CTOC_EVIDENCE_ROOT unset the command now packs the project the
+    // caller is standing in.
+    const fix = buildFixture();
+    const res = run({ root: null, cwd: fix });
+    assert.equal(res.status, 0, `stderr: ${res.stderr}`);
+
+    const written = manifestPath(fix);
+    assert.ok(fs.existsSync(written), 'the pack lands under the working directory');
+    const text = fs.readFileSync(written, 'utf8');
+    assert.equal(topLevel(text).pack_id, `${SINCE}_${UNTIL}`);
+    assert.deepEqual(
+      artifactEntries(text).map((e) => e.path).sort(),
+      [...FIXTURE_ARTIFACTS].sort(),
+      'the artifacts come from the working directory, not from the script\'s own repository'
+    );
+    assert.deepEqual(sweepRepoEvidenceDir(), [], 'the repository is not touched');
+  });
+
+  it('refuses a working directory that is not a project, and writes nothing', () => {
+    const outside = mkTemp('ctoc-evpack-outside-');
+    const res = run({ root: null, cwd: outside });
+
+    assert.equal(res.status, 1, `an unresolvable root must refuse; stdout: ${res.stdout}`);
+    assert.match(res.stderr, /CTOC_EVIDENCE_ROOT/, 'the refusal names the explicit-project rule');
+    assert.match(res.stderr, /\.ctoc\//, 'the refusal names the project-root rule');
+    assert.deepEqual(fs.readdirSync(outside), [], 'the refusal path writes nothing at all');
+
+    // A .ctoc that is a FILE is not a project either.
+    const decoy = mkTemp('ctoc-evpack-decoy-');
+    fs.writeFileSync(path.join(decoy, '.ctoc'), 'not a directory\n');
+    const res2 = run({ root: null, cwd: decoy });
+    assert.equal(res2.status, 1, `a .ctoc FILE is not a project root; stdout: ${res2.stdout}`);
+    assert.match(res2.stderr, /CTOC_EVIDENCE_ROOT/);
+    assert.deepEqual(fs.readdirSync(decoy), ['.ctoc'], 'nothing was written beside the decoy');
+
+    assert.deepEqual(sweepRepoEvidenceDir(), []);
+  });
+
+  it('collectInputs refuses when no project can be resolved, naming the cause', () => {
+    // The exported seam reads a ROOT frozen at require time. Without its own
+    // guard a caller outside a project gets a path.join TypeError that names
+    // neither the cause nor the remedy.
+    const outside = mkTemp('ctoc-evpack-collect-');
+    const childEnv = { ...process.env };
+    delete childEnv.CTOC_EVIDENCE_ROOT;
+    const child = spawnSync(
+      process.execPath,
+      ['-e', `require(${JSON.stringify(SCRIPT)}).collectInputs('1970-01-01', '1970-01-02');`],
+      { cwd: outside, env: childEnv, encoding: 'utf8' }
+    );
+
+    assert.notEqual(child.status, 0, `collectInputs must refuse; stdout: ${child.stdout}`);
+    assert.match(child.stderr, /CTOC_EVIDENCE_ROOT/, 'the throw names the explicit-project rule');
+    assert.ok(
+      !/must be of type string/.test(child.stderr),
+      `the refusal must not be a bare path.join TypeError. stderr was:\n${child.stderr}`
+    );
+    assert.deepEqual(sweepRepoEvidenceDir(), []);
   });
 });
