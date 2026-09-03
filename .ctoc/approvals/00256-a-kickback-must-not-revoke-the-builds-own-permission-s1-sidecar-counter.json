@@ -1,0 +1,9 @@
+{
+  "content_sha256": "e0a8959aed0595b123f2a617ad98cb29f5ff511a2645a413a76f22c94fdbc3a9",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-03T07:59:29.994Z",
+  "approved_by": "human",
+  "plan_basename": "00256-a-kickback-must-not-revoke-the-builds-own-permission-s1-sidecar-counter"
+}
