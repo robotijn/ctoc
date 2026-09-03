@@ -1,0 +1,9 @@
+{
+  "content_sha256": "c6b83ae519db3094252c22f5080a0a40f2f54f383a033468674318b35e19e351",
+  "hash_scope": "specification",
+  "stage_from": "functional",
+  "stage_to": "implementation",
+  "approved_at": "2026-09-01T16:36:16.322Z",
+  "approved_by": "human",
+  "plan_basename": "the-done-gate-reads-the-record-the-executor-wrote"
+}
