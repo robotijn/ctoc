@@ -11,9 +11,15 @@
  *   node src/scripts/evidence-pack.js [--since=YYYY-MM-DD] [--until=YYYY-MM-DD]
  *
  * Environment:
- *   CTOC_EVIDENCE_ROOT  the project the pack is ABOUT. Unset (the default and
- *                       the shipped behaviour) the pack covers the repository
- *                       this script lives in.
+ *   CTOC_EVIDENCE_ROOT  the project the pack is ABOUT, in strict precedence:
+ *                       1. CTOC_EVIDENCE_ROOT, resolved as given;
+ *                       2. otherwise the working directory, but ONLY when it
+ *                          holds a .ctoc/ DIRECTORY;
+ *                       3. otherwise the command REFUSES. It never falls back to
+ *                          the script's own location — installed from the
+ *                          marketplace that is the plugin cache, so the pack
+ *                          would describe the plugin instead of the user's
+ *                          project, and would say so in a compliance artifact.
  *
  * Cross-platform Node 18+. On Windows, falls back to .zip via the built-in
  * archive logic (tar may not be available). Pure JS, no native dependencies.
@@ -27,20 +33,37 @@ const safeFs = require('../lib/safe-fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
+const { requestExit } = require('../lib/request-exit');
 
-// The project the evidence pack is ABOUT. It defaults to the repository this
-// script ships in — byte-for-byte the behaviour this command has always had.
-// CTOC_EVIDENCE_ROOT names a different project explicitly, and is the only way
-// to run the command against a project that is not the one the file lives in
-// (the script's own location, not the working directory, has always decided).
-// Unset, the variable changes nothing.
+/**
+ * The project the evidence pack is ABOUT, in strict precedence:
+ *   1. CTOC_EVIDENCE_ROOT — an explicit project, resolved as given.
+ *   2. process.cwd() — but ONLY when it holds a .ctoc/ DIRECTORY, i.e. the
+ *      caller is standing in a CTOC project.
+ *   3. null — the command refuses. It does NOT fall back to the script's own
+ *      location: installed from the marketplace that is the plugin cache, so
+ *      the pack would describe the plugin instead of the user's project and
+ *      would say so in a compliance artifact.
+ *
+ * @returns {string|null} An absolute project root, or null when none can be told.
+ */
 function resolveRoot() {
   const override = process.env.CTOC_EVIDENCE_ROOT;
-  return override ? path.resolve(override) : path.resolve(__dirname, '..', '..');
+  if (override) return path.resolve(override);
+  const cwd = process.cwd();
+  const dotCtoc = path.join(cwd, '.ctoc');
+  if (safeFs.existsSync(dotCtoc) && safeFs.statSync(dotCtoc).isDirectory()) return path.resolve(cwd);
+  return null;
 }
 
+// ONE encoding of the refusal, shared by the command and the exported collector,
+// so the two cannot drift into naming different remedies.
+const NO_ROOT_MESSAGE =
+  'evidence-pack: refusing to run — cannot tell which project this pack is about. ' +
+  'Run it from a project root (a directory containing .ctoc/), ' +
+  'or set CTOC_EVIDENCE_ROOT to that project.';
+
 const ROOT = resolveRoot();
-const EVIDENCE_DIR = path.join(ROOT, '.ctoc', 'evidence-packs');
 
 function parseArgs(argv) {
   const args = { since: null, until: null };
@@ -58,6 +81,11 @@ function parseArgs(argv) {
 }
 
 function collectInputs(since, until) {
+  // The function is exported and reads a ROOT frozen at require time. Without
+  // this a caller outside a project gets `TypeError: The "path" argument must
+  // be of type string. Received null` from deep inside path.join, naming
+  // neither the cause nor the remedy.
+  if (ROOT === null) throw new Error(NO_ROOT_MESSAGE);
   const sinceMs = new Date(since).getTime();
   const untilMs = new Date(until + 'T23:59:59Z').getTime();
   const inputs = [];
@@ -78,7 +106,7 @@ function collectInputs(since, until) {
 
   // 2. Chain log slice.
   const chainPath = path.join(ROOT, '.ctoc', 'audit', 'chain.jsonl');
-  if (safeFs.existsSync(chainPath)) inputs.push(chainPath);
+  pushIfInWindow(chainPath, sinceMs, untilMs, inputs);
 
   // 3. Gate approvals — every plan with approval markers.
   const plansDirs = ['vision', 'functional', 'implementation', 'todo', 'review', 'done'];
@@ -105,14 +133,14 @@ function collectInputs(since, until) {
 
   // 6. Provenance events.
   const provPath = path.join(ROOT, '.ctoc', 'ai-provenance.jsonl');
-  if (safeFs.existsSync(provPath)) inputs.push(provPath);
+  pushIfInWindow(provPath, sinceMs, untilMs, inputs);
 
   // 7. Configuration baselines (latest version's manifest).
   const baselinesRoot = path.join(ROOT, '.ctoc', 'baselines');
   if (safeFs.existsSync(baselinesRoot)) {
     for (const ver of safeFs.readdirSync(baselinesRoot)) {
       const mPath = path.join(baselinesRoot, ver, 'manifest.yaml');
-      if (safeFs.existsSync(mPath)) inputs.push(mPath);
+      pushIfInWindow(mPath, sinceMs, untilMs, inputs);
     }
   }
 
@@ -121,6 +149,23 @@ function collectInputs(since, until) {
   collectAllInWindow(capaDir, sinceMs, untilMs, inputs);
 
   return [...new Set(inputs)];
+}
+
+/**
+ * Push a single known file onto `out` only when its mtime falls inside the
+ * window — the same `>= sinceMs && <= untilMs` bounds collectAllInWindow uses,
+ * so a "window" means one thing across every collector.
+ *
+ * @param {string} file - Absolute path to the candidate artifact.
+ * @param {number} sinceMs - Inclusive lower bound, epoch milliseconds.
+ * @param {number} untilMs - Inclusive upper bound, epoch milliseconds.
+ * @param {string[]} out - Collector accumulator, appended in place.
+ * @returns {void}
+ */
+function pushIfInWindow(file, sinceMs, untilMs, out) {
+  if (!safeFs.existsSync(file)) return;
+  const stat = safeFs.statSync(file);
+  if (stat.mtimeMs >= sinceMs && stat.mtimeMs <= untilMs) out.push(file);
 }
 
 function collectAllInWindow(dir, sinceMs, untilMs, out) {
@@ -171,9 +216,20 @@ function packWithTar(tarPath, listFile, cwd = ROOT) {
 }
 
 function main() {
+  // Before anything is printed and before anything is written: a pack that
+  // cannot say which project it describes must not be produced at all.
+  if (ROOT === null) {
+    console.error(NO_ROOT_MESSAGE);
+    requestExit(1);
+    return;
+  }
+
   const args = parseArgs(process.argv);
   console.log(`Evidence pack: ${args.since} to ${args.until}`);
 
+  // Local, not module-level: at module scope a null ROOT would throw at require
+  // time and take down every caller that only wants the exported helpers.
+  const EVIDENCE_DIR = path.join(ROOT, '.ctoc', 'evidence-packs');
   ensureDir(EVIDENCE_DIR);
 
   const inputs = collectInputs(args.since, args.until);
@@ -202,34 +258,53 @@ function main() {
   const manifestYaml = yamlify(manifest);
   safeFs.writeFileSync(manifestPath, manifestYaml);
 
+  let degraded = null;                       // the salvage bundle path, when tar failed
   try {
     if (inputs.length > 0) {
+      // The manifest goes in FIRST, so the archive states what it contains
+      // without needing the file beside it. The member keeps its ROOT-relative
+      // name: renaming it to a bare manifest.yaml needs GNU tar's --transform,
+      // which macOS bsdtar does not have.
+      const manifestRel = path.relative(ROOT, manifestPath);
       const relInputs = inputs.map(p => path.relative(ROOT, p));
       const listFile = path.join(EVIDENCE_DIR, `.pack-${args.since}.list`);
-      safeFs.writeFileSync(listFile, relInputs.join('\n'));
+      safeFs.writeFileSync(listFile, [manifestRel, ...relInputs].join('\n'));
       packWithTar(tarPath, listFile);
       safeFs.unlinkSync(listFile);
     }
   } catch (e) {
-    console.error(`tar failed (${e.message}); writing JSON bundle instead.`);
+    // Salvage is worth keeping in an incident, but a compliance artifact that
+    // silently degraded its promised format must not report success.
+    const bundlePath = tarPath.replace(/\.tar\.gz$/, '.json');
     const bundle = {};
     for (const p of inputs) bundle[path.relative(ROOT, p)] = safeFs.readFileSync(p, 'utf8');
-    safeFs.writeFileSync(tarPath.replace(/\.tar\.gz$/, '.json'), JSON.stringify(bundle, null, 2));
+    safeFs.writeFileSync(bundlePath, JSON.stringify(bundle, null, 2));
+    degraded = bundlePath;
+    console.error(
+      `tar failed (${e.message}); the archive was NOT produced in the promised format. ` +
+      `A JSON bundle was written as salvage: ${path.relative(ROOT, bundlePath)}`
+    );
+    requestExit(1);
   }
 
   console.log(`Manifest: ${path.relative(ROOT, manifestPath)}`);
-  console.log(`Archive:  ${path.relative(ROOT, tarPath)}`);
+  console.log(degraded
+    ? `Archive:  NOT PRODUCED — salvage bundle at ${path.relative(ROOT, degraded)}`
+    : `Archive:  ${path.relative(ROOT, tarPath)}`);
 }
 
 function yamlify(obj, indent = 0) {
   const pad = '  '.repeat(indent);
   if (Array.isArray(obj)) {
-    if (obj.length === 0) return '[]';
+    if (obj.length === 0) return ' []';                     // a flow sequence needs the space after its key's colon
     return '\n' + obj.map(item => `${pad}- ${typeof item === 'object' ? yamlify(item, indent + 1).trimStart() : item}`).join('\n');
   }
   if (obj && typeof obj === 'object') {
     return Object.entries(obj).map(([k, v]) => {
-      if (v && typeof v === 'object') return `${pad}${k}:${yamlify(v, indent + 1)}`;
+      if (Array.isArray(v)) return `${pad}${k}:${yamlify(v, indent + 1)}`;              // ' []' or '\n  - …'
+      // A nested block map starts on its OWN line; writing its first key on the
+      // parent's line made the document unparseable.
+      if (v && typeof v === 'object') return `${pad}${k}:\n${yamlify(v, indent + 1)}`;
       return `${pad}${k}: ${v === null ? 'null' : JSON.stringify(v).replace(/^"|"$/g, '')}`;
     }).join('\n');
   }
