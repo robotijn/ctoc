@@ -1,9 +1,11 @@
 {
-  "content_sha256": "d1b60a09cec54d0a4c2e38e1ca69665f83b527bf34acf58557c8906de312a92c",
+  "content_sha256": "0e800c5daace2138c4fd911ddda74d9eacce31ccbf05a50a66fa964dce0585ae",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-08-31T14:59:34.302Z",
+  "approved_at": "2026-09-03T09:49:35.696Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00236-close-the-coverage-holes-s2-enforcement-fault-arms"
 }

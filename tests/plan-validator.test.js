@@ -44,6 +44,46 @@ const REVIEW_DONE_EXEC_PLAN = [
   '',
 ].join('\n');
 
+// 00255 fixtures. PROSE_EXEC_PLAN is the implementation planner's twin: the same
+// heading text, the same step headings, and NO checkbox on any line.
+const PROSE_EXEC_PLAN = [
+  '## Execution Plan',
+  '',
+  '### Step 8: TEST',
+  'Write the regression cases first and run them RED.',
+  '',
+  '### Step 9: PREPARE',
+  'No new dependency is needed.',
+  '',
+  '### Step 10: IMPLEMENT',
+  'Edit the one function named above.',
+  '',
+  '### Step 11: REVIEW',
+  'Self-review the diff against the plan.',
+  '',
+  '### Step 12: OPTIMIZE',
+  'Nothing on a hot path changes.',
+  '',
+  '### Step 13: SECURE',
+  'No new input crosses a trust boundary.',
+  '',
+  '### Step 14: VERIFY',
+  'Run the whole suite through the gated entry point.',
+  '',
+  '### Step 15: DOCUMENT',
+  'Update the module comment at the changed site.',
+  '',
+  '### Step 16: FINAL-REVIEW',
+  'Hand the built work to the human.',
+  '',
+].join('\n');
+
+// The canonical section src/lib/iron-loop.js appends at the build-queue crossing —
+// the one the executor ticks. Same blocks as REVIEW_DONE_EXEC_PLAN under the exact
+// heading iron-loop.js emits.
+const CANONICAL_EXEC_PLAN =
+  REVIEW_DONE_EXEC_PLAN.replace('## Execution Plan', '## Execution Plan (Steps 8-16)');
+
 describe('Plan Validator Tests', () => {
   let testDir;
   let plansDir;
@@ -386,6 +426,70 @@ Do things.
 
     assert.strictEqual(result.valid, true, `compliant plan must pass, errors: ${JSON.stringify(result.errors)}`);
     console.log('# review->done: a compliant plan passes');
+  });
+
+  test('review->done: a plan carrying BOTH execution sections is judged by the canonical one', () => {
+    // 00255. A plan written by the implementation planner carries a PROSE
+    // "## Execution Plan" (Step 8..16 headings, no checkbox anywhere). When it crosses
+    // into the build queue, src/lib/iron-loop.js appends the canonical
+    // "## Execution Plan (Steps 8-16)" template, and THAT is the section the executor
+    // ticks. `String.match` with /m returns the FIRST match, so extractStepBlocks read
+    // the planner's prose twin, saw no `- [x]`, and reported every required step as an
+    // unchecked checkbox — blocking a plan whose real record is fully ticked.
+    const planPath = createPlan('review', 'both-sections',
+      `---\napproved_by: human\n---\n\n# Both Sections\n\n${PROSE_EXEC_PLAN}\n\n${CANONICAL_EXEC_PLAN}`);
+
+    const planMtimeMs = fs.statSync(planPath).mtimeMs;
+    const evidencePath = verifyEvidencePath(testDir, 'both-sections');
+    fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
+    fs.writeFileSync(evidencePath, JSON.stringify({
+      planSlug: 'both-sections',
+      timestamp: new Date(planMtimeMs + 60000).toISOString(),
+      passed: true,
+      method: 'fallback-direct',
+      checks: {},
+      errors: [],
+      summary: 'fixture run'
+    }, null, 2));
+
+    const result = validator.validateTransition(planPath, 'review', 'done', testDir);
+
+    assert.ok(
+      !result.errors.some((e) => /unchecked required checkbox/.test(e)),
+      `the ticked canonical section must be the one read, errors: ${JSON.stringify(result.errors)}`,
+    );
+    assert.strictEqual(result.valid, true, `compliant plan must pass, errors: ${JSON.stringify(result.errors)}`);
+    console.log('# review->done: a plan carrying BOTH execution sections is judged by the canonical one');
+  });
+
+  test('review->done: a prose-only execution section still fails every required step', () => {
+    // 00255, the guard that keeps the fix honest. The SAME fixture with the canonical
+    // section removed: no checkbox exists anywhere, so no step is complete. Preferring
+    // the canonical section must never turn an un-ticked plan into a passing one.
+    const planPath = createPlan('review', 'prose-only',
+      `---\napproved_by: human\n---\n\n# Prose Only\n\n${PROSE_EXEC_PLAN}`);
+
+    const planMtimeMs = fs.statSync(planPath).mtimeMs;
+    const evidencePath = verifyEvidencePath(testDir, 'prose-only');
+    fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
+    fs.writeFileSync(evidencePath, JSON.stringify({
+      planSlug: 'prose-only',
+      timestamp: new Date(planMtimeMs + 60000).toISOString(),
+      passed: true,
+      method: 'fallback-direct',
+      checks: {},
+      errors: [],
+      summary: 'fixture run'
+    }, null, 2));
+
+    const result = validator.validateTransition(planPath, 'review', 'done', testDir);
+
+    assert.strictEqual(result.valid, false, 'a plan with no checkbox anywhere must not pass');
+    assert.ok(
+      result.errors.some((e) => /unchecked required checkbox/.test(e)),
+      `an unchecked required step must be reported, errors: ${JSON.stringify(result.errors)}`,
+    );
+    console.log('# review->done: a prose-only execution section still fails every required step');
   });
 
   test('review->done: warns about TODO markers', () => {

@@ -1,9 +1,11 @@
 {
-  "content_sha256": "51278aab382934af6b8f85396690d35ad34f695eacb0954a88b7a995dc22865c",
+  "content_sha256": "f6bcbe4829ff7a0eb07c8940df56c6396c4d31ceed1a5d016d4ee4aa14dabf83",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-30T23:42:42.356Z",
+  "approved_at": "2026-09-03T09:49:35.525Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00188-the-step-label-checker-is-documented-as-a-hook-that-rejects-plans"
 }

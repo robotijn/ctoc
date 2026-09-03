@@ -302,6 +302,18 @@ const EXECUTION_SECTION_PRODUCERS = Object.freeze([
   Object.freeze({ heading: 'decisions taken during execution', producer: 'iron-loop-executor — decisions recorded while building' }),
   Object.freeze({ heading: 'verification evidence', producer: 'iron-loop-executor — Step 14 VERIFY evidence' }),
   Object.freeze({ heading: 'decisions taken under ambiguity', producer: 'implementation-planner / iron-loop-executor — documented choices under ambiguity' }),
+  // ADDED 2026-09-03 BY HUMAN RULING (plan 00255), WITH ITS MIGRATION IN THE SAME
+  // CHANGE. `## Deferred Questions` is written by the pipeline itself, not by the
+  // human: `actions.js` runs `applyIronLoop` — `refineLoop` then
+  // `appendDeferredQuestions` — BEFORE `stampAndLedger` takes the digest, so the
+  // section was INSIDE the recorded specification of every plan crossed into the
+  // build queue. Adding the row therefore MOVED 35 already-recorded digests
+  // (measured on this repository before the edit; 0 were repaired by it). Those 35
+  // were re-recorded through `src/scripts/ledger-backfill.js --hash-scope
+  // specification` in this same change, so no plan is left holding a digest under
+  // the old semantics; `tests/approval-hash-survives-execution.js` carries the live
+  // guard that names any plan where that re-record did not happen.
+  Object.freeze({ heading: 'deferred questions', producer: 'iron-loop integrator (src/lib/iron-loop.js appendDeferredQuestions) — written during refinement at the build-queue crossing' }),
 ]);
 
 /**
@@ -1011,25 +1023,45 @@ function readEntryResult(slug, projectPath) {
  * closes; the old "integrator drives it via node -e" instruction was the hole).
  * The entry it writes classifies as `'backfilled'`, never `'human'`.
  *
+ * TWO HASH SCOPES, CHOSEN BY THE CALLER, DEFAULTING TO THE LEGACY ONE. The 2026-07-14
+ * migration ledgered plans that were already finished, so a WHOLE-FILE digest was the
+ * right, stronger binding and stays the default. Re-recording a LIVE plan is a
+ * different job: a plan still in the build queue keeps growing an execution record, and
+ * a whole-file digest over those bytes is invalidated by the next line the executor
+ * writes — surfacing as `hash-mismatch`, which is an ATTACK signature, and revoking the
+ * build's own write permission. `opts.hash_scope: 'specification'` records the
+ * specification digest instead — the same scope `stampAndLedger` records at a live gate
+ * crossing, hashed HERE from the file's bytes so the scope stamp and the digest are
+ * derived together and cannot disagree. Anything other than `'specification'` or an
+ * absent value keeps the legacy whole-file behaviour byte-for-byte.
+ *
  * @param {string} projectPath - the project root
  * @param {string} planPath - absolute path to the existing plan file
- * @param {{stage_to?: string, reason?: string}} [opts] - destination stage the
- *   plan resides in, and the human-readable backfill reason (`stage_to` is
- *   required and enforced at runtime)
+ * @param {{stage_to?: string, reason?: string, hash_scope?: ('specification'|'file')}} [opts] -
+ *   destination stage the plan resides in, the human-readable backfill reason, and the
+ *   digest scope to record (`stage_to` is required and enforced at runtime;
+ *   `hash_scope` defaults to whole-file)
  * @returns {object} the entry object as written
  * @throws {Error} if the plan file cannot be read, the slug is un-keyable, or the
  *   canonical key collides with a different original basename (loud, never silent).
  */
 function backfillEntry(projectPath, planPath, opts = {}) {
-  const { stage_to, reason } = opts;
+  const { stage_to, reason, hash_scope } = opts;
   if (typeof stage_to !== 'string' || stage_to === '') {
     throw new Error('approval-ledger: backfillEntry requires opts.stage_to');
   }
   const content = safeFs.readFileSync(planPath, 'utf8');
   const slug = slugFromPlanPath(planPath);
   const originalBasename = path.basename(planPath).replace(/\.md$/i, '');
+  // Specification scope is requested by handing `content` to writeEntry, which routes
+  // it through resolveHash — the ONE place a digest and its scope stamp are derived
+  // together. An unlocatable boundary THROWS there rather than falling back to a
+  // weaker binding, which is the correct direction for an approval record.
+  const digest = hash_scope === 'specification'
+    ? { content }
+    : { content_sha256: computeContentHash(content) };
   return writeEntry(slug, {
-    content_sha256: computeContentHash(content),
+    ...digest,
     // The gate SOURCE for this destination, from the ONE encoding (R6-B). A stage
     // that is not a gate destination has no source → fall back to the 'backfill'
     // marker so the required field is never left empty.

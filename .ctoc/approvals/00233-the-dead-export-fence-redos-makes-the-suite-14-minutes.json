@@ -1,9 +1,11 @@
 {
-  "content_sha256": "d3a7a40eef94f4a97b895d757d8516d5d161021a929053e48c3dfc6815d20c01",
+  "content_sha256": "b6b008b212201e7eddf82419ec22b3bb23118af4caa816f439158f6657567dcf",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-29T12:46:04.430Z",
+  "approved_at": "2026-09-03T09:49:35.646Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00233-the-dead-export-fence-redos-makes-the-suite-14-minutes"
 }

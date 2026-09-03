@@ -307,6 +307,20 @@ test('11: every EXECUTION_SECTION_PRODUCERS row names a heading AND its producer
   }
 });
 
+// ── 11b. THE DEFERRED-QUESTIONS ROW IS PINNED ─────────────────────────────────
+
+test('11b: the exempt table names the deferred-questions section and its producer', () => {
+  // Human ruling 2026-09-03 (plan 00255). `## Deferred Questions` is written by the
+  // pipeline itself — src/lib/iron-loop.js appendDeferredQuestions, during the
+  // refinement pass — so it is the integrator's report, not the specification the
+  // human ruled on. Removing this row silently re-hashes 35 live approvals, so the
+  // row is pinned here by name rather than left to a comment.
+  const row = ledger.EXECUTION_SECTION_PRODUCERS.find((e) => e.heading === 'deferred questions');
+  assert.ok(row, 'the exempt table must carry a "deferred questions" row');
+  assert.match(row.producer, /iron-loop\.js/, 'the row names the module that writes the section');
+  assert.match(row.producer, /appendDeferredQuestions/, 'the row names the function that writes it');
+});
+
 // ── 12. THE DERIVED EXPORT IS UNCHANGED IN SHAPE ──────────────────────────────
 
 test('12: EXECUTION_SECTIONS is a frozen array of strings equal to the table headings in order', () => {

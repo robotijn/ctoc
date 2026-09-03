@@ -1,9 +1,11 @@
 {
-  "content_sha256": "7bffb7d971175836793049c3f8011ed7b5f8dc46ad7e11307738eeb42d540b64",
+  "content_sha256": "297633f80932c5ebe63418d0ac1d09e4612f91aed1cf6036fa6659c24a803d3b",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-08-31T14:59:34.363Z",
+  "approved_at": "2026-09-03T09:49:35.972Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00248-close-the-coverage-holes-s14-start-command"
 }

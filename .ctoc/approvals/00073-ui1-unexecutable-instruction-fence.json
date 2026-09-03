@@ -1,9 +1,11 @@
 {
-  "content_sha256": "5319f4e4a5d033202ed982877df1ab07e43aa89ba5ea884712876f5d199ced56",
+  "content_sha256": "81b851626903bbc324a93c9b84e1cb60e9ec87690082653d8cbe2bdaa7ff2e24",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-30T19:47:41.266Z",
+  "approved_at": "2026-09-03T09:49:35.272Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00073-ui1-unexecutable-instruction-fence"
 }

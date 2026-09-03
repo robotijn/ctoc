@@ -1,9 +1,11 @@
 {
-  "content_sha256": "91e16e7f20b6281d9ba587bb84f8bf262130f7869ffcfecfb19ab4becc675e92",
+  "content_sha256": "cfa8ec07c3b78a775be74d2447211410b7de7a2aae5d25d736e72817b5ab4d05",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-29T00:34:00.084Z",
+  "approved_at": "2026-09-03T09:49:35.574Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00205-an-unsigned-state-file-signs-itself-and-is-believed"
 }

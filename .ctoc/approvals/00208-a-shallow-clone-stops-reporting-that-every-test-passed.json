@@ -1,9 +1,11 @@
 {
-  "content_sha256": "2cd8cc6278892fd2733a374037dad18722e8e5595d2ceda5aaeaea04adfa949c",
+  "content_sha256": "b731746abfa3b65963c69ca25acf1717e00601c4abe58863c760c6c6726a188f",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-29T00:05:22.043Z",
+  "approved_at": "2026-09-03T09:49:35.622Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00208-a-shallow-clone-stops-reporting-that-every-test-passed"
 }

@@ -1,9 +1,11 @@
 {
-  "content_sha256": "805d83159d20907fa17f5ee064d95e2b42a724873a7d6571a0cb58e4dfbef10c",
+  "content_sha256": "84ce4b9e97fdb984bcc6fe1f2d508d5bb85bdf8f9e39ec6037257796c7e2642e",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-08-31T14:59:34.637Z",
+  "approved_at": "2026-09-03T09:49:35.770Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00240-close-the-coverage-holes-s6-iron-loop-enforcer"
 }

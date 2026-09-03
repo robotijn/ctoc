@@ -351,6 +351,73 @@ describe('backfillOnePlan dark branches', () => {
     assert.equal(entry.stage_from, 'implementation', 'stage_from must derive from the gate source of todo');
   });
 
+  test('hash_scope_specification_records_a_specification_scoped_entry', () => {
+    // Plan 00255. Re-recording a LIVE plan's digest is not the same job as the 2026
+    // legacy migration: a plan still being built keeps growing an execution record,
+    // and a whole-file digest over those bytes is invalidated by the next line the
+    // executor writes — which reads as `hash-mismatch`, a forgery signature, and
+    // revokes the build's own write permission. --hash-scope specification records
+    // the digest the gate actually compares on a live plan.
+    const root = newRoot();
+    const p = path.join(root, 'plans', 'todo', 'live.md');
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    const body = '---\ntype: implementation\n---\n\n# Live\n\nSpecification text.\n';
+    fs.writeFileSync(p, body);
+
+    const res = backfill.run(['--plan', p, '--stage', 'todo', '--hash-scope', 'specification', '--root', root]);
+
+    assert.equal(res.ok, true, `expected a successful re-record, got: ${res.error}`);
+    const entry = ledger.readEntry('live', root);
+    assert.equal(entry.hash_scope, 'specification');
+    assert.equal(entry.backfilled, true, 'a re-record is still a backfilled entry, never a human one');
+    assert.equal(ledger.entryKind(entry), 'backfilled');
+    assert.equal(ledger.verify('live', body, 'todo', root), true);
+    // The property the flag exists for: an execution record appended afterwards
+    // does NOT invalidate the entry.
+    const built = `${body}\n## Execution Record\n\n- [x] Step 16 FINAL-REVIEW — done\n`;
+    assert.equal(ledger.verify('live', built, 'todo', root), true,
+      'a specification-scoped re-record must survive the executor writing its record');
+  });
+
+  test('hash_scope_defaults_to_whole_file_and_an_unknown_value_is_refused', () => {
+    // The legacy migration path is UNCHANGED: no --hash-scope means whole-file, exactly
+    // as every backfill written before plan 00255. And an unrecognised value is an
+    // ERROR, never a silent fallback to either scope — recording a digest under a
+    // scope the caller did not ask for is the quiet no-op this script refuses.
+    const root = newRoot();
+    const p = path.join(root, 'plans', 'done', 'legacy3.md');
+    fs.writeFileSync(p, '---\ntype: implementation\n---\n\nbody\n');
+
+    const res = backfill.run(['--plan', p, '--stage', 'done', '--root', root]);
+    assert.equal(res.ok, true);
+    assert.equal(ledger.readEntry('legacy3', root).hash_scope, 'file');
+
+    const bad = backfill.run(['--plan', p, '--stage', 'done', '--hash-scope', 'whole', '--root', root]);
+    assert.equal(bad.ok, false);
+    assert.match(bad.error, /--hash-scope must be one of specification\|file/);
+  });
+
+  test('an_existing_entry_is_OVERWRITTEN_by_a_re_record', () => {
+    // The migration depends on this: `backfillEntry` → `writeEntry` → `persistEntry`
+    // must REPLACE an existing entry, not refuse it. Pinned because a refusal here
+    // would silently leave 35 approvals recorded under the old hash semantics.
+    const root = newRoot();
+    const p = path.join(root, 'plans', 'todo', 'twice.md');
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, '---\ntype: implementation\n---\n\nfirst\n');
+
+    assert.equal(backfill.run(['--plan', p, '--stage', 'todo', '--reason', 'one', '--root', root]).ok, true);
+    fs.writeFileSync(p, '---\ntype: implementation\n---\n\nsecond\n');
+    const again = backfill.run(['--plan', p, '--stage', 'todo', '--reason', 'two',
+      '--hash-scope', 'specification', '--root', root]);
+
+    assert.equal(again.ok, true);
+    const entry = ledger.readEntry('twice', root);
+    assert.equal(entry.backfill_reason, 'two', 'the re-record replaces the earlier entry');
+    assert.equal(entry.hash_scope, 'specification');
+    assert.equal(ledger.verify('twice', '---\ntype: implementation\n---\n\nsecond\n', 'todo', root), true);
+  });
+
   test('backfill_write_error_surfaces_as_ok_false', () => {
     // Arrange — a plan whose basename is not a keyable slug ("@bad") passes the
     // existsSync check but makes backfillEntry throw "Invalid slug" inside the try.

@@ -1,9 +1,11 @@
 {
-  "content_sha256": "bfe768e7626f50acd1d5fe49b84cb5f7210fd38cfd5c314cae1a2b26b9a3b7d7",
+  "content_sha256": "8e5cf3b0a8c6c849dc9075b210e9cac11d7e1ad233250be5399b3753f3a8a0d6",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-08-31T14:59:34.271Z",
+  "approved_at": "2026-09-03T09:49:35.923Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00246-close-the-coverage-holes-s12-verify-claims"
 }
