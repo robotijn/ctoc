@@ -1,0 +1,9 @@
+{
+  "content_sha256": "654dff525ff7e45b7a64dd3266f51be08b4d7531180a823e24b6f1dd2cac78fa",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-03T12:12:02.307Z",
+  "approved_by": "human",
+  "plan_basename": "00259-a-canonical-create-react-app-is-detected-s1-symmetric-credit"
+}

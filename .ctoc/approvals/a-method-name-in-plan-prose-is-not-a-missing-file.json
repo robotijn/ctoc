@@ -1,0 +1,9 @@
+{
+  "content_sha256": "89b5db4b20a9255a766cba88acaa8e4e2815ecdfec08215f99350e854a6cf74f",
+  "hash_scope": "specification",
+  "stage_from": "functional",
+  "stage_to": "implementation",
+  "approved_at": "2026-09-03T14:28:17.256Z",
+  "approved_by": "human",
+  "plan_basename": "a-method-name-in-plan-prose-is-not-a-missing-file"
+}
