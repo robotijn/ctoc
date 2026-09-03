@@ -1,9 +1,11 @@
 {
-  "content_sha256": "633e89d42a58f75367bd0c2fcef2d5be030e3bf9fa884704903e38ceecd3c3f3",
+  "content_sha256": "9ca45287e02de72e3ab024eab1b90b37b3b10132dee88fbf825be8c9bd5b59cd",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-30T14:47:43.896Z",
+  "approved_at": "2026-09-03T10:23:23.889Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00186-a-shipped-recipe-is-proven-by-running-it"
 }

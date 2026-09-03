@@ -1,8 +1,11 @@
 {
-  "content_sha256": "aaa8259a06d0e752e95b39eb3cb8fddfe269ae4d296fd91ad3efeb2d097a4960",
+  "content_sha256": "e1d5554c86d12bc79b2a7cf3efade32a5875781260d686c5da0892f1e98516d8",
+  "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-19T07:27:00.543Z",
+  "approved_at": "2026-09-03T10:23:22.045Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00081-skipped-step-detection-word-boundary"
 }

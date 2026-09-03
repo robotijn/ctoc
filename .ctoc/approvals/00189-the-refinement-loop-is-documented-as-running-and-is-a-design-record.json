@@ -1,9 +1,11 @@
 {
-  "content_sha256": "674780b8992bcef908202b039aa5d16fc69e7ccba0fe6f4405f774f2516b902b",
+  "content_sha256": "6ce34698c7913a8dafed652752a72f65081b386a9efc87ac0338284d0b6ae89c",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-30T19:04:14.706Z",
+  "approved_at": "2026-09-03T10:23:23.940Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00189-the-refinement-loop-is-documented-as-running-and-is-a-design-record"
 }

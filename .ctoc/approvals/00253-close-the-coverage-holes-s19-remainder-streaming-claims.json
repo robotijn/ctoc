@@ -1,9 +1,9 @@
 {
-  "content_sha256": "c79296a2d2038341d4cfcc9e77b61b99074059206147b62b3ce5df49bf601397",
+  "content_sha256": "ef96c8b5973ec3b66a53cea309e00c1bb43ced4fd09707e1739fea9383c1edcc",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-08-31T14:59:34.516Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-09-03T10:22:50.964Z",
   "approved_by": "human",
   "plan_basename": "00253-close-the-coverage-holes-s19-remainder-streaming-claims"
 }

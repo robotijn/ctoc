@@ -1,9 +1,11 @@
 {
-  "content_sha256": "2bd863947ff23864c2b24cd4744d66fb7b67eda0eca759eea9de35ff42c945f4",
+  "content_sha256": "2a2e9538319485c970c839e9c6eb91dfff536573c3f189dd486798267ff7e674",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-23T17:22:01.854Z",
+  "approved_at": "2026-09-03T10:23:24.602Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00225-the-approved-queue-is-derived-continuation-work-and-shown-at-session-start"
 }

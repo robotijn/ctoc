@@ -1,11 +1,9 @@
 {
-  "content_sha256": "6a90b9e93189cd331e1d15ed8277df51a7a9fc6f65b9b64d0aa3c98414c4f702",
+  "content_sha256": "7164821b514ce92ca162ced404417c9ae3cafe3442bd39ff54cb497a147c850f",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T09:49:35.745Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-09-03T10:22:51.132Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00239-close-the-coverage-holes-s5-quality-agent"
 }
