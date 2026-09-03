@@ -73,6 +73,15 @@ const VERSION_UPDATES = [
     file: 'README.md',
     pattern: /getVersion\(\)\s+\/\/\s*→\s*'\d+\.\d+\.\d+'/,
     replacement: (v) => `getVersion()       // → '${v}'`
+  },
+  {
+    // The Lesson 2 dashboard capture's first line. A version inside a fenced
+    // block is invisible to the badge/headline patterns above, so it re-rotted
+    // on every release until it was named here. Anchored `^...$` with /m and no
+    // /g: it must rewrite that one line and never a mid-line prose mention.
+    file: 'README.md',
+    pattern: /^CTOC v\d+\.\d+\.\d+$/m,
+    replacement: (v) => `CTOC v${v}`
   }
 ];
 
@@ -82,12 +91,16 @@ const VERSION_UPDATES = [
 // structural change, exactly like the version replacements above. FIXED contracts
 // (slash commands, hooks, tabs) are deliberately NOT here: a change to those is a
 // real event that stays policed by exact-equality tests, never auto-rewritten.
+// `files` names every documentation file the entry applies to. README.md's
+// structure block uses the SAME two patterns CLAUDE.md's does, so they are one
+// encoding with two targets — a parallel README table would be a second
+// encoding of one rule, and two encodings of one rule drift.
 const COUNT_UPDATES = [
-  { field: 'testFiles', label: 'testFiles', pattern: /(Run all )\d+( test files)/ },
-  { field: 'testFiles', label: 'testFiles', pattern: /(tests\/\s+)\d+( test files)/ },
-  { field: 'libModules', label: 'libModules', pattern: /(lib\/\s+)\d+( JS modules)/ },
-  { field: 'agents', label: 'agents', pattern: /(agents\/\s+)\d+( agent definitions)/ },
-  { field: 'skills', label: 'skills', pattern: /(skills\/\s+)\d+( skill files)/ },
+  { field: 'testFiles', label: 'testFiles', pattern: /(Run all )\d+( test files)/, files: ['CLAUDE.md'] },
+  { field: 'testFiles', label: 'testFiles', pattern: /(tests\/\s+)\d+( test files)/, files: ['CLAUDE.md', 'README.md'] },
+  { field: 'libModules', label: 'libModules', pattern: /(lib\/\s+)\d+( JS modules)/, files: ['CLAUDE.md', 'README.md'] },
+  { field: 'agents', label: 'agents', pattern: /(agents\/\s+)\d+( agent definitions)/, files: ['CLAUDE.md'] },
+  { field: 'skills', label: 'skills', pattern: /(skills\/\s+)\d+( skill files)/, files: ['CLAUDE.md'] },
 ];
 
 /**
@@ -249,26 +262,34 @@ function updateVersionInFiles(version, root = ROOT) {
 }
 
 /**
- * Rewrite the GROWING doc-count lines in CLAUDE.md to the live values, so no
- * human or executor ever hand-edits them (plan 00215). Only the integer on each
- * matched line changes. A count line that is EXPECTED but ABSENT is recorded as a
- * NAMED failure — never a silent no-op — because a generator whose whole job is to
- * keep a number true must fail loud when it cannot find the line to keep true.
+ * Rewrite the GROWING doc-count lines in ONE documentation file to the live
+ * values, so no human or executor ever hand-edits them (plan 00215). Only the
+ * integer on each matched line changes. A count line that is EXPECTED for this
+ * file but ABSENT is recorded as a NAMED failure — never a silent no-op —
+ * because a generator whose whole job is to keep a number true must fail loud
+ * when it cannot find the line to keep true. A file that is simply not present
+ * is SKIPPED, never a failure: the release script is drivable against fixtures
+ * that carry no documentation at all.
  *
+ * Which entries apply is decided by each COUNT_UPDATES entry's `files` list, so
+ * a shape that exists only in CLAUDE.md never reports a false failure against
+ * README.md.
+ *
+ * @param {string} docFile - repository-relative documentation file name
  * @param {string} [root] - project root (used to compute the live counts)
- * @param {{ counts?: object, claudeMdPath?: string }} [opts]
- *   `counts` overrides the computed counts; `claudeMdPath` overrides the target
- *   (a test drives a COPY in os.tmpdir(), never the real CLAUDE.md).
+ * @param {{ counts?: object, targetPath?: string }} [opts]
+ *   `counts` overrides the computed counts; `targetPath` overrides the target
+ *   (a test drives a COPY in os.tmpdir(), never the real tracked file).
  * @returns {{ updated: string[], failures: string[] }}
  */
-function updateDocCountsInClaudeMd(root = ROOT, { counts, claudeMdPath } = {}) {
+function updateDocCountsInFile(docFile, root = ROOT, { counts, targetPath } = {}) {
   const resolved = counts || computeDocCounts(root);
-  const filePath = claudeMdPath || path.join(root, 'CLAUDE.md');
+  const filePath = targetPath || path.join(root, docFile);
   const updated = [];
   const failures = [];
 
   if (!safeFs.existsSync(filePath)) {
-    console.log('  Skip: CLAUDE.md (not found)');
+    console.log(`  Skip: ${docFile} (not found)`);
     return { updated, failures };
   }
 
@@ -276,6 +297,7 @@ function updateDocCountsInClaudeMd(root = ROOT, { counts, claudeMdPath } = {}) {
   const original = content;
 
   for (const update of COUNT_UPDATES) {
+    if (!update.files.includes(docFile)) continue;
     const n = resolved[update.field];
     let matched = false;
     content = content.replace(update.pattern, (_m, before, after) => {
@@ -283,8 +305,8 @@ function updateDocCountsInClaudeMd(root = ROOT, { counts, claudeMdPath } = {}) {
       return `${before}${n}${after}`;
     });
     if (!matched) {
-      console.error(`  ERROR: CLAUDE.md count line for ${update.label} not found`);
-      failures.push(`CLAUDE.md (${update.label} line not found)`);
+      console.error(`  ERROR: ${docFile} count line for ${update.label} not found`);
+      failures.push(`${docFile} (${update.label} line not found)`);
     }
   }
 
@@ -292,15 +314,42 @@ function updateDocCountsInClaudeMd(root = ROOT, { counts, claudeMdPath } = {}) {
     try {
       atomicWriteFileSync(filePath, content);
     } catch (err) {
-      console.error(`  ERROR: CLAUDE.md count sync write failed: ${err.message}`);
-      failures.push('CLAUDE.md');
+      console.error(`  ERROR: ${docFile} count sync write failed: ${err.message}`);
+      failures.push(docFile);
       return { updated, failures };
     }
-    updated.push('CLAUDE.md');
-    console.log('  Updated doc counts: CLAUDE.md');
+    updated.push(docFile);
+    console.log(`  Updated doc counts: ${docFile}`);
   }
 
   return { updated, failures };
+}
+
+/**
+ * Rewrite CLAUDE.md's growing doc-count lines. Thin wrapper over
+ * updateDocCountsInFile; the contract (signature, log strings, failure strings)
+ * is unchanged.
+ *
+ * @param {string} [root]
+ * @param {{ counts?: object, claudeMdPath?: string }} [opts]
+ * @returns {{ updated: string[], failures: string[] }}
+ */
+function updateDocCountsInClaudeMd(root = ROOT, { counts, claudeMdPath } = {}) {
+  return updateDocCountsInFile('CLAUDE.md', root, { counts, targetPath: claudeMdPath });
+}
+
+/**
+ * Rewrite README.md's structure-block growing counts (the `tests/ N test files`
+ * and `lib/ N JS modules` lines). The README stated 524 test files while disk
+ * held 543 — the counts drifted with every added file because nothing synced
+ * them. Now they come from the same generator CLAUDE.md's do.
+ *
+ * @param {string} [root]
+ * @param {{ counts?: object, readmePath?: string }} [opts]
+ * @returns {{ updated: string[], failures: string[] }}
+ */
+function updateDocCountsInReadme(root = ROOT, { counts, readmePath } = {}) {
+  return updateDocCountsInFile('README.md', root, { counts, targetPath: readmePath });
 }
 
 /**
@@ -335,6 +384,9 @@ function main(root = ROOT) {
   console.log('\nSyncing documented growing counts in CLAUDE.md...');
   failures.push(...updateDocCountsInClaudeMd(root).failures);
 
+  console.log('\nSyncing documented growing counts in README.md...');
+  failures.push(...updateDocCountsInReadme(root).failures);
+
   if (failures.length > 0) {
     console.error(
       `Release failed: could not sync ${failures.length} file(s): ${failures.join(', ')}`
@@ -351,6 +403,7 @@ module.exports = {
   updateJsonVersionFiles,
   updateVersionInFiles,
   updateDocCountsInClaudeMd,
+  updateDocCountsInReadme,
   atomicWriteFileSync,
   main,
   JSON_VERSION_FILES,

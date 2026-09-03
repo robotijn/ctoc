@@ -1,0 +1,9 @@
+{
+  "content_sha256": "0d0bec48ac855e62a285fd790c790db56c5c84ea23f395d929aeb9d1272d836c",
+  "hash_scope": "specification",
+  "stage_from": "functional",
+  "stage_to": "implementation",
+  "approved_at": "2026-09-03T10:31:59.745Z",
+  "approved_by": "human",
+  "plan_basename": "the-readme-stays-true-on-every-release"
+}

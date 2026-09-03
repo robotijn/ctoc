@@ -509,6 +509,28 @@ describe('syncToReadme against a fixture README', () => {
     assert.ok(!after.includes('version-1.0.0-blue'), 'old badge replaced');
   });
 
+  test('also rewrites the dashboard capture line — the same targets the release script rewrites', () => {
+    // Arrange — a README carrying the badge, the version token AND the Lesson 2
+    // capture's first line. syncToReadme's docblock promises "the same targets
+    // the release script rewrites"; the capture line is one of them.
+    const current = version.getVersion();
+    const readme = path.join(tmpDir, 'README.md');
+    fs.writeFileSync(readme,
+      '  <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blue">\n' +
+      '\n' +
+      '**1.0.0** · Built by someone\n' +
+      '\n' +
+      'CTOC v1.0.0\n');
+
+    // Act
+    const result = version.syncToReadme(tmpDir);
+    const after = fs.readFileSync(readme, 'utf8');
+
+    // Assert
+    assert.strictEqual(result.success, true);
+    assert.match(after, new RegExp(`^CTOC v${current.replace(/\./g, '\\.')}$`, 'm'));
+  });
+
   test('returns success:false when no version line is present (fail loud, no phantom success)', () => {
     // Arrange — a README with no matchable version token at line start.
     const readme = path.join(tmpDir, 'README.md');

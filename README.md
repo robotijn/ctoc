@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.14.63-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.14.64-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-124-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-429-blue">
@@ -19,7 +19,7 @@ CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" 
 
 ## How to read this README
 
-This README is written as a **course**, not a feature list. It follows what the learning-science literature says makes a course work: state the outcomes first and design backward from them (Wiggins & McTighe), teach with **worked examples** before asking you to drive on your own (Sweller & Cooper's worked-example effect), fade the guidance as you get competent, and give you a short **retrieval check** at the end of each lesson so the knowledge sticks. Every screen you see below is a **real capture** from the current version — nothing is mocked up.
+This README is written as a **course**, not a feature list. It follows what the learning-science literature says makes a course work: state the outcomes first and design backward from them (Wiggins & McTighe), teach with **worked examples** before asking you to drive on your own (Sweller & Cooper's worked-example effect), fade the guidance as you get competent, and give you a short **retrieval check** at the end of each lesson so the knowledge sticks. Every screen you see below is a **real capture** — nothing is mocked up. A capture is a snapshot of a live repository, so its plan counts show that moment; the version line always shows the current version (the release sync keeps it true).
 
 **Part 1 — The course** (read in order, about 30 minutes end to end):
 
@@ -135,7 +135,7 @@ Answer them once; both choices are remembered. "Keep defaults, stop asking" and 
 **Worked example.** The classic pipeline overview (`Open the dashboard` on the first screen) of a busy project — this is a real capture of the CTO Chief repository itself:
 
 ```
-CTOC v6.14.36
+CTOC v6.14.64
 ────────────────────────────────────────────────────────────
 
 ▼ Business (2)
@@ -143,28 +143,30 @@ CTOC v6.14.36
     Canvas         0
     Functional     0
 
-▼ Implementation (0)
-    Implementation 0
+▼ Implementation (5)
+    Implementation 5
     Todo           0
 
-▼ Execution (373)
-    In progress    0
+▼ Execution (397)
+    In progress    1
     Review         134
-    Done           239
+    Done           262
 
 TASKS
+  ▶ 1 running   implement 00257-the-readme-stays-true-on-every-release-s1-capture-sync-and-honest-cells
   ⏸ 4 queued    precompute 00003-r2a-scheduler-lifecycle-honesty (waits: ready)
-  ✓ 1 done → 1 awaiting review
+  ✓ 32 done → 32 awaiting review
+  ✗ 1 failed   implement 00252-close-the-coverage-holes-s18-remainder-hooks-commands
 
 INBOX
-  ⊙ 0 morning questions
+  ⊙ 1 morning question · view: inbox questions
   ⊙ 0 decisions awaiting review
-  ⊙ 134 plans at gates · view: inbox gates
+  ⊙ 139 plans at gates · view: inbox gates
   ⊙ 134 possibly-stale plans
-  ⊙ 1 background task done — awaiting review
+  ⊙ 32 background tasks done — awaiting review
 
 AGENT
-  ○ Idle
+  ● Active: 00257-the-readme-stays-true-on-every-release-s1-capture-sync-and-honest-cells
 ```
 
 Read it top to bottom:
@@ -853,7 +855,7 @@ CTO Chief runs in a chosen **environment** that tunes its *own* behavior — how
 | Environment | Enforcement | Auto-push | Notable |
 |-------------|-------------|-----------|---------|
 | `dev` | soft (warn, never block) | off | Fast local iteration; cost estimates shown |
-| `staging` | strict | off (manual push) | Rehearse production; auto-move to review |
+| `staging` | strict | off (manual push) | Rehearse production; the profile sets nothing but strict enforcement |
 | `prod` | strict | off unless you set `git.autoPushEnabled` | Locked down; top model; minimal noise |
 | `ask` *(default)* | — | — | No profile applied; the dashboard asks you to choose |
 
@@ -1103,7 +1105,7 @@ node --test tests/*.test.js   # fast pass only — does NOT enforce the floor
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.14.63'
+getVersion()       // → '6.14.64'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -1136,7 +1138,7 @@ ctoc/
 │                    61 quality configs, 6 agent-fragments/ — the cross-cutting
 │                    rules every agent carries: ancestry-read, async-choice-protocol,
 │                    honest-status, no-stub-rule, plain-gate-words, warnings-are-critical)
-├── tests/           524 test files (run with `npm test`)
+├── tests/           543 test files (run with `npm test`)
 ├── .ctoc/           Config, templates, operations, audit, loop journals, baselines
 │   ├── templates/   CLAUDE.md.template, canvas templates, SaaS templates,
 │   │                questions.yaml, product-kpis.yaml
@@ -1172,6 +1174,6 @@ Use CTO Chief freely for any project. You may not offer CTO Chief itself or a de
 
 ---
 
-**6.14.63** · Built by [@robotijn](https://github.com/robotijn)
+**6.14.64** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

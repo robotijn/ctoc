@@ -35,6 +35,7 @@ const {
   getVersion,
   updateJsonVersionFiles,
   updateVersionInFiles,
+  updateDocCountsInReadme,
   main,
 } = require('../src/scripts/release');
 
@@ -238,6 +239,10 @@ const README_AT_1_0_0 = [
   '**1.0.0** — the headline version at line start',
   '![v](https://img.shields.io/badge/version-1.0.0-blue) and again version-1.0.0-blue here.',
   "getVersion()       // → '1.0.0'",
+  'CTOC v1.0.0',
+  'A sentence mentioning CTOC v1.0.0 mid-line, which must not be rewritten.',
+  '│   ├── lib/         7 JS modules (planning, the fences)',
+  '├── tests/           9 test files (run with `npm test`)',
   '',
 ].join('\n');
 
@@ -316,6 +321,38 @@ describe('updateVersionInFiles — syncs every configured README pattern', () =>
     assert.ok(out.includes('Intro line with an inline'));
   });
 
+  test('should_rewrite_the_dashboard_capture_version_line', () => {
+    // Arrange
+    const root = makeRoot();
+    fs.writeFileSync(path.join(root, 'README.md'), README_AT_1_0_0);
+
+    // Act
+    updateVersionInFiles('2.0.0', root);
+    const out = readText(root, 'README.md');
+
+    // Assert — the Lesson 2 capture's first line is a version reference too. It
+    // lives inside a fenced block, invisible to the badge/headline patterns, so
+    // it re-rotted on every release until VERSION_UPDATES named it.
+    assert.match(out, /^CTOC v2\.0\.0$/m);
+    assert.ok(!out.includes('\nCTOC v1.0.0\n'));
+  });
+
+  test('should_leave_a_mid_line_CTOC_version_mention_untouched', () => {
+    // Arrange
+    const root = makeRoot();
+    fs.writeFileSync(path.join(root, 'README.md'), README_AT_1_0_0);
+
+    // Act
+    updateVersionInFiles('2.0.0', root);
+    const out = readText(root, 'README.md');
+
+    // Assert — ANCHOR GUARD for the case above: the capture pattern is
+    // `^CTOC v\d+\.\d+\.\d+$` with /m and no /g. Dropping either anchor would
+    // rewrite this prose sentence. (This assertion also holds before the pattern
+    // exists — it is a guard, not evidence of the feature.)
+    assert.match(out, /mentioning CTOC v1\.0\.0 mid-line/);
+  });
+
   test('should_report_no_updates_on_a_second_run_idempotent', () => {
     // Arrange — first run brings the file to 2.0.0
     const root = makeRoot();
@@ -327,6 +364,90 @@ describe('updateVersionInFiles — syncs every configured README pattern', () =>
 
     // Assert
     assert.deepEqual(updated, []);
+    assert.deepEqual(failures, []);
+  });
+});
+
+// =============================================================================
+// Cluster F — updateDocCountsInReadme: the README's structure counts come from
+// the ONE generator, exactly as CLAUDE.md's already do. The four rows pin the
+// `files:` filter, the named failure, the partial write, and the skip-when-absent
+// branch that keeps release-metadata-sync's README-less fixtures green.
+// =============================================================================
+
+describe('updateDocCountsInReadme — the README structure counts come from the generator', () => {
+  test('should_write_the_live_counts_into_the_README_structure_block', () => {
+    // Arrange
+    const root = makeRoot();
+    fs.writeFileSync(path.join(root, 'README.md'), README_AT_1_0_0);
+
+    // Act
+    const { updated, failures } = updateDocCountsInReadme(root, {
+      counts: { testFiles: 543, libModules: 134 },
+    });
+    const out = readText(root, 'README.md');
+
+    // Assert
+    assert.deepEqual(failures, []);
+    assert.ok(updated.includes('README.md'));
+    assert.match(out, /tests\/\s+543 test files/);
+    assert.match(out, /lib\/\s+134 JS modules/);
+  });
+
+  test('should_name_a_failure_when_the_README_test_count_line_is_missing', () => {
+    // Arrange — the structure block lost its tests/ line.
+    const root = makeRoot();
+    fs.writeFileSync(
+      path.join(root, 'README.md'),
+      README_AT_1_0_0.split('\n').filter((l) => !l.includes('test files')).join('\n')
+    );
+
+    // Act
+    const { failures } = updateDocCountsInReadme(root, {
+      counts: { testFiles: 543, libModules: 134 },
+    });
+    const out = readText(root, 'README.md');
+
+    // Assert — a count line that is EXPECTED but ABSENT is a NAMED failure, never
+    // a silent no-op; and the surviving line is still rewritten (partial progress
+    // is written — the named failure is what makes the gap loud).
+    assert.ok(failures.some((f) => f.includes('README.md') && f.includes('testFiles')));
+    assert.match(out, /lib\/\s+134 JS modules/);
+  });
+
+  test('should_skip_a_missing_README_without_reporting_a_failure', () => {
+    // Arrange — a root with no README at all.
+    const root = makeRoot();
+
+    // Act
+    const result = updateDocCountsInReadme(root, { counts: { testFiles: 1, libModules: 1 } });
+
+    // Assert — this is the branch that keeps release-metadata-sync test 5 green
+    // (its fixtures carry no README). "Absent" must never become "failure".
+    assert.deepEqual(result, { updated: [], failures: [] });
+  });
+
+  test('should_leave_the_CLAUDE_only_count_lines_alone_when_syncing_the_README', () => {
+    // Arrange — a README that also carries the two CLAUDE.md-only count shapes.
+    const root = makeRoot();
+    const body = README_AT_1_0_0 + [
+      'Run all 9 test files with node --test.',
+      '├── agents/          1 agent definitions across 24 categories',
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(root, 'README.md'), body);
+
+    // Act
+    const { failures } = updateDocCountsInReadme(root, {
+      counts: { testFiles: 543, libModules: 134, agents: 124 },
+    });
+    const out = readText(root, 'README.md');
+
+    // Assert — pins the `files:` filter. Without it the `Run all` and `agents/`
+    // entries would fire here: the agents line would be rewritten and, worse, a
+    // README lacking either shape would report a false failure on every release.
+    assert.ok(out.includes('Run all 9 test files with node --test.'));
+    assert.ok(out.includes('├── agents/          1 agent definitions across 24 categories'));
     assert.deepEqual(failures, []);
   });
 });
@@ -376,6 +497,13 @@ describe('main — reads VERSION, then syncs both JSON and docs, exit code as co
     writeJson(root, '.claude-plugin', 'plugin.json', { version: '1.0.0' });
     writeJson(root, 'package.json', { version: '1.0.0' });
     fs.writeFileSync(path.join(root, 'README.md'), README_AT_1_0_0);
+    // Seed a non-trivial, KNOWN count so the README count sync's effect is
+    // distinguishable from the fixture's own numbers.
+    fs.mkdirSync(path.join(root, 'tests'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'tests', 'a.test.js'), '// a\n');
+    fs.writeFileSync(path.join(root, 'tests', 'b.test.js'), '// b\n');
+    fs.mkdirSync(path.join(root, 'src', 'lib'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src', 'lib', 'only.js'), '// only\n');
 
     // Act
     const code = main(root);
@@ -387,6 +515,13 @@ describe('main — reads VERSION, then syncs both JSON and docs, exit code as co
     assert.equal(readJson(root, '.claude-plugin', 'plugin.json').version, '2.0.0');
     assert.equal(readJson(root, '.claude-plugin', 'marketplace.json').metadata.version, '2.0.0');
     assert.match(readText(root, 'README.md'), /^\*\*2\.0\.0\*\*/m);
+
+    // …and that main() wires BOTH README syncs: the capture-line version and the
+    // structure-block counts, the latter read from the live generator.
+    const readme = readText(root, 'README.md');
+    assert.match(readme, /^CTOC v2\.0\.0$/m);
+    assert.match(readme, /tests\/\s+2 test files/);
+    assert.match(readme, /lib\/\s+1 JS modules/);
   });
 
   test('should_return_1_when_a_json_target_is_present_but_the_wrong_shape', () => {
