@@ -1,114 +1,102 @@
-# Handoff — CTOC: README-as-a-course + coverage wave + gate fixes, all shipped
+# Handoff — CTOC: validator claim-parser fix in flight; detector slice gate-green, waiting on it
 
 <!-- Maintained by the `handoff` skill. Left by the previous Claude instance so
      the next one (claude or claudex) can continue. Treat as last-known state —
      verify against the repo before acting. VERIFY EVERY CLAIM IN THIS FILE
      AGAINST DISK, INCLUDING THIS FILE. -->
 
-- Updated: 2026-09-03 13:49 by claude
+- Updated: 2026-09-03 22:17 by claude
 - Branch: main
-- Status: complete
+- Status: in progress
 
 ## Goal
-Rewrite `README.md` as a course grounded in learning-science evidence, close the
-suite's missing coverage with tests that would catch regressions, fix the gate
-defects that surfaced along the way, and fix the evidence-pack archiver's five
-defects — everything through CTOC's own iron loop, every gate crossed by the
-human.
+Finish two human-approved fixes that are mid-pipeline: (1) the Create-React-App
+detector fix — BUILT and gate-green, blocked at completion by (2) a
+plan-validator defect that misreads a JavaScript method name in plan prose as a
+claimed-but-missing file. Fix 2 was building in the background when this
+handoff was saved.
 
 ## Current status
-- Done (all pushed, `origin/main` = local at v6.14.65, commit `253a443a`):
-  - `README.md` is a nine-lesson course with real captures; its guard test
-    (`tests/readme-numbers.test.js`) derives its pins from disk; the release sync
-    now rewrites the capture's `CTOC vX.Y.Z` line and the README structure counts
-    (`release.js` `VERSION_UPDATES`/`COUNT_UPDATES` + `version.js
-    syncToReadme`), with derived pins that go red on drift.
-  - Coverage wave: 20 slices, suite 99.04% → 99.9% (floor deliberately HELD at
-    99 by the human — never raise it without his word); ~15 modules at 100%;
-    every fail-closed enforcement arm mutation-proved to deny; fail-open arms
-    are stated contracts; dead ranges reported, never deleted.
-  - Gate fixes: `plan-validator.extractStepBlocks` prefers the canonical
-    `## Execution Plan (Steps 8-16)` section; `EXECUTION_SECTION_PRODUCERS`
-    gained the `deferred questions` row; the circuit breaker persists kickback
-    counts in `.ctoc/state/kickbacks/<slug>.json` (a Step 14 kickback no longer
-    revokes the build's own write permission); 36 + 93 approvals re-recorded via
-    `ledger-backfill --hash-scope specification` — 0 mismatches across ~400
-    ledgered plans.
-  - Evidence pack (`src/scripts/evidence-pack.js`): packs the caller's project
-    (never the plugin cache; loud refusal on an unrelated cwd), manifest is the
-    archive's first member, tar-absent exits non-zero keeping the salvage
-    bundle, manifest is parseable YAML (js-yaml round-trip), all three
-    window-blind collectors fixed.
-- In progress: nothing. `todo`/`in-progress`/`functional` are empty; the six
-  files in `plans/implementation/` are parent INDEXES of shipped work
-  (ledgered; residency clean — leave them).
-- Next: only human-scheduled items (see Open questions).
+- Done and pushed earlier (through `253a443a` / v6.14.65): README course +
+  README-truth sync machinery, the 20-slice coverage wave (99.04→99.9%, floor
+  HELD at 99), done-gate + kickback-sidecar fixes, ledger at zero mismatches,
+  evidence-pack five fixes. See the previous handoff content in git history.
+- In progress at save time (both plans human-approved through every gate up to
+  the build):
+  1. `plans/in-progress/00259-…-s1-symmetric-credit.md` (CRA detector) —
+     **work FINISHED and gate-green** (its evidence is recorded inside the plan
+     under Execution Record / Verification Evidence; `npm test` PASS 99.9%).
+     Its `menu task complete t103` was REFUSED by the validator defect below.
+     Its four file edits are in the working tree, deliberately UNCOMMITTED
+     together with the in-flight parser work (one gate-green commit later).
+  2. `plans/in-progress/00260-…-s1-honest-claim-parser.md` (validator fix) —
+     executor was RUNNING as task t105 (background) at save time, editing
+     `src/lib/plan-validator.js` + its two test files. It may have completed or
+     died after this save — CHECK before touching those files.
+- Next: see Resume here.
 
 ## Key decisions
-- Coverage floor stays 99 (human, 2026-09-03) — measured 99.9; the ratchet is
-  his alone.
-- Hash-binding migration (human): exempt row added AND every affected approval
-  re-recorded as `backfilled` via the sanctioned `src/scripts/ledger-backfill.js`
-  (never `node -e` — the Bash hook denies inline ledger writes).
-- README captures: version line machine-synced; counts are snapshots (the
-  promise sentence states that split). The active-agent capture stays — a tidied
-  capture is not a capture.
-- New plans enter at `plans/functional/` — a plan authored into a gate
-  destination is blocked by `gate-destinations-approved` and reverted.
-- Executors write ticks ONLY in the canonical checkbox section and records only
-  under `## Execution Record` / `## Verification Evidence` / `## Decisions Taken
-  Under Ambiguity`; an invented heading breaks the approval hash.
+- The validator defect: `validateNoContradictions`'s created-file pattern
+  captures `assert.strictEqual` (capture stops at `(`), scans inline backtick
+  code, and treats any dotted identifier as a path. Fix = three guards
+  (read-past-match call skip — NOT a lookahead, it backtracks; inline call-span
+  stripping; path-plausibility with a union extension list incl. `template`,
+  `gitkeep`). Human approved 2026-09-03.
+- Six shipped plans / seven tokens misread today; the slice makes the runnable
+  sweep the census (a text probe under-reports).
+- One vacuous test tightened with Lesson-14 justification: `VP1 #4` in
+  tests/plan-validator.test.js used the verb `add`, which the pattern never
+  matches.
+- Overload protocol (human, 2026-09-03): when the opus subagent tier returns
+  529, back off 30 minutes and retry — never substitute a different model.
+- All standing rulings from the previous handoff still bind (floor 99;
+  new plans enter at functional/; executors write only canonical sections;
+  `depends_on: none` never `[]`; one blank line before appended records).
 
 ## Open questions / blockers
-None blocking. Awaiting the human's scheduling (reproduced, recorded, NOT built):
-1. Framework detector misses canonical Create React App (`react-scripts` in
-   `dependencies`; `hasDevDependency`/`hasDependency` asymmetry in
-   `src/lib/framework-security-checker.js`) — its security surface is skipped.
-2. Confinement refusal blames the approval ledger for unresolvable paths
-   (`src/lib/real-path-confinement.js` `resolve-failed` → wrong human-facing
-   reason).
-3. `src/hooks/SessionStart.js` `main().catch` exits before piped stderr drains.
-4. `.ctoc/reachability-roots.json`: `src/scripts/evidence-pack.js` has no
-   `reasons` note (one line).
-5. No `general.entry_point` declared in `.ctoc/settings.json` for CTOC itself,
-   so the last-mile launch check opts out on every build here (CLAUDE.md
-   documents the declaration it would use).
-6. Four stale queued tasks from an older session: t43–t45 (gate-question
-   precomputes), t48 (implement for a plan no longer in the queue) — run or
-   cancel on his word.
-7. 93→0 legacy mismatches are migrated, but tier counts still disagree across
-   `docs/AGENT_ARCHITECTURE.md` (20/99), `.ctoc/architecture/
-   tier-definitions.yaml` (16/99) and agent frontmatter (23/100) — README
-   follows the architecture doc.
+- t105 (parser fix build) outcome unknown at save time.
+- After the parser fix ships gate-green: complete the detector slice with
+  `node src/commands/start.js menu task complete t103 --summary "…"` (it was
+  refused only by the parser defect; its work needs NO rebuild).
+- The executor's scope-growth question at
+  `.ctoc/inbox/questions/1788440244002-hhro07.md` is answered in-file (fix
+  approved as its own plan); close it out when both slices are done.
+- Still awaiting the human's scheduling (unchanged): hasViteSignal placement
+  defect (sibling of the CRA fix, recorded in plan 00259's ancestry),
+  confinement refusal message naming the wrong store, SessionStart
+  exit-before-drain, reachability-roots `reasons` note, `general.entry_point`
+  declaration for CTOC itself, stale tasks t43–t45 + t48.
 
 ## Gotchas
-- The release one-liner must check `npm test`'s exit via `$?` on an unpiped
-  run — `PIPESTATUS` is bash-only; in zsh it once let a red gate push.
-- `node --test tests/*.test.js` bypasses the coverage/zero-skipped gate; only
-  `npm test` is the gate. Its coverage reporter can rarely lose the number under
-  child-process-heavy runs ("Could not report code coverage") — the gate then
-  correctly refuses; re-run.
-- The enforcement hook accepts an escape phrase only when the HUMAN types it.
-- `depends_on: []` in plan frontmatter parses as a phantom dependency — use the
-  literal word `none`.
-- A two-blank-line separator before an appended plan record breaks the
-  approval hash; use one.
-- Coverage-report rows are indented under directory headings — reading the
-  basename alone confuses `src/lib/inbox.js` with `src/areas/inbox.js` (this
-  bit two planners).
+- The working tree deliberately carries BOTH slices' edits uncommitted
+  (detector files finished; parser files possibly mid-write by t105). Do not
+  commit or revert until t105's outcome is known and its gate is green.
+- The parser-fix slice's own completion runs through the parser it fixes.
+- A plan's prose must cite calls in fenced blocks until the fix lands —
+  inline citations trip the old parser at completion.
+- Opus subagent tier had a multi-hour 529 overload on 2026-09-03; the fifth
+  launch attempt succeeded ~21:00.
+- The zsh gate-exit trap, the `npm test`-is-the-gate rule, and the
+  coverage-reporter losing its number under child-process load: all still
+  true (previous handoff, git history).
 
 ## Key files
-- `README.md` — the course; guard: `tests/readme-numbers.test.js`.
-- `src/scripts/release.js`, `src/lib/version.js` — README/CLAUDE.md sync.
-- `src/lib/plan-validator.js`, `src/lib/approval-ledger.js`,
-  `src/scripts/ledger-backfill.js` — done-gate + hash semantics.
-- `src/lib/circuit-breaker.js` + `.ctoc/state/kickbacks/` — sidecar counters.
-- `src/scripts/evidence-pack.js` + `tests/evidence-pack-main.test.js`.
-- `plans/done/00234…00258` — the wave's plans with execution records.
-- Session memory: `~/.claude/projects/-Users-doctony-Code-ctoc/memory/`
-  (`project_coverage_wave_shipped.md` lists the open findings).
+- `src/lib/plan-validator.js` (+ tests/plan-validator*.test.js) — in flight, t105.
+- `src/lib/framework-detector.js` (+ its two test files,
+  tests/remainder-security-tooling-coverage.test.js header) — finished, t103.
+- `plans/in-progress/00259…`, `plans/in-progress/00260…` — the two live plans,
+  evidence recorded in-plan.
+- `.ctoc/approvals/00259….json`, `.ctoc/approvals/00260….json` + the two parent
+  entries — the human's crossings (committed with this handoff).
+- Task registry: t103 running (waiting), t105 running (building) at save time.
 
 ## Resume here
-Nothing is in flight. If continuing: pick an item from Open questions with the
-human, write its functional plan into `plans/functional/`, validate, and drive
-it through the gates — he approves every crossing.
+1. Check whether t105 finished: does `.ctoc/state/verify/00260-…json` exist and
+   read `passed:true`? Is `plans/review/00260-…md` present? If yes → commit both
+   slices' edits (one commit, full `npm test` first, unpiped `$?` check), push.
+2. Then run the t103 completion command above; on `ok:true` both plans are in
+   review — ask the human "is it finished?" for both (his word crosses).
+3. If t105 died mid-build: `git status` the three parser files, read the plan's
+   Execution Plan ticks to see how far it got, and relaunch an
+   iron-loop-executor for task t105 with the brief pattern used all session
+   (Rule 1 plan path, declared files, red-first, complete-once).

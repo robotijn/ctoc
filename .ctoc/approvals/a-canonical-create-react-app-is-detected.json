@@ -1,0 +1,9 @@
+{
+  "content_sha256": "2472cbab119502b8fa3ff81907cebe9067914601839638113d340d63072f652f",
+  "hash_scope": "specification",
+  "stage_from": "functional",
+  "stage_to": "implementation",
+  "approved_at": "2026-09-03T12:03:05.189Z",
+  "approved_by": "human",
+  "plan_basename": "a-canonical-create-react-app-is-detected"
+}
