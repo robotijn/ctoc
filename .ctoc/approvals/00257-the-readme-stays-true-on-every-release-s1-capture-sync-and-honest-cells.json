@@ -1,9 +1,9 @@
 {
-  "content_sha256": "f78fa7cafa17d89478eff211f56077bfd6f698c7e6007f245e2a85b5bbb51bbe",
+  "content_sha256": "9d9faaa50c23d05b0eca9caee916c7de87675dfc6fba00c8ab59f17170a02159",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T10:40:52.616Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-09-03T11:06:15.235Z",
   "approved_by": "human",
   "plan_basename": "00257-the-readme-stays-true-on-every-release-s1-capture-sync-and-honest-cells"
 }

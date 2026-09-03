@@ -15,8 +15,8 @@ files:
   - tests/version.test.js
   - tests/readme-numbers.test.js
 approved_by: human
-approved_at: 2026-09-03T10:40:52.562Z
-gate_crossed: implementation → todo
+approved_at: 2026-09-03T11:06:15.181Z
+gate_crossed: review → done
 ---
 
 # Refresh the dashboard capture, sync the README's version + counts from the generator, and delete the false staging claim
