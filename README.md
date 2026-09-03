@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.14.54-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.14.55-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-124-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-429-blue">
@@ -1103,7 +1103,7 @@ node --test tests/*.test.js   # fast pass only — does NOT enforce the floor
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.14.54'
+getVersion()       // → '6.14.55'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -1172,6 +1172,6 @@ Use CTO Chief freely for any project. You may not offer CTO Chief itself or a de
 
 ---
 
-**6.14.54** · Built by [@robotijn](https://github.com/robotijn)
+**6.14.55** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>
