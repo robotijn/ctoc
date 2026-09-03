@@ -1,11 +1,11 @@
-# Handoff — CTOC: validator claim-parser fix in flight; detector slice gate-green, waiting on it
+# Handoff — CTOC: PAUSED by the human — parser-fix build stopped mid-flight; detector slice gate-green, waiting
 
 <!-- Maintained by the `handoff` skill. Left by the previous Claude instance so
      the next one (claude or claudex) can continue. Treat as last-known state —
      verify against the repo before acting. VERIFY EVERY CLAIM IN THIS FILE
      AGAINST DISK, INCLUDING THIS FILE. -->
 
-- Updated: 2026-09-03 22:19 by claude
+- Updated: 2026-09-03 22:20 by claude
 - Branch: main
 - Status: in progress
 
@@ -13,8 +13,7 @@
 Finish two human-approved fixes that are mid-pipeline: (1) the Create-React-App
 detector fix — BUILT and gate-green, blocked at completion by (2) a
 plan-validator defect that misreads a JavaScript method name in plan prose as a
-claimed-but-missing file. Fix 2 was building in the background when this
-handoff was saved.
+claimed-but-missing file. Fix 2 was STOPPED by the human mid-build; resume only on his word.
 
 ## Current status
 - Done and pushed earlier (through `253a443a` / v6.14.65): README course +
@@ -54,7 +53,12 @@ handoff was saved.
   `depends_on: none` never `[]`; one blank line before appended records).
 
 ## Open questions / blockers
-- t105 (parser fix build) outcome unknown at save time.
+- The parser-fix build is STOPPED, not finished: the human ordered the running
+  executor killed at 22:18 (registry task t105 is `cancelling`; no verify
+  evidence exists for 00260). Its unresolved tail: its own plan prose still
+  tripped "a different misread shape" it had not yet diagnosed — the next
+  executor must investigate that FIRST (read the stop note appended to the
+  plan and the ticks in its canonical section).
 - After the parser fix ships gate-green: complete the detector slice with
   `node src/commands/start.js menu task complete t103 --summary "…"` (it was
   refused only by the parser defect; its work needs NO rebuild).
@@ -68,9 +72,11 @@ handoff was saved.
   declaration for CTOC itself, stale tasks t43–t45 + t48.
 
 ## Gotchas
-- The working tree deliberately carries BOTH slices' edits uncommitted
-  (detector files finished; parser files possibly mid-write by t105). Do not
-  commit or revert until t105's outcome is known and its gate is green.
+- The working tree deliberately carries BOTH slices' edits uncommitted:
+  detector files (4) are FINISHED work; parser files (3) are the stopped
+  build's partial work — its last report said Steps 8–10 were done and the
+  AFTER sweep clean. Do not commit or revert either set until the parser fix
+  is completed gate-green; then one commit ships both.
 - The parser-fix slice's own completion runs through the parser it fixes.
 - A plan's prose must cite calls in fenced blocks until the fix lands —
   inline citations trip the old parser at completion.
@@ -88,15 +94,22 @@ handoff was saved.
   evidence recorded in-plan.
 - `.ctoc/approvals/00259….json`, `.ctoc/approvals/00260….json` + the two parent
   entries — the human's crossings (committed with this handoff).
-- Task registry: t103 running (waiting), t105 running (building) at save time.
+- Task registry: t103 `running` (its work finished, completion refused by the
+  parser defect — waiting); t105 `cancelling` (executor killed by the human's
+  order; reconcile will settle it once liveness confirms the agent is gone).
 
 ## Resume here
-1. Check whether t105 finished: does `.ctoc/state/verify/00260-…json` exist and
-   read `passed:true`? Is `plans/review/00260-…md` present? If yes → commit both
-   slices' edits (one commit, full `npm test` first, unpiped `$?` check), push.
-2. Then run the t103 completion command above; on `ok:true` both plans are in
-   review — ask the human "is it finished?" for both (his word crosses).
-3. If t105 died mid-build: `git status` the three parser files, read the plan's
-   Execution Plan ticks to see how far it got, and relaunch an
-   iron-loop-executor for task t105 with the brief pattern used all session
-   (Rule 1 plan path, declared files, red-first, complete-once).
+1. On the human's word only (he ordered the pause): relaunch an
+   iron-loop-executor to FINISH plan 00260 under a fresh task (register via
+   `menu task add implement 00260-… --touches src/lib/plan-validator.js,tests/plan-validator.test.js,tests/plan-validator-coverage.test.js`;
+   t105 is cancelling and must not be reused). Brief pattern as all session
+   (Rule 1 plan path, declared files, complete-once) PLUS: first diagnose the
+   stopped build's unresolved tail — its own plan prose tripping "a different
+   misread shape" — starting from the three parser files' current diffs and
+   the plan's ticks; re-run Step 8 against the current tree before continuing.
+2. When 00260 completes gate-green: run
+   `node src/commands/start.js menu task complete t103 --summary "…"` (the
+   detector work needs NO rebuild), then commit BOTH slices' edits in one
+   gate-green commit (full `npm test` first, unpiped `$?` check) and push.
+3. Both plans in review → ask the human "is it finished?" for both; his word
+   crosses. Then close out the answered scope-growth question.
