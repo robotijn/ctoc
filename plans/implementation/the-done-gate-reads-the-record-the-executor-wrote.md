@@ -22,7 +22,7 @@ gate_crossed: functional → implementation
 
 | # | Slice file | Scope (one line) | depends_on |
 |---|---|---|---|
-| 1 | `the-done-gate-reads-the-record-the-executor-wrote-s1-canonical-section-and-deferred-row.md` | The step-block reader prefers the canonical ticked execution section over the planner's prose twin; the exemption-row request is settled with two committed proofs instead of a guessed table row. | – |
+| 1 | `00255-the-done-gate-reads-the-record-the-executor-wrote-s1-canonical-section-and-deferred-row.md` | The step-block reader prefers the canonical ticked execution section over the planner's prose twin; the exemption-row request is settled with two committed proofs instead of a guessed table row. | – |
 
 One slice: the two source edits and their tests are one unit of work, per the parent's own
 notes. The slice reports one departure from the approach below and its evidence — the

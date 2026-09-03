@@ -1,0 +1,9 @@
+{
+  "content_sha256": "fbd40ef57908e746b4c061060de9c709c9e685068e006d794008e6ca92ee77fd",
+  "hash_scope": "specification",
+  "stage_from": "functional",
+  "stage_to": "implementation",
+  "approved_at": "2026-09-03T07:34:02.943Z",
+  "approved_by": "human",
+  "plan_basename": "a-kickback-must-not-revoke-the-builds-own-permission"
+}

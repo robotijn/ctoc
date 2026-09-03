@@ -1,4 +1,5 @@
 ---
+iron_loop_verdict: true
 title: "The done check reads the canonical execution section the executor ticked"
 type: implementation
 iron_loop: true
@@ -9,9 +10,14 @@ effort: small
 files:
   - src/lib/plan-validator.js
   - src/lib/approval-ledger.js
+  - src/scripts/ledger-backfill.js
+  - tests/ledger-backfill-coverage.test.js
   - tests/plan-validator.test.js
   - tests/approval-boundary-is-legible.test.js
   - tests/approval-hash-survives-execution.test.js
+approved_by: human
+approved_at: 2026-09-03T07:34:03.169Z
+gate_crossed: implementation → todo
 ---
 
 # The done check reads the canonical execution section the executor ticked
@@ -219,7 +225,38 @@ contains no `Deferred Questions` heading, so the golden constant cannot move.
 `tests/approval-boundary-is-legible.test.js` is declared in `files:` because it is the file
 that would pin the producer row if the human answers "add it"; this slice does not edit it.
 
-## The question this slice hands back
+## The human's ruling (2026-09-03) — the question below is ANSWERED
+
+The human chose, with the proofs in hand: **add the row AND re-record every affected
+plan's approval in the same change**, so no plan is left holding a digest recorded
+under the old semantics. Binding consequences for the build:
+
+1. Append the seventh row to `EXECUTION_SECTION_PRODUCERS`:
+   `{ heading: 'deferred questions', producer: 'iron-loop integrator (src/lib/iron-loop.js appendDeferredQuestions) — written during refinement at the build-queue crossing' }`.
+2. In the same build, enumerate every ledgered plan across `todo/`, `in-progress/`,
+   `review/` and `done/`, compute `contentMatches` under the NEW semantics, and for
+   each entry that flips from match to mismatch (measured expectation: the ~53
+   carriers of the heading), re-record its digest through the ONE sanctioned writer:
+   `node src/scripts/ledger-backfill.js --plan <path> --stage <its recorded stage_to> --reason "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics"`.
+   `backfillEntry` writes via `writeEntry` (verify at build that it overwrites an
+   existing entry; if the script refuses an existing entry or the plan's recorded
+   `stage_to`, extend the script minimally — it is in `files:` for exactly this).
+   Every re-recorded entry reads `entryKind: backfilled`, never `human` — the audit
+   can always tell the migration from a live approval.
+3. Acceptance after the re-record: `contentMatches` is true for every ledgered plan
+   EXCEPT `00252-close-the-coverage-holes-s18-remainder-hooks-commands`, whose
+   mismatch is caused by the `kickback_counts` frontmatter block (a separate plan,
+   "A kickback must not revoke the build's own permission", handles that class; the
+   human re-approves 00252 through the menu, or its digest is re-recorded here too —
+   re-record it here, with its own reason naming the kickback block, so zero
+   mismatches remain).
+4. The proof cases the planner specified stay, retargeted to the new truth: a
+   fixture approved WITH the section present verifies both before and after the row
+   (because its entry is re-recorded), and the case that showed real `plans/todo/`
+   bytes hashing differently with the section removed becomes the guard that the
+   re-record actually happened (zero mismatches on the live scan).
+
+## The question this slice handed back (answered above — kept for the record)
 
 The parent plan's part B is held, with its evidence, for one decision. State it to the human
 in plain words, with the number case 4 measures:
@@ -263,3 +300,12 @@ decision, not a quality one):
 4. **The declared `files:` list is unchanged from the parent plan** even though this slice
    edits only two of the five. The list is the write permission the human approved;
    narrowing it would force a scope-growth request the moment the question above is answered.
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built. Structural fact: no Step 8, 9, 10, 11, 12, 13, 14, 15, 16 found.
