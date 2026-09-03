@@ -1,9 +1,11 @@
 {
-  "content_sha256": "c1f5a94ac6bb9c5ae7c328bc99cf75c780082db8a104d29bef47a0ac4c81590b",
+  "content_sha256": "5af79551db1e72dc8ea03520f0c89aaddcaccd05d8d737deac9408766e36b716",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-30T19:04:14.554Z",
+  "approved_at": "2026-09-03T09:49:35.397Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00180-find-out-whether-a-human-gate-has-ever-been-crossed-unattended"
 }

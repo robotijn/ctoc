@@ -1,9 +1,11 @@
 {
-  "content_sha256": "2a7368ee82c96754d8851b25c187e7e8c475f63bd9003374f554445f95f9d0ca",
+  "content_sha256": "0984cbe5794c79ed92247b34cc06b769d787179024497a818d9ab163d965d797",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-08-31T14:59:34.721Z",
+  "approved_at": "2026-09-03T09:49:35.844Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00243-close-the-coverage-holes-s9-streaming-gate"
 }

@@ -301,6 +301,52 @@ decision, not a quality one):
    edits only two of the five. The list is the write permission the human approved;
    narrowing it would force a scope-growth request the moment the question above is answered.
 
+5. **The re-record uses a new `--hash-scope specification` flag, not `backfillEntry`'s
+   whole-file default.** Verified at build: `backfillEntry` hashed the WHOLE file
+   (`computeContentHash`), which `resolveHash` records honestly as `hash_scope: 'file'`.
+   That is the right binding for the 2026-07-14 legacy migration — those plans were
+   finished — but it is the wrong one here. All 35 flipped entries are live,
+   specification-scoped plans; 33 sit in review and two are in the build queue, one of
+   them THIS plan. A whole-file digest over a plan still being built is invalidated by
+   the next line its own executor writes, which surfaces as `hash-mismatch` — an attack
+   signature — and revokes the build's own write permission. So the flag was added
+   (closed enum, validated, whole-file still the default, legacy path byte-for-byte
+   unchanged) and every re-record was taken under specification scope. Confirmed after
+   the migration: `approval-residency.isApprovedForCoverage` returns
+   `{approved: true, kind: 'backfilled'}` for this plan and for the one in the queue.
+
+6. **The ruling's acceptance criterion "zero mismatches across all ledgered plans" is
+   NOT met, is not pursued, and is reported instead of absorbed.** It was written on the
+   premise that two plans were failing. The measured premise is 94, and this change
+   repairs none of them (see the baseline above: zero entries unflip). Reaching a global
+   zero would mean re-recording 93 further approvals whose digests moved for reasons
+   nobody has examined — which is precisely the post-approval laundering the ledger
+   exists to expose, at repository scale, on a slice authorised to fix a validator
+   region lookup. What WAS done is the operative half of the ruling, exactly as written:
+   every entry that flips under the new semantics is re-recorded, plus `00252` by name.
+   Measured after: 94 → 93 total mismatches (only `00252` cleared), 36 entries carry the
+   2026-09-03 reason, all 36 classify `backfilled` and none `human`. The remaining 93
+   are a decision for the human, stated below.
+
+7. **The live guard asserts an attributable property, not a global zero.** A global
+   zero-mismatch assertion would be red on arrival for 93 unrelated reasons and would
+   stay flaky forever. The committed guard walks every SPECIFICATION-scoped ledger entry
+   whose plan carries the note and requires it to match, subtracting a pinned set of the
+   21 that already failed before this change. It is a subset assertion, so re-approving
+   any of those 21 never turns the suite red, while any NEW name does. Verified RED in
+   the live window between the exempt row landing and the migration running: the same
+   walk returned 57 mismatching note-carriers, 36 of them outside the pinned set — the
+   35 flips plus `00252`. After the migration it returns zero.
+
+8. **This plan had no canonical `## Execution Plan (Steps 8-16)` section, so one was
+   written before the digest was re-recorded.** The integrator's own note in this file
+   reports "no Step 8, 9, 10, 11, 12, 13, 14, 15, 16 found", and the heading was
+   genuinely absent — the very defect this slice fixes could not have been ticked
+   against. The section was appended in the template shape `src/lib/iron-loop.js`
+   emits, BEFORE the re-record, so the recorded specification covers it. Every later
+   write to this file lands either on a checkbox line (stripped from the digest) or
+   inside an exempt section, so the entry stays valid through completion.
+
 
 ## Deferred Questions
 
@@ -309,3 +355,163 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built. Structural fact: no Step 8, 9, 10, 11, 12, 13, 14, 15, 16 found.
+
+## Execution Record
+
+### Baseline measurement, taken BEFORE any edit (2026-09-03)
+
+A read-only scan of every ledgered plan across `plans/todo/`, `plans/in-progress/`,
+`plans/review/` and `plans/done/` (395 plans hold a ledger entry), computing
+`contentMatches` on the live bytes, and re-computing the specification digest with the
+`## Deferred Questions` section removed to predict the flip set. Exactly one heading
+spelling exists on disk: `## Deferred Questions`, 57 occurrences, no other level and no
+suffixed variant.
+
+| Measurement | Count |
+|---|---|
+| Ledgered plans scanned | 395 |
+| Already mismatching BEFORE this change | **94** |
+| Entries that FLIP match → mismatch when the row is added | **35** |
+| Entries that UNFLIP mismatch → match when the row is added | **0** |
+| Plans carrying a `## Deferred Questions` heading | 57 |
+
+Three facts here contradict the premise the ruling was given, and are reported rather
+than absorbed:
+
+1. **The row fixes nothing.** Zero entries unflip. Neither `00234` nor `00252` — the two
+   plans the parent plan said the row would repair — is restored by it. This is exactly
+   what the slice's own ordering proof predicted (`actions.js` runs the refinement pass
+   BEFORE `stampAndLedger`, so the section was already inside every recorded digest);
+   the measurement now confirms it on the live ledger rather than by argument.
+2. **The flip set is 35, not the ~53 the ruling estimated.** All 35 are
+   `hash_scope: 'specification'` with `stage_to: 'todo'` — 33 in `plans/review/`, one in
+   `plans/todo/`, and one in `plans/in-progress/`, which is THIS plan.
+3. **94 plans already mismatch, not 2.** Every one of them is unrelated to this change
+   (the row unflips none of them): 269 of the 395 entries carry legacy whole-file
+   (`hash_scope` absent or `'file'`) semantics, so any ordinary post-approval execution
+   record invalidates them by construction. The flip set is disjoint from this set, so
+   after re-recording the 35 flips plus `00252` (which the ruling names), **93 of the 94
+   pre-existing mismatches remain**. Re-recording those 93 is NOT done here — see the
+   decision recorded below.
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [x] Test: a plan carrying BOTH execution sections is judged by the canonical one — tests/plan-validator.test.js; RED first with 7 "unchecked required checkbox" errors (steps 8, 9, 10, 11, 13, 14, 16), green after the fix
+- [x] Test: a prose-only execution section still fails every required step — tests/plan-validator.test.js; GREEN before and after, the guard that the fix never turns an unticked plan into a pass
+- [x] Test: the integrator's Deferred Questions note does not invalidate an approval — tests/approval-hash-survives-execution.test.js; RED before the exempt row, green after
+- [x] Test: an approval recorded WITH the note present still verifies after a rewrite — tests/approval-hash-survives-execution.test.js; RED before the exempt row, green after
+- [x] Test: LIVE LEDGER — no plan mismatches BECAUSE of the deferred-questions exemption — tests/approval-hash-survives-execution.test.js; measured RED in the live window between the row and the migration (57 mismatching note-carriers, 36 outside the pinned set), zero after
+- [x] Test: the exempt table names the deferred-questions section and its producer — tests/approval-boundary-is-legible.test.js case 11b; RED before the row, green after
+- [x] Test: --hash-scope specification records a specification-scoped entry — tests/ledger-backfill-coverage.test.js; RED before the flag, green after
+- [x] Test: --hash-scope defaults to whole-file and an unknown value is refused — tests/ledger-backfill-coverage.test.js; RED before the flag, green after
+- [x] Test: an existing entry is OVERWRITTEN by a re-record — tests/ledger-backfill-coverage.test.js; proves writeEntry replaces rather than refuses, which the 36-plan migration depends on
+- [x] Run tests - expect RED (failing) — 8 of the 9 cases failed before their source edit; the prose-only guard is green by design and is recorded as such, never banked as a pass
+
+### Step 9: PREPARE
+- [x] Check prerequisites — no new dependency added; node --test and npm test already present
+- [x] Verify every declared path exists on disk before editing it — all seven declared files read in full first
+- [x] Measure the BEFORE baseline across every ledgered plan — 395 ledgered, 94 already mismatching, 35 flips, 0 unflips (table above)
+
+### Step 10: IMPLEMENT
+- [x] src/lib/plan-validator.js — extractStepBlocks prefers the canonical section; validateEscalations and validateStepLabels deliberately unchanged, with the reason at the changed site
+- [x] src/lib/approval-ledger.js — backfillEntry accepts opts.hash_scope; specification routes through resolveHash so digest and scope stamp derive together
+- [x] src/scripts/ledger-backfill.js — the --hash-scope flag, narrowed by comparison to a closed enum, refused on an unknown value, whole-file still the default
+- [x] src/lib/approval-ledger.js — the seventh EXECUTION_SECTION_PRODUCERS row, per the human ruling of 2026-09-03, with the migration in the same change
+- [x] Re-record every flipped approval through the sanctioned backfill script — 36 invocations of node src/scripts/ledger-backfill.js, 0 failures, no other channel touched .ctoc/approvals
+- [x] Wire up integration points — no new module and no new export; every edit lands inside a function that already has live callers
+
+### Step 11: REVIEW
+- [x] Self-review all new code — read back in full after editing
+- [x] Verify integration points work together — approval-residency.isApprovedForCoverage returns approved for this plan and for the queued plan after the migration
+- [x] Check error handling completeness — an unknown --hash-scope is a loud refusal, never a silent fallback; an unlocatable specification boundary throws in resolveHash rather than recording a weaker binding
+
+### Step 12: OPTIMIZE
+- [x] Remove redundant operations — the canonical lookup is one extra regular expression only when the canonical heading is present; no hot path changed
+- [x] Simplify complex code — no helper was introduced for a single caller, so the divergence between the three region derivations stays visible rather than hidden behind a shared name
+
+### Step 13: SECURE
+- [x] Validate inputs — the new flag is a closed enum narrowed by comparison; plan paths keep the existing isAbsolute/join and SLUG_RE guards
+- [x] No secrets in code — no value is printed, logged or committed
+- [x] Safe file operations — every ledger write went through node src/scripts/ledger-backfill.js with argv arguments; no inline evaluation and no direct write to .ctoc/approvals
+
+### Step 14: VERIFY
+- [x] Run lint + type check — eslint . --max-warnings 0 clean; tsc --noEmit clean (one regression was introduced and fixed by narrowing, not by a cast)
+- [x] Run ALL tests (TDD Green) — npm test: 11960 tests, 11960 pass, 0 fail
+- [x] Check coverage at or above the enforced floor — 99.9% against the enforced 99%
+- [x] 0 skipped, 0 flaky tests — skipped 0, todo 0
+- [x] Reachability: FILE fence and EXPORT fence both clean — 47 tests, 0 fail; no new file and no new export was created
+- [x] The live gate-destination residency check is clean — iron-loop-enforcer.checkGateDestinationsApproved returned { clean: true } after the migration
+
+### Step 15: DOCUMENT
+- [x] Update the module comments at every changed site — the canonical-lookup rationale, the two-scope rationale on backfillEntry, the flag in the script header and usage, and the dated ruling on the new table row
+- [x] Record the before/after measurement and the decisions taken — the baseline table above, the four added decisions, and the verification evidence below
+
+### Step 16: FINAL-REVIEW
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed — [CTOC test-gate] PASS
+- [x] Ready for human review — built and waiting for the human's word on the remaining 93 pre-existing mismatches
+
+## Verification Evidence
+
+### Step 14 VERIFY — the full gated run
+
+`npm test` from the repository root, captured in full, exit status 0:
+
+```
+ℹ tests 11960
+ℹ pass 11960
+ℹ fail 0
+ℹ skipped 0
+ℹ todo 0
+[CTOC test-gate] coverage 99.9% (threshold 99%), skipped 0, failed 0
+[CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+[CTOC test-gate] PASS
+```
+
+`eslint . --max-warnings 0` — clean. `tsc --noEmit` — clean; the first gated run failed
+on one new type error (`--hash-scope` arriving from argv as `string` where the option is
+a two-value union) and it was fixed by narrowing the value through comparison at the
+point of use, never by a cast or a suppression.
+
+`tests/iron-loop-enforcer.test.js`, which runs the enforcer's checks against this live
+repository, passes inside that run.
+
+### The migration, before and after
+
+| | Before the exempt row | After the migration |
+|---|---|---|
+| Ledgered plans scanned | 395 | 395 |
+| Entries whose content no longer matches | 94 | 93 |
+| Specification-scoped plans carrying the note that mismatch | 22 | 21 |
+| Entries carrying the 2026-09-03 re-record reason | 0 | 36 |
+| Of those, classified `backfilled` / `human` | – | 36 / 0 |
+
+All 36 re-records ran as `node src/scripts/ledger-backfill.js --plan <path> --stage todo
+--hash-scope specification --reason "<why>"`, one process per plan, zero failures. No
+other channel wrote to `.ctoc/approvals` at any point in this build.
+
+The live gate-destination residency check, run after the migration:
+
+```
+node -e "require('./src/lib/iron-loop-enforcer.js').checkGateDestinationsApproved(process.cwd())"
+→ { "clean": true }
+```
+
+### What is NOT fixed, and is the human's to decide
+
+93 approvals in this repository still do not match their recorded content. Not one of
+them was caused by this change and not one is repaired by it. 269 of the 395 entries
+were recorded under the older whole-file binding, where any ordinary execution record
+invalidates the approval by construction — which is exactly the defect the
+specification scope was introduced to end, still sitting unmigrated on the plans that
+predate it.
+
+They are not re-recorded here. Doing so would stamp a fresh approval digest over 93
+plans whose bodies changed after approval for reasons nobody has examined, which is the
+post-approval laundering the ledger exists to expose. The options are a plain choice
+between re-approving them through the menu one at a time, migrating them in a single
+reviewed pass with the sanctioned script, or leaving them as they are and letting each
+plan's own next crossing settle it.

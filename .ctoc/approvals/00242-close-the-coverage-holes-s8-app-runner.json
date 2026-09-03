@@ -1,9 +1,11 @@
 {
-  "content_sha256": "89560e3be8db568673966ca54a18e163c715e072f4eb35d008d618c9d9fe5f7a",
+  "content_sha256": "e4f9ab38299eb849b4bb84d5cbf45a1d5997b751e5bfe27a32ef64faf798d616",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-08-31T14:59:34.694Z",
+  "approved_at": "2026-09-03T09:49:35.819Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00242-close-the-coverage-holes-s8-app-runner"
 }

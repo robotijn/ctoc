@@ -1,9 +1,11 @@
 {
-  "content_sha256": "8db036f1916981a3385ac98cc7416fc13eca1e9606ef0509728e124025e7a4ba",
+  "content_sha256": "348af88e7b6c0f070eb02c4960e95fc40b8a6abce6d620a2c50ce473fba1c85b",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-08-31T14:59:34.390Z",
+  "approved_at": "2026-09-03T09:49:35.998Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00249-close-the-coverage-holes-s15-remainder-fences"
 }

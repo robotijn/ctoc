@@ -1,9 +1,11 @@
 {
-  "content_sha256": "3aa7fc8afecb8d1f4aca2eee1431c60251b3bd44977dba392873081545ab5cc0",
+  "content_sha256": "882b1de8691881416f0ce7073d326c64ed3fe34fb635d5ac9dab8fdadf5e8a16",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-30T19:04:14.519Z",
+  "approved_at": "2026-09-03T09:49:35.299Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00110-agents-told-to-run-code-they-cannot-run"
 }

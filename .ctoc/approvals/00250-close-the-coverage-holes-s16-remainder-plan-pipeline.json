@@ -1,9 +1,11 @@
 {
-  "content_sha256": "092eb67cbf10219f1788228a9b558bdc3f368de1692397689a7101d280213f56",
+  "content_sha256": "e068d48d63cc0a6a853e0ec71e8d550a2c2d6ce07c82f5472ce12bf1392c09e5",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-08-31T14:59:34.419Z",
+  "approved_at": "2026-09-03T09:49:36.023Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00250-close-the-coverage-holes-s16-remainder-plan-pipeline"
 }

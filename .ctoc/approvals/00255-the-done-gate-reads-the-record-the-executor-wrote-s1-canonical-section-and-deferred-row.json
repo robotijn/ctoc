@@ -1,9 +1,11 @@
 {
-  "content_sha256": "ca45de89dc91b572328c5f9c521cfb8014db111fc1d34d3e26563ac4cff697ec",
+  "content_sha256": "c58892a462cbdcedbfcf6cecd9986fb8556cf0ad29edb95847e4041878f6b1d3",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-09-03T07:34:03.217Z",
+  "approved_at": "2026-09-03T09:49:35.221Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00255-the-done-gate-reads-the-record-the-executor-wrote-s1-canonical-section-and-deferred-row"
 }

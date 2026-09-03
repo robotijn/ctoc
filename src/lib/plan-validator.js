@@ -340,7 +340,23 @@ function validateStepsComplete(content, planPath, projectPath) {
  * Returns {} if no execution section is present (legacy plans without one).
  */
 function extractStepBlocks(content) {
-  const execMatch = content.match(/^##\s+Execution Plan[\s\S]*$/m);
+  // Prefer the CANONICAL section. `src/lib/iron-loop.js` (refineLoop, integrate)
+  // appends `## Execution Plan (Steps 8-16)` when the plan enters the build queue,
+  // and the executor ticks THAT template. A plan written by the implementation
+  // planner may ALSO carry an earlier prose `## Execution Plan` with no checkboxes;
+  // `String.match` with /m returns the FIRST match, so the prose twin was the region
+  // read, and every required step was reported as an unchecked box on a plan whose
+  // real record was fully ticked. When the canonical heading is absent, behaviour is
+  // byte-for-byte what it was.
+  //
+  // The two sibling derivations in this file deliberately do NOT follow.
+  // `validateEscalations` scans for a DECLARED unapproved skip; pointing it at the
+  // canonical section would DROP a declaration written in the prose twin, turning an
+  // error it raises today into silence. `validateStepLabels` checks the human-written
+  // step LABELS; pointing it at CTOC's own generated template would make it assert
+  // against its own output. Both stay on the first region on purpose.
+  const canonicalMatch = content.match(/^##\s+Execution Plan \(Steps 8-16\)[\s\S]*$/m);
+  const execMatch = canonicalMatch || content.match(/^##\s+Execution Plan[\s\S]*$/m);
   // Region = from the Execution Plan heading up to the next top-level "## " heading.
   const region = execMatch ? execMatch[0].split(/\n##\s+(?!#)/)[0] : '';
   if (!region) return {};

@@ -1,9 +1,11 @@
 {
-  "content_sha256": "04fc31ee1ca5f33b31547237190631d90aac70e249f1409a0144e0807f7e777b",
+  "content_sha256": "ada70d898d0b338c6d1ce7736c7a231deea2e374e454dc9495dcaeafb09a425a",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-31T00:27:46.686Z",
+  "approved_at": "2026-09-03T09:49:35.447Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00183-the-critique-fleet-records-that-it-ran-so-a-clean-plan-can-cross-again"
 }

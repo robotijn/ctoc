@@ -214,6 +214,132 @@ test('on REAL executed plan bytes, the specification hash is stable across the e
   assert.equal(withCheckbox.hash, before.hash);
 });
 
+// --- 6b. THE PIPELINE'S OWN "DEFERRED QUESTIONS" NOTE (plan 00255) -------------
+
+/**
+ * The literal shape `src/lib/iron-loop.js` (appendDeferredQuestions) writes into a
+ * plan: a level-2 heading, the integrator's provenance paragraph, and one bullet.
+ */
+const DEFERRED_QUESTIONS_SECTION = [
+  '',
+  '## Deferred Questions',
+  '',
+  '_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO',
+  'quality evaluation. These entries are the integrator\'s own report on itself, not',
+  'findings from a critic that read this plan._',
+  '',
+  '- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan.',
+  '',
+].join('\n');
+
+test('the integrator\'s Deferred Questions note does not invalidate an approval', () => {
+  // Human ruling 2026-09-03: `deferred questions` is the pipeline's OWN output, not
+  // the specification the human ruled on, so it joins the exempt table. An approval
+  // recorded before the note exists must survive the note being written.
+  const slug = 'deferred-appended';
+  approve(slug, SPEC_PLAN);
+  assert.equal(
+    ledger.verify(slug, SPEC_PLAN + DEFERRED_QUESTIONS_SECTION, 'todo', projectDir), true,
+    'the integrator\'s own deferred-questions note is an execution section, not specification',
+  );
+});
+
+test('an approval recorded WITH the Deferred Questions note already present still verifies', () => {
+  // The ordinary crossing: `actions.js` runs the refinement pass BEFORE
+  // `stampAndLedger`, so the note is usually already on disk when the digest is
+  // taken. Excluding it must not break that entry either — both sides of the
+  // comparison exclude the same region.
+  const slug = 'deferred-at-approval';
+  const withNote = SPEC_PLAN + DEFERRED_QUESTIONS_SECTION;
+  approve(slug, withNote);
+  assert.equal(ledger.verify(slug, withNote, 'todo', projectDir), true);
+  // ... and the note may then be REWRITTEN by a second refinement pass without
+  // invalidating anything, which is the whole point of exempting it.
+  const rewritten = withNote.replace(
+    '- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan.',
+    '- **evaluation**: NOT EVALUATED — second pass, same verdict, different words.',
+  );
+  assert.notEqual(rewritten, withNote, 'the fixture edit must actually change the bytes');
+  assert.equal(ledger.verify(slug, rewritten, 'todo', projectDir), true);
+});
+
+/**
+ * Approvals that ALREADY failed their specification comparison before the
+ * deferred-questions exemption landed on 2026-09-03, measured on this repository at
+ * that moment (94 entries mismatched in total; these 21 are the ones that also carry
+ * the note, so the test below would otherwise attribute their failure to the
+ * exemption). Every one is a pre-existing, unrelated post-approval edit awaiting an
+ * ordinary re-approval through the menu. The set may only SHRINK: the assertion is a
+ * SUBSET check, so re-approving one of these never turns the suite red, while ANY new
+ * name appearing here does.
+ */
+const MISMATCHED_BEFORE_THE_EXEMPTION = new Set([
+  '00072-r1-per-request-ctoc-routing-hook',
+  '00074-gc1-golden-corpus-real-sample-fence',
+  '00086-a-registry-read-error-cannot-blank-the-dashboard',
+  '00125-the-sync-barrier-is-undefended-where-work-actually-starts',
+  '00167-the-completion-route-records-work-it-never-saw-start',
+  '00182-an-empty-question-list-must-prove-a-critique-ran-before-it-can-cross-a-gate',
+  '00184-the-audit-record-of-a-crossed-gate-says-how-many-questions-existed',
+  '00186-a-shipped-recipe-is-proven-by-running-it',
+  '00189-the-refinement-loop-is-documented-as-running-and-is-a-design-record',
+  '00190-the-quality-gate-is-named-a-key-entry-point-and-no-command-can-reach-it',
+  '00191-the-compliance-seam-is-two-call-sites-from-being-real',
+  '00201-the-shell-gate-works-out-what-a-command-writes-and-says-when-it-cannot',
+  '00202-the-shell-channel-asks-the-coverage-question-the-edit-channel-asks-and-records-its-answer',
+  '00203-a-configured-check-command-reaches-a-shell-that-was-never-meant-to-interpret-it',
+  '00204-the-configuration-directory-stops-granting-writes-to-its-own-command-tables',
+  '00206-the-shell-gate-stops-allowing-a-command-it-could-not-read',
+  '00209-a-failed-tool-detection-stops-reporting-lint-and-typecheck-as-passed',
+  '00234-readme-as-a-course-s1-readme-and-guard-pins',
+  '00237-close-the-coverage-holes-s3-fail-open-contracts',
+  '00253-close-the-coverage-holes-s19-remainder-streaming-claims',
+  '00254-close-the-coverage-holes-s20-floor-raise-decision',
+]);
+
+test('LIVE LEDGER: the deferred-questions exemption invalidated no approval it did not re-record', () => {
+  // THE GUARD THAT THE MIGRATION HAPPENED (plan 00255). Adding the exempt row moved
+  // the specification digest of every ledgered plan carrying the note — measured on
+  // 2026-09-03: 35 entries flipped from match to mismatch, and 0 were repaired by the
+  // row. All 35, plus 00252 which the ruling names, were re-recorded through
+  // `src/scripts/ledger-backfill.js --hash-scope specification` in the SAME change.
+  // If that migration is ever reverted, half-applied, or a future edit to the exempt
+  // table repeats the mistake, a plan lands in `offenders` BY NAME and this fails.
+  //
+  // It deliberately does NOT assert "zero mismatches in the ledger": 94 entries
+  // already mismatched before this change, almost all of them legacy whole-file
+  // (`hash_scope` absent or `'file'`) entries invalidated by their own ordinary
+  // execution records. Asserting a global zero would be asserting somebody else's
+  // unexamined debt and would go red for reasons unrelated to this exemption. The
+  // scope here is exact: a SPECIFICATION-scoped entry whose plan carries the note.
+  // For those, an ordinary build must not move the digest at all — that is the whole
+  // design — so a mismatch among them is a genuine finding, not noise.
+  const stages = ['todo', 'in-progress', 'review', 'done'];
+  const offenders = [];
+  let examined = 0;
+  for (const stage of stages) {
+    const dir = path.join(REPO_ROOT, 'plans', stage);
+    if (!fs.existsSync(dir)) continue;
+    for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort()) {
+      const planPath = path.join(dir, file);
+      const slug = ledger.slugFromPlanPath(planPath);
+      const entry = ledger.readEntry(slug, REPO_ROOT);
+      if (!entry || entry.hash_scope !== 'specification') continue;
+      const content = fs.readFileSync(planPath, 'utf8');
+      if (!/^##\s*Deferred Questions\s*$/m.test(content)) continue;
+      examined++;
+      if (ledger.contentMatches(entry, content).match) continue;
+      if (MISMATCHED_BEFORE_THE_EXEMPTION.has(slug)) continue;
+      offenders.push(`${stage}/${file}`);
+    }
+  }
+  assert.ok(examined > 0, 'expected real ledgered plans carrying a Deferred Questions section');
+  assert.deepEqual(offenders, [],
+    'these approvals carry the pipeline-written Deferred Questions note and no longer match ' +
+    'their recorded specification; re-record each through ' +
+    'src/scripts/ledger-backfill.js --hash-scope specification');
+});
+
 // --- 7-8. FAIL CLOSED WHEN THE BOUNDARY CANNOT BE ESTABLISHED ------------------
 
 test('content with NO frontmatter delimiters FAILS to hash and FAILS verification', () => {

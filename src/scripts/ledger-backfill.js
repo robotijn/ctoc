@@ -31,10 +31,16 @@
  *
  *   --plan <path> --stage <s>  ledger ONE existing plan as a BACKFILLED human-kind
  *     [--reason <text>]        entry (`backfilled: true` + `backfill_reason`) — the
- *                              2026-07-14 legacy migration for plans that crossed a
- *                              human gate before the ledger existed. `entryKind`
- *                              reports `'backfilled'`, never `'human'`, so the record
- *                              stays auditable.
+ *     [--hash-scope <scope>]   2026-07-14 legacy migration, and (with
+ *                              `--hash-scope specification`) the sanctioned way to
+ *                              RE-RECORD a live plan's digest when the hash semantics
+ *                              themselves change by human ruling. Whole-file is the
+ *                              default and is unchanged; specification is the scope a
+ *                              live gate crossing records, so a plan still being built
+ *                              is not invalidated by its own execution record. Either
+ *                              way the entry is a MIGRATION record, not an approval:
+ *                              `entryKind` reports `'backfilled'`, never `'human'`, so
+ *                              an audit can always tell the two apart.
  *
  *   --mark-migrated [--force]  record that this project's approval provenance has been
  *                              migrated. THIS ARMS the residency sweep's revert for
@@ -68,8 +74,12 @@ const USAGE = `ctoc ledger-backfill — record approval provenance for plans tha
       pipeline-kind entry (evidence: vision-decomposed). Idempotent.
 
   node src/scripts/ledger-backfill.js --plan <path> --stage <implementation|todo|done>
-                                      [--reason <text>] [--root <dir>] [--dry-run]
-      Ledger ONE existing plan as a backfilled human-kind entry.
+                                      [--reason <text>] [--hash-scope <specification|file>]
+                                      [--root <dir>] [--dry-run]
+      Ledger ONE existing plan as a backfilled human-kind entry. --hash-scope
+      defaults to the whole file (the legacy migration binding); pass
+      "specification" when re-recording a plan that is still being BUILT, so the
+      executor's own execution record does not invalidate the entry it just wrote.
 
   node src/scripts/ledger-backfill.js --mark-migrated [--force] [--root <dir>] [--dry-run]
       Record that this project's approval provenance is migrated. This ARMS the
@@ -86,8 +96,8 @@ const USAGE = `ctoc ledger-backfill — record approval provenance for plans tha
  *
  * @param {string[]} argv - argument list (WITHOUT node/script)
  * @returns {{vision?: boolean, plan?: string, stage?: string, reason?: string,
- *            root?: string, dryRun?: boolean, help?: boolean, error?: string,
- *            markMigrated?: boolean, force?: boolean}}
+ *            hashScope?: string, root?: string, dryRun?: boolean, help?: boolean,
+ *            error?: string, markMigrated?: boolean, force?: boolean}}
  */
 function parseArgs(argv) {
   const opts = {};
@@ -103,6 +113,7 @@ function parseArgs(argv) {
       case '--plan': opts.plan = list[++i]; break;
       case '--stage': opts.stage = list[++i]; break;
       case '--reason': opts.reason = list[++i]; break;
+      case '--hash-scope': opts.hashScope = list[++i]; break;
       case '--root': opts.root = list[++i]; break;
       default:
         return { error: `unknown argument "${arg}"\n\n${USAGE}` };
@@ -180,13 +191,24 @@ function backfillVisions(root, dryRun) {
  * --plan/--stage: ledger ONE existing plan as a backfilled human-kind entry.
  *
  * @param {string} root
- * @param {{plan: string, stage: string, reason?: string, dryRun?: boolean}} opts
+ * @param {{plan: string, stage: string, reason?: string, hashScope?: string, dryRun?: boolean}} opts
  * @returns {{ok: boolean, ledgered: string[], skipped: Array<object>, entry?: object, error?: string}}
  */
 function backfillOnePlan(root, opts) {
   const VALID_STAGES = ['implementation', 'todo', 'done'];
   if (!VALID_STAGES.includes(opts.stage)) {
     return { ok: false, ledgered: [], skipped: [], error: `--stage must be one of ${VALID_STAGES.join('|')} (got "${opts.stage}")` };
+  }
+  // An unrecognised scope is an ERROR, never a silent fallback to either value:
+  // recording a digest under a scope the caller did not ask for is exactly the quiet
+  // no-op this script exists to refuse. Absent means the legacy whole-file scope.
+  // Narrowed by comparison, not by a cast: the value arrives from argv as an
+  // arbitrary string and the closed enum is stated here, at the point of use.
+  const hashScope = opts.hashScope === 'specification' ? 'specification'
+    : opts.hashScope === 'file' ? 'file'
+      : undefined;
+  if (opts.hashScope !== undefined && hashScope === undefined) {
+    return { ok: false, ledgered: [], skipped: [], error: `--hash-scope must be one of specification|file (got "${opts.hashScope}")` };
   }
   const planPath = path.isAbsolute(opts.plan) ? opts.plan : path.join(root, opts.plan);
   if (!safeFs.existsSync(planPath)) {
@@ -198,6 +220,7 @@ function backfillOnePlan(root, opts) {
     const entry = ledger.backfillEntry(root, planPath, {
       stage_to: opts.stage,
       reason: opts.reason !== undefined ? opts.reason : '',
+      hash_scope: hashScope,
     });
     return { ok: true, ledgered: [slug], skipped: [], entry };
   } catch (err) {
@@ -317,13 +340,20 @@ function run(argv, cwd = process.cwd()) {
   if (opts.force && !opts.markMigrated) {
     return { ok: false, ledgered: [], skipped: [], error: '--force is only meaningful with --mark-migrated' };
   }
+  if (opts.hashScope !== undefined && !opts.plan) {
+    return { ok: false, ledgered: [], skipped: [], error: '--hash-scope is only meaningful with --plan' };
+  }
   if (opts.markMigrated) {
     return markMigrated(root, { force: opts.force === true, dryRun: opts.dryRun === true });
   }
   if (opts.vision) return backfillVisions(root, opts.dryRun === true);
   if (opts.plan) {
     if (!opts.stage) return { ok: false, ledgered: [], skipped: [], error: '--plan requires --stage' };
-    return backfillOnePlan(root, { plan: String(opts.plan), stage: String(opts.stage), reason: opts.reason, dryRun: opts.dryRun === true });
+    return backfillOnePlan(root, {
+      plan: String(opts.plan), stage: String(opts.stage), reason: opts.reason,
+      hashScope: opts.hashScope !== undefined ? String(opts.hashScope) : undefined,
+      dryRun: opts.dryRun === true,
+    });
   }
   return { ok: false, ledgered: [], skipped: [], error: `no mode selected\n\n${USAGE}` };
 }

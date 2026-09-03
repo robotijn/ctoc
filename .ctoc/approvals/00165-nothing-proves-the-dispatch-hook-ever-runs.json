@@ -1,9 +1,11 @@
 {
-  "content_sha256": "df63e80ee2fc94bcfbdba5ef5f91dafb1306fa629b7d540ce07e1cc60e84a653",
+  "content_sha256": "adf8afa1c5c3ab2f276c709b4b0fb26102f14f5f72bf9153ab2f6ae38c9eb30e",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-28T21:47:51.024Z",
+  "approved_at": "2026-09-03T09:49:35.372Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00165-nothing-proves-the-dispatch-hook-ever-runs"
 }

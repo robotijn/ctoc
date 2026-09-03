@@ -1,9 +1,11 @@
 {
-  "content_sha256": "a249b9e5bbd5a8cc73607981b37a8e13cb790f8b4398c3cec4272415025e16d5",
+  "content_sha256": "482d61fc0897bdfa857e8a4d30188b0d6fbcc8c5d1cd81e10c93d634ba1e406b",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-08-31T14:59:34.483Z",
+  "approved_at": "2026-09-03T09:49:36.072Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "digest re-recorded 2026-09-03 under the deferred-questions exemption; its mismatch was caused by the kickback_counts frontmatter block src/lib/circuit-breaker.js wrote into the plan header during the build, which the frontmatter is hashed in full",
   "plan_basename": "00252-close-the-coverage-holes-s18-remainder-hooks-commands"
 }

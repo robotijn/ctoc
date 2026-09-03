@@ -1,9 +1,11 @@
 {
-  "content_sha256": "82b584191936d38f7b42c65f537f7b8c7b83a8622c9c9886a652d661684c966f",
+  "content_sha256": "1c5325b3563cdb069ad4f9b0eafe25117f2d94418986e9eef41085d93be217c5",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-08-31T14:59:34.204Z",
+  "approved_at": "2026-09-03T09:49:35.869Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00244-close-the-coverage-holes-s10-menu-screens"
 }

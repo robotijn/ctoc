@@ -1,9 +1,11 @@
 {
-  "content_sha256": "3bc759447fd8bcea730137e662fce7c0d407db6d83f0b0f7bfcc296f8984ac3b",
+  "content_sha256": "d507a5aaf5aab3eff791aa3c3b8873ffe5a1b7134cc107fd7ee56988676f0c4e",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-30T19:04:14.803Z",
+  "approved_at": "2026-09-03T09:49:35.324Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00123-an-executor-that-needs-one-more-file-stops-and-asks"
 }
