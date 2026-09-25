@@ -234,11 +234,20 @@ class FrameworkDetector {
       }
     }
 
-    // Check dev dependencies (lower weight)
+    // Tooling signal (lower weight). `packageDevDeps` names the packages a project
+    // of this shape TYPICALLY declares as dev dependencies — the signal is the
+    // package's PRESENCE, not its placement, so it is looked up with hasDependency
+    // (all four maps), never hasDevDependency. Create React App's own generator
+    // puts react-scripts in `dependencies`; reading devDependencies alone scored
+    // that canonical project 40, below react-vite's 40 on priority order, and
+    // detect() returned null for a real React app — its whole security surface
+    // silently skipped. Same philosophy as FINDING 5(b) on hasDependency above:
+    // under-detecting a real web app is the failure that matters. The weight stays
+    // +10; this is a placement fix, not a rescore.
     if (framework.packageDevDeps) {
       checks++;
       for (const dep of framework.packageDevDeps) {
-        if (this.hasDevDependency(dep)) {
+        if (this.hasDependency(dep)) {
           score += 10;
           break;
         }
