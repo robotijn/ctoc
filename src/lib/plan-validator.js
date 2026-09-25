@@ -118,6 +118,50 @@ const MASKED_SPAN_PATTERNS = [
 const NON_NEWLINE_RE = /[^\n\r]/g;
 
 /**
+ * A captured token is a FILE only if it can be one: it carries a path separator,
+ * or its final suffix is a real file extension. `d.push`, `stat.birthtime` and
+ * `this.scannersRun` are member expressions cited in prose and fail both tests.
+ *
+ * The set is the union of the extensions the parent plan names and the ones this
+ * repository's plans actually DECLARE in `files:` (`template` and `gitkeep` are
+ * the two the derivation added). Adding an extension only ever makes the check
+ * STRICTER, so this list is a ratchet: extend it, never trim it. Trimming it to
+ * the extensions this repository happens to declare would silence a genuine
+ * missing-file claim in every downstream project that declares another — a false
+ * green manufactured while fixing a false red, the worse of the two failures.
+ */
+const FILE_EXTENSIONS = Object.freeze(new Set([
+  'js', 'mjs', 'cjs', 'ts', 'md', 'json', 'yaml', 'yml',
+  'txt', 'sh', 'py', 'html', 'css', 'template', 'gitkeep'
+]));
+
+/**
+ * Could this Pattern 1 capture name a file at all?
+ *
+ * The separator test is deliberately first and deliberately covers the
+ * backslash: `declaredFileExistsUnder` splits a declared path on either
+ * separator, so the plausibility rule must agree with it. `lastIndexOf`
+ * returning -1 needs no branch — `slice(0)` yields the whole token, which is not
+ * in the set — and a dotless token cannot reach here anyway, because the capture
+ * requires a dot.
+ *
+ * @param {string} token - a Pattern 1 capture
+ * @returns {boolean} true if the token could name a file
+ */
+function isPathPlausible(token) {
+  if (token.includes('/') || token.includes('\\')) return true;
+  return FILE_EXTENSIONS.has(token.slice(token.lastIndexOf('.') + 1).toLowerCase());
+}
+
+// An inline code span that contains a CALL is a citation of code, never a file
+// claim. Only spans containing an open parenthesis are blanked: a span citing a
+// plain path is left visible, so a real claim written in backticks still
+// validates. Single-line by construction (the content class excludes the
+// delimiter and the newline), so a stray backtick can never open a span that
+// swallows the document and switches the checker off.
+const INLINE_CALL_SPAN_RE = safeRegExp('(`{1,3})[^`\\n]*?\\([^`\\n]*?\\1', 'g');
+
+/**
  * Blank out the contents of coded and quoted spans, preserving LENGTH exactly.
  *
  * A status word inside inline code or a quotation is a MENTION, not a claim, and
@@ -275,18 +319,26 @@ function validateStepsComplete(content, planPath, projectPath) {
   // false-matched prose mentions of "Step N" (common in meta-plans that document
   // the Iron Loop itself) and could not recognize the integrator's multi-line
   // format ("### Step N: LABEL" followed by "- [x]" checkbox lines) (v6.9.86).
-  const blocks = extractStepBlocks(content);
+  const record = extractExecutionRecord(content);
+  const blocks = record.blocks;
+  // The heading of the section the blocks came from, so a refusal can name it and a
+  // wrong-section read is legible from the refusal alone.
+  result.executionSectionHeading = record.heading;
 
   for (const step of requiredSteps) {
     const block = blocks[String(step.num)];
     const hasStep = block != null;
     let isCompleted = false;
     let isSkipped = false;
+    // Recorded so a caller can tell "the box is open" from "there is no box at all" —
+    // two different facts that used to share one refusal message.
+    let hasCheckbox = false;
 
     if (block) {
       const hasUnchecked = /-\s*\[ \]/.test(block);
       const hasChecked = /-\s*\[x\]/i.test(block);
       const hasAnyBox = /-\s*\[[ x]\]/i.test(block);
+      hasCheckbox = hasAnyBox;
       const hasWord = /\b(?:COMPLETE|COMPLETED|DONE)\b/i.test(block) || /✓/.test(block);
       // Complete iff there is positive evidence (a ticked box or a completion
       // word) AND no remaining unchecked box in the block. A completion WORD
@@ -319,6 +371,7 @@ function validateStepsComplete(content, planPath, projectPath) {
       present: hasStep,
       completed: isCompleted,
       skipped: isSkipped,
+      hasCheckbox,
       required: step.required
     };
 
@@ -335,32 +388,14 @@ function validateStepsComplete(content, planPath, projectPath) {
 }
 
 /**
- * Extract the "## Execution Plan" region and split it into per-step blocks keyed
- * by step number. A block runs from one "### Step N" heading to the next.
- * Returns {} if no execution section is present (legacy plans without one).
+ * Split ONE execution region into per-step blocks keyed by step number. A block
+ * runs from one "### Step N" heading to the next (or the end of the region).
+ *
+ * @param {string} region - One "## Execution Plan …" section's text.
+ * @returns {Object<string,string>} Step number (as a string) → block text.
  */
-function extractStepBlocks(content) {
-  // Prefer the CANONICAL section. `src/lib/iron-loop.js` (refineLoop, integrate)
-  // appends `## Execution Plan (Steps 8-16)` when the plan enters the build queue,
-  // and the executor ticks THAT template. A plan written by the implementation
-  // planner may ALSO carry an earlier prose `## Execution Plan` with no checkboxes;
-  // `String.match` with /m returns the FIRST match, so the prose twin was the region
-  // read, and every required step was reported as an unchecked box on a plan whose
-  // real record was fully ticked. When the canonical heading is absent, behaviour is
-  // byte-for-byte what it was.
-  //
-  // The two sibling derivations in this file deliberately do NOT follow.
-  // `validateEscalations` scans for a DECLARED unapproved skip; pointing it at the
-  // canonical section would DROP a declaration written in the prose twin, turning an
-  // error it raises today into silence. `validateStepLabels` checks the human-written
-  // step LABELS; pointing it at CTOC's own generated template would make it assert
-  // against its own output. Both stay on the first region on purpose.
-  const canonicalMatch = content.match(/^##\s+Execution Plan \(Steps 8-16\)[\s\S]*$/m);
-  const execMatch = canonicalMatch || content.match(/^##\s+Execution Plan[\s\S]*$/m);
-  // Region = from the Execution Plan heading up to the next top-level "## " heading.
-  const region = execMatch ? execMatch[0].split(/\n##\s+(?!#)/)[0] : '';
-  if (!region) return {};
-
+function splitStepBlocks(region) {
+  /** @type {Object<string,string>} */
   const blocks = {};
   const headingRe = /^#{2,4}\s*Step\s*(\d+)\b[^\n]*$/gim;
   const heads = [];
@@ -374,6 +409,97 @@ function extractStepBlocks(content) {
     blocks[heads[i].num] = region.slice(start, end);
   }
   return blocks;
+}
+
+/**
+ * Per-step checkbox EVIDENCE in a set of step blocks: how many step blocks hold at
+ * least one `- [ ]` / `- [x]` line.
+ *
+ * This is deliberately NOT a raw count of checkbox LINES. A raw line count lets one
+ * verbose step block (a backfilled prose twin carrying three lines under each of
+ * seven steps = 21 lines) outrank a section that actually covers all nine steps with
+ * one line each = 9 lines. Coverage of the STEPS is what makes a section the build
+ * record; volume inside one step is not. Do not "simplify" this to a line count.
+ *
+ * @param {Object<string,string>} blocks - Step blocks from splitStepBlocks.
+ * @returns {number} Number of blocks holding at least one checkbox.
+ */
+function countStepEvidence(blocks) {
+  let n = 0;
+  for (const block of Object.values(blocks)) {
+    if (/-\s*\[[ x]\]/i.test(block)) n++;
+  }
+  return n;
+}
+
+/**
+ * Select the execution region that IS the executor's build record and split it into
+ * per-step blocks keyed by step number.
+ *
+ * A plan legitimately carries TWO "## Execution Plan" sections: the implementation
+ * planner writes a prose one (all nine "### Step N" headings, few or no checkboxes),
+ * then `src/lib/iron-loop.js` (refineLoop, integrate) appends the canonical checkbox
+ * template as a second one when the plan enters the build queue — and the executor
+ * ticks THAT. Reading the wrong one reports every required step as an unchecked box
+ * on a plan whose real record is fully ticked, which refuses it at review→done.
+ *
+ * The section is chosen by EVIDENCE, never by its NAME. A name match is brittle and
+ * the spelling has already drifted across live plans: `(Steps 8–16)` with an EN DASH,
+ * `(Steps 7-15)` from the old numbering, `(Iron Loop Steps 8-16)`, `— Build Record`.
+ * Every drift made the name match miss and the prose twin win. So: collect EVERY
+ * candidate section, and take the one with the most per-step checkbox evidence
+ * (countStepEvidence — blocks-with-a-box, not checkbox lines; see there for why).
+ *
+ * Ties go to the LAST candidate, because the build template is appended AFTER the
+ * planner's prose, so the later section is the more recent record. Zero evidence
+ * anywhere falls back to the FIRST candidate — byte-for-byte the legacy behaviour, so
+ * a legacy plan with one prose section and no checkboxes keeps exactly its old
+ * verdict.
+ *
+ * The two sibling derivations in this file deliberately do NOT follow, and must not
+ * be "unified" with this selection. `validateEscalations` scans for a DECLARED
+ * unapproved skip; pointing it at the richest section would DROP a declaration
+ * written in the prose twin, turning an error it raises today into silence.
+ * `validateStepLabels` checks the human-written step LABELS; pointing it at CTOC's
+ * own generated template would make it assert against its own output. Both stay on
+ * the FIRST region on purpose.
+ *
+ * @param {string} content - Full plan text.
+ * @returns {{heading: string, blocks: Object<string,string>}} The selected section's
+ *   heading line (empty when the plan has no execution section) and its step blocks
+ *   ({} when there is none).
+ */
+function extractExecutionRecord(content) {
+  // Every candidate, in document order. Same heading shape the single-match regex
+  // used (`^##\s+Execution Plan`), so what counts as a candidate is unchanged — only
+  // the number of candidates considered is.
+  const sectionRe = /^##\s+Execution Plan/gm;
+  const candidates = [];
+  let m;
+  while ((m = sectionRe.exec(content)) !== null) {
+    // Region = from the heading up to the next top-level "## " heading (the same
+    // terminator as before: "###" is not a terminator, so step headings stay inside).
+    const region = content.slice(m.index).split(/\n##\s+(?!#)/)[0];
+    if (!region) continue;
+    const blocks = splitStepBlocks(region);
+    candidates.push({
+      heading: region.split('\n')[0].trim(),
+      blocks,
+      evidence: countStepEvidence(blocks)
+    });
+  }
+  if (candidates.length === 0) return { heading: '', blocks: {} };
+
+  let best = candidates[0];
+  for (const candidate of candidates) {
+    // `>=` is the tiebreak: scanning in document order, equal evidence leaves the
+    // LAST candidate holding the slot.
+    if (candidate.evidence >= best.evidence) best = candidate;
+  }
+  // No section carries any checkbox at all: there is no evidence to choose on, so
+  // keep the historical first-match region rather than silently preferring the last.
+  const chosen = best.evidence === 0 ? candidates[0] : best;
+  return { heading: chosen.heading, blocks: chosen.blocks };
 }
 
 /**
@@ -528,9 +654,17 @@ function validateNoContradictions(content, projectPath) {
   // (e.g. `lines.push('CLAUDE.md')`, `Hash('sha256').update(body).digest`) are
   // NOT file-creation claims; scanning them produced false "claimed as created"
   // errors that blocked otherwise-complete plans at review (v6.9.86).
+  //
+  // An inline span that contains a call is stripped for the same reason, after
+  // the fences and before the scan: a call cited in a sentence is code, not a
+  // claim that a file of that name exists. The filler is a SPACE and the LENGTH
+  // is preserved, exactly as `maskQuotedSpans` does above: blanking can then
+  // only ever REMOVE a match, never create one by joining the text on either
+  // side of the span.
   const scanContent = content
     .replace(/```[\s\S]*?```/g, '')
-    .replace(/~~~[\s\S]*?~~~/g, '');
+    .replace(/~~~[\s\S]*?~~~/g, '')
+    .replace(INLINE_CALL_SPAN_RE, (span) => span.replace(NON_NEWLINE_RE, ' '));
 
   // The plan's `files:` frontmatter is the authoritative declaration of what the
   // plan creates. Parse it once (inline-array, block-list AND scalar forms; all
@@ -546,6 +680,21 @@ function validateNoContradictions(content, projectPath) {
 
   while ((match = createdFilePattern.exec(scanContent)) !== null) {
     const filePath = match[1];
+
+    // A capture immediately followed by "(" is a call, not a path. The capture
+    // class stops AT the parenthesis, so the character after the completed match
+    // is the evidence. Expressing this as a lookahead inside the pattern is
+    // WRONG and silently so: the suffix quantifier is greedy, so a failing
+    // lookahead makes the engine backtrack one character and match anyway,
+    // capturing one character less instead of rejecting the call. The trailing
+    // [`"]? may have consumed one delimiter; the capture itself can never end in
+    // one, so this test is exact.
+    const trailer = /[`"]$/.test(match[0]) ? 1 : 0;
+    if (scanContent[match.index + match[0].length - trailer] === '(') continue;
+
+    // A token that cannot name a file is not a claim about a file.
+    if (!isPathPlausible(filePath)) continue;
+
     const fullPath = path.isAbsolute(filePath)
       ? filePath
       : path.join(projectPath, filePath);
@@ -841,6 +990,13 @@ function validateReviewToDone(planPath, projectPath) {
   //    required step is ABSENT; it records present-but-unchecked steps in its
   //    checklist. Promote each present-required-but-unchecked step to an error so
   //    an unchecked Step 14 VERIFY box blocks the transition.
+  //
+  //    The refusal distinguishes TWO facts that used to share one message. "The box
+  //    is open" and "the block holds no box at all" have different causes and
+  //    different fixes: the first is unfinished work, the second is usually a plan
+  //    whose real record lives in ANOTHER execution section than the one that was
+  //    read. One message for both left the reader no way to tell, so the no-box
+  //    refusal names the heading of the section that WAS read.
   const stepValidation = validateStepsComplete(content, planPath, projectPath);
   result.checklist.steps = stepValidation.checklist;
   result.warnings.push(...stepValidation.warnings);
@@ -852,8 +1008,9 @@ function validateReviewToDone(planPath, projectPath) {
     if (entry && entry.required === true && entry.present === true &&
         entry.completed === false && entry.skipped === false) {
       const num = key.replace(/^step_/, '');
-      result.errors.push(
-        `review→done blocked: Step ${num} (${entry.name}) has an unchecked required checkbox`
+      result.errors.push(entry.hasCheckbox === false
+        ? `review→done blocked: Step ${num} (${entry.name}) has no checkbox at all in the execution section read (${stepValidation.executionSectionHeading || 'no "## Execution Plan" section found'})`
+        : `review→done blocked: Step ${num} (${entry.name}) has an unchecked required checkbox`
       );
       result.valid = false;
     }
@@ -1272,9 +1429,14 @@ function validateStepLabels(content) {
     .replace(/~~~[\s\S]*?~~~/g, '');
 
   // (b) Extract real step HEADINGS from the "## Execution Plan" region ONLY, in
-  // document order (mirrors extractStepBlocks' region logic). Whole-body
+  // document order (same region terminator as extractExecutionRecord). Whole-body
   // scanning let a prose mention of "Step 10: IMPLEMENT" masquerade as a step;
   // headings under the Execution Plan are the only things that count here.
+  //
+  // This stays on the FIRST region and does NOT follow extractExecutionRecord's
+  // richest-evidence selection: the labels being checked are the HUMAN-written ones,
+  // and the richest section is typically the template CTOC itself appended — pointing
+  // this check there would make it assert against its own output.
   const execMatch = scanContent.match(/^##\s+Execution Plan[\s\S]*$/m);
   const region = execMatch ? execMatch[0].split(/\n##\s+(?!#)/)[0] : '';
 

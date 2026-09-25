@@ -326,6 +326,27 @@ describe('plan-validator dark-branch coverage', () => {
   // validateNoContradictions — script pattern (367-389) & skipped-tests (392-408)
   // ========================================================================
 
+  test('validateNoContradictions_writes_no_checklist_entry_for_a_cited_member_expression', () => {
+    // Arrange — prose citing a property read. It is not a file, so the scan must
+    // skip it BEFORE the checklist write: a checklist entry for a token that
+    // names no file is a record of a claim nobody made.
+    const content = '# Plan\n\nAdded stat.birthtime tracking to the queue order.\n';
+
+    // Act
+    const result = validator.validateNoContradictions(content, testDir);
+
+    // Assert — kills a fix that suppresses the error but keeps the entry.
+    assert.deepEqual(
+      Object.keys(result.checklist).filter((k) => k.startsWith('file_')),
+      [],
+      `a skipped token must leave no file_* checklist entry, got: ${JSON.stringify(result.checklist)}`
+    );
+    assert.ok(
+      !result.errors.some((e) => /claimed as created/i.test(e)),
+      `a member expression is not a file claim, got: ${JSON.stringify(result.errors)}`
+    );
+  });
+
   test('validateNoContradictions_warns_when_path_like_script_reference_is_missing', () => {
     // Arrange — a slash-bearing script path that does not exist on disk.
     const content = '# Plan\n\nrun `scripts/deploy.sh` to release.\n';
@@ -694,8 +715,13 @@ describe('plan-validator dark-branch coverage', () => {
     assert.equal(result.checklist.steps.step_14.completed, false,
       'a step whose only body is the word COMPLETE (no checkbox) must NOT be completed');
     assert.equal(result.valid, false, 'word-only stub Step 14 must block review->done');
-    assert.ok(result.errors.some((e) => /Step 14 \(VERIFY\) has an unchecked required checkbox/i.test(e)),
-      `expected the unchecked/stub error, got: ${JSON.stringify(result.errors)}`);
+    // A word-only stub holds NO checkbox, so the refusal is the no-checkbox one (which
+    // also names the section it read) rather than the open-box one. Two distinct facts,
+    // two distinct messages; the verdict is unchanged.
+    assert.equal(result.checklist.steps.step_14.hasCheckbox, false,
+      'the word-only stub carries no checkbox and the checklist must say so');
+    assert.ok(result.errors.some((e) => /Step 14 \(VERIFY\) has no checkbox at all in the execution section read \(## Execution Plan\)/i.test(e)),
+      `expected the no-checkbox stub error, got: ${JSON.stringify(result.errors)}`);
   });
 
   test('validateReviewToDone_completes_a_step_that_has_a_ticked_box_and_a_completion_word', () => {

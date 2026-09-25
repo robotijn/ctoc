@@ -154,6 +154,116 @@ describe('Plan Validator Tests', () => {
     console.log('# validateNoContradictions: still flags real missing created file');
   });
 
+  // === contradiction parser: a member expression is not a file — 00260 ===
+  //
+  // Every input below is byte-for-byte prose from a plan that ships in this
+  // repository. Each one made the pre-review gate refuse a plan because a method
+  // call written in prose ("Added `this.scannersRun` tracking") was read as a
+  // claim that a FILE named `this.scannersRun` had been created. Two of them
+  // span a line break: the separator between the verb and the capture is
+  // `[:\s]*`, and `\s` matches a newline, so a paragraph ending in "Added" picks
+  // up the backticked call that opens the next line.
+
+  const MISREAD_CORPUS = [
+    [
+      'plans/in-progress/00259 line 293 — the live refusal',
+      "- one assertion ADDED: `assert.strictEqual(result.confidence, 50)`.",
+    ],
+    [
+      'plans/review/00157 line 269 — created.push yields the capture d.push',
+      "### Step 11: REVIEW — confirm no `created.push` remains on a preview path. Confirm no write remains outside `record`.",
+    ],
+    [
+      'plans/review/00157 line 357 — created.length yields the capture d.length',
+      "    `result.created.length > 0` on a run that writes nothing. It does not merely",
+    ],
+    [
+      'plans/review/00025 line 117 — a member expression after Added',
+      "2. **`run()` honesty.** Added `this.scannersRun` tracking. `run()` now returns",
+    ],
+    [
+      'plans/review/00013 lines 186-187 — the verb and the call are on different lines',
+      "2. **Plan-uniqueness enforced at the action + CLI layer, with a shared registry lookup.** Added\n"
+        + "   `taskRegistry.findActivePlanTask(reg, plan, kind)` (prefers running/cancelling over queued) and",
+    ],
+    [
+      'plans/done/ctoc-audit-w11-s5 lines 42-43 — exclusive-create then a call, across a newline',
+      "**Fix:** make the WRITE the point of exclusivity, not the check. Attempt an exclusive-create\n"
+        + "`safeFs.writeFileSync(lockPath, data, { flag: 'wx' })` — atomic create-or-fail (`EEXIST`).",
+    ],
+    [
+      'plans/done/ctoc-audit-w11-s7 line 49 — a property read and an arrow-body subtraction',
+      "`created: stat.birthtime` (line 38) and `files.sort((a,b)=>a.created-b.created)` (line 52,",
+    ],
+  ];
+
+  for (const [label, prose] of MISREAD_CORPUS) {
+    test(`00260 misread corpus: ${label} produces no file-claim error`, () => {
+      const result = validator.validateNoContradictions(`# Plan\n\n${prose}\n`, testDir);
+
+      assert.ok(
+        !result.errors.some(e => /claimed as created/i.test(e)),
+        `a call cited in prose is not a file claim, got: ${JSON.stringify(result.errors)}`
+      );
+    });
+  }
+
+  test('00260 teeth: a paren-free backtick claim still errors on a line that also cites a call', () => {
+    // Kills an over-broad inline-span strip: only a span containing an open
+    // parenthesis is a code citation. The span holding the real claim has none,
+    // so the claim must survive and still error.
+    const content = '# Plan\n\nCreated `src/lib/definitely-missing-xyz.js` once `wire(the, thing)` landed.\n';
+
+    const result = validator.validateNoContradictions(content, testDir);
+
+    assert.ok(
+      result.errors.some(e => /claimed as created/i.test(e) && /definitely-missing-xyz\.js/.test(e)),
+      `a paren-free claim beside a call span must still error, got: ${JSON.stringify(result.errors)}`
+    );
+  });
+
+  test('00260 teeth: a separator-bearing claim with an unknown suffix still errors', () => {
+    // Kills a plausibility rule that checks the extension only. The suffix
+    // ".weirdext" is in no extension list, but the token carries a path
+    // separator, so it names a file and its absence is a real contradiction.
+    const content = '# Plan\n\nCreated `src/lib/gone-xyz.weirdext` for the feature.\n';
+
+    const result = validator.validateNoContradictions(content, testDir);
+
+    assert.ok(
+      result.errors.some(e => /claimed as created/i.test(e) && /gone-xyz\.weirdext/.test(e)),
+      `a slash-bearing claim must still error, got: ${JSON.stringify(result.errors)}`
+    );
+  });
+
+  test('00260 teeth: a backslash-separated claim still errors', () => {
+    // Kills the second operand of the separator test. A Windows-authored
+    // declaration is split on either separator by the existence check, so the
+    // plausibility rule must agree with it.
+    const content = '# Plan\n\nCreated `src\\lib\\gone-xyz.weirdext` for the feature.\n';
+
+    const result = validator.validateNoContradictions(content, testDir);
+
+    assert.ok(
+      result.errors.some(e => /claimed as created/i.test(e) && /gone-xyz\.weirdext/.test(e)),
+      `a backslash-separated claim must still error, got: ${JSON.stringify(result.errors)}`
+    );
+  });
+
+  test('00260 teeth: a path-plausible token immediately followed by "(" is a call, not a claim', () => {
+    // Kills the read-past-the-match guard on its own. The token IS path
+    // plausible (it carries a separator and a .js suffix), so only the "next
+    // character is an open parenthesis" test can reject it.
+    const content = '# Plan\n\nCreated src/lib/gone-abc.js(argv) in the same pass.\n';
+
+    const result = validator.validateNoContradictions(content, testDir);
+
+    assert.ok(
+      !result.errors.some(e => /claimed as created/i.test(e)),
+      `a call spelled with a path-shaped callee is not a file claim, got: ${JSON.stringify(result.errors)}`
+    );
+  });
+
   // === contradiction parser: files:-declaration basename fallback — VP1 ===
 
   test('VP1 #1: bare-basename claim resolved via files: declaration (OM2/PI0 shape) → no error', () => {
@@ -238,7 +348,7 @@ describe('Plan Validator Tests', () => {
       '---',
       '# Plan',
       '',
-      'add `util.js`.',
+      'Created `util.js`.',
       '',
     ].join('\n');
 
@@ -485,9 +595,13 @@ Do things.
     const result = validator.validateTransition(planPath, 'review', 'done', testDir);
 
     assert.strictEqual(result.valid, false, 'a plan with no checkbox anywhere must not pass');
+    // The refusal now states WHICH fact holds: these blocks hold no checkbox at all
+    // (they are prose), which is a different cause — and a different fix — from an
+    // open box. It names the section that was read so a wrong-section read is legible
+    // from the refusal alone. Same verdict as before, stated precisely.
     assert.ok(
-      result.errors.some((e) => /unchecked required checkbox/.test(e)),
-      `an unchecked required step must be reported, errors: ${JSON.stringify(result.errors)}`,
+      result.errors.some((e) => /Step 14 \(VERIFY\) has no checkbox at all in the execution section read \(## Execution Plan\)/.test(e)),
+      `an incomplete required step must be reported, errors: ${JSON.stringify(result.errors)}`,
     );
     console.log('# review->done: a prose-only execution section still fails every required step');
   });
@@ -700,6 +814,186 @@ describe('validateStepLabels — structure-aware step-label gate', () => {
     assert.ok(result.errors.some(e => /Step 10.*wrong label/i.test(e)),
       `Expected a Step 10 wrong-label error. Got: ${JSON.stringify(result.errors)}`);
     console.log('# validateStepLabels regression: bare wrong label rejected');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Richest-evidence region selection — which "## Execution Plan" section IS the
+// executor's build record.
+//
+// A plan legitimately carries TWO such sections: the implementation planner
+// writes a prose one (all nine "### Step N" headings, few or no checkboxes), and
+// src/lib/iron-loop.js appends the canonical checkbox template as a second one,
+// which the executor ticks. Selecting by the section's NAME is brittle — the
+// spelling has already drifted in live plans (EN DASH, "Steps 7-15", "Iron Loop
+// Steps 8-16", "— Build Record"), and every miss makes the gate read the prose
+// twin and refuse a plan whose real record is fully ticked.
+//
+// The discriminator is PER-STEP checkbox evidence: the number of step blocks
+// holding at least one box. A raw checkbox-LINE count would let one verbose step
+// block outrank a section covering all nine steps (fixture RICH_PROSE below is
+// that exact shape, taken from a real plan).
+// ---------------------------------------------------------------------------
+describe('extractStepBlocks — richest-evidence execution region wins', () => {
+  const validator = require('../src/lib/plan-validator.js');
+  let testDir;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-exec-region-'));
+    fs.mkdirSync(path.join(testDir, 'plans', 'review'), { recursive: true });
+    fs.mkdirSync(path.join(testDir, '.ctoc'), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  // Write the plan plus a FRESH PASSING VERIFY evidence artifact, so the only
+  // thing these tests can fail on is the step-block read.
+  function gate3(slug, body) {
+    const planPath = path.join(testDir, 'plans', 'review', `${slug}.md`);
+    fs.writeFileSync(planPath, `---\napproved_by: human\n---\n\n# ${slug}\n\n${body}\n`);
+    const mtime = fs.statSync(planPath).mtimeMs;
+    const evidencePath = verifyEvidencePath(testDir, slug);
+    fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
+    fs.writeFileSync(evidencePath, JSON.stringify({
+      planSlug: slug,
+      timestamp: new Date(mtime + 60000).toISOString(),
+      passed: true,
+      method: 'fallback-direct',
+      checks: {},
+      errors: [],
+      summary: 'fixture run',
+    }, null, 2));
+    return validator.validateReviewToDone(planPath, testDir);
+  }
+
+  const checkboxRefusals = (result) => result.errors.filter((e) => /checkbox/i.test(e));
+
+  // A ticked canonical record under an arbitrary heading spelling.
+  const tickedUnder = (heading) => REVIEW_DONE_EXEC_PLAN.replace('## Execution Plan', heading);
+
+  // The real shape of plans/review/00072-r1-per-request-ctoc-routing-hook.md: a
+  // prose twin BACKFILLED with checkboxes under seven of nine steps (12 and 15
+  // carry none), and deliberately MORE checkbox LINES (21) than the canonical
+  // section has (9). Per-step evidence: 7 blocks vs 9 — the canonical section
+  // must win. The prose twin's boxes include an OPEN one in every required step,
+  // so if a raw line count picked it, every required step would refuse.
+  const RICH_PROSE = (() => {
+    const steps = [
+      [8, 'TEST'], [9, 'PREPARE'], [10, 'IMPLEMENT'], [11, 'REVIEW'],
+      [12, 'OPTIMIZE'], [13, 'SECURE'], [14, 'VERIFY'], [15, 'DOCUMENT'],
+      [16, 'FINAL-REVIEW'],
+    ];
+    const lines = ['## Execution Plan', ''];
+    for (const [num, name] of steps) {
+      lines.push(`### Step ${num}: ${name}`);
+      if (num === 12 || num === 15) {
+        lines.push('Prose only — this block carries no checkbox at all.', '');
+        continue;
+      }
+      lines.push(
+        '- [x] Backfilled: the executor recorded this step as complete.',
+        '- [x] Evidence lives in the Execution Log section of this plan.',
+        '- [ ] Planner intent line that was never ticked.',
+        '',
+      );
+    }
+    return lines.join('\n');
+  })();
+
+  test('R1: a second section headed "## Execution Plan — Build Record" is the record read', () => {
+    const result = gate3('build-record', `${PROSE_EXEC_PLAN}\n\n${tickedUnder('## Execution Plan — Build Record')}`);
+    assert.deepStrictEqual(checkboxRefusals(result), [],
+      `the ticked Build Record section must be the one read, errors: ${JSON.stringify(result.errors)}`);
+    assert.strictEqual(result.valid, true, `plan must pass, errors: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('R2: an EN DASH canonical heading "## Execution Plan (Steps 8–16)" is the record read', () => {
+    // U+2013. Seven live sections in this repository use this spelling; the old
+    // ASCII-hyphen name match missed every one of them.
+    const result = gate3('en-dash', `${PROSE_EXEC_PLAN}\n\n${tickedUnder('## Execution Plan (Steps 8–16)')}`);
+    assert.deepStrictEqual(checkboxRefusals(result), [],
+      `the EN DASH section must be the one read, errors: ${JSON.stringify(result.errors)}`);
+    assert.strictEqual(result.valid, true, `plan must pass, errors: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('R3: evidence is counted per STEP BLOCK, not per checkbox LINE (21 lines/7 blocks loses to 9 lines/9 blocks)', () => {
+    // The canonical record is under the EN DASH spelling so this case is RED against
+    // the old name match too, not only against a raw-line-count discriminator.
+    const result = gate3('per-step-count', `${RICH_PROSE}\n\n${tickedUnder('## Execution Plan (Steps 8–16)')}`);
+    assert.deepStrictEqual(checkboxRefusals(result), [],
+      `the 9-block canonical section must outrank the 21-line prose twin, errors: ${JSON.stringify(result.errors)}`);
+    assert.strictEqual(result.valid, true, `plan must pass, errors: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('R4: on EQUAL per-step evidence the LATER section wins (the build template is appended last)', () => {
+    // Both candidates cover all nine steps, so evidence ties. The first carries an
+    // OPEN Step 14 box, the second is fully ticked: only "last wins" passes.
+    const first = REVIEW_DONE_EXEC_PLAN.replace(
+      '- [x] All tests green, 0 skipped, 0 flaky',
+      '- [ ] All tests green, 0 skipped, 0 flaky',
+    );
+    // BOTH headings are the bare "## Execution Plan", so no name match can separate
+    // them and only the tie rule decides. The old code took the first.
+    const result = gate3('tie-last-wins', `${first}\n\n${REVIEW_DONE_EXEC_PLAN}`);
+    assert.deepStrictEqual(checkboxRefusals(result), [],
+      `on a tie the LATER section must be read, errors: ${JSON.stringify(result.errors)}`);
+    assert.strictEqual(result.valid, true, `plan must pass, errors: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('R5: zero evidence anywhere — the FIRST section is still the one read (legacy behaviour)', () => {
+    const result = gate3('prose-only-region', PROSE_EXEC_PLAN);
+    assert.strictEqual(result.checklist.steps.step_14.present, true,
+      'the prose section supplies the step blocks');
+    assert.strictEqual(result.checklist.steps.step_14.completed, false,
+      'a block with no checkbox is not complete');
+    assert.strictEqual(result.valid, false, 'a plan with no checkbox anywhere must not pass');
+    assert.ok(checkboxRefusals(result).length > 0,
+      `required steps must still refuse, errors: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('R6: a genuinely UNTICKED box still reads "has an unchecked required checkbox"', () => {
+    const body = REVIEW_DONE_EXEC_PLAN.replace(
+      '- [x] All tests green, 0 skipped, 0 flaky',
+      '- [ ] All tests green, 0 skipped, 0 flaky',
+    );
+    const result = gate3('unticked-14', body);
+    assert.strictEqual(result.valid, false);
+    assert.ok(result.errors.includes(
+      'review→done blocked: Step 14 (VERIFY) has an unchecked required checkbox'),
+      `exact wording must be unchanged, errors: ${JSON.stringify(result.errors)}`);
+  });
+
+  test('R7: a required block with NO checkbox reads a DISTINCT message naming the section heading', () => {
+    const body = REVIEW_DONE_EXEC_PLAN.replace(
+      '### Step 14: VERIFY\n- [x] All tests green, 0 skipped, 0 flaky',
+      '### Step 14: VERIFY\nRan the suite; see the log below.',
+    );
+    const result = gate3('no-box-14', body);
+    assert.strictEqual(result.valid, false);
+    assert.strictEqual(result.checklist.steps.step_14.hasCheckbox, false,
+      'the checklist must record that the block held no checkbox');
+    const step14 = result.errors.filter((e) => /Step 14 \(VERIFY\)/.test(e));
+    assert.ok(step14.some((e) => /no checkbox/i.test(e) && /## Execution Plan/.test(e)),
+      `expected a no-checkbox refusal naming the heading read, got: ${JSON.stringify(step14)}`);
+    assert.ok(!step14.some((e) => /unchecked required checkbox/.test(e)),
+      `the two facts must not share one message, got: ${JSON.stringify(step14)}`);
+  });
+
+  test('R8: a plan with no "## Execution Plan" section at all yields no step blocks', () => {
+    const result = gate3('no-exec-section', '## Design\n\nProse only. No execution section exists.');
+    for (const num of [8, 9, 10, 11, 13, 14, 16]) {
+      assert.strictEqual(result.checklist.steps[`step_${num}`].present, false,
+        `Step ${num} must have no block`);
+      assert.ok(result.errors.includes(`Step ${num} (${{
+        8: 'TEST', 9: 'PREPARE', 10: 'IMPLEMENT', 11: 'REVIEW',
+        13: 'SECURE', 14: 'VERIFY', 16: 'FINAL-REVIEW',
+      }[num]}) is required but not addressed`),
+        `Step ${num} must be reported as not addressed, errors: ${JSON.stringify(result.errors)}`);
+    }
+    assert.deepStrictEqual(checkboxRefusals(result), [],
+      'an absent block is its own message, not a checkbox refusal');
   });
 });
 
