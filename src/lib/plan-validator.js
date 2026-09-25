@@ -117,6 +117,16 @@ const MASKED_SPAN_PATTERNS = [
 /** Every character except a line break; used to blank a span in place. */
 const NON_NEWLINE_RE = /[^\n\r]/g;
 
+// The two end-anchored boundary tests Pattern 1 runs per match. Compiled once at
+// module level because the contradiction scan runs on every gate check and a
+// regex literal inside the loop is re-created on every evaluation. Neither
+// carries the `g` flag, so neither carries `lastIndex` and the reuse hazard the
+// note above MASKED_SPAN_PATTERNS warns about does not apply.
+/** Did the match consume a trailing code/quote delimiter? */
+const TRAILING_DELIMITER_RE = /[`"]$/;
+/** Is the verb genuinely SEPARATED from the path it claims? */
+const PATH_SEPARATED_RE = /[:\s`"]$/;
+
 /**
  * A captured token is a FILE only if it can be one: it carries a path separator,
  * or its final suffix is a real file extension. `d.push`, `stat.birthtime` and
@@ -646,6 +656,19 @@ function declaredFileExistsUnder(root, declared) {
  * a legitimately declared+created file (e.g. prose "create `guard-files.js`"
  * for a declared `src/hooks/guard-files.js`) no longer false-blocks. A claim
  * matching no declared file and absent on disk still errors (D-VP1-2).
+ *
+ * A CITATION is not a claim (00260). Pattern 1 rejects, before it records
+ * anything, four shapes that name no file: a token inside a fenced block, a token
+ * inside an inline span containing a call, a token immediately followed by an open
+ * parenthesis, and a token whose "verb" is fused straight onto it with no
+ * separator — a verb syllable inside a cited slug. A token that cannot name a file
+ * at all (no path separator, no known extension) is rejected too. Each rejection
+ * removes a real refusal observed on this repository's own plans; the teeth are
+ * pinned by the `00260 teeth:` cases in `tests/plan-validator.test.js`.
+ *
+ * @param {string} content - the full plan text (untrusted; every pattern here is linear)
+ * @param {string} projectPath - repository root the claims resolve against
+ * @returns {{errors: string[], warnings: string[], checklist: object}} scan result
  */
 function validateNoContradictions(content, projectPath) {
   const result = { errors: [], warnings: [], checklist: {} };
@@ -689,8 +712,30 @@ function validateNoContradictions(content, projectPath) {
     // capturing one character less instead of rejecting the call. The trailing
     // [`"]? may have consumed one delimiter; the capture itself can never end in
     // one, so this test is exact.
-    const trailer = /[`"]$/.test(match[0]) ? 1 : 0;
+    const trailer = TRAILING_DELIMITER_RE.test(match[0]) ? 1 : 0;
     if (scanContent[match.index + match[0].length - trailer] === '(') continue;
+
+    // A verb FUSED to the path is one token, not a sentence. The alternation has
+    // no left word boundary, so `created?` matches the five letters `create`
+    // wherever they occur — including as a syllable inside a hyphen-joined slug.
+    // A plan filename cited in a table cell
+    // (`…-a-canonical-create-react-app-is-detected-s1-symmetric-credit.md`) starts
+    // a match at that syllable and captures the slug's tail, which carries a real
+    // `.md` suffix and no trailing parenthesis, so neither guard above can see it.
+    //
+    // The join is tested on the PATH side, never the word side: in real prose the
+    // verb and the path it claims are always separated by whitespace, a colon, or
+    // an opening code delimiter, whereas a verb may legitimately be glued to the
+    // word BEFORE it ("newly-created", "re-created"). Refusing a verb preceded by
+    // a token character would silence those genuine claims — a false green
+    // manufactured while fixing a false red, the worse of the two failures.
+    //
+    // `match[0]` is verb + separator + opening delimiter + path + trailer. The
+    // capture class excludes both delimiters, so a match ending in one can only
+    // be the trailer — already measured above — which makes the path's offset
+    // plain arithmetic rather than a second search for the verb in the match.
+    const beforePath = match[0].slice(0, match[0].length - filePath.length - trailer);
+    if (!PATH_SEPARATED_RE.test(beforePath)) continue;
 
     // A token that cannot name a file is not a claim about a file.
     if (!isPathPlausible(filePath)) continue;

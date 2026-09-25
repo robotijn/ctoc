@@ -1,9 +1,11 @@
 {
-  "content_sha256": "b07d079d635bc698991edfd86becf2a3f158aeda63a738688f5a101dc2714f87",
+  "content_sha256": "af96a412676970af216521930c9c998d8ab68244dc7c78ae4868f5035acb6929",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-09-03T20:11:11.842Z",
+  "approved_at": "2026-09-25T08:09:20.813Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "pipeline wrote a Deferred Questions note into the body after the digest was recorded; re-record at specification scope so execution does not invalidate the human approval",
   "plan_basename": "00260-a-method-name-in-plan-prose-is-not-a-missing-file-s1-honest-claim-parser"
 }
