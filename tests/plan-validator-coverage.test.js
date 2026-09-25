@@ -347,6 +347,29 @@ describe('plan-validator dark-branch coverage', () => {
     );
   });
 
+  test('validateNoContradictions_writes_no_checklist_entry_for_a_verb_fused_into_a_cited_slug', () => {
+    // Arrange — a plan filename cited in prose. `create` is a syllable inside the
+    // slug, so the scan starts a match there and captures the slug's tail. The
+    // token ends in `.md`, so the plausibility guard credits it as a path; only
+    // the separation test can reject it, and it must reject it BEFORE the
+    // checklist write.
+    const content = '# Plan\n\nSee `00259-a-canonical-create-react-app-is-detected-s1-symmetric-credit.md` for the sibling slice.\n';
+
+    // Act
+    const result = validator.validateNoContradictions(content, testDir);
+
+    // Assert — kills a fix that suppresses the error but keeps the entry.
+    assert.deepEqual(
+      Object.keys(result.checklist).filter((k) => k.startsWith('file_')),
+      [],
+      `a fused verb must leave no file_* checklist entry, got: ${JSON.stringify(result.checklist)}`
+    );
+    assert.ok(
+      !result.errors.some((e) => /claimed as created/i.test(e)),
+      `a verb syllable inside a cited slug is not a file claim, got: ${JSON.stringify(result.errors)}`
+    );
+  });
+
   test('validateNoContradictions_warns_when_path_like_script_reference_is_missing', () => {
     // Arrange — a slash-bearing script path that does not exist on disk.
     const content = '# Plan\n\nrun `scripts/deploy.sh` to release.\n';

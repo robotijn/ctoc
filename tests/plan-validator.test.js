@@ -264,6 +264,83 @@ describe('Plan Validator Tests', () => {
     );
   });
 
+  // === contradiction parser: a verb FUSED into a cited token is not a verb — 00260 ===
+  //
+  // The verb alternation has no left word boundary, so `created?` matches the
+  // five letters `create` wherever they appear — including as a SYLLABLE inside a
+  // hyphen-joined slug. A plan filename cited in a table cell
+  // (`…-a-canonical-create-react-app-is-detected-s1-symmetric-credit.md`) therefore
+  // starts a match at `create`, and the capture runs from the next character to
+  // the slug's real `.md` suffix. That token carries a plausible extension and is
+  // not followed by an open parenthesis, so NEITHER the call-skip nor the
+  // plausibility guard can see it. This is the shape that refused the very plan
+  // that fixes it (its own line 207 cites the plan it repairs).
+
+  const FUSED_VERB_CORPUS = [
+    [
+      'plans/implementation/a-canonical-create-react-app-is-detected.md line 27 — a cited slug in a table cell',
+      "| 1 | `00259-a-canonical-create-react-app-is-detected-s1-symmetric-credit.md` | `calculateConfidence`'s `packageDevDeps` loop credits through `hasDependency` | - |",
+    ],
+    [
+      'plans/in-progress/00260 line 207 — this plan citing the plan it repairs',
+      "| `assert.strictEqual` | `plans/in-progress/00259-a-canonical-create-react-app-is-detected-s1-symmetric-credit.md:293` — the live refusal | A, then B, then C |",
+    ],
+  ];
+
+  for (const [label, prose] of FUSED_VERB_CORPUS) {
+    test(`00260 fused-verb corpus: ${label} produces no file-claim error`, () => {
+      const result = validator.validateNoContradictions(`# Plan\n\n${prose}\n`, testDir);
+
+      assert.ok(
+        !result.errors.some(e => /claimed as created/i.test(e)),
+        `a verb syllable inside a cited slug is not a file claim, got: ${JSON.stringify(result.errors)}`
+      );
+    });
+  }
+
+  test('00260 teeth: a claim separated from the verb by a COLON only still errors', () => {
+    // Pins the `:` operand of the separation test. The verb and the path are
+    // separate words here — the colon is the separator — so the claim is real.
+    const content = '# Plan\n\nCreated:src/lib/gone-colon-xyz.js in one pass.\n';
+
+    const result = validator.validateNoContradictions(content, testDir);
+
+    assert.ok(
+      result.errors.some(e => /claimed as created/i.test(e) && /gone-colon-xyz\.js/.test(e)),
+      `a colon-separated claim must still error, got: ${JSON.stringify(result.errors)}`
+    );
+  });
+
+  test('00260 teeth: a claim separated from the verb by a DELIMITER only still errors', () => {
+    // Pins the backtick operand of the separation test: zero whitespace, zero
+    // colon, but the opening code delimiter still separates verb from path.
+    const content = '# Plan\n\nCreated`src/lib/gone-tick-xyz.js` in one pass.\n';
+
+    const result = validator.validateNoContradictions(content, testDir);
+
+    assert.ok(
+      result.errors.some(e => /claimed as created/i.test(e) && /gone-tick-xyz\.js/.test(e)),
+      `a delimiter-separated claim must still error, got: ${JSON.stringify(result.errors)}`
+    );
+  });
+
+  test('00260 teeth: a HYPHEN-PREFIXED verb followed by a real claim still errors', () => {
+    // Kills the rejected alternative. Reading the character BEFORE the match and
+    // refusing a verb glued to a preceding token character would also refuse
+    // "newly-created", "re-created" and "auto-created" — every hyphen-joined
+    // compound adjective — and silence a genuine missing-file claim. The guard
+    // must test the join on the PATH side, where a real sentence always has a
+    // separator, not on the word side, where a real sentence may not.
+    const content = '# Plan\n\nnewly-created `src/lib/gone-compound-xyz.js` for the feature.\n';
+
+    const result = validator.validateNoContradictions(content, testDir);
+
+    assert.ok(
+      result.errors.some(e => /claimed as created/i.test(e) && /gone-compound-xyz\.js/.test(e)),
+      `a hyphen-compound verb still introduces a real claim, got: ${JSON.stringify(result.errors)}`
+    );
+  });
+
   // === contradiction parser: files:-declaration basename fallback — VP1 ===
 
   test('VP1 #1: bare-basename claim resolved via files: declaration (OM2/PI0 shape) → no error', () => {
