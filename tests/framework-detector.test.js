@@ -242,7 +242,7 @@ describe('framework-detector: a bare react dep with no bundler is NOT react-vite
     assert.strictEqual(result.id, 'react-vite');
   });
 
-  it('REGRESSION: a real Create React App (react + react-scripts) still → react-cra', () => {
+  it('REGRESSION: react-scripts in devDependencies (the historical layout) still → react-cra', () => {
     write(dir, 'package.json', JSON.stringify({
       dependencies: { react: '^18.3.1', 'react-dom': '^18.3.1' },
       devDependencies: { 'react-scripts': '5.0.1' }
@@ -250,6 +250,27 @@ describe('framework-detector: a bare react dep with no bundler is NOT react-vite
     const result = new FrameworkDetector(dir).detect();
     assert.ok(result);
     assert.strictEqual(result.id, 'react-cra');
+    // The dev-tool credit for this fixture now flows through hasDependency. The
+    // +10 is the only observable proving that lookup still reads the
+    // devDependencies map: a mutant narrowing it to `dependencies` alone would
+    // leave the id correct and be caught by nothing but this number.
+    assert.strictEqual(result.confidence, 50, 'react dep 40 + react-scripts 10');
+  });
+
+  it('canonical Create React App (react-scripts in dependencies) → react-cra', () => {
+    // Create React App's own generator writes react-scripts into `dependencies`,
+    // not devDependencies. Reading devDependencies alone scored this project
+    // react-cra 40, tied react-vite at 40, lost the tie on priority order, and
+    // the react-vite Vite-evidence guard nulled it — detect() returned null for
+    // a real React app and its whole security surface was silently skipped.
+    write(dir, 'package.json', JSON.stringify({
+      dependencies: { react: '^18.3.1', 'react-dom': '^18.3.1', 'react-scripts': '5.0.1' }
+    }));
+    const result = new FrameworkDetector(dir).detect();
+    assert.ok(result, 'a canonical Create React App must not read as no-framework');
+    assert.strictEqual(result.id, 'react-cra');
+    assert.strictEqual(result.confidence, 50, 'react dep 40 + react-scripts 10');
+    assert.strictEqual(result.defaultPort, 3000);
   });
 });
 

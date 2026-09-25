@@ -410,3 +410,94 @@ describe('framework-detector: calculateConfidence scoring contract', () => {
     assert.equal(detector.calculateConfidence({ configFiles: ['nope.js'] }), 0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// calculateConfidence(): the packageDevDeps credit reads ALL FOUR dependency
+// maps, per profile. `packageDevDeps` names the packages a project of this shape
+// TYPICALLY declares as dev dependencies — the signal is the package's PRESENCE,
+// not its placement. Each row below declares that profile's tool in
+// `dependencies`, which is where several real generators put it (Create React
+// App writes react-scripts there). Every row goes RED if the credit is looked up
+// with hasDevDependency instead of hasDependency.
+//
+// For vue, svelte and remix the VERDICT does not move — they clear the 40 floor
+// on their framework dependency alone — so `confidence` is the only observable
+// that changes, and the id is asserted alongside it to prove no neighbour
+// profile stole the match.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('framework-detector: the packageDevDeps credit is earned by presence, not placement', () => {
+  let dir;
+  beforeEach(() => { dir = makeProject('framework-devcredit-'); });
+  afterEach(() => { rm(dir); });
+
+  it('vue + @vue/cli-service in dependencies, no config file → vue @50', () => {
+    // Arrange — vue dep 40, and the tool credit must come from `dependencies`.
+    writePkg(dir, { dependencies: { vue: '^3.4.0', '@vue/cli-service': '^5.0.8' } });
+
+    // Act
+    const result = new FrameworkDetector(dir).detect();
+
+    // Assert
+    assert.ok(result);
+    assert.equal(result.id, 'vue');
+    assert.equal(result.confidence, 50, 'vue dep 40 + @vue/cli-service 10');
+  });
+
+  it('svelte + @sveltejs/kit in dependencies, no svelte.config.js → svelte @50', () => {
+    // Arrange
+    writePkg(dir, { dependencies: { svelte: '^4.2.0', '@sveltejs/kit': '^2.5.0' } });
+
+    // Act
+    const result = new FrameworkDetector(dir).detect();
+
+    // Assert
+    assert.ok(result);
+    assert.equal(result.id, 'svelte');
+    assert.equal(result.confidence, 50, 'svelte dep 40 + @sveltejs/kit 10');
+  });
+
+  it('react + vite in dependencies, with vite.config.ts on disk → react-vite @100', () => {
+    // Arrange — the config file is deliberate: hasViteSignal() is a SEPARATE
+    // gate that still reads devDependencies only, so without a config file this
+    // fixture would score 50 and then be disqualified to null by that gate. The
+    // config file isolates the credit change from it.
+    write(dir, 'vite.config.ts', 'export default {}');
+    writePkg(dir, { dependencies: { react: '^18.3.1', 'react-dom': '^18.3.1', vite: '^5.4.0' } });
+
+    // Act
+    const result = new FrameworkDetector(dir).detect();
+
+    // Assert — config 50 + react dep 40 + vite 10.
+    assert.ok(result);
+    assert.equal(result.id, 'react-vite');
+    assert.equal(result.confidence, 100);
+  });
+
+  it('@remix-run/dev in dependencies, no remix.config.js → remix @50', () => {
+    // Arrange — also proves the priority walk is unchanged: remix is visited
+    // before react-vite, and the strict `>` keeps remix even when both score.
+    writePkg(dir, {
+      dependencies: { '@remix-run/dev': '^2.9.0', react: '^18.3.1', 'react-dom': '^18.3.1' }
+    });
+
+    // Act
+    const result = new FrameworkDetector(dir).detect();
+
+    // Assert
+    assert.ok(result);
+    assert.equal(result.id, 'remix');
+    assert.equal(result.confidence, 50, '@remix-run/dev dep 40 + @remix-run/dev tool credit 10');
+  });
+
+  it('react with no react-scripts anywhere and no Vite signal → null (guard, green before and after)', () => {
+    // Arrange — nothing but react. react-vite and react-cra both score 40; the
+    // priority walk visits react-vite first and `>` is strict, so react-vite is
+    // bestMatch and the react-vite Vite-evidence guard nulls it. The react-cra
+    // disqualifier body is never entered here — react-cra never becomes
+    // bestMatch — so this case does NOT cover that branch, before or after.
+    writePkg(dir, { dependencies: { react: '^18.3.1', 'react-dom': '^18.3.1' } });
+
+    // Act + Assert
+    assert.equal(new FrameworkDetector(dir).detect(), null);
+  });
+});

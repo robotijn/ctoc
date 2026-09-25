@@ -93,23 +93,28 @@
  *                                 arms, RETURNS a result object; resolveVerifyTimeout cannot
  *                                 throw on any environment value.
  *   framework-detector.js 298-300 detect()'s react-cra bundler-evidence disqualifier. Its
- *                                 condition cannot be true. react-cra outranks react-vite
- *                                 (checked first, and `>` is strict) only by the +10 that
- *                                 `hasDevDependency('react-scripts')` awards; the
- *                                 disqualifier then asks `hasDependency('react-scripts')`,
- *                                 which reads devDependencies as well as the other three
- *                                 maps, so it is already true. See the FINDING below — the
- *                                 same asymmetry has a live, user-visible consequence.
+ *                                 condition cannot be true. react-cra declares no config
+ *                                 files, so it can only outrank react-vite (walked first,
+ *                                 and `>` is strict) by the +10 its packageDevDeps entry
+ *                                 `react-scripts` awards — and that credit is now looked up
+ *                                 with `hasDependency`, the disqualifier's own predicate.
+ *                                 So whenever react-cra is bestMatch the condition is
+ *                                 already false: dead by construction, kept as the guard's
+ *                                 honest statement of intent. Reordering the priority walk
+ *                                 or deleting the guard are behaviour changes and belong to
+ *                                 their own plan.
  *
- * FINDING FOR THE HUMAN (adjacent to the dead range above; NOT covered by a case here
- * because `src/lib/framework-detector.js` is not among this plan's declared files and a
- * test asserting today's wrong answer would pin the bug in place). Create React App's own
- * generator puts `react-scripts` in `dependencies`. Measured on this tree: such a project
- * scores react-cra 40 (the react dependency alone — `hasDevDependency` does not see
- * `dependencies`), ties react-vite at 40, loses the tie to react-vite on priority order,
- * and is then nulled by the react-vite Vite-evidence guard. `detect()` returns **null** for
- * a canonical Create React App project. Moving react-scripts to devDependencies — the shape
- * the existing regression test uses — detects react-cra correctly. This needs its own plan.
+ * FIXED (2026-09-03, by the plan "a canonical Create React App is detected"). Create React
+ * App's own generator puts `react-scripts` in `dependencies`. calculateConfidence used to
+ * credit the packageDevDeps signal through `hasDevDependency` (devDependencies only), so
+ * such a project scored react-cra 40 on the react dependency alone, tied react-vite at 40,
+ * lost the tie on priority order, and was nulled by the react-vite Vite-evidence guard:
+ * `detect()` returned **null** for a canonical Create React App and its whole security
+ * surface was silently skipped. The credit loop now uses `hasDependency` — all four maps,
+ * the FINDING 5(b) philosophy — at the unchanged +10 weight. Pinned by
+ * tests/framework-detector.test.js, "canonical Create React App (react-scripts in
+ * dependencies) → react-cra", and by the per-profile packageDevDeps sweep in
+ * tests/framework-detector-coverage.test.js. The dead range above is unaffected; see (c).
  *
  * Line numbers are from the 2026-08-31 gate run and move with every commit; the behaviour
  * each case asserts, not the number, is what holds.
