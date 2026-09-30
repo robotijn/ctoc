@@ -100,6 +100,276 @@
           "cons": "Widens this agent's contract and output types; needs its own change to the agent file, its skill and possibly the dispatch type list."
         }
       ]
+    },
+    {
+      "id": "h-s4-agent-r1-shell-name-check-is-instruction-only",
+      "date": "2026-09-30",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "round": 1,
+      "kind": "out-of-scope-file",
+      "evidence": "The agent needs Bash to query a registry and read the status code, so a package name taken from untrusted code can reach a shell. Round 1 added a character check the agent performs itself, single quotes, and a second check inside each recipe; all three are instructions, nothing enforces them, and the second check cannot catch a single quote. tests/watcher-shape.test.js lines 94-100 call Bash \"a write tool wearing a read tool's coat\". The only enforcement point would be the Bash pre-tool hook, src/hooks/PreToolUse.Bash.js, which is outside this slice. This is a decision on how much risk to accept. The Step 13 security review (dispatch d-s4-step13-secure, Info 3) adds the general point: the agent's read-only use of Bash is itself an instruction, not a fence; the grant is unrestricted, and a command the shell-write coverage check cannot identify as a write is not stopped by it.",
+      "options": [
+        {
+          "key": "instruction-only",
+          "label": "Keep the check at the instruction level as written",
+          "pros": "No change outside this slice; the session's live run saw every hostile name tried refused.",
+          "cons": "Nothing stops an agent that skips its own check; a name holding a line break followed by the recipe's end marker is guarded only by that check (a single quote is now read as text and refused by the recipe's own check)."
+        },
+        {
+          "key": "hook-guard",
+          "label": "Add a guard in the Bash pre-tool hook that refuses this agent's commands when a registry address holds characters outside the allowlist",
+          "pros": "The rule holds even when the agent does not follow it.",
+          "cons": "A change to a security hook, which needs its own approved plan; the hook must be able to tell which agent is running, which was not checked."
+        }
+      ]
+    },
+    {
+      "id": "h-s4-agent-r1-shared-dispatch-phrase-ai-code-review",
+      "date": "2026-09-30",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "round": 1,
+      "kind": "frontmatter-key-finding",
+      "evidence": "Both this agent's description (line 3) and ai-code-quality-reviewer's description (line 3) list the dispatch phrase \"AI code review\". A round may not remove a dispatch phrase, so round 1 kept it and added boundary sentences to the description instead. Whether one of the two agents should give the phrase up is a routing decision.",
+      "options": [
+        {
+          "key": "keep-both",
+          "label": "Keep the phrase on both agents",
+          "pros": "No routing change; the new boundary sentences say which agent owns what.",
+          "cons": "A request with that phrase can route to either agent."
+        },
+        {
+          "key": "one-owner",
+          "label": "Remove the phrase from one of the two agents",
+          "pros": "The phrase routes to one agent only.",
+          "cons": "Removes a dispatch phrase, which the trigger fences and routing may rely on; needs a decision on which agent keeps it."
+        }
+      ]
+    },
+    {
+      "id": "h-s4-agent-r1-lookalike-overlap-with-dependency-auditor",
+      "date": "2026-09-30",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "round": 1,
+      "kind": "merge-remove-or-rename",
+      "evidence": "This file now checks for look-alike names on the names a change adds, at review time, and leaves the whole dependency graph to dependency-auditor. dependency-auditor's description (agents/security/dependency-auditor.md line 3) still says it flags typosquats, so two agents claim part of the same territory. That file is outside this slice.",
+      "options": [
+        {
+          "key": "split-as-drawn",
+          "label": "Keep the split as round 1 drew it and bring dependency-auditor's description into line in its own slice",
+          "pros": "Each agent keeps a clear side: this one at review time, that one across the graph.",
+          "cons": "Depends on a later slice editing dependency-auditor; until then the two descriptions overlap."
+        },
+        {
+          "key": "auditor-owns-all",
+          "label": "Give look-alike checking wholly to dependency-auditor and remove it from this agent",
+          "pros": "One owner for the whole check.",
+          "cons": "This agent would report a registered look-alike only as a hand-on, and the review-time check on new names moves to an agent dispatched for the whole graph."
+        }
+      ]
+    },
+    {
+      "id": "h-s4-agent-r1-cto-chief-dispatch-condition",
+      "date": "2026-09-30",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "round": 1,
+      "kind": "out-of-scope-file",
+      "evidence": "agents/coordinator/cto-chief.md line 528 dispatches this agent \"IF the implementation generated artificial-intelligence outputs\". Read literally, that means a product that produces model output, while this agent checks code an assistant wrote. That file is outside this slice.",
+      "options": [
+        {
+          "key": "reword",
+          "label": "Reword the condition in cto-chief.md to name code written by a coding assistant",
+          "pros": "The coordinator dispatches the agent for the work it does.",
+          "cons": "An edit to the top-level coordinator, which needs its own approved change."
+        },
+        {
+          "key": "leave",
+          "label": "Leave the condition as it is",
+          "pros": "No change to the coordinator.",
+          "cons": "The agent may be dispatched for products that call a model and skipped for code an assistant wrote."
+        }
+      ]
+    },
+    {
+      "id": "h-s4-agent-r2-private-registry-recipe-and-credentials",
+      "date": "2026-09-30",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "round": 2,
+      "kind": "tool-grant-change",
+      "evidence": "Round 2 added a rule for a private-looking name that the public registry answers with status 200: the agent records it as a possible dependency confusion, with \"no owning agent named here\", and never treats REGISTERED as settling it (Supply-chain Levels for Software Artifacts threat model, https://slsa.dev/spec/v1.1/threats: \"Register a package name in a public registry that shadows a name used on the victim's internal registry\"). Settling it would mean querying the organisation's own private registry, which needs a recipe, credentials and a scope this agent was never given. Whether to give it those is a decision about risk and scope.",
+      "options": [
+        {
+          "key": "record-only",
+          "label": "Keep the agent recording a possible dependency confusion, with no private-registry access",
+          "pros": "No credentials reach an agent that handles untrusted names in a shell; nothing outside this file changes.",
+          "cons": "A shadowed private name is never settled by this agent; someone must check it by hand or with another tool."
+        },
+        {
+          "key": "private-registry-recipe",
+          "label": "Give the agent a read-only recipe and credentials for the organisation's private registry",
+          "pros": "The agent can compare the public and private answers and settle the case itself.",
+          "cons": "Puts registry credentials in reach of an agent whose inputs are untrusted; needs a credential-handling design and its own approved change."
+        }
+      ]
+    },
+    {
+      "id": "h-s4-agent-r3-provenance-read-never-verified",
+      "date": "2026-09-30",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "round": 3,
+      "kind": "tool-grant-change",
+      "evidence": "Round 3 made the npm recipe print whether the latest version carries provenance (provenance=present) or was published through trusted publishing (trusted_publisher=yes), read from https://registry.npmjs.org/<name>. The agent can report that provenance is present; it cannot report that it is valid, because verifying a signature needs a tool its grant (Read, Grep, Bash) does not hold, and the file forbids reporting provenance as verified. The European Union Agency for Cybersecurity's draft advisory on artificial-intelligence-assisted software development (version 0.4, table 5) says \"Where available, verify package signing, integrity or provenance metadata.\" Whether to add verification, and at what cost, is a decision about risk.",
+      "options": [
+        {
+          "key": "presence-only",
+          "label": "Keep the agent reading only whether provenance is present",
+          "pros": "No new tool or dependency; the file already says provenance is never reported as verified.",
+          "cons": "A package with forged or mismatched provenance reads the same as one with valid provenance."
+        },
+        {
+          "key": "add-verification",
+          "label": "Give the agent a way to verify provenance signatures",
+          "pros": "The agent could tell valid provenance from present provenance.",
+          "cons": "Needs a verification tool or dependency and a change to the agent's tool grant, which the plan keeps fixed; its own approved change."
+        }
+      ]
+    },
+    {
+      "id": "h-s4-skill-r1-ci-gate-scope",
+      "date": "2026-09-30",
+      "path": "skills/ai-quality/hallucination-detector/SKILL.md",
+      "round": 1,
+      "kind": "merge-remove-or-rename",
+      "evidence": "The skill's \"Tool Integration (2026)\" section recommends a gate for continuous integration built from third-party tools (Socket, Snyk, Aikido, cosign, OpenSSF Scorecard, deps.dev, Dependency-Track, slopcheck). The wrapper agent never runs that gate and tells the agent never to cite it (\"Read the method first\", item 4), and several of those tools' claims were not checked in round 1 (finding f-s4-skill-r1-27). Round 1 made the gate safe to read (names first, no lifecycle scripts) but did not decide whether the skill should keep it. That is a scope decision.",
+      "options": [
+        {
+          "key": "keep-gate",
+          "label": "Keep the recommended gate in the skill, checked further in later rounds",
+          "pros": "Readers keep a worked example of a pipeline gate; round 1 already removed its unsafe order.",
+          "cons": "The skill carries tool claims its own agent never uses, each needing sources in every round."
+        },
+        {
+          "key": "remove-gate",
+          "label": "Remove the gate section from the skill and keep only the wrapper's read-only recipes",
+          "pros": "The skill describes only what its agent does; fewer unchecked tool claims.",
+          "cons": "Loses the pipeline guidance; the pinned headings \"Tool Integration (2026)\" are quoted by the wrapper and would need a coordinated edit."
+        }
+      ]
+    },
+    {
+      "id": "h-s4-skill-r3-renamed-low-without-maintainers",
+      "date": "2026-09-30",
+      "path": "skills/ai-quality/hallucination-detector/SKILL.md",
+      "round": 3,
+      "kind": "output-contract-change",
+      "evidence": "Round 3 limits the LOW triage tier for a renamed library: the page for technique T1195.001 (https://www.cisa.gov/eviction-strategies-tool/info-attack/T1195.001, carrying the same words as https://attack.mitre.org/techniques/T1195/001/, both read 2026-09-30) says a supply-chain compromise \"may also include abandoned packages, which in some cases could be re-registered by threat actors after being removed by adversaries\". The rule triages a renamed library as LOW only when the registry answer shows the maintainers the well-known project has. Only the wrapper's npm recipe prints maintainers (\"The PyPI, crates.io and Maven Central recipes print none of these\", agents/ai-quality/hallucination-detector.md), so, applied strictly, no renamed library outside npm could ever be LOW. The files now keep LOW where the recipe prints no maintainers, with \"maintainers not read\" in the limitations; the same scoping is in the wrapper's renamed_package severity row (late correction). Which rule to keep is a decision about how much risk to accept. The Step 11 review (dispatch d-s4-step11-review, .ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 7) adds the npm case: when an npm answer carries no maintainers, the recipe prints maintainers=\"not in the answer\" and both files then treat the name as suspected_lookalike (high), while the same missing data on PyPI keeps LOW. The npm answer without maintainers is therefore handled the opposite way to PyPI. The renamed rule now also reads \"shares at least one maintainer with\" the well-known project, because the session's probe found react-query and @tanstack/react-query share one maintainer but not all (.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md).",
+      "options": [
+        {
+          "key": "as-written",
+          "label": "Keep the rule as written: LOW where the registry's recipe prints no maintainers (PyPI, crates.io, Maven Central); an npm answer without maintainers counts as a mismatch, so suspected_lookalike (high)",
+          "pros": "npm, whose recipe can read maintainers, gets the stricter reading when they are missing.",
+          "cons": "Missing maintainers mean high on npm and low elsewhere."
+        },
+        {
+          "key": "low-wherever-not-read",
+          "label": "Keep LOW wherever maintainers were not read, npm answers without maintainers included, with \"maintainers not read\" in the limitations",
+          "pros": "One rule for missing data on every registry.",
+          "cons": "A re-registered name on npm whose answer omits maintainers is triaged LOW."
+        },
+        {
+          "key": "strict-maintainers",
+          "label": "Triage a renamed library as LOW only when maintainers were read and at least one is shared; otherwise suspected_lookalike, on every registry",
+          "pros": "A re-registered abandoned name is never triaged LOW without evidence of a shared owner.",
+          "cons": "Every renamed library outside npm becomes suspected_lookalike, severity high."
+        }
+      ]
+    },
+    {
+      "id": "h-s4-skill-r3-reviewer-react-codeshift-wording",
+      "date": "2026-09-30",
+      "path": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md",
+      "round": 3,
+      "kind": "out-of-scope-file",
+      "evidence": "Round 3 of skills/ai-quality/hallucination-detector/SKILL.md now says react-codeshift was \"created 2026-01-14 by a third party, maintainer \\\"debugducky\\\" ... That is not a registry hold: the wrapper's npm recipe prints REGISTERED for it\" (https://registry.npmjs.org/react-codeshift, read 2026-09-30). The finished reviewer skill, skills/ai-quality/ai-code-quality-reviewer/SKILL.md line 184, calls it \"a defensive placeholder\"; its own line 176 already says an Aikido researcher registered the name. The wording is imprecise beside the new text, not false, so it is a lead for that skill's owner, not a refutation. The reviewer skill is outside this slice's files; the scope-growth request is inbox question 1790801303564-1rhgy4 (.ctoc/inbox/questions/1790801303564-1rhgy4.md).",
+      "options": [
+        {
+          "key": "align-wording",
+          "label": "Widen the scope and align the reviewer skill's line 184 with the new wording",
+          "pros": "The two skills describe one name the same way.",
+          "cons": "Edits a finished file outside this slice, through a scope widening only you can grant; its record then needs a late-correction entry."
+        },
+        {
+          "key": "leave-as-is",
+          "label": "Leave the reviewer skill's wording as it is",
+          "pros": "No edit to a finished file; its line 176 already names who registered the package.",
+          "cons": "The two skills describe the same package with different precision."
+        }
+      ]
+    },
+    {
+      "id": "h-s4-step13-names-sent-to-public-registries",
+      "date": "2026-09-30",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "round": null,
+      "kind": "project-rules-disagree",
+      "evidence": "The Step 13 security review (dispatch d-s4-step13-secure, .ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md, Low 5): every package name the wrapper checks is sent to public services (npm, PyPI, crates.io, Maven Central, and npm's downloads interface) before the private-name rule is applied, and the skill's gate runs `socket ci`, which uploads the manifests to a third party. A client's internal package names can therefore leave the approved data boundary. The user-agent string names only the public repository. Which way to go is a decision about data boundaries.",
+      "options": [
+        {
+          "key": "keep-querying",
+          "label": "Keep querying every name, internal-looking ones included",
+          "pros": "Dependency-confusion detection keeps the public answer it needs.",
+          "cons": "Client-internal names reach npm, PyPI and Socket."
+        },
+        {
+          "key": "hold-private-names",
+          "label": "Hold back names the private-name rule matches unless the dispatch says the data boundary allows sending them",
+          "pros": "Nothing internal leaves the boundary without permission.",
+          "cons": "Dependency-confusion detection is lost for exactly those names."
+        }
+      ]
+    },
+    {
+      "id": "h-s4-post-kickback-pypi-owners-and-status",
+      "date": "2026-09-30",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "round": null,
+      "kind": "output-contract-change",
+      "evidence": "The citation validator's re-read after the kickbacks (dispatch d-s4-post-kickback-revalidate, .ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-d-s4-post-kickback-revalidate.md, \"Leads\") found two things the PyPI recipe does not read. PyPI's JSON answer carries owner roles: sklearn has \"ownership\":{\"organization\":null,\"roles\":[{\"role\":\"Owner\",\"user\":\"filo\"},…]} (https://pypi.org/pypi/sklearn/json, read 2026-09-30), so the recipe could print owners and let the shared-maintainer rule apply to PyPI instead of writing \"maintainers not read\". And PyPI's index interface serves a project-status object with \"active\", \"archived\" or \"quarantined\" (https://blog.pypi.org/posts/2025-08-14-project-status-markers/, read 2026-09-30); a status marker is not a hold. Either would change what the recipe prints, which is a design decision.",
+      "options": [
+        {
+          "key": "read-pypi-owners",
+          "label": "Extend the PyPI recipe to print owners (and the status marker) and apply the shared-maintainer rule to PyPI",
+          "pros": "A renamed PyPI library can be triaged on the same evidence as npm; a quarantined or archived project is visible.",
+          "cons": "New recipe code, a session run, and a re-validation; the status marker comes from a second interface and a second request per name."
+        },
+        {
+          "key": "leave-maintainers-not-read",
+          "label": "Leave the PyPI recipe as it is, with \"maintainers not read\" in the limitations",
+          "pros": "No new code; the limitation is stated in every report.",
+          "cons": "PyPI renamed libraries keep the weaker evidence, and a quarantined project reads the same as an active one."
+        }
+      ]
+    },
+    {
+      "id": "h-s4-post-kickback-c-cpp-owner",
+      "date": "2026-09-30",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "round": null,
+      "kind": "merge-remove-or-rename",
+      "evidence": "Both files hand \"C and C++ language issues\" to sast-scanner (wrapper hand-on list; skill C and C++ section). The citation validator's re-read (.ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-d-s4-post-kickback-revalidate.md, \"Leads\") notes that sast-scanner's scope is security vulnerabilities (\"Static Application Security Testing — deep code analysis for vulnerabilities\", agents/security/sast-scanner.md line 3), while memory-safety-checker names C and C++ memory patterns (\"Detects memory leaks and unsafe memory patterns … across C/C++/Rust/…\", agents/specialized/memory-safety-checker.md line 3). Which sibling owns C and C++ issues that are not about security is an ownership decision.",
+      "options": [
+        {
+          "key": "keep-sast-scanner",
+          "label": "Keep sast-scanner as the one owner named for C and C++ language issues",
+          "pros": "One pointer, already consistent in both files.",
+          "cons": "Memory-safety issues that are not security findings point to an agent whose scope is security."
+        },
+        {
+          "key": "name-both",
+          "label": "Name memory-safety-checker for memory patterns and sast-scanner for security issues",
+          "pros": "Each issue goes to the agent whose description claims it.",
+          "cons": "Two pointers to keep in step across both files; a text change in both."
+        }
+      ]
     }
   ]
 }

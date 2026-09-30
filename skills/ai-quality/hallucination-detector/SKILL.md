@@ -11,6 +11,8 @@ when_to_load:
   - "AI hallucination"
   - "slopsquatting"
   - "verify imports"
+  - "package hallucination"
+  - "library hallucination"
 related_skills:
   - ai-quality/ai-code-quality-reviewer
   - quality/code-reviewer
@@ -30,8 +32,7 @@ effort_budget:
 
 # Hallucination Detector (skill)
 
-> Converted from agents/ai-quality/hallucination-detector.md as part of CTOC v7 B2 leaf-node sweep.
-> Auto-loaded when the user prompt matches a when_to_load trigger.
+> This is the method that the wrapper agent `agents/ai-quality/hallucination-detector.md` reads by this file's path before it checks anything. Nothing loads this file on a phrase match: its `when_to_load` phrases are trigger vocabulary that only a test reads, and a specialist is reached by an agent reading its body by path (`tests/skill-loading.test.js`, lines 9–13). Where this file and the wrapper disagree, the wrapper wins, and its read-only registry recipes replace every existence check here.
 
 ## Role
 
@@ -39,24 +40,31 @@ You are a skeptical reviewer of AI-generated code. You assume every import, ever
 
 ## 2026 Best Practices (AI Quality category)
 
-The hallucination landscape has shifted from "LLM gets the wrong name" to "attackers register the wrong name as malware." Detection must be paired with verification against an authoritative source for every imported artifact.
+Detection must be paired with verification against an authoritative source for every imported artifact.
 
-- **Slopsquatting is the dominant supply-chain vector** for AI-generated code. The USENIX Security 2025 study by Spracklen et al. (*We Have a Package for You! A Comprehensive Analysis of Package Hallucinations by Code Generating LLMs*) analyzed 576,000 code samples across 16 LLMs and measured **roughly 5–22%** of recommended package imports as non-existent on the official registry (about 5% for commercial frontier models, about 22% for open-source models). Attackers register the most-hallucinated names on npm and PyPI within hours. Treat every AI-suggested package import as untrusted until the registry confirms it existed BEFORE the LLM's training cutoff.
-- **Verify-every-import** is the new baseline. Before any AI-generated code merges:
-  - npm: `npm view <pkg>` returns a non-empty JSON object **and** the package was first published before the model's training cutoff.
-  - PyPI: `pip index versions <pkg>` succeeds **and** the package has provenance via PyPI Trusted Publishers (PEP 740 attestations) when available.
-  - Maven Central: artifact resolves **and** the JAR is GPG-signed by a known publisher.
-  - NuGet: package resolves **and** is signed (author or repository signature).
-  - Go modules: `go list -m <module>@<version>` succeeds against the module proxy **and** sum-db verifies.
-  - Cargo: `cargo search <crate>` returns a match **and** the crate has not been yanked.
-  - SQL extensions / Postgres contrib: extension exists in `pg_available_extensions` on a real Postgres install of the claimed version.
-- **Cross-reference signatures** with the registry's authenticity layer. A package that exists is not the same as a package that should exist. Check **npm provenance** (Sigstore attestations linking package to source repo), **PyPI Trusted Publishers** (OIDC-issued attestations), **Maven GPG signatures** against the publisher's known key, **NuGet author/repository signatures**, **Go sumdb** (`GOSUMDB=sum.golang.org`), and **Sigstore Rekor** transparency log for any signed artifact. Mismatch or absent attestation = elevated risk even if the package "exists."
-- **Verify API methods exist in the documented version**, not just "in the library." A function that was renamed, removed, or never existed is a hallucination. Check the package's `package.json` exports / `.pyi` stubs / `module-info.java` / Cargo docs.rs / Go pkg.go.dev against the called method.
+- **Slopsquatting: registering the names models invent.** Spracklen and colleagues (*We Have a Package for You! A Comprehensive Analysis of Package Hallucinations by Code Generating LLMs*, USENIX Security 2025, https://www.usenix.org/conference/usenixsecurity25/presentation/spracklen; preprint https://arxiv.org/abs/2406.10279; both read 2026-09-30) generated 576,000 code samples in Python and JavaScript with 16 models and report that "the average percentage of hallucinated packages is at least 5.2% for commercial models and 21.7% for open-source models" (page 3687), measured against the registries' package lists "as of 10 January, 2024" (page 3693); the commercial models were ChatGPT 4.0, ChatGPT 4.0 Turbo and ChatGPT 3.5 Turbo (Table 1, page 3692). A 2026 replication on "five frontier code-capable LLMs released between October 2025 and March 2026" measured "between 4.62% (Claude Haiku 4.5) and 6.10% (GPT-5.4-mini)" (Churilov, https://arxiv.org/abs/2605.17062, an independent preprint not shown as peer-reviewed, read 2026-09-30). The attack: "An adversary can exploit package hallucinations, especially if they are repeated, by publishing a package … with the same name as the hallucinated … package" (USENIX version, pages 3687–3688). The European Union Agency for Cybersecurity describes slopsquatting as the case "where attackers publish packages matching hallucinated package names generated by AI tools" (Technical Advisory for Secure Use of Package Managers, version 1.1, March 2026, section 5.2, page 26, https://www.enisa.europa.eu/sites/default/files/2026-03/ENISA%20Technical%20Advisory%20-%20Package_Managers_Final.pdf, read 2026-09-30). Treat every package a model suggests as untrusted until its registry confirms it and, when the model's training cutoff is known and the registry answer carries a registration date (npm's `created`), until that date is before the cutoff, which is necessary and not sufficient: a `created` date can be older than the package now behind the name, and whether npm keeps it across an unpublish and a new registration was not checked; a PyPI first upload is not a registration date, so the wrapper does not set it against the cutoff (its look-alike check, item 1): Krishna and colleagues count a package as invented if it "was first registered after the model's knowledge cutoff date" (https://arxiv.org/html/2501.19012, read 2026-09-30).
+- **Existence is not enough.** "Trivial cross-referencing methods (i.e., comparing a generated package name with a list of known packages) are ineffective for detecting a package hallucination attack, as an adversary may already have published the hallucinated package with malicious code." (USENIX version, page 3688). Its mitigation section judges a curated allow-list, chosen by a metric such as package popularity, only a partial answer: it "would be a more effective method", but "this is still considered a blunt and reactive approach that requires constant verification and updating" (page 3698). The same paper, citing earlier work, groups package confusion into "typosquatting, combosquatting, brandjacking, and similarity attacks" (page 3688); the Cybersecurity and Infrastructure Security Agency's page for technique T1195.001, which links its description to MITRE ATT&CK ("View on ATT&CK") and carries the same words as MITRE ATT&CK's own page for the technique (https://attack.mitre.org/techniques/T1195/001/, read 2026-09-30), says "Adversaries may also employ 'typosquatting' or name-confusion by choosing names similar to existing popular libraries or packages in order to deceive a user." (https://www.cisa.gov/eviction-strategies-tool/info-attack/T1195.001, read 2026-09-30); and names that look invented can be registered (see the examples below). A private-looking name that the public registry answers is dependency confusion: "Register a package name in a public registry that shadows a name used on the victim's internal registry" (https://slsa.dev/spec/v1.1/threats, read 2026-09-30).
+- **Ways past these checks, and the rule for each.** Each of these gets past a review that stops at the registry's answer:
+  - A pre-registered name with no well-known counterpart: record it as "registered; no well-known counterpart named; not settled" (the wrapper's look-alike check).
+  - A private registry configured outside the repository, in a user's own settings or a pipeline's environment: a reviewer who reads only the repository cannot see it; say so in the limitations (the wrapper's rule for a private-looking name).
+  - A name written with a character that only imitates a Latin letter: the wrapper's character check refuses it; search the line for any character above code point 127 before recording the name as not checked.
+  - Declaration files written by the publisher of a look-alike: a member found there proves only that the publisher declared it (section 2 below).
+  - A repository link that points at the genuine project: the link is the publisher's claim, not proof of where the code came from (the wrapper), so give Scorecard a repository you have reason to trust, never the one a package's metadata names.
+  - A new scope that resembles one the repository already uses, for example `@acme-corp` beside `@acme`: the scope itself is the counterpart to compare (the wrapper).
+  - Inflated download counts: the European Union Agency for Cybersecurity warns that "Popularity metrics can be misleading or artificially inflated" and "should not be relied upon in isolation" (version 1.1, section 4.1.1, page 17, https://www.enisa.europa.eu/sites/default/files/2026-03/ENISA%20Technical%20Advisory%20-%20Package_Managers_Final.pdf, read 2026-09-30); a name registered later than its counterpart is reported whatever its count.
+  - The dated answers in this file's examples: each status 404 below was true on the day it was read, and the names are now published here, where anyone can register them; `react-codeshift` and `serde_json_ext` below show that plausible names do get registered. Run the recipe again in every review; a dated answer is never today's.
+- **Verify every import against its registry, never by installing it.** The same advisory says "Verify package names carefully to avoid malicious imitations or naming collisions." (section 4.1.2, page 18, https://www.enisa.europa.eu/sites/default/files/2026-03/ENISA%20Technical%20Advisory%20-%20Package_Managers_Final.pdf, read 2026-09-30). The wrapper's read-only recipes for npm, PyPI, crates.io and Maven Central are in `agents/ai-quality/hallucination-detector.md`, "Detection Methods", section 1. All four report a name the registry does not have and an answer they could not read; the npm recipe also prints HELD BY NPM when the name's only maintainer is the user `npm` and its latest version or description reads as npm's security hold, a lead that never skips the look-alike check, and the PyPI recipe prints no placeholder label, because a summary is the publisher's to write. `npm view <pkg>` returning a result is not proof of a usable package: npm holds some names as security placeholders that still answer with a version, such as `fs`, latest "0.0.1-security" (https://registry.npmjs.org/fs/latest, read 2026-09-30). The wrapper has no recipe for NuGet, the Go module proxy or Postgres extensions, so names from those are recorded as not checked. What is known about them:
+  - NuGet: its own search command is `dotnet package search <id> --exact-match`, for the .NET 8.0.2xx software development kit and later, where `--exact-match` "narrows the search to only include packages whose IDs exactly match" (https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-package-search, read 2026-09-30); the version list at https://api.nuget.org/v3-flatcontainer/newtonsoftex.advancedjson/index.json answered status 404 for that missing id on 2026-09-30.
+  - Go modules: the module proxy's version list at https://proxy.golang.org/github.com/uber-go/cachepro/@v/list answered status 404 for that missing module on 2026-09-30. A package path inside a module is not a module path: https://proxy.golang.org/github.com/aws/aws-sdk-go-v2/secrets/@v/list answered 404 on 2026-09-30, while `github.com/aws/aws-sdk-go-v2/service/secretsmanager` is a separate module with its own version list (https://proxy.golang.org/github.com/aws/aws-sdk-go-v2/service/secretsmanager/@v/list, read 2026-09-30).
+  - Cargo: never `cargo search`, which "performs a textual search for crates" (https://doc.rust-lang.org/cargo/commands/cargo-search.html, read 2026-09-30) rather than an exact-name lookup; use the wrapper's crates.io recipe.
+  - Postgres extensions: "The pg_available_extensions view lists the extensions that are available for installation." (https://www.postgresql.org/docs/current/view-pg-available-extensions.html, read 2026-09-30) — on the server you query, so an empty answer means "not installable here", not "exists nowhere".
+- **Cross-reference signatures, and know which ones can tell names apart.** A package that exists is not the same as a package that should exist. Maven Central requires every published file to be signed ("One of the requirements for publishing your artifacts to the Central Repository, is that they have been signed with PGP.", https://central.sonatype.org/publish/requirements/gpg/, read 2026-09-30), so a `.asc` file proves nothing; check the signing key against the publisher's known key. On NuGet, look for an author signature, not only a signature. npm provenance comes from GitHub Actions or GitLab and is signed through Sigstore, and "You can verify the provenance attestations of downloaded packages with … `npm audit signatures`" (https://docs.npmjs.com/generating-provenance-statements, read 2026-09-30). On PyPI, attestations follow Python Enhancement Proposal 740 — "PyPI's implementation of digital attestations (PEP 740)" (https://docs.pypi.org/attestations/, read 2026-09-30) — and Trusted Publishing is a separate mechanism that uses OpenID Connect "to exchange short-lived identity tokens" for uploads (https://docs.pypi.org/trusted-publishers/, read 2026-09-30). Go's checksum database is "an auditable checksum database which will be used by the go command to authenticate modules" (https://proxy.golang.org, read 2026-09-30), and it "ensures that the `go` command always adds the same lines to everyone's `go.sum` file" (https://go.dev/blog/module-mirror-launch, read 2026-09-30): everyone receives the same code, which is not the same as safe code. Sigstore's **Rekor** "fulfils the signature transparency role of Sigstore's software signing infrastructure" (https://docs.sigstore.dev/logging/overview/, read 2026-09-30). A missing or mismatched attestation is a reason to look closer, never proof on its own; and a present, valid one shows only where a package was built, not that it is the package the code meant (this file's own reasoning).
+- **Verify API methods exist in the documented version**, not just "in the library." A function that was renamed, removed, or never existed is a hallucination. Check the called member against the declarations of the resolved version: the package's `package.json` "exports" and its type declarations; Python `.pyi` stub files ("Stub files are syntactically valid Python files with a `.pyi` suffix", https://typing.python.org/en/latest/spec/distributing.html, read 2026-09-30), remembering that a stub package can be partial by design ("If a stub package distribution is partial it MUST include `partial\n` in a `py.typed` file", same page), so a module missing from a partial stub package proves nothing; docs.rs for Rust ("All libraries published to crates.io are documented.", https://docs.rs/about, read 2026-09-30); pkg.go.dev for Go. A Java `module-info.java` names packages, not members: "The `exports` directive specifies the name of a package to be exported by the current module" (the Java Language Specification, section 7.7.2, https://docs.oracle.com/javase/specs/jls/se21/html/jls-7.html, read 2026-09-30). It settles a wrong package, never a missing method; for a method, read the class file with `javap -p`.
 - **Detect inconsistent claims** within the same artifact. When function name says X, docstring says Y, and observable behavior is Z, the LLM has drifted. Concretely: signature says `def foo(x: int)` but docstring says "accepts a string" → hallucinated docstring OR hallucinated signature. Flag the disagreement; do not let the integrator pick one silently.
-- **Prefer retrieval-augmented over pure generative for fact-heavy answers.** When an AI must cite a CVE, a benchmark, a price, a version number, an API spec, or a quote: the answer should come through retrieval against an indexed authoritative source (docs, CVE database, vendor pricing page, paper PDF), with the citation verifiable. Span-level verification (REFIND, SemEval 2025) and metamorphic testing of RAG (MetaRAG, 2025) are the current state-of-the-art for catching fabricated citations even inside RAG pipelines.
-- **AI code carries elevated error rate** — Veracode's 2025 GenAI Code Security Report measured that AI-generated code introduced at least one security flaw in ~45% of tests (100+ models across Java, Python, C#, and JavaScript); combined with the 5–22% phantom-package rate, AI code must clear the same review bar as handwritten code. No fast-track to merge.
-- **Multi-technique detection**: pattern matching + AST analysis + registry verification + signature verification. Any single technique leaves a leak. Single-technique findings get `confidence: low`; corroboration by a second technique escalates to `confidence: high`.
-- **Deterministic AST analysis** gives 100% precision on semantic errors when structurally grounded — e.g. "this method does not exist on this class" can be verified deterministically from the library's type stubs / declaration files.
+- **Prefer retrieval-augmented over pure generative for fact-heavy answers.** When an artificial-intelligence model must cite a vulnerability identifier from the Common Vulnerabilities and Exposures program, a benchmark, a price, a version number, an application programming interface specification, or a quote: the answer should come through retrieval against an indexed authoritative source (documentation, the Common Vulnerabilities and Exposures database, a vendor pricing page, the paper itself), with the citation verifiable. Two 2025 methods locate unsupported text at the level of a span: REFIND "detects hallucinated spans within LLM outputs by directly leveraging retrieved documents" (Lee and Yu, https://arxiv.org/abs/2502.13622, accepted to SemEval@ACL 2025) and MetaRAG "localizes unsupported claims at the factoid span where they occur" (Sok, Luz and Haddam, https://arxiv.org/abs/2509.09360); both read 2026-09-30. Neither abstract mentions citations, so neither is shown to check them.
+- **Code written by artificial intelligence carries an elevated error rate** — Veracode's 2025 GenAI Code Security Report gives a 45% rate of risky security flaws in code "generated by over 100 large language models across Java, JavaScript, Python, and C#", without a settled unit: its report page says "45% of tests" and its July 2025 blog post says "45% of code samples failed security tests" (https://www.veracode.com/resources/analyst-reports/2025-genai-code-security-report/ and https://www.veracode.com/blog/genai-code-security-report/, both read 2026-09-30); with the package-invention rates above, such code must clear the same review bar as handwritten code. No fast-track to merge.
+- **Multi-technique detection**: pattern matching, analysis of the abstract syntax tree, registry verification and signature verification. Any single technique leaves a leak. Confidence follows the wrapper's "Severity and confidence" table: a registry answer of status 200 or 404, read during the check, for the name the code needs, or installed declaration files that lack the member after every re-export is followed, is HIGH on its own, except where that table gives MEDIUM (a Maven Central 404, a Python import name no manifest maps to a distribution, a member missing only from plain source, a registration date set against a stated training cutoff); a pattern hit alone is LOW; and a whole module missing from a Python stub package that declares itself partial is not a finding at all but an unknown (the wrapper's Export Verification).
+- **Checking a call against the library's declaration files** settles whether a method exists on a class without running anything. One 2026 study (Khati and colleagues, https://arxiv.org/abs/2601.19106, accepted to FORGE 2026, read 2026-09-30) reported "100% precision and 87.6% recall (0.934 F1-score)" for detection based on the syntax tree, on "a manually-curated dataset of 200 Python snippets"; it is one small Python study, not a general guarantee.
 
 ## Hallucination Categories
 
@@ -64,7 +72,9 @@ Every finding falls into one of these categories. The category drives the verifi
 
 | Category | Definition | Verification |
 |---|---|---|
-| **Hallucinated import** | Registry does not have this package name at all | `npm view` / `pip index versions` / `cargo search` / `go list -m` / `nuget search` returns nothing |
+| **Hallucinated import** | The registry of the code's own ecosystem has no such name when checked, or, when the model's training cutoff is known, the name was first registered after it | A status 404 from the wrapper's read-only recipes, or the registration date set against the cutoff; never a search that matches text rather than the exact name |
+| **Registry placeholder** | The registry answers, but holds the name with no usable package behind it | npm: the answer's `maintainers` is exactly the user `npm`, and the latest version ends in `-security` or the description reads "security holding package", as for `crossenv` (https://registry.npmjs.org/crossenv, read 2026-09-30) and `fs`, whose `maintainers` the session's raw probe found to be exactly `["npm"]` on 2026-09-30 (`.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md`). PyPI: no field shows a hold; a summary such as `sklearn`'s "deprecated sklearn package, use scikit-learn instead" (https://pypi.org/pypi/sklearn/json, read 2026-09-30) is the publisher's own words. A package that only calls itself a placeholder, published by an ordinary account, is not a hold, and a description or summary is the publisher's to write: the wrapper's npm recipe prints HELD BY NPM only on the conditions above, its PyPI recipe prints no placeholder label, and every name, held-looking or not, goes to the look-alike check before it is reported or suggested |
+| **Suspected look-alike** | The name is registered, but may be one registered in advance under a name models invent | The wrapper's look-alike check: age, downloads, maintainers and repository link set beside the well-known package's |
 | **Wrong import path** | Package exists, but the imported subpath / submodule / namespace does not | Inspect the package's actual `exports` / `__init__.py` / module declarations |
 | **Fictional function name** | Library exists, but the called function does not exist in any version | Library's type stubs / docs / source; consider renames |
 | **Wrong function signature** | Function exists, but arguments/return-type are wrong (deprecated, removed, or never existed) | Compare to the version specified in the lockfile / docs of that version |
@@ -74,114 +84,137 @@ Every finding falls into one of these categories. The category drives the verifi
 
 ## 7-Language Coverage
 
-Hallucination patterns are language-specific. The detection technique is the same — verify against the authoritative registry — but the registries and pattern signatures differ.
+Hallucination patterns are language-specific. The detection technique is the same — verify against the authoritative registry — but the registries and pattern signatures differ. The command templates in the examples below take a package name or version: substitute only a value that passed the wrapper's character check, and run package-manager clients from outside the repository under review.
 
 ### TypeScript / JavaScript (npm)
 
 ```typescript
+// TypeScript / JavaScript (Node.js 24 was used to run the probes); checked against the vendors' documentation and the npm registry's answers, read 2026-09-30
 // HALLUCINATION — package doesn't exist on npm (slopsquatting target)
-import { useSmartCache } from 'react-smart-cache';   // npm: not found
-import { ValidatorPro } from 'email-validator-pro';  // npm: not found
+import { useSmartCache } from 'react-smart-cache';   // npm: status 404 at https://registry.npmjs.org/react-smart-cache (read 2026-09-30)
 
-// HALLUCINATION — package renamed; old name parked or never existed
-import { useQuery } from 'react-query';              // moved to '@tanstack/react-query'
-import { hashSync } from 'bcrypt';                   // works in Node, NOT in browser; AI confuses with 'bcryptjs'
+// LOOKS INVENTED, IS REGISTERED — email-validator-pro has been on npm since 2017-05-18
+// (https://registry.npmjs.org/email-validator-pro, read 2026-09-30); judge a name by its registry, never by its sound
+import { ValidatorPro } from 'email-validator-pro';
+
+// STALE, NOT HALLUCINATED — the old name still installs an older version (latest "3.39.3",
+// https://registry.npmjs.org/react-query/latest, read 2026-09-30); new code uses '@tanstack/react-query'
+import { useQuery } from 'react-query';
+import { hashSync } from 'bcrypt';                   // a native binding for Node.js; the pure-JavaScript 'bcryptjs' is "Compatible to the C++ bcrypt binding on Node.js and also working in the browser." (https://raw.githubusercontent.com/dcodeIO/bcrypt.js/main/README.md, read 2026-09-30)
 
 // HALLUCINATION — wrong import path inside a real package
 import { Switch } from 'react-router-dom';           // removed in v6; use Routes
-import { z } from 'zod/schemas';                     // no such subpath — Zod's real subpaths are 'zod/v4', 'zod/v4-mini', 'zod/v3'
+import { z } from 'zod/schemas';                     // no such subpath: zod 4.6.5's "exports" include "./v4", "./v4-mini", "./v3" and "./mini", and no "./schemas" (https://registry.npmjs.org/zod/latest, read 2026-09-30)
 
-// VERIFICATION
+// VERIFICATION (read-only; the wrapper's npm recipe is the full check)
 //   npm view react-smart-cache version
-//   → 'npm ERR! 404'  → category: hallucinated_import
-//   npm view react-router-dom dist-tags
-//   → look at .exports for the actual subpaths
+//   → npm 11 reports a 404 as "npm error code E404" (seen from npm i in https://github.com/npm/cli/issues/8736, npm 11.6.2; npm view's own output not observed) → category: hallucinated_import
+//   npm view react-router-dom exports --json
+//   → the package's actual subpaths
 ```
 
 ### Python (pip / PyPI)
 
 ```python
+# Python 3.12 and later; checked against Django's documentation, FastAPI's documentation and source directory, requests' documentation and source, and PyPI's answers, read 2026-09-30
 # HALLUCINATION — package doesn't exist on PyPI
-import huggingface_cli                          # Lasso's classic test — empty package was registered later
+import huggingface_cli                          # Lasso's classic test — empty package was registered later; PyPI answers 404 for huggingface-cli today (https://pypi.org/pypi/huggingface-cli/json, read 2026-09-30)
 from email_validator_pro import validate        # PyPI: not found
 from django_security_audit import scan          # PyPI: not found
 
 # HALLUCINATION — wrong submodule inside a real package
-from django.core.validators import validate_strong_password   # Django has no such validator
-from fastapi.security.advanced import OAuth3                  # No 'advanced' submodule
+from django.core.validators import validate_strong_password   # Django has no such validator; its password check is validate_password(password, user=None, password_validators=None) (https://docs.djangoproject.com/en/5.2/topics/auth/passwords/, read 2026-09-30)
+from fastapi.security.advanced import OAuth3                  # No 'advanced' submodule: the fastapi/security directory holds __init__.py, api_key.py, base.py, http.py, oauth2.py, open_id_connect_url.py and utils.py (https://api.github.com/repos/fastapi/fastapi/contents/fastapi/security, read 2026-09-30)
 
 # HALLUCINATION — wrong signature on a real method
 import requests
 requests.get(url, json_body=payload)            # 'json_body' is not a kwarg; it's 'json='
 
-# VERIFICATION
-#   pip index versions huggingface_cli
-#   python -c "import django.core.validators as m; print(dir(m))"
-#   python -c "import inspect, requests; print(inspect.signature(requests.get))"
+# VERIFICATION (read-only: never import a package to inspect it)
+#   the wrapper's PyPI recipe, run on the distribution name (an import name is not a distribution name)
+#   read the installed source or .pyi stub of django.core.validators and search it for the name
+#   on the main branch, def get(url: _t.UriType, params: _t.ParamsType = None, **kwargs: Unpack[_t.GetKwargs]) -> Response,
+#   and GetKwargs in src/requests/_types.py declares json: JsonType and nothing named json_body
+#   (https://raw.githubusercontent.com/psf/requests/main/src/requests/_types.py); request's docstring has
+#   ":param json: (optional) A JSON serializable Python object to send in the body of the :class:`Request`."
+#   (https://raw.githubusercontent.com/psf/requests/main/src/requests/api.py); both read 2026-09-30; released versions' typing not checked
 ```
 
 ### C# / .NET (NuGet)
 
 ```csharp
+// C# / .NET 9; checked against Microsoft Learn, the Stripe.net source and the NuGet flat-container version list, read 2026-09-30
 // HALLUCINATION — NuGet package does not exist
 using NewtonsoftEx.AdvancedJson;                 // NuGet: not found
-using Stripe.Checkout.PaymentPro;                // Stripe.net has no 'PaymentPro' namespace
+using Stripe.Checkout.PaymentPro;                // Stripe.net's Services/Checkout folder holds only Sessions and SessionLineItems, no PaymentPro (https://github.com/stripe/stripe-dotnet/tree/master/src/Stripe.net/Services/Checkout, read 2026-09-30); its SessionService.cs declares namespace Stripe.Checkout, and "PaymentPro" does not appear in it (https://raw.githubusercontent.com/stripe/stripe-dotnet/master/src/Stripe.net/Services/Checkout/Sessions/SessionService.cs, read 2026-09-30); the rest of the repository was not searched
 
 // HALLUCINATION — wrong namespace inside a real package
-using EntityFrameworkCore.AsyncQueries;          // No such namespace; async is built into EF Core
+using EntityFrameworkCore.AsyncQueries;          // Wrong namespace: "The EF Core async extension methods are defined in the `Microsoft.EntityFrameworkCore` namespace." (https://learn.microsoft.com/en-us/ef/core/miscellaneous/async, read 2026-09-30); whether any package declares EntityFrameworkCore.AsyncQueries was not checked
 
 // HALLUCINATION — wrong method signature
 var result = db.Users.FromSqlRaw(query, args, validate: true);  // FromSqlRaw has no 'validate' parameter
 
 // VERIFICATION
-//   dotnet package search NewtonsoftEx.AdvancedJson          (empty result = not on NuGet)
-//   dotnet add package NewtonsoftEx.AdvancedJson             (NU1101 if the id doesn't resolve)
-//   Inspect dotnet reflection on the .dll for the method signature
-//   Also verify NuGet package signature: dotnet nuget verify <pkg>.nupkg
+//   dotnet package search NewtonsoftEx.AdvancedJson --exact-match   (empty result = not on NuGet; .NET 8.0.2xx software development kit and later; https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-package-search, read 2026-09-30)
+//   https://api.nuget.org/v3-flatcontainer/newtonsoftex.advancedjson/index.json answered status 404 on 2026-09-30
+//   Never use dotnet add package to test a name
+//   Read the method's signature in the library's interface reference, never by loading the assembly
+//   Signature: dotnet nuget verify <pkg>.nupkg — look for an author signature, not only a signature
 ```
 
 ### Java (Maven Central)
 
 ```java
 // HALLUCINATION — Maven coordinates don't resolve
-import org.apache.commons.security.PasswordValidator;   // commons-security doesn't exist
+import org.apache.commons.security.PasswordValidator;   // no org.apache.commons:commons-security and no class of this name on Maven Central; an artifact called commons-security exists under three other groups, none of them org.apache.commons (https://search.maven.org/solrsearch/select?q=a:commons-security&rows=20&wt=json, read 2026-09-30)
 // pom.xml: <artifactId>spring-boot-starter-security-advanced</artifactId>   ← not found
 
-// HALLUCINATION — wrong method on a real class
-String json = ObjectMapper.builder().build().writeValueAsJson(obj);  // Jackson is writeValueAsString
+// HALLUCINATION — two invented calls on a real class (Java 21 and later; Jackson 2.18; checked against the library source, not compiled)
+String json = ObjectMapper.builder().build().writeValueAsJson(obj);  // Jackson 2.18's ObjectMapper declares neither a static builder() nor writeValueAsJson (https://raw.githubusercontent.com/FasterXML/jackson-databind/2.18/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java, read 2026-09-30); the builder is JsonMapper.builder() (https://raw.githubusercontent.com/FasterXML/jackson-databind/2.18/src/main/java/com/fasterxml/jackson/databind/json/JsonMapper.java, line 113, read 2026-09-30)
+// In Jackson 3 too, ObjectMapper declares no static builder(); the only "static builder()" in its source is a comment (https://raw.githubusercontent.com/FasterXML/jackson-databind/3.x/src/main/java/tools/jackson/databind/ObjectMapper.java, read 2026-09-30), and JsonMapper.java in the same branch declares it at line 151 (https://raw.githubusercontent.com/FasterXML/jackson-databind/3.x/src/main/java/tools/jackson/databind/json/JsonMapper.java, read 2026-09-30)
+// SAFE — the form the jackson-databind readme shows: ObjectMapper mapper = new ObjectMapper(); then mapper.writeValueAsString(...) (https://raw.githubusercontent.com/FasterXML/jackson-databind/2.18/README.md, read 2026-09-30)
+String json = new ObjectMapper().writeValueAsString(obj);
 
-// VERIFICATION
-//   mvn dependency:resolve   (will fail with [ERROR] Could not find artifact)
-//   curl -I "https://repo1.maven.org/maven2/<groupId-path>/<artifactId>/<version>/"
+// VERIFICATION (read-only; the wrapper's Maven Central recipe is the full check)
+//   https://repo1.maven.org/maven2/org/apache/commons/commons-security/maven-metadata.xml answered status 404 on 2026-09-30
+//   Central's search guide documents a class-name search, fc:, that "Returns a list of artifacts, down to the specific version containing the class" (https://central.sonatype.org/search/rest-api-guide/, read 2026-09-30);
+//   https://search.maven.org/solrsearch/select?q=fc:org.apache.commons.security.PasswordValidator&rows=20&wt=json answered numFound 0 on 2026-09-30
+//   Never run mvn dependency:resolve to test a name
 //   Verify GPG: gpg --verify <jar>.asc <jar>   (against publisher's known key)
-//   javap -p <Class>   → list declared methods
+//   javap -p -cp <jar> <fully.qualified.Class>   → "Shows all classes and members" (https://docs.oracle.com/en/java/javase/21/docs/specs/man/javap.html, read 2026-09-30); javap disassembles class files already on disk ("disassemble one or more class files", same page)
 ```
 
 ### Go modules
 
 ```go
+// Go (outside the seven required languages, so no version is named); checked against the module proxy and pkg.go.dev, read 2026-09-30
 // HALLUCINATION — module path doesn't exist
 import "github.com/uber-go/cachepro"             // not in goproxy
-import "go.opentelemetry.io/otel/exporters/jaeger-pro"   // Jaeger exporter was deprecated in 2023; never had a 'pro'
+import "go.opentelemetry.io/otel/exporters/jaeger-pro"   // Jaeger exporter was deprecated in 2023 (https://pkg.go.dev/go.opentelemetry.io/otel/exporters/jaeger, read 2026-09-30); https://proxy.golang.org/go.opentelemetry.io/otel/exporters/jaeger-pro/@v/list answered status 404 on 2026-09-30
 
-// HALLUCINATION — wrong import subpath inside real module
-import "github.com/aws/aws-sdk-go-v2/secrets"    // it's '.../service/secretsmanager'
+// HALLUCINATION — wrong import path; the real code is a separate module
+import "github.com/aws/aws-sdk-go-v2/secrets"    // it's the separate module 'github.com/aws/aws-sdk-go-v2/service/secretsmanager' (https://proxy.golang.org/github.com/aws/aws-sdk-go-v2/service/secretsmanager/@v/list, read 2026-09-30)
 
 // HALLUCINATION — wrong function signature
 client.GetObject(ctx, bucket, key)               // v2 takes &s3.GetObjectInput{}, not positional args
 
 // VERIFICATION
 //   go list -m github.com/uber-go/cachepro@latest        (will fail if missing)
-//   go mod download github.com/uber-go/cachepro          (sumdb check)
+//   https://proxy.golang.org/github.com/uber-go/cachepro/@v/list answered status 404 on 2026-09-30
+//   Never run go mod download to test a name: it "downloads the named modules into the module cache" (https://go.dev/ref/mod, read 2026-09-30)
 //   Check pkg.go.dev/<module> for actual exported functions
 ```
 
 ### Rust (Cargo / crates.io)
 
 ```rust
+// Rust (outside the seven required languages, so no edition is named); checked against the Rust Reference, docs.rs and crates.io's answers, read 2026-09-30
 // HALLUCINATION — crate doesn't exist on crates.io
-use tokio_advanced::runtime::SmartRuntime;       // crates.io: not found
-use serde_json_ext::Value;                       // not found
+use tokio_advanced::runtime::SmartRuntime;       // crates.io: status 404 at https://index.crates.io/to/ki/tokio_advanced (read 2026-09-30)
+
+// LOOKS INVENTED, IS REGISTERED — serde_json_ext is on crates.io; its index entry lists version "0.1.0"
+// (https://index.crates.io/se/rd/serde_json_ext, read 2026-09-30): a plausible name that got registered
+use serde_json_ext::Value;
 
 // HALLUCINATION — wrong path inside a real crate
 use reqwest::async_client::AsyncClient;          // it's reqwest::Client; the blocking client is reqwest::blocking::Client behind the "blocking" feature
@@ -190,18 +223,21 @@ use reqwest::async_client::AsyncClient;          // it's reqwest::Client; the bl
 // Cargo.toml: tokio = { version = "1", features = ["full-async"] }   ← 'full-async' is not a real feature
 
 // VERIFICATION
-//   cargo search tokio_advanced                          (empty result = hallucinated)
+//   Do not run: cargo search tokio_advanced                          (a "textual search" returning up to 10 results by default — "default: 10, max: 100", https://doc.rust-lang.org/cargo/commands/cargo-search.html, read 2026-09-30 — so a hit is not an exact-name match; use the wrapper's crates.io recipe)
 //   cargo info reqwest                                    (metadata + features; use docs.rs/<crate> for the exported API)
 //   Crates have been-yanked check via crates.io API:
-//     curl https://crates.io/api/v1/crates/<name>/<version> | jq .version.yanked
+//     curl -A '<application> (<contact>)' https://crates.io/api/v1/crates/<name>/<version> | jq .version.yanked
+//     (crates.io requires "a user-agent header that allows us to uniquely identify your application" and "a maximum of 1 request per second", https://rust-lang.github.io/rfcs/3463-crates-io-policy-update.html, read 2026-09-30)
+//   The package name can differ from the name in a use path: hyphens are disallowed in crate names, and "when `Cargo.toml` doesn't specify a crate name, Cargo will transparently replace `-` with `_`" (https://doc.rust-lang.org/reference/items/extern-crates.html, read 2026-09-30); read the name from Cargo.toml
 ```
 
 ### SQL — Postgres extensions
 
 ```sql
--- HALLUCINATION — extension does not exist in any Postgres distribution
-CREATE EXTENSION pg_advanced_search;             -- not in core, not in contrib, not on PGXN
-CREATE EXTENSION pgvector_pro;                   -- pgvector exists; 'pgvector_pro' does not
+-- SQL / PostgreSQL 18; checked against the PostgreSQL 18 documentation, PGXN's answers and the pgvector readme, read 2026-09-30
+-- HALLUCINATION — invented extension names
+CREATE EXTENSION pg_advanced_search;             -- not among PostgreSQL 18's supplied modules in Appendix F (https://www.postgresql.org/docs/18/contrib.html) and not on PGXN (the PostgreSQL Extension Network): https://api.pgxn.org/dist/pg_advanced_search.json answered status 404, while https://api.pgxn.org/dist/pair.json answered 200; all read 2026-09-30
+CREATE EXTENSION pgvector_pro;                   -- the pgvector project's extension is created with CREATE EXTENSION vector; (https://raw.githubusercontent.com/pgvector/pgvector/master/README.md, read 2026-09-30)
 
 -- HALLUCINATION — function does not exist on a real extension
 SELECT pgcrypto.encrypt_aes_gcm(data, key);      -- pgcrypto has pgp_sym_encrypt, not encrypt_aes_gcm
@@ -210,111 +246,137 @@ SELECT pgcrypto.encrypt_aes_gcm(data, key);      -- pgcrypto has pgp_sym_encrypt
 CREATE INDEX idx ON users USING hash_advanced (email);   -- 'hash_advanced' is not a real access method
 
 -- VERIFICATION
---   SELECT * FROM pg_available_extensions WHERE name = 'pg_advanced_search';   (empty = hallucinated)
---   \dx+ pgcrypto                                                              (lists actual functions)
---   SELECT amname FROM pg_am;                                                   (valid access methods)
+--   SELECT * FROM pg_available_extensions WHERE name = 'pg_advanced_search';   (empty = not installable on this server; the view "lists the extensions that are available for installation", https://www.postgresql.org/docs/current/view-pg-available-extensions.html, read 2026-09-30)
+--   \dx+ pgcrypto                                                              (for installed extensions only: "all the objects belonging to each matching extension are listed", https://www.postgresql.org/docs/current/app-psql.html, read 2026-09-30)
+--   SELECT amname FROM pg_am WHERE amtype = 'i';                                                   (index access methods; amtype is "t = table (including materialized views), i = index", https://www.postgresql.org/docs/current/catalog-pg-am.html, read 2026-09-30)
 ```
 
-### C / C++ — explicitly out of scope
+### C / C++ — registry checks through Conan and vcpkg only
 
-C/C++ have no centralized package registry equivalent to npm/PyPI/Maven/NuGet/crates.io/goproxy. Dependencies are vendored via Conan, vcpkg, system packages (apt/dnf/brew), or git submodules — each with its own attestation model. The "verify against the registry" technique that anchors this skill does not have a single authoritative target in the C/C++ ecosystem. **Out of scope for this skill.** For C/C++ code review, use [[security/sast-scanner]] which handles the language directly and defers dependency verification to the build system. If the user has a specific Conan/vcpkg package to verify, use Bash to query the relevant central index manually.
+C and C++ have no single registry that every project uses, but two package managers keep a central catalogue that a name can be checked against. ConanCenter is "a central public repository where the community contributes packages for popular open-source libraries", with its recipes in https://github.com/conan-io/conan-center-index (https://docs.conan.io/2/introduction.html, read 2026-09-30). vcpkg "hosts a selection of libraries packaged into ports at https://github.com/Microsoft/vcpkg. This collection of ports is called the curated registry", each port in its own `ports/<name>` directory (https://learn.microsoft.com/en-us/vcpkg/concepts/registries, read 2026-09-30). System packages and vendored code have no registry to check. Spracklen and colleagues measured Python and JavaScript only, noting that "Java, C, or C++ do not rely on a centralized open-source repository" (https://www.usenix.org/system/files/usenixsecurity25-spracklen.pdf, page 3692, read 2026-09-30). Record a Conan or vcpkg dependency's name under unknowns as not checked, record system and vendored libraries the same way, and use [[security/sast-scanner]] for the language itself. The wrapper has no Conan or vcpkg recipe, so the addresses below are observed facts, like those for NuGet and Go, not recipes to run.
+
+```c
+/* C17 (OpenSSL 3.0 or later). Checked against OpenSSL's manual pages and its exported-symbol list. Compiled with Apple clang 21
+   (clang -std=c17 -Wall -Wextra -pedantic -c) on 2026-09-30 against stand-in type declarations, since OpenSSL's headers were
+   not installed: the three SAFE declarations compile; the invented call is rejected as a call to an undeclared function
+   (.ctoc/audit/improvement-run-notes/s4-skill-round3-session-runs.md). That shows only that the three declarations are valid C17: without
+   OpenSSL's headers every function, real or invented, is undeclared, so that OpenSSL has no EVP_Q_encrypt rests on the
+   exported-symbol list and manual page cited below. */
+
+/* The two catalogues, read 2026-09-30:
+     https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes/zlib/config.yml            answered status 200
+     https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes/libfastjson_pro/config.yml answered status 404
+     https://raw.githubusercontent.com/microsoft/vcpkg/master/ports/fmt/vcpkg.json                            answered status 200
+     https://raw.githubusercontent.com/microsoft/vcpkg/master/ports/libfastjson-pro/vcpkg.json                answered status 404
+   A 404 means "not in that catalogue", not "exists nowhere": a private Conan remote or vcpkg registry can hold the name. */
+
+/* HALLUCINATION — an invented function on a real library */
+EVP_Q_encrypt(NULL, "AES-256-GCM", NULL, key, iv, in, inlen, out, &outlen);
+/* OpenSSL exports exactly two functions whose names begin EVP_Q_, EVP_Q_digest and EVP_Q_mac, and no EVP_Q_encrypt
+   (https://raw.githubusercontent.com/openssl/openssl/master/util/libcrypto.num, read 2026-09-30); its manual page for the
+   cipher routines has no function beginning "EVP_Q_" (https://raw.githubusercontent.com/openssl/openssl/master/doc/man3/EVP_EncryptInit.pod,
+   read 2026-09-30). The name copies EVP_Q_digest(), "a quick one-shot digest function", one of the functions that were
+   "added in OpenSSL 3.0" (https://raw.githubusercontent.com/openssl/openssl/master/doc/man3/EVP_DigestInit.pod, read 2026-09-30). */
+
+/* SAFE — the cipher routines that manual page declares:
+     int EVP_EncryptInit_ex2(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type, const unsigned char *key, const unsigned char *iv, const OSSL_PARAM params[]);
+     int EVP_EncryptUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl, const unsigned char *in, int inl);
+     int EVP_EncryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl);
+   These are the declarations only, not a working Advanced Encryption Standard in Galois/Counter Mode (AES-GCM) program: tag handling, EVP_CIPHER_CTX_new and EVP_aes_256_gcm were
+   not checked for this file, and an AES-GCM example without the authentication-tag step would teach broken cryptography. */
+```
+
+```cpp
+// C++23. The two calls below were compiled with Apple clang 21 (clang++ -std=c++23) on 2026-09-30
+// (.ctoc/audit/improvement-run-notes/s4-skill-round2-session-runs.md).
+
+// HALLUCINATION — a member function std::vector does not have
+if (v.contains(x)) { /* ... */ }   // the class synopsis in [vector.overview] declares no member named contains (https://eel.is/c++draft/vector.overview, read 2026-09-30); on a std::vector<int> clang reports "no member named 'contains' in 'std::vector<int>'"
+
+// SAFE — the algorithm, since C++23, header <algorithm> (https://en.cppreference.com/w/cpp/algorithm/ranges/contains, read 2026-09-30); it compiles and runs
+if (std::ranges::contains(v.begin(), v.end(), x)) { /* ... */ }   // [alg.contains] returns "ranges::find(std::move(first), last, value, proj) != last" (https://eel.is/c++draft/alg.contains, read 2026-09-30)
+```
 
 ## Detection Methods
 
 ### 1. Package existence + signature
-```bash
-# npm — exists + provenance attestation
-npm view <pkg> --json 2>/dev/null | jq '{name, version, attestations: .dist.attestations}'
-# PyPI — exists + Trusted Publisher attestation (PEP 740, served by the Integrity API)
-pip index versions <pkg> 2>/dev/null && \
-  curl -s "https://pypi.org/integrity/<pkg>/<version>/<filename>/provenance"
-# Maven Central — exists + GPG signature
-curl -fI "https://repo1.maven.org/maven2/<g>/<a>/<v>/<a>-<v>.jar.asc"
-# NuGet — exists + author/repo signature
-dotnet nuget verify <pkg>.nupkg
-# Go — exists + sumdb
-GOPROXY=https://proxy.golang.org go list -m <module>@<version>
-# Cargo — exists + not yanked
-curl -s "https://crates.io/api/v1/crates/<name>/<v>" | jq '.version.yanked'
-# Postgres extension — exists in target Postgres version
-psql -c "SELECT * FROM pg_available_extensions WHERE name = '<ext>'"
-```
+
+Existence: use the wrapper's read-only recipes (`agents/ai-quality/hallucination-detector.md`, "Detection Methods", section 1) for npm, PyPI, crates.io and Maven Central. They query the registry and never install, import or run what they check, and they check a name's characters before it reaches a shell, because the name comes from the code under review. The wrapper has no recipe for NuGet, the Go module proxy or Postgres extensions, so names from those are recorded as not checked; the addresses under "2026 Best Practices" above are observed facts about those registries, not recipes to run.
+
+Provenance and signatures, read-only:
+- npm: the wrapper's npm recipe prints whether the latest version carries provenance (`dist.attestations`) and was published through trusted publishing (`_npmUser.trustedPublisher`), fields that https://registry.npmjs.org/sigstore/latest carried on 2026-09-30. It reads presence only; "You can verify the provenance attestations of downloaded packages with … `npm audit signatures`" (https://docs.npmjs.com/generating-provenance-statements, read 2026-09-30).
+- PyPI: `GET https://pypi.org/integrity/<project>/<version>/<filename>/provenance` answers 404 when a file has no provenance (https://docs.pypi.org/api/integrity/, read 2026-09-30); https://pypi.org/integrity/sigstore/4.5.0/sigstore-4.5.0-py3-none-any.whl/provenance answered status 200 both with and without the header `Accept: application/vnd.pypi.integrity.v1+json` on 2026-09-30.
+- Maven Central: every published file is signed, so check the key, not the file: `gpg --verify <jar>.asc <jar>` against the publisher's known key.
+- NuGet: `dotnet nuget verify <pkg>.nupkg`, looking for an author signature.
+- Postgres: an extension is checked only on a server you are allowed to query, never by installing it; `pg_available_extensions` answers for that server alone.
 
 ### 2. AST / type-stub verification
-```javascript
-// JS/TS — inspect actual exports
-const pkg = require('package-name');
-console.log(Object.keys(pkg));
-```
 
-```python
-# Python — inspect signatures from the installed version, not from training data
-import inspect, importlib
-mod = importlib.import_module('package_name')
-print([n for n in dir(mod) if not n.startswith('_')])
-print(inspect.signature(mod.some_function))
-```
+Read the installed copy as files; never `require`, `import` or `importlib.import_module` a package named in the code under review, because an unverified name may be an attacker's package. The wrapper's "Export Verification" section gives the order: for JavaScript and TypeScript, the installed `package.json`, its "exports"/"types" entry, every re-export, then a search for the member; for Python, the installed source or `.pyi` stub file; with no installed copy, the member stays unsettled and is never installed to settle it. Two limits the wrapper states apply here too: a member found in the installed copy settles the member only when the package's name is settled as well, because a package's declaration files come from whoever published it; and an installed copy has already been through its install step, so read the `scripts` object in its `package.json` and hand every entry whose name contains `install` to dependency-auditor, which owns install-time hook abuse.
 
 ### 3. Cross-claim consistency
 For every function in AI-generated code, compare the **signature** ↔ **docstring/comments** ↔ **a sample call**. Disagreement on argument names, types, or return shape is a hallucination signal.
 
 ### 4. RAG-verified citations
-When code or comments cite a CVE, benchmark number, paper, or version: verify via an authoritative source through retrieval (NVD, vendor docs, paper PDF). Fabricated citations are common in AI-generated security claims.
+When code or comments cite a vulnerability identifier, a benchmark number, a paper or a version, verify it against an authoritative source: the National Vulnerability Database, vendor documentation, or the paper itself. For a vulnerability identifier, the Common Vulnerabilities and Exposures program's record service answered status 404 for an identifier with no record (https://cveawg.mitre.org/api/cve/CVE-2025-99999, read 2026-09-30).
 
 ## Tool Integration (2026)
 
-The detection stack has matured around four layers — registry-check, malicious-package detection, signature verification, and supply-chain health — that compose into a single pre-merge gate.
+The table groups the tools into five layers; the gate below runs them in order. The European Union Agency for Cybersecurity says of the tools and commands in its best-practice section (section 4) that they are "illustrative examples only and do not represent a recommendation of specific tools" (version 1.1, page 16, https://www.enisa.europa.eu/sites/default/files/2026-03/ENISA%20Technical%20Advisory%20-%20Package_Managers_Final.pdf, read 2026-09-30); the tools named here are meant the same way.
 
 | Layer | Tools | Purpose |
 |---|---|---|
-| Existence + audit | `npm audit`, `pip-audit`, `cargo audit`, `go list -m`, `dotnet list package --vulnerable`, `mvn dependency:resolve` | Does it resolve? Any known CVEs? |
-| Malicious-package detection | **Socket.dev**, **Snyk Open Source**, **Aikido Intel**, **GitHub Advisory Database** | Behavioral analysis catches install-script malware, typosquatting and slopsquatting names; Socket also scores post-install scripts and network calls |
-| Slopsquatting-specific | Community **slopcheck** tools (e.g. the npm and Python CLIs of that name) and public known-hallucination corpora (e.g. the DepScope hallucinations dataset) | Cross-check imports against a corpus of names already observed as LLM hallucinations before install |
-| Signature / provenance | **Sigstore** (`cosign verify`, Rekor lookup), **npm provenance**, **PyPI Trusted Publishers (PEP 740)**, **Maven GPG**, **NuGet signing**, **Go sumdb** | Verify the artifact's chain back to the source repo |
-| OSS health | **OpenSSF Scorecard**, **deps.dev**, **Dependency-Track** | Maintenance signal — abandoned packages are slopsquatting bait |
+| Existence + audit | the wrapper's read-only registry recipes for existence; for known vulnerabilities `npm audit`, `pip-audit`, `cargo audit`, `govulncheck`, and `dotnet package list --vulnerable` (the "noun first" form introduced in .NET 10; `dotnet list package --vulnerable` on .NET 9 and earlier, https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-package-list, read 2026-09-30) | Does it resolve? Any known vulnerabilities? |
+| Malicious-package detection | **Socket.dev**, **Snyk Open Source**, **Aikido Intel**, **GitHub Advisory Database** | Report packages already identified as malicious. The GitHub Advisory Database carries "advisories about malicious open source packages", published "from the npm security team and the OpenSSF Malicious Packages repository" (https://docs.github.com/en/code-security/security-advisories/working-with-global-security-advisories-from-the-github-advisory-database/about-the-github-advisory-database, read 2026-09-30); Socket's "Known malware" alert means the package version "has been flagged either by Socket's AI scanner and confirmed by our threat research team, or is listed as malicious in security databases and other sources" (https://socket.dev/alerts/malware, read 2026-09-30); Aikido's page says "We detect malware and vulnerabilities in open-source ecosystems within minutes." and, in the text read, names no detection method (https://intel.aikido.dev, read 2026-09-30); how Snyk detects malicious packages was not checked, because https://docs.snyk.io/manage-risk/prioritize-issues-for-fixing/malicious-packages answered with a page-not-found page on 2026-09-30 |
+| Slopsquatting-specific | **slopcheck** — three unrelated projects carry this name: https://github.com/experimental-gains/slopcheck (the one described in the next column); the PyPI distribution `slopcheck`, version 0.6.1, whose project address is https://github.com/0xToxSec/slopcheck (https://pypi.org/pypi/slopcheck/json); and the npm package `slopcheck`, version 0.2.0, maintainer mattschaller, created 2026-03-08, repository github.com/mattschaller/slopcheck (https://registry.npmjs.org/slopcheck); all read 2026-09-30. Installing "slopcheck" by bare name from PyPI or npm gets one of the other two. The shared name is itself the lesson: install a checking tool by its repository or exact registry entry, and check that entry as you would any other name; and the DepScope hallucinations dataset (https://github.com/cuttalo/depscope-hallucinations-dataset) | experimental-gains' slopcheck: "Catch hallucinated / slopsquatted dependency names before you `pip install` or `npm install` them." It asks the live PyPI and npm registries, the same question as the wrapper's recipes. DepScope: a "Public corpus of verified LLM-generated package-name hallucinations observed in production AI coding agent traffic", licensed Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International. Both read 2026-09-30 |
+| Signature / provenance | **Sigstore** (`cosign verify`, Rekor lookup), **npm provenance**, **PyPI attestations (Python Enhancement Proposal 740)**, **Maven Central's required signatures**, **NuGet signing**, **Go's checksum database** | Verify the artifact's chain back to the repository that built it; a valid attestation shows which repository and workflow built a package, not that it is the repository the code meant (this file's own reasoning, since anyone can publish with provenance from their own repository) |
+| Open-source software health | **OpenSSF Scorecard**, **deps.dev**, **Dependency-Track** | Health signals; with Scorecard, read individual checks and their risk levels, such as Maintained and Signed-Releases, never the overall score against a threshold; deps.dev helps "better understand the structure, construction, and security of open source software packages" (https://docs.deps.dev/, read 2026-09-30); Dependency-Track is "an intelligent Component Analysis platform that allows organizations to identify and reduce risk in the software supply chain" (https://docs.dependencytrack.org/, read 2026-09-30) |
 
-Recommended pre-merge gate (CI):
+Recommended pre-merge gate for continuous integration. Check names, and scan for packages already known to be malicious, before anything is installed, which matches the order in the European Union Agency for Cybersecurity's advisory: package selection comes before integration, and its vulnerability scans run "prior to installation or during dependency review" (section 4.1.2, page 18). The advisory also names "native package manager commands such as npm ci --ignore-scripts for dependency integrity and install-script control" (section 5.1, page 25), with the caution "Disabling scripts may impact packages and functionality." (section 4.2.1, page 19) (https://www.enisa.europa.eu/sites/default/files/2026-03/ENISA%20Technical%20Advisory%20-%20Package_Managers_Final.pdf, version 1.1, March 2026, read 2026-09-30). The reasons: `npm ci` runs lifecycle scripts including `preinstall`, `install` and `postinstall` (https://docs.npmjs.com/cli/v12/using-npm/scripts, read 2026-09-30), installing with pip "involves running arbitrary code from distributions" (https://pip.pypa.io/en/stable/topics/secure-installs/, read 2026-09-30), and "`pip-audit -r INPUT` is functionally equivalent to `pip install -r INPUT`" (https://github.com/pypa/pip-audit, read 2026-09-30).
 
 ```bash
-# 1. Resolve and audit
-npm ci && npm audit --omit=dev
-pip install -r requirements.txt && pip-audit
+# 1. Names first, read-only: run the wrapper's registry recipes on every new dependency name
+#    (agents/ai-quality/hallucination-detector.md, "Detection Methods", section 1).
+#    The recipes print their verdict as the first line and exit 0 whatever they found (only a signal that stops them gives another status; npm's DOWNLOADS line is not a verdict):
+#    fail the job unless the verdict line begins REGISTERED and a look-alike check then cleared the name.
+
+# 2. Malicious-package detection before anything is installed (Socket as example; it reads the manifest files)
+socket ci                       # alias for 'socket scan create --report'; non-zero exit when alerts violate your security or license policy
+
+# 3. Install without lifecycle scripts, then audit for known vulnerabilities (only after steps 1 and 2 passed),
+#    in a job with no secrets, a read-only token, and no cache or artifact that a later job restores, because pip-audit runs the same code an install would
+npm ci --ignore-scripts && npm audit   # all dependencies, development ones included unless NODE_ENV is production, which makes npm's omit option default to dev (https://docs.npmjs.com/cli/v12/commands/npm-audit, read 2026-09-30): they run on developer and pipeline machines too; the exit code depends on the audit-level configuration
+pip-audit -r requirements.txt   # runs the same code an install would, and is not a malware check
 cargo audit
-go list -m -u all && govulncheck ./...
-
-# 2. Slopsquatting / known-hallucination corpus
-#    (slopcheck-family tools scan the repo's manifests/config for hallucinated names;
-#     check the specific tool's --help for its exact invocation and flags)
-slopcheck .
-
-# 3. Malicious-package detection (Socket as example)
-socket ci                       # alias for 'socket scan create --report'; non-zero exit on unhealthy alerts
+govulncheck ./...
 
 # 4. Signature / provenance
-npm view <pkg> --json | jq '.dist.attestations'   # must be non-empty for critical deps
-cosign verify-attestation --type slsaprovenance <artifact>
+npm audit signatures
+cosign verify-attestation --type slsaprovenance --certificate-identity <id> --certificate-oidc-issuer <issuer> <image>   # container images only
 
-# 5. Health
-scorecard --repo=github.com/<org>/<pkg> --format=json | jq '.score'   # < 5 = elevated risk
+# 5. Health (authenticate first, as the Scorecard README requires)
+scorecard --repo=github.com/<org>/<pkg> --format=json   # <org>/<pkg>: a repository you have reason to trust, never the one a package's metadata names
 ```
 
-Any layer reporting **hallucinated, unsigned, or unscored** for a critical dependency = `severity: critical` letter to CTO Chief.
+Install every tool this gate names by its repository or exact registry entry, the lesson of the `slopcheck` name above, and check that entry as you would any other name. Sources, all read 2026-09-30: `--ignore-scripts` means "npm does not run scripts specified in package.json files", but "commands explicitly intended to run a particular script, such as `npm start`, `npm stop`, `npm restart`, `npm test`, and `npm run` will still run their intended script if `ignore-scripts` is set, but they will _not_ run any pre- or post-scripts." (https://docs.npmjs.com/cli/v12/commands/npm-ci), and, this file's own reasoning, a package's own code still runs whenever it is loaded; for `npm audit`, "If vulnerabilities were found the exit code will depend on the `audit-level` config." (https://docs.npmjs.com/cli/v12/commands/npm-audit); pip-audit's documentation says "you **must not** assume that `pip-audit` will **defend** you against malicious packages" (https://github.com/pypa/pip-audit); `socket ci` "is basically an alias to `socket scan create --report`", its exit code is non-zero when the scan "has alerts that violate your security or license policy" and also when there are "no supported manifest files", and its token "needs the `full-scans:create`, `full-scans:list`, and `security-policy:read` permissions" (https://docs.socket.dev/docs/socket-ci); `cosign verify-attestation` is to "Verify an attestation on the supplied container image", and for keyless verification "Either --certificate-identity or --certificate-identity-regexp must be set", and the same holds for the issuer (https://github.com/sigstore/cosign/blob/main/doc/cosign_verify-attestation.md); Scorecard's README says "you must authenticate your requests before running Scorecard" (https://github.com/ossf/scorecard); neither the README nor the checks documentation names a JavaScript Object Notation field for the score or a risk threshold, and each check carries its own risk level instead, for example Maintained, "Risk: `High` (possibly unpatched vulnerabilities)", and Signed-Releases, "Risk: `High` (possibility of installing malicious releases)" (https://raw.githubusercontent.com/ossf/scorecard/main/docs/checks.md, read 2026-09-30). Triage reads those individual checks, never the overall score against a threshold. `go list -m -u all` lists the dependencies "along with the latest version available for each", so it is not an audit (https://go.dev/doc/modules/managing-dependencies). Report what a layer finds as a finding, with the severity the triage table below gives it.
 
 ## Common Hallucinations (curated reference)
 
 ### Package Names (npm/PyPI)
-| Hallucinated | Actual |
+Several of these are real packages chosen for the wrong job, not invented names: report them as stale or wrong for the environment, never as non-existent.
+
+| Written | Prefer |
 |---|---|
 | `react-query` | `@tanstack/react-query` (rename, 2022) |
-| `bcrypt` (browser) | `bcryptjs` (bcrypt is Node-only) |
-| `node-fetch` (Node ≥18) | built-in `fetch` |
-| `huggingface-cli` (PyPI) | `huggingface_hub[cli]` (Lasso's slopsquatting demonstration) |
-| `react-codeshift` | confused fork name; the real tools are `jscodeshift` + `react-codemod` |
+| `bcrypt` where no pre-built binary fits and native builds aren't available | `bcryptjs`: bcrypt is a native add-on whose install script is "node-gyp-build" (https://registry.npmjs.org/bcrypt/latest, read 2026-09-30), and its readme says "Pre-built binaries for various NodeJS versions are made available on a best-effort basis." (https://raw.githubusercontent.com/kelektiv/node.bcrypt.js/master/README.md, read 2026-09-30) |
+| `node-fetch` on Node.js 21 or later (a real package, so stale rather than invented) | built-in `fetch`: Node.js's history table for `fetch` lists version v18.0.0 as "No longer behind `--experimental-fetch` CLI flag." and version v21.0.0 as "No longer experimental." (https://nodejs.org/api/globals.html, read 2026-09-30) |
+| `huggingface-cli` (PyPI; Lasso's slopsquatting demonstration; answers 404 today, https://pypi.org/pypi/huggingface-cli/json, read 2026-09-30) | `huggingface_hub`: "The `huggingface_hub` Python package comes with a built-in CLI called `hf`." (https://huggingface.co/docs/huggingface_hub/guides/cli, read 2026-09-30); version 2.0.0 lists no `cli` extra (https://pypi.org/pypi/huggingface_hub/json, read 2026-09-30) |
+| `react-codeshift` | created 2026-01-14 by a third party, maintainer "debugducky", latest version "1.0.0", with the description "Placeholder to prevent dependency confusion." (the description begins with a symbol) (https://registry.npmjs.org/react-codeshift, read 2026-09-30). That is not a registry hold: the wrapper's npm recipe prints REGISTERED for it, and, this file's own reasoning, its publisher can put anything in the next version; the React team's codemods are the react-codemod collection, run as `npx codemod <framework>/<version>/<transform> --target <path>`, for example `npx codemod react/19/remove-forward-ref --target <path>` (https://raw.githubusercontent.com/reactjs/react-codemod/master/README.md, read 2026-09-30) |
 
 ### Method Names
 | Hallucinated | Actual |
 |---|---|
-| `moment.formatISO()` | `moment().toISOString()` (formatISO is date-fns) |
+| `moment.formatISO()` | `formatISO` is date-fns, not moment. Name the output the code needs instead of offering an equivalent: moment's `toISOString()` converts to Coordinated Universal Time unless called with `keepOffset` true (https://raw.githubusercontent.com/moment/moment/develop/src/lib/moment/format.js, read 2026-09-30), while date-fns `formatISO` returns "The formatted date string (in local time zone)" (https://unpkg.com/date-fns@4.4.0/formatISO.js, read 2026-09-30) |
 | `React.useAutoEffect()` | does not exist |
 | `axios.get(url, { body: ... })` | GET has no body; use `params` |
 | `requests.get(url, json_body=...)` | kwarg is `json=` |
@@ -322,58 +384,17 @@ Any layer reporting **hallucinated, unsigned, or unscored** for a critical depen
 ### Configuration Options
 | Hallucinated | Actual |
 |---|---|
-| `fs.readFileSync(path, { throwOnError: true })` | not a real option |
+| `fs.readFileSync(path, { throwOnError: true })` | not an option that `readFileSync` in Node.js's `lib/fs.js` reads (as the wrapper recorded it on 2026-09-30); a registered virtual-file-system handler receives the options unchanged (see the wrapper's "Configuration Options") |
 | `tokio` feature `full-async` | actual feature is `full` |
 | Postgres `USING hash_advanced` | built-in access methods are `btree, hash, gist, spgist, gin, brin` — no `hash_advanced` |
 
 ## Output Format
 
-```markdown
-## Hallucination Detection Report
-
-### Summary
-| Severity | Count | Required Action |
-|----------|-------|-----------------|
-| CRITICAL | 0     | IMMEDIATE       |
-| HIGH     | 2     | Before Release  |
-| MEDIUM   | 5     | Within Sprint   |
-| LOW      | 12    | Backlog         |
-
-### Verified Issues
-| Type | File | Line | Issue | Registry checked | Confidence |
-|------|------|------|-------|-------------------|------------|
-| Hallucinated import | src/api.ts | 1 | 'react-smart-cache' not on npm | npm registry | High |
-| Fictional function | src/utils.ts | 45 | moment.formatISO() (it's date-fns) | type stubs | High |
-| Wrong import path | api/users.py | 3 | django.core.validators.validate_strong_password | django source | High |
-| Hallucinated CVE | docs/sec.md | 12 | CVE-2025-99999 (not in NVD) | nvd.nist.gov | Critical |
-
-### Detail per finding
-**1. Hallucinated import** (High confidence — npm registry verified)
-- File: `src/api.ts:1`
-- Code: `import { useSmartCache } from 'react-smart-cache'`
-- Verification: `npm view react-smart-cache` → 404
-- Slopsquatting risk: name is plausible; an attacker could register it. Verified against DepScope dataset: not currently malicious, but a typosquat for `react-cache`.
-- Fix: remove import OR replace with `@tanstack/react-query` if caching was the intent
-
-### Verification Status
-| Check | Count |
-|---|---|
-| Imports verified existing | 45 |
-| Imports not found | 3 |
-| Imports signed (provenance/GPG) | 38 |
-| Methods verified against type stubs | 128 |
-| Methods suspicious | 5 |
-| CVE citations verified | 4 |
-| CVE citations fabricated | 1 |
-
-### Recommendations
-1. Remove all three hallucinated imports; do NOT install them speculatively.
-2. Re-verify any AI-generated section that cited CVE-2025-99999 — the citation is fabricated; the underlying claim may also be.
-3. Add `slopcheck` and `socket ci` to PR gates.
-4. Pin remaining deps with provenance attestations where available.
-```
+Return findings in the response format of the agent that dispatched you. For the wrapper that is the dispatch protocol's response (`docs/DISPATCH_PROTOCOL.md`), as `agents/ai-quality/hallucination-detector.md` defines it: its finding types, the registry fields `registry_checked` and `registry_response`, and its confidence rules. Every number in a report comes from checks you ran; never copy an example count.
 
 ## Severity (internal triage vs. refinement-loop output)
+
+**Not running.** The refinement loop that this section and the two after it describe is a design: `docs/REFINEMENT_LOOP.md` says "the loop is **NOT RUNNING** today". Nothing sends the letter described here. Findings go back in the dispatching agent's own format, with the severity that agent's table gives them; the triage table below is what that table follows. The rest of this section is the design as written.
 
 These tiers are the **internal triage view** used when you produce a human-readable scan report. When this skill emits a letter to CTO Chief via the refinement loop, **every finding becomes `severity: critical`** per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire. The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.
 
@@ -386,17 +407,20 @@ These tiers are the **internal triage view** used when you produce a human-reada
 
 The wire severity is always `critical`. Triage tier informs the human-readable report only.
 
+One limit on the LOW row, which applies now: an old package name is not always still in its owner's hands. The Cybersecurity and Infrastructure Security Agency's page for technique T1195.001 says this "may also include abandoned packages, which in some cases could be re-registered by threat actors after being removed by adversaries." (https://www.cisa.gov/eviction-strategies-tool/info-attack/T1195.001 and https://attack.mitre.org/techniques/T1195/001/, both read 2026-09-30). Where the wrapper's recipe prints maintainers (its npm recipe does), triage a renamed library as LOW only when the registry answer read during the check shows the name shares at least one maintainer with the well-known project; otherwise treat the name as a suspected look-alike. Where the recipe prints no maintainers (the PyPI, crates.io and Maven Central recipes), the LOW tier stays, and the limitations say "maintainers not read".
+
 ## Red Lines
 
-- NEVER merge code with unverified imports of "convenient" packages — every import must pass the existence + signature check.
+- NEVER merge code with unverified imports of "convenient" packages — every import must pass the read-only existence check; a signature that every package on its registry carries does not count as a check.
 - NEVER ship AI-generated code without a human-review pass on imports and citations.
 - NEVER trust a CVE ID, benchmark number, or version claim that wasn't retrieved from an authoritative source within this conversation. RAG with span-level verification or reject the claim.
 - NEVER accept a method signature without checking the library's actual API in the resolved version (lockfile-bound, not "latest").
 - NEVER auto-install a hallucinated dependency to "see if it works" — that's exactly the slopsquatting attack path.
+- NEVER `require`, `import` or otherwise load a package named in the code under review to see what it exports; read its installed files instead.
 
 ## Letter schema (refinement-loop output contract)
 
-When emitting a finding via the refinement loop, write the letter with these fields:
+When the refinement loop runs — it does not today (see the note under "Severity") — a letter would carry these fields. The schema's confidence comment is the design's; the confidence rule in force is the one under "2026 Best Practices" ("Multi-technique detection"), which follows the wrapper's table. The wrapper already uses two of them, `registry_checked` and `registry_response`, and the seven `kind` values as its finding types, so they must not be renamed:
 
 ```yaml
 finding_id: <sha256(critic+file+line+kind)[:12]>     # fingerprint for dedup
@@ -418,7 +442,7 @@ registry_response: "HTTP 404"                         # raw evidence
 corroborated_by: [ast-verify, slopcheck]              # other techniques/tools that also flagged it
 slopsquatting_risk: low | medium | high               # plausibility of attacker registering this name
 suggested_fix: "Replace with '@tanstack/react-query' or remove import"
-reference: https://docs.npmjs.com/cli/v10/commands/npm-view
+reference: https://docs.npmjs.com/cli/v12/commands/npm-view
 ```
 
 The integrator uses `confidence` and `corroborated_by` to weight findings. A `confidence: low` single-source finding (e.g. pattern match alone, no registry check) doesn't block phase advancement on its own; corroboration by a second technique escalates. `slopsquatting_risk: high` on an otherwise-low finding still BLOCKS — an attacker-registerable name is a live supply-chain risk regardless of current registry state.
@@ -427,7 +451,7 @@ The integrator uses `confidence` and `corroborated_by` to weight findings. A `co
 
 ## Refinement Loop — critic mode (v6.9.8)
 
-When invoked as a critic by the Iron Loop integrator (see [docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md)), apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
+This mode is a design: nothing invokes this skill as a critic today, because the loop is not running ([docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md): "the loop is **NOT RUNNING** today"). When the Iron Loop integrator does invoke it as a critic, apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):
 
 - Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief.
 - The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.

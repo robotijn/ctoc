@@ -1,0 +1,3496 @@
+{
+  "schema": 1,
+  "path": "agents/ai-quality/hallucination-detector.md",
+  "prerequisite": null,
+  "rounds": [
+    {
+      "round": 1,
+      "date": "2026-09-30",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:cd62423dd93648eebe87823f22ac0614f8e6ae421e88360b42e53c5d42b9185c",
+      "fingerprint_after": "sha256:412d36530695efbf8ce48ff0f9161c5e21047fcfe0553e488bf087027e2aa3ea",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s4-agent-r1-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-agent-r1-research-gaps",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-agent-r1-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-agent-r1-validate-a",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-agent-r1-validate-b",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-agent-r1-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "arXiv library hallucinations LLMs developer queries misspelling fake library names time-related prompts",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "Lasso Security Bar Lanyado AI package hallucinations huggingface-cli empty package downloads research",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "\"pip index is currently an experimental command\" pip source index.py",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "crates.io data access policy crawlers \"1 request per second\" User-Agent sparse index",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "blog.pypi.org project quarantine malware simple index hidden uninstallable",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "PyPI warehouse typosquatting check new project name creation blocked similar to popular project",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "TanStack Query v5 useQuery throwOnError option",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "npm registry scoped package URL encoding",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "PyPI quarantine \"often coupled with prohibiting the Project name from being reused\"",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://arxiv.org/abs/2406.10279",
+          "read_on": "2026-09-30",
+          "bore_on": "Spracklen and colleagues: scope and rates (the skill's 16 models and 576,000 samples; the attack premise)",
+          "outcome": "supported",
+          "quote": "at least 5.2% for commercial models and 21.7% for open-source models",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/html/2406.10279",
+          "read_on": "2026-09-30",
+          "bore_on": "the pre-registration attack, repetition, cross-registry and similarity figures, and how names were extracted (changes F and G)",
+          "outcome": "supported",
+          "quote": "There is no way to definitively determine the required packages from a code snippet alone.",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/html/2501.19012",
+          "read_on": "2026-09-30",
+          "bore_on": "Krishna and colleagues: a name first registered after the training cutoff counts as invented (change G)",
+          "outcome": "supported",
+          "quote": "was first registered after the model's knowledge cutoff date",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2509.22202",
+          "read_on": "2026-09-30",
+          "bore_on": "the term \"slopsquatting\" in the description; version history of the Twist paper",
+          "outcome": "supported",
+          "quote": "expose systems to supply chain threats such as slopsquatting",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/html/2509.22202v4",
+          "read_on": "2026-09-30",
+          "bore_on": "Twist and colleagues: prompt-induced rates and the member-versus-name sentences (changes G and H); the ranges \"0.00% to 0.10%\" and \"1.97% to 6.02%\" are table cells, not running text",
+          "outcome": "supported",
+          "quote": "Library member hallucinations remained consistently low (mostly 1%–5%) across all LLMs.",
+          "error": null
+        },
+        {
+          "url": "https://www.lasso.security/blog/ai-package-hallucinations",
+          "read_on": "2026-09-30",
+          "bore_on": "the empty huggingface-cli package and its downloads (change G)",
+          "outcome": "supported",
+          "quote": "more than 30k authentic downloads",
+          "error": null
+        },
+        {
+          "url": "https://docs.npmjs.com/cli/v11/commands/npm-view",
+          "read_on": "2026-09-30",
+          "bore_on": "what npm view answers for a missing name",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/npm/registry/blob/main/docs/REGISTRY-API.md",
+          "read_on": "2026-09-30",
+          "bore_on": "the registry's not-found response",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/email-validator-pro",
+          "read_on": "2026-09-30",
+          "bore_on": "line 32, \"Made-up package that does not exist on any registry\" (change C)",
+          "outcome": "refuted",
+          "quote": "\"name\": \"email-validator-pro\"",
+          "error": null
+        },
+        {
+          "url": "https://pypi.org/pypi/email-validator-pro/json",
+          "read_on": "2026-09-30",
+          "bore_on": "the same name on PyPI (change C)",
+          "outcome": "supported",
+          "quote": "HTTP 404 Not Found",
+          "error": null
+        },
+        {
+          "url": "https://www.npmjs.com/package/email-validator-pro",
+          "read_on": "2026-09-30",
+          "bore_on": "line 32, second route",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://api.npmjs.org/downloads/point/last-week/email-validator-pro",
+          "read_on": "2026-09-30",
+          "bore_on": "the npm download-count address and its downloads field (changes F and G)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://docs.pypi.org/api/json/",
+          "read_on": "2026-09-30",
+          "bore_on": "the PyPI JSON interface: documented status codes and the downloads field (changes F and G)",
+          "outcome": "supported",
+          "quote": "is always `-1` and should not be used",
+          "error": null
+        },
+        {
+          "url": "https://docs.pypi.org/api/",
+          "read_on": "2026-09-30",
+          "bore_on": "line 71, \"the stable PyPI JSON API\"; caching (change F)",
+          "outcome": "refuted",
+          "quote": "All API requests are cached",
+          "error": null
+        },
+        {
+          "url": "https://docs.pypi.org/api/index-api/",
+          "read_on": "2026-09-30",
+          "bore_on": "Python name normalisation (change F)",
+          "outcome": "supported",
+          "quote": "The project is matched case-insensitively with the `_`, `-` and `.` characters considered equal.",
+          "error": null
+        },
+        {
+          "url": "https://pip.pypa.io/en/stable/news/",
+          "read_on": "2026-09-30",
+          "bore_on": "lines 72-73, pip index versions \"flags as experimental\" (change F)",
+          "outcome": "refuted",
+          "quote": "Remove `experimental` warning from `pip index versions` command.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/pypa/pip/main/src/pip/_internal/commands/index.py",
+          "read_on": "2026-09-30",
+          "bore_on": "lines 72-73, the experimental flag in pip's source",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://crates.io/data-access",
+          "read_on": "2026-09-30",
+          "bore_on": "crates.io access policy",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "the page is rendered in the browser; no content reached the fetch tool"
+        },
+        {
+          "url": "https://rust-lang.github.io/rfcs/3463-crates-io-policy-update.html",
+          "read_on": "2026-09-30",
+          "bore_on": "crates.io request rate and user-agent requirement (change F)",
+          "outcome": "supported",
+          "quote": "a maximum of 1 request per second",
+          "error": null
+        },
+        {
+          "url": "https://doc.rust-lang.org/cargo/reference/registry-index.html",
+          "read_on": "2026-09-30",
+          "bore_on": "the sparse index answer for a crate that does not exist",
+          "outcome": "supported",
+          "quote": "For crates that do not exist, the registry should respond with a 404 \"Not Found\", 410 \"Gone\" or 451 \"Unavailable For Legal Reasons\" code",
+          "error": null
+        },
+        {
+          "url": "https://crates.io/api/v1/crates/tokio_advanced",
+          "read_on": "2026-09-30",
+          "bore_on": "the new Rust example (change C) and the crates.io row (change F)",
+          "outcome": "supported",
+          "quote": "HTTP 404",
+          "error": null
+        },
+        {
+          "url": "https://index.crates.io/to/ki/tokio_advanced",
+          "read_on": "2026-09-30",
+          "bore_on": "the new Rust example (change C)",
+          "outcome": "supported",
+          "quote": "HTTP 404",
+          "error": null
+        },
+        {
+          "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-security/maven-metadata.xml",
+          "read_on": "2026-09-30",
+          "bore_on": "the Maven Central row (change F)",
+          "outcome": "supported",
+          "quote": "HTTP 404",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/nuget/api/package-base-address-resource",
+          "read_on": "2026-09-30",
+          "bore_on": "NuGet: answer for a missing package; no recipe written because the service index address was not read",
+          "outcome": "did-not-bear",
+          "quote": "If the package source has no versions of the provided package ID, a 404 status code is returned.",
+          "error": null
+        },
+        {
+          "url": "https://docs.npmjs.com/policies/unpublish",
+          "read_on": "2026-09-30",
+          "bore_on": "a 404 does not mean a name can never be registered (change F)",
+          "outcome": "supported",
+          "quote": "until 24 hours have passed",
+          "error": null
+        },
+        {
+          "url": "https://docs.npmjs.com/threats-and-mitigations",
+          "read_on": "2026-09-30",
+          "bore_on": "the private-package variant of the attack (change F)",
+          "outcome": "supported",
+          "quote": "A variant of this attack is when a public package is registered with the same name of a private package that an organization is using.",
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/crossenv",
+          "read_on": "2026-09-30",
+          "bore_on": "lines 68-69, npm view as an existence check; the placeholder rule (change F)",
+          "outcome": "refuted",
+          "quote": "security holding package",
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/fs/latest",
+          "read_on": "2026-09-30",
+          "bore_on": "lines 68-69; a built-in name held by npm; a held name can change hands (change F)",
+          "outcome": "refuted",
+          "quote": "we'll probably give it to you if you want it",
+          "error": null
+        },
+        {
+          "url": "https://blog.pypi.org/posts/2024-12-30-quarantine/",
+          "read_on": "2026-09-30",
+          "bore_on": "PyPI removal and name reuse (change F); the first wording \"removals are pretty much coupled\" is not on the page",
+          "outcome": "supported",
+          "quote": "This is often coupled with prohibiting the Project name from being reused",
+          "error": null
+        },
+        {
+          "url": "https://packaging.python.org/en/latest/discussions/distribution-package-vs-import-package/",
+          "read_on": "2026-09-30",
+          "bore_on": "an import name is not a distribution name (change F)",
+          "outcome": "supported",
+          "quote": "PyPI and other package indices do not enforce any relationship between the name of a distribution package and the import packages it provides.",
+          "error": null
+        },
+        {
+          "url": "https://pypi.org/pypi/sklearn/json",
+          "read_on": "2026-09-30",
+          "bore_on": "a PyPI placeholder (change F)",
+          "outcome": "supported",
+          "quote": "deprecated sklearn package, use scikit-learn instead",
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/react-query",
+          "read_on": "2026-09-30",
+          "bore_on": "line 24, the name still installs",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://tanstack.com/query/latest/docs/framework/react/guides/migrating-to-react-query-4",
+          "read_on": "2026-09-30",
+          "bore_on": "lines 25 and 125, renamed at v4",
+          "outcome": "supported",
+          "quote": "react-query is now @tanstack/react-query",
+          "error": null
+        },
+        {
+          "url": "https://tanstack.com/query/latest/docs/framework/react/reference/useQuery",
+          "read_on": "2026-09-30",
+          "bore_on": "line 141, throwOnError",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://nodejs.org/api/modules.html",
+          "read_on": "2026-09-30",
+          "bore_on": "lines 88-92, require of ECMAScript modules (removed with change H)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://nodejs.org/api/esm.html",
+          "read_on": "2026-09-30",
+          "bore_on": "lines 92-93, dynamic import() \"in every case\" (removed with change H)",
+          "outcome": "refuted",
+          "quote": "Addons are not currently supported with ES module imports.",
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/bcrypt/latest",
+          "read_on": "2026-09-30",
+          "bore_on": "lines 27-28, bcrypt is native; its install script (change C)",
+          "outcome": "supported",
+          "quote": "node-gyp-build",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/kelektiv/node.bcrypt.js/master/README.md",
+          "read_on": "2026-09-30",
+          "bore_on": "lines 27-28, \"needs a compiler\" (changes C and N)",
+          "outcome": "refuted",
+          "quote": "Pre-built binaries for various NodeJS versions are made available on a best-effort basis.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/dcodeIO/bcrypt.js/main/README.md",
+          "read_on": "2026-09-30",
+          "bore_on": "lines 28 and 126, bcryptjs as the alternative",
+          "outcome": "supported",
+          "quote": "Optimized bcrypt in JavaScript with zero dependencies",
+          "error": null
+        },
+        {
+          "url": "https://axios-http.com/docs/req_config",
+          "read_on": "2026-09-30",
+          "bore_on": "lines 43, 102 and 128",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 301 to axios.rest, not followed by the first research dispatch"
+        },
+        {
+          "url": "https://axios.rest/pages/advanced/request-config",
+          "read_on": "2026-09-30",
+          "bore_on": "axios has no body key; GET takes params (changes D and the table)",
+          "outcome": "supported",
+          "quote": "The `data` is the data to be sent as the request body.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/axios/axios/v1.x/index.d.ts",
+          "read_on": "2026-09-30",
+          "bore_on": "line 102, AxiosRequestConfig has no body property",
+          "outcome": "supported",
+          "quote": "data?: D;",
+          "error": null
+        },
+        {
+          "url": "https://nodejs.org/api/fs.html",
+          "read_on": "2026-09-30",
+          "bore_on": "line 49, readFileSync options",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "content truncated before readFileSync"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/lib/fs.js",
+          "read_on": "2026-09-30",
+          "bore_on": "line 49 and the throwOnError row (change Q): the options the body of readFileSync reads",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://tanstack.com/query/v5/docs/react/guides/migrating-to-v5",
+          "read_on": "2026-09-30",
+          "bore_on": "line 141, throwOnError is a real TanStack Query option (change Q)",
+          "outcome": "refuted",
+          "quote": "The `useErrorBoundary` option has been renamed to `throwOnError`",
+          "error": null
+        },
+        {
+          "url": "https://docs.djangoproject.com/en/stable/ref/validators/",
+          "read_on": "2026-09-30",
+          "bore_on": "line 55, validate_strong_password",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://fastapi.tiangolo.com/reference/fastapi/",
+          "read_on": "2026-09-30",
+          "bore_on": "line 58, auto_validate",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://react.dev/reference/react/hooks",
+          "read_on": "2026-09-30",
+          "bore_on": "lines 61 and 136, useAutoFetch and useAutoEffect",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://unpkg.com/date-fns/formatISO.js",
+          "read_on": "2026-09-30",
+          "bore_on": "formatISO is a date-fns function",
+          "outcome": "supported",
+          "quote": "export function formatISO(date, options)",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/moment/moment/develop/src/lib/moment/prototype.js",
+          "read_on": "2026-09-30",
+          "bore_on": "moment instances have no formatISO; toISOString exists",
+          "outcome": "supported",
+          "quote": "proto.toISOString = toISOString;",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/moment/moment/develop/src/moment.js",
+          "read_on": "2026-09-30",
+          "bore_on": "the static moment.formatISO",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://date-fns.org/docs/formatISO",
+          "read_on": "2026-09-30",
+          "bore_on": "formatISO documentation",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "only the page title came back; the page is built by JavaScript"
+        },
+        {
+          "url": "https://nodejs.org/api/globals.html",
+          "read_on": "2026-09-30",
+          "bore_on": "line 127, global fetch history (change O)",
+          "outcome": "supported",
+          "quote": "No longer experimental.",
+          "error": null
+        },
+        {
+          "url": "https://lodash.com/docs/4.17.15",
+          "read_on": "2026-09-30",
+          "bore_on": "line 134, cloneDeep",
+          "outcome": "supported",
+          "quote": "`_.cloneDeep(value)` Recursively clone `value`.",
+          "error": null
+        },
+        {
+          "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flatMap",
+          "read_on": "2026-09-30",
+          "bore_on": "line 135, flatMap is an instance method (change P)",
+          "outcome": "supported",
+          "quote": "The `flatMap()` method of `Array` instances returns",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/tc39/proposals/main/finished-proposals.md",
+          "read_on": "2026-09-30",
+          "bore_on": "line 135, the year 2019 (change P)",
+          "outcome": "supported",
+          "quote": "`Array.prototype.{flat,flatMap}`",
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/qwzxkvjmplnbrtdhgfcysqwzxkvjmplnbrtdhgfc",
+          "read_on": "2026-09-30",
+          "bore_on": "an unscoped name never registered (the npm recipe's 404 branch)",
+          "outcome": "supported",
+          "quote": "HTTP 404 Not Found",
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/@isaacs%2fcliui",
+          "read_on": "2026-09-30",
+          "bore_on": "the %2f form for scoped names (change F)",
+          "outcome": "supported",
+          "quote": "\"name\": \"@isaacs/cliui\"",
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/@qzvxkj-no-such-scope-20260930%2fqzvxkj-no-such-pkg-20260930",
+          "read_on": "2026-09-30",
+          "bore_on": "a missing scoped name at the %2f address (re-validation correction 3)",
+          "outcome": "supported",
+          "quote": "HTTP 404",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s4-agent-round1-recipes-run-live-by-the-session.md",
+          "read_on": "2026-09-30",
+          "bore_on": "the three new registry recipes run live by the session in bash and zsh against real, placeholder, missing and hostile names and with no network; includes @zzqqxx-nobody/zzqqxx-nothing-here-42 answering 404 at the %2f address",
+          "outcome": "supported",
+          "quote": "@zzqqxx-nobody/zzqqxx-nothing-here-42         NOT ON THE REGISTRY (HTTP 404)",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s4-agent-r1-1",
+          "kind": "new",
+          "text": "The export check imported the package it was checking (line 94), which runs that package's code and needs it installed first; the skill itself calls installing an unverified name \"exactly the slopsquatting attack path\". Replaced by reading the installed copy's declaration files, never running it (changes H and I).",
+          "evidence": "Final change list .ctoc/audit/improvement-run-notes/s4-agent-round1-critic-final-d-s4-agent-r1-critic.md, changes H and I; skill \"Red Lines\"; https://nodejs.org/api/esm.html, read 2026-09-30: \"Addons are not currently supported with ES module imports.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-2",
+          "kind": "new",
+          "text": "The npm existence recipe reported names npm holds as security placeholders as found, turned every network failure into NOT FOUND, and put a name from untrusted code into a shell unchecked. Replaced by a recipe that reads the status, labels placeholders, reports COULD NOT LOOK, and applies a character check before any shell (change F).",
+          "evidence": "https://registry.npmjs.org/crossenv, read 2026-09-30: \"security holding package\"; https://registry.npmjs.org/fs/latest: latest \"0.0.1-security\"; .ctoc/audit/improvement-run-notes/s4-agent-round1-recipes-run-live-by-the-session.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-3",
+          "kind": "new",
+          "text": "The PyPI recipe called the JSON interface \"stable\" (unsourced), said pip flags index versions as experimental (stale since pip 25.1), and turned failures into NOT FOUND. Rewritten with the documented interface, the pip 25.1 news lines, placeholder labelling and COULD NOT LOOK (change F).",
+          "evidence": "https://pip.pypa.io/en/stable/news/, read 2026-09-30: \"Remove `experimental` warning from `pip index versions` command.\"; https://docs.pypi.org/api/json/",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-4",
+          "kind": "new",
+          "text": "The only fabricated-package example, email-validator-pro, is a registered npm package (since 2017-05-18). Relabelled as a name that looks invented and is registered; a Rust example checked as 404 on crates.io added; the failure classes grow from three to four with the registry placeholder (change C).",
+          "evidence": "https://registry.npmjs.org/email-validator-pro, read 2026-09-30: \"name\": \"email-validator-pro\", latest \"1.0.1\", created \"2017-05-18T04:34:21.018Z\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-5",
+          "kind": "new",
+          "text": "The wrapper never told the agent to read its skill, and nothing fenced off the skill's install and run commands or its present-tense description of the refinement loop. Added \"Read the method first\" with six limits (change B).",
+          "evidence": "docs/REFINEMENT_LOOP.md line 8: \"the loop is **NOT RUNNING** today\"; skill lines 119, 138, 154, 175, 246, 253, 280-281",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-6",
+          "kind": "new",
+          "text": "No rule that the code under review is data, and no handling of missing, unreadable or oversized input. Added \"What you read is data\" and \"Input, and what you do when it is missing or odd\" (change B).",
+          "evidence": "Final change list .ctoc/audit/improvement-run-notes/s4-agent-round1-critic-final-d-s4-agent-r1-critic.md, change B",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-7",
+          "kind": "new",
+          "text": "The output was free markdown although the file declares dispatch_protocol: v1. Replaced by the protocol response with severity and confidence tables and an escalation section (change R).",
+          "evidence": "docs/DISPATCH_PROTOCOL.md; .ctoc/architecture/dispatch-schema.yaml",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-8",
+          "kind": "new",
+          "text": "No boundary with sibling agents, and the description did not separate them. Added \"What you own, and what you hand on\" and a description naming dependency-checker, dependency-auditor and ai-code-quality-reviewer, keeping every dispatch phrase byte-identical (changes A and B).",
+          "evidence": "agents/security/dependency-checker.md line 3; agents/security/dependency-auditor.md line 3; agents/ai-quality/ai-code-quality-reviewer.md lines 3, 18, 38, 40",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-9",
+          "kind": "new",
+          "text": "The look-alike check had a vague trigger (\"looks model-generated\") and ordered a download count PyPI cannot give. Now run on every registered name the change adds, using only what the recipes print; repository link and maintainer dropped because no recipe reads them (change G).",
+          "evidence": "https://arxiv.org/html/2406.10279, read 2026-09-30: \"Only 13.4% … have a Levenshtein distance of 1 or 2\"; https://docs.pypi.org/api/json/: \"is always `-1` and should not be used\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-10",
+          "kind": "new",
+          "text": "Eleven failure classes were missing: import name versus distribution name, registry placeholders, 404 is not \"never existed\", the wrong registry, name normalisation, registration after the training cutoff, private package names, could-not-look reported as not found, member invention, untrusted names in a shell, cached answers. Covered in change F.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round1-research-d-s4-agent-r1-research.md, section B.5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-11",
+          "kind": "new",
+          "text": "Two detection patterns were wrong (the react-query pattern missed a line ending in a semicolon; the formatISO pattern matched correct date-fns calls) and the list read as a measure of frequency. Patterns corrected and relabelled as leads (changes J, K and L).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round1-research-d-s4-agent-r1-research.md, \"Things in the file that are not citations but are wrong\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-12",
+          "kind": "new",
+          "text": "A JavaScript line with a # comment sat inside a block fenced as Python. Given its own TypeScript fence (change E).",
+          "evidence": "agent file line 61 before the edit",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-13",
+          "kind": "new",
+          "text": "\"bcrypt … needs a compiler\" was unsourced and overstated: the bcrypt readme ships pre-built binaries on a best-effort basis. Example and table row reworded (changes C and N).",
+          "evidence": "https://raw.githubusercontent.com/kelektiv/node.bcrypt.js/master/README.md, read 2026-09-30: \"Pre-built binaries for various NodeJS versions are made available on a best-effort basis.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-14",
+          "kind": "new",
+          "text": "The heading \"Common AI Hallucinations\" claimed a frequency the file does not source. Renamed \"Reference Examples\" with a sentence saying so (change M).",
+          "evidence": "Final change list .ctoc/audit/improvement-run-notes/s4-agent-round1-critic-final-d-s4-agent-r1-critic.md, change M",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-15",
+          "kind": "new",
+          "text": "\"Prevention Tips\" treated a manifest entry as proof and was written to a human, not to the agent. Deleted (change S).",
+          "evidence": "Final change list .ctoc/audit/improvement-run-notes/s4-agent-round1-critic-final-d-s4-agent-r1-critic.md, change S",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-16",
+          "kind": "new",
+          "text": "The axios example was labelled \"Wrong method signature\" when it is a wrong configuration key (change D).",
+          "evidence": "https://axios.rest/pages/advanced/request-config, read 2026-09-30: no body key among the request configuration keys",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-17",
+          "kind": "new",
+          "text": "The throwOnError row would flag correct TanStack Query code; the autoValidate row cannot be sourced as a negative across every library; the cacheTimeout row said nothing. Rows rewritten to name the receiving library (change Q).",
+          "evidence": "https://tanstack.com/query/v5/docs/react/guides/migrating-to-v5, read 2026-09-30: \"The `useErrorBoundary` option has been renamed to `throwOnError`\"; https://raw.githubusercontent.com/nodejs/node/main/lib/fs.js",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-18",
+          "kind": "new",
+          "text": "Array.flatMap() was written as a static method; it is on the array prototype. Row reworded with the finished-proposals source (change P).",
+          "evidence": "https://raw.githubusercontent.com/tc39/proposals/main/finished-proposals.md, read 2026-09-30: \"`Array.prototype.{flat,flatMap}`\", expected publication year 2019",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-19",
+          "kind": "new",
+          "text": "\"node-fetch (modern Node)\" gave no version. Row now names Node.js 21 with the history table's wording (change O).",
+          "evidence": "https://nodejs.org/api/globals.html, read 2026-09-30: v18.0.0 \"No longer behind `--experimental-fetch` CLI flag.\" and v21.0.0 \"No longer experimental.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-20",
+          "kind": "new",
+          "text": "First validation of the proposed changes: the Twist figures were table cells, not running-text quotations; the PyPI quarantine quotation was misworded (\"pretty much\" for \"often\"); the recipe's second character check cannot stop a single quote. All three corrected in the final change list before it was applied.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round1-validate-a-d-s4-agent-r1-validate-a.md; https://blog.pypi.org/posts/2024-12-30-quarantine/, read 2026-09-30: \"This is often coupled with prohibiting the Project name from being reused\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-21",
+          "kind": "new",
+          "text": "Second validation of the proposed changes: the response omitted agent_version and completed_at; the severity table claimed to follow the skill while downgrading its critical row; the hand-on to ai-code-quality-reviewer claimed work that agent gives to others. Fields added with the date command, the departure declared, and the hand-on narrowed in the final change list.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round1-validate-b-d-s4-agent-r1-validate-b.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-22",
+          "kind": "new",
+          "text": "After the edit, the response template's tokens_used: null disagrees with the dispatch schema, which requires an integer. The departure is now stated openly in the Output Format paragraph. Whether the schema should allow null is already with the human under h-s3-agent-r1-tokens-used-null-versus-dispatch-schema; this file matches the finished sibling agents/ai-quality/ai-code-quality-reviewer.md.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round1-revalidate-d-s4-agent-r1-revalidate.md, correction 1; .ctoc/architecture/dispatch-schema.yaml line 134: \"tokens_used: { type: integer, minimum: 0 }\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-23",
+          "kind": "new",
+          "text": "After the edit, \"This rule is this file's own and is meant to be stricter than any registry's\" had no source. Replaced with the validator's wording, which makes no comparison.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round1-revalidate-d-s4-agent-r1-revalidate.md, correction 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-24",
+          "kind": "new",
+          "text": "After the edit, the sentence that a missing scoped name at the %2f address \"was not checked\" was out of date. Replaced with the validator's probe, which answered 404; the session's live run saw the same for @zzqqxx-nobody/zzqqxx-nothing-here-42.",
+          "evidence": "https://registry.npmjs.org/@qzvxkj-no-such-scope-20260930%2fqzvxkj-no-such-pkg-20260930, read 2026-09-30: HTTP 404; .ctoc/audit/improvement-run-notes/s4-agent-round1-recipes-run-live-by-the-session.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-25",
+          "kind": "new",
+          "text": "The character check that guards a shell against untrusted package names is an instruction the agent follows, not an enforcement; Bash can also write. Whether to enforce it with a hook is the human's decision on risk.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round1-critic-d-s4-agent-r1-critic.md, finding 16; tests/watcher-shape.test.js lines 94-100",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-agent-r1-shell-name-check-is-instruction-only"
+        },
+        {
+          "id": "f-s4-agent-r1-26",
+          "kind": "new",
+          "text": "The dispatch phrase \"AI code review\" is in both this agent's and ai-code-quality-reviewer's description; no dispatch phrase may be removed in a round, so whether one agent gives it up is the human's.",
+          "evidence": "agents/ai-quality/hallucination-detector.md line 3; agents/ai-quality/ai-code-quality-reviewer.md line 3",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-agent-r1-shared-dispatch-phrase-ai-code-review"
+        },
+        {
+          "id": "f-s4-agent-r1-27",
+          "kind": "new",
+          "text": "Look-alike and typosquat detection overlaps with dependency-auditor, whose description still says it flags typosquats; this file now draws its side as the names the change adds, at review time.",
+          "evidence": "agents/security/dependency-auditor.md line 3",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-agent-r1-lookalike-overlap-with-dependency-auditor"
+        },
+        {
+          "id": "f-s4-agent-r1-28",
+          "kind": "new",
+          "text": "CTO Chief dispatches this agent \"IF the implementation generated artificial-intelligence outputs\", which reads as a product that produces model output, not code an assistant wrote. That file is outside this slice.",
+          "evidence": "agents/coordinator/cto-chief.md line 528",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-agent-r1-cto-chief-dispatch-condition"
+        },
+        {
+          "id": "f-s4-agent-r1-29",
+          "kind": "new",
+          "text": "The critic that ran is the installed plugin copy (6.14.67), whose tools line is \"tools: Read, Grep\"; the repository copy holds WebSearch and WebFetch. The citation validator did this round's research under d-s4-agent-r1-research and d-s4-agent-r1-research-gaps. Same condition as the previous slice, already with the human.",
+          "evidence": "/Users/account/.claude/plugins/cache/robotijn/ctoc/6.14.67/agents/pipeline/agent-critic.md line 4: \"tools: Read, Grep\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s3-agent-r1-installed-critic-has-no-web-tools"
+        },
+        {
+          "id": "f-s4-agent-r1-30",
+          "kind": "new",
+          "text": "Skill line 84 says email-validator-pro is \"npm: not found\"; refuted by the same source as f-s4-agent-r1-4. Skill line 46 uses npm view returning a non-empty result as the existence test; refuted because placeholder names answer with a version.",
+          "evidence": "https://registry.npmjs.org/email-validator-pro and https://registry.npmjs.org/crossenv, read 2026-09-30",
+          "decision": "rejected",
+          "reason": "Cross-file: this is a finding about skills/ai-quality/hallucination-detector/SKILL.md, which is in this same slice (s4) and not yet started; it is applied in that file's own rounds, and nothing in this file changes for it.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-31",
+          "kind": "new",
+          "text": "Skill line 44, \"Attackers register the most-hallucinated names on npm and PyPI within hours\", is not in the paper, whose threat model says \"can exploit\".",
+          "evidence": "https://arxiv.org/html/2406.10279, read 2026-09-30",
+          "decision": "rejected",
+          "reason": "Cross-file: this is a finding about skills/ai-quality/hallucination-detector/SKILL.md, which is in this same slice (s4) and not yet started; it is applied in that file's own rounds, and nothing in this file changes for it.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-32",
+          "kind": "new",
+          "text": "Skill commands run the package being checked (lines 119, 246-247, 252-255), install it (lines 138, 280-281) or download it (lines 154, 175).",
+          "evidence": "skills/ai-quality/hallucination-detector/SKILL.md at sha256:e1472d75e7ebcbcfb1f0a69340601ce698cc506b609392d454772ec7d6290f11",
+          "decision": "rejected",
+          "reason": "Cross-file: this is a finding about skills/ai-quality/hallucination-detector/SKILL.md, which is in this same slice (s4) and not yet started; it is applied in that file's own rounds, and nothing in this file changes for it.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-33",
+          "kind": "new",
+          "text": "Skill lines 378, 399-424 and 428-436 describe the refinement-loop letter in the present tense although the loop is not running. Fence the text rather than delete it: tests/critic-warnings-are-critical.test.js lines 71-89 require its strings.",
+          "evidence": "docs/REFINEMENT_LOOP.md line 8; tests/critic-warnings-are-critical.test.js lines 71-89",
+          "decision": "rejected",
+          "reason": "Cross-file: this is a finding about skills/ai-quality/hallucination-detector/SKILL.md, which is in this same slice (s4) and not yet started; it is applied in that file's own rounds, and nothing in this file changes for it.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r1-34",
+          "kind": "new",
+          "text": "Skill lines 83 (react-smart-cache \"npm: not found\"), 88 (the bcrypt browser comment) and 96 (npm printing \"npm ERR! 404\") were not checked; line 421 cites npm's version 10 documentation where the research read version 11. This file now depends on the skill's triage table, its registry_checked and registry_response field names and its kind values; the skill's rounds must keep them or update this file too.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round1-critic-d-s4-agent-r1-critic.md, finding 19",
+          "decision": "rejected",
+          "reason": "Cross-file: this is a finding about skills/ai-quality/hallucination-detector/SKILL.md, which is in this same slice (s4) and not yet started; it is applied in that file's own rounds, and nothing in this file changes for it.",
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 38,
+        "VALIDATED": 28,
+        "FABRICATED": 5,
+        "UNSOURCEABLE": 4,
+        "MISATTRIBUTED": 0
+      },
+      "validator_final": {
+        "examined": 85,
+        "VALIDATED": 82,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 1,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/ai-quality/hallucination-detector/SKILL.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "It applies: every one of the seven languages has a package ecosystem. After the edits the file has recipes for npm (JavaScript and TypeScript), PyPI (Python), crates.io (Rust) and Maven Central (Java); none for NuGet (C#) or the Go module proxy, whose names are recorded as not checked, carried to round 2; a Postgres extension (SQL) is deliberately not checked because that means querying a database; C and C++ are out of scope, following the skill. The examples in the file are TypeScript, Python and a new Rust block.",
+        "examples_checked": [
+          {
+            "language": "TypeScript and JavaScript (react-query, bcrypt, email-validator-pro, axios, moment, fs, React hook examples)",
+            "how": "official documentation, package registries and library source read by the validator dispatches on 2026-09-30"
+          },
+          {
+            "language": "Python (Django validators on Django 6.1, FastAPI decorator)",
+            "how": "official documentation: docs.djangoproject.com and fastapi.tiangolo.com, read 2026-09-30"
+          },
+          {
+            "language": "Rust (tokio_advanced)",
+            "how": "crates.io answered status 404 at the web interface and the sparse index, read 2026-09-30"
+          },
+          {
+            "language": "Bash and zsh (the three registry recipes: npm, PyPI, crates.io and Maven Central): GNU bash 3.2.57(1)-release (arm64-apple-darwin25) and zsh 5.9 (arm64-apple-darwin25.0), with curl 8.7.1 and node v24.14.1 parsing the answers, on macOS 26.6.1, LANG=C.UTF-8",
+            "how": "run live by the session against the registries on 2026-09-30, see .ctoc/audit/improvement-run-notes/s4-agent-round1-recipes-run-live-by-the-session.md"
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "date": "2026-09-30",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:412d36530695efbf8ce48ff0f9161c5e21047fcfe0553e488bf087027e2aa3ea",
+      "fingerprint_after": "sha256:3cc6e9d7398cf1ddfb863d0364acea4c7146981791c7456c1305362b4588f27b",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s4-agent-r2-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-agent-r2-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-agent-r2-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-agent-r2-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "ECMA-262 multipage text-processing address",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "OpenSSF Security-Focused Guide for AI Code Assistant Instructions",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "NIST SP 800-218 practice PW.4",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "CISA typosquatting dependency confusion",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "Maven Central maven-metadata.xml",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Krishna Importing Phantoms publication venue",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "Twist library hallucinations publication venue",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "site:cisa.gov typosquatting dependency confusion",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "OWASP full name Open Worldwide Application Security Project",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "POSIX Portable Operating System Interface expansion",
+          "source_class": "standards body",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html",
+          "read_on": "2026-09-30",
+          "bore_on": "the shell constructs in the recipes: bracket negation, the optional opening parenthesis in case, parameter expansion, exit status of a command substitution, quoting",
+          "outcome": "supported",
+          "quote": "If an exclamation-mark character ('!') appears as the first character of a bracket expression, the sense of the subsequent match shall be inverted",
+          "error": null
+        },
+        {
+          "url": "https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html",
+          "read_on": "2026-09-30",
+          "bore_on": "the bracket ranges A-Za-z0-9 in the recipes (changes 3a to 3d and 8b)",
+          "outcome": "refuted",
+          "quote": "In other locales, a range expression has unspecified behavior: strictly conforming applications shall not rely on whether the range expression is valid, or on the set of collating elements matched.",
+          "error": null
+        },
+        {
+          "url": "https://packaging.python.org/en/latest/specifications/name-normalization/",
+          "read_on": "2026-09-30",
+          "bore_on": "the Python name-comparison rule (change 1), valid names (changes 3c, 8a, 8b)",
+          "outcome": "refuted",
+          "quote": "The name should be lowercased with all runs of the characters `.`, `-`, or `_` replaced with a single `-` character.",
+          "error": null
+        },
+        {
+          "url": "https://tc39.es/ecma262/multipage/text-processing.html",
+          "read_on": "2026-09-30",
+          "bore_on": "the detection patterns (ECMAScript regular expressions)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "the fetch was cut off at section 13, before the regular-expression section"
+        },
+        {
+          "url": "https://tc39.es/ecma262/2026/multipage/text-processing.html",
+          "read_on": "2026-09-30",
+          "bore_on": "the detection patterns (ECMAScript regular expressions)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "the fetch was cut off at section 13, before the regular-expression section"
+        },
+        {
+          "url": "https://yaml.org/spec/1.2.2/",
+          "read_on": "2026-09-30",
+          "bore_on": "the YAML response template",
+          "outcome": "supported",
+          "quote": "Comments must be separated from other tokens by white space characters.",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/llmrisk/llm092025-misinformation/",
+          "read_on": "2026-09-30",
+          "bore_on": "the attack, cited from a standards body (change 7b)",
+          "outcome": "supported",
+          "quote": "Attackers experiment with popular coding assistants to find commonly hallucinated package names.",
+          "error": null
+        },
+        {
+          "url": "https://owasp.org/about/",
+          "read_on": "2026-09-30",
+          "bore_on": "the name \"Open Worldwide Application Security Project\" (change 7b)",
+          "outcome": "supported",
+          "quote": "The Open Worldwide Application Security Project (OWASP) is a 501(c)(3) nonprofit foundation",
+          "error": null
+        },
+        {
+          "url": "https://top10.owasp.org/2025/A03_2025-Software_Supply_Chain_Failures",
+          "read_on": "2026-09-30",
+          "bore_on": "provenance and signed packages (carried to round 3)",
+          "outcome": "did-not-bear",
+          "quote": "Prefer signed packages to reduce the chance of including a modified, malicious component",
+          "error": null
+        },
+        {
+          "url": "https://best.openssf.org/Security-Focused-Guide-for-AI-Code-Assistant-Instructions.html",
+          "read_on": "2026-09-30",
+          "bore_on": "the term \"slopsquatting\" from a foundation (change 7b); the words first proposed were a block quotation of Bill Toulas, corrected to the guide's own sentence",
+          "outcome": "supported",
+          "quote": "These hallucinations enable “slopsquatting” attacks, where attackers create malicious packages with names commonly hallucinated by AI models",
+          "error": null
+        },
+        {
+          "url": "https://github.com/ossf/wg-best-practices-os-developers/blob/main/docs/Security-Focused-Guide-for-AI-Code-Assistant-Instructions.md?plain=1",
+          "read_on": "2026-09-30",
+          "bore_on": "the exact characters of the guide's sentence and its citation marker",
+          "outcome": "supported",
+          "quote": "These hallucinations enable “slopsquatting” attacks, where attackers create malicious packages with names commonly hallucinated by AI models [billtoulas2025a].",
+          "error": null
+        },
+        {
+          "url": "https://best.openssf.org/Concise-Guide-for-Evaluating-Open-Source-Software",
+          "read_on": "2026-09-30",
+          "bore_on": "the look-alike comparison and its lack of a threshold (changes 6a to 6c)",
+          "outcome": "supported",
+          "quote": "Check if a similar name is more popular - that could indicate a typosquatting attack.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/ossf/wg-best-practices-os-developers/main/docs/Concise-Guide-for-Evaluating-Open-Source-Software.md",
+          "read_on": "2026-09-30",
+          "bore_on": "the separator character in the Concise Guide sentence",
+          "outcome": "supported",
+          "quote": "Check its creation time and popularity.",
+          "error": null
+        },
+        {
+          "url": "https://slsa.dev/spec/v1.1/threats",
+          "read_on": "2026-09-30",
+          "bore_on": "dependency confusion answering 200 (change 2)",
+          "outcome": "supported",
+          "quote": "Register a package name in a public registry that shadows a name used on the victim's internal registry",
+          "error": null
+        },
+        {
+          "url": "https://slsa.dev/",
+          "read_on": "2026-09-30",
+          "bore_on": "the expansion of SLSA (change 2)",
+          "outcome": "supported",
+          "quote": "Supply-chain Levels for Software Artifacts",
+          "error": null
+        },
+        {
+          "url": "https://www.usenix.org/conference/usenixsecurity25/presentation/spracklen",
+          "read_on": "2026-09-30",
+          "bore_on": "the peer-reviewed version of Spracklen and colleagues: venue and pages (changes 5, 6a, 7a, 7b)",
+          "outcome": "supported",
+          "quote": "34th USENIX Security Symposium (USENIX Security 25)",
+          "error": null
+        },
+        {
+          "url": "https://www.usenix.org/system/files/usenixsecurity25-spracklen.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "the quoted sentences on pages 3687-3688, 3692, 3695 and 3697, and the four confusion classes on page 3688",
+          "outcome": "supported",
+          "quote": "Trivial cross-referencing methods (i.e., comparing a generated package name with a list of known packages) are ineffective for detecting a package hallucination attack, as an adversary may already have published the hallucinated package with malicious code.",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/html/2406.10279",
+          "read_on": "2026-09-30",
+          "bore_on": "whether the preprint also carries the cross-referencing sentence (\"The published version adds:\")",
+          "outcome": "refuted",
+          "quote": "Trivial cross-referencing methods (i.e. comparing a generated package name with a list of known packages) are ineffective",
+          "error": null
+        },
+        {
+          "url": "https://www.enisa.europa.eu/sites/default/files/2025-12/ENISA%20Technical%20Advisory%20-%20Package_Managers_v_0.8_draft.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "malicious and compromised packages as threats (change 10); dependency confusion; provenance (carried)",
+          "outcome": "supported",
+          "quote": "3.2.2 Compromised Legitimate Packages",
+          "error": null
+        },
+        {
+          "url": "https://nvlpubs.nist.gov/nistpubs/specialpublications/nist.sp.800-218.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "provenance and signatures (carried to round 3)",
+          "outcome": "did-not-bear",
+          "quote": "Confirm the integrity of software components through digital signatures or other mechanisms.",
+          "error": null
+        },
+        {
+          "url": "https://maven.apache.org/repositories/metadata.html",
+          "read_on": "2026-09-30",
+          "bore_on": "whether every Maven Central artifact publishes maven-metadata.xml (carried)",
+          "outcome": "did-not-bear",
+          "quote": "The artifactId level metadata (found in directory of artifactId) serves purpose of version discovery.",
+          "error": null
+        },
+        {
+          "url": "https://central.sonatype.org/publish/publish-portal-upload/",
+          "read_on": "2026-09-30",
+          "bore_on": "whether every Maven Central artifact publishes maven-metadata.xml (carried)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/moment/moment/develop/ts3.1-typings/moment.d.ts",
+          "read_on": "2026-09-30",
+          "bore_on": "the static moment.formatISO (a round-1 carried item)",
+          "outcome": "supported",
+          "quote": "toISOString(keepOffset?: boolean): string;",
+          "error": null
+        },
+        {
+          "url": "https://tanstack.com/query/v5/docs/framework/react/reference/useQuery",
+          "read_on": "2026-09-30",
+          "bore_on": "TanStack Query's own throwOnError reference entry (carried)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "{\"isNotFound\":true}"
+        },
+        {
+          "url": "https://tanstack.com/query/latest/docs/framework/react/reference/useQuery",
+          "read_on": "2026-09-30",
+          "bore_on": "TanStack Query's own throwOnError reference entry (carried)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "{\"isNotFound\":true}"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/TanStack/query/main/docs/framework/react/reference/useQuery.md",
+          "read_on": "2026-09-30",
+          "bore_on": "TanStack Query's own throwOnError reference entry (carried)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/lib/fs.js",
+          "read_on": "2026-09-30",
+          "bore_on": "the options the body of readFileSync reads, and a new handler branch at its top (change 13)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/lib/internal/fs/utils.js",
+          "read_on": "2026-09-30",
+          "bore_on": "the helpers readFileSync passes its options to",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/nodejs/node/commits/main/lib/fs.js",
+          "read_on": "2026-09-30",
+          "bore_on": "\"a branch that keeps changing\" (change 13)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://doc.rust-lang.org/reference/items/extern-crates.html",
+          "read_on": "2026-09-30",
+          "bore_on": "the Rust crate name versus package name (change 5)",
+          "outcome": "supported",
+          "quote": "The `as` clause can be used to bind the imported crate to a different name.",
+          "error": null
+        },
+        {
+          "url": "https://crates.io/api/v1/crates/serde-json",
+          "read_on": "2026-09-30",
+          "bore_on": "crates.io treating - and _ alike when looked up in that direction",
+          "outcome": "supported",
+          "quote": "\"serde_json\"",
+          "error": null
+        },
+        {
+          "url": "https://openreview.net/forum?id=nZVqGkUr1r",
+          "read_on": "2026-09-30",
+          "bore_on": "the publication venue of Twist and colleagues (carried)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "a browser-verification page was returned"
+        },
+        {
+          "url": "https://standards.ieee.org/ieee/1003.1-2024_Cor_1/11920/",
+          "read_on": "2026-09-30",
+          "bore_on": "the expansion of POSIX (change 8b)",
+          "outcome": "supported",
+          "quote": "Portable Operating System Interface (POSIX",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s4-agent-round2-session-runs.md",
+          "read_on": "2026-09-30",
+          "bore_on": "the three final detection patterns, the Python example and the three recipes with changes 3a to 3d applied, all run by the session before applying",
+          "outcome": "supported",
+          "quote": "react-query /(?:\\bfrom|\\brequire\\s*\\(|\\bimport\\s*\\(?)\\s*['\"]react-query(?:\\/[^'\"]*)?['\"]/ — all 6 must-match true, all 3 must-not-match false: ALL OK",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s4-agent-r2-1",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s4-agent-r1-10: the Python comparison rule treated each of `.`, `-` and `_` as one character; the packaging specification collapses a run of them into one `-`, so friendly--bard and friendly-bard are one name. Rule replaced with the specification's sentence (change 1).",
+          "evidence": "https://packaging.python.org/en/latest/specifications/name-normalization/, read 2026-09-30: \"The name should be lowercased with all runs of the characters `.`, `-`, or `_` replaced with a single `-` character.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-2",
+          "kind": "new",
+          "text": "A private-looking name that the public registry answers with status 200 was left unflagged; the recipe printed REGISTERED and nothing followed. Added a rule recording it as a possible dependency confusion, with no owning agent named (change 2).",
+          "evidence": "https://slsa.dev/spec/v1.1/threats, read 2026-09-30: \"Register a package name in a public registry that shadows a name used on the victim's internal registry\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-3",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects round 1's decision to leave the locale out (\"the claim that bracket ranges depend on the locale is unvalidated\"): the claim is now sourced. The nine bracket ranges are spelled out letter by letter rather than setting LC_ALL, and the prose says why (changes 3a to 3d and 8b). The session's run saw the same refusals in both locales tested on this machine.",
+          "evidence": "https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html, section 9.3.5, read 2026-09-30: \"In other locales, a range expression has unspecified behavior\"; .ctoc/audit/improvement-run-notes/s4-agent-round2-session-runs.md, \"Locale and the bracket ranges\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-4",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s4-agent-r1-11: all three detection patterns missed common forms (import() and subpaths for react-query; chained calls for moment; a multi-line object for axios, which also matched `somebody:`). Replaced (changes 4a to 4c); the session ran each against its must-match and must-not-match lists and all passed before applying.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round2-session-runs.md, \"The three final patterns (changes 4a–4c)\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-5",
+          "kind": "new",
+          "text": "Rust had no rule mapping the crate name in a use path to the package name to query. Added, with the Rust Reference's condition for the - to _ replacement; the same line now cites the peer-reviewed page for the 8.7% sentence (change 5).",
+          "evidence": "https://doc.rust-lang.org/reference/items/extern-crates.html, read 2026-09-30: \"when `Cargo.toml` doesn't specify a crate name, Cargo will transparently replace `-` with `_`\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-6",
+          "kind": "new",
+          "text": "Resolves the round-1 carried item on the look-alike thresholds: \"much later\" and \"far less\" had no source and none was found. The degree words are dropped, the comparison is stated as the Open Source Security Foundation states it, and the four confusion classes the paper names are added (changes 6a to 6c).",
+          "evidence": "https://best.openssf.org/Concise-Guide-for-Evaluating-Open-Source-Software, read 2026-09-30: \"Check its creation time and popularity.\"; USENIX Security 2025 page 3688: \"typosquatting, combosquatting, brandjacking, and similarity attacks\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-7",
+          "kind": "new",
+          "text": "The attack was cited only to preprints and a vendor blog. Added the peer-reviewed USENIX Security 2025 pages, the paper's cross-referencing sentence, the Open Worldwide Application Security Project's LLM09:2025 Attack Scenario 1, and the Open Source Security Foundation guide's sentence naming slopsquatting (changes 7a and 7b).",
+          "evidence": "https://www.usenix.org/conference/usenixsecurity25/presentation/spracklen, pages 3687-3688, 3692, 3695, 3697; https://genai.owasp.org/llmrisk/llm092025-misinformation/, read 2026-09-30",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-8",
+          "kind": "new",
+          "text": "The character-check prose said \"letters\" with no bound. Now unaccented Latin letters, tied to the packaging specification's \"ASCII letters and numbers, period, underscore and hyphen\" (change 8a).",
+          "evidence": "https://packaging.python.org/en/latest/specifications/name-normalization/, read 2026-09-30: \"A valid name consists only of ASCII letters and numbers, period, underscore and hyphen.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-9",
+          "kind": "new",
+          "text": "The PyPI recipe accepted names ending in `.`, `_` or `-`, which cannot be valid distribution names. The recipe now records them as not valid under the packaging specification and never queries them (changes 3c and 8b); the session saw requests- and requests_ refused.",
+          "evidence": "https://packaging.python.org/en/latest/specifications/name-normalization/, read 2026-09-30: \"It must start and end with a letter or number.\"; .ctoc/audit/improvement-run-notes/s4-agent-round2-session-runs.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-10",
+          "kind": "new",
+          "text": "No one was named for a malicious or compromised package. The catch-all line now names both, with no owning agent, citing the European Union Agency for Cybersecurity's draft advisory (change 10).",
+          "evidence": "https://www.enisa.europa.eu/sites/default/files/2025-12/ENISA%20Technical%20Advisory%20-%20Package_Managers_v_0.8_draft.pdf, version 0.8, read 2026-09-30: sections 3.2.1 and 3.2.2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-11",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects an incomplete round-1 fix (f-s4-agent-r1-4): the fabricated-class definition did not carry the training-cutoff clause that the definition above it had gained (change 11).",
+          "evidence": "agents/ai-quality/hallucination-detector.md, the definition of an invented name and the four failure classes; round 1 validator A, \"Change 4 contradicts change 9\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-12",
+          "kind": "new",
+          "text": "An empty case item `(pattern) ;;` in the npm recipe; the formal grammar was not fetched. Given the no-op command `:` (carried by change 3a); the session's run exercised it with the name abc in bash and zsh.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round2-session-runs.md, \"abc REGISTERED … (exercises the `: ;;` item)\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-13",
+          "kind": "new",
+          "text": "The readFileSync sentence pointed at a moving branch with no commit recorded. It is now bounded to the code as read on 2026-09-30 (change 13).",
+          "evidence": "https://github.com/nodejs/node/commits/main/lib/fs.js, read 2026-09-30: ten commits to lib/fs.js between 2 and 26 September 2026",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-14",
+          "kind": "new",
+          "text": "The FastAPI example was a decorator with no function after it, not a complete Python statement. A function added (change 14); the session parsed it with python3 ast: SyntaxError before, parses after.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round2-session-runs.md, \"The FastAPI example (change 14)\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-15",
+          "kind": "new",
+          "text": "The standards recommend checking a package's provenance or signature (ENISA sections 4.1.1 and 4.1.2, OWASP Top 10:2025 A03, NIST SP 800-218 PW.4.4 example 6, SLSA 1.1), but no registry field or interface that carries provenance was validated.",
+          "evidence": "https://top10.owasp.org/2025/A03_2025-Software_Supply_Chain_Failures, read 2026-09-30: \"Prefer signed packages\"",
+          "decision": "rejected",
+          "reason": "Not applied this round: a check the recipes cannot run would be an order the agent cannot carry out. Carried to round 3, to validate the registry fields (npm dist.attestations, PyPI's Integrity interface) before adding a check.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-16",
+          "kind": "new",
+          "text": "Dependency confusion cannot be settled without querying the organisation's private registry, which needs a recipe, credentials and a scope this agent was never given.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round2-critic-d-s4-agent-r2-critic.md, finding 16",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-agent-r2-private-registry-recipe-and-credentials"
+        },
+        {
+          "id": "f-s4-agent-r2-17",
+          "kind": "new",
+          "text": "Validation of change 7b: the words proposed as the Open Source Security Foundation guide's were Bill Toulas's, block-quoted inside the guide, joined across three sentences. Replaced with the guide's own sentence, confirmed at the source by the session, with a note that the guide cites a news report for it.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round2-validate-d-s4-agent-r2-validate.md, row 27; .ctoc/audit/improvement-run-notes/s4-agent-round2-revalidate-d-s4-agent-r2-revalidate.md, \"The OpenSSF sentence, character by character\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-18",
+          "kind": "new",
+          "text": "Validation of change 8b: the POSIX quotation stopped at \"is valid.\" and dropped the clause that supports the point. Completed with \", or on the set of collating elements matched.\"",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round2-validate-d-s4-agent-r2-validate.md, row 30",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-19",
+          "kind": "new",
+          "text": "Validation of change 5: the Rust quotation dropped its condition \"when `Cargo.toml` doesn't specify a crate name\". Condition included.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round2-validate-d-s4-agent-r2-validate.md, row 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-20",
+          "kind": "new",
+          "text": "Validation of change 6a: the paper credits the four confusion classes to its reference 28. Now reads \"The same paper, citing earlier work, groups …\".",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round2-validate-d-s4-agent-r2-validate.md, row 12",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-21",
+          "kind": "new",
+          "text": "Re-validation: \"The published version adds:\" said the preprint lacks the cross-referencing sentence; arXiv version 3 carries it. Reworded with the validator's text: \"The paper also says: … (USENIX version, page 3688; the preprint carries the same sentence).\"",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round2-revalidate-d-s4-agent-r2-revalidate.md, row 74; https://arxiv.org/html/2406.10279, read 2026-09-30",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-22",
+          "kind": "new",
+          "text": "Skill lines 51, 183 and 193 query cargo search with the name from the use path; the Rust Reference rule on - and _ (f-s4-agent-r2-5) applies there too.",
+          "evidence": "https://doc.rust-lang.org/reference/items/extern-crates.html, read 2026-09-30",
+          "decision": "rejected",
+          "reason": "Cross-file: this is a finding about skills/ai-quality/hallucination-detector/SKILL.md, which is in this same slice (s4) and not yet started; it is applied in that file's own rounds, and nothing in this file changes for it.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-23",
+          "kind": "new",
+          "text": "The skill cites Spracklen by venue (\"USENIX Security 2025\") with no page numbers; they are 3687 to 3706, and the quoted sentences sit on 3687-3688, 3692, 3695 and 3697.",
+          "evidence": "https://www.usenix.org/conference/usenixsecurity25/presentation/spracklen",
+          "decision": "rejected",
+          "reason": "Cross-file: this is a finding about skills/ai-quality/hallucination-detector/SKILL.md, which is in this same slice (s4) and not yet started; it is applied in that file's own rounds, and nothing in this file changes for it.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-24",
+          "kind": "new",
+          "text": "The skill lacks the dependency-confusion case answering 200 (f-s4-agent-r2-2) and the four confusion classes (f-s4-agent-r2-6).",
+          "evidence": "https://slsa.dev/spec/v1.1/threats; USENIX Security 2025 page 3688",
+          "decision": "rejected",
+          "reason": "Cross-file: this is a finding about skills/ai-quality/hallucination-detector/SKILL.md, which is in this same slice (s4) and not yet started; it is applied in that file's own rounds, and nothing in this file changes for it.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-25",
+          "kind": "new",
+          "text": "The skill's provenance recipes (npm view … | jq '.dist.attestations', PyPI's Integrity interface) were never validated; validating them is what would let this file add a provenance check (f-s4-agent-r2-15).",
+          "evidence": "skills/ai-quality/hallucination-detector/SKILL.md lines 226-230",
+          "decision": "rejected",
+          "reason": "Cross-file: this is a finding about skills/ai-quality/hallucination-detector/SKILL.md, which is in this same slice (s4) and not yet started; it is applied in that file's own rounds, and nothing in this file changes for it.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r2-26",
+          "kind": "new",
+          "text": "Any bracket range or name rule the skill has (lines 226-240) must follow f-s4-agent-r2-1, f-s4-agent-r2-3 and f-s4-agent-r2-8.",
+          "evidence": "skills/ai-quality/hallucination-detector/SKILL.md lines 226-240",
+          "decision": "rejected",
+          "reason": "Cross-file: this is a finding about skills/ai-quality/hallucination-detector/SKILL.md, which is in this same slice (s4) and not yet started; it is applied in that file's own rounds, and nothing in this file changes for it. The round-1 cross-file findings f-s4-agent-r1-30 to f-s4-agent-r1-34 remain pending for the skill's rounds; they are not repeated here.",
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 42,
+        "VALIDATED": 38,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 1
+      },
+      "validator_final": {
+        "examined": 108,
+        "VALIDATED": 104,
+        "FABRICATED": 1,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/ai-quality/hallucination-detector/SKILL.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "It applies: every one of the seven languages has a package ecosystem. Round 2 used different source classes from round 1 (which read preprints, registry and vendor documentation, and live probes): specifications (POSIX, the Python packaging name specification, YAML 1.2.2, the Rust Reference), standards bodies and foundations (OWASP, OpenSSF, SLSA), security agencies (ENISA, NIST), and a peer-reviewed publisher (USENIX Security 2025), because they state rules and threat models that bind or advise everyone rather than what one registry answers today. This round touches Python (name normalisation, names ending in punctuation, the decorator example), JavaScript and TypeScript (the three detection patterns) and Rust (the crate-name rule). Java is unchanged; C# (NuGet) and Go still have no recipe and are carried; SQL (Postgres extensions) is still not queried, by design; C and C++ are out of scope, following the skill.",
+        "examples_checked": [
+          {
+            "language": "JavaScript (the three detection patterns): node v24.14.1",
+            "how": "run by the session in Node against must-match and must-not-match lists before applying, see .ctoc/audit/improvement-run-notes/s4-agent-round2-session-runs.md"
+          },
+          {
+            "language": "Python (the FastAPI decorator example): Python 3.9.6",
+            "how": "parsed by the session with python3 ast before and after the change, see .ctoc/audit/improvement-run-notes/s4-agent-round2-session-runs.md"
+          },
+          {
+            "language": "Bash and zsh (the three registry recipes with changes 3a to 3d): GNU bash 3.2.57(1)-release (arm64-apple-darwin25) and zsh 5.9 (arm64-apple-darwin25.0), with curl 8.7.1 and node v24.14.1 parsing the answers, on macOS 26.6.1, LANG=C.UTF-8",
+            "how": "run live by the session against the registries before applying, see .ctoc/audit/improvement-run-notes/s4-agent-round2-session-runs.md"
+          },
+          {
+            "language": "Rust (crate name versus package name)",
+            "how": "official documentation: https://doc.rust-lang.org/reference/items/extern-crates.html, read 2026-09-30"
+          }
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "date": "2026-09-30",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:3cc6e9d7398cf1ddfb863d0364acea4c7146981791c7456c1305362b4588f27b",
+      "fingerprint_after": "sha256:c23cd371b1c99f00ad927ef9ee7f24d97ea43fee799b502fc53dbf41987dafc9",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s4-agent-r3-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-agent-r3-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-agent-r3-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-agent-r3-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "Cyber Resilience Act Article 13 due diligence third-party components wording",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "NSA CISA developer guide typosquatting",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "site:cisa.gov typosquatting OR dependency confusion",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "ANSSI BSI \"AI Coding Assistants\" report",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "UK National Cyber Security Centre software supply chain dependency guidance",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "ncsc.gov.uk software supply chain attacks check your dependencies",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "inflated npm download counts malicious packages",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "ENISA Technical Advisory Secure Use of Package Managers final",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "Node.js virtual file system vfs handlers",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://registry.npmjs.org/email-validator-pro",
+          "read_on": "2026-09-30",
+          "bore_on": "re-read: name, latest 1.0.1, created date",
+          "outcome": "supported",
+          "quote": "\"created\":\"2017-05-18T04:34:21.018Z\"",
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/fs/latest",
+          "read_on": "2026-09-30",
+          "bore_on": "re-read: 0.0.1-security and the placeholder wording; the apostrophe is U+0027 in the session's raw-byte probe",
+          "outcome": "supported",
+          "quote": "we'll probably give it to you if you want it",
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/crossenv",
+          "read_on": "2026-09-30",
+          "bore_on": "re-read: the \"security holding package\" description",
+          "outcome": "supported",
+          "quote": "security holding package",
+          "error": null
+        },
+        {
+          "url": "https://pypi.org/pypi/sklearn/json",
+          "read_on": "2026-09-30",
+          "bore_on": "PyPI first-upload times under releases, and the downloads object (changes 7a, 7b, 9)",
+          "outcome": "supported",
+          "quote": "{\"last_day\":-1,\"last_month\":-1,\"last_week\":-1}",
+          "error": null
+        },
+        {
+          "url": "https://crates.io/api/v1/crates/tokio_advanced",
+          "read_on": "2026-09-30",
+          "bore_on": "re-read: status 404",
+          "outcome": "supported",
+          "quote": "HTTP 404",
+          "error": null
+        },
+        {
+          "url": "https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html",
+          "read_on": "2026-09-30",
+          "bore_on": "re-read: the POSIX range sentence",
+          "outcome": "supported",
+          "quote": "shall not rely on whether the range expression is valid, or on the set of collating elements matched.",
+          "error": null
+        },
+        {
+          "url": "https://packaging.python.org/en/latest/specifications/name-normalization/",
+          "read_on": "2026-09-30",
+          "bore_on": "re-read: normalisation and valid names; a name with a look-alike character cannot be a distribution name (change 4a)",
+          "outcome": "supported",
+          "quote": "A valid name consists only of ASCII letters and numbers, period, underscore and hyphen.",
+          "error": null
+        },
+        {
+          "url": "https://packaging.python.org/en/latest/discussions/distribution-package-vs-import-package/",
+          "read_on": "2026-09-30",
+          "bore_on": "re-read: import name versus distribution name",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://doc.rust-lang.org/reference/items/extern-crates.html",
+          "read_on": "2026-09-30",
+          "bore_on": "the Rust hyphen rule and the sentence before \"In such case\" (change 12); round 3's first draft said that sentence was not read, which the validator found stale",
+          "outcome": "supported",
+          "quote": "When naming Rust crates, hyphens are disallowed. However, Cargo packages may make use of them.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/rust-lang/reference/master/src/items/extern-crates.md",
+          "read_on": "2026-09-30",
+          "bore_on": "second route for the Rust sentence",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/lib/fs.js",
+          "read_on": "2026-09-30",
+          "bore_on": "the virtual-file-system handler branch at the top of readFileSync (change 11)",
+          "outcome": "supported",
+          "quote": "const h = vfsState.handlers;",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/lib/internal/fs/utils.js",
+          "read_on": "2026-09-30",
+          "bore_on": "where vfsState is defined and set (change 11)",
+          "outcome": "supported",
+          "quote": "function setVfsHandlers(handlers) { vfsState.handlers = handlers; }",
+          "error": null
+        },
+        {
+          "url": "https://nodejs.org/api/vfs.html",
+          "read_on": "2026-09-30",
+          "bore_on": "the name \"virtual file system\" for the handler (change 11)",
+          "outcome": "supported",
+          "quote": "Virtual File System",
+          "error": null
+        },
+        {
+          "url": "https://eur-lex.europa.eu/eli/reg/2024/2847/oj/eng",
+          "read_on": "2026-09-30",
+          "bore_on": "Cyber Resilience Act, Article 13(5)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "did not load (three EUR-Lex addresses tried)"
+        },
+        {
+          "url": "https://www.european-cyber-resilience-act.com/Cyber_Resilience_Act_Article_13.html",
+          "read_on": "2026-09-30",
+          "bore_on": "Cyber Resilience Act, Article 13(5), through an unofficial mirror run by a private company; names no check of identity, name or provenance, so not cited (finding 14, left open)",
+          "outcome": "did-not-bear",
+          "quote": "manufacturers shall exercise due diligence when integrating components sourced from third parties",
+          "error": null
+        },
+        {
+          "url": "https://www.cisa.gov/sites/default/files/2024-02/CISA-Open-Source-Software-Security-Roadmap-508c.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "CISA Open Source Software Security Roadmap: names typosquatting as a threat but prescribes no way to verify a package",
+          "outcome": "did-not-bear",
+          "quote": "employing typosquatting attacks that take advantage of developer errors",
+          "error": null
+        },
+        {
+          "url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf?__blob=publicationFile&v=7",
+          "read_on": "2026-09-30",
+          "bore_on": "the plausibility check for an unknown library (change 1)",
+          "outcome": "supported",
+          "quote": "Unknown libraries should be checked for plausibility, e.g. when they were created, how commonly they are used or how active a source code repository is.",
+          "error": null
+        },
+        {
+          "url": "https://cyber.gouv.fr/en",
+          "read_on": "2026-09-30",
+          "bore_on": "the agency's own English name (wording fix on the joint report sentence)",
+          "outcome": "supported",
+          "quote": "France's Cybersecurity Agency",
+          "error": null
+        },
+        {
+          "url": "https://www.ncsc.gov.uk/blogs/software-supply-chain-attacks-check-your-dependencies",
+          "read_on": "2026-09-30",
+          "bore_on": "the United Kingdom National Cyber Security Centre on typosquatting and ownership transfer; nothing this file lacks",
+          "outcome": "did-not-bear",
+          "quote": "Publishing packages using similar names or misspelling popular legitimate packages in the hope they are installed by mistake.",
+          "error": null
+        },
+        {
+          "url": "ncsc.gov.uk, the PDF version of the same blog post under a /2026-06/ path (the research note does not record the full address)",
+          "read_on": "2026-09-30",
+          "bore_on": "the National Cyber Security Centre PDF version",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 404 at the /2026-06/ address"
+        },
+        {
+          "url": "https://www.enisa.europa.eu/sites/default/files/2026-09/ENISA%20Technical%20Advisory-AI-assisted-software-development-draft.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "install scripts, maintainers, provenance and popularity (changes 2a, 8b, 9)",
+          "outcome": "supported",
+          "quote": "Do not rely on popularity metrics alone, as they may be misleading or inflated.",
+          "error": null
+        },
+        {
+          "url": "https://www.enisa.europa.eu/sites/default/files/2026-03/ENISA%20Technical%20Advisory%20-%20Package_Managers_Final.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "the final package-manager advisory replacing the 0.8 draft citation, sections 3.2.1 and 3.2.2 (change 10)",
+          "outcome": "supported",
+          "quote": "Compromised legitimate packages",
+          "error": null
+        },
+        {
+          "url": "https://www.tenable.com/blog/how-cyberattackers-inflate-malicious-package-npm-download-counts",
+          "read_on": "2026-09-30",
+          "bore_on": "inflated download counts (change 9)",
+          "outcome": "supported",
+          "quote": "reached more than 50,000 downloads in three days after attackers uploaded more than 700 versions",
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/sigstore/latest",
+          "read_on": "2026-09-30",
+          "bore_on": "the provenance, trusted-publisher, maintainers and repository fields (changes 6d, 8a, 8b)",
+          "outcome": "supported",
+          "quote": "{\"url\":\"git+https://github.com/sigstore/sigstore-js.git\",\"type\":\"git\"}",
+          "error": null
+        },
+        {
+          "url": "https://api.npmjs.org/downloads/point/last-week/@isaacs%2fcliui",
+          "read_on": "2026-09-30",
+          "bore_on": "downloads for a scoped npm name (changes 6a to 6d)",
+          "outcome": "supported",
+          "quote": "{\"downloads\":116807845,\"start\":\"2026-09-22\",\"end\":\"2026-09-28\",\"package\":\"@isaacs/cliui\"}",
+          "error": null
+        },
+        {
+          "url": "https://api.npmjs.org/downloads/point/last-week/@isaacs/cliui",
+          "read_on": "2026-09-30",
+          "bore_on": "the plain-slash form answers the same",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/bcrypt/latest",
+          "read_on": "2026-09-30",
+          "bore_on": "bcrypt's install script as the install-scripts example (change 2a)",
+          "outcome": "supported",
+          "quote": "\"install\":\"node-gyp-build\"",
+          "error": null
+        },
+        {
+          "url": "https://docs.pypi.org/api/json/",
+          "read_on": "2026-09-30",
+          "bore_on": "the downloads field (change 9)",
+          "outcome": "supported",
+          "quote": "this key is always `-1` and should not be used.",
+          "error": null
+        },
+        {
+          "url": "https://docs.pypi.org/api/integrity/",
+          "read_on": "2026-09-30",
+          "bore_on": "PyPI provenance through the integrity interface; left open because it needs one request per file",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://pypi.org/integrity/sigstore/4.5.0/sigstore-4.5.0-py3-none-any.whl/provenance",
+          "read_on": "2026-09-30",
+          "bore_on": "the address the skill uses for PyPI provenance (a cross-file finding for the skill)",
+          "outcome": "did-not-bear",
+          "quote": "attestation_bundles",
+          "error": null
+        },
+        {
+          "url": "https://top10.owasp.org/2025/A03_2025-Software_Supply_Chain_Failures",
+          "read_on": "2026-09-30",
+          "bore_on": "signed packages; the entry's name (change 8b)",
+          "outcome": "supported",
+          "quote": "Prefer signed packages to reduce the chance of including a modified, malicious component",
+          "error": null
+        },
+        {
+          "url": "https://owasp.org/about/",
+          "read_on": "2026-09-30",
+          "bore_on": "the name Open Worldwide Application Security Project",
+          "outcome": "supported",
+          "quote": "The Open Worldwide Application Security Project (OWASP) is a 501(c)(3) nonprofit foundation",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/TanStack/query/main/docs/framework/react/reference/useQuery.md",
+          "read_on": "2026-09-30",
+          "bore_on": "TanStack Query's own throwOnError reference entry (left open)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://maven.apache.org/repositories/layout.html",
+          "read_on": "2026-09-30",
+          "bore_on": "whether every Maven Central artifact publishes maven-metadata.xml (left open)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md",
+          "read_on": "2026-09-30",
+          "bore_on": "raw-byte probes (a) to (f); the recipes with changes 6a to 6c, 7a and 8a run in bash and zsh before applying; the four pattern evasions; the look-alike-character check; and the recipes exactly as they stand in the edited file run after applying",
+          "outcome": "supported",
+          "quote": "sigstore             REGISTERED latest=5.0.0 created=2022-08-08… provenance=present trusted_publisher=yes",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s4-agent-r3-1",
+          "kind": "new",
+          "text": "A registered invented name with no well-known counterpart passed silently at REGISTERED. It is now recorded as \"registered; no well-known counterpart named; not settled\", with the plausibility check France's Cybersecurity Agency and the German Federal Office for Information Security recommend; a new scope resembling one the repository uses gets the same check (change 1).",
+          "evidence": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf?__blob=publicationFile&v=7, page 10, read 2026-09-30: \"Unknown libraries should be checked for plausibility, e.g. when they were created, how commonly they are used or how active a source code repository is.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-2",
+          "kind": "new",
+          "text": "The export check accepted a member found in the package's own declaration files even for a suspected name, whose publisher wrote those files; and an installed copy has already run its install step. A found member now settles nothing for an unsettled name, and install-type scripts are recorded for dependency-auditor, which owns install-time hook abuse (changes 2a and 2b).",
+          "evidence": "https://www.enisa.europa.eu/sites/default/files/2026-09/ENISA%20Technical%20Advisory-AI-assisted-software-development-draft.pdf, version 0.4, table 5, read 2026-09-30: \"Flag unnecessary or risky installation behaviour, such as unusual install scripts, post-install hooks…\"; agents/security/dependency-auditor.md line 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-3",
+          "kind": "new",
+          "text": "A private registry configured outside the repository, or an internal name with no prefix, never triggered the dependency-confusion rule. The blind spot cannot be closed from inside the repository, so the file now states it and writes a limitation for every such name (change 3).",
+          "evidence": "https://slsa.dev/spec/v1.1/threats (quoted in round 2); .ctoc/audit/improvement-run-notes/s4-agent-round3-research-d-s4-agent-r3-research.md, Part C, item 4",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-4",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s4-agent-r2-8, which covered only refusal: a name written with a character that imitates a Latin letter was refused and recorded as not checked, a free downgrade for an attacker. A refused name's line is now Grepped for a character above code point 127 and, where it imitates a known package, reported as suspected_lookalike (changes 4a to 4c). The session confirmed the refusal and the Grep hit on reаct with a Cyrillic letter.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md, \"Look-alike character (change 4a)\"; https://packaging.python.org/en/latest/specifications/name-normalization/",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-5",
+          "kind": "new",
+          "text": "A replacement name taken from text the registry entry's owner wrote (a summary such as \"use scikit-learn instead\") could reach a suggestion unchecked. The recipe must now be run on that name first (change 5).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round3-research-d-s4-agent-r3-research.md, Part C, item 6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-6",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects round 1 (f-s4-agent-r1-2 and f-s4-agent-r1-9), which recorded downloads for a scoped npm name as not checked: the downloads address answers for a scoped name in the %2f form. The recipe now reads it (changes 6a to 6d).",
+          "evidence": "https://api.npmjs.org/downloads/point/last-week/@isaacs%2fcliui, read 2026-09-30: {\"downloads\":116807845,…,\"package\":\"@isaacs/cliui\"}; .ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md, items (b) and the pre-apply run",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-7",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects round 1 (f-s4-agent-r1-9), which said the PyPI recipe reads no registration date: every file under releases carries upload_time_iso_8601. The recipe now prints first_upload, called the first upload, never the registration date, and the training-cutoff rule is not applied to it (changes 7a and 7b).",
+          "evidence": "https://pypi.org/pypi/sklearn/json, read 2026-09-30: earliest \"2015-07-15T14:17:46.609926Z\"; .ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md, item (c)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-8",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects round 1's dropped repository and maintainer fields (f-s4-agent-r1-9) and resolves round 2's carried provenance item (f-s4-agent-r2-15): the fields dist.attestations, _npmUser.trustedPublisher, maintainers and repository were seen with their shapes. The npm recipe now prints them, read from the latest version's entry; provenance is read as present or absent, never as verified (changes 8a and 8b). The session's run showed sigstore with provenance=present trusted_publisher=yes.",
+          "evidence": "https://registry.npmjs.org/sigstore/latest, read 2026-09-30; https://www.enisa.europa.eu/sites/default/files/2026-09/ENISA%20Technical%20Advisory-AI-assisted-software-development-draft.pdf, table 5: \"Where available, verify package signing, integrity or provenance metadata.\"; .ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-9",
+          "kind": "new",
+          "text": "Nothing warned that a download count can be manufactured, and PyPI's downloads field was described imprecisely. A count now never clears a name on its own, with the agency's popularity sentence and Tenable's initial analysis; PyPI's field is shown as the object of -1 values it is (change 9).",
+          "evidence": "https://www.tenable.com/blog/how-cyberattackers-inflate-malicious-package-npm-download-counts, read 2026-09-30: \"each version uploaded to the npm public registry typically receives between 100 and 150 downloads from automated systems\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-10",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s4-agent-r2-10: the package-manager advisory is now final (version 1.1, March 2026) and the section titles can be quoted (change 10).",
+          "evidence": "https://www.enisa.europa.eu/sites/default/files/2026-03/ENISA%20Technical%20Advisory%20-%20Package_Managers_Final.pdf, read 2026-09-30: sections 3.2.1 \"Insertion of malicious packages/dependencies\" and 3.2.2 \"Compromised legitimate packages\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-11",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s4-agent-r2-13: readFileSync now first hands the caller's options object to a registered virtual-file-system handler and returns its result unless it is undefined; vfsState is defined in lib/internal/fs/utils.js and set by setVfsHandlers(handlers) (change 11, with the validator's optional wording).",
+          "evidence": "https://raw.githubusercontent.com/nodejs/node/main/lib/fs.js and https://raw.githubusercontent.com/nodejs/node/main/lib/internal/fs/utils.js, read 2026-09-30",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-12",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s4-agent-r2-19: the Rust quotation dropped \"In such case\". The critique proposed saying the sentence before it was not read; the validator read it, so the file now quotes the whole passage ending on an ellipsis (change 12, validator's replacement text).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round3-validate-d-s4-agent-r3-validate.md, rows 28-29; https://doc.rust-lang.org/reference/items/extern-crates.html",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-13",
+          "kind": "new",
+          "text": "The pattern list never said a miss proves nothing. It now names four forms outside what the patterns match; the session ran all four against the patterns and each printed false (change 13).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md, \"Pattern evasions (change 13)\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-14",
+          "kind": "new",
+          "text": "The Cyber Resilience Act, Article 13(5), places a due-diligence duty on manufacturers integrating third-party components but names no check this agent can run, and the only readable text was an unofficial mirror.",
+          "evidence": "https://www.european-cyber-resilience-act.com/Cyber_Resilience_Act_Article_13.html, read 2026-09-30; EUR-Lex did not load",
+          "decision": "rejected",
+          "reason": "Left open: not cited. Revisit only if the official text is read and it names a check this agent can run.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-15",
+          "kind": "new",
+          "text": "After change 8 the agent can say provenance is present, never that it is valid: verifying a signature needs a tool it does not hold, and its tools line is fixed.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round3-critic-d-s4-agent-r3-critic.md, finding 15",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-agent-r3-provenance-read-never-verified"
+        },
+        {
+          "id": "f-s4-agent-r3-16",
+          "kind": "new",
+          "text": "Validation: the words \"AI-assisted development\" were unexpanded in changes 2a, 8b and 9. Now \"artificial-intelligence-assisted software development\".",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round3-validate-d-s4-agent-r3-validate.md, row 30",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-17",
+          "kind": "new",
+          "text": "Validation: \"Tenable found that\" overstated the source, which says \"From Tenable's initial analysis\". Now \"Tenable's initial analysis found that\".",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round3-validate-d-s4-agent-r3-validate.md, row 18",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-18",
+          "kind": "new",
+          "text": "Validation: the Open Worldwide Application Security Project entry is named by its page title, \"A03:2025 Software Supply Chain Failures\", rather than \"Top 10:2025\", which the validator could not confirm as the project's own name.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round3-validate-d-s4-agent-r3-validate.md, row 15",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-19",
+          "kind": "new",
+          "text": "Re-validation wording: \"These are real packages an AI reaches for out of habit\" left \"AI\" unexpanded; now \"an artificial-intelligence model\". The description line's first sentence and its dispatch phrases were left byte-identical, as the plan requires.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round3-revalidate-d-s4-agent-r3-revalidate.md, \"Optional wording, not an error\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-20",
+          "kind": "new",
+          "text": "Re-validation wording: \"the French Cybersecurity Agency\" is not the agency's own English form; now \"France's Cybersecurity Agency\".",
+          "evidence": "https://cyber.gouv.fr/en, read 2026-09-30: \"France's Cybersecurity Agency — ANSSI\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-21",
+          "kind": "new",
+          "text": "Left open after three rounds, each stated in the file where it matters: PyPI provenance through its integrity interface; the contents of PyPI's ownership key; repository activity; whether provenance is valid; whether a PyPI first upload is the registration date; whether every Maven Central artifact publishes maven-metadata.xml (a 404 there stays MEDIUM); TanStack Query version 5's own throwOnError reference entry; what a Node.js virtual-file-system handler reads; recipes for NuGet and the Go module proxy; whether moment().toISOString() matches date-fns formatISO in every time zone; whether time.created survives an npm name transfer; a name registered before the training cutoff; npm's own rules for non-ASCII names; the publication venues of Krishna and of Twist and colleagues; the ECMAScript regular-expression specification; and two structural questions (the axios key in the package-name table, and the flatMap polyfill row).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round3-critic-d-s4-agent-r3-critic.md, \"Left open, in the file's own words or here\"",
+          "decision": "rejected",
+          "reason": "Left open: no source or tool reached this round settles these, and a change without one would be a claim from memory or an order the agent cannot carry out.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-22",
+          "kind": "new",
+          "text": "The provenance fields dist.attestations and _npmUser.trustedPublisher now have confirmed shapes; the PyPI integrity address the skill uses (lines 226-230) answered 200 with and without the Accept header; the skill's recipe still needs a filename per version.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md, items (d) and (f)",
+          "decision": "rejected",
+          "reason": "Cross-file: this is a finding about skills/ai-quality/hallucination-detector/SKILL.md, which is in this same slice (s4) and not yet started; it is applied in that file's own rounds, and nothing in this file changes for it.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-23",
+          "kind": "new",
+          "text": "The three free evasions (a registered name with no counterpart, a private registry configured outside the repository, an attacker's own declaration files and install scripts) apply to the skill's method too.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round3-critic-d-s4-agent-r3-critic.md, findings 1 to 3",
+          "decision": "rejected",
+          "reason": "Cross-file: this is a finding about skills/ai-quality/hallucination-detector/SKILL.md, which is in this same slice (s4) and not yet started; it is applied in that file's own rounds, and nothing in this file changes for it.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-24",
+          "kind": "new",
+          "text": "The popularity warning and Tenable's inflation figures apply to any download-count check in the skill.",
+          "evidence": "https://www.tenable.com/blog/how-cyberattackers-inflate-malicious-package-npm-download-counts; https://www.enisa.europa.eu/sites/default/files/2026-09/ENISA%20Technical%20Advisory-AI-assisted-software-development-draft.pdf, table 5",
+          "decision": "rejected",
+          "reason": "Cross-file: this is a finding about skills/ai-quality/hallucination-detector/SKILL.md, which is in this same slice (s4) and not yet started; it is applied in that file's own rounds, and nothing in this file changes for it. The cross-file findings of rounds 1 and 2 remain pending for the skill's rounds; they are not repeated here.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-25",
+          "kind": "new",
+          "text": "Scenario 20 asks each changed example to name its language version. One comment line now opens three changed example blocks: the TypeScript import examples (TypeScript / JavaScript, Node.js 24 used to run the patterns), the Python examples (Python 3.12 and later, the version the parent plan sets; the decorated example parses under Python 3.9.6), and the Rust example (checked against the Rust Reference and a live crates.io answer). Two changes from the dispatcher's wording keep the lines true: the TypeScript line says \"documentation or its registry answer\", because email-validator-pro and bcrypt's install script were checked against registry answers; the Python line leaves out requests, which is not in that block.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-agent-round2-session-runs.md (Python 3.9.6, node v24.14.1); plans/implementation/every-agent-and-specialist-skill-improved-three-times.md, criterion 4 and scenario 20",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-agent-r3-26",
+          "kind": "new",
+          "text": "Completes f-s4-agent-r3-25 for scenario 20: the two remaining changed TypeScript example blocks, \"Wrong API Usage\" (its axios label changed in round 1) and the React hook block (given its own fence in round 1), now open with the same TypeScript / JavaScript version line. The \"Wrong API Usage\" line says \"documentation or its source code\", because its moment and fs claims were checked against moment's and Node.js's own source files, not documentation; the React line says \"documentation or its registry answer\" as dispatched. The Rust block carries a check line but no version: Rust is outside the seven languages the parent plan's criterion 4 requires, the example is a single use path checked against the Rust Reference and a live crates.io answer, and no one read which edition the Reference documents, so naming one would be a claim nobody checked.",
+          "evidence": "plans/implementation/every-agent-and-specialist-skill-improved-three-times.md, criterion 4 and scenario 20; https://raw.githubusercontent.com/moment/moment/develop/ts3.1-typings/moment.d.ts and https://raw.githubusercontent.com/nodejs/node/main/lib/fs.js (round 2 sources)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 30,
+        "VALIDATED": 29,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "validator_final": {
+        "examined": 91,
+        "VALIDATED": 86,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/ai-quality/hallucination-detector/SKILL.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "It applies: every one of the seven languages has a package ecosystem. Round 3 used four source classes different from rounds 1 and 2, which asked whether each statement is true: raw re-reads of primary material (registry answers, specification pages and Node.js source, with the session's curl probes as byte-level evidence); regulators (the Cyber Resilience Act through an unofficial mirror, left open and not cited; CISA's open-source roadmap; the joint report of France's Cybersecurity Agency and the German Federal Office for Information Security; the United Kingdom National Cyber Security Centre; the European Union Agency for Cybersecurity's draft advisory on artificial-intelligence-assisted software development and its final package-manager advisory); an attacker-technique source (Tenable, on inflated download counts); and an adversarial pass of twelve ways past the file's checks. They ask what a regulator expects a review to do and how an attacker who has read this file would get past it. This round touches JavaScript and TypeScript (the npm recipe gains scoped downloads, maintainers, repository link and provenance presence; the pattern list states its limits), Python (the PyPI recipe gains the first upload) and Rust (the crate-name quotation). Java is unchanged; C# (NuGet) and Go still have no recipe and are left open; SQL (Postgres extensions) is not queried, by design; C and C++ are out of scope, following the skill.",
+        "examples_checked": [
+          {
+            "language": "Bash and zsh (the npm, PyPI and crates.io recipes): GNU bash 3.2.57(1)-release (arm64-apple-darwin25) and zsh 5.9 (arm64-apple-darwin25.0), with curl 8.7.1 and node v24.14.1 parsing the answers, on macOS 26.6.1, LANG=C.UTF-8",
+            "how": "run live by the session with changes 6a to 6c, 7a and 8a applied before applying, and again exactly as they stand in the edited file after applying, see .ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md"
+          },
+          {
+            "language": "JavaScript (the four pattern evasions in change 13): node v24.14.1",
+            "how": "run by the session in Node against the file's patterns; each printed false, see .ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md"
+          },
+          {
+            "language": "The look-alike-character check (change 4a): the npm recipe under GNU bash 3.2.57(1)-release (arm64-apple-darwin25) and zsh 5.9 (arm64-apple-darwin25.0), with curl 8.7.1 and node v24.14.1 parsing the answers, on macOS 26.6.1, LANG=C.UTF-8; the Grep pattern [^\\x00-\\x7F]",
+            "how": "run by the session: the Cyrillic name refused by the npm recipe and found by the Grep pattern, see .ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md"
+          },
+          {
+            "language": "Rust (crate name versus package name)",
+            "how": "official documentation: https://doc.rust-lang.org/reference/items/extern-crates.html and its source, read 2026-09-30"
+          }
+        ]
+      }
+    }
+  ],
+  "late_corrections": [
+    {
+      "id": "lc-s4-agent-1",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "round": 1
+      },
+      "source": {
+        "url": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "quote": "`npm view <pkg>` returning a result is not proof of a usable package"
+      },
+      "before": "2. The skill's existence tests — `npm view <pkg>` returning a non-empty result, `pip index versions <pkg>` succeeding — are replaced by this file's recipes. The first reports as existing a name npm holds as a placeholder (see \"What a registry answer proves\").",
+      "after": "2. The skill's per-language verification lines are examples; this file's recipes are the existence checks. The skill records observed addresses for NuGet and the Go module proxy, and a database query for Postgres extensions, that this file has not turned into recipes, so names from those registries stay \"not checked\" (see \"No recipe here\").",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass",
+        "covered_by": ".ctoc/audit/improvement-run-notes/s4-npm-test-final.md (the end-of-slice npm test on the final bytes, agent sha256:432f165a381e9ac2c46a5f8b43be76568317d5646905a6dcc26f1793b94dffae, skill sha256:e259dc1af2a4f9fb6e0e084646467f619abfbcaea7dd8071bc9ada339f9ca794: 12,035 passed, 0 failed, 0 skipped, coverage 99.9% against 99, offline claims ledger PASS)"
+      }
+    },
+    {
+      "id": "lc-s4-agent-2",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "round": 2
+      },
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      },
+      "source": {
+        "url": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "quote": "The wrapper has no Conan or vcpkg recipe, so the addresses below are observed facts"
+      },
+      "before": "2. The skill's per-language verification lines are examples; this file's recipes are the existence checks. The skill records observed addresses for NuGet and the Go module proxy, and a database query for Postgres extensions, that this file has not turned into recipes, so names from those registries stay \"not checked\" (see \"No recipe here\").",
+      "after": "2. The skill's per-language verification lines are examples; this file's recipes are the existence checks. The skill records observed addresses for NuGet, the Go module proxy, ConanCenter and vcpkg, and a database query for Postgres extensions, that this file has not turned into recipes, so names from those registries stay \"not checked\" (see \"No recipe here\")."
+    },
+    {
+      "id": "lc-s4-agent-3",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "round": 2
+      },
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass",
+        "covered_by": ".ctoc/audit/improvement-run-notes/s4-npm-test-final.md (the end-of-slice npm test on the final bytes, agent sha256:432f165a381e9ac2c46a5f8b43be76568317d5646905a6dcc26f1793b94dffae, skill sha256:e259dc1af2a4f9fb6e0e084646467f619abfbcaea7dd8071bc9ada339f9ca794: 12,035 passed, 0 failed, 0 skipped, coverage 99.9% against 99, offline claims ledger PASS)"
+      },
+      "source": {
+        "url": "https://typing.python.org/en/latest/spec/distributing.html",
+        "quote": "If a stub package distribution is partial it MUST include `partial\\n` in a `py.typed` file"
+      },
+      "before": "- A member missing from the declaration files, after every re-export is followed, is a finding with confidence HIGH. A member missing only from plain source may be created while the code runs, so its confidence is MEDIUM.\n| HIGH | The registry answered status 200 or 404 during this dispatch for the name the code needs, or the installed declaration files lack the member after every re-export was followed. Quote the answer, or the file and line, in `confidence_rationale`. |",
+      "after": "- A member missing from the declaration files, after every re-export is followed, is a finding with confidence HIGH; a whole module missing from a Python stub package that declares itself partial is not a finding: record it under `self_assessment.unknowns` (\"whether `<module>` exists: absent from a partial stub package; not settled\") (\"If a stub package distribution is partial it MUST include `partial\\n` in a `py.typed` file\", https://typing.python.org/en/latest/spec/distributing.html, read 2026-09-30). A member missing only from plain source may be created while the code runs, so its confidence is MEDIUM.\n| HIGH | The registry answered status 200 or 404 during this dispatch for the name the code needs, or the installed declaration files lack the member after every re-export was followed (not a whole module missing from a Python stub package that declares itself partial; see Export Verification). Quote the answer, or the file and line, in `confidence_rationale`. |"
+    },
+    {
+      "id": "lc-s4-agent-4",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "round": 3
+      },
+      "source": {
+        "url": "https://attack.mitre.org/techniques/T1195/001/",
+        "quote": "may also include abandoned packages, which in some cases could be re-registered by threat actors after being removed by adversaries."
+      },
+      "before": "| `suspected_lookalike`: downloaded less, or registered later, than the well-known package it was likely mistaken for; or written with a character that imitates a Latin letter of a known package's name | high |\n| `renamed_package` | low |",
+      "after": "| `suspected_lookalike`: downloaded less, or registered later, than the well-known package it was likely mistaken for; or written with a character that imitates a Latin letter of a known package's name; or a renamed name whose npm maintainers differ from the well-known project's | high |\n| `renamed_package`: low when the npm recipe's answer shows the maintainers the well-known project has, or when the registry's recipe prints no maintainers (the PyPI, crates.io and Maven Central recipes), in which case write \"maintainers not read\" in `self_assessment.limitations`; otherwise it is `suspected_lookalike` (high, above), because an abandoned name \"could be re-registered by threat actors\" (https://www.cisa.gov/eviction-strategies-tool/info-attack/T1195.001 and https://attack.mitre.org/techniques/T1195/001/, both read 2026-09-30) | low |",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s4-agent-5",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "round": 3
+      },
+      "source": {
+        "url": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md",
+        "quote": "An ordinary package publisher can write its own registry description so that the recipe labels its package \"held by the registry\"."
+      },
+      "before": "The wrapper at sha256:9a4a4f6d8ef26e133b1168895691d4bac56c6e92c8ffbbb3d774854d27f7e422 (after lc-s4-agent-4): the npm recipe labelled HELD BY NPM on a -security version or a \"security holding package\" description alone; the PyPI recipe printed HELD BY PYPI on a summary; names went into the recipes as name='…'; Export Verification followed any path a package names; the exit status was not stated; the renamed_package condition sat in a table cell requiring \"the maintainers the well-known project has\"; moment's toISOString was offered as the equivalent of date-fns formatISO.",
+      "after": "The wrapper at sha256:432f165a381e9ac2c46a5f8b43be76568317d5646905a6dcc26f1793b94dffae: HELD BY NPM only when maintainers is exactly the user npm and the version or description says so, a lead that never skips the look-alike check; no PyPI placeholder label (publisher_summary); names read with IFS= read -r from a quoted heredoc; curl -q with HTTPS-only redirects; values through JSON.stringify with the Unicode separator limit stated; traps on exit and on hang-up, interrupt and termination signals; Export Verification limited to the package's own directory, with the symbolic-link limit stated; the exit-status and DOWNLOADS rules; the renamed_package condition under the table with \"shares at least one maintainer\"; the precedence sentence; the created-date limit with the fs dates; the moment and date-fns difference; the character check in seven numbered steps; C and C++ language issues handed to sast-scanner.",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass",
+        "covered_by": ".ctoc/audit/improvement-run-notes/s4-npm-test-final.md (the end-of-slice npm test on the final bytes, agent sha256:432f165a381e9ac2c46a5f8b43be76568317d5646905a6dcc26f1793b94dffae, skill sha256:e259dc1af2a4f9fb6e0e084646467f619abfbcaea7dd8071bc9ada339f9ca794: 12,035 passed, 0 failed, 0 skipped, coverage 99.9% against 99, offline claims ledger PASS)"
+      },
+      "source_dispatches": [
+        "d-s4-step13-secure",
+        "d-s4-step11-review",
+        "d-s4-step11-review-2",
+        "d-s4-post-kickback-revalidate",
+        "d-s4-step13-secure-2",
+        "d-s4-post-kickback-revalidate-2"
+      ],
+      "validator_counts": "d-s4-post-kickback-revalidate-2, the wrapper's claims: 19 examined, 18 validated, 1 not a citation, 0 refuted, 0 misattributed; its two wrapper leftovers were applied in its own wording."
+    }
+  ],
+  "held": null
+}

@@ -1,0 +1,18 @@
+# Skill file, round 3: the research note's requested raw probes RUN by the session (curl 8.7.1, node v24.14.1), 2026-09-30, 22:22 CEST
+
+- Jackson 3.x ObjectMapper.java (https://raw.githubusercontent.com/FasterXML/jackson-databind/3.x/src/main/java/tools/jackson/databind/ObjectMapper.java, status 200): NO code line declares a static builder() on ObjectMapper — the only 'static builder()' hit is a comment on line 49 ("First build method is the static builder() on exact type"); writeValueAsJson absent (0). Jackson 3.x JsonMapper.java (status 200): 151:    public static Builder builder() {. So in Jackson 3 too, the builder is on JsonMapper, not ObjectMapper.
+- react-codeshift (raw): description "🚫 Placeholder to prevent dependency confusion."; dist-tags {"latest":"1.0.0"}; maintainers [{"name":"debugducky",…}]; created 2026-01-14T21:02:51.762Z — a third party's registration, not an npm hold.
+- PyPI slopcheck (https://pypi.org/pypi/slopcheck/json, status 200): name slopcheck, version 0.6.1, project URLs → https://github.com/0xToxSec/slopcheck. npm slopcheck (raw): "Scan markdown and config files for hallucinated npm package names. Defends against slopsquatting supply chain attacks.", latest 0.2.0, maintainer mattschaller, created 2026-03-08T11:07:16.684Z, repository github.com/mattschaller/slopcheck. So THREE different projects carry the name slopcheck: experimental-gains/slopcheck (the one the skill links), 0xToxSec/slopcheck (the PyPI distribution), mattschaller/slopcheck (the npm package). The skill must name the tool by repository, and say which registry distribution is which.
+- FastAPI fastapi/security directory (GitHub contents API): __init__.py, api_key.py, base.py, http.py, oauth2.py, open_id_connect_url.py, utils.py — no advanced.py; so "No 'advanced' submodule" holds for the directory, not only for __init__.
+- OpenSSL EVP_EncryptInit.pod (raw, status 200): all three prototypes present after whitespace normalisation; "EVP_Q_" occurs 0 times in the pod.
+
+## Round 3 critique's open items probed (session, 22:27 CEST)
+- deps.dev: BOTH wordings exist on different pages, raw: https://docs.deps.dev/ says "structure, construction, and security"; https://docs.deps.dev/faq/ says "structure, security, and construction". The file's quotation (from docs.deps.dev/) is exact for that address.
+- Jackson 3 JsonMapper address: https://raw.githubusercontent.com/FasterXML/jackson-databind/3.x/src/main/java/tools/jackson/databind/json/JsonMapper.java (status 200), line 151: `public static Builder builder() {`.
+- FastAPI directory listing address: https://api.github.com/repos/fastapi/fastapi/contents/fastapi/security (GitHub contents interface).
+- All 20 `old` strings targeting the skill occur exactly once and do not overlap; the 1 targeting the agent occurs exactly once.
+
+## Step 11 item 14: the C example compiled at C17 (executor, 2026-09-30; Apple clang version 21.0.0 (clang-2100.1.1.101), macOS 26.6.1)
+OpenSSL's headers are not installed on this machine, so the example's own lines were compiled with stand-in type declarations (`EVP_CIPHER_CTX` and `EVP_CIPHER` incomplete, `OSSL_PARAM` a complete stand-in struct). This checks that the lines are valid C17; what OpenSSL declares rests on its manual page and `util/libcrypto.num`.
+- `clang -std=c17 -Wall -Wextra -pedantic -c safe.c` on the three SAFE prototypes, byte for byte from the skill: exit 0, no diagnostics.
+- `clang -std=c17 -Wall -Wextra -pedantic -c bad.c` on the HALLUCINATION call, byte for byte, with no declaration of `EVP_Q_encrypt`: exit 1, "error: call to undeclared function 'EVP_Q_encrypt'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]".

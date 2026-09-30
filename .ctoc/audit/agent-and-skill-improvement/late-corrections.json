@@ -516,6 +516,843 @@
         "command": "npm test",
         "result": "pass"
       }
+    },
+    {
+      "id": "lc-s4-agent-1",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "round": 1
+      },
+      "source": {
+        "url": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "quote": "`npm view <pkg>` returning a result is not proof of a usable package"
+      },
+      "before": "2. The skill's existence tests — `npm view <pkg>` returning a non-empty result, `pip index versions <pkg>` succeeding — are replaced by this file's recipes. The first reports as existing a name npm holds as a placeholder (see \"What a registry answer proves\").",
+      "after": "2. The skill's per-language verification lines are examples; this file's recipes are the existence checks. The skill records observed addresses for NuGet and the Go module proxy, and a database query for Postgres extensions, that this file has not turned into recipes, so names from those registries stay \"not checked\" (see \"No recipe here\").",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass",
+        "covered_by": ".ctoc/audit/improvement-run-notes/s4-npm-test-final.md (the end-of-slice npm test on the final bytes, agent sha256:432f165a381e9ac2c46a5f8b43be76568317d5646905a6dcc26f1793b94dffae, skill sha256:e259dc1af2a4f9fb6e0e084646467f619abfbcaea7dd8071bc9ada339f9ca794: 12,035 passed, 0 failed, 0 skipped, coverage 99.9% against 99, offline claims ledger PASS)"
+      }
+    },
+    {
+      "id": "lc-s4-agent-2",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "round": 2
+      },
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      },
+      "source": {
+        "url": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "quote": "The wrapper has no Conan or vcpkg recipe, so the addresses below are observed facts"
+      },
+      "before": "2. The skill's per-language verification lines are examples; this file's recipes are the existence checks. The skill records observed addresses for NuGet and the Go module proxy, and a database query for Postgres extensions, that this file has not turned into recipes, so names from those registries stay \"not checked\" (see \"No recipe here\").",
+      "after": "2. The skill's per-language verification lines are examples; this file's recipes are the existence checks. The skill records observed addresses for NuGet, the Go module proxy, ConanCenter and vcpkg, and a database query for Postgres extensions, that this file has not turned into recipes, so names from those registries stay \"not checked\" (see \"No recipe here\")."
+    },
+    {
+      "id": "lc-s4-agent-3",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "round": 2
+      },
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass",
+        "covered_by": ".ctoc/audit/improvement-run-notes/s4-npm-test-final.md (the end-of-slice npm test on the final bytes, agent sha256:432f165a381e9ac2c46a5f8b43be76568317d5646905a6dcc26f1793b94dffae, skill sha256:e259dc1af2a4f9fb6e0e084646467f619abfbcaea7dd8071bc9ada339f9ca794: 12,035 passed, 0 failed, 0 skipped, coverage 99.9% against 99, offline claims ledger PASS)"
+      },
+      "source": {
+        "url": "https://typing.python.org/en/latest/spec/distributing.html",
+        "quote": "If a stub package distribution is partial it MUST include `partial\\n` in a `py.typed` file"
+      },
+      "before": "- A member missing from the declaration files, after every re-export is followed, is a finding with confidence HIGH. A member missing only from plain source may be created while the code runs, so its confidence is MEDIUM.\n| HIGH | The registry answered status 200 or 404 during this dispatch for the name the code needs, or the installed declaration files lack the member after every re-export was followed. Quote the answer, or the file and line, in `confidence_rationale`. |",
+      "after": "- A member missing from the declaration files, after every re-export is followed, is a finding with confidence HIGH; a whole module missing from a Python stub package that declares itself partial is not a finding: record it under `self_assessment.unknowns` (\"whether `<module>` exists: absent from a partial stub package; not settled\") (\"If a stub package distribution is partial it MUST include `partial\\n` in a `py.typed` file\", https://typing.python.org/en/latest/spec/distributing.html, read 2026-09-30). A member missing only from plain source may be created while the code runs, so its confidence is MEDIUM.\n| HIGH | The registry answered status 200 or 404 during this dispatch for the name the code needs, or the installed declaration files lack the member after every re-export was followed (not a whole module missing from a Python stub package that declares itself partial; see Export Verification). Quote the answer, or the file and line, in `confidence_rationale`. |"
+    },
+    {
+      "id": "lc-s4-agent-4",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "round": 3
+      },
+      "source": {
+        "url": "https://attack.mitre.org/techniques/T1195/001/",
+        "quote": "may also include abandoned packages, which in some cases could be re-registered by threat actors after being removed by adversaries."
+      },
+      "before": "| `suspected_lookalike`: downloaded less, or registered later, than the well-known package it was likely mistaken for; or written with a character that imitates a Latin letter of a known package's name | high |\n| `renamed_package` | low |",
+      "after": "| `suspected_lookalike`: downloaded less, or registered later, than the well-known package it was likely mistaken for; or written with a character that imitates a Latin letter of a known package's name; or a renamed name whose npm maintainers differ from the well-known project's | high |\n| `renamed_package`: low when the npm recipe's answer shows the maintainers the well-known project has, or when the registry's recipe prints no maintainers (the PyPI, crates.io and Maven Central recipes), in which case write \"maintainers not read\" in `self_assessment.limitations`; otherwise it is `suspected_lookalike` (high, above), because an abandoned name \"could be re-registered by threat actors\" (https://www.cisa.gov/eviction-strategies-tool/info-attack/T1195.001 and https://attack.mitre.org/techniques/T1195/001/, both read 2026-09-30) | low |",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s4-agent-5",
+      "path": "agents/ai-quality/hallucination-detector.md",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/hallucination-detector/SKILL.md",
+        "round": 3
+      },
+      "source": {
+        "url": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md",
+        "quote": "An ordinary package publisher can write its own registry description so that the recipe labels its package \"held by the registry\"."
+      },
+      "before": "The wrapper at sha256:9a4a4f6d8ef26e133b1168895691d4bac56c6e92c8ffbbb3d774854d27f7e422 (after lc-s4-agent-4): the npm recipe labelled HELD BY NPM on a -security version or a \"security holding package\" description alone; the PyPI recipe printed HELD BY PYPI on a summary; names went into the recipes as name='…'; Export Verification followed any path a package names; the exit status was not stated; the renamed_package condition sat in a table cell requiring \"the maintainers the well-known project has\"; moment's toISOString was offered as the equivalent of date-fns formatISO.",
+      "after": "The wrapper at sha256:432f165a381e9ac2c46a5f8b43be76568317d5646905a6dcc26f1793b94dffae: HELD BY NPM only when maintainers is exactly the user npm and the version or description says so, a lead that never skips the look-alike check; no PyPI placeholder label (publisher_summary); names read with IFS= read -r from a quoted heredoc; curl -q with HTTPS-only redirects; values through JSON.stringify with the Unicode separator limit stated; traps on exit and on hang-up, interrupt and termination signals; Export Verification limited to the package's own directory, with the symbolic-link limit stated; the exit-status and DOWNLOADS rules; the renamed_package condition under the table with \"shares at least one maintainer\"; the precedence sentence; the created-date limit with the fs dates; the moment and date-fns difference; the character check in seven numbered steps; C and C++ language issues handed to sast-scanner.",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass",
+        "covered_by": ".ctoc/audit/improvement-run-notes/s4-npm-test-final.md (the end-of-slice npm test on the final bytes, agent sha256:432f165a381e9ac2c46a5f8b43be76568317d5646905a6dcc26f1793b94dffae, skill sha256:e259dc1af2a4f9fb6e0e084646467f619abfbcaea7dd8071bc9ada339f9ca794: 12,035 passed, 0 failed, 0 skipped, coverage 99.9% against 99, offline claims ledger PASS)"
+      },
+      "source_dispatches": [
+        "d-s4-step13-secure",
+        "d-s4-step11-review",
+        "d-s4-step11-review-2",
+        "d-s4-post-kickback-revalidate",
+        "d-s4-step13-secure-2",
+        "d-s4-post-kickback-revalidate-2"
+      ],
+      "validator_counts": "d-s4-post-kickback-revalidate-2, the wrapper's claims: 19 examined, 18 validated, 1 not a citation, 0 refuted, 0 misattributed; its two wrapper leftovers were applied in its own wording."
     }
   ]
 }

@@ -1,0 +1,2808 @@
+{
+  "schema": 1,
+  "path": "skills/ai-quality/hallucination-detector/SKILL.md",
+  "prerequisite": null,
+  "rounds": [
+    {
+      "round": 1,
+      "date": "2026-09-30",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:e1472d75e7ebcbcfb1f0a69340601ce698cc506b609392d454772ec7d6290f11",
+      "fingerprint_after": "sha256:7176fa669d40e784777d9d8054bbc8d33f1dc07cfd8ac84b2367c85551f181dd",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s4-skill-r1-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-skill-r1-research-gaps",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-skill-r1-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-skill-r1-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-skill-r1-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "\"We Have a Package for You\" Spracklen USENIX Security 2025 package hallucinations",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "\"Importing Phantoms\" measuring LLM package hallucination vulnerabilities arXiv",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "pip index versions experimental command \"may be removed\" pip changelog",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "npm CLI changelog \"npm ERR!\" replaced \"npm error\" log prefix version",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "\"npm error code E404\" \"npm error 404 Not Found - GET https://registry.npmjs.org/\"",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "go.dev ref mod GOPROXY protocol \"404 (Not Found) or 410 (Gone)\" fall back",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "crates.io data access policy \"User-Agent\" \"1 request per second\"",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "cargo info command stabilized Cargo 1.82 changelog",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Lasso Security Bar Lanyado huggingface-cli empty package",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "Veracode 2025 GenAI Code Security Report 45%",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "REFIND SemEval-2025; MetaRAG metamorphic testing",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "socket CLI \"socket ci\" alias \"socket scan create --report\"",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "DepScope hallucinations dataset slopcheck",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "deterministic AST analysis detecting hallucinations LLM-generated code 100% precision arXiv",
+          "source_class": "original paper",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://www.usenix.org/system/files/usenixsecurity25-spracklen.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "line 44 statistics, the commercial models, the C and C++ sentence (read as page images)",
+          "outcome": "supported",
+          "quote": "Java, C, or C++ do not rely on a centralized open-source repository",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2406.10279",
+          "read_on": "2026-09-30",
+          "bore_on": "authors, venue and versions of Spracklen and colleagues",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2605.17062",
+          "read_on": "2026-09-30",
+          "bore_on": "whether the 5-22% range is current (Churilov; five current models)",
+          "outcome": "refuted",
+          "quote": "We replicate their methodology on five frontier code-capable LLMs released between October 2025 and March 2026",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2502.13622",
+          "read_on": "2026-09-30",
+          "bore_on": "REFIND, span-level detection (change 9a)",
+          "outcome": "supported",
+          "quote": "detects hallucinated spans within LLM outputs by directly leveraging retrieved documents",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2509.09360",
+          "read_on": "2026-09-30",
+          "bore_on": "MetaRAG, span-level detection (change 9a)",
+          "outcome": "supported",
+          "quote": "localizes unsupported claims at the factoid span where they occur",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2601.19106",
+          "read_on": "2026-09-30",
+          "bore_on": "\"100% precision\" from syntax-tree analysis: one small Python study (change 9b)",
+          "outcome": "refuted",
+          "quote": "a manually-curated dataset of 200 Python snippets",
+          "error": null
+        },
+        {
+          "url": "https://docs.npmjs.com/cli/v10/commands/npm-view",
+          "read_on": "2026-09-30",
+          "bore_on": "line 421 reference (version 10 labelled Legacy)",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://docs.npmjs.com/cli/v12/commands/npm-view",
+          "read_on": "2026-09-30",
+          "bore_on": "the current npm-view page, \"Version 12.2.0 (Latest)\" (leftover 8)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/npm/cli/issues/8736",
+          "read_on": "2026-09-30",
+          "bore_on": "line 96 \"npm ERR! 404\"; the E404 there comes from npm i and a bug",
+          "outcome": "refuted",
+          "quote": "npm error code E404",
+          "error": null
+        },
+        {
+          "url": "https://docs.npmjs.com/generating-provenance-statements",
+          "read_on": "2026-09-30",
+          "bore_on": "npm provenance and npm audit signatures (line 52)",
+          "outcome": "supported",
+          "quote": "You can verify the provenance attestations of downloaded packages with",
+          "error": null
+        },
+        {
+          "url": "https://docs.npmjs.com/cli/v12/using-npm/scripts",
+          "read_on": "2026-09-30",
+          "bore_on": "npm ci runs lifecycle scripts (the gate, change 1g)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://docs.npmjs.com/cli/v12/commands/npm-ci",
+          "read_on": "2026-09-30",
+          "bore_on": "--ignore-scripts (change 1g)",
+          "outcome": "supported",
+          "quote": "npm does not run scripts specified in package.json files",
+          "error": null
+        },
+        {
+          "url": "https://pip.pypa.io/en/stable/topics/secure-installs/",
+          "read_on": "2026-09-30",
+          "bore_on": "pip install runs code (change 1g)",
+          "outcome": "supported",
+          "quote": "involves running arbitrary code from distributions",
+          "error": null
+        },
+        {
+          "url": "https://github.com/pypa/pip-audit",
+          "read_on": "2026-09-30",
+          "bore_on": "pip-audit installs (change 1g)",
+          "outcome": "supported",
+          "quote": "`pip-audit -r INPUT` is functionally equivalent to `pip install -r INPUT`",
+          "error": null
+        },
+        {
+          "url": "https://docs.pypi.org/api/integrity/",
+          "read_on": "2026-09-30",
+          "bore_on": "PyPI provenance path and 404 (line 230)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://docs.pypi.org/trusted-publishers/",
+          "read_on": "2026-09-30",
+          "bore_on": "Trusted Publishing is separate from attestations (misattributed in the file)",
+          "outcome": "refuted",
+          "quote": "to exchange short-lived identity tokens",
+          "error": null
+        },
+        {
+          "url": "https://docs.pypi.org/attestations/",
+          "read_on": "2026-09-30",
+          "bore_on": "attestations follow Python Enhancement Proposal 740",
+          "outcome": "supported",
+          "quote": "PyPI's implementation of digital attestations (PEP 740)",
+          "error": null
+        },
+        {
+          "url": "https://pypi.org/pypi/huggingface-cli/json",
+          "read_on": "2026-09-30",
+          "bore_on": "the huggingface-cli example (session raw probe)",
+          "outcome": "supported",
+          "quote": "status 404",
+          "error": null
+        },
+        {
+          "url": "https://huggingface.co/docs/huggingface_hub/guides/cli",
+          "read_on": "2026-09-30",
+          "bore_on": "the huggingface_hub[cli] extra is stale; the command is hf",
+          "outcome": "refuted",
+          "quote": "comes with a built-in CLI called `hf`",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-package-search",
+          "read_on": "2026-09-30",
+          "bore_on": "dotnet package search (changes 1b, 5a)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://api.nuget.org/v3-flatcontainer/newtonsoftex.advancedjson/index.json",
+          "read_on": "2026-09-30",
+          "bore_on": "the invented NuGet name (line 127)",
+          "outcome": "supported",
+          "quote": "404",
+          "error": null
+        },
+        {
+          "url": "https://central.sonatype.org/publish/requirements/gpg/",
+          "read_on": "2026-09-30",
+          "bore_on": "Maven Central signs every file, so a signature proves nothing (line 52)",
+          "outcome": "supported",
+          "quote": "they have been signed with PGP",
+          "error": null
+        },
+        {
+          "url": "https://search.maven.org/solrsearch/select?q=a:commons-security&rows=20&wt=json",
+          "read_on": "2026-09-30",
+          "bore_on": "commons-security exists under three other groups (line 147)",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://proxy.golang.org",
+          "read_on": "2026-09-30",
+          "bore_on": "Go checksum database (line 52)",
+          "outcome": "supported",
+          "quote": "an auditable checksum database which will be used by the go command to authenticate modules",
+          "error": null
+        },
+        {
+          "url": "https://go.dev/blog/module-mirror-launch",
+          "read_on": "2026-09-30",
+          "bore_on": "the checksum database gives everyone the same code, not safe code",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://proxy.golang.org/github.com/aws/aws-sdk-go-v2/secrets/@v/list",
+          "read_on": "2026-09-30",
+          "bore_on": "the Go example (session raw probe)",
+          "outcome": "supported",
+          "quote": "status 404",
+          "error": null
+        },
+        {
+          "url": "https://proxy.golang.org/github.com/aws/aws-sdk-go-v2/service/secretsmanager/@v/list",
+          "read_on": "2026-09-30",
+          "bore_on": "the real module path (change 11)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://doc.rust-lang.org/cargo/commands/cargo-search.html",
+          "read_on": "2026-09-30",
+          "bore_on": "cargo search is textual (changes 6c, 6d)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://rust-lang.github.io/rfcs/3463-crates-io-policy-update.html",
+          "read_on": "2026-09-30",
+          "bore_on": "crates.io user-agent and rate rule (change 6d)",
+          "outcome": "supported",
+          "quote": "a maximum of 1 request per second",
+          "error": null
+        },
+        {
+          "url": "https://doc.rust-lang.org/reference/items/extern-crates.html",
+          "read_on": "2026-09-30",
+          "bore_on": "the Rust hyphen rule (change 6d)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://index.crates.io/se/rd/serde_json_ext",
+          "read_on": "2026-09-30",
+          "bore_on": "serde_json_ext is registered (line 184; session raw probe)",
+          "outcome": "refuted",
+          "quote": "\"vers\":\"0.1.0\"",
+          "error": null
+        },
+        {
+          "url": "https://www.postgresql.org/docs/current/view-pg-available-extensions.html",
+          "read_on": "2026-09-30",
+          "bore_on": "empty pg_available_extensions does not mean invented (change 12a)",
+          "outcome": "refuted",
+          "quote": "lists the extensions that are available for installation",
+          "error": null
+        },
+        {
+          "url": "https://www.postgresql.org/docs/current/app-psql.html",
+          "read_on": "2026-09-30",
+          "bore_on": "\\dx+ lists objects of installed extensions only (change 12b)",
+          "outcome": "supported",
+          "quote": "all the objects belonging to each matching extension are listed",
+          "error": null
+        },
+        {
+          "url": "https://www.postgresql.org/docs/current/catalog-pg-am.html",
+          "read_on": "2026-09-30",
+          "bore_on": "pg_am includes table access methods (changes 12c, 12d)",
+          "outcome": "supported",
+          "quote": "t = table (including materialized views), i = index",
+          "error": null
+        },
+        {
+          "url": "https://docs.djangoproject.com/en/5.2/topics/auth/passwords/",
+          "read_on": "2026-09-30",
+          "bore_on": "the real Django function (change 1a; session raw probe)",
+          "outcome": "supported",
+          "quote": "validate_password(password, user=None, password_validators=None)",
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/react-query/latest",
+          "read_on": "2026-09-30",
+          "bore_on": "react-query still installs (session raw probe)",
+          "outcome": "supported",
+          "quote": "\"version\":\"3.39.3\"",
+          "error": null
+        },
+        {
+          "url": "https://docs.conan.io/2/introduction.html",
+          "read_on": "2026-09-30",
+          "bore_on": "ConanCenter is a central catalogue (change 10)",
+          "outcome": "refuted",
+          "quote": "a central public repository where the community contributes packages for popular open-source libraries",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/vcpkg/concepts/registries",
+          "read_on": "2026-09-30",
+          "bore_on": "vcpkg curated registry (change 10)",
+          "outcome": "refuted",
+          "quote": "This collection of ports is called the curated registry",
+          "error": null
+        },
+        {
+          "url": "https://cveawg.mitre.org/api/cve/CVE-2025-99999",
+          "read_on": "2026-09-30",
+          "bore_on": "an identifier with no record (change 13; session raw probe)",
+          "outcome": "supported",
+          "quote": "status 404",
+          "error": null
+        },
+        {
+          "url": "https://nodejs.org/api/globals.html",
+          "read_on": "2026-09-30",
+          "bore_on": "fetch history (change 15)",
+          "outcome": "supported",
+          "quote": "No longer experimental.",
+          "error": null
+        },
+        {
+          "url": "https://docs.sigstore.dev/logging/overview/",
+          "read_on": "2026-09-30",
+          "bore_on": "Rekor (leftover 9)",
+          "outcome": "supported",
+          "quote": "fulfils the signature transparency role of Sigstore's software signing infrastructure",
+          "error": null
+        },
+        {
+          "url": "https://www.veracode.com/resources/analyst-reports/2025-genai-code-security-report/",
+          "read_on": "2026-09-30",
+          "bore_on": "line 56 Veracode figure (leftover 1)",
+          "outcome": "supported",
+          "quote": "AI-generated code introduced risky security flaws in 45% of tests",
+          "error": null
+        },
+        {
+          "url": "https://docs.github.com/en/code-security/security-advisories/working-with-global-security-advisories-from-the-github-advisory-database/about-the-github-advisory-database",
+          "read_on": "2026-09-30",
+          "bore_on": "the malicious-package row (leftover 4)",
+          "outcome": "supported",
+          "quote": "advisories about malicious open source packages",
+          "error": null
+        },
+        {
+          "url": "https://github.com/experimental-gains/slopcheck",
+          "read_on": "2026-09-30",
+          "bore_on": "slopcheck queries live registries, not a corpus (leftover 5)",
+          "outcome": "supported",
+          "quote": "Catch hallucinated / slopsquatted dependency names before you `pip install` or `npm install` them.",
+          "error": null
+        },
+        {
+          "url": "https://github.com/cuttalo/depscope-hallucinations-dataset",
+          "read_on": "2026-09-30",
+          "bore_on": "DepScope is the corpus; licence; count disagrees with itself (leftover 5)",
+          "outcome": "supported",
+          "quote": "Public corpus of verified LLM-generated package-name hallucinations observed in production AI coding agent traffic",
+          "error": null
+        },
+        {
+          "url": "https://github.com/sigstore/cosign/blob/main/doc/cosign_verify-attestation.md",
+          "read_on": "2026-09-30",
+          "bore_on": "cosign keyless verification needs identity flags (change 1g)",
+          "outcome": "refuted",
+          "quote": "Either --certificate-identity or --certificate-identity-regexp must be set",
+          "error": null
+        },
+        {
+          "url": "https://github.com/ossf/scorecard",
+          "read_on": "2026-09-30",
+          "bore_on": "Scorecard needs authentication; no score field or threshold in the README (change 1g)",
+          "outcome": "refuted",
+          "quote": "you must authenticate your requests before running Scorecard",
+          "error": null
+        },
+        {
+          "url": "https://docs.socket.dev/docs/socket-ci",
+          "read_on": "2026-09-30",
+          "bore_on": "Socket token permissions (change 1g)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.businesswire.com",
+          "read_on": "2026-09-30",
+          "bore_on": "the Veracode release",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "403 Forbidden"
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s4-skill-round1-session-runs.md",
+          "read_on": "2026-09-30",
+          "bore_on": "raw curl probes of the 15 statements the validator could not reach (curl 8.7.1, node v24.14.1, macOS 26.6.1)",
+          "outcome": "supported",
+          "quote": "https://cveawg.mitre.org/api/cve/CVE-2025-99999 → status 404",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s4-skill-r1-1",
+          "kind": "new",
+          "text": "The method ran, installed or downloaded the package it checks, against its own red line (python -c \"import …\", dotnet add package, mvn dependency:resolve, go mod download, require and importlib, and a gate running npm ci and pip install before any name was checked). Every such order is replaced by read-only checks and the wrapper's recipes; the gate checks names first and installs without lifecycle scripts; a red line is added after line 395, which stays byte-identical (changes 1a-1h).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md, finding 1; https://docs.npmjs.com/cli/v12/using-npm/scripts; https://pip.pypa.io/en/stable/topics/secure-installs/",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-2",
+          "kind": "new",
+          "text": "Two mechanisms were described as running: loading on a phrase match (tests/skill-loading.test.js records nothing loads a specialist that way) and the refinement-loop letter (docs/REFINEMENT_LOOP.md: \"the loop is **NOT RUNNING** today\"). The text is fenced as a design and every string tests/critic-warnings-are-critical.test.js pins survives (changes 2a-2d).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md, finding 2; docs/REFINEMENT_LOOP.md line 8",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-3",
+          "kind": "new",
+          "text": "Names the file called invented are registered (email-validator-pro on npm since 2017, serde_json_ext on crates.io, commons-security under three other Maven groups); react-query still installs; pgvector's extension is named vector; the huggingface_hub[cli] extra and react-codeshift are stale (changes 3a-3d, 1c).",
+          "evidence": "https://registry.npmjs.org/email-validator-pro; https://index.crates.io/se/rd/serde_json_ext (\"vers\":\"0.1.0\"); https://search.maven.org/solrsearch/select?q=a:commons-security&rows=20&wt=json",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-4",
+          "kind": "new",
+          "text": "The headline statistics were unsourced or stale (\"dominant\", \"within hours\", \"commercial frontier models\", \"roughly\"), and the file lacked the reason existence alone proves nothing, the four confusion classes and dependency confusion (change 4).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md, finding 4; https://www.usenix.org/system/files/usenixsecurity25-spracklen.pdf; https://arxiv.org/abs/2605.17062",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-5",
+          "kind": "new",
+          "text": "The existence tests and signature checks were refuted, misattributed or could not tell names apart: npm view answers for placeholders; PyPI's Trusted Publishing and attestations were conflated; NuGet and Maven signatures exist on every package; cargo search is textual; the Postgres view answers only for the server queried. Two statements contradicted the wrapper and now agree with it (changes 5a, 5b).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md, finding 5; https://docs.pypi.org/trusted-publishers/; https://central.sonatype.org/publish/requirements/gpg/",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-6",
+          "kind": "new",
+          "text": "Stale and refuted commands: the renamed .NET vulnerability command, the attestation label, cargo search's textual matching, the crates.io user-agent and rate rule, and the Rust hyphen rule (changes 6a-6d).",
+          "evidence": "https://rust-lang.github.io/rfcs/3463-crates-io-policy-update.html; https://doc.rust-lang.org/reference/items/extern-crates.html",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-7",
+          "kind": "new",
+          "text": "The Output Format held illustrative counts that could be copied as data, \"Critical\" as a confidence, an unchecked DepScope claim and an unsourced slopcheck invocation, and contradicted the wrapper. Replaced by a pointer to the wrapper's response format (change 7).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md, finding 7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-8",
+          "kind": "new",
+          "text": "The confidence rule (one technique means LOW) contradicted the wrapper, which rates a registry answer or declaration files lacking the member as HIGH on its own (change 8; completed by leftover 2).",
+          "evidence": "agents/ai-quality/hallucination-detector.md, \"Severity and confidence\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-9",
+          "kind": "new",
+          "text": "REFIND and MetaRAG were called state of the art for catching fabricated citations, which their abstracts do not say; \"100% precision on semantic errors\" generalised one small Python study (changes 9a, 9b).",
+          "evidence": "https://arxiv.org/abs/2502.13622; https://arxiv.org/abs/2509.09360; https://arxiv.org/abs/2601.19106",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-10",
+          "kind": "new",
+          "text": "\"C and C++ have no centralized package registry\" is wrong as an absolute: ConanCenter and the vcpkg curated registry are central catalogues. The sentence is corrected; checked C and C++ examples are carried to round 2 (change 10).",
+          "evidence": "https://docs.conan.io/2/introduction.html; https://learn.microsoft.com/en-us/vcpkg/concepts/registries",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-11",
+          "kind": "new",
+          "text": "The Go example's heading said \"wrong import subpath inside real module\"; the real code is a separate module (change 11).",
+          "evidence": "https://proxy.golang.org/github.com/aws/aws-sdk-go-v2/service/secretsmanager/@v/list; https://proxy.golang.org/github.com/aws/aws-sdk-go-v2/secrets/@v/list (404)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-12",
+          "kind": "new",
+          "text": "Three Postgres verification comments drew the wrong conclusion (\"empty = hallucinated\"; \\dx+ lists actual functions; pg_am lists valid access methods) (changes 12a-12d).",
+          "evidence": "https://www.postgresql.org/docs/current/view-pg-available-extensions.html; https://www.postgresql.org/docs/current/app-psql.html; https://www.postgresql.org/docs/current/catalog-pg-am.html",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-13",
+          "kind": "new",
+          "text": "\"Fabricated citations are common in AI-generated security claims\" had no source, and the vulnerability lookup had no address (change 13).",
+          "evidence": "https://cveawg.mitre.org/api/cve/CVE-2025-99999 (status 404, session raw probe)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-14",
+          "kind": "new",
+          "text": "The Django example lacked the real function, and the huggingface example lacked today's status; carried by change 1a, both confirmed by the session's raw probes.",
+          "evidence": "https://docs.djangoproject.com/en/5.2/topics/auth/passwords/; https://pypi.org/pypi/huggingface-cli/json (404)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-15",
+          "kind": "new",
+          "text": "The node-fetch row sat under \"Hallucinated\" although node-fetch is a real package, and gave no version (change 15).",
+          "evidence": "https://nodejs.org/api/globals.html",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-16",
+          "kind": "new",
+          "text": "Red line 391 demanded a signature check that proves nothing on registries where every package is signed (change 16).",
+          "evidence": "https://central.sonatype.org/publish/requirements/gpg/",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-17",
+          "kind": "new",
+          "text": "Two field terms were missing from the trigger vocabulary: \"package hallucination\" and \"library hallucination\"; the list only grows, and no corpus prompt contains either phrase, so the match rate is unaffected (change 17). \"package confusion\" is deliberately not added.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-validate-d-s4-skill-r1-validate.md, \"Tests, checked by reading the tests' actual assertions\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-18",
+          "kind": "new",
+          "text": "Pre-apply validation (77 statements: 55 hold, 1 refuted, 2 misattributed, 2 unsourceable, 15 unreached) corrected the proposed text before it was applied: the react-codeshift quotation, the Hugging Face quotation, the context of npm's E404, Maven's numFound, the Go blog sentence, the model-name quotation, two gate corrections, and two statements that contradicted the wrapper. The session probed the 15 unreached items with raw fetches; all hold.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-validate-d-s4-skill-r1-validate.md; .ctoc/audit/improvement-run-notes/s4-skill-round1-session-runs.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-19",
+          "kind": "new",
+          "text": "Re-validation leftover 1: line 56 still gave \"the 5–22% phantom-package rate\" and an unaddressed Veracode figure. Replaced with the report's own words and address.",
+          "evidence": "https://www.veracode.com/resources/analyst-reports/2025-genai-code-security-report/, read 2026-09-30: \"AI-generated code introduced risky security flaws in 45% of tests\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-20",
+          "kind": "new",
+          "text": "Re-validation leftover 2: the confidence rule now names the wrapper's MEDIUM cases.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-revalidate-d-s4-skill-r1-revalidate.md, \"Claims that need action\", item 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-21",
+          "kind": "new",
+          "text": "Re-validation leftovers 3 and 6: \"four layers\" contradicted a five-row table, and \"abandoned packages are slopsquatting bait\" contradicted the file's own definition of an invented name. Corrected and stripped.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-revalidate-d-s4-skill-r1-revalidate.md, items 3 and 6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-22",
+          "kind": "new",
+          "text": "Re-validation leftovers 4 and 5: the malicious-package row credited the GitHub Advisory Database with behavioural analysis, and the slopsquatting row called slopcheck a corpus. Corrected with the advisory database's own words, slopcheck's and DepScope's own descriptions, and DepScope's licence; no ecosystem count, because DepScope's page disagrees with itself.",
+          "evidence": "https://docs.github.com/en/code-security/security-advisories/working-with-global-security-advisories-from-the-github-advisory-database/about-the-github-advisory-database; https://github.com/experimental-gains/slopcheck; https://github.com/cuttalo/depscope-hallucinations-dataset",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-23",
+          "kind": "new",
+          "text": "Re-validation leftover 7: the throwOnError row said \"not a real option\", stronger than the checked fact. Now bounded to what readFileSync reads, with the virtual-file-system handler noted.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-revalidate-d-s4-skill-r1-revalidate.md, item 7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-24",
+          "kind": "new",
+          "text": "Re-validation leftovers 8 and \"should change\": the npm documentation addresses moved from versions 10 and 11 (now \"Legacy\") to version 12 at lines 271, 294 and 374; the Rekor sentence, marked not checked, is now confirmed and cited.",
+          "evidence": "https://docs.npmjs.com/cli/v12/commands/npm-view; https://docs.sigstore.dev/logging/overview/",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-25",
+          "kind": "new",
+          "text": "Line 43, \"The hallucination landscape has shifted from \\\"LLM gets the wrong name\\\" to \\\"attackers register the wrong name as malware.\\\"\", has no primary source; the re-validator's one search found only a secondary report. Stripped, not corrected.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-revalidate-d-s4-skill-r1-revalidate.md, \"Not checked\", line 43",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-26",
+          "kind": "new",
+          "text": "The wrapper's \"Read the method first\" item 2 described skill text these changes remove. Corrected in the wrapper as late correction lc-s4-agent-1 (the wrapper had finished its three rounds), with the re-validator's optional addition naming the Postgres query; its verdict on the new text: consistent. Wrapper fingerprint cced22322c9b… before the optional addition, 64b625c40f6f… after; its 34 fences pass. The full gate (npm test: 12,035 passed, 0 failed, 0 skipped, coverage 99.9% against the floor of 99, offline claims ledger PASS; output /private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/s4-npm-test-1.out) ran after the correction and before the optional addition and this round's leftovers, which only the fences have checked since.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md, \"Cross-file findings for the agent\", item 1; .ctoc/audit/improvement-run-notes/s4-skill-round1-revalidate-d-s4-skill-r1-revalidate.md, part (B)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-27",
+          "kind": "new",
+          "text": "The re-read left 10 claims not checked: line 53 (.pyi stubs, module-info.java, docs.rs), line 72 (the National Vulnerability Database half), lines 133, 136, 157, 165, 173, 184, 208 and 217 (code-level claims), and parts of lines 266-269 (Snyk, Socket and Aikido beyond snippets, an npm slopcheck command, cosign verify, deps.dev and Dependency-Track) and line 305 (jscodeshift and react-codemod). Carried to round 2, with the critic's list: the Veracode primary source, bcrypt in the browser, Stripe.net, Entity Framework Core, Jackson and ObjectMapper.builder(), javap -p, the Jaeger exporter, .version.yanked, PGXN, the rename year 2022, and the C and C++ examples.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-revalidate-d-s4-skill-r1-revalidate.md, \"Not checked\"; .ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md, \"Carried to round 2\"",
+          "decision": "rejected",
+          "reason": "Not changed this round: none was looked up, and a change without a read source would be a claim from memory. Carried to round 2.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-28",
+          "kind": "new",
+          "text": "Whether the skill keeps a recommended gate for continuous integration at all: the wrapper never runs it, and some tools it names are unchecked. A scope decision.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md, \"For the human\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-skill-r1-ci-gate-scope"
+        },
+        {
+          "id": "f-s4-skill-r1-29",
+          "kind": "new",
+          "text": "The trigger phrase \"AI code review\" is shared with ai-code-quality-reviewer's vocabulary. Already with the human from the wrapper's round 1.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md, \"For the human\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-agent-r1-shared-dispatch-phrase-ai-code-review"
+        },
+        {
+          "id": "f-s4-skill-r1-30",
+          "kind": "new",
+          "text": "Turning the observed NuGet and Go module proxy addresses into wrapper recipes would need recipe code and a session run.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md, \"Cross-file findings for the agent\", item 3",
+          "decision": "rejected",
+          "reason": "Cross-file: a finding about agents/ai-quality/hallucination-detector.md, which has finished its three rounds; not a refuted claim but a new capability; recipe code and a session run are the dispatcher's decision, so no late correction is made.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r1-31",
+          "kind": "new",
+          "text": "The wrapper's \"the examples across seven languages\" is not true for C and C++ until this skill has checked C and C++ examples.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md, \"Cross-file findings for the agent\", item 4; .ctoc/audit/improvement-run-notes/s4-skill-round1-revalidate-d-s4-skill-r1-revalidate.md, part (B)",
+          "decision": "rejected",
+          "reason": "Cross-file: a finding about agents/ai-quality/hallucination-detector.md, which has finished its three rounds; carried to this skill's round 2, which is asked to add checked C and C++ examples; if it cannot, the wrapper's sentence becomes a late correction then.",
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 82,
+        "VALIDATED": 54,
+        "FABRICATED": 11,
+        "UNSOURCEABLE": 6,
+        "MISATTRIBUTED": 5
+      },
+      "validator_final": {
+        "examined": 145,
+        "VALIDATED": 127,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 4
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-census.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-ledger-gate.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/critic-warnings-are-critical.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/plugin-skill-discovery.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/test-gate-ledger-wiring.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "agents/ai-quality/hallucination-detector.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "It applies: every one of the seven languages has a package ecosystem. Round 1 read research papers (two, Spracklen and colleagues and Churilov, as PDF page images) and the registries' and vendors' own documentation and answers, with the session's raw curl probes as byte-level evidence. Corrected this round: JavaScript and TypeScript, Python, C#, Java and SQL, plus the extra Go and Rust examples. C and C++: the out-of-scope sentence is corrected, but there is no checked example yet; carried to round 2 with this research request: probe github.com/microsoft/vcpkg ports/<name> for one real and one invented port; probe ConanCenter's recipe path for one real and one invented name; and check one invented C or C++ function or header against its vendor documentation.",
+        "examples_checked": [
+          {
+            "language": "JavaScript and TypeScript (npm examples)",
+            "how": "registry answers and vendor documentation, read 2026-09-30 (react-smart-cache 404; email-validator-pro registered; react-query 3.39.3 by the session's raw probe)"
+          },
+          {
+            "language": "Python (Django 5.2 documentation; PyPI)",
+            "how": "official documentation and PyPI answers read 2026-09-30; Django's validate_password signature and huggingface-cli's 404 by the session's raw probes"
+          },
+          {
+            "language": "C# (.NET, dotnet package search, .NET 8.0.2xx and later)",
+            "how": "NuGet flat container answer (404) and Microsoft Learn documentation, read 2026-09-30"
+          },
+          {
+            "language": "Java (Maven Central)",
+            "how": "Maven Central search answers and the Sonatype publishing requirements, read 2026-09-30"
+          },
+          {
+            "language": "Go (module proxy)",
+            "how": "proxy.golang.org answers (404 for the invented path, 200 for the real module), read 2026-09-30"
+          },
+          {
+            "language": "Rust (crates.io)",
+            "how": "crates.io sparse index answers, read 2026-09-30; serde_json_ext's by the session's raw probe"
+          },
+          {
+            "language": "SQL (PostgreSQL, current documentation)",
+            "how": "PostgreSQL documentation for pg_available_extensions, psql and pg_am, and pgvector's readme, read 2026-09-30 by the session's raw probes"
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "date": "2026-09-30",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:7176fa669d40e784777d9d8054bbc8d33f1dc07cfd8ac84b2367c85551f181dd",
+      "fingerprint_after": "sha256:9d56e48e41da44b77c849bda44960f8ce326b549363adc030e7d66e378aad179",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s4-skill-r2-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-skill-r2-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-skill-r2-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-skill-r2-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "OWASP Software Component Verification Standard package management typosquatting requirement",
+          "source_class": "standards body",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes/zlib/config.yml",
+          "read_on": "2026-09-30",
+          "bore_on": "ConanCenter, a real recipe (session raw probe)",
+          "outcome": "supported",
+          "quote": "200",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes/libfastjson_pro/config.yml",
+          "read_on": "2026-09-30",
+          "bore_on": "ConanCenter, the invented name (session raw probe)",
+          "outcome": "supported",
+          "quote": "404",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/microsoft/vcpkg/master/ports/fmt/vcpkg.json",
+          "read_on": "2026-09-30",
+          "bore_on": "vcpkg, a real port (session raw probe)",
+          "outcome": "supported",
+          "quote": "200",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/microsoft/vcpkg/master/ports/libfastjson-pro/vcpkg.json",
+          "read_on": "2026-09-30",
+          "bore_on": "vcpkg, the invented name (session raw probe)",
+          "outcome": "supported",
+          "quote": "404",
+          "error": null
+        },
+        {
+          "url": "https://docs.openssl.org/master/man3/EVP_DigestInit/",
+          "read_on": "2026-09-30",
+          "bore_on": "OpenSSL digest manual page",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "navigation only, no page body"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/openssl/openssl/master/doc/man3/EVP_DigestInit.pod",
+          "read_on": "2026-09-30",
+          "bore_on": "EVP_Q_digest, the name the invented call copies (change 2)",
+          "outcome": "supported",
+          "quote": "EVP_Q_digest() is a quick one-shot digest function.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/openssl/openssl/master/doc/man3/EVP_EncryptInit.pod",
+          "read_on": "2026-09-30",
+          "bore_on": "the real cipher routines; no EVP_Q_ function (change 2)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/openssl/openssl/master/util/libcrypto.num",
+          "read_on": "2026-09-30",
+          "bore_on": "OpenSSL exports exactly EVP_Q_digest and EVP_Q_mac, no EVP_Q_encrypt (session raw)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://eel.is/c++draft/vector.overview",
+          "read_on": "2026-09-30",
+          "bore_on": "std::vector declares no member named contains (change 2)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://eel.is/c++draft/alg.contains",
+          "read_on": "2026-09-30",
+          "bore_on": "std::ranges::contains returns (change 2)",
+          "outcome": "supported",
+          "quote": "ranges::find(std::move(first), last, value, proj) != last",
+          "error": null
+        },
+        {
+          "url": "https://en.cppreference.com/w/cpp/algorithm/ranges/contains",
+          "read_on": "2026-09-30",
+          "bore_on": "the algorithm since C++23, header <algorithm>",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/FasterXML/jackson-databind/2.18/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+          "read_on": "2026-09-30",
+          "bore_on": "no static builder() and no writeValueAsJson on Jackson 2.18 ObjectMapper (session raw; change 1)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/FasterXML/jackson-databind/2.18/src/main/java/com/fasterxml/jackson/databind/json/JsonMapper.java",
+          "read_on": "2026-09-30",
+          "bore_on": "the builder is JsonMapper.builder(), line 113 (session raw; change 1)",
+          "outcome": "supported",
+          "quote": "public static JsonMapper.Builder builder() {",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/FasterXML/jackson-databind/2.18/README.md",
+          "read_on": "2026-09-30",
+          "bore_on": "the SAFE form in the readme (change 1)",
+          "outcome": "supported",
+          "quote": "ObjectMapper mapper = new ObjectMapper(); // create once, reuse",
+          "error": null
+        },
+        {
+          "url": "https://javadoc.io/static/com.fasterxml.jackson.core/jackson-databind/2.18.2/com/fasterxml/jackson/databind/ObjectMapper.html",
+          "read_on": "2026-09-30",
+          "bore_on": "Jackson 2.18 ObjectMapper reference",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "truncated"
+        },
+        {
+          "url": "https://javadoc.io/static/tools.jackson.core/jackson-databind/3.0.0/tools/jackson/databind/ObjectMapper.html",
+          "read_on": "2026-09-30",
+          "bore_on": "Jackson 3 ObjectMapper reference (carried)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "status 404"
+        },
+        {
+          "url": "https://docs.oracle.com/en/java/javase/21/docs/specs/man/javap.html",
+          "read_on": "2026-09-30",
+          "bore_on": "javap disassembles class files already on disk (change 10)",
+          "outcome": "supported",
+          "quote": "javap - disassemble one or more class files",
+          "error": null
+        },
+        {
+          "url": "https://docs.oracle.com/javase/specs/jls/se21/html/jls-7.html",
+          "read_on": "2026-09-30",
+          "bore_on": "module-info.java names packages, not members (change 3)",
+          "outcome": "refuted",
+          "quote": "The `exports` directive specifies the name of a package to be exported by the current module",
+          "error": null
+        },
+        {
+          "url": "https://typing.python.org/en/latest/spec/distributing.html",
+          "read_on": "2026-09-30",
+          "bore_on": ".pyi stubs and partial stub packages (change 3; wrapper late correction)",
+          "outcome": "supported",
+          "quote": "If a stub package distribution is partial it MUST include `partial\\n` in a `py.typed` file",
+          "error": null
+        },
+        {
+          "url": "https://docs.rs/about",
+          "read_on": "2026-09-30",
+          "bore_on": "docs.rs documents every crates.io library (change 3)",
+          "outcome": "supported",
+          "quote": "All libraries published to crates.io are documented.",
+          "error": null
+        },
+        {
+          "url": "https://go.dev/ref/mod",
+          "read_on": "2026-09-30",
+          "bore_on": "go mod download downloads (change 12b)",
+          "outcome": "supported",
+          "quote": "downloads the named modules into the module cache",
+          "error": null
+        },
+        {
+          "url": "https://github.com/stripe/stripe-dotnet/tree/master/src/Stripe.net/Services/Checkout",
+          "read_on": "2026-09-30",
+          "bore_on": "Stripe.net has no PaymentPro folder (change 11a)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/ef/core/miscellaneous/async",
+          "read_on": "2026-09-30",
+          "bore_on": "Entity Framework Core async methods live in Microsoft.EntityFrameworkCore (change 11b; read raw)",
+          "outcome": "supported",
+          "quote": "The EF Core async extension methods are defined in the `Microsoft.EntityFrameworkCore` namespace.",
+          "error": null
+        },
+        {
+          "url": "https://proxy.golang.org/go.opentelemetry.io/otel/exporters/jaeger-pro/@v/list",
+          "read_on": "2026-09-30",
+          "bore_on": "the invented Jaeger module (change 12a)",
+          "outcome": "supported",
+          "quote": "404",
+          "error": null
+        },
+        {
+          "url": "https://pkg.go.dev/go.opentelemetry.io/otel/exporters/jaeger",
+          "read_on": "2026-09-30",
+          "bore_on": "the Jaeger exporter deprecation (change 12a)",
+          "outcome": "supported",
+          "quote": "OpenTelemetry dropped support for Jaeger exporter in July 2023.",
+          "error": null
+        },
+        {
+          "url": "https://api.pgxn.org/dist/pg_advanced_search.json",
+          "read_on": "2026-09-30",
+          "bore_on": "the invented extension on PGXN (change 9)",
+          "outcome": "supported",
+          "quote": "404",
+          "error": null
+        },
+        {
+          "url": "https://api.pgxn.org/dist/pair.json",
+          "read_on": "2026-09-30",
+          "bore_on": "a real PGXN extension as the control (change 9)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.postgresql.org/docs/18/contrib.html",
+          "read_on": "2026-09-30",
+          "bore_on": "PostgreSQL 18 Appendix F, the pinned address (change 9; session probe 200)",
+          "outcome": "supported",
+          "quote": "Documentation: 18: Appendix F",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/reactjs/react-codemod/master/README.md",
+          "read_on": "2026-09-30",
+          "bore_on": "the react-codemod usage (change 8)",
+          "outcome": "refuted",
+          "quote": "maintained by the React team in collaboration with the Codemod.com team",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/ossf/scorecard/main/docs/checks.md",
+          "read_on": "2026-09-30",
+          "bore_on": "Scorecard check risk levels, no score field or threshold (changes 7a, 7b)",
+          "outcome": "supported",
+          "quote": "Risk: `High` (possibly unpatched vulnerabilities)",
+          "error": null
+        },
+        {
+          "url": "https://api.securityscorecards.dev/projects/github.com/ossf/scorecard",
+          "read_on": "2026-09-30",
+          "bore_on": "Scorecard answer format",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/OWASP/Software-Component-Verification-Standard/tree/master/en",
+          "read_on": "2026-09-30",
+          "bore_on": "OWASP Software Component Verification Standard, chapter list",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/dependency-check/DependencyCheck/main/README.md",
+          "read_on": "2026-09-30",
+          "bore_on": "OWASP Dependency-Check is a vulnerability scanner, not a name check (finding 13)",
+          "outcome": "did-not-bear",
+          "quote": "attempts to detect publicly disclosed vulnerabilities contained within a project's dependencies",
+          "error": null
+        },
+        {
+          "url": "https://www.enisa.europa.eu/sites/default/files/2026-03/ENISA%20Technical%20Advisory%20-%20Package_Managers_Final.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "slopsquatting definition, the name check, the gate order, npm ci --ignore-scripts, the tool disclaimer (changes 5a-5d; read as page images)",
+          "outcome": "supported",
+          "quote": "where attackers publish packages matching hallucinated package names generated by AI tools",
+          "error": null
+        },
+        {
+          "url": "https://www.usenix.org/system/files/usenixsecurity25-spracklen.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "the paper's judgement on curated allow-lists, page 3698 (change 6; read as page images)",
+          "outcome": "supported",
+          "quote": "this is still considered a blunt and reactive approach that requires constant verification and updating",
+          "error": null
+        },
+        {
+          "url": "https://www.veracode.com/blog/genai-code-security-report/",
+          "read_on": "2026-09-30",
+          "bore_on": "the two Veracode units (change 4)",
+          "outcome": "supported",
+          "quote": "45% of code samples failed security tests",
+          "error": null
+        },
+        {
+          "url": "https://www.veracode.com/resources/analyst-reports/2025-genai-code-security-report/",
+          "read_on": "2026-09-30",
+          "bore_on": "the two Veracode units (change 4)",
+          "outcome": "supported",
+          "quote": "AI-generated code introduced risky security flaws in 45% of tests",
+          "error": null
+        },
+        {
+          "url": "https://docs.deps.dev/",
+          "read_on": "2026-09-30",
+          "bore_on": "deps.dev claims no maintenance signal (re-validation leftover 1)",
+          "outcome": "refuted",
+          "quote": "better understand the structure, construction, and security of open source software packages",
+          "error": null
+        },
+        {
+          "url": "https://docs.dependencytrack.org/",
+          "read_on": "2026-09-30",
+          "bore_on": "Dependency-Track claims no maintenance signal (re-validation leftover 1)",
+          "outcome": "refuted",
+          "quote": "an intelligent Component Analysis platform that allows organizations to identify and reduce risk in the software supply chain",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/dcodeIO/bcrypt.js/main/README.md",
+          "read_on": "2026-09-30",
+          "bore_on": "bcrypt versus bcryptjs in the browser (re-validation leftover 2)",
+          "outcome": "supported",
+          "quote": "Compatible to the C++ bcrypt binding on Node.js and also working in the browser.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s4-skill-round2-session-runs.md",
+          "read_on": "2026-09-30",
+          "bore_on": "the session's executed checks: four catalogue probes, OpenSSL's export list, Jackson 2.18 source, the two C++ lines compiled with Apple clang 21 at -std=c++23, and the pinned PostgreSQL 18 address",
+          "outcome": "supported",
+          "quote": "`if (v.contains(x)) { /* ... */ }`                                → FAILS: error: no member named 'contains' in 'std::vector<int>'",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s4-skill-r2-1",
+          "kind": "new",
+          "text": "The Jackson example hid a second invented call: Jackson 2.18's ObjectMapper has neither a static builder() nor writeValueAsJson. The comment now names both, and a SAFE line in the readme's form is added (change 1).",
+          "evidence": "https://raw.githubusercontent.com/FasterXML/jackson-databind/2.18/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java; .ctoc/audit/improvement-run-notes/s4-skill-round2-session-runs.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-2",
+          "kind": "new",
+          "text": "Resolves round 1's carried item (f-s4-skill-r1-27): C and C++ had no example. Added a C example (an invented OpenSSL function, EVP_Q_encrypt, checked against the manual pages and the export list; the SAFE side is the three declared cipher prototypes only, because tag handling and the context and cipher calls were not checked and a Galois/Counter Mode example without the tag step would teach broken cryptography) and a C++23 example (std::vector::contains, which does not exist, beside std::ranges::contains), with the four catalogue probes (change 2).",
+          "evidence": "https://raw.githubusercontent.com/openssl/openssl/master/util/libcrypto.num; https://eel.is/c++draft/vector.overview; .ctoc/audit/improvement-run-notes/s4-skill-round2-session-runs.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-3",
+          "kind": "new",
+          "text": "module-info.java was credited with checking methods; the Java Language Specification says it names packages. The line also gains the partial-stub caution for Python and the docs.rs sentence for Rust (change 3).",
+          "evidence": "https://docs.oracle.com/javase/specs/jls/se21/html/jls-7.html, section 7.7.2; https://typing.python.org/en/latest/spec/distributing.html",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-4",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects the round-1 re-validation's wording (f-s4-skill-r1-19): the Veracode report page counts the 45% in \"tests\", its July 2025 blog post in \"code samples\". The file now gives the rate with both units and settles neither (change 4).",
+          "evidence": "https://www.veracode.com/resources/analyst-reports/2025-genai-code-security-report/; https://www.veracode.com/blog/genai-code-security-report/",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-5",
+          "kind": "new",
+          "text": "No agency source stood behind the slopsquatting definition, the name check, the gate's order or npm ci --ignore-scripts. The European Union Agency for Cybersecurity's final advisory now does, with its tool disclaimer (changes 5a-5d).",
+          "evidence": "https://www.enisa.europa.eu/sites/default/files/2026-03/ENISA%20Technical%20Advisory%20-%20Package_Managers_Final.pdf, sections 4.1.2, 4.2.1, 5.1 and 5.2 and page 16, read as page images",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-6",
+          "kind": "new",
+          "text": "\"Existence is not enough\" lacked the paper's own judgement that a curated allow-list is \"a blunt and reactive approach\" (change 6). Table 4's mitigation rates are deliberately not carried: they measure fixes on the model's side that a reviewer of finished code cannot apply.",
+          "evidence": "https://www.usenix.org/system/files/usenixsecurity25-spracklen.pdf, page 3698",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-7",
+          "kind": "new",
+          "text": "Scorecard was judged on its README alone, and triage was not told what to read: the checks documentation also names no score field or threshold, and each check carries its own risk level (changes 7a, 7b).",
+          "evidence": "https://raw.githubusercontent.com/ossf/scorecard/main/docs/checks.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-8",
+          "kind": "new",
+          "text": "Resolves round 1's carried item: \"the real tools are jscodeshift + react-codemod\" — the react-codemod readme no longer mentions jscodeshift; its usage form is now given (change 8).",
+          "evidence": "https://raw.githubusercontent.com/reactjs/react-codemod/master/README.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-9",
+          "kind": "new",
+          "text": "Resolves round 1's carried item: the pg_advanced_search heading claimed \"any Postgres distribution\"; what was checked is PostgreSQL 18's Appendix F and PGXN, with a real extension as a control (change 9).",
+          "evidence": "https://api.pgxn.org/dist/pg_advanced_search.json (404); https://api.pgxn.org/dist/pair.json (200); https://www.postgresql.org/docs/18/contrib.html",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-10",
+          "kind": "new",
+          "text": "Resolves round 1's carried item: javap needs the class path, and is a disassembler of class files already on disk (change 10).",
+          "evidence": "https://docs.oracle.com/en/java/javase/21/docs/specs/man/javap.html",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-11",
+          "kind": "new",
+          "text": "Resolves round 1's carried items: the Stripe.net and Entity Framework Core comments had no source (changes 11a, 11b).",
+          "evidence": "https://github.com/stripe/stripe-dotnet/tree/master/src/Stripe.net/Services/Checkout; https://learn.microsoft.com/en-us/ef/core/miscellaneous/async",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-12",
+          "kind": "new",
+          "text": "Resolves round 1's carried item: the Go comments lacked their evidence; \"never had a 'pro'\" is replaced by the proxy's 404, and go mod download's behaviour is quoted (changes 12a, 12b).",
+          "evidence": "https://proxy.golang.org/go.opentelemetry.io/otel/exporters/jaeger-pro/@v/list; https://go.dev/ref/mod",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-13",
+          "kind": "new",
+          "text": "Checked, no change: OWASP Dependency-Check is a vulnerability scanner, not a name check, and the file does not name it; the \"open-source software health\" row names Dependency-Track, a different project.",
+          "evidence": "https://raw.githubusercontent.com/dependency-check/DependencyCheck/main/README.md",
+          "decision": "rejected",
+          "reason": "No change: nothing in the file is wrong about it, and it must not be added to the name-checking layer.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-14",
+          "kind": "new",
+          "text": "Validation (d-s4-skill-r2-validate): two framings were misattributed and two phrases unsourceable. Corrected inside the new text before applying: the tool disclaimer covers only the advisory's best-practice section (5c); the gate's order is framed as matching the advisory's order, whose sentence is about vulnerability scans (5d); \"javap … runs nothing\" replaced by what the manual says (10); \"No such namespace\" replaced by \"Wrong namespace\" with the unchecked part stated (11b). Also taken: the codemod form with its version segment (8), the PostgreSQL address pinned to 18 and PGXN spelled out (9), the specification named in prose (3), a read date on the checks address (7b), the Jaeger deprecation source (12a), \"Advanced Encryption Standard in Galois/Counter Mode (AES-GCM)\" spelled out (2), and \"open-source software health\" spelled out (7a).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round2-validate-d-s4-skill-r2-validate.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-15",
+          "kind": "new",
+          "text": "Re-validation leftover 1 (the one mismatch): the health row said \"Maintenance signal\", which neither deps.dev nor Dependency-Track claims. Now \"Health signals\", with each project's own description.",
+          "evidence": "https://docs.deps.dev/; https://docs.dependencytrack.org/",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-16",
+          "kind": "new",
+          "text": "Re-validation leftover 2: the bcrypt comment's claim about model behaviour (\"AI confuses with 'bcryptjs'\") had no source. Stripped; the Node.js-versus-browser half is now quoted from the bcrypt.js readme.",
+          "evidence": "https://raw.githubusercontent.com/dcodeIO/bcrypt.js/main/README.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-17",
+          "kind": "new",
+          "text": "The wrapper needed two corrections this round made true: its \"Read the method first\" item 2 now names ConanCenter and vcpkg (late correction lc-s4-agent-2), and a whole module missing from a partial Python stub package is not a finding but an unknown, in both the Export Verification bullet and the confidence table's HIGH row (lc-s4-agent-3). The re-read found both consistent. The full gate (npm test: 12,035 passed, 0 failed, 0 skipped, coverage 99.89% against the floor of 99, offline claims ledger PASS; output /private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/s4-npm-test-2.out) ran after the two corrections and before the re-validation's two follow-up edits to lc-s4-agent-3 (the table row and \"is not a finding\"), which only the fences have checked since.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round2-critic-d-s4-skill-r2-critic.md, \"Cross-file findings for the agent\", items 2 and 3; .ctoc/audit/improvement-run-notes/s4-skill-round2-revalidate-d-s4-skill-r2-revalidate.md, \"The agent's two new passages\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-18",
+          "kind": "new",
+          "text": "The wrapper's \"the examples across seven languages\" is now true: all seven required languages carry examples. This closes f-s4-skill-r1-31.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round2-critic-d-s4-skill-r2-critic.md, \"Cross-file findings for the agent\", item 1",
+          "decision": "rejected",
+          "reason": "No change needed in the wrapper.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-19",
+          "kind": "new",
+          "text": "Carried to round 3: bcrypt's browser behaviour beyond the readme sentence; how Socket, Snyk and Aikido detect malware; cosign verify itself; Scorecard's command-line JSON format; Stripe.net's namespace declarations; PostgreSQL \"core\" and third-party distributions; crates.io with an identifying user-agent; whether go list -m …@latest contacts the proxy; whether jscodeshift still drives react-codemod; npm view's own 404 output; an npm command named slopcheck; OWASP's Software Component Verification Standard beyond chapter 4; the advisory's printed pages 22-24; npm audit's exit rule; the National Vulnerability Database; Jackson 3's ObjectMapper; a name missing inside a present stub module; later Veracode updates; the published C++23 text as opposed to the working draft; the Java SAFE line uncompiled; and abbreviations from before round 2 left in prose (LLM, RAG, AST, NVD, CVE, GPG, SQL, sumdb, API), some inside protected items.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round2-critic-d-s4-skill-r2-critic.md, \"Carried to round 3\"; .ctoc/audit/improvement-run-notes/s4-skill-round2-revalidate-d-s4-skill-r2-revalidate.md, \"Not checked\"",
+          "decision": "rejected",
+          "reason": "Not changed this round: none was read, and a change without a read source would be a claim from memory. Carried to round 3.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r2-20",
+          "kind": "new",
+          "text": "Standing: whether the skill keeps a recommended gate for continuous integration at all.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round2-critic-d-s4-skill-r2-critic.md, \"For the human\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-skill-r1-ci-gate-scope"
+        },
+        {
+          "id": "f-s4-skill-r2-21",
+          "kind": "new",
+          "text": "Standing: the trigger phrase \"AI code review\" is shared with ai-code-quality-reviewer.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round2-critic-d-s4-skill-r2-critic.md, \"For the human\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-agent-r1-shared-dispatch-phrase-ai-code-review"
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 41,
+        "VALIDATED": 37,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 2,
+        "MISATTRIBUTED": 2
+      },
+      "validator_final": {
+        "examined": 172,
+        "VALIDATED": 169,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-census.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-ledger-gate.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/critic-warnings-are-critical.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/plugin-skill-discovery.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/test-gate-ledger-wiring.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "agents/ai-quality/hallucination-detector.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "It applies, and all seven required languages now carry examples: C#, Java, Python, C, C++, JavaScript and TypeScript, and SQL. Round 2 used different source classes from round 1 (which asked what a registry or vendor page says): specifications (the C++ working draft, the Java Language Specification, the Python typing specification, the Go Modules Reference), a security agency's final advisory (the European Union Agency for Cybersecurity, version 1.1, read as page images), standards bodies (OWASP's Software Component Verification Standard, OWASP Dependency-Check, OpenSSF Scorecard's checks documentation), the peer-reviewed paper's mitigation section (read as page images), and the session's executed checks; libraries' own references were used only to judge whether examples are correct. The C SAFE side is the three declared prototypes only: tag handling, EVP_CIPHER_CTX_new and EVP_aes_256_gcm were not checked, and an AES-GCM example without the authentication-tag step would teach broken cryptography.",
+        "examples_checked": [
+          {
+            "language": "C++23",
+            "how": "compiled by the session with Apple clang 21 (clang++ -std=c++23) on macOS 26.6.1: the invented std::vector::contains fails with \"no member named 'contains' in 'std::vector<int>'\"; std::ranges::contains compiles and runs, exit 0"
+          },
+          {
+            "language": "C (OpenSSL 3.0 or later)",
+            "how": "checked against OpenSSL's manual pages and its exported-symbol list util/libcrypto.num (session raw read); not compiled"
+          },
+          {
+            "language": "Java (Jackson 2.18)",
+            "how": "checked against the raw library source (session raw read); not compiled: javac on this machine has no Java runtime"
+          },
+          {
+            "language": "SQL (PostgreSQL 18)",
+            "how": "PGXN answers (404 for the invented name, 200 for the pair control) and PostgreSQL 18's Appendix F, read 2026-09-30"
+          },
+          {
+            "language": "C# (.NET, Entity Framework Core, Stripe.net)",
+            "how": "the Entity Framework Core page read raw and Stripe.net's source folder, read 2026-09-30"
+          },
+          {
+            "language": "Go (module proxy)",
+            "how": "proxy.golang.org answered 404 for the invented module, read 2026-09-30"
+          },
+          {
+            "language": "Python (typing specification)",
+            "how": "the typing specification on stub files and partial stub packages, read 2026-09-30"
+          },
+          {
+            "language": "JavaScript and TypeScript (react-codemod)",
+            "how": "the react-codemod readme, read 2026-09-30"
+          }
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "date": "2026-09-30",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:9d56e48e41da44b77c849bda44960f8ce326b549363adc030e7d66e378aad179",
+      "fingerprint_after": "sha256:e259dc1af2a4f9fb6e0e084646467f619abfbcaea7dd8071bc9ada339f9ca794",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s4-skill-r3-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-skill-r3-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-skill-r3-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s4-skill-r3-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "CISA secure by design, typosquatting or dependency confusion (cisa.gov only)",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "2026 national agency guidance on AI-generated code and hallucinated packages",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "Socket malware detection (socket.dev only)",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Snyk malicious-package detection (snyk.io only)",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://docs.npmjs.com/cli/v12/commands/npm-ci",
+          "read_on": "2026-09-30",
+          "bore_on": "npm ci --ignore-scripts still runs named scripts (changes 1a, 1b)",
+          "outcome": "supported",
+          "quote": "but they will _not_ run any pre- or post-scripts.",
+          "error": null
+        },
+        {
+          "url": "https://docs.npmjs.com/cli/v12/commands/npm-audit",
+          "read_on": "2026-09-30",
+          "bore_on": "npm audit's exit code (change 1b)",
+          "outcome": "supported",
+          "quote": "If vulnerabilities were found the exit code will depend on the `audit-level` config.",
+          "error": null
+        },
+        {
+          "url": "https://github.com/pypa/pip-audit",
+          "read_on": "2026-09-30",
+          "bore_on": "pip-audit is not a malware defence (changes 1a, 1b)",
+          "outcome": "supported",
+          "quote": "you **must not** assume that `pip-audit` will **defend** you against malicious packages",
+          "error": null
+        },
+        {
+          "url": "https://docs.socket.dev/docs/socket-ci",
+          "read_on": "2026-09-30",
+          "bore_on": "socket ci reads manifests and fails on policy alerts, so it can run before installing (changes 1a, 1b)",
+          "outcome": "supported",
+          "quote": "has alerts that violate your security or license policy",
+          "error": null
+        },
+        {
+          "url": "https://github.com/sigstore/cosign/blob/main/doc/cosign_verify-attestation.md",
+          "read_on": "2026-09-30",
+          "bore_on": "cosign verify-attestation is for container images (finding 11)",
+          "outcome": "supported",
+          "quote": "Verify an attestation on the supplied container image",
+          "error": null
+        },
+        {
+          "url": "https://www.cisa.gov/eviction-strategies-tool/info-attack/T1195.001",
+          "read_on": "2026-09-30",
+          "bore_on": "name confusion and re-registered abandoned packages (changes 8a, 8b; the wrapper late correction)",
+          "outcome": "supported",
+          "quote": "Adversaries may also employ 'typosquatting' or name-confusion by choosing names similar to existing popular libraries or packages in order to deceive a user.",
+          "error": null
+        },
+        {
+          "url": "https://attack.mitre.org/techniques/T1195/001/",
+          "read_on": "2026-09-30",
+          "bore_on": "the origin of the agency page's words, version 1.3 (changes 8a, 8b)",
+          "outcome": "supported",
+          "quote": "may also include abandoned packages, which in some cases could be re-registered by threat actors after being removed by adversaries.",
+          "error": null
+        },
+        {
+          "url": "https://www.enisa.europa.eu/sites/default/files/2026-03/ENISA%20Technical%20Advisory%20-%20Package_Managers_Final.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "inflated popularity metrics, section 4.1.1, page 17 (change 2; page image)",
+          "outcome": "supported",
+          "quote": "Popularity metrics can be misleading or artificially inflated",
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/react-codeshift",
+          "read_on": "2026-09-30",
+          "bore_on": "a third party's self-described placeholder (changes 3a, 3b; session raw)",
+          "outcome": "refuted",
+          "quote": "Placeholder to prevent dependency confusion.",
+          "error": null
+        },
+        {
+          "url": "https://pypi.org/pypi/slopcheck/json",
+          "read_on": "2026-09-30",
+          "bore_on": "the PyPI distribution slopcheck is a different project (change 4a; session raw)",
+          "outcome": "refuted",
+          "quote": "0.6.1",
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/slopcheck",
+          "read_on": "2026-09-30",
+          "bore_on": "the npm package slopcheck is a third project (change 4a; session raw)",
+          "outcome": "refuted",
+          "quote": "Scan markdown and config files for hallucinated npm package names.",
+          "error": null
+        },
+        {
+          "url": "https://github.com/experimental-gains/slopcheck",
+          "read_on": "2026-09-30",
+          "bore_on": "the slopcheck the skill describes (change 4b)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/bcrypt/latest",
+          "read_on": "2026-09-30",
+          "bore_on": "bcrypt's install script (change 5)",
+          "outcome": "supported",
+          "quote": "\"install\":\"node-gyp-build\"",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/kelektiv/node.bcrypt.js/master/README.md",
+          "read_on": "2026-09-30",
+          "bore_on": "bcrypt names no browser; pre-built binaries best-effort (change 5)",
+          "outcome": "supported",
+          "quote": "Pre-built binaries for various NodeJS versions are made available on a best-effort basis.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/psf/requests/main/src/requests/api.py",
+          "read_on": "2026-09-30",
+          "bore_on": "requests.get's signature and request's docstring (change 9)",
+          "outcome": "supported",
+          "quote": ":param json: (optional) A JSON serializable Python object to send in the body of the :class:`Request`.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/psf/requests/main/src/requests/_types.py",
+          "read_on": "2026-09-30",
+          "bore_on": "GetKwargs declares json and no json_body (change 9, validator's correction)",
+          "outcome": "refuted",
+          "quote": "json: JsonType",
+          "error": null
+        },
+        {
+          "url": "https://socket.dev/alerts/malware",
+          "read_on": "2026-09-30",
+          "bore_on": "Socket's \"Known malware\" alert (change 10)",
+          "outcome": "supported",
+          "quote": "has been flagged either by Socket's AI scanner and confirmed by our threat research team, or is listed as malicious in security databases and other sources",
+          "error": null
+        },
+        {
+          "url": "https://intel.aikido.dev",
+          "read_on": "2026-09-30",
+          "bore_on": "Aikido names no detection method in the text read (change 10)",
+          "outcome": "did-not-bear",
+          "quote": "We detect malware and vulnerabilities in open-source ecosystems within minutes.",
+          "error": null
+        },
+        {
+          "url": "https://docs.snyk.io/manage-risk/prioritize-issues-for-fixing/malicious-packages",
+          "read_on": "2026-09-30",
+          "bore_on": "how Snyk detects malicious packages (change 10)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "a page-not-found page"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/stripe/stripe-dotnet/master/src/Stripe.net/Services/Checkout/Sessions/SessionService.cs",
+          "read_on": "2026-09-30",
+          "bore_on": "Stripe.net's Checkout namespace (change 12)",
+          "outcome": "supported",
+          "quote": "namespace Stripe.Checkout",
+          "error": null
+        },
+        {
+          "url": "https://api.github.com/repos/fastapi/fastapi/contents/fastapi/security",
+          "read_on": "2026-09-30",
+          "bore_on": "the FastAPI security directory (change 13; session raw)",
+          "outcome": "supported",
+          "quote": "open_id_connect_url.py",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/FasterXML/jackson-databind/3.x/src/main/java/tools/jackson/databind/ObjectMapper.java",
+          "read_on": "2026-09-30",
+          "bore_on": "Jackson 3 ObjectMapper has no static builder() (change 14; session raw)",
+          "outcome": "supported",
+          "quote": "First build method is the static builder() on exact type",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/FasterXML/jackson-databind/3.x/src/main/java/tools/jackson/databind/json/JsonMapper.java",
+          "read_on": "2026-09-30",
+          "bore_on": "Jackson 3 JsonMapper.builder() at line 151 (change 14; session raw)",
+          "outcome": "supported",
+          "quote": "public static Builder builder() {",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/openssl/openssl/master/doc/man3/EVP_EncryptInit.pod",
+          "read_on": "2026-09-30",
+          "bore_on": "the C example's prototypes re-read raw; no EVP_Q_ (session raw)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://docs.deps.dev/",
+          "read_on": "2026-09-30",
+          "bore_on": "the deps.dev quotation's exact page (session raw)",
+          "outcome": "supported",
+          "quote": "structure, construction, and security",
+          "error": null
+        },
+        {
+          "url": "https://docs.deps.dev/faq/",
+          "read_on": "2026-09-30",
+          "bore_on": "the other deps.dev wording on a different page (session raw)",
+          "outcome": "did-not-bear",
+          "quote": "structure, security, and construction",
+          "error": null
+        },
+        {
+          "url": "https://typing.python.org/en/latest/spec/distributing.html",
+          "read_on": "2026-09-30",
+          "bore_on": "the partial-stub exception the skill now mirrors (change 15)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s4-skill-round3-session-runs.md",
+          "read_on": "2026-09-30",
+          "bore_on": "the session's raw probes: Jackson 3 source, react-codeshift, the three slopcheck projects, the FastAPI directory, OpenSSL's manual page, the deps.dev pages and the JsonMapper address",
+          "outcome": "supported",
+          "quote": "So THREE different projects carry the name slopcheck",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s4-skill-r3-1",
+          "kind": "new",
+          "text": "The gate contradicted its own source: it installed, and ran pip-audit (which runs install code), before scanning for known malicious packages. The malicious-package scan now runs first, on the manifests; npm ci --ignore-scripts' limit, npm audit's exit rule, pip-audit's own warning, Socket's exit conditions and cosign's scope are quoted (changes 1a-1c).",
+          "evidence": "https://github.com/pypa/pip-audit; https://docs.socket.dev/docs/socket-ci; https://docs.npmjs.com/cli/v12/commands/npm-ci",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-2",
+          "kind": "new",
+          "text": "The skill was silent on eight ways past its checks that cost an attacker nothing (a pre-registered name with no counterpart, a private registry outside the repository, look-alike characters, a look-alike's own declaration files, a repository link to the genuine project, a resembling scope, inflated download counts, and this file's own dated 404s). Each now has a rule, mostly the wrapper's (change 2).",
+          "evidence": "https://www.enisa.europa.eu/sites/default/files/2026-03/ENISA%20Technical%20Advisory%20-%20Package_Managers_Final.pdf, section 4.1.1, page 17; the wrapper's look-alike, private-name, character and Export Verification rules",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-3",
+          "kind": "new",
+          "text": "A third party's self-described \"placeholder\" (react-codeshift, maintainer debugducky) was presented as a registry hold; the wrapper's recipe prints REGISTERED for it. The skill now says so, and sends such names to the look-alike check (changes 3a, 3b).",
+          "evidence": "https://registry.npmjs.org/react-codeshift; .ctoc/audit/improvement-run-notes/s4-skill-round3-session-runs.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-4",
+          "kind": "new",
+          "text": "The recommended tool name \"slopcheck\" belongs to three unrelated projects (GitHub experimental-gains, the PyPI distribution, the npm package); \"installed with pip\" installed a different one. Each is now named, and the collision is stated as the lesson (changes 4a, 4b).",
+          "evidence": "https://pypi.org/pypi/slopcheck/json; https://registry.npmjs.org/slopcheck; .ctoc/audit/improvement-run-notes/s4-skill-round3-session-runs.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-5",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects the bcrypt row and the \"Hallucinated\" heading carried from round 2 (f-s4-skill-r2-19): the table lists real packages, and \"bcrypt is Node-only\" had no source. The heading is now \"Written | Prefer\" with the wrapper's rule, and the bcrypt row uses the wrapper's sourced wording (change 5).",
+          "evidence": "https://registry.npmjs.org/bcrypt/latest; https://raw.githubusercontent.com/kelektiv/node.bcrypt.js/master/README.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-6",
+          "kind": "new",
+          "text": "Section 2 lacked the wrapper's two limits on reading an installed copy (a look-alike's declaration files prove nothing about the name; the install step has already run, so install scripts go to dependency-auditor) (change 6).",
+          "evidence": "agents/ai-quality/hallucination-detector.md, Export Verification",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-7",
+          "kind": "new",
+          "text": "The provenance layer implied that a valid attestation settles the question; it shows only where a package was built. Labelled as this file's own reasoning (changes 7a, 7b).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round3-critic-d-s4-skill-r3-critic.md, finding 7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-8",
+          "kind": "new",
+          "text": "No regulator source stood behind name confusion, and the LOW \"Renamed library\" tier assumed an old name stays with its owner. The words are the Cybersecurity and Infrastructure Security Agency's page for T1195.001, which carries MITRE ATT&CK's description, so both addresses are cited; the LOW tier is limited after the protected table (changes 8a, 8b). Where the recipe prints no maintainers, the LOW tier stays, with \"maintainers not read\" (plan decision 6).",
+          "evidence": "https://www.cisa.gov/eviction-strategies-tool/info-attack/T1195.001; https://attack.mitre.org/techniques/T1195/001/",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-9",
+          "kind": "new",
+          "text": "The requests example: the critique proposed that reading requests.get's signature cannot settle whether json_body exists. The validator found that premise contradicted by the source: the signature's **kwargs is typed Unpack[_t.GetKwargs], and GetKwargs in src/requests/_types.py declares json: JsonType and nothing named json_body. The validator's lines replaced the critique's; released versions' typing is stated as not checked (change 9).",
+          "evidence": "https://raw.githubusercontent.com/psf/requests/main/src/requests/_types.py; .ctoc/audit/improvement-run-notes/s4-skill-round3-validate-d-s4-skill-r3-validate.md, row 25",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-10",
+          "kind": "new",
+          "text": "Resolves round 2's carried item: the tool table said Socket's detection \"was not checked\". Socket's \"Known malware\" page is quoted; Aikido's page names no method in the text read; Snyk's documentation address answered a page-not-found page, so Snyk stays not checked, in the file's words (change 10).",
+          "evidence": "https://socket.dev/alerts/malware; https://intel.aikido.dev; https://docs.snyk.io/manage-risk/prioritize-issues-for-fixing/malicious-packages",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-11",
+          "kind": "new",
+          "text": "cosign verify-attestation verifies container images, not package dependencies; carried by changes 1a and 1b.",
+          "evidence": "https://github.com/sigstore/cosign/blob/main/doc/cosign_verify-attestation.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-12",
+          "kind": "new",
+          "text": "Resolves round 2's carried item: Stripe.net's SessionService.cs declares namespace Stripe.Checkout and has no PaymentPro (change 12).",
+          "evidence": "https://raw.githubusercontent.com/stripe/stripe-dotnet/master/src/Stripe.net/Services/Checkout/Sessions/SessionService.cs",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-13",
+          "kind": "new",
+          "text": "The FastAPI comment now cites the security directory's listing (change 13).",
+          "evidence": "https://api.github.com/repos/fastapi/fastapi/contents/fastapi/security",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-14",
+          "kind": "new",
+          "text": "Resolves round 2's carried item: in Jackson 3 too, ObjectMapper declares no static builder(); JsonMapper does, at line 151 (change 14).",
+          "evidence": "https://raw.githubusercontent.com/FasterXML/jackson-databind/3.x/src/main/java/tools/jackson/databind/json/JsonMapper.java; .ctoc/audit/improvement-run-notes/s4-skill-round3-session-runs.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-15",
+          "kind": "new",
+          "text": "The confidence sentence no longer matched the wrapper after its round-2 late corrections; it now carries the partial-stub exception (change 15).",
+          "evidence": "agents/ai-quality/hallucination-detector.md, Export Verification and the HIGH row",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-16",
+          "kind": "new",
+          "text": "Validation (d-s4-skill-r3-validate: 40 claims, 38 validated, 1 contradicted by its source, 1 misattributed) corrected the new text before applying: change 9 (above); the T1195.001 words credited to MITRE ATT&CK as their origin (8a, 8b); Snyk's address and Aikido's own sentence (10); the JsonMapper 3.x address (14); \"created 2026-01-14\" (3a); \"status 404\" (2); the full npm-ci sentence (1b).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round3-validate-d-s4-skill-r3-validate.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-17",
+          "kind": "new",
+          "text": "Re-validation (d-s4-skill-r3-revalidate: 217 claims, 216 validated, 1 mismatch): the scope rule said \"the organisation's own\", reaching further than the wrapper's \"one the repository already uses\". Corrected to the wrapper's scope.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round3-revalidate-d-s4-skill-r3-revalidate.md, \"The mismatch and what was not checked\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-18",
+          "kind": "new",
+          "text": "The wrapper's renamed_package severity row carried the same assumption as the skill's LOW tier. Late-corrected with the same scoping, the validator's wording \"otherwise it is `suspected_lookalike` (high, above)\" and both T1195.001 addresses (lc-s4-agent-4); the re-read found the row well-formed and consistent. The wrapper's suspected_lookalike definition row now lists the new route (npm maintainers that differ), the re-validation's optional addition.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round3-critic-d-s4-skill-r3-critic.md, \"Cross-file findings for the agent\", item 1; .ctoc/audit/improvement-run-notes/s4-skill-round3-revalidate-d-s4-skill-r3-revalidate.md, \"The agent's changed row\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-19",
+          "kind": "new",
+          "text": "Cross-file items needing no change in the wrapper: self-described placeholders already print REGISTERED; the wrapper never runs the gate; \"the examples across seven languages\" is true; everything the wrapper depends on is byte-identical.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round3-critic-d-s4-skill-r3-critic.md, \"Cross-file findings for the agent\", items 2-5",
+          "decision": "rejected",
+          "reason": "No change needed in the wrapper.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-20",
+          "kind": "new",
+          "text": "Left open, with no round 4. Stated in the file: how Snyk detects malicious packages; that Aikido describes no method; requests' released-version typing; the rest of the Stripe.net repository; npm view's own 404 output; a module missing from a partial stub package (an unknown); a complete AES-GCM program in C (excluded). Not claimed in the file: cosign verify; whether go list -m …@latest contacts the proxy; later Veracode updates; the National Vulnerability Database; PostgreSQL \"core\" and third-party distributions; Django's raw source; whether npm keeps time.created when a held name is adopted; OWASP's Software Component Verification Standard beyond chapter 4; the advisory's printed pages 22-24; the Cyber Resilience Act text; a name missing inside a present stub module; whether socket ci gives a complete answer before installing; the npm recipe's \"maintainers not in the answer\" falling to suspected look-alike (a design choice the re-read noted); and pre-round-2 abbreviations in prose, some inside protected items.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round3-critic-d-s4-skill-r3-critic.md, \"Left open\"; .ctoc/audit/improvement-run-notes/s4-skill-round3-revalidate-d-s4-skill-r3-revalidate.md, \"Not checked\"",
+          "decision": "rejected",
+          "reason": "Left open: no source or tool reached in the three rounds settles these, and a change without one would be a claim from memory.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-21",
+          "kind": "new",
+          "text": "Standing: whether the skill keeps a recommended gate for continuous integration at all; the slopcheck name collision shows the risk of recommending tools by name.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round3-critic-d-s4-skill-r3-critic.md, \"For the human\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-skill-r1-ci-gate-scope"
+        },
+        {
+          "id": "f-s4-skill-r3-22",
+          "kind": "new",
+          "text": "Standing: the trigger phrase \"AI code review\" is shared with ai-code-quality-reviewer.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round3-critic-d-s4-skill-r3-critic.md, \"For the human\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-agent-r1-shared-dispatch-phrase-ai-code-review"
+        },
+        {
+          "id": "f-s4-skill-r3-23",
+          "kind": "new",
+          "text": "New this round: only the npm recipe prints maintainers, so the strict LOW rule would make every renamed library outside npm a suspected look-alike. The files keep LOW where no maintainers are printed, with \"maintainers not read\" (plan decision 6); which rule to keep is the human's.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-skill-round3-validate-d-s4-skill-r3-validate.md, \"Checks by reading\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-skill-r3-renamed-low-without-maintainers"
+        },
+        {
+          "id": "f-s4-skill-r3-24",
+          "kind": "new",
+          "text": "Scenario 20 asks each changed example to name its language version in the file. One version-and-check line now opens each changed block that lacked one: TypeScript / JavaScript; Python 3.12 and later and C# / .NET 9 (the versions the parent plan's criterion 4 sets); Go and Rust, outside the seven, with no version named; SQL / PostgreSQL 18. The Java line names Java 21 and later beside Jackson 2.18. Each line states only checks the round notes record: the Python line names Django's documentation, not its source, which was never read, and leaves out a parse under Python 3.9.6, because this block has no decorated example (that parse was of the wrapper's FastAPI example). Plan decision 7.",
+          "evidence": "plans/implementation/every-agent-and-specialist-skill-improved-three-times.md, criterion 4 and scenario 20; the round notes s4-skill-round1-* to s4-skill-round3-*",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-25",
+          "kind": "new",
+          "text": "A lead for another skill's owner, not a refutation: the finished reviewer skill (skills/ai-quality/ai-code-quality-reviewer/SKILL.md, line 184) calls react-codeshift \"a defensive placeholder\". Its own line 176 already says an Aikido researcher registered the name, which is what the raw registry answer shows (a third party's registration describing itself as a placeholder), so the wording is imprecise beside this file's round-3 text, not false. Plan decision 2's hold does not apply: this round stays complete, with no held marker (plan decision 8). The file is outside this slice, so a scope-growth request was filed: inbox question 1790801303564-1rhgy4.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md lines 176 and 184; https://registry.npmjs.org/react-codeshift; .ctoc/inbox/questions/1790801303564-1rhgy4.md",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-skill-r3-reviewer-react-codeshift-wording"
+        },
+        {
+          "id": "f-s4-skill-r3-26",
+          "kind": "new",
+          "text": "Step 13 security review, High 1 (a kickback to Step 10): publisher-written registry text picked the held label and could push a second, attacker-owned name into a suggestion. The wrapper's npm recipe now prints HELD BY NPM only when maintainers is exactly the user npm and the version or description says so, the observed pattern of the two held names; its PyPI recipe prints no placeholder label and names the summary publisher_summary; registry_placeholder is reported only after the look-alike check; a name taken from registry text never goes into a suggestion on that text; the look-alike check also covers every name to be suggested; the skill's Registry placeholder row (line 76) is corrected to match. The session's probe: fs and crossenv have maintainers exactly [\"npm\"], no ordinary package observed does, and _npmUser.name is not a marker. The wrapper's changes will be recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md, High 1 (dispatch d-s4-step13-secure); .ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md, \"Step 13 follow-up probe\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-27",
+          "kind": "new",
+          "text": "Step 13, Medium 1 and Low 4: a single quote in a package name was the one way into the shell. The wrapper's three recipes now read the name with IFS= read -r from a quoted heredoc, so a quote-breaking name is literal text the recipe refuses; the executor checked this offline in bash 3.2.57 and zsh 5.9 with the name x'; echo INJECTED; '$(echo INJECTED2): every recipe printed NOT CHECKED. The prose names the remaining limit (a line break followed by the end marker) and asks for one recipe per Bash call. The wrapper's changes will be recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md, Medium 1, Low 4 (dispatch d-s4-step13-secure)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-28",
+          "kind": "new",
+          "text": "Step 13, Medium 2: Export Verification followed paths a hostile package chooses. The wrapper now follows an \"exports\"/\"types\" target or a re-export only inside the package's own directory, or for a bare package name inside the project's node_modules, and records refused targets. The wrapper's changes will be recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md, Medium 2 (dispatch d-s4-step13-secure)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-29",
+          "kind": "new",
+          "text": "Step 13, Medium 3 and Info 2: the recipes always exit 0, so a gate built on them could not fail at step 1. Both files now say a pipeline must fail on any line other than REGISTERED followed by a cleared look-alike check; the recipes remove their temporary file on exit through a trap (checked offline: no file left in bash or zsh). The wrapper's changes will be recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md, Medium 3, Info 2 (dispatch d-s4-step13-secure)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-30",
+          "kind": "new",
+          "text": "Step 13, Medium 4 and Low 8: the gate's step 3 now runs in a job with no secrets and a read-only token, because pip-audit runs install code, and npm audit no longer omits development dependencies, which run on developer and pipeline machines too.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md, Medium 4, Low 8 (dispatch d-s4-step13-secure)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-31",
+          "kind": "new",
+          "text": "Step 13, Low 1 and Low 3: registry fields are printed through JSON.stringify, so a line break cannot forge a second verdict line (checked offline: one output line, the break escaped), and an unparseable answer prints a fixed COULD NOT LOOK line without echoing it (checked offline with an HTML error page). The wrapper's changes will be recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md, Low 1, Low 3 (dispatch d-s4-step13-secure)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-32",
+          "kind": "new",
+          "text": "Step 13, Low 2: every curl in the recipes now runs with -q --proto '=https' --proto-redir '=https', so a user's configuration file is not read and no redirect leaves HTTPS. The wrapper's changes will be recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md, Low 2 (dispatch d-s4-step13-secure)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-33",
+          "kind": "new",
+          "text": "Step 13, Low 6 and Low 7: the skill's command templates now carry \"substitute only a name that passed the wrapper's character check, and run package-manager clients from outside the repository under review\", and every tool the gate names is to be installed by its repository or exact registry entry.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md, Low 6, Low 7 (dispatch d-s4-step13-secure)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-34",
+          "kind": "new",
+          "text": "Step 13, Info 1: the wrapper's provenance read now says a valid attestation would show only where a package was built, not that it is the package the code meant. The wrapper's changes will be recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md, Info 1 (dispatch d-s4-step13-secure)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-35",
+          "kind": "new",
+          "text": "Step 13, Low 5: every package name is sent to public registries, and the gate's socket ci uploads manifests, before the private-name rule applies. Not a change: a data-boundary decision for the human, with the scanner's two options.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md, Low 5 (dispatch d-s4-step13-secure)",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-step13-names-sent-to-public-registries"
+        },
+        {
+          "id": "f-s4-skill-r3-36",
+          "kind": "new",
+          "text": "Step 13, Info 3: Bash is granted without restriction; the read-only stance is an instruction. Already with the human.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md, Info 3 (dispatch d-s4-step13-secure)",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-agent-r1-shell-name-check-is-instruction-only"
+        },
+        {
+          "id": "f-s4-skill-r3-37",
+          "kind": "new",
+          "text": "Step 13, Info 4 and Info 5: a maintainer's email address in a session note (redacted by the session; neither instruction file is involved), and checks that found no problem (the date command, the non-ASCII search, the scripts read, the character check's refusals).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md, Info 4, Info 5 (dispatch d-s4-step13-secure)",
+          "decision": "rejected",
+          "reason": "No change to either file: Info 4 was handled by the session in the note, and Info 5 found nothing to fix.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-38",
+          "kind": "new",
+          "text": "Step 11 review, items 1 and 2: Steps 11, 13 and 16 were ticked although their agents had not run, and the execution record said the end-of-slice npm test ran on the final text of both files, which later edits made false. The boxes now record each step as run with a kickback, ticked only when its findings are resolved, and the gate line says the run is pending on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 1, 2 (dispatch d-s4-step11-review)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-39",
+          "kind": "new",
+          "text": "Step 11, item 3: the look-alike comparison and the renamed-package rule conflicted for the same package. The wrapper now states which wins: a name the answer shows to be the renamed predecessor (npm: it shares at least one maintainer with the well-known package) or a real package wrong for the environment is reported under that type, and the download and age comparison applies only when the relation is not established. The session's probe showed why \"shares at least one maintainer\" and not \"the same maintainers\": react-query and @tanstack/react-query share one maintainer of several, and the download comparison would otherwise fire on the file's own renamed example. Both files now use that wording. The wrapper's changes will be recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 3 (dispatch d-s4-step11-review); .ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md, \"Step 11 follow-up probes\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-40",
+          "kind": "new",
+          "text": "Step 11, item 4: the react-codeshift lead was recorded four inconsistent ways. The \"not yet written\" paragraph is deleted, the execution record names h-s4-skill-r3-reviewer-react-codeshift-wording, and the inbox question 1790801303564-1rhgy4 now gives criterion 9 alone as its acceptance criterion.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 4 (dispatch d-s4-step11-review)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-41",
+          "kind": "new",
+          "text": "Step 11, item 5: the skill's C and C++ passage ordered a catalogue check its wrapper does not run. It now records Conan and vcpkg names as not checked, and the wrapper's hand-on list gains \"C and C++ language issues: sast-scanner\", so both files name the same owner. The wrapper's changes will be recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 5 (dispatch d-s4-step11-review)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-42",
+          "kind": "new",
+          "text": "Step 11, item 6: the wrapper's curated package table claimed a model habit it cites no source for; the sentence now reads \"These are real packages; flag them as stale or wrong for the context, never as non-existent.\" The wrapper's changes will be recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 6 (dispatch d-s4-step11-review)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-43",
+          "kind": "new",
+          "text": "Step 11, item 7: an npm answer without maintainers is handled the opposite way to PyPI's missing maintainers; added to the human's entry on the renamed rule, with three options.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 7 (dispatch d-s4-step11-review)",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-skill-r3-renamed-low-without-maintainers"
+        },
+        {
+          "id": "f-s4-skill-r3-44",
+          "kind": "correction-of-earlier-round",
+          "text": "Step 11, items 8 and 9: the skill's cargo search verification line now begins \"Do not run:\", matching its own rule, and the letter schema says its confidence comment is the design's while the rule in force is the one under \"2026 Best Practices\".",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 8, 9 (dispatch d-s4-step11-review)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-45",
+          "kind": "correction-of-earlier-round",
+          "text": "Step 11, item 10: the record encoded a validator \"mismatch\" two ways. One mapping is used in every round: a mismatch counts in examined only (plan decision 4), so this round's validator_final now shows 0 misattributed.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 10 (dispatch d-s4-step11-review)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-46",
+          "kind": "new",
+          "text": "Step 11, item 11: the cutoff rule relied on npm's created date without saying whether it survives an unpublish and a new registration. The wrapper now says that was not checked and that such a date does not show the package now behind the name existed then. The wrapper's changes will be recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 11 (dispatch d-s4-step11-review)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-47",
+          "kind": "new",
+          "text": "Step 11, items 12 and 16: fingerprint and count slips in the plan (the wrapper's criterion 8 fingerprint, decision 5, \"13 lines\" for a 12-line frontmatter) are corrected, and late corrections lc-s4-agent-1 and lc-s4-agent-3, whose full-gate run preceded their final text, now name the covering run: the end-of-slice npm test on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 12, 16 (dispatch d-s4-step11-review)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-48",
+          "kind": "new",
+          "text": "Step 11, item 13: abbreviations in passages this slice changed are spelled out in the skill: an artificial-intelligence model, the Common Vulnerabilities and Exposures program, an application programming interface, the paper itself, the abstract syntax tree, Maven Central's required signatures, and Go's checksum database.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 13 (dispatch d-s4-step11-review)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-49",
+          "kind": "new",
+          "text": "Step 11, item 14: the C example named a library version, not a C standard. It now names C17 and records that its three declarations compiled with Apple clang 21 at -std=c17 against stand-in types, since OpenSSL's headers are not installed here, while the invented call is rejected as an undeclared function.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 14 (dispatch d-s4-step11-review); .ctoc/audit/improvement-run-notes/s4-skill-round3-session-runs.md, \"Step 11 item 14\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-50",
+          "kind": "new",
+          "text": "Step 11, items 15 and 17: the wrapper's three TypeScript version lines now say Node.js 24 ran the section 4 patterns and these examples were checked against documentation, registry answers or source; the skill's cutoff sentence now matches the wrapper, which never sets a PyPI first upload against the cutoff. The wrapper's changes will be recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 15, 17 (dispatch d-s4-step11-review)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-51",
+          "kind": "new",
+          "text": "Step 11, item 18: the wrapper's character-check paragraph is split into seven numbered steps with its text unchanged, and the renamed_package condition moved out of the severity table cell into a paragraph under the table. The wrapper's changes will be recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run on the final bytes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 18 (dispatch d-s4-step11-review)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-52",
+          "kind": "new",
+          "text": "Step 11, item 19: both files offered moment().toISOString() as the equivalent of date-fns formatISO. They now name the difference: moment's toISOString converts to Coordinated Universal Time unless keepOffset is true, and date-fns formatISO returns the date \"in local time zone\"; the wrapper adds the session's Node.js 24 run.",
+          "evidence": "https://raw.githubusercontent.com/moment/moment/develop/src/lib/moment/format.js; https://unpkg.com/date-fns@4.4.0/formatISO.js; .ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md; .ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md, item 19 (dispatch d-s4-step11-review)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-53",
+          "kind": "correction-of-earlier-round",
+          "text": "Skill line 56 (round 1's text) still said the npm and PyPI recipes tell a held name apart; since the Step 10 return the PyPI recipe prints no placeholder label. Now the security review's wording: npm prints HELD BY NPM on the stated condition, a lead that never skips the look-alike check, and PyPI prints no placeholder label, because a summary is the publisher's to write.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-d-s4-post-kickback-revalidate.md, leftover 1; .ctoc/audit/improvement-run-notes/s4-step11-review-2-d-s4-step11-review-2.md, new finding 1; .ctoc/audit/improvement-run-notes/s4-step13-secure-2-d-s4-step13-secure-2.md, new finding 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-54",
+          "kind": "new",
+          "text": "The exit-status sentence in both files, read literally, failed every npm name on its DOWNLOADS line. Both now say the verdict is the first line and a pipeline must fail unless it begins REGISTERED and a look-alike check then cleared the name; the wrapper adds that a DOWNLOADS line after COULD NOT LOOK is information, not a verdict, and that DOWNLOADS NOT READ is recorded under unknowns. The wrapper's changes are recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run (decision 9).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-d-s4-post-kickback-revalidate.md, leftovers 2-4; .ctoc/audit/improvement-run-notes/s4-step11-review-2-d-s4-step11-review-2.md, new finding 6; .ctoc/audit/improvement-run-notes/s4-step13-secure-2-d-s4-step13-secure-2.md, new finding 2 and the residual \"download count after an unreadable answer\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-55",
+          "kind": "new",
+          "text": "The gate's npm audit comment said \"development ones included\" without its condition; npm's omit option defaults to dev when NODE_ENV is production.",
+          "evidence": "https://docs.npmjs.com/cli/v12/commands/npm-audit, read 2026-09-30 (validator: omit \"Default: 'dev' if the NODE_ENV environment variable is set to 'production'\"); .ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-d-s4-post-kickback-revalidate.md, leftover 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-56",
+          "kind": "new",
+          "text": "The wrapper said \"the recipe's second check\" refuses a quoted name; that holds for the npm recipe only, so it now says the recipe's own character check refuses it. The wrapper's changes are recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run (decision 9).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-d-s4-post-kickback-revalidate.md, leftover 6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-57",
+          "kind": "new",
+          "text": "The skill's TypeScript version line cited react-codeshift's answer for a block with no react-codeshift in it; the clause is removed.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-d-s4-post-kickback-revalidate.md, leftover 7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-58",
+          "kind": "new",
+          "text": "The wrapper's \"an offset of minus 120 minutes\" could be read with the wrong sign; it now says a time zone two hours ahead of Coordinated Universal Time, and links the Node.js run to moment's native toISOString fallback in the same source file. The wrapper's changes are recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run (decision 9).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-d-s4-post-kickback-revalidate.md, leftovers 8 and 10",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-59",
+          "kind": "new",
+          "text": "The skill's cutoff sentence lacked the wrapper's caveat on npm's created date; one sentence now says a date before the cutoff is necessary and not sufficient, and that whether npm keeps it across an unpublish and a new registration was not checked. The wrapper now gives the fs example from the session's raw read: created \"2014-06-02T02:18:51.732Z\", placeholder version \"2016-08-23T17:56:58.976Z\". The wrapper's changes are recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run (decision 9).",
+          "evidence": "https://registry.npmjs.org/fs, read 2026-09-30; .ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md, \"Session re-read with curl, 23:20 CEST\"; .ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-d-s4-post-kickback-revalidate.md, leftovers 9 and 11; .ctoc/audit/improvement-run-notes/s4-step11-review-2-d-s4-step11-review-2.md, new finding 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-60",
+          "kind": "new",
+          "text": "The skill's round 3 record held the current fingerprint but validator counts and an empty not_reverified list from a re-read of earlier text. The re-read of the kickback's text (d-s4-post-kickback-revalidate: 20 skill claims, 16 validated, 3 refuted, 1 misattributed) found four claims, all corrected in this pass; validator_final records the last re-read of the final text (d-s4-post-kickback-revalidate-2: 9 skill claims, 7 validated, 2 not citations counted in examined only, 0 refuted, 0 misattributed), and not_reverified names the two changed claims neither re-read checked.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-2-d-s4-step11-review-2.md, new finding 2; .ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-d-s4-post-kickback-revalidate.md; .ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-2-d-s4-post-kickback-revalidate-2.md, counts",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-61",
+          "kind": "new",
+          "text": "The C17 note said the invented call is rejected without saying that without OpenSSL's headers every call is undeclared; it now says the compile shows only that the lines are valid C17, and that OpenSSL has no EVP_Q_encrypt rests on the export list and manual page.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-2-d-s4-step11-review-2.md, new finding 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-62",
+          "kind": "new",
+          "text": "Three version lines carried an internal pointer, \"the parent plan's criterion 4\", that means nothing to a reader of the skill; removed.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-2-d-s4-step11-review-2.md, new finding 4",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-63",
+          "kind": "new",
+          "text": "The wrapper called HELD BY NPM \"never a verdict\" while its confidence table rates a registry answer HIGH; it now says a HELD BY NPM line never skips the look-alike check. The same line now says JSON.stringify escapes line feeds and carriage returns but not the Unicode line and paragraph separators or the next-line character, so the output is to be split on line feeds only (the security review measured this). The wrapper's changes are recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run (decision 9).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-2-d-s4-step11-review-2.md, new finding 7; .ctoc/audit/improvement-run-notes/s4-step13-secure-2-d-s4-step13-secure-2.md, new finding 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-64",
+          "kind": "new",
+          "text": "Out-of-date wording in the plan (Step 16 boxes, the closing item, the Step 10 return) and in the inbox question (\"late correction found by the skill's round 3\" three times) now matches decision 8: the react-codeshift item is a lead.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-2-d-s4-step11-review-2.md, new finding 8",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-65",
+          "kind": "new",
+          "text": "The wrapper's path limit on Export Verification checks paths by their text; it now says whether a followed target is a symbolic link is not something these tools can see, to be stated in the limitations. The wrapper's changes are recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run (decision 9).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-2-d-s4-step11-review-2.md, new finding 9; .ctoc/audit/improvement-run-notes/s4-step13-secure-2-d-s4-step13-secure-2.md, residual \"symbolic links\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-66",
+          "kind": "new",
+          "text": "Two wrapper sentences lacked their source: the attestation sentence is marked as the file's own reasoning, and the line-break limit cites the session's run in which the line after the end marker executed. The wrapper's changes are recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run (decision 9).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-2-d-s4-step11-review-2.md, new finding 10; .ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md, \"Session runs after the Step 10 return\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-67",
+          "kind": "new",
+          "text": "Findings f-s4-skill-r3-44 (the cargo line left from round 1) and f-s4-skill-r3-45 (the records of rounds 2 and 3) were recorded as new; their exact kind is correction-of-earlier-round, now set.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-2-d-s4-step11-review-2.md, new finding 11",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-68",
+          "kind": "new",
+          "text": "The recipes' temporary file survived a termination signal in zsh; both traps now add trap 'exit 1' HUP INT TERM, which the security review tested in both shells; the executor's no-network run after the change left no file in either shell (recorded in .ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md, \"Executor run after the trap change\"), and the session's 23:26 run (offline, and a termination signal, 30 files before and after) corroborates it. The wrapper's changes are recorded as late correction lc-s4-agent-5 once the validator has re-read them and the end-of-slice npm test has run (decision 9).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-2-d-s4-step13-secure-2.md, new finding 4; .ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md, \"Session runs after the third return to Step 10 (23:26 CEST)\" and \"Executor run after the trap change\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-69",
+          "kind": "new",
+          "text": "The gate's step 3 job could still pass code to later jobs through a cache or an artifact; it now runs with no cache or artifact that a later job restores.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-2-d-s4-step13-secure-2.md, new finding 5 (believed by the reviewer, not verified)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-70",
+          "kind": "new",
+          "text": "The command-template rule covered names but not versions; it now covers \"a package name or version\".",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step13-secure-2-d-s4-step13-secure-2.md, new finding 6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-71",
+          "kind": "new",
+          "text": "The read-only use of Bash is an instruction, not a fence; the sentence is added to the human's existing entry on the shell name check.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-step11-review-2-d-s4-step11-review-2.md, Step 13 table, Info 3",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-agent-r1-shell-name-check-is-instruction-only"
+        },
+        {
+          "id": "f-s4-skill-r3-72",
+          "kind": "new",
+          "text": "Leads, not changes: PyPI's answer carries owner roles and its index serves a project-status marker; whether the PyPI recipe should read them is a design decision.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-d-s4-post-kickback-revalidate.md, \"Leads\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-post-kickback-pypi-owners-and-status"
+        },
+        {
+          "id": "f-s4-skill-r3-73",
+          "kind": "new",
+          "text": "Lead, not a change: sast-scanner's scope is security, while memory-safety-checker names C and C++ memory patterns; which owns C and C++ issues that are not about security is an ownership decision.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-d-s4-post-kickback-revalidate.md, \"Leads\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s4-post-kickback-c-cpp-owner"
+        },
+        {
+          "id": "f-s4-skill-r3-74",
+          "kind": "new",
+          "text": "The narrow re-read of this return's text (d-s4-post-kickback-revalidate-2: 28 claims across both files, 25 validated, 3 not citations, 0 refuted, 0 misattributed; for this skill, 9 claims, 7 validated, 2 not citations) left three wording leftovers, applied as leftovers of the same pass. In the skill: \"That shows only that the three declarations are valid C17\", since the call line was rejected. The wrapper's changes are recorded as late correction lc-s4-agent-5 after the end-of-slice npm test.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-2-d-s4-post-kickback-revalidate-2.md, leftover 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s4-skill-r3-75",
+          "kind": "new",
+          "text": "The trap now gives exit status 1 when a signal stops a recipe, so \"always exit 0\" was too strong in both files; both now say the recipes exit 0 whatever they found and only a signal that stops them gives another status. The wrapper's moment sentence now says the native toISOString is returned when moment converts and the year is between 0 and 9999, which is where the call sits in moment's source.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s4-post-kickback-revalidate-2-d-s4-post-kickback-revalidate-2.md, leftovers 1 and 3; https://raw.githubusercontent.com/moment/moment/develop/src/lib/moment/format.js",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 40,
+        "VALIDATED": 38,
+        "FABRICATED": 1,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 1
+      },
+      "validator_final": {
+        "examined": 9,
+        "VALIDATED": 7,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [
+        {
+          "claim": "The renamed rule's evidence: react-query and @tanstack/react-query share at least one maintainer",
+          "verified_on": "2026-09-30",
+          "reason": "The validator's two fetches of the maintainer lists were cut off (both showed tannerlinsley); the full lists rest on the session's recipe run."
+        },
+        {
+          "claim": "The C example's C17 compile with Apple clang 21",
+          "verified_on": "2026-09-30",
+          "reason": "Not re-run by the validator; it rests on the executor's run recorded in .ctoc/audit/improvement-run-notes/s4-skill-round3-session-runs.md."
+        }
+      ],
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-census.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-ledger-gate.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/critic-warnings-are-critical.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/plugin-skill-discovery.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/test-gate-ledger-wiring.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "agents/ai-quality/hallucination-detector.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "It applies, and all seven required languages carry checked examples. Round 3 used source classes different from rounds 1 and 2, which asked whether a statement matches its source: raw re-reads of the source files and registry answers a statement describes (requests, Stripe.net, Jackson 3, FastAPI, OpenSSL, react-codeshift, the three slopcheck projects), a regulator new to this file (the Cybersecurity and Infrastructure Security Agency's page for technique T1195.001, whose words are MITRE ATT&CK's description), and an adversarial pass (21 ways past the file's checks, ranked by cost to an attacker). Nothing is carried: what stays unresolved is listed as left open.",
+        "examples_checked": [
+          {
+            "language": "Python (requests; FastAPI)",
+            "how": "requests read in its main-branch source api.py and _types.py; FastAPI in its security directory listing; read 2026-09-30"
+          },
+          {
+            "language": "C# (Stripe.net)",
+            "how": "read in SessionService.cs, read 2026-09-30"
+          },
+          {
+            "language": "Java (Jackson 2.18 and 3)",
+            "how": "read in the raw library source (session raw); not compiled, no Java runtime"
+          },
+          {
+            "language": "JavaScript and TypeScript (react-codeshift; bcrypt row)",
+            "how": "the raw registry answer (session raw) and the bcrypt registry answer and readme"
+          },
+          {
+            "language": "C (OpenSSL 3.0 or later)",
+            "how": "unchanged example; OpenSSL's manual page re-read raw by the session; not compiled"
+          },
+          {
+            "language": "C++23",
+            "how": "unchanged example; compiled in round 2 with Apple clang 21 at -std=c++23"
+          },
+          {
+            "language": "SQL (PostgreSQL 18)",
+            "how": "unchanged this round; checked in round 2 against PGXN and PostgreSQL 18's Appendix F"
+          }
+        ]
+      }
+    }
+  ],
+  "late_corrections": [],
+  "held": null
+}
