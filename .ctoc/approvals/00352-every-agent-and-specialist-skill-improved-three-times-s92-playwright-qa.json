@@ -1,0 +1,9 @@
+{
+  "content_sha256": "60d21eb0899b6dcdccbc28299202475456ec5e5c5832dcc839e0cdeb3123939b",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:19.135Z",
+  "approved_by": "human",
+  "plan_basename": "00352-every-agent-and-specialist-skill-improved-three-times-s92-playwright-qa"
+}

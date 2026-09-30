@@ -1,0 +1,9 @@
+{
+  "content_sha256": "159f36e24d1602fa97ec05f6db66812fe2acaddfef20c8d6fc118bba9bf5c44b",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:20.276Z",
+  "approved_by": "human",
+  "plan_basename": "00391-the-readme-matches-the-product-today-s10-reference"
+}

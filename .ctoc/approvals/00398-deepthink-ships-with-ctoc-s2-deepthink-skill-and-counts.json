@@ -1,0 +1,9 @@
+{
+  "content_sha256": "9de8934f69d03a9d69613e504a72951e027adec240ae2aff982d23c1f1894d2a",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T11:39:25.393Z",
+  "approved_by": "human",
+  "plan_basename": "00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts"
+}

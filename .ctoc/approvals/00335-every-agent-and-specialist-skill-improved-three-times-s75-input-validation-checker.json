@@ -1,0 +1,9 @@
+{
+  "content_sha256": "ca06af8eafad81a14536502268f591ef88502230315848801e94b90b8c3de814",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:18.663Z",
+  "approved_by": "human",
+  "plan_basename": "00335-every-agent-and-specialist-skill-improved-three-times-s75-input-validation-checker"
+}

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "27c7a42ed72172a6a95ab7432ffdf2237bda11a2f7e76cc7dd4a620da8624214",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.401Z",
+  "approved_by": "human",
+  "plan_basename": "00291-every-agent-and-specialist-skill-improved-three-times-s31-clm-obligations"
+}

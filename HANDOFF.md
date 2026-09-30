@@ -1,115 +1,113 @@
-# Handoff — CTOC: PAUSED by the human — parser-fix build stopped mid-flight; detector slice gate-green, waiting
+# Handoff — CTOC: restart required (plugin update removed the agents from the session); five plans in flight
 
-<!-- Maintained by the `handoff` skill. Left by the previous Claude instance so
-     the next one (claude or claudex) can continue. Treat as last-known state —
-     verify against the repo before acting. VERIFY EVERY CLAIM IN THIS FILE
-     AGAINST DISK, INCLUDING THIS FILE. -->
+<!-- Maintained by hand this time. Left by the previous Claude instance so the next
+     one can continue. Treat as last-known state — VERIFY EVERY CLAIM AGAINST DISK,
+     INCLUDING THIS FILE. -->
 
-- Updated: 2026-09-03 22:20 by claude
+- Updated: 2026-09-30 16:30 by claude
 - Branch: main
-- Status: in progress
+- Status: in progress — session must be restarted before any CTOC agent can be dispatched
 
-## Goal
-Finish two human-approved fixes that are mid-pipeline: (1) the Create-React-App
-detector fix — BUILT and gate-green, blocked at completion by (2) a
-plan-validator defect that misreads a JavaScript method name in plan prose as a
-claimed-but-missing file. Fix 2 was STOPPED by the human mid-build; resume only on his word.
+## Why the restart
+At 16:05 on 2026-09-30 the human's other session updated the installed plugin
+(`~/.claude/plugins/installed_plugins.json`: ctoc@robotijn 6.14.67, lastUpdated
+14:05 UTC). A plugin update withdraws every `ctoc:*` agent type from a running
+session. Agents already running finished; nothing new could be dispatched. Restart
+Claude Code in this repository, then resume below.
 
-## Current status
-- Done and pushed earlier (through `253a443a` / v6.14.65): README course +
-  README-truth sync machinery, the 20-slice coverage wave (99.04→99.9%, floor
-  HELD at 99), done-gate + kickback-sidecar fixes, ledger at zero mismatches,
-  evidence-pack five fixes. See the previous handoff content in git history.
-- In progress at save time (both plans human-approved through every gate up to
-  the build):
-  1. `plans/in-progress/00259-…-s1-symmetric-credit.md` (CRA detector) —
-     **work FINISHED and gate-green** (its evidence is recorded inside the plan
-     under Execution Record / Verification Evidence; `npm test` PASS 99.9%).
-     Its `menu task complete t103` was REFUSED by the validator defect below.
-     Its four file edits are in the working tree, deliberately UNCOMMITTED
-     together with the in-flight parser work (one gate-green commit later).
-  2. `plans/in-progress/00260-…-s1-honest-claim-parser.md` (validator fix) —
-     executor was STOPPED BY THE HUMAN mid-build (t105 cancelling); it had edited
-     `src/lib/plan-validator.js` + its two test files. Its last report: AFTER sweep clean of member-expression misreads, but its
-     own plan prose still tripped a different misread shape — unresolved. A stop note is appended to the plan.
-- Next: see Resume here.
+## The human's rulings this session (verbatim where quoted)
+- "improve every skill and every agent 3 times using websearch and ultrathink"
+  → plan `every-agent-and-specialist-skill-improved-three-times` (121 slices).
+- README: "rebuild the readme completely if needed"; "don't call it lessons, just
+  show how to use it and explain why, start with a quickstart"; "sequence it the
+  order that a plan goes through the ctoc system" → plan
+  `the-readme-matches-the-product-today` (15 slices).
+- "add the ask-me-questions and deepthink skill to the ctoc installation" → plan
+  `deepthink-ships-with-ctoc` (4 slices, 00397–00400).
+- "stop asking theswe stupid questions fix it" — settle forks as documented choices.
+- "keep going until everything is done then commit and push" — NO push until all done.
+- "ctoc is overdoing the usage of ctoc, small changes … do not require a complete
+  ctoc run" and "there are too many pre-mortms and way too many devils-advicate being
+  started when i use ctoc on another project" → plan `small-changes-take-a-small-path`
+  (approved into implementation; SLICING NOT DONE — the planner was cut off by the
+  usage limit; re-dispatch a fresh implementation-planner with the brief in the plan's
+  own "Notes for the implementation planner").
+- "there are now 100+ ctoc menu items! remove them I only want start, update,
+  deepthink, ask-me-questions" then "do it" → plan
+  `the-menu-shows-only-the-skills-a-human-invokes` (a single plan, no slices; in
+  `plans/todo/`, FIRST in `.ctoc/state/todo-order.json`). His "do it" was taken as
+  the approval for both planning moments and is recorded as `approved_by: human`.
+  Push stays (it is a command, not a skill) — say "remove push" and it goes.
+- "make the testing agents smarter so that when running tests only the parts are run
+  that the code touched not the entire suite, only before pushing to git the entire
+  test suite is running" → NOT YET PLANNED (agents were gone). Write a functional
+  plan: executor verify-in-loop runs the tests that read the touched files (the
+  read-tracing preload the inventory slice used; `coverage-mapper` /
+  `smart-test-runner` exist but are unwired); the full `npm test` with the coverage
+  floor runs only at `/ctoc:push` and the wave barrier. Memory file
+  `feedback_affected_tests_in_loop_full_suite_before_push.md` records it.
 
-## Key decisions
-- The validator defect: `validateNoContradictions`'s created-file pattern
-  captures `assert.strictEqual` (capture stops at `(`), scans inline backtick
-  code, and treats any dotted identifier as a path. Fix = three guards
-  (read-past-match call skip — NOT a lookahead, it backtracks; inline call-span
-  stripping; path-plausibility with a union extension list incl. `template`,
-  `gitkeep`). Human approved 2026-09-03.
-- Six shipped plans / seven tokens misread today; the slice makes the runnable
-  sweep the census (a text probe under-reports).
-- One vacuous test tightened with Lesson-14 justification: `VP1 #4` in
-  tests/plan-validator.test.js used the verb `add`, which the pattern never
-  matches.
-- Overload protocol (human, 2026-09-03): when the opus subagent tier returns
-  529, back off 30 minutes and retry — never substitute a different model.
-- All standing rulings from the previous handoff still bind (floor 99;
-  new plans enter at functional/; executors write only canonical sections;
-  `depends_on: none` never `[]`; one blank line before appended records).
+## Where each plan stands
+| Plan | Stage | State |
+|---|---|---|
+| Detector fix `00259` | review | verify passed; waiting for "finished" |
+| Agent-critic web grant `00261` (s1) | review | v6.14.68; waiting for "finished" |
+| Inventory + record check `00262` (s2) | review | v6.14.69; waiting for "finished" |
+| Reviewer agent + skill `00263` (s3) | review | v6.14.70, commit 56db38d5; waiting for "finished" |
+| Improvement slices `00264`–`00381` (s4–s121) | todo | approved, queued in order |
+| README slices `00382`–`00396` | todo | approved; `00394` depends on `00381` |
+| Deepthink slices `00397`–`00400` | todo | approved |
+| Menu fix (single plan) | todo, FIRST | approved; build it next |
+| Change paths + fleet volume | implementation | approved as "what to build"; needs slicing, then the "how to build" click |
 
-## Open questions / blockers
-- The parser-fix build is STOPPED, not finished: the human ordered the running
-  executor killed at 22:18 (registry task t105 is `cancelling`; no verify
-  evidence exists for 00260). Its unresolved tail: its own plan prose still
-  tripped "a different misread shape" it had not yet diagnosed — the next
-  executor must investigate that FIRST (read the stop note appended to the
-  plan and the ticks in its canonical section).
-- After the parser fix ships gate-green: complete the detector slice with
-  `node src/commands/start.js menu task complete t103 --summary "…"` (it was
-  refused only by the parser defect; its work needs NO rebuild).
-- The executor's scope-growth question at
-  `.ctoc/inbox/questions/1788440244002-hhro07.md` is answered in-file (fix
-  approved as its own plan); close it out when both slices are done.
-- Still awaiting the human's scheduling (unchanged): hasViteSignal placement
-  defect (sibling of the CRA fix, recorded in plan 00259's ancestry),
-  confinement refusal message naming the wrong store, SessionStart
-  exit-before-drain, reachability-roots `reasons` note, `general.entry_point`
-  declaration for CTOC itself, stale tasks t43–t45 + t48.
+Unpushed commits: 50c970b5 (6.14.68), 5d688c3f (6.14.69), 56db38d5 (6.14.70).
+Uncommitted: the four plan moves to review, `.ctoc/approvals/*` for every approved
+plan, `.ctoc/state/todo-order.json`, `plans/todo/*`, `plans/implementation/*`, the
+`.ctoc/logs/transitions.json` growth, `.ctoc/streaming/questions/*` untracked files.
+Commit these as `chore(plans): …` before building; never `git add -A` blindly.
+
+## The round protocol that worked (slice s3, 2 files, ~4 hours)
+Per file, per round: (1) citation-validator does the WEB RESEARCH (the installed
+critic has no web tools — the repository's critic gained them in 6.14.68, but the
+installed plugin is older; after a marketplace update to ≥6.14.68 the critic can
+research itself); (2) agent-critic, via SendMessage on the same agent (keeps
+context), turns the research into findings with exact `proposed_change {old,new}`;
+(3) executor (also kept alive via SendMessage across the whole slice) applies, runs
+the inventory's `tests_reading` for the file + the record check; (4) validator
+re-validates the edited file; (5) leftovers fixed, re-checked; (6) executor writes
+the round entry (shape: parent index "The record's exact shape"; check:
+`tests/agent-and-skill-improvement-record.test.js`). Round source classes: 1 original
+papers + vendor docs; 2 standards bodies + publishers (code-example correctness);
+3 raw re-reads + regulators (the ANSSI/BSI PDF is saved under the session's
+tool-results; `pdftotext` is installed and settles page-image disputes). Every
+report is saved verbatim under `.ctoc/audit/improvement-run-notes/` (extract the
+last assistant text block from the subagent JSONL). Dispatch ids: `d-s<N>-<agent|skill>-r<k>-<research|critic|revalidate>`.
+Late corrections to a finished file IN THE SAME SLICE are allowed (plan rule); to a
+file in a finished slice they need the scope-growth question.
 
 ## Gotchas
-- The working tree deliberately carries BOTH slices' edits uncommitted:
-  detector files (4) are FINISHED work; parser files (3) are the stopped
-  build's partial work — its last report said Steps 8–10 were done and the
-  AFTER sweep clean. Do not commit or revert either set until the parser fix
-  is completed gate-green; then one commit ships both.
-- The parser-fix slice's own completion runs through the parser it fixes.
-- A plan's prose must cite calls in fenced blocks until the fix lands —
-  inline citations trip the old parser at completion.
-- Opus subagent tier had a multi-hour 529 overload on 2026-09-03; the fifth
-  launch attempt succeeded ~21:00.
-- The zsh gate-exit trap, the `npm test`-is-the-gate rule, and the
-  coverage-reporter losing its number under child-process load: all still
-  true (previous handoff, git history).
+- ONE build at a time on the shared tree (Tijn's rule). Never render the dashboard
+  while a build runs: `start.js dashboard` reconciles and MOVES plans.
+- The scheduler's `startAgent` picks the todo head by `.ctoc/state/todo-order.json`,
+  then birthtime. `menu task start <id> --agent-id` fails after `startAgent` (already
+  running) — harmless.
+- `renumberImplementationPlans` is UNSAFE for `NNNNN-` placeholders; use
+  `scratchpad/assign-numbers.js`'s approach: `allocatePlanNumber` per slice in order,
+  then rewrite references.
+- Validator misreads inline `a.b()` citations in plan prose as claimed files — cite
+  in fenced blocks.
+- Usage limit hits kill subagents; SendMessage resumes them after the reset.
+- Co-author line: executors sign as Opus 5.5; the harness rule says Fable 5.1.
 
-## Key files
-- `src/lib/plan-validator.js` (+ tests/plan-validator*.test.js) — in flight, t105.
-- `src/lib/framework-detector.js` (+ its two test files,
-  tests/remainder-security-tooling-coverage.test.js header) — finished, t103.
-- `plans/in-progress/00259…`, `plans/in-progress/00260…` — the two live plans,
-  evidence recorded in-plan.
-- `.ctoc/approvals/00259….json`, `.ctoc/approvals/00260….json` + the two parent
-  entries — the human's crossings (committed with this handoff).
-- Task registry: t103 `running` (its work finished, completion refused by the
-  parser defect — waiting); t105 `cancelling` (executor killed by the human's
-  order; reconcile will settle it once liveness confirms the agent is gone).
-
-## Resume here
-1. On the human's word only (he ordered the pause): relaunch an
-   iron-loop-executor to FINISH plan 00260 under a fresh task (register via
-   `menu task add implement 00260-… --touches src/lib/plan-validator.js,tests/plan-validator.test.js,tests/plan-validator-coverage.test.js`;
-   t105 is cancelling and must not be reused). Brief pattern as all session
-   (Rule 1 plan path, declared files, complete-once) PLUS: first diagnose the
-   stopped build's unresolved tail — its own plan prose tripping "a different
-   misread shape" — starting from the three parser files' current diffs and
-   the plan's ticks; re-run Step 8 against the current tree before continuing.
-2. When 00260 completes gate-green: run
-   `node src/commands/start.js menu task complete t103 --summary "…"` (the
-   detector work needs NO rebuild), then commit BOTH slices' edits in one
-   gate-green commit (full `npm test` first, unpiped `$?` check) and push.
-3. Both plans in review → ask the human "is it finished?" for both; his word
-   crosses. Then close out the answered scope-growth question.
+## Resume here (after restart)
+1. `git status`; commit the plan/approval/order state as `chore(plans): …` (no push).
+2. Ask the human "finished?" for the four review plans (or `done-all` per parent).
+3. Build the menu fix: `startAgent(root,{force:true})` → it is the head → dispatch
+   `iron-loop-executor` with the plan path, Rule 1 files, complete-once via
+   `menu task complete <id>`; run its affected tests + full gate; commit patch bump.
+4. Re-dispatch `implementation-planner` for `small-changes-take-a-small-path`
+   (placeholders `NNNNN-`, then number), then the human's "how to build" click.
+5. Write + approve the smart-test-selection functional plan; slice; queue it.
+6. Continue the improvement run at s4 (`00264`, hallucination-detector agent+skill)
+   with the round protocol above; then README slices; then deepthink.
+7. When everything is done: full `npm test`, then push (the human's instruction).

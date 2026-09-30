@@ -1,0 +1,9 @@
+{
+  "content_sha256": "001194fcd1c7960b2399f57476b471a7c4f64e2fa266f9347f7e09442279669c",
+  "hash_scope": "specification",
+  "stage_from": "functional",
+  "stage_to": "implementation",
+  "approved_at": "2026-09-29T18:06:48.369Z",
+  "approved_by": "human",
+  "plan_basename": "the-readme-matches-the-product-today"
+}

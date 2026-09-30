@@ -1,0 +1,9 @@
+{
+  "content_sha256": "832633b91b0421ae4d8ff57156db7094b5c94dc9c1978c166c5ae60224084ff7",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:19.922Z",
+  "approved_by": "human",
+  "plan_basename": "00380-every-agent-and-specialist-skill-improved-three-times-s120-security-scanner"
+}

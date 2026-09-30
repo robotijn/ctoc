@@ -1,0 +1,9 @@
+{
+  "content_sha256": "dfeba61c711fd425649ad05eab5ee675e35dfb966e8adc91196434f5fd473233",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:18.323Z",
+  "approved_by": "human",
+  "plan_basename": "00323-every-agent-and-specialist-skill-improved-three-times-s63-posthog-sentry-react-native"
+}

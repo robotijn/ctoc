@@ -1,0 +1,9 @@
+{
+  "content_sha256": "cde310c8a4cef040eac60a027a868a9192022d887421017b96eb95334007a600",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:19.366Z",
+  "approved_by": "human",
+  "plan_basename": "00360-every-agent-and-specialist-skill-improved-three-times-s100-e2e-test-writer"
+}

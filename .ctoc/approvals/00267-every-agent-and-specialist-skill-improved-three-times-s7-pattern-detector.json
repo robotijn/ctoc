@@ -1,0 +1,9 @@
+{
+  "content_sha256": "4933dfeb63363997c1ffc825b61d49c82313d67301c23edfec08f477d16a5e62",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:16.673Z",
+  "approved_by": "human",
+  "plan_basename": "00267-every-agent-and-specialist-skill-improved-three-times-s7-pattern-detector"
+}

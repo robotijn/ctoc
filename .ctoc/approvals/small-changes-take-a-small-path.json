@@ -1,0 +1,9 @@
+{
+  "content_sha256": "ff091181f14be1daf436846212841306df19df0885e5926c5138043c937e8960",
+  "hash_scope": "specification",
+  "stage_from": "functional",
+  "stage_to": "implementation",
+  "approved_at": "2026-09-30T13:40:48.563Z",
+  "approved_by": "human",
+  "plan_basename": "small-changes-take-a-small-path"
+}

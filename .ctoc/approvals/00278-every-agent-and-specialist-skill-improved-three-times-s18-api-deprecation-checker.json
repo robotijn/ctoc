@@ -1,0 +1,9 @@
+{
+  "content_sha256": "45e6dca33b437eebbe63bfd348bf7e29977ab3841b2c73472b0aa1b62c3f498f",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.012Z",
+  "approved_by": "human",
+  "plan_basename": "00278-every-agent-and-specialist-skill-improved-three-times-s18-api-deprecation-checker"
+}

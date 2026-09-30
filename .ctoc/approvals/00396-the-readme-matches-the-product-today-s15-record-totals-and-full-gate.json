@@ -1,0 +1,9 @@
+{
+  "content_sha256": "216fe3efc3dd9c2439b36f3ce8fb6e4f6ba1925e2c20a571969e1136eb8a1d34",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:20.412Z",
+  "approved_by": "human",
+  "plan_basename": "00396-the-readme-matches-the-product-today-s15-record-totals-and-full-gate"
+}

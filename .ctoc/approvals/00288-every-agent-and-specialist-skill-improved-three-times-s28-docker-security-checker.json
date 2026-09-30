@@ -1,0 +1,9 @@
+{
+  "content_sha256": "ba7f70f0246f93e9ca1af0043ce8feb570bed8f9bce56e0224b29ba81305cdde",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.312Z",
+  "approved_by": "human",
+  "plan_basename": "00288-every-agent-and-specialist-skill-improved-three-times-s28-docker-security-checker"
+}

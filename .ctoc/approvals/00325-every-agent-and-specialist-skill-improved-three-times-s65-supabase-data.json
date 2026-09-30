@@ -1,0 +1,9 @@
+{
+  "content_sha256": "23710520b744420880a00a231ccacd7fedabb685e3196d714b4644f3344a3379",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:18.380Z",
+  "approved_by": "human",
+  "plan_basename": "00325-every-agent-and-specialist-skill-improved-three-times-s65-supabase-data"
+}

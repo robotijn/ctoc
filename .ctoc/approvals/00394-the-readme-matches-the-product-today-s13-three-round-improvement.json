@@ -1,0 +1,9 @@
+{
+  "content_sha256": "727e4429f160ea89d42cb158d78f473bb2b57cd0b6751819da212fce7a9584fa",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:20.356Z",
+  "approved_by": "human",
+  "plan_basename": "00394-the-readme-matches-the-product-today-s13-three-round-improvement"
+}

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "edf26d1c4e1f6a87a0cfc3552505bb9ba6479790aeafc68428cf34e0684863f9",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:20.330Z",
+  "approved_by": "human",
+  "plan_basename": "00393-the-readme-matches-the-product-today-s12-links-and-anchors"
+}

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "268b06169593984bd779eda0de4b3980b7bb59a70b2de770b8e68f0c9f9e6384",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:19.867Z",
+  "approved_by": "human",
+  "plan_basename": "00378-every-agent-and-specialist-skill-improved-three-times-s118-iron-loop-executor"
+}

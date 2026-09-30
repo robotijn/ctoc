@@ -1,0 +1,9 @@
+{
+  "content_sha256": "151fa71985a73a066d9b4b5710bf91d05f6b0d80a428b1b7df7272b7729cff35",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:16.645Z",
+  "approved_by": "human",
+  "plan_basename": "00266-every-agent-and-specialist-skill-improved-three-times-s6-dependency-analyzer"
+}

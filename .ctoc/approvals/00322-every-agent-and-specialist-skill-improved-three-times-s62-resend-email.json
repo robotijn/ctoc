@@ -1,0 +1,9 @@
+{
+  "content_sha256": "f0ca7be216b9b3af656b41f934760a2ff50b4ce931ae2cb9d69b2a43b2337cd8",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:18.295Z",
+  "approved_by": "human",
+  "plan_basename": "00322-every-agent-and-specialist-skill-improved-three-times-s62-resend-email"
+}

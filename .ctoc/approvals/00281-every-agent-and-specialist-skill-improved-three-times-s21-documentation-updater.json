@@ -1,0 +1,9 @@
+{
+  "content_sha256": "9ff3e4062d9eaef4c04d6bc098643fdcf06e12ac32f38ddabab4491bf0bdaf8a",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.102Z",
+  "approved_by": "human",
+  "plan_basename": "00281-every-agent-and-specialist-skill-improved-three-times-s21-documentation-updater"
+}

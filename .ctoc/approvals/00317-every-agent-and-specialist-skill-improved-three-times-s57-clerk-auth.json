@@ -1,0 +1,9 @@
+{
+  "content_sha256": "af2606a59ab73d1a32efff567d32e77a5ea6e655f2eb3941c1b87eb30df9c592",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:18.154Z",
+  "approved_by": "human",
+  "plan_basename": "00317-every-agent-and-specialist-skill-improved-three-times-s57-clerk-auth"
+}

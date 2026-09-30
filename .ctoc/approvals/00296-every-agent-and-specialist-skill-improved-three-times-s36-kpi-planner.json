@@ -1,0 +1,9 @@
+{
+  "content_sha256": "e9c7d230475f7eb79ebc44af4bc8d09dec5c9329f6a39470d2cc6caa5117d11f",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.549Z",
+  "approved_by": "human",
+  "plan_basename": "00296-every-agent-and-specialist-skill-improved-three-times-s36-kpi-planner"
+}

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "959813b798e2262b8bceb6a87bbbf1a1c3ffe63acb66367e80014339cdc7cc7a",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:19.052Z",
+  "approved_by": "human",
+  "plan_basename": "00349-every-agent-and-specialist-skill-improved-three-times-s89-translation-checker"
+}

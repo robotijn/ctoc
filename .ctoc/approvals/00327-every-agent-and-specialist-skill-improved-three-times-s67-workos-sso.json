@@ -1,0 +1,9 @@
+{
+  "content_sha256": "9e4317aa4574b785c00dc2450c4d6db40a05a051a533b18def4e7be74ddfa4a3",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:18.441Z",
+  "approved_by": "human",
+  "plan_basename": "00327-every-agent-and-specialist-skill-improved-three-times-s67-workos-sso"
+}

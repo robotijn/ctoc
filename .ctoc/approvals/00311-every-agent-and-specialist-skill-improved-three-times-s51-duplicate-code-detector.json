@@ -1,0 +1,9 @@
+{
+  "content_sha256": "94a5bcf6e8361450664a627fdb67330325c17e308a52c86661826cd73475bbef",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.985Z",
+  "approved_by": "human",
+  "plan_basename": "00311-every-agent-and-specialist-skill-improved-three-times-s51-duplicate-code-detector"
+}

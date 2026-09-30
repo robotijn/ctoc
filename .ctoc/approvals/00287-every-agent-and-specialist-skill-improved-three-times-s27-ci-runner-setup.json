@@ -1,0 +1,9 @@
+{
+  "content_sha256": "eb21becc0eb5312a3a2e8261dd3af8e7e7092a860acbef6878dd807af2c5333e",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.282Z",
+  "approved_by": "human",
+  "plan_basename": "00287-every-agent-and-specialist-skill-improved-three-times-s27-ci-runner-setup"
+}

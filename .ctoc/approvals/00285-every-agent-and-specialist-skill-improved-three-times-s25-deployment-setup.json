@@ -1,0 +1,9 @@
+{
+  "content_sha256": "0816047ab3ce07c8b52f2c3287935aa848b024f6bdec6734f287dac1c142642a",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.221Z",
+  "approved_by": "human",
+  "plan_basename": "00285-every-agent-and-specialist-skill-improved-three-times-s25-deployment-setup"
+}

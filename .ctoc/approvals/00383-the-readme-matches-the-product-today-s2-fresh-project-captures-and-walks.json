@@ -1,0 +1,9 @@
+{
+  "content_sha256": "4fa9cbb31db3a55011b208643b310f006d1a639bad58d0d961289b79fd9d4689",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:20.035Z",
+  "approved_by": "human",
+  "plan_basename": "00383-the-readme-matches-the-product-today-s2-fresh-project-captures-and-walks"
+}

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "31c5111d992a84284335cf0e6e97d129a947355a7a3c156fd19a44150dafcc65",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:19.421Z",
+  "approved_by": "human",
+  "plan_basename": "00362-every-agent-and-specialist-skill-improved-three-times-s102-property-test-writer"
+}

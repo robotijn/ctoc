@@ -1,0 +1,9 @@
+{
+  "content_sha256": "f0ade346a5020219b272a8da00947cab81b97cead0aa1ff1aac90b779bee96fc",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:20.235Z",
+  "approved_by": "human",
+  "plan_basename": "00390-the-readme-matches-the-product-today-s9-after-the-journey"
+}

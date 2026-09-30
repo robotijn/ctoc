@@ -1,0 +1,9 @@
+{
+  "content_sha256": "543d9ae234b73a2b2e74da52cc8cd6c3e8fe1674dc460aaa0e28ad5ce19cbfff",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:19.507Z",
+  "approved_by": "human",
+  "plan_basename": "00365-every-agent-and-specialist-skill-improved-three-times-s105-feature-flag-auditor"
+}

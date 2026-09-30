@@ -1,0 +1,9 @@
+{
+  "content_sha256": "7b5b2d2c9e805a74e87ba2431ae527474f9684f5271d032212d143e5c8c09d47",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.664Z",
+  "approved_by": "human",
+  "plan_basename": "00300-every-agent-and-specialist-skill-improved-three-times-s40-vision-advisor"
+}

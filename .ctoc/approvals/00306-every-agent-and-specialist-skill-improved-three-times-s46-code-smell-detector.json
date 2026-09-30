@@ -1,0 +1,9 @@
+{
+  "content_sha256": "d0b83eac23c3a9b2db416ea233abf77e5d945f74ae37122723de9660aea7c1f3",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.838Z",
+  "approved_by": "human",
+  "plan_basename": "00306-every-agent-and-specialist-skill-improved-three-times-s46-code-smell-detector"
+}

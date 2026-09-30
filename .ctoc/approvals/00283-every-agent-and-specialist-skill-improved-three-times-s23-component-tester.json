@@ -1,0 +1,9 @@
+{
+  "content_sha256": "0ed64e76fafa764f93afde8a0ca81df44757eb9c1d161cd8e0a9d24d7a800978",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.163Z",
+  "approved_by": "human",
+  "plan_basename": "00283-every-agent-and-specialist-skill-improved-three-times-s23-component-tester"
+}

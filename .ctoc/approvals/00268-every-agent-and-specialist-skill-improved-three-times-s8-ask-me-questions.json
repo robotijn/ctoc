@@ -1,0 +1,9 @@
+{
+  "content_sha256": "460271167fa82f19dc7db46e2d536b5e783184774d056024512d74bbcd579206",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:16.706Z",
+  "approved_by": "human",
+  "plan_basename": "00268-every-agent-and-specialist-skill-improved-three-times-s8-ask-me-questions"
+}

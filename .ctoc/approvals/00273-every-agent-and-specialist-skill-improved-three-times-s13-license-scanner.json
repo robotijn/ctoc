@@ -1,0 +1,9 @@
+{
+  "content_sha256": "f4c576e03057d93bd86ec02f09761243089bd62ced5310258d0a941593538114",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:16.862Z",
+  "approved_by": "human",
+  "plan_basename": "00273-every-agent-and-specialist-skill-improved-three-times-s13-license-scanner"
+}

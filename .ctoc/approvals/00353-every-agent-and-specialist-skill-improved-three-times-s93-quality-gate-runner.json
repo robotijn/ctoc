@@ -1,0 +1,9 @@
+{
+  "content_sha256": "ccc5827de0ff98066a10b6ad2bcfc5a041a3f27c2346b4d5b06f79aab8e5364f",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:19.169Z",
+  "approved_by": "human",
+  "plan_basename": "00353-every-agent-and-specialist-skill-improved-three-times-s93-quality-gate-runner"
+}

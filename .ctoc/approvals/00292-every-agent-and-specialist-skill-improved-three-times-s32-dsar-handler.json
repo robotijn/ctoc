@@ -1,0 +1,9 @@
+{
+  "content_sha256": "2211095d20ba8a0096a71080e8138d9c5d5fa12f7d48da557e00ef6ec5af9091",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.431Z",
+  "approved_by": "human",
+  "plan_basename": "00292-every-agent-and-specialist-skill-improved-three-times-s32-dsar-handler"
+}

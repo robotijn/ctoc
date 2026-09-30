@@ -1,0 +1,9 @@
+{
+  "content_sha256": "b35752262a6e8c7961bf8e7578ff6fcee841b69e3a63650efd521617e4d7a114",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.607Z",
+  "approved_by": "human",
+  "plan_basename": "00298-every-agent-and-specialist-skill-improved-three-times-s38-stack-chooser"
+}

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "6117cf558c20997f7f35b473f95afbf5e49fe55b472561a53bc83f443e131832",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.339Z",
+  "approved_by": "human",
+  "plan_basename": "00289-every-agent-and-specialist-skill-improved-three-times-s29-kubernetes-checker"
+}

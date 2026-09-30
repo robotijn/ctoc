@@ -1,0 +1,9 @@
+{
+  "content_sha256": "b7ed8f87ec6dfff2a382b4ba1cd05c56fca36411cc0bcd3daf590fb09877bc76",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:19.394Z",
+  "approved_by": "human",
+  "plan_basename": "00361-every-agent-and-specialist-skill-improved-three-times-s101-integration-test-writer"
+}

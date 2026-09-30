@@ -1,0 +1,9 @@
+{
+  "content_sha256": "635084043d764d2dde3f316b3c85557a656a86a0715ffe1a520dfeec709d8eb0",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:16.895Z",
+  "approved_by": "human",
+  "plan_basename": "00274-every-agent-and-specialist-skill-improved-three-times-s14-cloud-cost-analyzer"
+}

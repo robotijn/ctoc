@@ -1,0 +1,9 @@
+{
+  "content_sha256": "a74754c5cab912edf96661c4db6bdd3c8b5909a7588d53a1fb4aba36c2822ff8",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.807Z",
+  "approved_by": "human",
+  "plan_basename": "00305-every-agent-and-specialist-skill-improved-three-times-s45-code-reviewer"
+}

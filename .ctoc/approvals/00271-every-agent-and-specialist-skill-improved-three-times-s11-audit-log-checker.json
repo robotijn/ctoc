@@ -1,0 +1,9 @@
+{
+  "content_sha256": "b04f4a486fa8578db02fe021b598d0608842954a273cbde876f5a746ff77edc4",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:16.800Z",
+  "approved_by": "human",
+  "plan_basename": "00271-every-agent-and-specialist-skill-improved-three-times-s11-audit-log-checker"
+}

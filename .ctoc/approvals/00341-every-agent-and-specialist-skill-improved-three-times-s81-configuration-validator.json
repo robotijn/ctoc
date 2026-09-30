@@ -1,0 +1,9 @@
+{
+  "content_sha256": "f1a00e5ed4b367ea5409ef5981e9f057c2c1c5d78fed1a0719070faf74a72fc3",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:18.835Z",
+  "approved_by": "human",
+  "plan_basename": "00341-every-agent-and-specialist-skill-improved-three-times-s81-configuration-validator"
+}

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "82b3195ce8dc08f8a013e6fa470f18f5a3440cf193de4bfd484da9613a12df61",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.867Z",
+  "approved_by": "human",
+  "plan_basename": "00307-every-agent-and-specialist-skill-improved-three-times-s47-complexity-analyzer"
+}

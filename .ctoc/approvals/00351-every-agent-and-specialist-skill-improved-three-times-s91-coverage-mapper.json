@@ -1,0 +1,9 @@
+{
+  "content_sha256": "5bd7ef55ded185bee47d59e56296e7f87676cebba95f1f391105fd34b9763c9a",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:19.108Z",
+  "approved_by": "human",
+  "plan_basename": "00351-every-agent-and-specialist-skill-improved-three-times-s91-coverage-mapper"
+}

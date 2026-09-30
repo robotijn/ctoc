@@ -1,0 +1,9 @@
+{
+  "content_sha256": "a8d3ecdae887e8a9087fa8ac36572ae7f512bab91486ae900ed0b90115fcc06d",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.251Z",
+  "approved_by": "human",
+  "plan_basename": "00286-every-agent-and-specialist-skill-improved-three-times-s26-ci-pipeline-checker"
+}

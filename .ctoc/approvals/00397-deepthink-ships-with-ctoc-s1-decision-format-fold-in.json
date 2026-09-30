@@ -1,0 +1,9 @@
+{
+  "content_sha256": "8ba6ef3c47686f4beac42fd74982ce744b77907778a710fb28b5749284d778d5",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T11:39:25.362Z",
+  "approved_by": "human",
+  "plan_basename": "00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in"
+}

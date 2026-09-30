@@ -1,0 +1,9 @@
+{
+  "content_sha256": "885b0eced4093291187813ae06baa16adb0b5ae10c13938d3d082616b704bdf4",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:19.251Z",
+  "approved_by": "human",
+  "plan_basename": "00356-every-agent-and-specialist-skill-improved-three-times-s96-mutation-test-runner"
+}

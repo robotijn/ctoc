@@ -1,0 +1,9 @@
+{
+  "content_sha256": "4f7a26216c7ebd76414282b31d53c713c230a48e8c25bf84a458897cff42b926",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:18.100Z",
+  "approved_by": "human",
+  "plan_basename": "00315-every-agent-and-specialist-skill-improved-three-times-s55-hil-harness"
+}

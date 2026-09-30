@@ -1,0 +1,9 @@
+{
+  "content_sha256": "cb2acd3d791c27da9062c925622fc04c10adb34deb4a7a9c50a4d320d91cdffc",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:18.917Z",
+  "approved_by": "human",
+  "plan_basename": "00344-every-agent-and-specialist-skill-improved-three-times-s84-health-check-validator"
+}

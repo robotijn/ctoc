@@ -1,0 +1,9 @@
+{
+  "content_sha256": "bf069e2f69ffb69eeaf7253a6a9edee8461dd1b56ba1b00cc8b1b9c894711c20",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:16.483Z",
+  "approved_by": "human",
+  "plan_basename": "00261-every-agent-and-specialist-skill-improved-three-times-s1-agent-critic-gains-web-research"
+}

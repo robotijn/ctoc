@@ -1,0 +1,9 @@
+{
+  "content_sha256": "1147a9f997abef0f2fb18592a3039a531e5a8c6e15a3e7c1f4e8130449fca61d",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:18.971Z",
+  "approved_by": "human",
+  "plan_basename": "00346-every-agent-and-specialist-skill-improved-three-times-s86-observability-checker"
+}

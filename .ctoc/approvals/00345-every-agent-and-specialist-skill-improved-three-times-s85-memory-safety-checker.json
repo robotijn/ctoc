@@ -1,0 +1,9 @@
+{
+  "content_sha256": "a5feddcb5ec02d6c70f935b68790ef4287b8f48f449db5c6c690ba1c56d82c68",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:18.944Z",
+  "approved_by": "human",
+  "plan_basename": "00345-every-agent-and-specialist-skill-improved-three-times-s85-memory-safety-checker"
+}

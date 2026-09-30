@@ -1,0 +1,9 @@
+{
+  "content_sha256": "4ca5e0bca83920db4580293eb33091675ac0a973c413ee4d2382093c93b81cf7",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T14:25:24.904Z",
+  "approved_by": "human",
+  "plan_basename": "the-menu-shows-only-the-skills-a-human-invokes"
+}

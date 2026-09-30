@@ -1,0 +1,9 @@
+{
+  "content_sha256": "7aea11c4a7e765fd8882c500b89087044b868996bee71729d0d46edcfdf77090",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:16.982Z",
+  "approved_by": "human",
+  "plan_basename": "00277-every-agent-and-specialist-skill-improved-three-times-s17-ml-model-validator"
+}

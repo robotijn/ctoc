@@ -1,0 +1,9 @@
+{
+  "content_sha256": "07b5e5c0cdee659d3a0fb61c54886899a3707b45ca8a1b83c26a3dbdde0108d6",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:20.122Z",
+  "approved_by": "human",
+  "plan_basename": "00386-the-readme-matches-the-product-today-s5-web-addresses-and-host-documentation"
+}

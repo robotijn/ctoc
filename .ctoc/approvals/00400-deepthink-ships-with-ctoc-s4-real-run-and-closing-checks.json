@@ -1,0 +1,9 @@
+{
+  "content_sha256": "60800cde86972302216645e614669d5e06727d2fc582320ec80821cd1d5793b2",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T11:39:25.455Z",
+  "approved_by": "human",
+  "plan_basename": "00400-deepthink-ships-with-ctoc-s4-real-run-and-closing-checks"
+}

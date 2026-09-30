@@ -1,0 +1,9 @@
+{
+  "content_sha256": "3ff57f1a7fb2baa2564d2a33ad93a8b57af9c5d59b115faa08dc9adb5856e2b3",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:19.785Z",
+  "approved_by": "human",
+  "plan_basename": "00375-every-agent-and-specialist-skill-improved-three-times-s115-citation-validator"
+}

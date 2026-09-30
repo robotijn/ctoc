@@ -1,0 +1,9 @@
+{
+  "content_sha256": "7fe8dd8828dd68f879ffed101682043cb5c8a626d37088ebd493ec6252bfc71b",
+  "hash_scope": "specification",
+  "stage_from": "functional",
+  "stage_to": "implementation",
+  "approved_at": "2026-09-30T10:09:57.973Z",
+  "approved_by": "human",
+  "plan_basename": "deepthink-ships-with-ctoc"
+}

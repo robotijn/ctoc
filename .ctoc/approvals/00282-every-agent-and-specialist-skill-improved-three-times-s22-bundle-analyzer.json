@@ -1,0 +1,9 @@
+{
+  "content_sha256": "5a1c7556fd346ce3dbd7efb5d78fc70142b03e4b3ae19b417116dc391b5176a7",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:17.133Z",
+  "approved_by": "human",
+  "plan_basename": "00282-every-agent-and-specialist-skill-improved-three-times-s22-bundle-analyzer"
+}

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "a6f6dfd7db8e5aed084b0748fb4deaf2e1b1c90de8e95bd7a22f28d4ec5cfce8",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:18.043Z",
+  "approved_by": "human",
+  "plan_basename": "00313-every-agent-and-specialist-skill-improved-three-times-s53-quality-gate"
+}

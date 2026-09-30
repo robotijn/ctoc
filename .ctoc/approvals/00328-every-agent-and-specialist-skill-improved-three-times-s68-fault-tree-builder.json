@@ -1,0 +1,9 @@
+{
+  "content_sha256": "15bcbf6362ebcf9937930545e4abe39345345294acafb5453519ecd6401a5238",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-09-30T07:58:18.468Z",
+  "approved_by": "human",
+  "plan_basename": "00328-every-agent-and-specialist-skill-improved-three-times-s68-fault-tree-builder"
+}
