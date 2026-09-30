@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "path": "agents/pipeline/agent-critic.md",
+  "prerequisite": {
+    "date": "2026-09-30",
+    "fingerprint_before": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f",
+    "fingerprint_after": "sha256:b464e3f401bd243218cc7a4df9b39cf81ce61cbf87a4d56d9a6eb4ddff349b99",
+    "fences": [
+      {
+        "test": "tests/agent-contract-load.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/agent-dispatch-resolution.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/agent-honest-status-fence.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/agent-layer-reachability.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/agent-model-floor.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/agent-modernization.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/agent-resolver.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/agent-shared-not-dispatchable.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/agent-slots.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/architecture-invariants.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/compliance-claims-match-code.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/compliance-seam-is-executable.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/corpus-audit-ledger.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/cto-chief-toplevel.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/export-reachability.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/gate-numbers-fence.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/instruction-surfaces-say-the-moment.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/iron-loop-enforcer-coverage.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/iron-loop-enforcer.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/no-model-optimized-for.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/no-tier-3.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/reachability-surface-scan-is-linear.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/reachability.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/readme-numbers.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/refinement-loop-claims-match-code.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/registry-integrity.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/session-start-hook.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/session-start-question-dispatch.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/skill-loading.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/streaming-render.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/tier1-no-peer-dispatch.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/unexecutable-instruction-fence.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/w10-live-agent-reconcile.test.js",
+        "result": "pass"
+      },
+      {
+        "test": "tests/watcher-shape.test.js",
+        "result": "pass"
+      }
+    ],
+    "full_gate": {
+      "command": "npm test",
+      "result": "pass"
+    }
+  },
+  "rounds": [],
+  "late_corrections": [],
+  "held": null
+}
