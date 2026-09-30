@@ -396,3 +396,77 @@ These are findings about CTOC itself, recorded for the human. This plan does not
 - **Recipe fence.** Any state-changing recipe added to `start.md` needs a fixture; a new one absent from the coverage record fails the suite.
 - **Do not write any `## Execution Plan` section of your own.** The canonical build template is appended when a plan enters the build queue.
 - **Do not search for reachability or callers with text search.** Use `analyze` and `analyzeExports` and the suite.
+
+## Implementation slices (dependency-ordered)
+
+Decomposed on 2026-09-30 by the implementation planner into fourteen slices, each its own small plan in `plans/implementation/` with `parent_plan: small-changes-take-a-small-path` and its own tests. The file names carry the placeholder prefix `NNNNN-` until the session numbers them. Slices 1 to 8 are Part A and slices 9 to 14 are Part B; the slice numbers are names in dependency order within each part and say nothing about which part is built first (see the open question below). Nothing here schedules anything.
+
+### Part A — small changes take a small path
+
+| # | Slice file | What it delivers | Files | Depends on |
+|---|---|---|---|---|
+| 1 | `00401-small-changes-take-a-small-path-s1-trust-boundary.md` | The one trust-boundary list; a typed escape phrase no longer unlocks a file on it, on either write channel | `src/lib/trust-boundary.js`, `src/hooks/PreToolUse.Edit.js`, `src/hooks/PreToolUse.Bash.js`, `tests/trust-boundary.test.js`, `CLAUDE.md` | none |
+| 2 | `00402-small-changes-take-a-small-path-s2-intake-classifier.md` | The intake classifier and the read-only `classify` command, runnable by the session through a narrow shell allowance for the plugin's own script | `src/lib/intake-classifier.js`, `src/lib/golden-corpus-scan.js`, `src/scripts/light-path.js`, `src/hooks/PreToolUse.Bash.js`, `src/commands/start.md`, `tests/intake-classifier.test.js`, `CLAUDE.md` | 1 |
+| 3 | `00403-small-changes-take-a-small-path-s3-light-path-grant.md` | The light-path record's reader and the grant on both write channels; the record store is unforgeable | `src/lib/light-path.js`, `src/lib/escape-phrases.js`, `src/hooks/PreToolUse.Edit.js`, `src/hooks/PreToolUse.Bash.js`, `tests/light-path-grant.test.js`, `CLAUDE.md` | 1, 2 |
+| 4 | `00404-small-changes-take-a-small-path-s4-open-and-close.md` | The one sanctioned writer: `open`, `ack` and `close`; from here a small change can be edited without a plan | `src/lib/light-path.js`, `src/scripts/light-path.js`, `src/hooks/PreToolUse.Bash.js`, `tests/light-path-open-close.test.js`, `CLAUDE.md` | 3 |
+| 5 | `00405-small-changes-take-a-small-path-s5-gate-and-commit.md` | The finish re-measure, the real full gate, and a commit rule that reads fresh evidence; the step gates accept a valid record | `src/lib/light-path.js`, `src/scripts/light-path.js`, `src/hooks/PreToolUse.Bash.js`, `tests/light-path-gate-commit.test.js`, `CLAUDE.md` | 4 |
+| 6 | `00406-small-changes-take-a-small-path-s6-light-path-recipe.md` | The whole light-path flow in the menu instructions, with every state-changing step proven by running | `src/commands/start.md`, `src/lib/recipe-harness.js`, `tests/shipped-recipes-execute.test.js`, `.ctoc/recipe-coverage.json`, `CLAUDE.md` | 5 |
+| 7 | `00407-small-changes-take-a-small-path-s7-path-aware-routing.md` | The per-prompt reminder tells the session to classify first instead of sending every change to a plan | `src/lib/ctoc-routing-reminder.js`, `tests/ctoc-routing-reminder.test.js` | 6 |
+| 8 | `00408-small-changes-take-a-small-path-s8-record-golden-corpus.md` | The record registered as a persisted contract with a real captured sample | `src/lib/golden-corpus-scan.js`, `tests/golden-corpus-fence.test.js`, `tests/fixtures/golden-corpus/light-path-record/*.json`, `tests/fixtures/golden-corpus/manifest.yaml`, `CLAUDE.md` | 6 |
+
+A human can first have a small change edited without a plan after slice 4, commit it through the hooks after slice 5, and is led to it by the session after slices 6 and 7.
+
+### Part B — the critique fleet runs only where the human is deciding
+
+| # | Slice file | What it delivers | Files | Depends on |
+|---|---|---|---|---|
+| 9 | `00409-small-changes-take-a-small-path-s9-critique-only-before-build.md` | Critiques only at the two pre-build decisions, never for a plan already in flight; the finished decision stops mentioning questions | `src/lib/streaming-precompute.js`, `src/lib/loop-b-driver.js`, `src/lib/streaming-gate.js`, `tests/critique-fleet-decision-points.test.js`, `tests/streaming-precompute.test.js`, `tests/stop-continuation-gate-queue.test.js`, `CLAUDE.md` | none |
+| 10 | `00410-small-changes-take-a-small-path-s10-unchanged-plan-not-recritiqued.md` | A content fingerprint keeps a critique while the plan's bytes are unchanged; the answer rule is untouched | `src/lib/streaming-precompute.js`, `tests/critique-freshness-fingerprint.test.js`, `tests/fixtures/golden-corpus/streaming-questions/*.json`, `tests/fixtures/golden-corpus/manifest.yaml`, `CLAUDE.md` | 9 |
+| 11 | `00411-small-changes-take-a-small-path-s11-group-answer-fan-out.md` | One group critique promoted to every member; one answer recorded for every member | `src/lib/streaming-questions-sweeper.js`, `src/lib/streaming-precompute.js`, `src/lib/streaming-gate.js`, `tests/critique-group-fan-out.test.js`, `tests/fixtures/golden-corpus/manifest.yaml`, `CLAUDE.md` | 10 |
+| 12 | `00412-small-changes-take-a-small-path-s12-critique-queue-and-four-lenses.md` | One critique queue behind every trigger; the texts name the same four lenses as the agents | `src/lib/streaming-precompute.js`, `src/hooks/SessionStart.js`, `src/commands/start.md`, `tests/critique-dispatch-texts.test.js`, `tests/session-start-coverage-holes.test.js`, `CLAUDE.md` | 11 |
+| 13 | `00413-small-changes-take-a-small-path-s13-one-critique-per-group.md` | One critique per parent group, dispatched when no sibling is still behind | `src/lib/streaming-gate.js`, `src/lib/streaming-precompute.js`, `agents/iron-loop/gate-critic.md`, `tests/critique-groups.test.js`, `CLAUDE.md` | 12 |
+| 14 | `00414-small-changes-take-a-small-path-s14-critique-cap.md` | At most ten critiques per open by default, settable, with the remainder shown where the human looks | `src/lib/settings.js`, `src/lib/streaming-precompute.js`, `src/lib/loop-b-driver.js`, `tests/critique-cap.test.js`, `CLAUDE.md` | 13 |
+
+### What must exist before what (technical)
+
+- Part A: 1 → 2 → 3 → 4 → 5 → 6, then 7 and 8 each after 6 (they share no file).
+- Part B: 9 → 10 → 11 → 12 → 13 → 14.
+- Both chains are deeper than three. The logic alone would allow some siblings, but every slice that creates a test or library file must declare `CLAUDE.md` (the documented-count rule checked when a plan enters the build queue), and Part B's slices all edit `src/lib/streaming-precompute.js`; two slices declaring one file must be ordered, so the chains are forced by the shared files.
+
+### Files declared by more than one slice
+
+- `CLAUDE.md`: every slice except 7 — across both parts.
+- `src/commands/start.md`: 2 and 6 (Part A) and 12 (Part B) — across both parts.
+- `tests/fixtures/golden-corpus/manifest.yaml`: 8 (Part A) and 10 and 11 (Part B) — across both parts.
+- `src/hooks/PreToolUse.Bash.js`: 1, 2, 3, 4, 5. `src/hooks/PreToolUse.Edit.js`: 1, 3.
+- `src/lib/light-path.js`: 3, 4, 5. `src/scripts/light-path.js`: 2, 4, 5. `src/lib/golden-corpus-scan.js`: 2, 8.
+- `src/lib/streaming-precompute.js`: 9 to 14. `src/lib/streaming-gate.js`: 9, 11, 13. `src/lib/loop-b-driver.js`: 9, 14.
+
+### Where the slices differ from this plan's text
+
+- **Files beyond this plan's `files:` list**, each needed by a slice: `src/lib/golden-corpus-scan.js`, `src/lib/escape-phrases.js`, `src/lib/loop-b-driver.js`, `src/lib/recipe-harness.js`, `agents/iron-loop/gate-critic.md`, `.ctoc/recipe-coverage.json`, the golden-corpus manifest and fixtures, and five existing test files. `src/lib/settings.js` is used by Part B only, so it is not shared between the parts; the golden-corpus manifest is.
+- **The test names differ** from the proposals in definition-of-done item 3: one new test file per slice, named by what it proves; the hook cases proposed for `tests/light-path-hooks.test.js` are spread across slices 3 to 5.
+- **Three existing tests pin behaviour this plan replaces** and are changed only by tightening, each with its justification written at the change: `tests/streaming-precompute.test.js` (its stale-candidate case uses a review plan — this plan's definition of done lists that file among the tests whose assertions stay unchanged, which decision 18 makes impossible for that one assertion), `tests/stop-continuation-gate-queue.test.js` (two cases use a review plan as "a plan needing questions"), and `tests/session-start-coverage-holes.test.js` (its fault stub targets the function the directive stops calling).
+- **A third dispatch trigger exists:** `src/hooks/stop-continuation-gate.js` re-injects the session-start directive on a blocked stop. It reads the same list, so slices 9 and 12 cover it without editing it.
+- **The render site for the remainder count** was identified by reading the render chain (the `/ctoc:start` default screen's banner, the overview tab and the session-start context all render `loopBDirective` in `src/lib/loop-b-driver.js`), not by running the dashboard; slices 9 and 14 run it first.
+- **A shell allowance the plan's text does not list** (slices 2 and 4; also the first open question below).
+- **A dependency bump in this repository cannot finish on a light path**, because the release sync rewrites the version in `package.json` after the gate run (slice 5, decision 3).
+
+## Open Questions For The Human
+
+1. **Which part is built first?** The two parts share `CLAUDE.md`, `src/commands/start.md` and the golden-corpus manifest, so their slices cannot be built side by side, and one part's slices must come before the other's. Which comes first is a schedule, and the schedule is yours. Until you answer, slices 1 and 9 carry no dependency across the parts; the order the session's numbering produces is then the queue order.
+   - **Part A first:** slice 9 depends on slice 8 (and slice 7). Small changes get their light path before the fleet is trimmed.
+   - **Part B first:** slice 1 depends on slice 14. The fleet is trimmed before small changes get their light path.
+   - **Interleaved:** you name the order; each cross-part edge is added where the shared files require it.
+
+2. **May the shell hook let the plugin's own light-path script start a light change?** By reading, no code ever sets a feature in the signed project state, so the shell hook refuses every `node` command in a project whose state names none — which would include the script's `classify` and `open`. Slices 2 and 4 add a narrow allowance: exactly the plugin's own copy of the script, as one simple command with no shell metacharacters, for those two subcommands, past the write step gate only (every other deny still runs). This is a satisfier the approved text does not list.
+   - **Keep the allowance as sliced:** a light change can start in any project; the shell hook gains one more way past its write step gate, bounded as described.
+   - **No allowance:** slices 2 and 4 drop one constant each; a light change can then start only where the signed state already names a feature at step 8 or later, which by reading no code produces today.
+
+## Facts the slices rest on that were read, not run
+
+- **Whether the registered hooks run in a live session was not established.** `.claude-plugin/hooks.json` registers them and `.claude-plugin/plugin.json` has no `hooks` key; the enforcement log in this repository holds 29 lines and none from the shell channel. By reading, a live shell hook would refuse the menu's own `node` command in any project whose signed state names no feature, which does not match daily use of the menu. Slice 2 establishes this first, by running.
+- **Whether `${CLAUDE_PLUGIN_ROOT}` reaches the shell hook expanded** when a session copies a command from the menu instructions was not established; slice 7 makes the routing reminder print the script's absolute path so the allowance does not depend on it.
+- **Whether an answer picked in a question tool reaches the transcript as a tool result** (which the escape-phrase extraction excludes) is believed from that extraction's code, not observed; the slices therefore ask the human to type "plan it" or "just do it".
+- **The risk-surface globs never match a path at the repository root** (for example a root `Dockerfile`), because the reused matcher needs a leading segment; read in `globMatch`. Slice 1 compensates inside the trust-boundary list only.
+- **The verify evidence store is writable through the shell channel** under the `.ctoc/` whitelist whenever the write step gate is satisfied, although every editing tool is denied it; read, not run. The done check trusts that store. Slice 5 does not rely on it alone; the store itself is left as a finding for you.
