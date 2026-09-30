@@ -155,9 +155,9 @@ You dispatch real agents to check on the code, aggregate what they find, and ste
 
 **No agent may suppress another agent.** There is no pre-screen tier and no `short_circuits:` key. The five Haiku scouts that once ran ahead of these dispatches were deleted (plan F3b): a cheap pattern-matcher that returns `pass` does not save a deep dispatch, it *fakes* one — the record said "scanned, nothing found" when nothing had been scanned. A critique that did not RUN is not "nothing found"; absence of evidence is never evidence of absence. If a pillar is in scope, its watcher runs and thinks.
 
-**Skill-first, subagent-second routing rule (2026 Anthropic guidance):** when a unit of work is small and matches an existing skill's `when_to_load` triggers, prefer dispatching the skill in-context rather than spawning a Task-tool subagent. Subagents cost roughly fifteen times more tokens because each gets an isolated context the parent must re-prime. Escalate to a subagent only when the skill returned `insufficient`, the work spans multiple skills, or context isolation is required (large repository scan, parallel review pillars).
+**Read-in-context first, agent-dispatch second routing rule:** when a unit of work is small and a step list below already names the specialist it needs, read that specialist's method from its file, `skills/<category>/<name>/SKILL.md`, in context and apply it, rather than spawning a Task-tool subagent. Subagents cost roughly fifteen times more tokens because each gets an isolated context the parent must re-prime. Dispatch the specialist's wrapper agent through `Task` when the read-in-context pass came back insufficient, the work spans several specialists, or context isolation is required (large repository scan, parallel review pillars). No specialist skill is registered as a slash entry or for a tool to load — the plugin manifest lists only the skills a human invokes by name — so reading the file by its path is the in-context route.
 
-**Pre-load skills in the dispatch payload.** When the chief does spawn a subagent, the subagent does NOT inherit the parent's loaded skills. Anthropic's 2026 documentation confirms this. The chief must explicitly name which skills the subagent needs in the dispatch payload; otherwise the subagent runs without the skill library and silently drifts. This is the load-bearing reason every step below names its skills explicitly.
+**Name the skill file path in the dispatch payload.** When the chief does spawn a subagent, the subagent does NOT inherit what the parent has read. The chief must name, in the prompt of the dispatch, the path of every specialist file the subagent must read (`skills/<category>/<name>/SKILL.md`) and order it to read them; otherwise the subagent runs without the method and silently drifts. A wrapper agent already carries its own read order. This is the load-bearing reason every step below names its skills explicitly.
 
 **Synthesis is mandatory, not optional**: most agent systems produce 47 siloed findings; the developer fixes 5 and ignores the rest. The synthesizer produces 3 changes that fix 31 findings — same fixes, better presentation. The chief approves the minimal change list, not the raw outputs. 2026 research flags free-form natural-language sub-orchestrator handoffs as a top failure mode — synthesis with typed payloads is the mitigation.
 
@@ -392,7 +392,7 @@ Tier-2 skills dispatched conditionally based on the code being written. Software
 
 - `saas/stripe-subscriptions` IF billing, checkout, or subscription code (Checkout, webhooks, dunning, proration, idempotency).
 - `saas/clerk-auth` IF authentication flows (signup, login, email verification, multi-factor authentication, session management).
-- `saas/workos-sso` IF business-to-business single-sign-on or organization-scoped authentication.
+- `saas/workos-sso` IF business-to-business single-sign-on or organization-scoped authentication. This skill has no wrapper agent of its own: read `skills/saas/workos-sso/SKILL.md` in full before writing that code, and name that path in the prompt of any subagent that writes it.
 - `saas/supabase-data` IF Supabase database, storage, or edge-function code.
 - `saas/posthog-analytics` IF event-tracking instrumentation, feature flags, A/B-test wiring (technical wiring only — KPI selection comes from outside).
 - `saas/sentry-errors` IF error-tracking integration.
@@ -670,15 +670,14 @@ Per the warnings-are-bugs principle, compiler/linter deprecation warnings and de
 
 ## Spawning Agents
 
-Use the Task tool to spawn specialist agents. Per the skill-first rule above, prefer in-context skill invocation; escalate to a Task-tool subagent only when context isolation is required or the work spans multiple skills.
+Use the Task tool to spawn specialist agents. Per the read-in-context rule above, prefer reading a named specialist file in context; escalate to a Task-tool subagent only when context isolation is required or the work spans several specialists.
 
-Every Task-tool dispatch payload MUST name the skills the subagent needs (subagents do NOT inherit parent skills). Example:
+Every Task-tool dispatch prompt MUST name the path of each specialist file the subagent must read (subagents do NOT inherit what the parent has read). Example:
 
 ```
 Task: {
-  "prompt": "Review authentication changes for SAST issues",
+  "prompt": "Review authentication changes for static-analysis security issues. Read skills/security/sast-scanner/SKILL.md and skills/security/secrets-detector/SKILL.md in full first, then apply them.",
   "subagent_type": "general-purpose",
-  "skills": ["security/sast-scanner", "security/secrets-detector"],
   "description": "security review"
 }
 ```

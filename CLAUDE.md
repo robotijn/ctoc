@@ -708,6 +708,8 @@ ctoc/
                          Note: in-progress is a plan state tracked in YAML frontmatter, not a separate directory
 ```
 
+**The plugin manifest registers only the skills a human types.** The `skills` array in `.claude-plugin/plugin.json` is exactly `["./skills/"]`, so the slash-command picker offers the three commands plus the skills directly under `skills/` (today `ask-me-questions`) and nothing else. It once listed every category folder (2026-07-17), which put every specialist skill into the human's picker; the human asked for them to go on 2026-09-30. Specialists are reached by an agent reading `skills/<category>/<name>/SKILL.md` by path, so no agent may hold the `Skill` tool. `tests/plugin-skill-discovery.test.js` holds all of it.
+
 **Key entry points:**
 
 | File | Purpose |

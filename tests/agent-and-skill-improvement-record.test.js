@@ -103,6 +103,16 @@ function toolsLine(text) {
   return line === undefined ? null : line;
 }
 
+/**
+ * A recorded `tools:` line with exactly one tool removed, order kept, rebuilt with
+ * the same "name, name" spacing; undefined when the recorded value is not a string.
+ */
+function withoutTool(line, tool) {
+  if (!isStr(line)) return undefined;
+  const names = line.replace(/^tools:/, '').split(',').map((t) => t.trim()).filter(Boolean);
+  return `tools: ${names.filter((t) => t !== tool).join(', ')}`;
+}
+
 // Round fields: every key is required; dates and fingerprints carry their own code.
 const ROUND_FIELDS = {
   round: [Number.isInteger, 'round-field'],
@@ -272,7 +282,13 @@ function checkRecordDir({ root, expected }) {
       fail('tools', `${p} cannot be read: ${err.code || err.message}`);
       continue;
     }
-    const want = p === CRITIC ? `tools: ${CRITIC_TOOLS}` : isObj(inv.tools_at_start) ? inv.tools_at_start[VALIDATOR] : undefined;
+    // The validator's grant is its recorded start line with ONLY the Skill tool
+    // removed (human ruling, 2026-09-30: the plugin manifest registers no
+    // specialist skill, so the Skill tool resolves nothing a watcher borrows). Still
+    // an exact comparison: keeping Skill, gaining a tool, or losing any other tool fails.
+    const want = p === CRITIC
+      ? `tools: ${CRITIC_TOOLS}`
+      : isObj(inv.tools_at_start) ? withoutTool(inv.tools_at_start[VALIDATOR], 'Skill') : undefined;
     if (line !== want) fail('tools', `${p} tools line is ${JSON.stringify(line)}, expected ${JSON.stringify(want)}`);
     const named = (line || '').replace(/^tools:/, '').split(',').map((t) => t.trim());
     const bad = named.filter((t) => FORBIDDEN_TOOLS.includes(t));
@@ -498,7 +514,7 @@ const FOO = 'skills/ai-quality/foo/SKILL.md';
 function goodModel() {
   const files = {
     [FOO]: '---\nname: foo\n---\n\n# foo\n',
-    [VALIDATOR]: '---\nname: citation-validator\ntools: Read, Grep, Skill, WebSearch, WebFetch\n---\n\n# validator\n',
+    [VALIDATOR]: '---\nname: citation-validator\ntools: Read, Grep, WebSearch, WebFetch\n---\n\n# validator\n',
     [CRITIC]: '---\nname: agent-critic\ntools: Read, Grep, WebSearch, WebFetch\n---\n\n# critic\n',
   };
   const entry = (p, kind, slice) => ({
@@ -703,6 +719,18 @@ describe('the record check rejects each named defect', () => {
     assertRejected(fixtureErrors((m) => {
       m.files[CRITIC] = m.files[CRITIC].replace('tools: Read, Grep, WebSearch, WebFetch', 'tools: Read, Grep, WebSearch, WebFetch, Write');
     }), 'tools');
+  });
+
+  it('rejects a validator tools line that keeps Skill, gains a tool, or loses one other than Skill', () => {
+    for (const wrong of [
+      'tools: Read, Grep, Skill, WebSearch, WebFetch',
+      'tools: Read, Grep, Glob, WebSearch, WebFetch',
+      'tools: Read, Grep, WebSearch',
+    ]) {
+      assertRejected(fixtureErrors((m) => {
+        m.files[VALIDATOR] = m.files[VALIDATOR].replace('tools: Read, Grep, WebSearch, WebFetch', wrong);
+      }), 'tools');
+    }
   });
 
   it('rejects an inventory whose counts disagree with its entries', () => {

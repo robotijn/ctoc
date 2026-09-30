@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.14.70-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.14.71-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-124-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-429-blue">
@@ -56,7 +56,7 @@ This README is written as a **course**, not a feature list. It follows what the 
 > [!TIP]
 > Enable auto-update: `/plugin` → Marketplaces tab → `robotijn` → Enable auto-update.
 
-**You know it worked when** typing `/ctoc` offers three commands — `/ctoc:start`, `/ctoc:push`, `/ctoc:update`. Those are the only three slash commands CTO Chief ships; everything else is reached through the dashboard.
+**You know it worked when** typing `/ctoc` offers three commands — `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and the one skill you invoke by name, `/ctoc:ask-me-questions`. Those are the only three slash commands CTO Chief ships; everything else is reached through the dashboard, and no specialist skill appears in the picker.
 
 > CTO Chief is **always** installed from the marketplace. Never point the plugin at a local checkout — `/ctoc:update` (Lesson 8) is how you get a newer version.
 
@@ -135,7 +135,7 @@ Answer them once; both choices are remembered. "Keep defaults, stop asking" and 
 **Worked example.** The classic pipeline overview (`Open the dashboard` on the first screen) of a busy project — this is a real capture of the CTO Chief repository itself:
 
 ```
-CTOC v6.14.70
+CTOC v6.14.71
 ────────────────────────────────────────────────────────────
 
 ▼ Business (2)
@@ -612,6 +612,8 @@ CTO Chief ships exactly **3 slash commands**. Everything else — vision, planni
 | `/ctoc:push` | Quality checks (lint, typecheck, tests, security), then push on success. Options: `--dry-run`, `--force`, `--skip-tests`. |
 | `/ctoc:update` | Update to the latest version from GitHub (then restart Claude Code). |
 
+Beside the three commands, the picker offers only the skills a human invokes by name — today `/ctoc:ask-me-questions`. The plugin manifest registers just the skills directly under `skills/`, so the specialist skills never appear there; the pipeline's agents read them.
+
 **Dashboard routes** you can say by name: `dashboard` · `menu commands` · `browse <stage>` · `plan <stage>/<file>` · `validate <stage>/<file>` · `stubs <slug>` · `inbox questions|decisions|gates|escalations|stale|verify|cleanup` · `tasks` · `task <id>`.
 
 There is no `ctoc` command-line executable; typing `ctoc` followed by a subcommand in a shell does nothing.
@@ -973,9 +975,9 @@ Each strategy is really executed — `git-branch` pushes to the environment bran
 
 Agents spawn conditionally based on your project and current Iron Loop step. No agent may skip another: if a pillar is in scope, its watcher runs and thinks about the code.
 
-> Three specialist skills have no agent file of their own and are reached through the skill auto-load mechanism below: `ai-governance-checker`, `workos-sso`, and `gdpr-compliance-checker` (whose body the rich `gdpr-agent` dispatches).
+> Every specialist skill is reached through the pipeline's agents, which read its `SKILL.md` by path: most through a wrapper agent that names it, `gdpr-compliance-checker` through `gdpr-agent` (which reads it in full), and `ai-governance-checker` through `eu-ai-act-agent` (which extends it). One has no agent of its own: `workos-sso`, which CTO Chief's implement step orders read from `skills/saas/workos-sso/SKILL.md` and which `clerk-auth` lists as a skill it reuses. That is an instruction-level route, the weakest of them.
 
-**How skills reach you after install.** Claude Code auto-discovers every artifact the plugin ships — slash commands, agents, hooks, skills — per the [Claude Code Plugins reference](https://code.claude.com/docs/en/plugins-reference). The specialist `SKILL.md` files then become available through three routing paths: (1) the pipeline — CTO Chief dispatches a Tier-1 sub-orchestrator, which dispatches the Tier-2 specialist by name; (2) `when_to_load` trigger phrases declared in each skill's frontmatter (e.g. `"SBOM"`, `"prompt injection"`), which auto-load the skill when your conversation matches; (3) direct invocation through Claude Code's built-in `Skill` tool.
+**How skills reach you after install.** Claude Code auto-discovers the slash commands, agents and hooks the plugin ships, per the [Claude Code Plugins reference](https://code.claude.com/docs/en/plugins-reference). Of the skills, it registers only those directly under `skills/` — the ones a human invokes by name, today `/ctoc:ask-me-questions` — because the plugin manifest lists only that folder. The specialist `SKILL.md` files are not registered: they reach your work through the pipeline — CTO Chief dispatches a Tier-1 sub-orchestrator, which dispatches the Tier-2 specialist's agent, and that agent reads the specialist's file by path. The `when_to_load` phrases in each skill's frontmatter (for example `"SBOM"`, `"prompt injection"`) are the trigger vocabulary the skill declares; they load nothing by themselves.
 
 ---
 
@@ -1105,7 +1107,7 @@ node --test tests/*.test.js   # fast pass only — does NOT enforce the floor
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.14.70'
+getVersion()       // → '6.14.71'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -1174,6 +1176,6 @@ Use CTO Chief freely for any project. You may not offer CTO Chief itself or a de
 
 ---
 
-**6.14.70** · Built by [@robotijn](https://github.com/robotijn)
+**6.14.71** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

@@ -102,11 +102,15 @@ const MUTATION_CAPABLE = [...WRITE_TOOLS, 'Bash', 'Task'];
 /**
  * The read-only allowlist. The template declares `tools: Read, Grep`; Glob is
  * permitted because it is pure enumeration and three recently-written watchers
- * use it, and Skill is permitted because the template's own `## What I Borrow`
- * section REQUIRES the Skill tool to invoke a borrowed skill lazily. Anything
- * outside this list is a capability nobody justified.
+ * use it. Anything outside this list is a capability nobody justified.
+ *
+ * Skill is NOT allowed (2026-09-30). The plugin manifest registers only the
+ * human-invoked skills directly under skills/, so the Skill tool can no longer
+ * resolve any specialist a watcher would borrow; holding it promises a method the
+ * watcher cannot get. A watcher borrows by READING the body at its path,
+ * skills/<category>/<name>/SKILL.md, which Read already grants.
  */
-const READONLY_ALLOWED = ['Read', 'Grep', 'Glob', 'Skill'];
+const READONLY_ALLOWED = ['Read', 'Grep', 'Glob'];
 
 /**
  * WEB-ENABLED watchers — an explicit, reviewable allowlist (mirrors SONNET_EXEMPT

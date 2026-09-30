@@ -18,6 +18,7 @@ files:
   - .ctoc/templates/watcher.md
   - README.md
   - CLAUDE.md
+  - tests/agent-and-skill-improvement-record.test.js
 depends_on: none
 approved_by: human
 approved_at: 2026-09-30T14:25:24.848Z
@@ -150,17 +151,19 @@ Each is a test or recorded output. Before the edits, the checks in 1, 6, 8 and 9
 
 ### Definition of Done
 
-- [ ] The checks in scenarios 1, 6, 8 and 9 and the tightened watcher fence were written first, run, and seen failing for the stated reasons before any other file changed; the checks that were already green are named as guards.
-- [ ] `plugin.json` `skills` is exactly `["./skills/"]`; the version fields are untouched and correct after a release sync.
-- [ ] The two agents, the template, the watcher fence, CTO Chief, the skill-loading wording, `README.md` and `CLAUDE.md` are edited as section 2 says, by tightening, with no pin loosened and no test weakened.
-- [ ] Scenario 4 is recorded from real dispatches; scenarios 3 and 5 are observed after shipping and recorded, or the closing report says plainly they were not observed.
-- [ ] No build that declares `README.md` or `CLAUDE.md` ran at the same time as this one.
-- [ ] `npm test` passes.
-- [ ] Reachability, in the same unit of work: the manifest is the live entry for the depth-one skills; each specialist body stays reachable through an agent that names it, and the weakest route (`saas/workos-sso`) is stated as such in the record, not called covered.
+- [x] The checks in scenarios 1, 6, 8 and 9 and the tightened watcher fence were written first, run, and seen failing for the stated reasons before any other file changed; the checks that were already green are named as guards.
+- [x] `plugin.json` `skills` is exactly `["./skills/"]`; the version fields are untouched and correct after a release sync.
+- [x] The two agents, the template, the watcher fence, CTO Chief, the skill-loading wording, `README.md` and `CLAUDE.md` are edited as section 2 says, by tightening, with no pin loosened and no test weakened.
+- [x] Scenario 4 is recorded from real dispatches; scenarios 3 and 5 are observed after shipping and recorded, or the closing report says plainly they were not observed.
+- [x] No build that declares `README.md` or `CLAUDE.md` ran at the same time as this one.
+- [x] `npm test` passes.
+- [x] Reachability, in the same unit of work: the manifest is the live entry for the depth-one skills; each specialist body stays reachable through an agent that names it, and the weakest route (`saas/workos-sso`) is stated as such in the record, not called covered.
 
 ## Decisions By The Human
 
 The authority for settling the forks below is the human's instruction for this session, quoted verbatim: "stop asking theswe stupid questions fix it". The plan's authority to exist is the request quoted under the problem statement. These instructions settle the forks only; they do not approve this plan at its gate, and no approval marker is written here.
+
+**Scope widened by the human on 2026-09-30.** The build stopped at verification because one test outside the declared files failed: the improvement-record check demands that the citation validator's tools line equal, character for character, the line recorded when the improvement run started, and that recorded line includes the Skill tool this plan removes. The executor filed the scope question; the human answered, verbatim: "ok fix it". The declared files therefore gain `tests/agent-and-skill-improvement-record.test.js`, for one edit only: the check expects the recorded starting line with only the Skill tool removed. It stays an exact match, so the validator can lose that one tool and can never gain one. The recorded starting line in the inventory is not rewritten.
 
 ## Decisions Taken Under Ambiguity
 
@@ -180,6 +183,10 @@ The authority for settling the forks below is the human's instruction for this s
 6. **Tests are edited, not added.** No new test file, so the test-file count and its release sync do not move.
 7. **No edit to `start.md`, `library.js`, `AGENT_ARCHITECTURE.md` or the other docs.** They were read and make no registration claim; the stale command names and nonexistent-command docs listed above are not caused by this change and are reported, not fixed.
 8. **The README is edited by exact passage, not rewritten.** The rebuild owns the rest.
+9. **(Build) The CTO Chief dispatch example keeps `"subagent_type": "general-purpose"`.** Only the `"skills"` key was dropped and the file paths moved into the prompt, as section 2 item 5 says; changing the example's agent type was not asked.
+10. **(Build) The README names `/ctoc:deepthink` nowhere yet.** Its skill is not on disk; the discovery test demands the README name every depth-one skill that IS on disk, so the deepthink plan's second slice is held to naming it when it lands.
+11. **(Build) The contributor sentence in `CLAUDE.md` sits directly under the architecture tree**, beside the `.claude-plugin/` and `skills/` lines it explains, and carries no number, so no count pin moves.
+12. **(Build) The skill-loading test header no longer says the phrases are matched by the pipeline.** The planning record found the corpus test to be their only reader; the header says so rather than claiming a runtime reader nobody verified.
 
 ## Open Questions For The Human
 
@@ -191,53 +198,53 @@ None.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
 
 
 ## Deferred Questions
@@ -247,3 +254,75 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record (Steps 8-16)
+
+### Step 8 — test first, seen red
+Red record (2026-09-30, before any non-test file changed). Command: `node --test` over the 44 affected test files listed under Step 14. Result: 848 tests, 842 pass, 6 fail, 0 skipped. The six failures, each for the stated reason:
+
+1. `plugin-skill-discovery` — "the skills array is exactly ["./skills/"]": the manifest held 24 entries (the 23 extra category folders were listed in the diff).
+2. `plugin-skill-discovery` — "no agent definition and not the watcher template holds or orders the Skill tool": six offences, `Skill` in `tools:` and the backticked tool in the body of `.ctoc/templates/watcher.md`, `agents/ai-quality/citation-validator.md` and `agents/iron-loop/advocate-critic.md`. No other agent was named, so no scope growth.
+3. `plugin-skill-discovery` — "the README names every human-invoked skill on disk": `/ctoc:ask-me-questions` absent.
+4. `plugin-skill-discovery` — "CTO Chief routes specialists through agents": `Skill-first, subagent-second` present.
+5. `watcher-shape` case 1: the template's tools held `Skill`, now outside the allowlist.
+6. `watcher-shape` case 4: both conforming agents held `Skill`.
+
+Guards, green before the implementation and therefore not red-first tests: "only the human-invoked skills sit directly under skills/" (scenario 2; the tree already holds only `ask-me-questions` at depth one). Its ability to fail was checked by a mutation in a scratch copy outside the repository (a copy of `security/sast-scanner/SKILL.md` placed at depth one): it failed and named `sast-scanner`. The unchanged discovery checks (array exists, `./skills/` first, paths exist, no duplicate names) and every other affected test were green before and are guards.
+
+Test edits and their justification (tightened, none loosened):
+- `tests/plugin-skill-discovery.test.js`: "every category folder is declared" is replaced by "the array is exactly `./skills/`", because the external contract changed — the human asked on 2026-09-30 for the specialist picker entries to go, and the old assertion made that impossible. Four new checks were added (depth-one names, no `Skill` tool, README names, CTO Chief text). The assertion message calling `ask-me-questions` "the only depth-1 skill" was corrected. The duplicate-name check now reuses one frontmatter helper; its assertion is unchanged.
+- `tests/watcher-shape.test.js`: `Skill` removed from the read-only allowlist, because with no specialist registered the tool resolves nothing a watcher borrows; the comment that said the template requires it is corrected. Stricter, not looser.
+
+### Steps 9 to 13 — what landed
+- Step 9: no dependency, directory or configuration was needed.
+- Step 10, in the declared files only: `.claude-plugin/plugin.json` `skills` is `["./skills/"]`; `.ctoc/templates/watcher.md`, `agents/ai-quality/citation-validator.md` and `agents/iron-loop/advocate-critic.md` dropped `Skill` from `tools:` and their `## What I Borrow` text now says a specialist is read from its file by path and that none is registered for a tool to load (the template's "must stay in tools" sentence and its quotation are gone); `agents/coordinator/cto-chief.md` has the read-in-context-first routing rule, the "name the skill file path in the dispatch payload" rule, the example without a `"skills"` key, and the Step 10 line for `saas/workos-sso` orders a read of `skills/saas/workos-sso/SKILL.md`; `tests/skill-loading.test.js` header, one comment and one describe name reworded, assertions unchanged; `README.md` Lesson 0, the Commands section, the blockquote above the agents' Skills table and the "How skills reach you after install" paragraph; `CLAUDE.md` one contributor paragraph. Error handling: no runtime code changed; the test helpers read real files and fail loudly on an unreadable one.
+- Steps 11 to 13: self-reviewed the diff; no secrets, no new path handling (the existing check that a declared manifest path has no `..` and is not absolute is kept).
+- `.ctoc/unexecutable-instruction-baseline.json` compared byte-for-byte against the last commit: identical (scenario 7).
+
+### Step 14 — stopped once: scope growth requested, then allowed
+After Step 10 the 44 affected test files ran 848 tests, 847 pass, 1 fail, 0 skipped. The whole suite (`node --test tests/*.test.js`, which does not enforce the coverage floor) then ran 12034 tests, 12033 pass, 1 fail, 0 skipped. The one failure, in both runs: `tests/agent-and-skill-improvement-record.test.js` — "the real record directory passes the check": check 9 demands the citation validator's tools line equal the start line recorded in `.ctoc/audit/agent-and-skill-improvement/inventory.json` (`tools: Read, Grep, Skill, WebSearch, WebFetch`), and this plan removes `Skill` from it. It was green before this build. Neither that test nor the inventory is in `files:`, so nothing was edited: a scope-growth request was filed to the inbox (question `1790779151941-1s4114`) naming the test file, with the change "the validator may lose a tool against its recorded start, never gain one". Rewriting the recorded start line instead would falsify a measured record and is not proposed. The build stops here until the human decides; version bump, completion and commit were not done.
+
+The 44 affected test files (the loop set, also used for the red run): `tests/plugin-skill-discovery.test.js`, `tests/watcher-shape.test.js`, `tests/skill-loading.test.js`, `tests/citation-validator.test.js`, `tests/cto-chief-toplevel.test.js`, `tests/cto-chief-compliance-dispatch.test.js`, `tests/readme-numbers.test.js`, `tests/unexecutable-instruction-fence.test.js`, `tests/release-metadata-sync.test.js`, `tests/version-syncplugin-path-fix.test.js`, `tests/agent-honest-status-fence.test.js`, `tests/gate-words.test.js`, `tests/instruction-surfaces-say-the-moment.test.js`, `tests/compliance-claims-match-code.test.js`, `tests/architecture-invariants.test.js`, `tests/agent-model-floor.test.js`, `tests/agent-contract-load.test.js`, `tests/agent-dispatch-resolution.test.js`, `tests/agent-layer-reachability.test.js`, `tests/agent-and-skill-improvement-record.test.js`, `tests/claude-md-lessons.test.js`, `tests/claude-md-lessons-coverage.test.js`, `tests/doc-counts.test.js`, `tests/doc-counts-generated.test.js`, `tests/cu5-s1-safety-wrappers.test.js`, `tests/cu5-s2-security-wrappers.test.js`, `tests/cu5-s3-legal-realtime-wrappers.test.js`, `tests/cu5-s4-compliance-aiquality-wrappers.test.js`, `tests/cu5-wrapper-coverage-completeness.test.js`, `tests/no-tier-3.test.js`, `tests/tier1-no-peer-dispatch.test.js`, `tests/registry-integrity.test.js`, `tests/version.test.js`, `tests/version-coverage.test.js`, `tests/version-license-invariant.test.js`, `tests/release.test.js`, `tests/no-phantom-command-family.test.js`, `tests/slash-command-no-model-pin.test.js`, `tests/corpus-audit-ledger.test.js`, `tests/skill-regulatory-citations.test.js`, `tests/operating-manual.test.js`, `tests/operating-manual-coverage.test.js`, `tests/agent-shared-not-dispatchable.test.js`, `tests/refinement-loop-claims-match-code.test.js`.
+
+### Step 14 continued — the scope the human allowed
+The human answered the scope question ("ok fix it"; recorded under "Decisions By The Human") and `tests/agent-and-skill-improvement-record.test.js` joined the declared files.
+
+Justification for this test change:
+- The contract that changed, from outside the test: the human's ruling that the plugin manifest registers no specialist skill, so the citation validator must not hold the Skill tool (scenario 6, decision 3), and the human's explicit answer allowing this one edit.
+- Why the test and not the code: the code (the validator's tools line) is now correct by that ruling. The test's premise, that the validator's grant equals its recorded starting line character for character, is the one fact the ruling changes. The recorded starting line in `.ctoc/audit/agent-and-skill-improvement/inventory.json` is a measured record and was not rewritten.
+- The edit: a helper derives the expected line from the recorded one with only `Skill` removed, order kept; the comparison stays exact. The synthetic fixture's validator file now carries the Skill-less line, mirroring the real one.
+- What newly fails: a validator line that still holds `Skill` (it used to pass, because it equalled the recorded start). What still fails: gaining any tool, losing any tool other than `Skill`, and any forbidden write tool.
+- Test first: the new case "rejects a validator tools line that keeps Skill, gains a tool, or loses one other than Skill" was written and run before the check changed, and failed with `expected a "tools" failure, got: []` on the line that keeps Skill (with it, "accepts a well-formed record directory" and "the real record directory passes the check" were red, 3 of 16). After the change: 16 of 16 pass. Its teeth were checked by adding the correct line to its list of wrong lines: it then failed with `got: []`, and the list was restored.
+
+Affected tests after the change: the same 44 files, 849 tests, 849 pass, 0 fail, 0 skipped.
+
+Version: `VERSION` set to 6.14.71 and `node src/scripts/release.js` run; it updated `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `package.json` and four version strings in `README.md`. `plugin.json` `skills` read back as exactly `["./skills/"]` (the release script re-indented the array onto separate lines; the value is unchanged). The release-sync, version, release, discovery and README-number tests: 198 tests, 198 pass, 0 skipped. There is no changelog file in this repository, so none was updated.
+
+### Steps 14 and 16 — verification run by the builder before completion
+Once nothing else was writing in the repository: `npm run lint` exited 0 (no warnings allowed); `npm run typecheck` exited 0 (1 test, 1 pass); `npm test` exited 0 — 12035 tests, 12035 pass, 0 fail, 0 skipped, coverage 99.9% against the 99% floor, the offline claims ledger gate passed. Scenario 12 holds on this run. Steps 8 to 15 were re-read against this record before the Step 16 boxes were ticked. The completion step runs its own verification and writes the evidence the human's final OK reads; that result is reported separately, not assumed from this run.
+
+### Definition of done — evidence per box, and the one box left open
+- Tests first, seen red, guards named: see "Step 8 — test first, seen red" and the improvement-record test's red above.
+- Manifest exact, versions right after the release sync: see "Step 14 continued".
+- Edits by tightening: see "Steps 9 to 13" and the per-test justifications.
+- No concurrent build on `README.md` or `CLAUDE.md`: the task registry (`.ctoc/state/tasks.json`) shows no other build task running between this task's start (14:32 UTC) and now; the last build declaring `CLAUDE.md` (t110) finished at 08:30 UTC. The planning tasks t113 and t116 declared no `README.md` or `CLAUDE.md` (t116 declares one plan file; t113 declares nothing and is still marked running in the registry, which the coordinator reports has stopped).
+- `npm test` passes: see "Steps 14 and 16".
+- Reachability: the manifest entry `./skills/` is the live entry for the depth-one skill (`ask-me-questions`). Each specialist body stays reachable only through an agent that reads it by path; `skills/iron-loop/advocate-lens/SKILL.md` through `advocate-critic`'s read order. The weakest route is `saas/workos-sso`: it has no agent of its own and is reached only by CTO Chief's Step 10 read order and the reuse table in `clerk-auth` — an instruction-level route, stated here as that and not called covered.
+- **Left open, truthfully: "Scenario 4 is recorded from real dispatches".** Dispatching `ai-code-quality-reviewer`, `clerk-auth`, `gdpr-agent` and `dead-code-detector` and reading their transcripts needs a dispatch tool the build executor does not hold. The first completion attempt was refused for this box and the six others (a kickback, recorded by the circuit breaker); the six are ticked above with their evidence, and this one waited for the session to run and record scenario 4 (now recorded below, and ticked).
+
+### Scenario 4 — recorded from real dispatches by the session
+Run by the session, not by the build executor, in this repository on 2026-09-30, against the INSTALLED plugin, version 6.14.67 (dispatched agents load from the installed plugin, not from this repository's agent files). Six dispatches; each agent was given a small read-only task and was NOT told to read its skill file; each transcript was checked tool call by tool call by the session.
+
+1. `clerk-auth` — a question about verifying a session in a route handler. One tool call, a read of `skills/saas/clerk-auth/SKILL.md`. READ ITS SKILL FILE.
+2. `ai-code-quality-reviewer` — reviewed `src/lib/request-exit.js`. Four tool calls (three file reads, one text search), none of its skill file. DID NOT READ ITS SKILL FILE. Cause, checked by exact string presence: the installed 6.14.67 definition contains no order to read `skills/ai-quality/ai-code-quality-reviewer/SKILL.md`; this repository's definition (changed in 6.14.70, not yet shipped) contains it. The read order this scenario expected for this agent is therefore UNTESTED until that version is shipped and installed. The agent holds `Read, Grep` and never held the Skill tool, so the manifest change removes no route it used.
+3. `gdpr-agent` — asked to scan `src/lib/inbox.js`. One tool call, a read of `.ctoc/settings.yaml`; it found the privacy profile absent from the active profiles (`active_profiles: []`, `declined: true`) and stopped at its first check, as its definition orders. DID NOT REACH ITS SKILL FILE; the read route is UNTESTED for this agent in this project. It never held the Skill tool.
+4. `dead-code-detector` — checked `src/lib/request-exit.js`. Five tool calls (one file read, four shell commands using the repository's own reachability analyzer and the TypeScript compiler), no skill file. DID NOT READ A SKILL FILE, which matches the plan's expectation that its method is inline; recorded, not a failure.
+5. `input-validation-checker` (added by the session as a substitute; its installed body mentions its skill file) — checked `src/scripts/ledger-backfill.js`. First tool call is a read of `skills/security/input-validation-checker/SKILL.md`. READ ITS SKILL FILE.
+6. `error-handler-checker` (added by the session as a substitute; its installed definition names its skill ONLY in the `target_skill` frontmatter key, with no path in the body) — checked `src/scripts/ledger-backfill.js`. First tool call is a read of `skills/specialized/error-handler-checker/SKILL.md`. READ ITS SKILL FILE.
+
+Outcome, plainly: of the three agents the scenario named as expected to read their skill file, ONE did (`clerk-auth`); the other two (`ai-code-quality-reviewer`, `gdpr-agent`) are untested, for the reasons above, neither caused by this change. The two substitute wrappers both read their skill file by repository-relative path, one of them with nothing but the frontmatter key to go on. Every other wrapper is untested. **Scenario 4's THEN clause as written is therefore NOT fully met.** The definition-of-done box ticked above says scenario 4 is recorded from real dispatches, which is now true; it does not say scenario 4 passed. Scenarios 3 and 5 remain NOT OBSERVED.
+
+### Not done by this build
+- Scenario 4 was run by the session, not by this build; its record is above and its THEN clause is not fully met.
+- Scenarios 3 and 5 are NOT OBSERVED: they can only be observed after the change ships and is installed from the marketplace.
+- The "no build declaring README.md or CLAUDE.md ran at the same time" item in the definition of done: the builder did not census other runs; the coordinator reported that two planning agents were writing plan files mid-build and had stopped before the verification above.

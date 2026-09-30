@@ -1,7 +1,7 @@
 ---
 name: <role-a-department-would-hire>
 description: <routing rule — what it watches, when to dispatch it, what it does NOT do>
-tools: Read, Grep, Skill
+tools: Read, Grep
 model: opus
 effort: high
 tier: 2
@@ -71,9 +71,10 @@ call it cannot see far enough to make.
 
 ## What I Borrow
 
-<Skills invoked lazily through the Skill tool when a finding needs them.
-Overlap with other watchers is deliberate: convergence from two routes raises
-confidence and must be said in the finding; divergence is itself a finding.>
+<Specialist methods read from their files by path,
+skills/<category>/<name>/SKILL.md, only when a finding needs them. Overlap with
+other watchers is deliberate: convergence from two routes raises confidence and
+must be said in the finding; divergence is itself a finding.>
 
 THERE IS NO PRELOADING. A `skills:` frontmatter key used to sit above, and this
 section used to say it loaded a lens skill every run. That was TESTED on
@@ -84,10 +85,10 @@ text it is guaranteed to receive. A contract that must be FETCHED is weaker than
 one that is PRESENT, because an agent that skips the fetch runs with no contract
 and does not know it.
 
-`Skill` MUST stay in `tools:` above or this section is dead. The Claude Code
-reference is explicit: *"To prevent a subagent from invoking skills entirely,
-omit `Skill` from the tools list."* A watcher declaring only `Read, Grep` cannot
-borrow anything, no matter what this section says.
+No specialist skill is registered for a tool to load: the plugin manifest lists
+only the skills a human invokes by name, directly under skills/. So a watcher
+borrows by READING the specialist's file with Read, at its repository path, when
+a finding needs it — never by asking a tool to load it by name.
 
 ## Anti-Scope
 

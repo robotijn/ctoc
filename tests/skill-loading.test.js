@@ -1,10 +1,16 @@
 /**
- * Tests for B2 — skill loading (auto-load triggers + frontmatter validation)
+ * Tests for B2 — skill loading (trigger vocabulary + frontmatter validation)
  *
  * Per the B2 plan's NFR-5, the test corpus exercises whether each converted
  * skill's `when_to_load` triggers match expected natural-language prompts.
  * Acceptance: ≥90% of corpus entries match the expected skill via substring
  * match against the skill's `when_to_load` array.
+ *
+ * The `when_to_load` phrases are the TRIGGER VOCABULARY each skill declares — the
+ * words for the situations it covers; this corpus is their only reader. They are not a
+ * registration: the plugin manifest registers only the skills a human invokes by
+ * name (tests/plugin-skill-discovery.test.js), and nothing loads a specialist on a
+ * phrase match. Specialists are reached by an agent reading the body by path.
  *
  * Also verifies:
  *   - Every redirect stub in agents/ points at an existing skill
@@ -27,7 +33,7 @@ const { resolveAgent, listConvertedAgents } = require('./helpers/agent-resolver'
 const REQUIRED_SKILL_FIELDS = ['name', 'description', 'when_to_load', 'related_skills', 'effort_level'];
 
 // Test corpus — per B2-6 refinement.
-// Each entry: a natural-language prompt + the skill that should auto-load.
+// Each entry: a natural-language prompt + the skill whose trigger vocabulary it matches.
 // As more agents convert, append more entries here.
 const TRIGGER_CORPUS = [
   { prompt: 'please review my code', expects: 'code-reviewer' },
@@ -262,7 +268,7 @@ describe('B2 — every converted skill has valid v7 frontmatter', () => {
   }
 });
 
-describe('B2-6 — auto-load trigger corpus matches expected skill', () => {
+describe('B2-6 — trigger-vocabulary corpus matches expected skill', () => {
   function matchSkill(prompt, converted) {
     const lowerPrompt = prompt.toLowerCase();
     for (const c of converted) {
