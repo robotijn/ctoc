@@ -13,8 +13,8 @@ files:
   - tests/framework-detector-coverage.test.js
   - tests/remainder-security-tooling-coverage.test.js
 approved_by: human
-approved_at: 2026-09-03T12:12:02.258Z
-gate_crossed: implementation → todo
+approved_at: 2026-09-30T14:40:49.884Z
+gate_crossed: review → done
 ---
 
 # The dev-tool credit reads all four dependency maps

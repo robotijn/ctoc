@@ -16,8 +16,8 @@ files:
   # the release sync rewrites that count, and the build needs the permission.
   - CLAUDE.md
 approved_by: human
-approved_at: 2026-09-30T07:58:16.494Z
-gate_crossed: implementation → todo
+approved_at: 2026-09-30T14:40:50.019Z
+gate_crossed: review → done
 ---
 
 # The run's first task — the starting inventory, the instruments, and the check that reads the record

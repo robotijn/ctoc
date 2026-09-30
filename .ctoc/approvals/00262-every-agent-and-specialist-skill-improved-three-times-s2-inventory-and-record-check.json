@@ -1,9 +1,9 @@
 {
-  "content_sha256": "db54983b03272ba377fad8d535a46e9ace835d597b6a6c4019378bc319d39cbb",
+  "content_sha256": "3a7a02c393bddc35c900ffc264901e59f3144a75c0ab4dfb68cd280d96e93ea7",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-30T07:58:16.522Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-09-30T14:40:50.046Z",
   "approved_by": "human",
   "plan_basename": "00262-every-agent-and-specialist-skill-improved-three-times-s2-inventory-and-record-check"
 }

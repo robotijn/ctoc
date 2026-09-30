@@ -11,8 +11,8 @@ files:
   - .ctoc/audit/agent-and-skill-improvement/agents/pipeline/agent-critic.md.json
   - .ctoc/audit/agent-and-skill-improvement/for-the-human.json
 approved_by: human
-approved_at: 2026-09-30T07:58:16.427Z
-gate_crossed: implementation → todo
+approved_at: 2026-09-30T14:40:49.990Z
+gate_crossed: review → done
 ---
 
 # The agent critic gains web research and covers specialist skill bodies, before any round begins
