@@ -1,4 +1,105 @@
 {
   "schema": 1,
-  "entries": []
+  "entries": [
+    {
+      "id": "h-s3-agent-r1-installed-critic-has-no-web-tools",
+      "date": "2026-09-30",
+      "path": "agents/ai-quality/ai-code-quality-reviewer.md",
+      "round": 1,
+      "kind": "instrument-list",
+      "evidence": "The agent critic that ran this round is the installed plugin copy, version 6.14.65, whose tools line reads 'tools: Read, Grep' (/Users/account/.claude/plugins/cache/robotijn/ctoc/6.14.65/agents/pipeline/agent-critic.md, line 4). The repository copy, at VERSION 6.14.69, reads 'tools: Read, Grep, WebSearch, WebFetch'. So the critic could not research the web itself: the citation validator (installed 6.14.65 copy, which holds web tools) did the research under dispatch d-s3-agent-r1-research, and the critic, dispatch d-s3-agent-r1-critic, critiqued against that report. Every later round of every file meets the same limit until the installed plugin carries the approved grant. The human already chose to keep going with the installed versions; this entry records the limitation so it is visible, not a new request to stop. Whether a marketplace version 6.14.68 or later is published was not checked.",
+      "options": [
+        {
+          "key": "keep-installed",
+          "label": "Keep going with the installed 6.14.65 copies: the citation validator researches, the agent critic critiques against its report",
+          "pros": "No interruption; the run continues as it did this round; the research is still done from live sources and every quote is traced to the validator's report.",
+          "cons": "The critic never chooses its own queries, so its critique is bounded by what the validator looked for; each round takes two dispatches instead of one; the instruments recorded are the installed copies, not the repository's."
+        },
+        {
+          "key": "update-plugin",
+          "label": "Update the plugin from the marketplace to a version carrying the critic's web grant, then re-dispatch the critic",
+          "pros": "The critic researches directly, as the parent plan intends; the instrument fingerprints match the repository's definitions.",
+          "cons": "Needs the published marketplace version, which was not checked; the rounds already done used the older instruments and their records say so; an update mid-run changes the instruments between rounds."
+        }
+      ]
+    },
+    {
+      "id": "h-s3-agent-r1-tokens-used-null-versus-dispatch-schema",
+      "date": "2026-09-30",
+      "path": "agents/ai-quality/ai-code-quality-reviewer.md",
+      "round": 1,
+      "kind": "pinned-contract",
+      "evidence": "The applied output format (critic finding f-s3-agent-r1-4) tells the agent to return 'tokens_used: null  # not measurable from inside this agent; never estimate it'. The dispatch schema, .ctoc/architecture/dispatch-schema.yaml line 134, types that field 'tokens_used: { type: integer, minimum: 0 }', and line 132 makes it required. So the honest value the file now orders does not satisfy the schema's type. Nothing breaks today: the only source file that names that schema, src/lib/v8-dispatcher.js, is listed as unreachable in .ctoc/reachability-baseline.json, and every fence that reads the agent file passed after the edit. Two other agents (agents/coordinator/ivv-chief.md line 187, agents/coordinator/synthesizer.md line 215) show 'tokens_used: <int>'. The executor applied the proposal exactly, as ordered, and did not change it; which side moves is a change to a machine-read contract and belongs to the human.",
+      "options": [
+        {
+          "key": "schema-allows-null",
+          "label": "Keep the agent's null and widen the schema so tokens_used may be null when an agent cannot measure it",
+          "pros": "The agent never reports a number it did not measure (Operating Lesson 18); the same rule can then apply to every agent that cannot see its own token count.",
+          "cons": "A change to the dispatch schema, outside this slice's files, needing its own approved change; any future reader that sums tokens must handle null."
+        },
+        {
+          "key": "agent-emits-integer",
+          "label": "Change the agent's instruction so it emits an integer, as the schema and two coordinator agents show",
+          "pros": "The agent's response matches the schema as written, with no schema change.",
+          "cons": "An agent cannot read its own token count, so any integer it writes is an estimate or a placeholder presented as a measurement; that reverses a line the critic added for honesty."
+        }
+      ]
+    },
+    {
+      "id": "h-s3-agent-r3-licensing-gap-no-owning-agent",
+      "date": "2026-09-30",
+      "path": "agents/ai-quality/ai-code-quality-reviewer.md",
+      "round": 3,
+      "kind": "out-of-scope-file",
+      "evidence": "The French Cybersecurity Agency and the German Federal Office for Information Security, joint report \"AI Coding Assistants\" (https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf, last updated September 2024), page 8, read by the executor from the saved copy: \"There are further risks, such as potential licensing violations when using AI-generated code, which have no direct security connection and are not addressed in the following.\" No agent's description claims to detect licensed code reproduced into a change: agents/compliance/license-scanner.md line 3 describes it as scanning dependencies for license compliance. The report gives no detection method. The agent critic (dispatch d-s3-agent-r3-critic, finding f-s3-agent-r3-9) proposed no text change: routing it to license-scanner would be a hand-on that agent's description does not claim, and adding a class to this agent would need a method no source gives. Filling the gap would change a file outside this slice (license-scanner or a new agent), so it is put to the human as a scheduling decision.",
+      "options": [
+        {
+          "key": "leave-unowned",
+          "label": "Leave licensing of reproduced code unowned for now; the reviewer does not report it",
+          "pros": "No change outside this slice; no detection rule is invented without a source.",
+          "cons": "Licensed code copied into a change by an assistant is checked by no agent; the regulator names the risk."
+        },
+        {
+          "key": "widen-license-scanner",
+          "label": "Schedule a change that widens license-scanner to cover licensed code reproduced into a change",
+          "pros": "The topic goes to the agent whose domain is licensing; one owner.",
+          "cons": "Needs its own plan, research into a detection method, and a change to license-scanner's description and body."
+        },
+        {
+          "key": "route-as-no-owning-agent",
+          "label": "Have this reviewer record suspected reproduced licensed code with the words \"no owning agent\", as it does for files left open",
+          "pros": "The gap becomes visible in every review without choosing an owner yet.",
+          "cons": "A further change to this agent file in a later round or slice; with no method, what counts as suspected stays a reviewer's judgement."
+        }
+      ]
+    },
+    {
+      "id": "h-s3-skill-r2-change-adds-no-tests-no-owner",
+      "date": "2026-09-30",
+      "path": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md",
+      "round": 2,
+      "kind": "out-of-scope-file",
+      "evidence": "Google's engineering practices guide, what to look for in a code review (https://google.github.io/eng-practices/review/reviewer/looking-for.html, read 2026-09-30, by the citation validator under dispatch d-s3-skill-r2-research): \"In general, tests should be added in the same CL as the production code unless the CL is handling an emergency.\" The reviewer checks tests that exist (vacuous tests, tests changed to pass) but not a change that adds production code with no tests at all; neither the agent's ten classes nor its hand-on list carries that case. The agent critic (dispatch d-s3-skill-r2-critic, finding f-s3-skill-r2-15) proposed no text: adding it is a scope decision. It named coverage-enforcer as the likely owner, since agents/testing/coverage-enforcer.md line 3 names diff coverage and patch coverage. Giving the case to coverage-enforcer, or adding it as an eleventh class here, changes files outside this slice or this agent's contract, so it is the human's call. Round 3 of the skill (dispatch d-s3-skill-r3-critic, finding f-s3-skill-r3-19) adds regulator support: the joint report \"AI Coding Assistants\" of the French Cybersecurity Agency and the German Federal Office for Information Security (https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf, printed page 9, read 2026-09-30) lists among its mitigations \"Automatic function tests should be employed.\"",
+      "options": [
+        {
+          "key": "leave-as-is",
+          "label": "Leave a change that adds no tests unchecked by this reviewer",
+          "pros": "No change to the reviewer's ten classes or to another agent.",
+          "cons": "Assistant-written production code that arrives with no tests is flagged by no class of this reviewer."
+        },
+        {
+          "key": "hand-to-coverage-enforcer",
+          "label": "Have this reviewer record such a change for coverage-enforcer, and schedule coverage-enforcer to own it",
+          "pros": "The check goes to the agent whose description already names diff and patch coverage.",
+          "cons": "A change to this agent's hand-on list and to coverage-enforcer, in a later slice or plan."
+        },
+        {
+          "key": "eleventh-class",
+          "label": "Add \"change adds no tests\" as an eleventh class of this reviewer",
+          "pros": "Visible in every review of assistant-written code with no new owner needed.",
+          "cons": "Widens this agent's contract and output types; needs its own change to the agent file, its skill and possibly the dispatch type list."
+        }
+      ]
+    }
+  ]
 }

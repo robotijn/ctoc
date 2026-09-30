@@ -1,0 +1,1739 @@
+{
+  "schema": 1,
+  "path": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md",
+  "prerequisite": null,
+  "rounds": [
+    {
+      "round": 1,
+      "date": "2026-09-30",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:a30ec5a401cb9e8251d96b31744909fbd7404ff26c498fd1634408e8abee96f9",
+      "fingerprint_after": "sha256:37a49e5f22d7102a4c0c083ad19bc13b35fa6b06502be08a1966a447ea5655cb",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s3-skill-r1-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-skill-r1-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-skill-r1-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "\"reading 'ReactCurrentDispatcher'\" React 19 react-dom 18 mismatch github issue",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "Aikido Security \"AI Code Review\" product pull request",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "Veracode \"AI Audit\" product",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "Veracode AI-generated code product audit compliance (restricted to veracode.com)",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "CVE-2025-53773 GitHub Copilot \".vscode/settings.json\" \"chat.tools.autoApprove\" prompt injection",
+          "source_class": "broad web",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://docs.python.org/3.12/library/asyncio-eventloop.html",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 195 (3.12 deprecation)",
+          "outcome": "supported",
+          "quote": "Deprecated since version 3.12: Deprecation warning is emitted if there is no current event loop. In some future Python release this will become an error.",
+          "error": null
+        },
+        {
+          "url": "https://docs.python.org/3/library/asyncio-eventloop.html",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 195 ('get_running_loop() is required')",
+          "outcome": "refuted",
+          "quote": "using the get_running_loop() function is preferred to get_event_loop() in coroutines and callbacks. ... Changed in version 3.14: Raises a RuntimeError if there is no current event loop.",
+          "error": null
+        },
+        {
+          "url": "https://react.dev/blog/2024/04/25/react-19-upgrade-guide",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 289 (ReactCurrentDispatcher mechanism)",
+          "outcome": "supported",
+          "quote": "we have renamed the `SECRET_INTERNALS` suffix to: `_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE`",
+          "error": null
+        },
+        {
+          "url": "https://react.dev/blog/2024/04/25/react-19-upgrade-guide",
+          "read_on": "2026-09-30",
+          "bore_on": "skill lines 187-188 (legacy lifecycles as a React 18-to-19 idiom)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://openjdk.org/jeps/440",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 289 (Java 16 as the record-pattern boundary)",
+          "outcome": "refuted",
+          "quote": "Release: 21 ... Record patterns were initially proposed as a preview feature by JEP 405 and delivered in JDK 19. They received a second preview through JEP 432, which was delivered in JDK 20.",
+          "error": null
+        },
+        {
+          "url": "https://openjdk.org/jeps/444",
+          "read_on": "2026-09-30",
+          "bore_on": "skill lines 207 and 289 (Thread.ofVirtual, Java 17)",
+          "outcome": "supported",
+          "quote": "Release: 21 ... Thread thread = Thread.ofVirtual().name(\"duke\").unstarted(runnable);",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/csharp/whats-new/csharp-version-history",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 289 (using declarations, C# 7)",
+          "outcome": "supported",
+          "quote": "C# version 8.0 / Released September 2019 ... [Using declarations](../language-reference/statements/using)",
+          "error": null
+        },
+        {
+          "url": "https://www.aikido.dev/code/code-quality",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 421 (product name and role)",
+          "outcome": "refuted",
+          "quote": "While security is important, Aikido primarily focuses on code quality to improve overall software health.",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2406.09834",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 49 (models emit deprecated interfaces); Part 2 finding 5",
+          "outcome": "supported",
+          "quote": "seven advanced LLMs, 145 API mappings from eight popular Python libraries, and 28,125 completion prompts",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/html/2406.09834",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 49; Part 2 finding 5",
+          "outcome": "supported",
+          "quote": "The DUR of the LLMs for the overall dataset ranges from 25% to 38%",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2410.21136",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 48 (tests encode the implementation); Part 2 finding 6",
+          "outcome": "supported",
+          "quote": "LLM-based test generation approaches are also prone on generating oracles that capture the actual program behaviour rather than the expected one.",
+          "error": null
+        },
+        {
+          "url": "https://en.cppreference.com/w/c/io/gets",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 finding 1 (C stale idiom)",
+          "outcome": "supported",
+          "quote": "the function has been deprecated in the third corrigendum to the C99 standard and removed altogether in the C11 standard.",
+          "error": null
+        },
+        {
+          "url": "https://en.cppreference.com/w/cpp/memory/auto_ptr",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 finding 1 (C++ stale idiom)",
+          "outcome": "supported",
+          "quote": "(deprecated in C++11) (removed in C++17) ... std::unique_ptr is preferred for this and other uses.",
+          "error": null
+        },
+        {
+          "url": "https://en.cppreference.com/w/c/language/operator_arithmetic",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 finding 1 (C missing edge case)",
+          "outcome": "supported",
+          "quote": "If the quotient a/b is not representable in the result type, the behavior of both a/b and a%b is undefined (that means INT_MIN%-1 is undefined on 2's complement systems)",
+          "error": null
+        },
+        {
+          "url": "https://google.github.io/googletest/reference/assertions.html",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 findings 1 and 7 (C++ vacuous test; float equality)",
+          "outcome": "supported",
+          "quote": "Due to rounding errors, it is very unlikely that two floating-point values will match exactly, so EXPECT_EQ is not suitable.",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/html/2503.11926",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 finding 2 (tests changed to pass)",
+          "outcome": "supported",
+          "quote": "edit the unit tests so they would pass",
+          "error": null
+        },
+        {
+          "url": "https://embracethered.com/blog/posts/2025/github-copilot-remote-code-execution-via-prompt-injection/",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 finding 3 (coding-assistant configuration)",
+          "outcome": "supported",
+          "quote": "it can create and write to files in the workspace without user approval.",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/sql/relational-databases/security/sql-injection",
+          "read_on": "2026-09-30",
+          "bore_on": "skill lines 274 and 280; Part 2 finding 4",
+          "outcome": "supported",
+          "quote": "Never build Transact-SQL statements directly from user input.",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-executesql-transact-sql",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 280; Part 2 finding 4",
+          "outcome": "supported",
+          "quote": "You should parameterize your queries when using `sp_executesql`.",
+          "error": null
+        },
+        {
+          "url": "https://docs.python.org/3/library/sqlite3.html",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 274; Part 2 finding 4",
+          "outcome": "supported",
+          "quote": "beware of using Python's string operations to assemble queries, as they are vulnerable to SQL injection attacks.",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s3-skill-r1-1",
+          "kind": "new",
+          "text": "The description calls the defects 'common pitfalls', which is unsourceable (research rows A2-A8). It also names six classes where the finished agent has ten. The new description names the ten classes and says the skill is the agent's method. The YAML stays a plain scalar with no colon-space sequence.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:3; agents/ai-quality/ai-code-quality-reviewer.md:3, :18; skill research report rows A2-A8",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-2",
+          "kind": "new",
+          "text": "related_skills gains the nine skills that the rewritten body hands work to and that were missing from the list. The round-1 report noted there was no link to dead-code detection. dependency-auditor stays, because its description covers supply-chain audits, but the body no longer says it checks whether a package exists. Every added path exists as a SKILL.md, and the three-segment form 'testing/runners/...' is already used in skills/testing/quality-gate-runner/SKILL.md:20. No test validates related_skills beyond its presence (tests/skill-loading.test.js:27).",
+          "evidence": "agents/ai-quality/ai-code-quality-reviewer.md:36-45; skill research report 'What the skill is missing' item 8; round-1 agent report section 3 item 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-3",
+          "kind": "new",
+          "text": "The opening note has two problems. It uses an internal code ('CTOC v7 B2 leaf-node sweep'). And it says 'Auto-loaded when the user prompt matches a when_to_load trigger', which claims a mechanism: a search of src/ for when_to_load finds nothing, and only the trigger test reads the phrases. The new note says what the file is, that the agent wins where the two disagree (the agent's rule 4), and who reads the phrases.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:35-36; a search of src/ for when_to_load finds no file; tests/skill-loading.test.js:266-278; agents/ai-quality/ai-code-quality-reviewer.md:27",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-4",
+          "kind": "new",
+          "text": "The Role claims 'quality issues specific to AI generation patterns', which research row A1 rates fabricated. It also frames the author as 'a confident junior', which is unsourced. The new Role names the agent's ten classes and forbids calling a defect typical of assistant-written code without a cited measurement. It points to the general-examples note, where the contrary measurement is cited.",
+          "evidence": "skill research report row A1: Cotroneo 'human-written code exhibits greater structural complexity and a higher concentration of maintainability issues'; agents/ai-quality/ai-code-quality-reviewer.md:49",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-5",
+          "kind": "new",
+          "text": "The ten principles under '2026 Best Practices' are rewritten against the research:\n- human review: now cited to the joint report (row A9), with the 84% figure reworded to 'no recorded review' and the paper's own caveat added (row 11);\n- Stack Overflow figures: kept, now with their source (rows 12 and 13);\n- import checks: 'verify on the registry' becomes 'confirm against the manifests, hand the rest to hallucination-detector', since Read and Grep cannot query a registry (the agent's limit 1);\n- provenance: 'table stakes' is dropped (row 20), and the check becomes 'record as not checked';\n- tests: 'routinely' becomes the paper's 'prone on', cited (row N1);\n- outdated interfaces: the unsourced mid-2024 version pairs are replaced by Wang and colleagues' measurement and the regulator's stated cause (row N2);\n- Veracode: corrected across its three reports (row 22);\n- citation-enforced prompting: deleted, since no study is named (row N4);\n- prompt drift: the unsourced cause is dropped and the check kept (row N5);\n- unrelated edits: re-sourced to Tambon and colleagues' 8.15% (row N6).\nThe heading '2026 Best Practices (AI Quality category)' is kept; no test pins it.",
+          "evidence": "skill research report rows 11-13, 15-22, A9, N1, N2, N4, N5, N6; agents/ai-quality/ai-code-quality-reviewer.md:24, :60",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-6",
+          "kind": "new",
+          "text": "The heading 'Common AI Code Issues' claims frequency for seven classes. Six of them are unsourceable as common (rows A2-A6 and A8); only missing edge cases is validated (row A7). The section is kept, its structure unchanged, under a neutral heading. It gains a note that cites the one measurement and the contrary comparison, and says which sections the agent hands on: sections 2-5 to code-reviewer, section 7 to concurrency-checker. No test pins the old heading.",
+          "evidence": "skill research report rows A2-A8; agents/ai-quality/ai-code-quality-reviewer.md:45, :51, :55",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-7",
+          "kind": "new",
+          "text": "Section 4 (inconsistent style) is broken as an example. Its 'BETTER' code calls `sleep`, which is never defined, and its 'ANTI-PATTERN' code shows no `.then()`, though the comment names the defect as mixing async with `.then()`. The replacement shows the named mix and fixes it using only core language syntax, so it makes no library claim.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:98-108 ('await sleep(100);' with no declaration or import)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-8",
+          "kind": "new",
+          "text": "Missing edge cases gets a sourced C example, which the research calls stronger than the TypeScript one: division by zero and INT_MIN / -1 are both undefined behaviour in C. The fix is the report's own replacement, written with an int return so it needs no header for a boolean type.",
+          "evidence": "https://en.cppreference.com/w/c/language/operator_arithmetic, read 2026-09-30 (skill research report section 3 item 1): \"If the second operand is zero, the behavior is undefined\"; \"If the quotient a/b is not representable in the result type, the behavior of both a/b and a%b is undefined (that means INT_MIN%-1 is undefined on 2's complement systems)\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-9",
+          "kind": "new",
+          "text": "'AI-Specific Categories' and 'These categories are AI-generation-specific' repeat the fabricated specificity claim (row A1). The heading becomes neutral. The intro now says which categories the agent reports and which three it hands on: D to concurrency-checker, E to sast-scanner, G to code-reviewer and secrets-detector.",
+          "evidence": "skill research report row A1 and section 3 item 8 ('Debug prints, races and SQL injection'); agents/ai-quality/ai-code-quality-reviewer.md:45",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-10",
+          "kind": "new",
+          "text": "Section A has four problems:\n- 'The single highest-impact category' has no source (row N7).\n- 'similar conflations appear across ecosystems' has no source (row N8).\n- The registry-existence check is handed to dependency-auditor, but the agent gives it to hallucination-detector (research item 8), and dependency-auditor's own file says nothing about registry existence.\n- The example comments assert that seven package names do not exist, which the research did not check and which is hallucination-detector's question.\nThe replacement keeps the validated react-codeshift case with both of its sources (row 24), adds the 39% figure the file left out (row 18), and makes every other example comment a statement about the manifests the reviewer read. The action takes the agent's confidence rule: LOW until confirmed.",
+          "evidence": "skill research report rows 18, 24, N7, N8, section 3 item 8, 'Not examined' (lines 157-175); agents/ai-quality/ai-code-quality-reviewer.md:39; a search of agents/security/dependency-auditor.md for registry, exist or slopsquat finds nothing",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-11",
+          "kind": "new",
+          "text": "Section B carries several unsourced or wrong claims:\n- 'Mid-2024-trained models are still emitting these in 2026' has no source (row N3).\n- The componentWillMount line is unsourced (row N9).\n- The asyncio line says get_running_loop() is 'required'; the documentation says 'preferred', and the hard error arrives only in 3.14 (row N10).\n- BinaryFormatter is said to be 'disabled by default since .NET 5'; that date is misattributed (row 29).\n- 'use HttpClient' is unquoted.\n- 'unfit for high-fan-out' is an unsourced opinion.\n- The action uses the skill's old type name.\nThe replacement sources every example in one intro sentence, adds the setuptools caveat to the distutils example (row 28) and gives asyncio a safe form (research item 9). It adds sourced C (`gets`) and C++ (`std::auto_ptr`) examples. It does not state the version that introduced `make_unique`, which the report marks as its memory. The type becomes stale_framework_idiom. The asyncio.run() quote comes from research item 9, which does not name its page; it is attributed to the event-loop page that item 9's other quotes come from.",
+          "evidence": "skill research report rows 27-30, N3, N9, N10, section 3 items 1 and 9; round-1 agent report rows 29-30; agents/ai-quality/ai-code-quality-reviewer.md:87 (type map)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-12",
+          "kind": "new",
+          "text": "Section C has three problems. Its safe example asserts an exact floating-point value (`toBe(10 * 1.21)`), which GoogleTest's reference advises against. It uses a 'with tax' specification that differs from the agent's 'sums active items only'. And it has no source, no C++ example and no Python safe form. I did not choose between the two specifications: the agent's example is taken because it is the finished file and its rule 4 makes it win. The section gains the Konstantinou source, a Python safe form, a sourced GoogleTest pair and a rule for floating-point results. The type becomes vacuous_test.",
+          "evidence": "skill research report section 3 items 1, 6 and 7, row N1; https://google.github.io/googletest/reference/assertions.html, read 2026-09-30: \"Due to rounding errors, it is very unlikely that two floating-point values will match exactly, so EXPECT_EQ is not suitable.\"; agents/ai-quality/ai-code-quality-reviewer.md:104-106",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-13",
+          "kind": "new",
+          "text": "Section D makes races this skill's own critical finding, but the agent hands them to concurrency-checker (research item 8). It uses the abbreviation TOCTOU and mentions goroutines, which are outside the seven languages. The Java comment says 'virtual threads', but the code uses a parallel stream; the research did not check which threads a parallel stream uses. The rewrite keeps the examples as recognition aids, removes the unsourced thread claim, spells out time-of-check-to-time-of-use, cites Mozilla for forEach, and changes the action to hand on.",
+          "evidence": "skill research report section 3 item 8 and 'Not examined' (line 260); agents/ai-quality/ai-code-quality-reviewer.md:45; https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach (validated in the agent file): \"does not wait for promises\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-14",
+          "kind": "new",
+          "text": "Section E has four problems. It shows bad SQL with no safe form (research item 4). Its line 'AI agents frequently emit raw SQL strings in migration files' has no source (row N21). Its action makes injection this skill's finding and uses the letter field corroborated_by, while the agent hands injection to sast-scanner. The rewrite adds the Transact-SQL safe form modelled on Microsoft's example A, and a Python safe form whose placeholder is labelled illustrative, because the report marks the sqlite placeholder as its memory. It adds the three Microsoft and Python quotes, and the report's two caveats (QUOTENAME for object names; parameterised data can still be manipulated). The report says only 'the same page' for those caveats, so they are credited to Microsoft's guidance without naming which page. The action changes to hand on. C#: the report notes that Microsoft's page shows a SqlParameter form but gives no code, so no C# safe form is added.",
+          "evidence": "skill research report section 3 item 4, row N21, section 3 item 8; the three Microsoft and Python sources in this log",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-15",
+          "kind": "new",
+          "text": "Section F has several problems:\n- The heading lists version pairs with no source.\n- 'record patterns rejected on Java 16' names the wrong boundary; they are final only in Java 21 (row N13).\n- useFormState is labelled 'React 18-only', but it existed only in React's Canary releases (row 32).\n- TimeProvider's 'not on .NET 7' misses the package route (row 34).\n- The action names 'the integrator', which does not run, and uses the skill's old type name.\nThe validated symptoms keep their sources: ReactCurrentDispatcher (row N11), Thread.ofVirtual (row N12) and using declarations (row N14). The React-mismatch evidence rests on React's guide; the two issue titles, seen only in search results, are not cited.",
+          "evidence": "skill research report rows N11-N14, 31-34; docs/REFINEMENT_LOOP.md:8 'the loop is **NOT RUNNING** today'; agents/ai-quality/ai-code-quality-reviewer.md:87",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-16",
+          "kind": "new",
+          "text": "Section G makes debug output this skill's critical finding, but the agent hands debug output to code-reviewer and a printed secret to secrets-detector (research item 8). The action changes to hand on, the abbreviation PII goes, and the one measured fact is added: Cotroneo's 'hardcoded debugging'. The examples stay as recognition aids.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:318; agents/ai-quality/ai-code-quality-reviewer.md:45; https://arxiv.org/html/2508.21634 (validated in the agent file): \"more prone to unused constructs and hardcoded debugging\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-17",
+          "kind": "new",
+          "text": "Section H's action has four problems. It rates a missing business rule critical, where the agent rates a misread request high. It uses the skill's old type name. It compares against 'business stages', which do not exist. And it names 'Step 10', a step number where plain words are wanted. The agent wins, so this becomes misread_request at high severity, compared against the dispatch's text or the plan's acceptance criteria. Tambon and colleagues' misinterpretation measurement and prompt-biased definition are cited, so this section carries the same facts as the agent.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:336; agents/ai-quality/ai-code-quality-reviewer.md:34, :51, :77, :87",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-18",
+          "kind": "new",
+          "text": "The catalogue lacks three of the agent's classes: incomplete output, tests changed to pass, and coding-assistant configuration (research items 2 and 3). The three are added after H, so no existing section moves:\n- I, incomplete output: examples in Python, TypeScript, C#, Java, C and C++. C and C++ use CWE-546's comment markers, because the report finds neither language has a standard 'not implemented' marker.\n- J, tests changed to pass: Baker and colleagues' five behaviours, with the caveat that the paper studies a model during training and gives no frequency. It adds ImpossibleBench, GitHub's guidance and Grep-able checks.\n- K, coding-assistant configuration: CVE-2025-53773 and `.vscode/settings.json`, which is on no list today. The key name `chat.tools.autoApprove` is left out, because it came only from search summaries.\nSQL is not meaningful for these three classes.",
+          "evidence": "skill research report section 3 items 1-3 and source https://arxiv.org/html/2503.11926 ('edit the unit tests so they would pass'); https://embracethered.com/blog/posts/2025/github-copilot-remote-code-execution-via-prompt-injection/ ('it can create and write to files in the workspace without user approval.'); agents/ai-quality/ai-code-quality-reviewer.md:35, :42, :43, :51, :53, :59, :77",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-19",
+          "kind": "new",
+          "text": "Several checklist lines are wrong for this skill:\n- 'Every new import exists on the registry (cross-check via dependency-auditor)' routes to the wrong agent and orders a registry check Read and Grep cannot run.\n- 'Every new dependency has a signature / provenance attestation' is an unrunnable check.\n- The Efficiency items are vague ('Appropriate data structures', 'Reasonable memory usage') and belong to other agents.\n- Debug noise and async are handed on.\nThe checklist now mirrors the agent: what this skill reports, what it hands on and to whom, plus the three new classes.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:344-367; agents/ai-quality/ai-code-quality-reviewer.md:24, :34-45",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-20",
+          "kind": "new",
+          "text": "The skill's own markdown report format contradicts the agent's, which is the protocol-v1 response. It routes the invented import to dependency-auditor, uses the old category names, and ranks vacuous tests High against the category's critical. The agent wins, so the section now points to the agent's format, lists the agent's type names, and states the hand-on rule. The heading 'Output Format' is kept.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:369-410; agents/ai-quality/ai-code-quality-reviewer.md:85-124",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-21",
+          "kind": "new",
+          "text": "The Tool Integration table is mostly fabricated:\n- The Copilot 'review filters' row is fabricated (row 25).\n- The 'Claude Code self-critique' row is fabricated, because the loop does not run (row N15).\n- The Cursor row is fabricated (row 26).\n- 'Aikido AI Code Reviewer' is misattributed; the product is called Aikido Code Quality (row N16).\n- 'Veracode AI Audit' is fabricated (row N17).\n- The git-hook row has no source (row N18), and neither does the recommended minimum (row N19).\nThe heading 'Tool Integration (2026)' is kept, because the agent's limit 3 names it. The body becomes a sourced table of what each vendor documents and what that means for a review, prefaced by the agent's rule that the table is never cited in a finding. The Copilot approval setting comes from round 1 of the agent's research. The trailer row uses the settings page's own wording from round 3. The 'Cursor Tab' quote is left out, because the round-1 report did not name its page.",
+          "evidence": "skill research report rows 25, 26, N15-N19; round-1 agent report section 3 items 6-9; round-3 agent report: https://code.claude.com/docs/en/settings-reference.md \"`false` to omit the trailer from every commit Claude Code makes\"; agents/ai-quality/ai-code-quality-reviewer.md:26",
+          "decision": "applied",
+          "reason": "Applied with one cell corrected: the commit-trailer cell states the fact without quotation marks, as the agent file does (finding f-s3-skill-r1-28).",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-22",
+          "kind": "new",
+          "text": "The Severity section has three problems. It states that every finding 'crosses the wire as severity: critical' in a letter, which describes the loop as running when docs/REFINEMENT_LOOP.md records it as not running. Its triage table disagrees with the category sections: B, C and H are critical there but HIGH here. And it lists handed-on classes (SQL injection, races) as this skill's. The new section keeps the heading 'Severity', which the agent's limit 2 names. It uses the agent's severities and type names, so the table and the categories no longer disagree, and it drops the letter rule.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:427-438; docs/REFINEMENT_LOOP.md:8; agents/ai-quality/ai-code-quality-reviewer.md:25, :77",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-23",
+          "kind": "new",
+          "text": "The 'Letter schema' section is removed rather than kept as a design record. It describes output for a loop that docs/REFINEMENT_LOOP.md records as not running. It contradicts the agent on four facts: dependency-auditor as the existence check, 'ALWAYS critical', the old type names, and an integrator that weights findings. Its reference line names 'Lasso' and an OWASP address the research did not fetch. And the loop's letter format has its own record in `.ctoc/architecture/refinement-loop-schema.json`, which the kept critic-mode block links to. No test pins it: tests/critic-warnings-are-critical.test.js:71-89 pins only the critic-mode heading, the warnings-are-critical link, the schema-file name, the REFINEMENT_LOOP.md link and 'severity: critical', all of which remain in the kept block. tests/refinement-loop-claims-match-code.test.js reads only docs/REFINEMENT_LOOP.md and the code. A side effect: the agent's limit 2 (line 25) names a 'Letter schema' section that will no longer exist (see f-s3-skill-r1-27).",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:440-464; tests/critic-warnings-are-critical.test.js:71-89; tests/refinement-loop-claims-match-code.test.js:30-35; docs/REFINEMENT_LOOP.md:8, :213; skill research report section 3 item 8 and 'Not examined' (line 461)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-24",
+          "kind": "new",
+          "text": "The Red Lines give orders this skill cannot carry out or should not own. It cannot 'verify every new import exists on the registry' and approves nothing. Debug prints and async are handed on. 'Human review gate' uses internal vocabulary. 'The 2026 incident data says otherwise' names no data (row N20). The lines are rewritten in the agent's terms, and one is added for tests changed to pass.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:468-474; skill research report row N20; agents/ai-quality/ai-code-quality-reviewer.md:24, :39, :45",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-25",
+          "kind": "new",
+          "text": "The critic-mode block describes the refinement loop as running ('When invoked as a critic by the Iron Loop integrator'). It is kept, because a test pins it in this skill and 16 others, and is labelled as a design record that says the loop does not run. Every pinned string stays in the block.",
+          "evidence": "docs/REFINEMENT_LOOP.md:8 'the loop is **NOT RUNNING** today', :24-26 (the integrator holds neither Task nor Bash); tests/critic-warnings-are-critical.test.js:15-33, :71-89",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-26",
+          "kind": "new",
+          "text": "when_to_load is deliberately left unchanged. The trigger test returns the FIRST skill whose phrase is a substring of the prompt. This skill's 'AI-generated code' already matches the corpus prompt 'hallucination check on AI-generated code', which is meant for hallucination-detector. Adding broader phrases, such as 'stub' or 'test tampering', could take more prompts from other skills below the 90% pass mark, and no finding needs a new phrase. The two corpus prompts meant for this skill, 'review AI code for quality issues' and 'AI code review on the PR', still match 'review AI code' and 'AI code review'.",
+          "evidence": "tests/skill-loading.test.js:175-178, :266-278, :299-300; skills/ai-quality/ai-code-quality-reviewer/SKILL.md:5-14",
+          "decision": "rejected",
+          "reason": "verified, no change needed",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-27",
+          "kind": "new",
+          "text": "Findings for the agent file, which is outside this dispatch; no text is proposed here. CTO Chief can schedule them.\n1. The agent's evidence section says stale framework idioms and vacuous tests have no measurement. Wang and colleagues (arXiv 2406.09834) and Konstantinou and colleagues (arXiv 2410.21136) now give them one.\n2. `.vscode/settings.json` (CVE-2025-53773) belongs in the agent's configuration list.\n3. The agent's limit 2 names a 'Letter schema' section that f-s3-skill-r1-23 removes.\nThe other citations added in this round reuse sources already recorded in the agent's three round logs and its regulator reading: Stack Overflow, Spracklen, Veracode, npm, PEP 740, React, .NET, Tambon, Cotroneo, Mozilla, ImpossibleBench, GitHub, Cursor, Claude Code, Aikido, the npm registry, and the regulator's pages 9 and 12.",
+          "evidence": "agents/ai-quality/ai-code-quality-reviewer.md:25, :43, :56; skill research report section 3 items 3, 5, 6",
+          "decision": "applied",
+          "reason": "Applied to the finished agent file as late corrections lc-s3-agent-1, lc-s3-agent-2 and lc-s3-agent-3, recorded on the agent's record and in late-corrections.json.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-28",
+          "kind": "correction-of-earlier-round",
+          "text": "The critic's tool table (f-s3-skill-r1-21) quoted the Claude Code settings reference's commit-trailer wording, which the agent's round-3 re-validation found misattributed because the page's wording changes between reads. Under the plan's rule for a refuted claim found in a file of this slice, the cell was corrected when the table was applied: it states without quotation marks that the settings reference documents setting attribution.commit to false to hide the commit trailer, with its source and read date, as the agent file does.",
+          "evidence": "https://code.claude.com/docs/en/settings-reference.md, read 2026-09-30; agent record round 3, finding f-s3-agent-r3-13; skills/ai-quality/ai-code-quality-reviewer/SKILL.md, the tool table's commit-trailer row",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r1-29",
+          "kind": "correction-of-earlier-round",
+          "text": "Found at re-validation (dispatch d-s3-skill-r1-revalidate) and corrected: the incomplete-output section said C and C++ have no standard \"not implemented\" marker, an unsourced statement about the languages. It now says this file cites no standard marker for C or C++, a statement about the file, and keeps the instruction to search them for CWE-546's comment markers.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md, section I, before \"C and C++ have no standard \\\"not implemented\\\" marker\", after \"This file cites no standard \\\"not implemented\\\" marker for C or C++\"; citation validator re-validation d-s3-skill-r1-revalidate",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 54,
+        "VALIDATED": 24,
+        "FABRICATED": 5,
+        "UNSOURCEABLE": 19,
+        "MISATTRIBUTED": 6
+      },
+      "validator_final": {
+        "examined": 87,
+        "VALIDATED": 87,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-census.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/critic-warnings-are-critical.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/plugin-skill-discovery.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/test-gate-ledger-wiring.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "agents/ai-quality/ai-code-quality-reviewer.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "The skill carries defect-and-better pairs for classes that exist in every language, so the rule applies wherever a class is meaningful. After these edits every pair is sourced or makes no factual claim. Gaps that remain are listed per language rather than filled from memory.",
+        "examples_checked": [
+          {
+            "language": "C# (.NET 9)",
+            "how": "A (import shapes, labelled unconfirmed); B (BinaryFormatter from Microsoft Learn's .NET 8 and .NET 9 pages, WebRequest from SYSLIB0014); F (TimeProvider from Microsoft Learn's API page, using declarations from the C# version history); H (tenant scoping, a project rule, no outside claim); I (NotImplementedException, sourced in the agent). No safe SQL form: the report notes Microsoft's SqlParameter example but gives no code."
+          },
+          {
+            "language": "Java 21+",
+            "how": "A (import shapes, unconfirmed); B (Thread.ofVirtual from JEP 444); D (parallel-stream HashMap, handed on, thread claim removed); F (record patterns from JEP 440, in prose); I (UnsupportedOperationException, with Oracle's unmodifiable-collection exception from the agent)."
+          },
+          {
+            "language": "Python 3.12+",
+            "how": "A (import shapes, unconfirmed); B (distutils from the 3.12 what's-new page, asyncio from the 3.12 and current event-loop pages, asyncio.run as the safe form); C (safe form against a stated specification); E (sqlite3 documentation's warning, placeholder labelled illustrative); G (handed on); H; I (pass, sourced in the agent); J (sys.exit(0) from Baker and colleagues)."
+          },
+          {
+            "language": "C (C17/23)",
+            "how": "Section 6 (division by zero and INT_MIN / -1 from cppreference's arithmetic-operators page); B (gets from cppreference, fgets as the named replacement); I (CWE-546 comment markers). No vacuous-test pair: the report found no authoritative C test-framework source."
+          },
+          {
+            "language": "C++ (20/23)",
+            "how": "B (std::auto_ptr from cppreference, std::unique_ptr as its stated successor; the version of make_unique is not stated); C (GoogleTest pair and the floating-point rule from GoogleTest's assertion reference); I (comment marker)."
+          },
+          {
+            "language": "JavaScript/TypeScript",
+            "how": "Sections 1-7 (section 4 rewritten to show the named mix; section 6 unchanged); A (react-codeshift from the npm registry and Aikido's blog); B (ReactDOM.render from React's 19 upgrade guide); C (the agent's 'sums active items only' example); D (forEach from Mozilla); F (useFormState and useFormStatus from React's 19 post); G (handed on); I; J (special-cased input and an edited expectation)."
+          },
+          {
+            "language": "SQL",
+            "how": "E (Transact-SQL bad form and sp_executesql safe form, modelled on Microsoft's example A, with Microsoft's two quotes). Not meaningful for imports, framework versions, tests or assistant configuration."
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "date": "2026-09-30",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:37a49e5f22d7102a4c0c083ad19bc13b35fa6b06502be08a1966a447ea5655cb",
+      "fingerprint_after": "sha256:80e4fb47c121e555b01b20ab8decd11ca56dd683196f5c02ada07223a0540dcc",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s3-skill-r2-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-skill-r2-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-skill-r2-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "\"R.23: Use make_unique() to make unique_ptrs\" C++ Core Guidelines",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "OWASP Code Review Guide 2.0 \"error handling\" \"logging\" reviewer checklist site:owasp.org",
+          "source_class": "publisher",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 314-316: HashMap mutated from a parallel stream",
+          "outcome": "supported",
+          "quote": "Note that this implementation is not synchronized. If multiple threads access a hash map concurrently, and at least one of the threads modifies the map structurally, it must be synchronized externally. (A structural modification is any operation that adds or deletes one or more mappings ...) ... the map should be \"wrapped\" using the Collections.synchronizedMap method.",
+          "error": null
+        },
+        {
+          "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 317: the better fix; which threads a parallel stream uses",
+          "outcome": "supported",
+          "quote": "If executed in parallel, the non-thread-safety of ArrayList would cause incorrect results, and adding needed synchronization would cause contention, undermining the benefit of parallelism. ... the forEach() can simply be replaced with a reduction operation that is safer, more efficient, and more amenable to parallelization",
+          "error": null
+        },
+        {
+          "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 317: ConcurrentHashMap as the fix",
+          "outcome": "supported",
+          "quote": "The entire method invocation is performed atomically.",
+          "error": null
+        },
+        {
+          "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 317: Collectors.toConcurrentMap as the fix",
+          "outcome": "supported",
+          "quote": "Returns a concurrent Collector that accumulates elements into a ConcurrentMap ... This is a concurrent and unordered Collector.",
+          "error": null
+        },
+        {
+          "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/UnsupportedOperationException.html",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 419-422: Java incomplete-output example and its by-design exception",
+          "outcome": "supported",
+          "quote": "Thrown to indicate that the requested operation is not supported. This class is a member of the Java Collections Framework.",
+          "error": null
+        },
+        {
+          "url": "https://en.cppreference.com/w/cpp/memory/unique_ptr/make_unique",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 246: std::make_unique version",
+          "outcome": "supported",
+          "quote": "(since C++14)",
+          "error": null
+        },
+        {
+          "url": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 245-246: Core Guidelines rule preferring make_unique (canonical page)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "fetch returned truncated content: \"The document content ends mid-section in the \\\"F: Functions\\\" area, well before reaching the R (Resource management) section where R.23 would appear\""
+        },
+        {
+          "url": "https://cpp-core-guidelines-docs.vercel.app/resource",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 245-246: rules R.23 and R.11 (a mirror of the guidelines, not the canonical page)",
+          "outcome": "supported",
+          "quote": "R.23: Use make_unique() to make unique_ptrs ... Reason: make_unique gives a more concise statement of the construction. It also ensures exception safety in complex expressions.",
+          "error": null
+        },
+        {
+          "url": "https://peps.python.org/pep-0249/",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 330-331: the ? placeholder",
+          "outcome": "supported",
+          "quote": "String constant stating the type of parameter marker formatting expected by the interface. ... qmark | Question mark style | ...WHERE name=?",
+          "error": null
+        },
+        {
+          "url": "https://en.cppreference.com/w/c/io/fgets",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 238-239: the fgets replacement",
+          "outcome": "supported",
+          "quote": "Parsing stops if a newline character is found (in which case str will contain that newline character) or if end-of-file occurs. ... str on success, null pointer on failure.",
+          "error": null
+        },
+        {
+          "url": "https://en.cppreference.com/w/c/language/sizeof",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 239: sizeof buf works only on an array",
+          "outcome": "supported",
+          "quote": "Note that if a has pointer type (such as after array-to-pointer conversion of function parameter type adjustment), this expression would simply divide the number of bytes in a pointer type by the number of bytes in the pointed type.",
+          "error": null
+        },
+        {
+          "url": "https://google.github.io/googletest/reference/assertions.html",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 286-297: the GoogleTest pair",
+          "outcome": "supported",
+          "quote": "Verifies that condition is true. ... When comparing a pointer to NULL, use EXPECT_NE(ptr, nullptr) instead of EXPECT_NE(ptr, NULL).",
+          "error": null
+        },
+        {
+          "url": "https://github.com/ThrowTheSwitch/Unity/blob/master/docs/UnityAssertionsReference.md",
+          "read_on": "2026-09-30",
+          "bore_on": "a C vacuous-test pair (Unity project documentation)",
+          "outcome": "supported",
+          "quote": "Verify if a pointer is or is not NULL. ... So Unity doesn't do direct floating point comparisons for equality.",
+          "error": null
+        },
+        {
+          "url": "https://libcheck.github.io/check/doc/check_html/check_4.html",
+          "read_on": "2026-09-30",
+          "bore_on": "a C vacuous-test pair (Check project documentation)",
+          "outcome": "supported",
+          "quote": "Check: a unit test framework for C ... ck_assert: Fails test if supplied condition evaluates to false. ... ck_assert_ptr_nonnull checks that pointer is not equal to NULL",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-executesql-transact-sql",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 339: the sp_executesql form, against example A",
+          "outcome": "supported",
+          "quote": "EXECUTE sp_executesql N'SELECT * FROM AdventureWorks2022.HumanResources.Employee WHERE BusinessEntityID = @level', N'@level TINYINT', @level = 109;",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/statements/exception-handling-statements",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 416: an expression-bodied member that throws",
+          "outcome": "supported",
+          "quote": "You can also use throw as an expression. ... an expression-bodied lambda or method ... DateTime ToDateTime(IFormatProvider provider) => throw new InvalidCastException(\"Conversion to a DateTime is not supported.\");",
+          "error": null
+        },
+        {
+          "url": "https://react.dev/blog/2024/04/25/react-19-upgrade-guide",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 211-212: what replaces ReactDOM.render",
+          "outcome": "supported",
+          "quote": "// After\nimport {createRoot} from 'react-dom/client';\nconst root = createRoot(document.getElementById('root'));\nroot.render(<App />);",
+          "error": null
+        },
+        {
+          "url": "https://react.dev/reference/react-dom/hooks/useFormStatus",
+          "read_on": "2026-09-30",
+          "bore_on": "skill 354: the useFormStatus import",
+          "outcome": "supported",
+          "quote": "import { useFormStatus } from \"react-dom\";",
+          "error": null
+        },
+        {
+          "url": "https://google.github.io/eng-practices/review/reviewer/looking-for.html",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 3: over-engineering, tests, comments, reading every line",
+          "outcome": "supported",
+          "quote": "Will the tests actually fail when the code is broken? If the code changes beneath them, will they start producing false positives?",
+          "error": null
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/477.html",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 3: category B (deprecated or removed interfaces)",
+          "outcome": "supported",
+          "quote": "The code uses deprecated or obsolete functions, which suggests that the code has not been actively reviewed or maintained.",
+          "error": null
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/242.html",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 3: the gets() example",
+          "outcome": "supported",
+          "quote": "gets() is inherently unsafe, because it copies all input from STDIN to the buffer without checking size.",
+          "error": null
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/369.html",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 3: section 6 (division by zero)",
+          "outcome": "supported",
+          "quote": "The product divides a value by zero.",
+          "error": null
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/215.html",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 3: category G (a debug print that leaks a token)",
+          "outcome": "supported",
+          "quote": "The product inserts sensitive information into debugging code, which could expose this information if the debugging code is not disabled in production.",
+          "error": null
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/571.html",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 3: category C (an assertion that is always true)",
+          "outcome": "supported",
+          "quote": "The product contains an expression that will always evaluate to true.",
+          "error": null
+        },
+        {
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Secure_Code_Review_Cheat_Sheet.html",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 3: OWASP review concerns",
+          "outcome": "supported",
+          "quote": "Business Logic Flaws: Complex workflows and state management issues that require domain understanding",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s3-skill-r2-1",
+          "kind": "new",
+          "text": "'Read every line as a claim to check' is in tension with Google's 'Every Line' rule, which lets a reviewer scan 'generated code'. Read as written, that rule would let a reviewer skim assistant-written code. The skill now says it applies the full reading the guide requires for human-written code. It makes no claim about what Google meant by 'generated code', because the report marks that reading as its own.",
+          "evidence": "round-2 report Part 3 item 5: \"Some things like data files, generated code, or large data structures you can scan over sometimes, but don't scan over a human-written class, function, or block of code and assume that what's inside of it is okay.\" (https://google.github.io/eng-practices/review/reviewer/looking-for.html, read 2026-09-30); skills/ai-quality/ai-code-quality-reviewer/SKILL.md:49",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-2",
+          "kind": "new",
+          "text": "The general-examples note gains Google's support for sections 1 and 3, over-engineering and comments. It adds no claim that these defects are typical of assistant-written code.",
+          "evidence": "round-2 report Part 3 items 3 and 4 (https://google.github.io/eng-practices/review/reviewer/looking-for.html, read 2026-09-30): \"Reviewers should be especially vigilant about over-engineering.\"; \"Usually comments are useful when they explain why some code exists, and should not be explaining what some code is doing.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-3",
+          "kind": "new",
+          "text": "Section 6 (division) now cites CWE-369 by its description only. The skill says it does not use that entry's code examples, because the report found them wrong for these languages: the C 'good code' uses `throw`, and the C# 'good code' swallows the exception.",
+          "evidence": "https://cwe.mitre.org/data/definitions/369.html, read 2026-09-30: \"The product divides a value by zero.\"; round-2 report Part 3 item 9",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-4",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s3-skill-r1-11, which left the C and C++ examples in section B under-sourced. The section's sources sentence gains:\n- the `fgets` behaviour: keeps the newline, returns a null pointer on failure;\n- the `sizeof`-of-a-pointer caveat;\n- `make_unique` since C++14;\n- C++ Core Guidelines R.23 and R.11, read on a mirror because the canonical page was cut off; the report advises re-reading R.23 on isocpp.github.io before relying on it;\n- CWE-477 for the category as a whole.",
+          "evidence": "round-2 report Part 1 rows 7, 8, 10-12 and Part 3 items 6 and 12; sources in this log for fgets, sizeof, make_unique, the Core Guidelines mirror and CWE-477",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-5",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s3-skill-r1-11: the React 'BETTER' line was a phrase, not code. It becomes the upgrade guide's own replacement snippet.",
+          "evidence": "https://react.dev/blog/2024/04/25/react-19-upgrade-guide, read 2026-09-30: \"// After\\nimport {createRoot} from 'react-dom/client';\\nconst root = createRoot(document.getElementById('root'));\\nroot.render(<App />);\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-6",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s3-skill-r1-11: the `fgets` replacement was correct but incomplete. The comment now carries the report's two caveats: `sizeof buf` gives a buffer's size only when `buf` is an array, and `fgets` keeps the newline.",
+          "evidence": "round-2 report Part 2, fgets row, and Part 1 rows 10-11 (https://en.cppreference.com/w/c/io/fgets, https://en.cppreference.com/w/c/language/sizeof, read 2026-09-30)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-7",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s3-skill-r1-11, which deliberately left out the `make_unique` version because it was the report's memory at the time. It is now sourced: C++14, header `<memory>`, with Core Guidelines R.23 and R.11 (medium confidence, read on a mirror).",
+          "evidence": "https://en.cppreference.com/w/cpp/memory/unique_ptr/make_unique, read 2026-09-30: \"(since C++14)\"; round-2 report Part 1 rows 7-8, Part 3 item 12",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-8",
+          "kind": "new",
+          "text": "`gets` is a security defect as well as a stale idiom (CWE-242). Under the skill's own hand-on rule it is also recorded for sast-scanner, not only reported as stale_framework_idiom.",
+          "evidence": "https://cwe.mitre.org/data/definitions/242.html, read 2026-09-30: \"gets() is inherently unsafe, because it copies all input from STDIN to the buffer without checking size.\"; round-2 report Part 3 item 7; agents/ai-quality/ai-code-quality-reviewer.md:45 (unsafe data sinks to sast-scanner)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-9",
+          "kind": "new",
+          "text": "Category C's intro gains two sources. Google's question ('Will the tests actually fail when the code is broken?') is the principle every example here fails. CWE-571 covers the always-true comparison, with the report's caveat that this holds only for a deterministic function.",
+          "evidence": "https://google.github.io/eng-practices/review/reviewer/looking-for.html, read 2026-09-30: \"Will the tests actually fail when the code is broken? If the code changes beneath them, will they start producing false positives?\"; https://cwe.mitre.org/data/definitions/571.html, read 2026-09-30: \"The product contains an expression that will always evaluate to true.\"; round-2 report Part 3 items 2 and 11",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-10",
+          "kind": "new",
+          "text": "The tautology comment 'always true' holds only if `getUser` is deterministic, per the report's CWE-571 caveat. The comment now says so.",
+          "evidence": "round-2 report Part 3 item 11: \"`expect(u).toEqual(getUser(1))` is always true only if `getUser` is deterministic.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-11",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s3-skill-r1-12. The GoogleTest pair tested two different functions (FindsOrder, then SumsActiveItemsOnly), so it did not show one test made right. It is replaced by a tautology and a specification check on the same function. A note says a pointer-only assertion is just as vacuous in GoogleTest's documented EXPECT_NE(ptr, nullptr) form, so switching the macro fixes nothing.\n\nC gains a vacuous-test pair, which round 1 left out for lack of a source. It uses Check's documented assertions. The report says the test-case wrapper (START_TEST / END_TEST) was not read, so the pair shows only the two assertion lines and says the wrapper is Check's own and not shown. It is aligned on one function, like the C++ pair.\n\nThe floating-point rule gains Check's tolerance assertion and Unity's statement.",
+          "evidence": "round-2 report Part 1 rows 13-16, Part 2 GoogleTest rows, the C pair and its caveat (\"the wrapper that declares a test case (`START_TEST` / `END_TEST`) were **not read this pass**\"); https://libcheck.github.io/check/doc/check_html/check_4.html, https://google.github.io/googletest/reference/assertions.html, https://github.com/ThrowTheSwitch/Unity/blob/master/docs/UnityAssertionsReference.md, all read 2026-09-30",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-12",
+          "kind": "new",
+          "text": "The Java race example (section D) keeps its two fixes and gains the stream documentation's preferred third: a reduction instead of a side-effecting forEach. The new variable is named `counted` so the snippet does not redeclare `counts`. The sources follow the report's row 4. The HashMap page is cited for the defect only. The ConcurrentHashMap and Collectors pages are cited for the fixes, because the HashMap page names only Collections.synchronizedMap. Nothing is claimed about which threads a parallel stream uses (row 5).",
+          "evidence": "round-2 report Part 1 rows 1-6 and Part 3 item 8, with its code \"items.parallelStream().collect(Collectors.toConcurrentMap(i -> i.key(), i -> 1, Integer::sum))\"; the four Oracle sources in this log",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-13",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s3-skill-r1-14, which labelled the Python placeholder 'illustrative' because it was the report's memory at the time. PEP 249 now sources it: `?` is the qmark style, and each driver declares its style in its module's `paramstyle`. The comment and the sources sentence change together. Which style sqlite3 itself declares was not read, so the text tells the reviewer to check the driver's paramstyle rather than asserting it.",
+          "evidence": "https://peps.python.org/pep-0249/, read 2026-09-30: \"String constant stating the type of parameter marker formatting expected by the interface. ... qmark | Question mark style | ...WHERE name=?\"; round-2 report Part 1 row 9, Part 2 Python row",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-14",
+          "kind": "new",
+          "text": "Three edits in one span of the category text:\n1. Category E's sources sentence gains PEP 249, which f-s3-skill-r2-13 relies on.\n2. Category G gains CWE-215 and OWASP's logging line, for the token-leaking print it hands to secrets-detector.\n3. Category H spells out 'CRUD', an abbreviation round 1 missed, and gains OWASP's business-logic line.\nThe span is one contiguous stretch of text, from category E's sources sentence to category H's description.",
+          "evidence": "https://cwe.mitre.org/data/definitions/215.html; https://cheatsheetseries.owasp.org/cheatsheets/Secure_Code_Review_Cheat_Sheet.html (round-2 report Part 3 item 13: \"Business Logic Flaws: Complex workflows and state management issues that require domain understanding\", \"Logging security: Sensitive data not logged\"); https://peps.python.org/pep-0249/; all read 2026-09-30; skills/ai-quality/ai-code-quality-reviewer/SKILL.md:342, :377, :381",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-15",
+          "kind": "new",
+          "text": "Google's review guide names a gap no class covers: a change that adds no tests. This is a scope decision. Neither the agent's ten classes nor its hand-on list carries it, so no category is proposed. For CTO Chief and the human: coverage-enforcer's description names 'diff coverage' and 'patch coverage', which would make it the natural owner if the human schedules this.",
+          "evidence": "round-2 report Part 3 item 1: \"In general, tests should be added in the same CL as the production code unless the CL is handling an emergency.\"; agents/testing/coverage-enforcer.md:3; agents/ai-quality/ai-code-quality-reviewer.md:32-45",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s3-skill-r2-change-adds-no-tests-no-owner"
+        },
+        {
+          "id": "f-s3-skill-r2-16",
+          "kind": "new",
+          "text": "Checked and left unchanged, because the report validated each as correct:\n- the TypeScript divide and the C checked_divide;\n- the std::auto_ptr anti-pattern;\n- the Transact-SQL sp_executesql form, which has the shape of example A;\n- the C# throwing expression-bodied member;\n- the Java UnsupportedOperationException stub and its exception for types that deliberately reject an operation;\n- the C and C++ placeholder returns;\n- the TypeScript special-cased test input, which matches category C's input and the diff's change from 10 to 15;\n- the useFormState and useFormStatus imports.\nThe OWASP dependency-management line was not added to category A: it concerns vulnerable or outdated libraries, which the agent hands to dependency-checker, not invented names.",
+          "evidence": "round-2 report Part 2 table; Part 3 item 13; sources in this log for sp_executesql, exception-handling statements, UnsupportedOperationException and useFormStatus",
+          "decision": "rejected",
+          "reason": "verified, no change needed",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-17",
+          "kind": "new",
+          "text": "Consistency with the agent's late corrections. The agent's configuration row now lists `.vscode/settings.json` (agent line 43), so the skill's 'One more belongs with them' is stale; category K now says the agent's row includes it, and why. The agent's limit 2 now names only the critic-mode design record, which the skill keeps; nothing to change. The agent's evidence section now carries the Wang and Konstantinou findings, which the skill already cites; nothing to change.",
+          "evidence": "agents/ai-quality/ai-code-quality-reviewer.md:25, :43, :56, :57; skills/ai-quality/ai-code-quality-reviewer/SKILL.md:467",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-18",
+          "kind": "new",
+          "text": "The second part of f-s3-skill-r2-14, category G: the hand-on to secrets-detector gains CWE-215 and OWASP's logging line.",
+          "evidence": "https://cwe.mitre.org/data/definitions/215.html, read 2026-09-30: \"The product inserts sensitive information into debugging code, which could expose this information if the debugging code is not disabled in production.\"; OWASP cheat sheet: \"Logging security: Sensitive data not logged\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r2-19",
+          "kind": "new",
+          "text": "The third part of f-s3-skill-r2-14, category H: 'CRUD' is spelled out, and OWASP's business-logic line is added.",
+          "evidence": "OWASP cheat sheet, read 2026-09-30: \"Business Logic Flaws: Complex workflows and state management issues that require domain understanding\"; skills/ai-quality/ai-code-quality-reviewer/SKILL.md:381",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 16,
+        "VALIDATED": 14,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 1,
+        "MISATTRIBUTED": 1
+      },
+      "validator_final": {
+        "examined": 120,
+        "VALIDATED": 120,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-census.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/critic-warnings-are-critical.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/plugin-skill-discovery.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/test-gate-ledger-wiring.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "agents/ai-quality/ai-code-quality-reviewer.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "The rule applies wherever a class is meaningful. This round adds a C vacuous-test pair, sourced to Check's documented assertions with the wrapper left out as the report requires. It aligns the C++ pair on one function, and adds sources to the C, C++, Java and Python examples the report checked.",
+        "examples_checked": [
+          {
+            "language": "C# (.NET 9)",
+            "how": "A (unconfirmed shapes); B (BinaryFormatter and WebRequest, Microsoft Learn, round 1); F (TimeProvider); H (tenant scoping); I (expression-bodied throw, validated against Microsoft Learn's throw-expression page this round). Still no safe SQL form: no C# parameter code is quoted in any report."
+          },
+          {
+            "language": "Java 21+",
+            "how": "A; B (Thread.ofVirtual, JEP 444); D (HashMap defect from Oracle's HashMap page; fixes from the ConcurrentHashMap and Collectors pages; the reduction from the stream package page, new this round); F (record patterns, JEP 440); I (UnsupportedOperationException, validated this round)."
+          },
+          {
+            "language": "Python 3.12+",
+            "how": "A; B (distutils, asyncio); C (specification value); E (placeholder now stated as PEP 249's qmark style, with the driver's paramstyle to check); G; H; I; J (sys.exit(0), Baker and colleagues)."
+          },
+          {
+            "language": "C (C17/23)",
+            "how": "Section 6 (cppreference arithmetic operators; CWE-369 by description); B (gets from cppreference and CWE-242, with a hand-on to sast-scanner; fgets caveats from the fgets and sizeof pages); C (new: Check's ck_assert_int_eq pair, test-case wrapper not shown); I (CWE-546 comment markers)."
+          },
+          {
+            "language": "C++ (20/23)",
+            "how": "B (auto_ptr from cppreference; make_unique since C++14 from cppreference; R.23 and R.11 read on a mirror); C (GoogleTest tautology and specification pair on one function; the pointer-only note)."
+          },
+          {
+            "language": "JavaScript/TypeScript",
+            "how": "Sections 1-7; A (react-codeshift); B (the React guide's createRoot snippet, new this round); C (the agent's example; tautology caveat added); D (Mozilla); F (useFormState; useFormStatus import checked against its reference page); G; I; J (special-cased input, validated this round)."
+          },
+          {
+            "language": "SQL",
+            "how": "E (Transact-SQL: the sp_executesql form checked against Microsoft's example A this round). Still not meaningful for imports, framework versions, tests or assistant configuration."
+          }
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "date": "2026-09-30",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:80e4fb47c121e555b01b20ab8decd11ca56dd683196f5c02ada07223a0540dcc",
+      "fingerprint_after": "sha256:13261a77d335529b7edcc1b6d4d8163ee9f6dbed08cc59a17eb63b0e9ec431c7",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s3-skill-r3-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-skill-r3-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-skill-r3-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "fetch raw CppCoreGuidelines.md for R.23 heading and R.11 Enforcement",
+          "source_class": "publisher",
+          "repeated_because": "round 2 read R.23/R.11 only on a mirror; canonical HTML truncated"
+        },
+        {
+          "text": "CWE REST API weakness 369,571,477,242,215,546 Description fields",
+          "source_class": "standards body",
+          "repeated_because": "round 2 quotes came through summaries of the HTML pages"
+        },
+        {
+          "text": "CWE REST API weakness 242,546 sentences containing gets() / BUG, HACK / TODO",
+          "source_class": "standards body",
+          "repeated_because": "the CWE-242 description returned did not match the skill's quote; needed the field it comes from"
+        },
+        {
+          "text": "fetch raw libcheck doc/check.texi for ck_assert, ck_assert_double_eq_tol, framework self-description",
+          "source_class": "vendor documentation",
+          "repeated_because": "earlier read via summary of check_4.html"
+        },
+        {
+          "text": "fetch check_4.html title and 'framework for C' wording",
+          "source_class": "vendor documentation",
+          "repeated_because": "raw Texinfo returned 'unit testing framework', differing from the skill"
+        },
+        {
+          "text": "fetch Aikido slopsquatting blog react-codeshift sentence",
+          "source_class": "vendor documentation",
+          "repeated_because": "no raw form exists; re-read for exact wording"
+        },
+        {
+          "text": "fetch Oracle Collectors toConcurrentMap signatures",
+          "source_class": "vendor documentation",
+          "repeated_because": "Part 2: three-argument overload signature never read"
+        },
+        {
+          "text": "fetch GCC manual Macro Arguments",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "fetch docs.python.org sqlite3 paramstyle",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Read local PDF ANSSI/BSI 'AI Coding Assistants' pages 8-12",
+          "source_class": "regulator",
+          "repeated_because": "brief asks for pages 8-12; agent cites 9-12"
+        },
+        {
+          "text": "fetch NIST SP 800-218 PDF, then Read saved PDF pages 26-31 and 22-24 for PW.7",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "Read the saved ANSSI and BSI PDF, printed page 9, for the spelling of the word before 'hallucinated'",
+          "source_class": "regulator",
+          "repeated_because": "the round-3 researcher's reading ('completly') disagrees with the agent file ('completetly')"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://raw.githubusercontent.com/isocpp/CppCoreGuidelines/master/CppCoreGuidelines.md",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 207: R.23 and R.11",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "neither R.23 nor R.11 are present in the markdown you supplied. The content ends mid-section in the \"F: Functions\" area. The last major section heading visible is: \"# <a name=\"s-functions\"></a>F: Functions\""
+        },
+        {
+          "url": "https://cwe-api.mitre.org/api/v1/cwe/weakness/369,571,477,242,215,546",
+          "read_on": "2026-09-30",
+          "bore_on": "skill lines 158, 207, 252, 256, 394, 416",
+          "outcome": "supported",
+          "quote": "CWE-242 Description: \"The product calls a function that can never be guaranteed to work safely.\"",
+          "error": null
+        },
+        {
+          "url": "https://cwe-api.mitre.org/api/v1/cwe/weakness/242,546",
+          "read_on": "2026-09-30",
+          "bore_on": "skill lines 252, 416",
+          "outcome": "supported",
+          "quote": "DemonstrativeExamples DX-5: \"However, gets() is inherently unsafe, because it copies all input from STDIN to the buffer without checking size.\" / ExtendedDescription: \"Many suspicious comments, such as BUG, HACK, FIXME, LATER, LATER2, TODO, in the code indicate missing security functionality and checking.\"",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/libcheck/check/master/doc/check.texi",
+          "read_on": "2026-09-30",
+          "bore_on": "skill lines 310, 312",
+          "outcome": "supported",
+          "quote": "Fails test if supplied condition evaluates to false. / Compares two double precision floating point values (@code{double}) with specified user tolerance set by the third parameter (@code{double})",
+          "error": null
+        },
+        {
+          "url": "https://libcheck.github.io/check/doc/check_html/check_4.html",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 310: Check's self-description",
+          "outcome": "supported",
+          "quote": "Check: a unit test framework for C",
+          "error": null
+        },
+        {
+          "url": "https://www.aikido.dev/blog/slopsquatting-ai-package-hallucination-attacks",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 175",
+          "outcome": "supported",
+          "quote": "In January 2026, Charlie claimed this npm package called `react-codeshift`. ... The package wasn't real, had no author, and definitely hadn't been registered before.",
+          "error": null
+        },
+        {
+          "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html",
+          "read_on": "2026-09-30",
+          "bore_on": "skill lines 332, 335: three-argument toConcurrentMap",
+          "outcome": "supported",
+          "quote": "public static <T, K, U> Collector<T,?,ConcurrentMap<K,U>> toConcurrentMap(Function<? super T,? extends K> keyMapper, Function<? super T,? extends U> valueMapper, BinaryOperator<U> mergeFunction)",
+          "error": null
+        },
+        {
+          "url": "https://gcc.gnu.org/onlinedocs/cpp/Macro-Arguments.html",
+          "read_on": "2026-09-30",
+          "bore_on": "skill lines 291-299: commas inside EXPECT_EQ arguments",
+          "outcome": "supported",
+          "quote": "Parentheses within each argument must balance; a comma within such parentheses does not end the argument. However, there is no requirement for square brackets or braces to balance, and they do not prevent a comma from separating arguments.",
+          "error": null
+        },
+        {
+          "url": "https://docs.python.org/3/library/sqlite3.html",
+          "read_on": "2026-09-30",
+          "bore_on": "skill lines 347-348, 359",
+          "outcome": "supported",
+          "quote": "String constant stating the type of parameter marker formatting expected by the sqlite3 module. Required by the DB-API. Hard-coded to \"qmark\". ... The named DB-API parameter style is also supported.",
+          "error": null
+        },
+        {
+          "url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "skill lines 53, 58; Part 3 (local copy, pages 8-12 read as page images)",
+          "outcome": "supported",
+          "quote": "Generated source code should generally be checked and reproduced by the developers. A critical review should be carried out particularly with regard to hallucinations and security risks.",
+          "error": null
+        },
+        {
+          "url": "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-218.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 3: PW.7 code review",
+          "outcome": "supported",
+          "quote": "Human-readable code includes source code, scripts, and any other form of code that an organization deems human-readable.",
+          "error": null
+        },
+        {
+          "url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "printed page 9, read by the critic from the saved copy as a page image: the spelling in the agent file's quote, and the page-9 quotes proposed here",
+          "outcome": "supported",
+          "quote": "explanations, comments or documentation generated by an AI assistant can be incorrect or completetly hallucinated, which might lead to security issues and reduce code maintenability. ... Automatic function tests should be employed. ... It might be beneficial to flag AI generated code blocks and to document the used AI tools.",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s3-skill-r3-1",
+          "kind": "correction-of-earlier-round",
+          "text": "The Aikido quote (category A, first placed by f-s3-skill-r1-10) had two unmarked cuts. It starts partway through its sentence: the source opens 'In January 2026,'. And it joins two sentences with no ellipsis, where the source has text between them. Both cuts are now marked; the meaning is unchanged.",
+          "evidence": "https://www.aikido.dev/blog/slopsquatting-ai-package-hallucination-attacks, read 2026-09-30: \"In January 2026, Charlie claimed this npm package called `react-codeshift`. ... The package wasn't real, had no author, and definitely hadn't been registered before.\"; round-3 report Part 1 Aikido row",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-2",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s3-skill-r2-11. Check's self-description reads differently in its two forms. The HTML manual's page headers read 'Check: a unit test framework for C', confirmed only through a summary. The raw Texinfo source reads 'Check is a unit testing framework for C.' The report did not find the line that produces the header, so both readings are given side by side. The ck_assert quote is confirmed raw in the Texinfo source, which is now cited. 'On the same page' becomes 'in the HTML manual', so it still points at the right source.",
+          "evidence": "https://libcheck.github.io/check/doc/check_html/check_4.html (\"Check: a unit test framework for C\") and https://raw.githubusercontent.com/libcheck/check/master/doc/check.texi (\"Fails test if supplied condition evaluates to false.\"), read 2026-09-30; round-3 report Part 1 Check rows: \"The raw Texinfo fetch returned a different sentence, \"Check is a unit testing framework for C.\"\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-3",
+          "kind": "new",
+          "text": "CWE-242's quoted sentence comes from the entry's demonstrative example, not its description. The report says the skill's 'says' is accurate and must not become 'describes'. The sentence keeps 'says', places the quote in its example, and adds the description.",
+          "evidence": "https://cwe-api.mitre.org/api/v1/cwe/weakness/369,571,477,242,215,546 and https://cwe-api.mitre.org/api/v1/cwe/weakness/242,546, read 2026-09-30: Description \"The product calls a function that can never be guaranteed to work safely.\"; DemonstrativeExamples DX-5 \"However, gets() is inherently unsafe, because it copies all input from STDIN to the buffer without checking size.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-4",
+          "kind": "new",
+          "text": "The Core Guidelines caveat said only that the canonical page was cut off. The raw source of the guidelines was cut off too, so R.23 and R.11 remain readable only on the mirror. The caveat now says so; the mirror citation stays.",
+          "evidence": "https://raw.githubusercontent.com/isocpp/CppCoreGuidelines/master/CppCoreGuidelines.md, read 2026-09-30, unreachable: \"The content ends mid-section in the \\\"F: Functions\\\" area\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-5",
+          "kind": "new",
+          "text": "The three-argument `toConcurrentMap` call in the Java example was never checked against its signature. Oracle's Collectors page gives the signature, and the sources sentence now cites it.",
+          "evidence": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html, read 2026-09-30: \"public static <T, K, U> Collector<T,?,ConcurrentMap<K,U>> toConcurrentMap(Function<? super T,? extends K> keyMapper, Function<? super T,? extends U> valueMapper, BinaryOperator<U> mergeFunction)\"; round-3 report Part 2 row 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-6",
+          "kind": "new",
+          "text": "The GoogleTest and Check lines are correct only because their braces sit inside a function call's parentheses; braces alone do not protect a comma from the preprocessor. A sentence citing the GCC manual now says so, so a later edit does not move a braced value out of the call and break the macro.",
+          "evidence": "https://gcc.gnu.org/onlinedocs/cpp/Macro-Arguments.html, read 2026-09-30: \"Parentheses within each argument must balance; a comma within such parentheses does not end the argument. However, there is no requirement for square brackets or braces to balance, and they do not prevent a comma from separating arguments.\"; round-3 report Part 2 row 2 and its caution",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-7",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s3-skill-r2-13, which could not say which placeholder style sqlite3 declares. sqlite3 declares qmark, 'Hard-coded' so, and also accepts the named style. The comment in the example says so, and so does the sources sentence.",
+          "evidence": "https://docs.python.org/3/library/sqlite3.html, read 2026-09-30: \"String constant stating the type of parameter marker formatting expected by the sqlite3 module. Required by the DB-API. Hard-coded to \\\"qmark\\\". ... The named DB-API parameter style is also supported.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-8",
+          "kind": "new",
+          "text": "The second half of f-s3-skill-r3-7: the sqlite3 source clause gains the paramstyle quotes that the comment now relies on.",
+          "evidence": "https://docs.python.org/3/library/sqlite3.html, read 2026-09-30 (round-3 report Part 2 row 3: \"Hard-coded to `\"qmark\"`.\" and \"The `named` DB-API parameter style is also supported.\")",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-9",
+          "kind": "new",
+          "text": "The 'Assume errors' principle had only the Stack Overflow survey behind it. The regulator report's automation-bias passage on page 8 is the missing source, and is added.",
+          "evidence": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf, read 2026-09-30, page 8 (round-3 report Part 3 item 5): \"Studies show a cognitive bias when using AI coding assistants, as many developers perceive them as secure, although security vulnerabilities are regularly identified.\"; \"even flawed solutions are well-worded\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-10",
+          "kind": "new",
+          "text": "The last red line ('never fast-track it because the model is thought to be good') had no source. Round 1 removed the unsourced 'incident data' it once claimed (f-s3-skill-r1-24). The regulator's automation-bias sentence now sources it.",
+          "evidence": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf, read 2026-09-30, page 8: \"many developers perceive them as secure, although security vulnerabilities are regularly identified\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-11",
+          "kind": "new",
+          "text": "The rule to read assistant-written code line by line gains NIST's secure-development practice PW.7, which sets code-review scope by the form of the code, not by who wrote it. 'SP' is written out as Special Publication. The report did not read the publication date, so none is given.",
+          "evidence": "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-218.pdf, read 2026-09-30, printed page 14 (round-3 report Part 3, PW.7): \"Human-readable code includes source code, scripts, and any other form of code that an organization deems human-readable.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-12",
+          "kind": "new",
+          "text": "Category A adds two checks from the regulator report (page 10):\n1. A software bill of materials hand-on, where the project keeps one, to sbom-cra-checker. Its description begins 'SBOM correctness, signing, retention', so the hand-on is worded as a correctness check.\n2. A permitted-package check, where the dispatch or plan names a list. It carries the skill-typed class `package_not_allowlisted` at medium severity, because the agent's rule says a class named only in the skill is reported under the skill's type. It is not a hallucination: the package is real but should not be there.\nBoth checks need only Read and Grep: read the named list, compare the imports. The report called the permitted-package check a scope decision, and the brief directed that it be proposed.",
+          "evidence": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf, read 2026-09-30, page 10 (round-3 report Part 3 items 1-2); agents/compliance/sbom-cra-checker.md:3; agents/ai-quality/ai-code-quality-reviewer.md:45 ('report it as a finding, typed as the skill types it')",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-13",
+          "kind": "new",
+          "text": "Consistency for f-s3-skill-r3-12: the severity table's medium row gains `package_not_allowlisted`.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:542",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-14",
+          "kind": "new",
+          "text": "Consistency for f-s3-skill-r3-12: the checklist gains the permitted-package check. The software bill of materials line follows in f-s3-skill-r3-15, and sbom-cra-checker joins related_skills in f-s3-skill-r3-16.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:508",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-15",
+          "kind": "new",
+          "text": "Consistency for f-s3-skill-r3-12: the checklist's 'Handed on' list gains the software bill of materials line.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:505; agents/compliance/sbom-cra-checker.md:3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-16",
+          "kind": "new",
+          "text": "related_skills gains compliance/sbom-cra-checker, the skill the new hand-on names. Its SKILL.md exists: it is one of the 96 skills that carry the pinned critic-mode block.",
+          "evidence": "skills/compliance/sbom-cra-checker/SKILL.md; skills/ai-quality/ai-code-quality-reviewer/SKILL.md:30",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-17",
+          "kind": "new",
+          "text": "Category K gains two concerns the regulator report names that neither the skill nor the agent carried. One is the audit of an added extension or tool-server entry (page 11). The other is a Markdown image link pointing outside the repository, added to a file the assistant reads, as a path for leaking data (page 10). The image link is found with Grep and recorded for llm-security-tester; it is not reported as a configuration change.",
+          "evidence": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf, read 2026-09-30, pages 10-11 (round-3 report Part 3 items 6-7): \"Limit the use of extensions.\"; \"Audit and anticipate impacts of the interactions of these extensions with development, production and CI/CD environments.\"; \"Displaying Markdown images is also a common way to exfiltrate sensitive information in a successful attack (Rehberger, 2024).\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-18",
+          "kind": "new",
+          "text": "The regulator report suggests marking assistant-written code blocks (page 9), hedged as 'might be beneficial'. It is not a defect class. The commit-trailer row's meaning cell now treats a block marking the same way as a trailer: a provenance hint to note, not proof, with provenance still taken from the dispatch.",
+          "evidence": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf, printed page 9, read by the critic and the round-3 researcher on 2026-09-30: \"It might be beneficial to flag AI generated code blocks and to document the used AI tools.\"; agents/ai-quality/ai-code-quality-reviewer.md:65",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-19",
+          "kind": "new",
+          "text": "For the human, no text change: round 2 left open that nothing checks whether a change adds tests at all (f-s3-skill-r2-15). The regulator report now supports that point as well: 'Automatic function tests should be employed.' (page 9). Adding the check is a scope decision. No class of the agent carries it, and coverage-enforcer's description ('diff coverage', 'patch coverage') would make it the natural owner.",
+          "evidence": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf, printed page 9, read 2026-09-30: \"Automatic function tests should be employed.\"; agents/testing/coverage-enforcer.md:3",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s3-skill-r2-change-adds-no-tests-no-owner"
+        },
+        {
+          "id": "f-s3-skill-r3-20",
+          "kind": "new",
+          "text": "Provenance record; no text change. Confirmed from raw sources in round 3: the GoogleTest quotes, Unity, OWASP (both lines; the raw file mentions artificial intelligence nowhere), CWE-369, 571, 477, 215 and 546, the HashMap and stream-package quotes (from OpenJDK source), and the regulator's page 12 and page 9 quotes. Confirmed only through a summary: Stack Overflow's two figures, ConcurrentHashMap.merge, toConcurrentMap's 'concurrent and unordered', and Check's HTML header. Two report items support existing text without an edit: page 9 on '\"deconstruct\" AI-generated code and the used prompts' (category H), and '\"source code critics\"' (the hand-on to sast-scanner).",
+          "evidence": "round-3 report Part 1 table and Part 3 item 8",
+          "decision": "rejected",
+          "reason": "verified, no change needed",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-skill-r3-21",
+          "kind": "new",
+          "text": "The disputed spelling on the regulator's page 9, which the agent file quotes. I read printed page 9 of the saved PDF as an image this round. As I read it, the page prints 'incorrect or completetly hallucinated, which might lead to security issues and reduce code maintenability', which is what the agent file quotes. The round-3 researcher read 'completly'. Both readings are of a page image; neither is a text extraction, and I have no tool that extracts the PDF's text layer. So I propose no change and rate my reading medium confidence. A correction on my own part: in the agent's round 3 (f-s3-agent-r3-8) I wrote 'completely', silently fixing the source's typo. The executor's re-validation replaced it with the source's spelling.",
+          "evidence": "/Users/account/.claude/projects/-Users-account-Code-ctoc/26a2fcc0-aa46-4510-a665-3c2f0ee314f5/tool-results/webfetch-1790763462989-llcq7m.pdf, printed page 9, read 2026-09-30; agents/ai-quality/ai-code-quality-reviewer.md:62 ('completetly hallucinated'); round-3 report Part 3 item 9",
+          "decision": "rejected",
+          "reason": "verified, no change needed",
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 31,
+        "VALIDATED": 28,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 3
+      },
+      "validator_final": {
+        "examined": 136,
+        "VALIDATED": 136,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-census.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/critic-warnings-are-critical.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/plugin-skill-discovery.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/test-gate-ledger-wiring.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "agents/ai-quality/ai-code-quality-reviewer.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "The rule applies wherever a class is meaningful. This round changes no example code; it adds sources that bear on the C, C++, Java and Python examples, a caution about the C and C++ test-macro lines, and one comment change in the Python safe form.",
+        "examples_checked": [
+          {
+            "language": "C# (.NET 9)",
+            "how": "Unchanged this round: A, B, F, H, I as sourced in rounds 1 and 2. Still no safe SQL form, because no report quotes C# parameter code."
+          },
+          {
+            "language": "Java 21+",
+            "how": "D: the three-argument toConcurrentMap call is now checked against Oracle's Collectors signature; the HashMap and stream-package quotes are confirmed from OpenJDK 21 source. B, F, I unchanged."
+          },
+          {
+            "language": "Python 3.12+",
+            "how": "E: the placeholder is now stated as what sqlite3 declares ('Hard-coded to \"qmark\"', named style also supported), with PEP 249 kept. A, B, C, G, H, I, J unchanged."
+          },
+          {
+            "language": "C (C17/23)",
+            "how": "C: the Check pair keeps its wrapper caveat. Check's self-description now cites both its HTML header and its Texinfo source, and ck_assert is confirmed raw. The GCC macro-argument caution covers the Check line. B: CWE-242 is now placed in its demonstrative example. Section 6 and I unchanged."
+          },
+          {
+            "language": "C++ (20/23)",
+            "how": "C: the GoogleTest pair is confirmed against the raw assertions reference, and the GCC caution explains why its braced arguments are safe. B: R.23 and R.11 remain mirror-only, and the caveat now says the raw source was cut off too."
+          },
+          {
+            "language": "JavaScript/TypeScript",
+            "how": "Unchanged this round; the Aikido quote in A is re-cut, which changes prose, not code."
+          },
+          {
+            "language": "SQL",
+            "how": "Unchanged: E's sp_executesql form, validated in round 2."
+          }
+        ]
+      }
+    }
+  ],
+  "late_corrections": [],
+  "held": null
+}

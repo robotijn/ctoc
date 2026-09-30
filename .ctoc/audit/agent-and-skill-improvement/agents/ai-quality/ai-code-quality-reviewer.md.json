@@ -1,0 +1,2170 @@
+{
+  "schema": 1,
+  "path": "agents/ai-quality/ai-code-quality-reviewer.md",
+  "prerequisite": null,
+  "rounds": [
+    {
+      "round": 1,
+      "date": "2026-09-30",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:9066b7fafa3300b0d257c5bc56af119e5fa7577765d35f3f4dd5789e9af55f60",
+      "fingerprint_after": "sha256:6cb024d000c83e7b5d41ce598e4142d70ea48191edc6f92a614b04150974ddff",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s3-agent-r1-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-agent-r1-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-agent-r1-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "\"We Have a Package for You\" Spracklen USENIX Security 2025 package hallucinations",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "Cursor docs \".cursorrules\" legacy \"will be deprecated\" project rules",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "code.claude.com docs settings \"attribution\" commit \"Co-Authored-By\" includeCoAuthoredBy deprecated",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "Sonar \"coding personalities\" leading LLMs report code smells percentage of issues 2025",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "GitClear AI Copilot code quality 2025 research duplicated code blocks eightfold copy/paste moved code",
+          "source_class": "broad web",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://arxiv.org/abs/2406.10279",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 46 (rates, 576,000 samples)",
+          "outcome": "supported",
+          "quote": "the average percentage of hallucinated packages is at least 5.2% for commercial models and 21.7%",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/html/2406.10279",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 46 (440,445 of 2.23M; 43% repetition)",
+          "outcome": "supported",
+          "quote": "43% of hallucinated packages were repeated in all 10 queries, while 39% did not repeat at all across the 10 queries",
+          "error": null
+        },
+        {
+          "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach",
+          "read_on": "2026-09-30",
+          "bore_on": "agent line 198",
+          "outcome": "supported",
+          "quote": "`forEach()` expects a synchronous function — it does not wait for promises.",
+          "error": null
+        },
+        {
+          "url": "https://github.blog/ai-and-ml/generative-ai/agent-pull-requests-are-everywhere-heres-how-to-review-them/",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 (agent pull request defect classes)",
+          "outcome": "supported",
+          "quote": "Any change that weakens CI is a blocker. Full stop.",
+          "error": null
+        },
+        {
+          "url": "https://cursor.com/docs/context/rules",
+          "read_on": "2026-09-30",
+          "bore_on": "skill line 420; Part 2",
+          "outcome": "supported",
+          "quote": "Project rules live in `.cursor/rules` as `.mdc` files and are version-controlled.",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/llms.txt",
+          "read_on": "2026-09-30",
+          "bore_on": "locating Claude Code pages",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/settings",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 (attribution)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/settings-reference.md",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 (attribution trailer)",
+          "outcome": "supported",
+          "quote": "`false`: Claude Code adds no commit trailer",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/code-review.md",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 (Claude Code Code Review)",
+          "outcome": "supported",
+          "quote": "Findings are tagged by severity and don't approve or block your PR",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/hooks",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 (hooks)",
+          "outcome": "supported",
+          "quote": "Hooks are user-defined shell commands, HTTP endpoints, MCP tool calls, LLM prompts, or subagents that execute automatically at specific points in Claude Code's lifecycle.",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/sub-agents.md",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 (subagent tools)",
+          "outcome": "supported",
+          "quote": "Inherits every tool available to subagents if omitted.",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2403.08937",
+          "read_on": "2026-09-30",
+          "bore_on": "agent lines 3/18/20; Part 2",
+          "outcome": "supported",
+          "quote": "Similar to human-written code, LLM-generated code is prone to bugs",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/pdf/2403.08937",
+          "read_on": "2026-09-30",
+          "bore_on": "agent 'Missing Edge Cases'; Part 2",
+          "outcome": "supported",
+          "quote": "Missing Corner Cases 15.27% ... The generated code operates correctly, except for overlooking certain corner cases.",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2407.06153",
+          "read_on": "2026-09-30",
+          "bore_on": "agent lines 3/18/20",
+          "outcome": "did-not-bear",
+          "quote": "three categories and ten sub-categories",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2307.12596",
+          "read_on": "2026-09-30",
+          "bore_on": "agent maintainability/style classes",
+          "outcome": "did-not-bear",
+          "quote": "1,930 ChatGPT-generated code snippets suffer from maintainability issues",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/html/2508.21634",
+          "read_on": "2026-09-30",
+          "bore_on": "agent lines 3/18/20 (over-engineering, complexity, duplication); Part 2",
+          "outcome": "refuted",
+          "quote": "AI-generated code is generally simpler and more repetitive, yet more prone to unused constructs and hardcoded debugging, while human-written code exhibits greater structural complexity and a higher concentration of maintainability issues.",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/html/2510.20270",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 (test exploitation)",
+          "outcome": "supported",
+          "quote": "GPT-5, cheats 54.0% of the time on Conflicting-SWEbench",
+          "error": null
+        },
+        {
+          "url": "https://www.sonarsource.com/blog/the-coding-personalities-of-leading-llms/",
+          "read_on": "2026-09-30",
+          "bore_on": "agent classes; Part 2",
+          "outcome": "supported",
+          "quote": "The models consistently introduced severe bugs like resource leaks and API contract violations, issues that require a holistic understanding of an application.",
+          "error": null
+        },
+        {
+          "url": "https://www.gitclear.com/ai_assistant_code_quality_2025_research",
+          "read_on": "2026-09-30",
+          "bore_on": "agent 'Duplicate Logic'",
+          "outcome": "supported",
+          "quote": "4x more code cloning",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s3-agent-r1-1",
+          "kind": "new",
+          "text": "This critic could not do its own research. The dispatched copy is the installed plugin 6.14.65, whose agent-critic has only Read and Grep; the repository at 6.14.69 grants it WebSearch and WebFetch. The citation validator did this round's research instead, under dispatch d-s3-agent-r1-research, and every source in this log comes from its report. Rounds 2 and 3 of this critic will hit the same limit until the installed plugin carries the approved grant. Needs the human because the fix is to install that approved grant: update the plugin from the marketplace to 6.14.68 or later and re-dispatch. I did not check whether that version is on the marketplace.",
+          "evidence": "installed copy .claude/plugins/cache/robotijn/ctoc/6.14.65/agents/pipeline/agent-critic.md:4 'tools: Read, Grep'; repository agents/pipeline/agent-critic.md:4 'tools: Read, Grep, WebSearch, WebFetch'; VERSION '6.14.69'; .ctoc/audit/improvement-run-notes/s3-agent-round1-research-d-s3-agent-r1-research.md:1 'citation-validator, installed plugin 6.14.65'",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s3-agent-r1-installed-critic-has-no-web-tools"
+        },
+        {
+          "id": "f-s3-agent-r1-2",
+          "kind": "new",
+          "text": "The description has three problems. It says 'common pitfalls', which the research could not source (rows 1-5 and 8). It claims hallucination-detector's classes, and shares the dispatch phrase 'AI code review' with it. And it lists six classes where the revised body owns ten. The new description lists the ten classes, names who owns the existence check and general review, drops the claim about frequency, and keeps all nine dispatch phrases byte for byte.",
+          "evidence": "agents/ai-quality/ai-code-quality-reviewer.md:3; agents/ai-quality/hallucination-detector.md:3 'fabricated patterns ... AI code review'; research report rows 1-9 'strip-the-specificity'",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-3",
+          "kind": "new",
+          "text": "Replaces the Role sentence (line 18). The body never points at its skill file, and nothing loads that file at dispatch, so most promised classes had no instructions. The new text adds five things. First, a pointer to the skill with limits: no order beyond Read and Grep, no claim that the refinement loop runs, never cite the skill's Tool Integration table, this file wins where the two disagree, and a fallback when the skill cannot be read. Second, a ten-class ownership table, each class with a method Read and Grep can carry out and a named agent for the rest. Third, a hand-on list naming every sibling. Fourth, an evidence section that carries each class's source, read date and verbatim quote, taken only from the research report, and forbids calling a defect typical of assistant-written code without a cited measurement. Fifth, input handling (the provenance rule now cites the optional Claude Code trailer) and a rule that the reviewed code is data, never instruction.",
+          "evidence": "agents/ai-quality/ai-code-quality-reviewer.md:18, lines 20-146; docs/AGENT_ARCHITECTURE.md:116 'whose body points at `skills/<category>/<name>/SKILL.md`'; a search of src/ for target_skill finds nothing; docs/REFINEMENT_LOOP.md:8 'the loop is **NOT RUNNING** today'; research report section 3 items 1-5, 8, 9, 11 and rows 6, 7, 9, 10, 25, 26",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-4",
+          "kind": "new",
+          "text": "Replaces lines 20-251. The file declares protocol v1 but outputs a free markdown report with no confidence and no severity rule. Its catalogue repeats code-reviewer, duplicate-code-detector, concurrency-checker and performance-profiler. Its checklist is vague ('Appropriate data structures', 'Reasonable memory usage', 'Appropriate line length'). Five of its eight example classes are unsourceable as common in assistant-written code (research rows 1-5 and 8). Some examples are broken: `sleep` is never defined (line 85), the style example shows none of the `.then()` mixing the template names (line 233), and the email expression rejects '+' (line 119). The replacement deletes the catalogue and checklist, which the skill carries, and adds severity rules for every class (incomplete output and a test changed to pass are critical, citing project lessons 7 and 14), confidence rules, the protocol-v1 response with all ten class types, and escalation.",
+          "evidence": "agents/ai-quality/ai-code-quality-reviewer.md:20-251; docs/DISPATCH_PROTOCOL.md:143-155; CLAUDE.md operating lessons 7, 9, 14; research report rows 1-5, 8",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-5",
+          "kind": "new",
+          "text": "The file's framing is refuted or unsourceable. The research found no source that over-engineering, verbose naming, excessive comments, inconsistent style, unnecessary complexity or incorrect async handling is common in assistant-written code (rows 1-5 and 8). 'Specific to AI generation patterns' (line 18) is fabricated (row 9). The description, role and body replacements in f-s3-agent-r1-2, -3 and -4 remove every such claim. The new evidence section forbids calling a defect typical of assistant-written code without a cited measurement, and says plainly that over-engineering points the other way.",
+          "evidence": "research report rows 1-5, 8 'UNSOURCEABLE ... strip-the-specificity', row 9 'FABRICATED'; https://arxiv.org/html/2508.21634, read 2026-09-30: \"AI-generated code is generally simpler and more repetitive, yet more prone to unused constructs and hardcoded debugging, while human-written code exhibits greater structural complexity and a higher concentration of maintainability issues.\"",
+          "decision": "applied",
+          "reason": "Applied: its substance is carried by the text applied under f-s3-agent-r1-2, f-s3-agent-r1-3 and f-s3-agent-r1-4, as the critic states.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-6",
+          "kind": "new",
+          "text": "Three claims the research validated are kept, now with sources. Missing edge cases (row 7) stays one of this agent's classes, with the Tambon measurement. Duplicate logic (row 6) goes to duplicate-code-detector with the Cotroneo and GitClear evidence; the GitClear figure is marked as a trend over time. The forEach claim (row 10) stays in the hand-on line with Mozilla's quote. The text is in f-s3-agent-r1-3.",
+          "evidence": "https://arxiv.org/pdf/2403.08937, read 2026-09-30: \"Missing Corner Cases 15.27% ... The generated code operates correctly, except for overlooking certain corner cases.\"; https://www.gitclear.com/ai_assistant_code_quality_2025_research: \"4x more code cloning\"; https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach: \"`forEach()` expects a synchronous function — it does not wait for promises.\"",
+          "decision": "applied",
+          "reason": "Applied: its substance is carried by the text applied under f-s3-agent-r1-3, as the critic states.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-7",
+          "kind": "new",
+          "text": "Misinterpretation of the prompt goes into this agent's classes as 'Misread request'. Why: it is the largest measured class; the agent can Read the dispatch and the plan's acceptance criteria; and no sibling's description owns whether code does what its request asked. code-reviewer reads whether names and structure show intent, and iron-loop-critic 'Scores execution plan on 5 dimensions'. The same class takes statements unrelated to the task (Non-Prompted Consideration, 8.15%), the skill's missing business rule, and edits outside the plan's declared files. Boundary risk, confidence MEDIUM: code-reviewer's description says it 'reads the changed code for intent'. I read that as readability, so the row hands readability of intent to code-reviewer.",
+          "evidence": "https://arxiv.org/pdf/2403.08937 (research report section 3 item 1), read 2026-09-30: \"20.77%\", \"The generated code deviates from the intention of the prompt.\"; \"8.15%\": \"statements that are unrelated to the task specification.\"; agents/quality/code-reviewer.md:3; agents/iron-loop/iron-loop-critic.md:3",
+          "decision": "applied",
+          "reason": "Applied: its substance is carried by the text applied under f-s3-agent-r1-3, as the critic states.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-8",
+          "kind": "new",
+          "text": "Incomplete or stub output goes into this agent's classes as 'Incomplete output', rated critical. Why: it is measured; this project's no-stub rule forbids it; Grep can find the markers; and no sibling's description names stubs. A TODO beside finished code stays with code-reviewer's rule on TODOs with no ticket reference. The text is in f-s3-agent-r1-3 (table row and evidence) and f-s3-agent-r1-4 (severity).",
+          "evidence": "https://arxiv.org/pdf/2403.08937 (research report section 3 item 1), read 2026-09-30: \"9.57%\": \"The model generates no code or produces an empty function such as a 'pass' statement.\"; CLAUDE.md lesson 7 'Never leave stubs or TODOs.'; agents/quality/code-reviewer.md:158 'TODO/FIXME without ticket reference'",
+          "decision": "applied",
+          "reason": "Applied: its substance is carried by the text applied under f-s3-agent-r1-3 and f-s3-agent-r1-4, as the critic states.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-9",
+          "kind": "new",
+          "text": "Prompt-biased code is not placed. The research report gives only its name and '6.52%', with no definition. Placing it in this agent or a sibling would rest on my memory of the paper, which this round forbids. What would place it: the definition read from arXiv 2403.08937 in round 2 or 3. No text change.",
+          "evidence": "research report section 3 item 1: 'Prompt-biased code \"6.52%\" and Wrong Input Type \"5.91%\".'",
+          "decision": "rejected",
+          "reason": "No text change this round: the research report gives only the name and a percentage for prompt-biased code, no definition, so placing it in this agent or a sibling would rest on memory, which the round forbids. Carried to round 2, where the definition is to be read from the paper itself.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-10",
+          "kind": "new",
+          "text": "Wrong input type is placed provisionally, from its name alone, since the report gives no definition. A call given a wrong signature, option or argument is sibling territory: hallucination-detector's 'Wrong API Usage' section, plus the type checker at verification. The hand-on line in f-s3-agent-r1-3 routes 'a library call with a wrong signature, option or argument' to hallucination-detector; that routing states no outside fact. The placement is confirmed or corrected once the definition is read.",
+          "evidence": "research report section 3 item 1: 'Wrong Input Type \"5.91%\"'; agents/ai-quality/hallucination-detector.md:40-50 '### Wrong API Usage ... Wrong method signature ... Made-up option'",
+          "decision": "applied",
+          "reason": "Applied: its substance is carried by the text applied under f-s3-agent-r1-3, as the critic states. The placement is provisional until the definition of wrong input type is read.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-11",
+          "kind": "new",
+          "text": "Unused constructs are sibling territory: dead-code-detector owns unused code, exports and imports. Hardcoded debugging, the other half of the same finding, stays with code-reviewer as 'debug output left in'. The hand-on line and evidence section in f-s3-agent-r1-3 carry both.",
+          "evidence": "https://arxiv.org/html/2508.21634 (research report section 3 item 2), read 2026-09-30: \"more prone to unused constructs and hardcoded debugging\"; agents/quality/dead-code-detector.md:3 'Finds unused code, exports, and dependencies'; agents/quality/code-reviewer.md:160 'Console.log/print statements'",
+          "decision": "applied",
+          "reason": "Applied: its substance is carried by the text applied under f-s3-agent-r1-3, as the critic states.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-12",
+          "kind": "new",
+          "text": "Tests modified or special-cased to pass go into this agent's classes as 'Tests changed to pass', rated critical. Why: vacuous tests already live here; no sibling's description owns test tampering (mutation-test-runner measures test strength, and code-reviewer blocks tests with no assertion); and the project's lesson 14 names weakening a test. With a diff, Read shows edited assertions, deleted or skipped tests and relaxed continuous-integration steps. Without one, Grep finds production code that checks for the literal inputs the tests use. The four behaviours come from the report's own summary of the benchmark, not a verbatim quote.",
+          "evidence": "https://arxiv.org/html/2510.20270 (research report section 3 item 3), read 2026-09-30: \"GPT-5, cheats 54.0% of the time on Conflicting-SWEbench\"; https://github.blog/ai-and-ml/generative-ai/agent-pull-requests-are-everywhere-heres-how-to-review-them/: \"Any change that weakens CI is a blocker. Full stop.\"; report item 3: 'modifying tests, overloading comparison operators, recording extra state, and special-casing test inputs'",
+          "decision": "applied",
+          "reason": "Applied: its substance is carried by the text applied under f-s3-agent-r1-3 and f-s3-agent-r1-4, as the critic states.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-13",
+          "kind": "new",
+          "text": "Resource leaks and contract violations are sibling territory. Memory leaks and leaked listeners go to memory-safety-checker. A service interface that departs from its published contract goes to api-contract-validator. A library call against its signature goes to hallucination-detector. No agent's description names a file, socket or connection left open. The file records that case as 'no owning agent', so CTO Chief sees the gap. Whether to fill it is the human's scheduling call, and I propose no new agent.",
+          "evidence": "https://www.sonarsource.com/blog/the-coding-personalities-of-leading-llms/ (research report section 3 item 4), read 2026-09-30: \"The models consistently introduced severe bugs like resource leaks and API contract violations, issues that require a holistic understanding of an application.\"; agents/specialized/memory-safety-checker.md:3 'memory leak ... event listener leak'; agents/specialized/api-contract-validator.md:3; a search of agent definitions for unclosed, file-handle and connection-leak wording found none",
+          "decision": "applied",
+          "reason": "Applied: its substance is carried by the text applied under f-s3-agent-r1-3, as the critic states.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-14",
+          "kind": "new",
+          "text": "Coding-assistant configuration files in a diff go into this agent's classes as a flag, rated high with confidence HIGH, because a file path in the reviewed change is enough to detect them. What the change lets the assistant do is analysed by llm-security-tester, which already watches the case 'A tool is added to an agent'. Provenance of the path list: only `.cursor/rules` is named inside a vendor quote. `.claude/`, `AGENTS.md`, `REVIEW.md`, `.github/copilot-instructions.md` and `*.instructions.md` come from the report's own text (item 11 and the corrections in rows 25 and 26). The citation validator should re-verify them.",
+          "evidence": "https://code.claude.com/docs/en/sub-agents.md (research report section 3 item 11), read 2026-09-30: \"Inherits every tool available to subagents if omitted.\"; https://code.claude.com/docs/en/hooks: \"Hooks are user-defined shell commands, HTTP endpoints, MCP tool calls, LLM prompts, or subagents that execute automatically at specific points in Claude Code's lifecycle.\"; https://cursor.com/docs/context/rules: \"Project rules live in `.cursor/rules` as `.mdc` files and are version-controlled.\"; agents/ai-quality/llm-security-tester.md:35",
+          "decision": "applied",
+          "reason": "Applied: its substance is carried by the text applied under f-s3-agent-r1-3, as the critic states. The path list is kept as a detection rule and attributed to no vendor beyond what each quote says.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-15",
+          "kind": "new",
+          "text": "Untrusted input in agent workflows (user text in prompts, over-permissioned workflow tokens, model output run as commands) is sibling territory and not one of this agent's classes. llm-security-tester covers model-calling paths and output execution; ci-pipeline-checker covers workflow permissions. The hand-on line in f-s3-agent-r1-3 routes both. The report gives these three items only in its own words, so the file makes no factual claim about them.",
+          "evidence": "research report section 3 item 5; agents/ai-quality/llm-security-tester.md:34 'Any code lands on a model-calling path', :50 'Output is never executed'; agents/infrastructure/ci-pipeline-checker.md:3 'github actions audit', :127 'GITHUB_TOKEN'",
+          "decision": "applied",
+          "reason": "Applied: its substance is carried by the text applied under f-s3-agent-r1-3, as the critic states.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-16",
+          "kind": "new",
+          "text": "Silly mistakes ('redundant conditions or unnecessary casting', 9.57%) are measured but are read-level judgement, so they go to code-reviewer. The hand-on line in f-s3-agent-r1-3 routes 'redundant conditions' there.",
+          "evidence": "https://arxiv.org/pdf/2403.08937 (research report section 3 item 1), read 2026-09-30: \"9.57%\": \"redundant conditions or unnecessary casting.\"",
+          "decision": "applied",
+          "reason": "Applied: its substance is carried by the text applied under f-s3-agent-r1-3, as the critic states.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-17",
+          "kind": "new",
+          "text": "Once the agent reads its skill, it would inherit the skill's 'Tool Integration (2026)' table. That table contains two fabricated rows (Copilot 'review filters' and the Cursor '.cursorrules' wording) and descriptions the vendor documentation contradicts. Limit 3 in f-s3-agent-r1-3 says the table is not part of the method and must never be cited in a finding. This holds before and after the skill is corrected, so it needs no later undoing.",
+          "evidence": "research report rows 25, 26 'FABRICATED'; section 3 items 8 and 10",
+          "decision": "applied",
+          "reason": "Applied: its substance is carried by the text applied under f-s3-agent-r1-3, as the critic states.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-18",
+          "kind": "new",
+          "text": "The provenance input rule now also says a commit trailer is no evidence either way, because Claude Code's trailer can be turned off. This keeps the agent from inferring human authorship from a missing trailer. The text is in f-s3-agent-r1-3.",
+          "evidence": "https://code.claude.com/docs/en/settings-reference.md (research report section 3 item 9), read 2026-09-30: \"`false`: Claude Code adds no commit trailer\"",
+          "decision": "applied",
+          "reason": "Applied: its substance is carried by the text applied under f-s3-agent-r1-3, as the critic states.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-19",
+          "kind": "correction-of-earlier-round",
+          "text": "Found at re-validation (dispatch d-s3-agent-r1-revalidate) and corrected: the evidence section, as first applied under f-s3-agent-r1-3, presented the ImpossibleBench result as a measurement of how often tests are changed to pass in assistant-written code, and counted it among five classes with a frequency. The benchmark measures behaviour on tasks deliberately made impossible, where the specification conflicts with the tests; its cheating rate is a propensity under that forced conflict, not a frequency in ordinary code. The tests-changed-to-pass bullet now says what the benchmark measures, and the sentence counting measured classes now says four classes carry a frequency and a fifth carries a propensity under a forced conflict.",
+          "evidence": "https://arxiv.org/html/2510.20270, read 2026-09-30: \"GPT-5, cheats 54.0% of the time on Conflicting-SWEbench\"; agents/ai-quality/ai-code-quality-reviewer.md lines 49 and 53; citation validator re-validation verdict MISATTRIBUTED (1 of 30), re-checked VALIDATED",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r1-20",
+          "kind": "new",
+          "text": "Found by the executor while applying f-s3-agent-r1-4: the applied output format orders the agent to return tokens_used as null, because an agent cannot measure its own token count, while the dispatch schema requires that field and types it as an integer of at least zero. Nothing breaks today, because the only source file naming the schema is recorded as unreachable in the reachability baseline and every fence reading the file passes. Which side moves is a change to a machine-read contract, so it is put to the human and the applied text is left as the critic wrote it.",
+          "evidence": "agents/ai-quality/ai-code-quality-reviewer.md output format \"tokens_used: null                 # not measurable from inside this agent; never estimate it\"; .ctoc/architecture/dispatch-schema.yaml:132 \"required: [tokens_used, tool_calls]\", :134 \"tokens_used: { type: integer, minimum: 0 }\"; .ctoc/reachability-baseline.json lists src/lib/v8-dispatcher.js as unreachable",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s3-agent-r1-tokens-used-null-versus-dispatch-schema"
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 10,
+        "VALIDATED": 3,
+        "FABRICATED": 1,
+        "UNSOURCEABLE": 6,
+        "MISATTRIBUTED": 0
+      },
+      "validator_final": {
+        "examined": 30,
+        "VALIDATED": 30,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/ai-quality/ai-code-quality-reviewer/SKILL.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "The domain is code in any language the project uses, so the rule applies. After the edits the file holds no pairs of defect-and-better examples; the catalogue moves to the skill body, which carries the examples. Its remaining code is one TypeScript test inside the output example (it illustrates the response format, not a defect class) and search strings for unfinished-work markers. The skill body has TypeScript, JavaScript, Python, C#, Java and SQL examples and none in C or C++, which belongs to the skill's rounds. No example was checked in this round, because the file now carries no pair of defect-and-better examples; the seven-language check falls to the skill body's rounds.",
+        "examples_checked": []
+      }
+    },
+    {
+      "round": 2,
+      "date": "2026-09-30",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:6cb024d000c83e7b5d41ce598e4142d70ea48191edc6f92a614b04150974ddff",
+      "fingerprint_after": "sha256:35c007e82d5c3bd6d71f6abf87f3b4de6a3a8f38073fb9600f4fdbc2ad55c12c",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s3-agent-r2-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-agent-r2-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-agent-r2-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "docs.python.org reference: full text of the pass statement section",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "docs.python.org library: full NotImplementedError entry",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Microsoft Learn: NotImplementedException definition and remarks, versus NotSupportedException",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Oracle Java SE 21: UnsupportedOperationException class description",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "doc.rust-lang.org: todo! description and its comparison with unimplemented!",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "doc.rust-lang.org: unimplemented! description and its panic message",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "npm docs: package.json description and the dependencies field",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Microsoft Learn NuGet: PackageReference in project files; Central Package Management; Directory.Packages.props",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Maven: introduction to the POM, definition and dependencies",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Gradle user guide: where dependencies are declared (build.gradle / build.gradle.kts); version catalogs",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Python Packaging User Guide: pyproject.toml specification, dependencies key, PEP 621",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "GitHub docs: repository custom instructions (.github/copilot-instructions.md, *.instructions.md, AGENTS.md, CLAUDE.md, GEMINI.md) and their use by Copilot code review",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Claude Code Code Review docs: every sentence on REVIEW.md and CLAUDE.md",
+          "source_class": "vendor documentation",
+          "repeated_because": "round 1 read this page for the severity/no-block quote; this pass needed the REVIEW.md and CLAUDE.md sentences"
+        },
+        {
+          "text": "Claude Code settings docs: project files under .claude/, CLAUDE.md, .mcp.json",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Claude Code .claude directory reference: project files Claude Code reads",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Cursor rules docs: every sentence on AGENTS.md and the legacy .cursorrules file",
+          "source_class": "vendor documentation",
+          "repeated_because": "round 1 read this page for the .mdc quote; this pass needed the AGENTS.md sentences"
+        },
+        {
+          "text": "OWASP Top 10 CI/CD Security Risks, CICD-SEC-3: definitions of dependency confusion, typosquatting, brandjacking",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "Google engineering practices, 'What to look for in a code review': headings; over-engineering, tests, documentation, edge cases",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "MITRE CWE-546 Suspicious Comment: description and markers",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "Tambon et al. PDF: definitions of Prompt-biased code and Wrong Input Type",
+          "source_class": "original paper",
+          "repeated_because": "round 1 gave these two categories' percentages without definitions; the brief asked for the definitions"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://docs.python.org/3/reference/simple_stmts.html",
+          "read_on": "2026-09-30",
+          "bore_on": "line 35: pass (Python)",
+          "outcome": "supported",
+          "quote": "It is useful as a placeholder when a statement is required syntactically, but no code needs to be executed ... def f(arg): pass    # a function that does nothing (yet)",
+          "error": null
+        },
+        {
+          "url": "https://docs.python.org/3/library/exceptions.html",
+          "read_on": "2026-09-30",
+          "bore_on": "line 35: NotImplementedError (Python)",
+          "outcome": "supported",
+          "quote": "In user defined base classes, abstract methods should raise this exception when they require derived classes to override the method, or while the class is being developed to indicate that the real implementation still needs to be added.",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/api/system.notimplementedexception",
+          "read_on": "2026-09-30",
+          "bore_on": "line 35: NotImplementedException (.NET)",
+          "outcome": "supported",
+          "quote": "You might choose to throw a NotImplementedException exception in properties or methods in your own types when a member is still in development and will only be implemented later in production code.",
+          "error": null
+        },
+        {
+          "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/UnsupportedOperationException.html",
+          "read_on": "2026-09-30",
+          "bore_on": "line 35: UnsupportedOperationException (Java)",
+          "outcome": "supported",
+          "quote": "Thrown to indicate that the requested operation is not supported. This class is a member of the Java Collections Framework.",
+          "error": null
+        },
+        {
+          "url": "https://doc.rust-lang.org/std/macro.todo.html",
+          "read_on": "2026-09-30",
+          "bore_on": "line 35: todo! (Rust)",
+          "outcome": "supported",
+          "quote": "Indicates unfinished code. ... while todo! conveys an intent of implementing the functionality later and the message is \"not yet implemented\", unimplemented! makes no such claims.",
+          "error": null
+        },
+        {
+          "url": "https://doc.rust-lang.org/std/macro.unimplemented.html",
+          "read_on": "2026-09-30",
+          "bore_on": "line 35: unimplemented! (Rust) and the words 'not implemented'",
+          "outcome": "supported",
+          "quote": "Indicates unimplemented code by panicking with a message of \"not implemented\".",
+          "error": null
+        },
+        {
+          "url": "https://docs.npmjs.com/cli/v11/configuring-npm/package-json",
+          "read_on": "2026-09-30",
+          "bore_on": "line 40: package.json",
+          "outcome": "supported",
+          "quote": "Dependencies are specified in a simple object that maps a package name to a version range.",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/nuget/consume-packages/package-references-in-project-files",
+          "read_on": "2026-09-30",
+          "bore_on": "line 40: *.csproj; Part 2 finding 3",
+          "outcome": "supported",
+          "quote": "Package references, using <PackageReference> MSBuild items, specify NuGet package dependencies directly within project files, as opposed to having a separate packages.config file.",
+          "error": null
+        },
+        {
+          "url": "https://maven.apache.org/guides/introduction/introduction-to-the-pom.html",
+          "read_on": "2026-09-30",
+          "bore_on": "line 40: pom.xml",
+          "outcome": "supported",
+          "quote": "A Project Object Model or POM is the fundamental unit of work in Maven. It is an XML file that contains information about the project and configuration details used by Maven to build the project.",
+          "error": null
+        },
+        {
+          "url": "https://docs.gradle.org/current/userguide/declaring_dependencies.html",
+          "read_on": "2026-09-30",
+          "bore_on": "line 40: build.gradle",
+          "outcome": "supported",
+          "quote": "To add a dependency in Gradle, you use the dependencies{} block in your build script.",
+          "error": null
+        },
+        {
+          "url": "https://packaging.python.org/en/latest/specifications/pyproject-toml/",
+          "read_on": "2026-09-30",
+          "bore_on": "line 40: pyproject.toml",
+          "outcome": "supported",
+          "quote": "dependencies lists the expected dependencies of the project as an array of strings. ... The specification of the [project] table was approved through PEP 621.",
+          "error": null
+        },
+        {
+          "url": "https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions",
+          "read_on": "2026-09-30",
+          "bore_on": "line 43: .github/copilot-instructions.md, *.instructions.md, AGENTS.md; Part 2 finding 2",
+          "outcome": "supported",
+          "quote": "These are specified in a copilot-instructions.md file in the .github directory of the repository. ... one or more NAME.instructions.md files within or below the .github/instructions directory ... Alternatively, you can use a single CLAUDE.md or GEMINI.md file stored in the root of the repository.",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/code-review.md",
+          "read_on": "2026-09-30",
+          "bore_on": "line 43: REVIEW.md; Part 2 findings 1 and 2",
+          "outcome": "supported",
+          "quote": "REVIEW.md is a file at your repository root that tailors Code Review to your repo.",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/settings.md",
+          "read_on": "2026-09-30",
+          "bore_on": "line 43: .claude/",
+          "outcome": "supported",
+          "quote": "name: 'Shared project', file: '.claude/settings.json', who: 'Everyone in the project'",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/claude-directory.md",
+          "read_on": "2026-09-30",
+          "bore_on": "line 43: .claude/; Part 2 finding 2 (CLAUDE.md, .mcp.json)",
+          "outcome": "supported",
+          "quote": "label: '.mcp.json' ... badge: 'committed', oneLiner: 'Project-scoped MCP servers, shared with your team'",
+          "error": null
+        },
+        {
+          "url": "https://cursor.com/docs/context/rules",
+          "read_on": "2026-09-30",
+          "bore_on": "line 43: AGENTS.md",
+          "outcome": "supported",
+          "quote": "AGENTS.md is a simple markdown file for defining agent instructions. ... Place it in your project root as an alternative to .cursor/rules",
+          "error": null
+        },
+        {
+          "url": "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-03-Dependency-Chain-Abuse",
+          "read_on": "2026-09-30",
+          "bore_on": "line 39",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "Status: 308 Permanent Redirect (to https://owasp.github.io/www-project-top-10-ci-cd-security-risks/CICD-SEC-03-Dependency-Chain-Abuse)"
+        },
+        {
+          "url": "https://owasp.github.io/www-project-top-10-ci-cd-security-risks/CICD-SEC-03-Dependency-Chain-Abuse",
+          "read_on": "2026-09-30",
+          "bore_on": "line 39: a name that resolves can be a look-alike registered in advance",
+          "outcome": "supported",
+          "quote": "Typosquatting: Publication of malicious packages with similar names to those of popular packages in the hope that a developer will misspell a package name and unintentionally fetch the typosquatted package.",
+          "error": null
+        },
+        {
+          "url": "https://google.github.io/eng-practices/review/reviewer/looking-for.html",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 findings 1 and 5",
+          "outcome": "supported",
+          "quote": "If a CL changes how users build, test, interact with, or release code, check to see that it also updates associated documentation, including READMEs, g3doc pages, and any generated reference docs.",
+          "error": null
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/546.html",
+          "read_on": "2026-09-30",
+          "bore_on": "line 35: TODO and FIXME (outside the brief's list); Part 2 finding 4",
+          "outcome": "supported",
+          "quote": "Many suspicious comments, such as BUG, HACK, FIXME, LATER, LATER2, TODO, in the code indicate missing security functionality and checking.",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/pdf/2403.08937",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 2 finding 6 (definitions, read directly from PDF pages 14-15)",
+          "outcome": "supported",
+          "quote": "This issue occurs when the LLM excessively relies on provided examples or particular terms in the prompt while implementing a function and it sometimes hinders the generalization or correctness of the generated code.",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s3-agent-r2-1",
+          "kind": "new",
+          "text": "Adds sources for the four detection rules the file stated without one, all validated by the round-2 research (the unfinished-work markers and their languages, the manifest names, the configuration files, the look-alike registration). Each rule gets one sentence naming its references, with quotes only where a quote changes behaviour: the three caveats, and the entries that back new list items. The same insertion adds a 'Handed on, with a source' bullet for the wrong-input-type definition (f-s3-agent-r2-6) and the documentation evidence (f-s3-agent-r2-5). Confidence is medium that the Maven and Gradle pages name the literal files pom.xml and build.gradle (report rows 10 and 11); the rule's source is still sound. The .cursorrules quote comes from round 1's source (https://cursor.com/help/customization/rules, read 2026-09-30), which this pass did not re-fetch. Finding 2 of this round's report repeats it.",
+          "evidence": "round-2 research report part 1, rows 1-19 'VALIDATED 18, FABRICATED 0'; part 2 findings 1, 2, 3, 6; agents/ai-quality/ai-code-quality-reviewer.md:35, :39, :40, :43, :57",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-2",
+          "kind": "new",
+          "text": "The unfinished-work marker list (line 35) changes three ways. It is narrowed to a `pass` statement, since a bare `pass` also matches words such as 'password'. It gains CWE-546's comment markers BUG, HACK and LATER (LATER also matches LATER2). And it names the three hits the references show are often deliberate: NotImplementedError in an abstract method, UnsupportedOperationException ('not supported' in Oracle's words), and an unimplemented! meant to stay. Without that clause a reader would report every such hit as a stub. The read-only collection example is the report's own gloss (row 4), not Oracle's words. todo!'s message 'not yet implemented' does not match the phrase 'not implemented', but the macro name still catches it (row 7), so no change is needed there.",
+          "evidence": "https://cwe.mitre.org/data/definitions/546.html, read 2026-09-30: \"BUG, HACK, FIXME, LATER, LATER2, TODO\"; https://docs.python.org/3/library/exceptions.html: \"In user defined base classes, abstract methods should raise this exception\"; https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/UnsupportedOperationException.html: \"Thrown to indicate that the requested operation is not supported.\"; https://doc.rust-lang.org/std/macro.todo.html: \"unimplemented! makes no such claims.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-3",
+          "kind": "new",
+          "text": "The configuration list (line 43) gains four files: CLAUDE.md at any level (GitHub and Claude Code both document it; today only .claude/CLAUDE.md is caught), GEMINI.md, .mcp.json (it adds tool servers) and the root .cursorrules. The hand-on is also reworded into llm-security-tester's own terms. Its description names applications that call language models, not a coding assistant's configuration; the work is claimed only in its body, which lists 'A tool is added to an agent' and 'A capability provider or extension server is installed', each marked 'Always' (lines 35-36).",
+          "evidence": "https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions, read 2026-09-30: \"Alternatively, you can use a single CLAUDE.md or GEMINI.md file stored in the root of the repository.\"; https://code.claude.com/docs/en/claude-directory.md: \"Project-scoped MCP servers, shared with your team\"; round-2 report part 2 finding 2: \"Claude reads `CLAUDE.md` files at every level of your directory hierarchy\", \"legacy and will be deprecated\"; agents/ai-quality/llm-security-tester.md:3, :35-36",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-4",
+          "kind": "new",
+          "text": "For .NET the version list (line 40) misses the two files where versions are often pinned: Directory.Packages.props under central package management, and packages.config, the .NET Framework default. Reading only *.csproj finds no version in either case and drops to confidence LOW, so today this is a coverage gap rather than a false finding. The file also names no Rust manifest; see f-s3-agent-r2-13.",
+          "evidence": "https://learn.microsoft.com/en-us/nuget/consume-packages/package-references-in-project-files, read 2026-09-30: \"as opposed to having a separate packages.config file.\"; round-2 report part 2 finding 3: \"a `<PackageVersion />` item must not be defined in `Directory.Packages.props` for an implicitly defined package\", \".NET Framework projects support PackageReference, but currently default to `packages.config`.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-5",
+          "kind": "new",
+          "text": "Documentation the change makes out of date is handed on to documentation-updater, whose description is 'Updates API docs, README, code comments, and changelog entries'. No agent's description claims to detect stale documentation, so the detection is written into this file as a Grep this agent can run: for a renamed or removed command, option, public function, configuration key or environment variable, or a changed build, test or run step, search README files, docs/ and CLAUDE.md files for the old name. Each hit is recorded as documentation out of date and handed to documentation-updater. It is not made an eleventh class: no measurement ties it to assistant-written code, and the fix belongs to the documentation writer.",
+          "evidence": "https://google.github.io/eng-practices/review/reviewer/looking-for.html, read 2026-09-30: \"If a CL changes how users build, test, interact with, or release code, check to see that it also updates associated documentation, including READMEs, g3doc pages, and any generated reference docs.\"; round-2 report part 2 finding 1 (Claude Code Code Review): \"if your PR changes code in a way that makes a `CLAUDE.md` statement outdated, Claude flags that the docs need updating too.\"; agents/documentation/documentation-updater.md:3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-6",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s3-agent-r1-10. Round 1 placed wrong input type provisionally with hallucination-detector, from the name alone. The paper's definition is a wrong-type argument to a real call. That is not a hallucination: hallucination-detector's remit is things that do not exist. It is a type error, and type-checker's own checks list 'Type Mismatches' under 'Function arguments'. Line 45 now sends a signature or option the library does not have to hallucination-detector, and a wrong-type argument to type-checker. The evidence is in the bullet f-s3-agent-r2-1 inserts.",
+          "evidence": "https://arxiv.org/pdf/2403.08937 (round-2 report part 2 finding 6, read directly from the PDF), read 2026-09-30: \"We use this label when LLM uses an incorrect input type in a correct function call.\"; agents/quality/type-checker.md:3 'Static type analysis', :46-47 'Type Mismatches - Function arguments'; agents/ai-quality/hallucination-detector.md:3 'references non-existent packages, APIs, methods, or fabricated patterns'",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-7",
+          "kind": "correction-of-earlier-round",
+          "text": "Closes f-s3-agent-r1-9, which left prompt-biased code unplaced for lack of a definition. The paper defines it as code that relies on the prompt's examples and fails to generalise. That is a misread of the request's general intent, so it goes under 'Misread request' (line 34), detected by the same literal-value Grep as line 42 but aimed at the request's examples. The brief suggested extending line 42; I put it in the misread-request row instead, because line 42 is about tests and a match against the request's examples is not a test change. Both the class name and the severity (high) fit the misread-request row.",
+          "evidence": "https://arxiv.org/pdf/2403.08937 (read directly from PDF pages 14-15), read 2026-09-30: \"This issue occurs when the LLM excessively relies on provided examples or particular terms in the prompt while implementing a function and it sometimes hinders the generalization or correctness of the generated code.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-8",
+          "kind": "new",
+          "text": "The evidence bullet for the misread request (line 51) gains the paper's definition of prompt-biased code, so the check added by f-s3-agent-r2-7 carries its source. No percentage is added: the report did not re-read the paper's percentage figure this pass.",
+          "evidence": "https://arxiv.org/pdf/2403.08937, read 2026-09-30: \"This issue occurs when the LLM excessively relies on provided examples or particular terms in the prompt while implementing a function and it sometimes hinders the generalization or correctness of the generated code.\"; round-2 report part 2 finding 6: 'I did not re-read the percentages in Figure 2 this pass.'",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-9",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects my round-1 text, which gave error handling to two agents: 'Error paths as such: error-handler-checker' (line 36) and 'error handling' under code-reviewer (line 45). The split now follows each agent's own description. An error path with no handling or fallback goes to error-handler-checker ('Verifies all error paths are handled with proper fallbacks'). Handling that swallows or over-catches goes to code-reviewer ('error handling that swallows or over-catches'). error-handler-checker also lists 'swallowed errors' as a dispatch phrase, so the two siblings overlap each other. That overlap is theirs, not this file's.",
+          "evidence": "agents/specialized/error-handler-checker.md:3; agents/quality/code-reviewer.md:3; agents/ai-quality/ai-code-quality-reviewer.md:36, :45",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-10",
+          "kind": "correction-of-earlier-round",
+          "text": "The second half of f-s3-agent-r2-9: on line 45, the code-reviewer share of error handling is narrowed to the part code-reviewer's description claims.",
+          "evidence": "agents/quality/code-reviewer.md:3 'error handling that swallows or over-catches'",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-11",
+          "kind": "new",
+          "text": "The agent and its skill disagree on names. The agent types findings 'vacuous_test', 'stale_framework_idiom' and 'misread_request'. The skill names the same classes 'vacuous_test_assertion', 'deprecated_api_pattern' and 'framework_version_mismatch', and 'missing_business_rule' and 'unrelated_edit', and the agent's type list ends with 'a type the skill names'. So one defect could be typed two ways, and records of the same defect would not be matched as duplicates. The output section now maps the skill's names onto the agent's.",
+          "evidence": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md:450-452 'hallucinated_import | deprecated_api_pattern | vacuous_test_assertion | race_condition | ai_sql_injection | framework_version_mismatch | debug_print_left | missing_business_rule | prompt_drift | unrelated_edit'; agents/ai-quality/ai-code-quality-reviewer.md:94",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-12",
+          "kind": "new",
+          "text": "Line 49 says the unmeasured classes are 'checked because they are defects', but nothing in the file supports that for over-engineering and vacuous tests. Google's review guide asks both questions. The bullet on unmeasured classes (line 56) now cites it, without adding any claim about how often they occur.",
+          "evidence": "round-2 report part 2 finding 5, https://google.github.io/eng-practices/review/reviewer/looking-for.html, read 2026-09-30: \"developers have made the code more generic than it needs to be, or added functionality that isn't presently needed\"; \"Will the tests actually fail when the code is broken?\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-13",
+          "kind": "new",
+          "text": "Two gaps stay open, with no text change, because this round's report does not source them. First, line 35 searches for Rust markers but line 40 names no Rust manifest, so a Rust version falls back to confidence LOW; the Cargo documentation was not fetched. Second, Gradle's build.gradle.kts appears only in the fetch tool's summary, not in a verbatim quote. Both are for round 3, which uses another class of source.",
+          "evidence": "round-2 report part 2 finding 3: 'The file greps for Rust markers but names no Rust manifest; this pass did not fetch Cargo's documentation'; part 1 row 11 'come from the reading model's summary, not a verbatim quote'",
+          "decision": "rejected",
+          "reason": "no source this round",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-14",
+          "kind": "new",
+          "text": "Checked the definition of every agent the file hands work to; no text change beyond the edits above. The re-validator had checked only that the agents exist. Fourteen of the sixteen claim the work in their own description: code-reviewer, error-handler-checker, code-smell-detector, hallucination-detector, type-checker, mutation-test-runner, duplicate-code-detector, dead-code-detector, memory-safety-checker, api-contract-validator, performance-profiler, concurrency-checker, sast-scanner, and documentation-updater (which updates documentation; it does not review it). ci-pipeline-checker's description claims 'pipeline security', and its body names the workflow token. llm-security-tester claims coding-assistant configuration only in its body; f-s3-agent-r2-3 rewords that row in its body's terms. The one hand-on that was not honest, wrong-type arguments sent to hallucination-detector, is corrected by f-s3-agent-r2-6.",
+          "evidence": "agents/quality/code-reviewer.md:3, :158, :160; agents/specialized/error-handler-checker.md:3; agents/quality/code-smell-detector.md:3; agents/ai-quality/hallucination-detector.md:3, :40-50, :77-83; agents/quality/type-checker.md:3, :46-47; agents/testing/runners/mutation-test-runner.md:3; agents/quality/duplicate-code-detector.md:3; agents/quality/dead-code-detector.md:3; agents/specialized/memory-safety-checker.md:3; agents/specialized/api-contract-validator.md:3; agents/specialized/performance-profiler.md:3; agents/security/concurrency-checker.md:3; agents/security/sast-scanner.md:3; agents/infrastructure/ci-pipeline-checker.md:3, :127; agents/ai-quality/llm-security-tester.md:3, :35-36; agents/documentation/documentation-updater.md:3",
+          "decision": "rejected",
+          "reason": "verified, no change needed",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r2-15",
+          "kind": "correction-of-earlier-round",
+          "text": "Found at re-validation (dispatch d-s3-agent-r2-revalidate) and corrected: the sentence added by f-s3-agent-r2-2 said three unfinished-work hits are \"often by design\", a frequency word that no source measures. It now says the three hits \"can be by design\". The re-validation's three other unsourced wordings (the read-only collection example, the unnamed lockfile, the docs directory) are kept as detection conventions and left for round 3 to source.",
+          "evidence": "agents/ai-quality/ai-code-quality-reviewer.md line 35, before \"Three hits are often by design\", after \"Three hits can be by design\"; citation validator re-validation d-s3-agent-r2-revalidate listing the wording as unsourced",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 18,
+        "VALIDATED": 18,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "validator_final": {
+        "examined": 59,
+        "VALIDATED": 59,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/ai-quality/ai-code-quality-reviewer/SKILL.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "The domain is code in any language the project uses, so the rule applies. The file still holds no pairs of defect-and-better examples, so the rule is met by deferring to the skill body. Its only code is one TypeScript test in the output example. Its search rules now carry sources for Python, .NET, Java and Rust markers, language-neutral comment markers that also cover C, C++ and SQL, and manifests for JavaScript and TypeScript, .NET, Java and Python. The skill body still has no C or C++ example. No example was checked in this round, because the file carries no pair of defect-and-better examples.",
+        "examples_checked": []
+      }
+    },
+    {
+      "round": 3,
+      "date": "2026-09-30",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:35c007e82d5c3bd6d71f6abf87f3b4de6a3a8f38073fb9600f4fdbc2ad55c12c",
+      "fingerprint_after": "sha256:21dea700f84541dc1bad8cd9b25cf441be0d353014920bd4ec5e105225a92c6b",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s3-agent-r3-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-agent-r3-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-agent-r3-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "Maven POM introduction: verbatim sentences containing pom.xml",
+          "source_class": "vendor documentation",
+          "repeated_because": "round 2 got no literal 'pom.xml' in a verbatim quote (medium confidence)"
+        },
+        {
+          "text": "Gradle declaring dependencies: verbatim lines containing build.gradle / build.gradle.kts",
+          "source_class": "vendor documentation",
+          "repeated_because": "round 2's file names came from the reading model's summary (medium confidence)"
+        },
+        {
+          "text": "Google eng-practices raw markdown source: looking-for.md three sentences",
+          "source_class": "publisher",
+          "repeated_because": "round 2 quotes came through a summarising fetch"
+        },
+        {
+          "text": "Cargo guide: Cargo.toml versus Cargo.lock",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "npm docs: package-lock.json description",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Yarn classic docs: yarn.lock",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "pnpm docs: working with Git, pnpm-lock.yaml",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "NuGet PackageReference page: packages.lock.json, plus the two quotes the file already uses",
+          "source_class": "vendor documentation",
+          "repeated_because": "file's two NuGet quotes came through a summarising fetch; page also carries the lockfile section"
+        },
+        {
+          "text": "Poetry basic usage: poetry.lock",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "uv project layout: uv.lock",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Gradle dependency locking: gradle.lockfile",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Oracle Java SE 21 Collection interface: UnsupportedOperationException and unmodifiable collections",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "ANSSI/BSI joint report on AI coding assistants: landing page",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "NIST SP 800-218A page: title, date, abstract, scope regarding AI-generated code",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "CISA guidance AI-generated code review secure by design \"AI-generated code\" 2025 2026",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "Maven lock file dependency locking official \"maven.apache.org\" reproducible builds no lockfile",
+          "source_class": "broad web",
+          "repeated_because": null
+        },
+        {
+          "text": "ANSSI/BSI report PDF (blob URL)",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "arXiv 2510.00730 Maven-Lockfile abstract",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "Claude Code settings reference, .md form: attribution / commit trailer",
+          "source_class": "vendor documentation",
+          "repeated_because": "round 1 quote came through a summarising fetch; round 2's raw read was settings.md, a different page"
+        },
+        {
+          "text": "Read the saved ANSSI and BSI PDF in full, pages 1-16, for review concerns about assistant-written code and for anything the file contradicts",
+          "source_class": "regulator",
+          "repeated_because": "the round-3 validator could not extract the PDF's text; the critic read the saved copy with its Read tool"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://maven.apache.org/guides/introduction/introduction-to-the-pom.html",
+          "read_on": "2026-09-30",
+          "bore_on": "line 40 pom.xml",
+          "outcome": "supported",
+          "quote": "As the name suggests, it's the relative path from the module's `pom.xml` to the parent's `pom.xml`.",
+          "error": null
+        },
+        {
+          "url": "https://docs.gradle.org/current/userguide/declaring_dependencies.html",
+          "read_on": "2026-09-30",
+          "bore_on": "line 40 build.gradle; gap build.gradle.kts",
+          "outcome": "supported",
+          "quote": "\"build.gradle\" / \"build.gradle.kts\" (code-sample captions, each shown several times)",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/google/eng-practices/master/review/reviewer/looking-for.md",
+          "read_on": "2026-09-30",
+          "bore_on": "lines 56, 58",
+          "outcome": "supported",
+          "quote": "where developers have made the code more generic than it needs to be, or added functionality that isn't presently needed by the system.",
+          "error": null
+        },
+        {
+          "url": "https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html",
+          "read_on": "2026-09-30",
+          "bore_on": "gap: Rust manifest and lockfile",
+          "outcome": "supported",
+          "quote": "`Cargo.toml` is a manifest file in which you can specify a bunch of different metadata about your package.",
+          "error": null
+        },
+        {
+          "url": "https://docs.npmjs.com/cli/v11/configuring-npm/package-lock-json",
+          "read_on": "2026-09-30",
+          "bore_on": "gap: lockfile names",
+          "outcome": "supported",
+          "quote": "This file is intended to be committed into source repositories",
+          "error": null
+        },
+        {
+          "url": "https://classic.yarnpkg.com/lang/en/docs/yarn-lock/",
+          "read_on": "2026-09-30",
+          "bore_on": "gap: lockfile names",
+          "outcome": "supported",
+          "quote": "Yarn uses a `yarn.lock` file in the root of your project.",
+          "error": null
+        },
+        {
+          "url": "https://pnpm.io/git",
+          "read_on": "2026-09-30",
+          "bore_on": "gap: lockfile names",
+          "outcome": "supported",
+          "quote": "You should always commit the lockfile (`pnpm-lock.yaml`).",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/nuget/consume-packages/package-references-in-project-files",
+          "read_on": "2026-09-30",
+          "bore_on": "line 59 NuGet quotes; gap packages.lock.json",
+          "outcome": "supported",
+          "quote": "If this property is set, NuGet restore will generate a lock file (`packages.lock.json`) at the project root directory that lists all the package dependencies.",
+          "error": null
+        },
+        {
+          "url": "https://python-poetry.org/docs/basic-usage/",
+          "read_on": "2026-09-30",
+          "bore_on": "gap: lockfile names",
+          "outcome": "supported",
+          "quote": "You should commit the `poetry.lock` file to your project repo",
+          "error": null
+        },
+        {
+          "url": "https://docs.astral.sh/uv/concepts/projects/layout/",
+          "read_on": "2026-09-30",
+          "bore_on": "gap: lockfile names",
+          "outcome": "supported",
+          "quote": "uv creates a `uv.lock` file next to the `pyproject.toml`.",
+          "error": null
+        },
+        {
+          "url": "https://docs.gradle.org/current/userguide/dependency_locking.html",
+          "read_on": "2026-09-30",
+          "bore_on": "gap: lockfile names",
+          "outcome": "supported",
+          "quote": "The lock state is preserved in a file named `gradle.lockfile`, located at the root of each project or subproject directory.",
+          "error": null
+        },
+        {
+          "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html",
+          "read_on": "2026-09-30",
+          "bore_on": "line 35 'a read-only collection, for example'; line 59 'only as'",
+          "outcome": "supported",
+          "quote": "An _unmodifiable collection_ is a collection, all of whose mutator methods (as defined above) are specified to throw `UnsupportedOperationException`.",
+          "error": null
+        },
+        {
+          "url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 3",
+          "outcome": "did-not-bear",
+          "quote": "German-French recommendations for the use of AI programming assistants (04.10.2024)",
+          "error": null
+        },
+        {
+          "url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf?__blob=publicationFile",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 3",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "I cannot extract readable text from the PDF content provided. The document appears to be a linearized PDF with compressed streams that require decompression to access the actual content."
+        },
+        {
+          "url": "https://csrc.nist.gov/pubs/sp/800/218/a/final",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 3",
+          "outcome": "did-not-bear",
+          "quote": "practices, tasks, recommendations, considerations, notes, and informative references that are specific to AI model development throughout the software development life cycle.",
+          "error": null
+        },
+        {
+          "url": "https://www.cisa.gov/securebydesign",
+          "read_on": "2026-09-30",
+          "bore_on": "Part 3 (search result only, not fetched)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2510.00730",
+          "read_on": "2026-09-30",
+          "bore_on": "gap: Maven has no lockfile",
+          "outcome": "supported",
+          "quote": "Yet, Maven, one of the most important package managers in the Java ecosystem, lacks native support for a lockfile.",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/settings-reference.md",
+          "read_on": "2026-09-30",
+          "bore_on": "line 64 commit trailer",
+          "outcome": "refuted",
+          "quote": "`false` to omit the trailer from every commit Claude Code makes",
+          "error": null
+        },
+        {
+          "url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "regulator review concerns for assistant-written code; read by the critic from the saved copy, all 16 pages, page numbers as printed",
+          "outcome": "supported",
+          "quote": "Generated source code should generally be checked and reproduced by the developers. A critical review should be carried out particularly with regard to hallucinations and security risks. (page 12)",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s3-agent-r3-1",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s3-agent-r1-18. The commit-trailer quote on line 64 is not on Claude Code's settings reference. The fact is real (the trailer can be turned off), but the page's wording is \"`false` to omit the trailer from every commit Claude Code makes\". The quote is replaced with the page's words. Confidence medium: the fetch returned only the attribution section, so the old phrase could still appear elsewhere on the page.",
+          "evidence": "https://code.claude.com/docs/en/settings-reference.md, read 2026-09-30, outcome refuted: \"`false` to omit the trailer from every commit Claude Code makes\"; round-3 report part 1, last row",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r3-2",
+          "kind": "correction-of-earlier-round",
+          "text": "Corrects f-s3-agent-r2-1. 'Oracle describes UnsupportedOperationException only as ...' (line 59) overstates Oracle: its Collection documentation specifies the exception for every mutator method of an unmodifiable collection. The sentence now cites that documentation, which also sources line 35's 'a read-only collection, for example', so line 35 needs no edit.",
+          "evidence": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html, read 2026-09-30: \"An _unmodifiable collection_ is a collection, all of whose mutator methods (as defined above) are specified to throw `UnsupportedOperationException`.\"; round-3 report part 2, last row 'misattributed, high'",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r3-3",
+          "kind": "new",
+          "text": "Closes the gaps f-s3-agent-r2-13 left open. Line 40 now names `Cargo.toml` and `build.gradle.kts`, and replaces 'a lockfile' with each ecosystem's lockfile name. It also adds that a missing lockfile is not a finding: NuGet's and Gradle's lockfiles must be switched on, and Maven has no native one. That keeps the agent from raising a false finding against a project that never enabled locking. The Maven statement rests on one paper, since no Apache Maven page was found. The wording follows that paper's 'native', and the source is named in the evidence section (f-s3-agent-r3-4).",
+          "evidence": "https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html, read 2026-09-30: \"`Cargo.toml` is a manifest file in which you can specify a bunch of different metadata about your package.\"; https://docs.gradle.org/current/userguide/declaring_dependencies.html: \"build.gradle\" / \"build.gradle.kts\" captions; round-3 report part 2: NuGet \"you can opt-in to the lock file feature by setting the MSBuild property `RestorePackagesWithLockFile`\", Gradle \"Once enabled, you must create an initial lock state\"; https://arxiv.org/abs/2510.00730: \"Yet, Maven, one of the most important package managers in the Java ecosystem, lacks native support for a lockfile.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r3-4",
+          "kind": "new",
+          "text": "Adds the sources for f-s3-agent-r3-3 to the detection-rules bullet (line 59), one reference per file, with a quote only where the address does not already name the file. The Yarn source is the classic documentation; the modern Yarn pages were not read. Maven's page now names `pom.xml` verbatim, which lifts round 2's medium-confidence Maven row to high confidence with no text change needed.",
+          "evidence": "round-3 report part 1 (Maven row) and part 2 (lockfile table); sources above for Cargo, npm, Yarn, pnpm, NuGet, Poetry, uv, Gradle, arXiv 2510.00730",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r3-5",
+          "kind": "new",
+          "text": "Completes Google's over-engineering sentence (line 56) with its last three words, 'by the system', read from the raw source. The meaning does not change; the quote is now complete to the end of the sentence.",
+          "evidence": "https://raw.githubusercontent.com/google/eng-practices/master/review/reviewer/looking-for.md, read 2026-09-30: \"where developers have made the code more generic than it needs to be, or added functionality that isn't presently needed by the system.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r3-6",
+          "kind": "new",
+          "text": "The regulator report names two concerns in assistant-written code that the hand-on list missed. First, insecure libraries 'suggested even when their documentation flagged security concerns' go to dependency-checker, whose description is 'Audits dependencies for vulnerabilities, outdated versions'. Second, weak hashing ('MD5 or a single iteration of SHA-256') goes to sast-scanner, whose body has a 'Weak Cryptography' section with MD5 patterns. Also added, from this fresh read: a credential written into the code goes to secrets-detector, whose description claims 'leaked credentials' and 'secret in repo'. Until now the list sent it nowhere, though the skill's debug-print example leaks a token. This adds no eleventh class.",
+          "evidence": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf, read 2026-09-30, page 9: \"insecure libraries were suggested even when their documentation flagged security concerns\"; page 9: \"insecure methods such as MD5 or a single iteration of SHA-256 are still often used\"; agents/security/dependency-checker.md:3; agents/security/sast-scanner.md:404 '### 7. Weak Cryptography'; agents/security/secrets-detector.md:3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r3-7",
+          "kind": "new",
+          "text": "Two changes to the documentation sentence on line 45. First, `docs/` was an unsourced convention. It is kept as a place to search, reworded to 'any `docs/` directory' so it no longer implies that every repository has one; README files and `CLAUDE.md` are already sourced (Google and Claude Code). Second, the regulator report names generated comments or documentation that is wrong or hallucinated, which no class and no hand-on covered. It is recorded the same way as out-of-date documentation, for documentation-updater, whose description includes updating 'code comments'.",
+          "evidence": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf, read 2026-09-30, page 9: \"explanations, comments or documentation generated by an AI assistant can be incorrect or completely hallucinated\"; agents/documentation/documentation-updater.md:3 'Updates API docs, README, code comments, and changelog entries'",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r3-8",
+          "kind": "new",
+          "text": "Adds the one relevant regulator source to the evidence section, read by me from the saved copy, with printed page numbers. It supports five existing rules: the review itself (page 12), stale framework idioms through outdated training data (page 9), hallucinated methods and the plausibility checks for unknown libraries (page 10), coding-assistant configuration through extensions that act for the programmer (page 11), and treating what is read as data, since package documentation can carry injected instructions (page 10). It also sources the three hand-ons from f-s3-agent-r3-6 and -7. The agencies are named in full, not by their short forms. The landing page dates the report 04.10.2024 and the PDF says 'Last updated: September 2024'; the bullet uses the PDF's date.",
+          "evidence": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf (saved copy .claude/projects/-Users-account-Code-ctoc/26a2fcc0-aa46-4510-a665-3c2f0ee314f5/tool-results/webfetch-1790763462989-llcq7m.pdf), read 2026-09-30, pages 2, 3, 9, 10, 11, 12",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r3-9",
+          "kind": "new",
+          "text": "What the regulators add beyond the edits above: nothing contradicts the file, and one gap is reported with no text change. The French and German report restates Spracklen's measurement consistently with line 52: 16 models, 576,000 code examples, 2.23 million packages, 19.7% hallucinated (page 10). Its automation-bias section ('even flawed solutions are well-worded', page 8) agrees with the file's 'report what the lines show'. The gap: the report names licensing violations from using AI-generated code as a risk it deliberately leaves out (page 8). No agent's description claims to detect reproduced licensed code, because license-scanner 'Scans dependencies for license compliance'. It is not added: the report gives no method, and routing it to license-scanner would be a hand-on its description does not claim. It is left for CTO Chief and the human to decide. Its recommendation to 'flag AI generated code blocks' (page 9) is not added: the file already takes provenance only from the dispatch. NIST SP 800-218A does not bear, because its scope is AI model development. CISA gave nothing quotable.",
+          "evidence": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf, read 2026-09-30, page 8: \"There are further risks, such as potential licensing violations when using AI-generated code, which have no direct security connection and are not addressed in the following.\"; page 8: \"as even flawed solutions are well-worded\"; page 9: \"It might be beneficial to flag AI generated code blocks and to document the used AI tools.\"; page 10: \"They found that 19.7% of imported packages were hallucinated.\"; agents/compliance/license-scanner.md:3; https://csrc.nist.gov/pubs/sp/800/218/a/final did-not-bear",
+          "decision": "reported-to-human",
+          "reason": "Reported for the licensing gap only; the finding's other observations need no change.",
+          "for_the_human_id": "h-s3-agent-r3-licensing-gap-no-owning-agent"
+        },
+        {
+          "id": "f-s3-agent-r3-10",
+          "kind": "new",
+          "text": "Consistency checks on this fresh read found nothing needing text. The Role lists ten classes, the table has ten rows, and the output type list names all ten plus reviewer_directed_instruction. Every class has a severity, stated explicitly or by the stated fallbacks. The type map covers every skill type this agent itself reports; the skill's race_condition, ai_sql_injection and debug_print_left are handed on, not reported, and prompt_drift falls to the 'typed as the skill types it' rule. In the text I proposed, the only abbreviations and codes are inside verbatim quotes or are proper names (MD5, CWE-546, MSBuild, npm, NuGet). No order goes beyond Read and Grep, and the text has no gate numbers.",
+          "evidence": "agents/ai-quality/ai-code-quality-reviewer.md:18, :32-43, :76, :86, :96; skills/ai-quality/ai-code-quality-reviewer/SKILL.md:450-452",
+          "decision": "rejected",
+          "reason": "verified, no change needed",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r3-11",
+          "kind": "new",
+          "text": "Quote provenance, for the record; no text change. Confirmed against the page's whole body or its raw source: both NuGet quotes, the three Claude Code Code Review quotes, GitHub's CLAUDE.md and GEMINI.md sentence (the source has backticks, the words are identical), OWASP's typosquatting definition, the Google sentences, and Mozilla's forEach sentence. Still confirmed only through a summarising fetch: Cursor's two quotes (the .md form of the page returned 404), CWE-546's marker list, and Gradle's captions. Not re-read in round 3: Tambon's abstract, Spracklen, ImpossibleBench, the GitHub blog, Claude Code's subagent and hooks pages, Cotroneo, GitClear, Sonar, and the Python, .NET, Oracle class-page and Rust quotes. The regulator quotes were read by me from the page images of the saved PDF.",
+          "evidence": "round-3 report part 1 table and 'Not examined this pass'",
+          "decision": "rejected",
+          "reason": "verified, no change needed",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r3-12",
+          "kind": "correction-of-earlier-round",
+          "text": "The regulator quote is rendered as the source prints it, with its spelling slip marked. The critic's first text for f-s3-agent-r3-8 quoted page 9 as \"completely hallucinated\"; the page prints \"completetly hallucinated\". The executor rejected the first issue because the quote was not on its page; the re-issue quotes the page as printed and adds \"(the source's spelling)\" outside the quotation marks.",
+          "evidence": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf (saved copy read by the executor, pages 9 to 12), read 2026-09-30, page 9: \"explanations, comments or documentation generated by an AI assistant can be incorrect or completetly hallucinated\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s3-agent-r3-13",
+          "kind": "correction-of-earlier-round",
+          "text": "Found at re-validation (dispatch d-s3-agent-r3-revalidate) and corrected: the commit-trailer sentence, corrected by f-s3-agent-r3-1, still quoted the settings reference, and the page's wording came back differently on every read because the fetch tool's reading model rewords it, so no verbatim quote is stable. The sentence now states the fact without quotation marks, with its source and read date: the settings reference documents setting attribution.commit to false to hide the commit trailer.",
+          "evidence": "https://code.claude.com/docs/en/settings-reference.md, read 2026-09-30; citation validator re-validation d-s3-agent-r3-revalidate, verdict MISATTRIBUTED (1 of 84) with the correct-to text; agents/ai-quality/ai-code-quality-reviewer.md line 65",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 16,
+        "VALIDATED": 14,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 2
+      },
+      "validator_final": {
+        "examined": 84,
+        "VALIDATED": 84,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/ai-quality/ai-code-quality-reviewer/SKILL.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "The domain is code in any language the project uses, so the rule applies. The file still holds no pairs of defect-and-better examples; they belong to the skill body, and the file's only code is one TypeScript test in the output example. Its sourced search rules now cover manifests and lockfiles for JavaScript and TypeScript, .NET, Java (Maven and Gradle, both Groovy and Kotlin build scripts), Python and Rust. Unfinished-work markers are sourced for Python, .NET, Java and Rust, and the language-neutral comment markers also apply to C, C++ and SQL. No manifest is named for C, C++ or SQL, and none of the three research reports sourced one. No example was checked in this round, because the file carries no pair of defect-and-better examples.",
+        "examples_checked": []
+      }
+    }
+  ],
+  "late_corrections": [
+    {
+      "id": "lc-s3-agent-1",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md",
+        "round": 1
+      },
+      "source": {
+        "url": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md",
+        "quote": "**Design record — this mechanism does not run.** `docs/REFINEMENT_LOOP.md` records that \"the loop is **NOT RUNNING** today\": no integrator invokes this skill as a critic and nothing reads a letter."
+      },
+      "before": "2. The skill's \"Refinement Loop — critic mode\" and \"Letter schema\" sections, and the letter rule in its \"Severity\" section, describe a mechanism that",
+      "after": "2. The skill's \"Refinement Loop — critic mode\" section, which the skill labels a design record, describes a mechanism that",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s3-agent-2",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md",
+        "round": 1
+      },
+      "source": {
+        "url": "https://arxiv.org/html/2406.09834",
+        "quote": "The DUR of the LLMs for the overall dataset ranges from 25% to 38%"
+      },
+      "before": "Four of the classes above carry a measurement of how often they appear in assistant-written code; a fifth, tests changed to pass, carries a measured propensity under a forced conflict; ... - **Fabricated patterns, stale framework idioms, vacuous tests.** This file cites no measurement of how often they occur.",
+      "after": "Five of the classes above carry a measurement of how often they appear in assistant-written code; a sixth, tests changed to pass, carries a measured propensity under a forced conflict; a seventh, vacuous tests, carries a documented tendency with no rate; ... - **Stale framework idioms.** Wang and colleagues tested \"seven advanced LLMs, 145 API mappings from eight popular Python libraries, and 28,125 completion prompts\" (https://arxiv.org/abs/2406.09834) and found that \"The DUR of the LLMs for the overall dataset ranges from 25% to 38%\" (https://arxiv.org/html/2406.09834), the DUR being the deprecated usage rate; the study covers Python only. - **Vacuous tests.** Konstantinou, Degiovanni and Papadakis, studying 24 Java repositories, found that \"LLM-based test generation approaches are also prone on generating oracles that capture the actual program behaviour rather than the expected one.\" (https://arxiv.org/abs/2410.21136). This is a tendency, with no rate. - **Fabricated patterns.** This file cites no measurement of how often they occur.",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s3-agent-3",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md",
+        "round": 1
+      },
+      "source": {
+        "url": "https://embracethered.com/blog/posts/2025/github-copilot-remote-code-execution-via-prompt-injection/",
+        "quote": "it can create and write to files in the workspace without user approval."
+      },
+      "before": "`.cursorrules`, `.github/copilot-instructions.md` or ending in `.instructions.md`. (evidence bullet ended at the Cursor rules quote)",
+      "after": "`.cursorrules`, `.vscode/settings.json`, `.github/copilot-instructions.md` or ending in `.instructions.md`. Evidence bullet adds: Visual Studio Code's workspace settings file, `.vscode/settings.json`, is on the list because of CVE-2025-53773, in which GitHub Copilot in agent mode \"can create and write to files in the workspace without user approval.\" (https://embracethered.com/blog/posts/2025/github-copilot-remote-code-execution-via-prompt-injection/).",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s3-agent-4",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md",
+        "round": 3
+      },
+      "source": {
+        "url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf",
+        "quote": "The creation of a Software Bill of Materials (SBOM) allows you to retrospectively understand whether vulnerable libraries were used and enables a targeted response if a vulnerability of certain components becomes known."
+      },
+      "before": "a credential written into the code (secrets-detector);",
+      "after": "a credential written into the code (secrets-detector); a new dependency, where the project keeps a software bill of materials (sbom-cra-checker);",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    }
+  ],
+  "held": null
+}

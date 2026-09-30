@@ -1,4 +1,521 @@
 {
   "schema": 1,
-  "entries": []
+  "entries": [
+    {
+      "id": "lc-s3-agent-1",
+      "path": "agents/ai-quality/ai-code-quality-reviewer.md",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md",
+        "round": 1
+      },
+      "source": {
+        "url": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md",
+        "quote": "**Design record — this mechanism does not run.** `docs/REFINEMENT_LOOP.md` records that \"the loop is **NOT RUNNING** today\": no integrator invokes this skill as a critic and nothing reads a letter."
+      },
+      "before": "2. The skill's \"Refinement Loop — critic mode\" and \"Letter schema\" sections, and the letter rule in its \"Severity\" section, describe a mechanism that",
+      "after": "2. The skill's \"Refinement Loop — critic mode\" section, which the skill labels a design record, describes a mechanism that",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s3-agent-2",
+      "path": "agents/ai-quality/ai-code-quality-reviewer.md",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md",
+        "round": 1
+      },
+      "source": {
+        "url": "https://arxiv.org/html/2406.09834",
+        "quote": "The DUR of the LLMs for the overall dataset ranges from 25% to 38%"
+      },
+      "before": "Four of the classes above carry a measurement of how often they appear in assistant-written code; a fifth, tests changed to pass, carries a measured propensity under a forced conflict; ... - **Fabricated patterns, stale framework idioms, vacuous tests.** This file cites no measurement of how often they occur.",
+      "after": "Five of the classes above carry a measurement of how often they appear in assistant-written code; a sixth, tests changed to pass, carries a measured propensity under a forced conflict; a seventh, vacuous tests, carries a documented tendency with no rate; ... - **Stale framework idioms.** Wang and colleagues tested \"seven advanced LLMs, 145 API mappings from eight popular Python libraries, and 28,125 completion prompts\" (https://arxiv.org/abs/2406.09834) and found that \"The DUR of the LLMs for the overall dataset ranges from 25% to 38%\" (https://arxiv.org/html/2406.09834), the DUR being the deprecated usage rate; the study covers Python only. - **Vacuous tests.** Konstantinou, Degiovanni and Papadakis, studying 24 Java repositories, found that \"LLM-based test generation approaches are also prone on generating oracles that capture the actual program behaviour rather than the expected one.\" (https://arxiv.org/abs/2410.21136). This is a tendency, with no rate. - **Fabricated patterns.** This file cites no measurement of how often they occur.",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s3-agent-3",
+      "path": "agents/ai-quality/ai-code-quality-reviewer.md",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md",
+        "round": 1
+      },
+      "source": {
+        "url": "https://embracethered.com/blog/posts/2025/github-copilot-remote-code-execution-via-prompt-injection/",
+        "quote": "it can create and write to files in the workspace without user approval."
+      },
+      "before": "`.cursorrules`, `.github/copilot-instructions.md` or ending in `.instructions.md`. (evidence bullet ended at the Cursor rules quote)",
+      "after": "`.cursorrules`, `.vscode/settings.json`, `.github/copilot-instructions.md` or ending in `.instructions.md`. Evidence bullet adds: Visual Studio Code's workspace settings file, `.vscode/settings.json`, is on the list because of CVE-2025-53773, in which GitHub Copilot in agent mode \"can create and write to files in the workspace without user approval.\" (https://embracethered.com/blog/posts/2025/github-copilot-remote-code-execution-via-prompt-injection/).",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s3-agent-4",
+      "path": "agents/ai-quality/ai-code-quality-reviewer.md",
+      "date": "2026-09-30",
+      "found_by": {
+        "path": "skills/ai-quality/ai-code-quality-reviewer/SKILL.md",
+        "round": 3
+      },
+      "source": {
+        "url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/ANSSI_BSI_AI_Coding_Assistants.pdf",
+        "quote": "The creation of a Software Bill of Materials (SBOM) allows you to retrospectively understand whether vulnerable libraries were used and enables a targeted response if a vulnerability of certain components becomes known."
+      },
+      "before": "a credential written into the code (secrets-detector);",
+      "after": "a credential written into the code (secrets-detector); a new dependency, where the project keeps a software bill of materials (sbom-cra-checker);",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    }
+  ]
 }
