@@ -94,7 +94,7 @@ the recommendation honestly) or it is so obvious you should not be asking at all
 
 ### Step 1 — Render the question, the explanation, and the decision matrix in the text response
 
-The text response that precedes the AskUserQuestion call has four parts in this exact order:
+The text response that precedes the AskUserQuestion call opens with four parts in this exact order:
 
 1. **Heading line.** Format: `### Question N — <the question phrased as a real question ending in a question mark>`. The heading must itself be a question, not a topic label. For example, "### Question 1 — Should the CTO Chief absorb the Product Loop, or stay focused on shipping only?" — never "### Question 1 — Product Loop placement". A heading without a question mark is a violation of this format.
 2. **Explanation paragraph.** One short paragraph (two to four sentences) that explains why this decision matters, what is at stake, and any relevant context the user needs to choose well. Cite a source as a markdown hyperlink if the explanation depends on a fact that could be wrong.
@@ -128,11 +128,30 @@ Matrix rules:
 
 After the matrix, write one sentence stating the question being decided. That sentence becomes the AskUserQuestion `question` text verbatim.
 
+### The lettered menu, last on screen, on every question (Tijn, 2026-09-07)
+
+Every decision question ends with a plain lettered menu, one line per option, after the question sentence and after the new-ideas block when one applies:
+
+```
+**a)** <option one, in one line> Recommended.
+**b)** <option two, in one line>
+**c)** <option three, in one line>
+**d)** <option four, in one line>
+
+Reply with a letter.
+```
+
+The menu is the last thing on screen on every question, in every mode, including plain text where the AskUserQuestion widget is not used. It ends with the line `Reply with a letter.` The user answers with a single letter, and the letter is mapped back to its option; never make the user type an option label. The recommended option is marked in the menu only on a quality decision, the same split as matrix rule 7; on an owner decision no option is marked. When the AskUserQuestion widget is also used, the menu still ends the text response, and the widget's options mirror the letters in the same order. The menu belongs to a decision question written in this format; a dashboard screen that prints its own numbered replies keeps them. The one exception is the screen after a further explanation the user asked for, described under Sequencing, which offers two replies and carries no decision menu.
+
+### New ideas are proposals to check, never facts (Tijn, 2026-09-07)
+
+When a question introduces something the user has not said — for example a mechanism, a number, a policy, a process, a vendor or a claim, whether the model thought of it or took it from a file, a web page or another agent's report — that element is a new idea. New ideas are welcome, but they are presented as new ideas and checked by the user before they are treated as part of the plan. Under the matrix, after the question sentence and before the lettered menu, add a short block titled **New ideas in this question, for you to check:** that lists each such element in one line, with where it came from. A question that introduces nothing new carries no such block. Never fold an invented element silently into an option's wording or into a recorded decision. Nothing the user has not confirmed is recorded as decided.
+
 ### Step 2 — Invoke AskUserQuestion (matrix is forbidden inside)
 
 The AskUserQuestion call contains only:
 
-- `question`: the one sentence from the previous paragraph. No matrix. No pros or cons. No recommendation reason.
+- `question`: the verbatim question sentence from Step 1, written after the matrix. No matrix. No pros or cons. No recommendation reason.
 - `header`: a label of twelve characters or fewer.
 - `options`: two to four entries. Each `label` is the option name. The recommended option's label ends with `(Recommended)`. Each `description` is one sentence summarizing the option. Use no abbreviations.
 
@@ -141,6 +160,8 @@ The matrix has been shown above the call. Do not replicate it inside the questio
 ## Sequencing — one question per turn, always
 
 **One question per turn. Never batch.** Even if the questions appear independent, ask them sequentially. Render one matrix in the text response, then invoke AskUserQuestion with a single question. Wait for the answer. Then render the next matrix and ask the next question.
+
+Never move to the next question until the user has answered the current one and says they are satisfied, and never answer or decide on the user's behalf. When the user asks for a further explanation, give it, then stop and offer two replies, `a) satisfied, next` and `b) more on this`, with no decision menu on the same screen; a reply to these two never records a decision, and when the user replies `satisfied, next` to a question not yet answered, show that question's lettered menu again, last, and wait for a letter. This applies to a further explanation the user asked for, not to the explanation paragraph every question carries.
 
 This rule governs discussion and design questions — the decisions that shape what gets built. Each deserves its own focused turn so the user can reason about it without parallel options bleeding into the choice, and it overrides the AskUserQuestion built-in batching capability for those questions.
 
@@ -167,13 +188,13 @@ Transactional email (receipts, password resets) must reach the inbox, not spam. 
 ┌────────────────────────────┬───────────────────────────────────────────────┬─────────────────────────────────────────────┬───────────────────────────────────────────────────────┐
 │ Option                     │ Pros                                          │ Cons                                        │ Recommendation                                        │
 ├────────────────────────────┼───────────────────────────────────────────────┼─────────────────────────────────────────────┼───────────────────────────────────────────────────────┤
-│ Resend                     │ React Email component integration.            │ Designed for transactional email only;      │                                                       │
-│                            │ Free tier of three thousand emails per month. │ not built for marketing campaigns.          │                                                       │
-│                            │ Strong deliverability reputation in 2026.     │                                             │                                                       │
-├────────────────────────────┼───────────────────────────────────────────────┼─────────────────────────────────────────────┼───────────────────────────────────────────────────────┤
 │ Postmark                   │ Top-tier deliverability metrics in 2026.      │ Pricing starts at fifteen dollars per month │ Recommended — highest deliverability reputation       │
 │                            │ Detailed bounce diagnostics for debugging.    │ for ten thousand emails; no free production │ for transactional email; pricing starts at fifteen    │
 │                            │ Best transactional reputation among providers.│ tier.                                       │ dollars per month at the ten-thousand-email tier.     │
+├────────────────────────────┼───────────────────────────────────────────────┼─────────────────────────────────────────────┼───────────────────────────────────────────────────────┤
+│ Resend                     │ React Email component integration.            │ Designed for transactional email only;      │                                                       │
+│                            │ Free tier of three thousand emails per month. │ not built for marketing campaigns.          │                                                       │
+│                            │ Strong deliverability reputation in 2026.     │                                             │                                                       │
 ├────────────────────────────┼───────────────────────────────────────────────┼─────────────────────────────────────────────┼───────────────────────────────────────────────────────┤
 │ Amazon Simple Email Service│ Lowest per-message cost at large scale: ten   │ Manual configuration of sender policy       │                                                       │
 │                            │ cents per thousand emails.                    │ framework and domain key records.           │                                                       │
@@ -183,6 +204,12 @@ Transactional email (receipts, password resets) must reach the inbox, not spam. 
 ```
 
 Which email delivery provider should the project use for transactional email?
+
+**a)** Postmark — highest deliverability reputation for transactional email. Recommended.
+**b)** Resend — free tier of three thousand emails per month.
+**c)** Amazon Simple Email Service — lowest cost per message at large scale.
+
+Reply with a letter.
 ````
 
 Then invoke AskUserQuestion with:
@@ -190,6 +217,8 @@ Then invoke AskUserQuestion with:
 - `question`: "Which email delivery provider should the project use for transactional email?"
 - `header`: "Email"
 - Three options: "Postmark (Recommended)", "Resend", "Amazon Simple Email Service" — each with a one-sentence description and no abbreviations.
+
+The widget's three options mirror the menu's letters in the same order: a) Postmark, b) Resend, c) Amazon Simple Email Service.
 
 ## What NOT to do
 
@@ -205,5 +234,8 @@ Then invoke AskUserQuestion with:
 - Never mark more than one option as Recommended. On a quality decision mark exactly one; on an owner decision mark none.
 - Never invoke AskUserQuestion without first rendering the matrix.
 - Never batch — one question per turn, always.
+- Never end a question without the lettered menu as the last thing on screen, ending with `Reply with a letter.`, except the screen after a further explanation, which offers two replies and carries no decision menu.
+- Never fold a new idea silently into an option's wording or into a recorded decision; list it in the new-ideas block for the user to check.
+- Never move to the next question before the user has answered and says they are satisfied.
 - Never call WebSearch on every Pros or Cons claim — only on claims that could be wrong.
 - Never ask the user a meta-question (for example, "should I show the matrix?" or "is this format good?"). It is a single automatic flow.
