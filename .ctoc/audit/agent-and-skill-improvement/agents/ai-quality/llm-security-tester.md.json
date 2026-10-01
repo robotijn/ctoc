@@ -1,0 +1,3482 @@
+{
+  "schema": 1,
+  "path": "agents/ai-quality/llm-security-tester.md",
+  "prerequisite": null,
+  "rounds": [
+    {
+      "round": 1,
+      "date": "2026-10-01",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:d0940f2cec21caf50ba4e9251a5a3f056d77c0d54aa5214bae63f23dd458d8b4",
+      "fingerprint_after": "sha256:4445b9711a86f1cf93eaadf98a217bcceffc08d6cc8e2f9b302786f9ec95660b",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s5-agent-r1-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-agent-r1-research-gaps",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-agent-r1-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-agent-r1-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-agent-r1-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "Current edition of the OWASP Top 10 for Large Language Model Applications, its entry names and publication date (2025 and 2026 editions)",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "OWASP 2025 entry texts for prompt injection, improper output handling, excessive agency, system prompt leakage, vector and embedding weaknesses and unbounded consumption: mitigations and verbatim sentences",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "Does LLM08:2026 Hidden Context Exposure say it replaces, renames or succeeds LLM07:2025 System Prompt Leakage",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "OWASP Top 10 for Agentic Applications for 2026: publication date and the exact entry headings in the document",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "OWASP Top 10 for the Model Context Protocol: status and entry names; Model Context Protocol security best practices",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "MITRE ATLAS latest atlas-data release, its counts, and the names and tactics of AML.T0051, AML.T0053, AML.T0056, AML.T0034, AML.T0080 and AML.T0081",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "CVE-2025-53773: the file and setting the injection wrote, the assigner, and the base score Microsoft gives",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "National Institute of Standards and Technology publications on adversarial machine learning and generative artificial intelligence risk",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "Current registry versions of garak, PyRIT and promptfoo",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://genai.owasp.org/llm-top-10/",
+          "read_on": "2026-09-30",
+          "bore_on": "line 3 and line 22: the 2025 edition and its identifiers written with the edition",
+          "outcome": "supported",
+          "quote": "LLM07:2025 System Prompt Leakage",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/llmrisk/llm01-prompt-injection/",
+          "read_on": "2026-09-30",
+          "bore_on": "line 48: 'the instruction is what hardens them' (check 1)",
+          "outcome": "refuted",
+          "quote": "it is unclear if there are fool-proof methods of prevention for prompt injection.",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/llmrisk/llm052025-improper-output-handling/",
+          "read_on": "2026-09-30",
+          "bore_on": "check 3: encoding, request forgery, zero trust",
+          "outcome": "supported",
+          "quote": "can result in XSS and CSRF in web browsers as well as SSRF, privilege escalation, or remote code execution on backend systems.",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/llmrisk/llm062025-excessive-agency/",
+          "read_on": "2026-09-30",
+          "bore_on": "checks 4 and 7: root causes, 'Execute extensions in user's context', 'Complete mediation'",
+          "outcome": "supported",
+          "quote": "Implement authorization in downstream systems rather than relying on an LLM to decide if an action is allowed or not.",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/llmrisk/llm072025-system-prompt-leakage/",
+          "read_on": "2026-09-30",
+          "bore_on": "line 22: the system prompt is not a secret",
+          "outcome": "supported",
+          "quote": "It's important to understand that the system prompt should not be considered a secret, nor should it be used as a security control.",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/llmrisk/llm082025-vector-and-embedding-weaknesses/",
+          "read_on": "2026-09-30",
+          "bore_on": "check 6: permission-aware stores and retrieval logs",
+          "outcome": "supported",
+          "quote": "Maintain detailed immutable logs of retrieval activities",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/llmrisk/llm102025-unbounded-consumption/",
+          "read_on": "2026-09-30",
+          "bore_on": "check 9: the cost case and logits and log-probabilities",
+          "outcome": "supported",
+          "quote": "Limit Exposure of Logits and Logprobs",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/",
+          "read_on": "2026-10-01",
+          "bore_on": "line 3: the 2025 list is no longer the current edition; the 2026 publication date",
+          "outcome": "refuted",
+          "quote": "August 3, 2026",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/2026/09/01/owasp-genai-security-project-unveils-2026-top-10-for-llm-applications-new-agent-control-standard-and-sponsors-as-community-tops-30000-members/",
+          "read_on": "2026-09-30",
+          "bore_on": "the 2026 edition exists: Excessive Agency ranked third",
+          "outcome": "supported",
+          "quote": "now ranked number three",
+          "error": null
+        },
+        {
+          "url": "https://github.com/GenAI-Security-Project/GenAI-LLM-Top10",
+          "read_on": "2026-09-30",
+          "bore_on": "the ten 2026 entries written with their edition",
+          "outcome": "supported",
+          "quote": "LLM08:2026 Hidden Context Exposure",
+          "error": null
+        },
+        {
+          "url": "https://github.com/GenAI-Security-Project/GenAI-LLM-Top10/tree/main/2026/final",
+          "read_on": "2026-09-30",
+          "bore_on": "the 2026 entry file names",
+          "outcome": "supported",
+          "quote": "LLM08_HiddenContextExposure.md",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM08_HiddenContextExposure.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 2: Hidden Context Exposure counts the system prompt; no sentence says it replaces System Prompt Leakage",
+          "outcome": "supported",
+          "quote": "In an LLM application, hidden context typically includes the system prompt, developer instructions, retrieved policy text",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/llm-top-10-2023-24/",
+          "read_on": "2026-10-01",
+          "bore_on": "change 15: sast-scanner's section 12 uses the 2023-24 numbering; only LLM01 keeps its number",
+          "outcome": "supported",
+          "quote": "LLM01: Prompt Injection",
+          "error": null
+        },
+        {
+          "url": "https://owasp.org/about",
+          "read_on": "2026-10-01",
+          "bore_on": "the name Open Worldwide Application Security Project",
+          "outcome": "supported",
+          "quote": "The Open Worldwide Application Security Project (OWASP) is a 501(c)(3) nonprofit foundation",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/OWASP/www-project-top-10-for-large-language-model-applications/main/2_0_vulns/LLM06_ExcessiveAgency.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 9: the root-cause sentence, second read",
+          "outcome": "supported",
+          "quote": "excessive functionality; excessive permissions; excessive autonomy.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/OWASP/www-project-top-10-for-large-language-model-applications/main/2_0_vulns/LLM10_UnboundedConsumption.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 13: the cost sentence in full (validator leftover 1)",
+          "outcome": "supported",
+          "quote": "leading to unsustainable financial burdens on the provider and risking financial ruin.",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+          "read_on": "2026-09-30",
+          "bore_on": "check 12: the Agentic Applications Top 10 and its publication date",
+          "outcome": "supported",
+          "quote": "December 9, 2025",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/2025/12/09/owasp-top-10-for-agentic-applications-the-benchmark-for-agentic-security-in-the-age-of-autonomous-ai/",
+          "read_on": "2026-09-30",
+          "bore_on": "check 4: human confirmation can be talked past (ASI09)",
+          "outcome": "supported",
+          "quote": "Confident, polished explanations misled human operators into approving harmful actions (ASI09 – Human-Agent Trust Exploitation)",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/download/52117/?tmstv=1765059207",
+          "read_on": "2026-10-01",
+          "bore_on": "check 12: the exact entry headings of the Agentic Applications document",
+          "outcome": "supported",
+          "quote": "Identity & Privilege Abuse is the agentic evolution of Excessive Agency (LLM06:2025).",
+          "error": null
+        },
+        {
+          "url": "https://owasp.org/www-project-mcp-top-10/",
+          "read_on": "2026-09-30",
+          "bore_on": "check 5: the Model Context Protocol Top 10 is in beta; its entries",
+          "outcome": "supported",
+          "quote": "Beta Release and Pilot Testing - We are here right now",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/OWASP/www-project-mcp-top-10/main/index.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 10: the entry names as the page writes them (validator leftover 2); the separator settled by the session's byte-level read on 2026-10-01: an ASCII hyphen-minus in the list text",
+          "outcome": "supported",
+          "quote": "MCP09:2025 - [Shadow MCP Servers]",
+          "error": null
+        },
+        {
+          "url": "https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices",
+          "read_on": "2026-09-30",
+          "bore_on": "the Trigger section and check 5: startup command in a client configuration, token passthrough, scopes, consent",
+          "outcome": "supported",
+          "quote": "An attacker includes a malicious 'startup' command in a client configuration",
+          "error": null
+        },
+        {
+          "url": "https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices",
+          "read_on": "2026-10-01",
+          "bore_on": "change 10: the confused-deputy section and the condition on the consent requirement (validator leftovers 3 and 4)",
+          "outcome": "supported",
+          "quote": "If an MCP client supports one-click local MCP server configuration, it **MUST** implement proper consent mechanisms prior to executing commands.",
+          "error": null
+        },
+        {
+          "url": "https://github.com/mitre-atlas/atlas-data/releases",
+          "read_on": "2026-09-30",
+          "bore_on": "line 24: 'The skill maps findings to the current taxonomy release'; the counts move release by release",
+          "outcome": "refuted",
+          "quote": "16 tactics, 114 techniques",
+          "error": null
+        },
+        {
+          "url": "https://github.com/mitre-atlas/atlas-data/releases/tag/v2026.09",
+          "read_on": "2026-09-30",
+          "bore_on": "line 24 and change 3: the counts of the latest release against the skill's pinned 84 techniques",
+          "outcome": "refuted",
+          "quote": "This version of ATLAS data contains 1 matrix, 16 tactics, 120 techniques, 88 sub-techniques, 40 mitigations, and 73 case studies.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/dist/ATLAS.yaml",
+          "read_on": "2026-10-01",
+          "bore_on": "change 3: the identifier table (names, sub-techniques, tactics); read in full, raw, by the session",
+          "outcome": "supported",
+          "quote": "name: Extract LLM System Prompt",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/CHANGELOG.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the names of AML.T0080, AML.T0081 and AML.T0051.002 before the session's raw read",
+          "outcome": "supported",
+          "quote": "Modify AI Agent Configuration",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/ATLAS.yaml",
+          "read_on": "2026-10-01",
+          "bore_on": "change 3: the lookup command, run once by the session",
+          "outcome": "supported",
+          "quote": "name: LLM Prompt Injection",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round1-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 3: the raw ATLAS read at the v2026.09 tag and the one run of the lookup command (curl 8.7.1, bash 3.2.57)",
+          "outcome": "supported",
+          "quote": "Output: `saved /var/folders/…/T/tmp.sToWkOzasJ` then `2026-09-30T22:27:05Z`.",
+          "error": null
+        },
+        {
+          "url": "https://cveawg.mitre.org/api/cve/CVE-2025-53773",
+          "read_on": "2026-09-30",
+          "bore_on": "change 6: the assigner, the description and the score 7.8",
+          "outcome": "supported",
+          "quote": "allows an unauthorized attacker to execute code locally.",
+          "error": null
+        },
+        {
+          "url": "https://api.msrc.microsoft.com/sug/v2.0/en-US/affectedProduct?$filter=cveNumber eq 'CVE-2025-53773'",
+          "read_on": "2026-10-01",
+          "bore_on": "change 6: Microsoft's own base score; and sast-scanner's '8.8 per Microsoft'",
+          "outcome": "supported",
+          "quote": "\"baseScore\": \"7.8\"",
+          "error": null
+        },
+        {
+          "url": "https://embracethered.com/blog/posts/2025/github-copilot-remote-code-execution-via-prompt-injection/",
+          "read_on": "2026-09-30",
+          "bore_on": "line 42: the settings file was the editor's workspace file, not the agent's own",
+          "outcome": "supported",
+          "quote": "can create and write to files in the workspace without user approval",
+          "error": null
+        },
+        {
+          "url": "https://csrc.nist.gov/pubs/ai/100/2/e2025/final",
+          "read_on": "2026-09-30",
+          "bore_on": "change 3: the attack-side taxonomy of the National Institute of Standards and Technology",
+          "outcome": "supported",
+          "quote": "Adversarial Machine Learning: A Taxonomy and Terminology of Attacks and Mitigations",
+          "error": null
+        },
+        {
+          "url": "https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.600-1.pdf",
+          "read_on": "2026-09-30",
+          "bore_on": "the generative artificial intelligence profile; governance, owned by the ai-governance-checker skill (read from the saved copy after the fetch could not parse it)",
+          "outcome": "did-not-bear",
+          "quote": "it expands the available attack surface, as GAI itself is vulnerable to attacks like prompt injection or data poisoning.",
+          "error": null
+        },
+        {
+          "url": "https://www.nist.gov/itl/ai-risk-management-framework",
+          "read_on": "2026-09-30",
+          "bore_on": "the risk management framework; governance, owned by the ai-governance-checker skill",
+          "outcome": "did-not-bear",
+          "quote": "Released on January 26, 2023",
+          "error": null
+        },
+        {
+          "url": "https://csrc.nist.gov/projects/cosais",
+          "read_on": "2026-09-30",
+          "bore_on": "control overlays for securing AI systems; only a predictive-AI outline is published",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://pypi.org/pypi/garak/json",
+          "read_on": "2026-09-30",
+          "bore_on": "the skill's tool versions (skill round)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://pypi.org/pypi/pyrit/json",
+          "read_on": "2026-09-30",
+          "bore_on": "the skill's tool versions and PyRIT's repository address (skill round)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/promptfoo/latest",
+          "read_on": "2026-09-30",
+          "bore_on": "the skill's tool versions (skill round)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://atlas.mitre.org/techniques/AML.T0051",
+          "read_on": "2026-09-30",
+          "bore_on": "the ATLAS technique page as a lookup route",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 404 Not Found"
+        },
+        {
+          "url": "https://atlas.mitre.org/techniques/AML.T0051/",
+          "read_on": "2026-09-30",
+          "bore_on": "the ATLAS technique page as a lookup route",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 404 Not Found"
+        },
+        {
+          "url": "https://genai.owasp.org/llmrisk/llm012025-prompt-injection/",
+          "read_on": "2026-09-30",
+          "bore_on": "the address the skill cites for LLM01 (skill line 613; skill round)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 404 Not Found"
+        },
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-53773",
+          "read_on": "2026-09-30",
+          "bore_on": "the National Vulnerability Database score",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "returned the site home page only; no record content"
+        },
+        {
+          "url": "https://msrc.microsoft.com/update-guide/vulnerability/CVE-2025-53773",
+          "read_on": "2026-10-01",
+          "bore_on": "Microsoft's rendered advisory page",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "page content empty (JavaScript shell); read the Microsoft interface instead"
+        },
+        {
+          "url": "https://github.com/mitre-atlas/atlas-data/tree/v2026.09/data",
+          "read_on": "2026-10-01",
+          "bore_on": "the ATLAS data directory at the release tag",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 404 Not Found"
+        },
+        {
+          "url": "agents/coordinator/cto-chief.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the Trigger table: which steps dispatch this agent (lines 345 and 476); sast-scanner dispatched always at the secure step (line 464); a presence check of instruction text, not of a runtime dispatch",
+          "outcome": "refuted",
+          "quote": "IF the design integrates a large-language-model with user-supplied inputs.",
+          "error": null
+        },
+        {
+          "url": "agents/coordinator/ivv-chief.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the Trigger table: the independent re-run at the secure step (line 94)",
+          "outcome": "supported",
+          "quote": "IF a large-language-model is integrated with user inputs.",
+          "error": null
+        },
+        {
+          "url": "agents/security/security-scanner.md",
+          "read_on": "2026-10-01",
+          "bore_on": "Related Agents: 'The verdict layer ... that aggregates your findings' (lines 35-46: it aggregates the result files of the analyzers it lists)",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "agents/ai-quality/ai-code-quality-reviewer.md",
+          "read_on": "2026-10-01",
+          "bore_on": "line 42 'the trigger no other watcher has', and the hand-off to this agent (line 43)",
+          "outcome": "refuted",
+          "quote": "What the change lets the assistant do — a tool added to an agent, a capability server installed: llm-security-tester",
+          "error": null
+        },
+        {
+          "url": "agents/iron-loop/red-team-critic.md",
+          "read_on": "2026-10-01",
+          "bore_on": "Related Agents: the sibling that attacks plans, not applications",
+          "outcome": "supported",
+          "quote": "Adversarial red-team lens for a plan",
+          "error": null
+        },
+        {
+          "url": "skills/security/sast-scanner/SKILL.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 15 and the cross-file finding: the 2023-24 numbering and \"8.8 per Microsoft\" (lines 377, 419, 421)",
+          "outcome": "supported",
+          "quote": "### 12. AI / LLM Integration (OWASP LLM Top 10 v1.1, 2024)",
+          "error": null
+        },
+        {
+          "url": "docs/DISPATCH_PROTOCOL.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 19: the response fields, the five severity levels, coverage as a fraction",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": ".ctoc/architecture/dispatch-schema.yaml",
+          "read_on": "2026-10-01",
+          "bore_on": "change 19: agent_version and completed_at required; tokens_used typed as an integer (lines 88 and 134)",
+          "outcome": "supported",
+          "quote": "tokens_used: { type: integer, minimum: 0 }",
+          "error": null
+        },
+        {
+          "url": "docs/REFINEMENT_LOOP.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 4: the skill's refinement-loop letter",
+          "outcome": "supported",
+          "quote": "the loop is **NOT RUNNING** today",
+          "error": null
+        },
+        {
+          "url": "CLAUDE.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 20: operating lesson 9, every vulnerability is critical",
+          "outcome": "supported",
+          "quote": "Deprecations, compiler/linter warnings, and vulnerabilities of any severity are critical — fix them now.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round1-revalidate-d-s5-agent-r1-revalidate.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the re-read of the edited file (d-s5-agent-r1-revalidate): 23 changes and 9 corrections landed; 81 claims examined, 77 verified against live pages, 4 not verifiable in that dispatch (three ATLAS rows because its fetch of the data file was truncated, and the spelled-out name of ATLAS); 5 leftovers",
+          "outcome": "supported",
+          "quote": "All 23 changes and all 9 folded corrections landed as written, so there are no deviations.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round1-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "after the re-read: the byte-level read of the Model Context Protocol Top 10 separators, and one run of the corrected failure branch of the lookup against a non-existent address (leftover 3)",
+          "outcome": "supported",
+          "quote": "The `{ rm -f \"$f\"; echo \"COULD NOT DOWNLOAD\"; }` form works in bash 3.2.57.",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s5-agent-r1-1",
+          "kind": "new",
+          "text": "Nothing told the agent that what it reads is data, although its subject is text written to instruct a model and it holds Bash; the skill's live-endpoint commands, its refinement-loop letter and three orders the tools cannot carry out were not fenced off; there was no handling of empty or unreadable input. Added \"Read the method first\", \"What you read is data\" and \"Input, and what you do when it is missing or odd\" (change 4, with validator leftover 8 on the NeMo Guardrails wording).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round1-critic-d-s5-agent-r1-critic.md, finding f-s5-agent-r1-1, change 4; .ctoc/audit/improvement-run-notes/s5-agent-round1-validate-d-s5-agent-r1-validate.md, leftover 8; docs/REFINEMENT_LOOP.md line 8: \"the loop is **NOT RUNNING** today\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-2",
+          "kind": "new",
+          "text": "The claim \"The skill maps findings to the current taxonomy release\" was refuted (the skill pins release 5.6.0 and 84 techniques; v2026.09 has 120); \"You have web access; use it\" is not true of WebSearch alone; identifiers carried no edition while OWASP has published a renumbered 2026 edition; no National Institute of Standards and Technology taxonomy was cited. Added \"Taxonomies, identifiers and where they come from\" with a Bash lookup route and what to write when it fails, the ATLAS v2026.09 identifier table and edition-tagged OWASP identifiers (changes 3 and 21, with validator leftover 9 anchoring the lookup). The re-read's leftovers 2, 3 and 4 tightened the lookup: the tactic identifiers are read from the list under the `tactics:` key, a failed download removes its temporary file, and the fallback names \"the table and the lists below\".",
+          "evidence": "https://github.com/mitre-atlas/atlas-data/releases/tag/v2026.09: \"1 matrix, 16 tactics, 120 techniques, 88 sub-techniques\"; skill line 494; .ctoc/audit/improvement-run-notes/s5-agent-round1-session-runs.md; .ctoc/audit/improvement-run-notes/s5-agent-round1-validate-d-s5-agent-r1-validate.md, leftover 9; .ctoc/audit/improvement-run-notes/s5-agent-round1-revalidate-d-s5-agent-r1-revalidate.md, leftovers 2, 3 and 4; .ctoc/audit/improvement-run-notes/s5-agent-round1-session-runs.md, \"After the round-1 re-validation\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-3",
+          "kind": "new",
+          "text": "The output was not the dispatch protocol's response, every example claimed HIGH confidence and a \"demonstrated\" path although the agent runs no probe, one example used severity high, and agreement fields were pre-filled. Replaced by the protocol response with this agent's fields under `context`, a \"Severity and confidence\" table, empty agreement fields unless handed other findings (change 19, with validator leftover 6 correcting the coverage figure to 0.91 and leftover 7 adding `agent_version` and `completed_at` and a limitation line on `tokens_used`, as the session decided).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round1-critic-d-s5-agent-r1-critic.md, finding f-s5-agent-r1-3; docs/DISPATCH_PROTOCOL.md lines 97, 147, 149; skill line 617: \"confidence: medium when only the static pattern is matched\"; .ctoc/audit/improvement-run-notes/s5-agent-round1-validate-d-s5-agent-r1-validate.md, leftovers 6 and 7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-4",
+          "kind": "new",
+          "text": "Convergence the agent cannot see (\"independently show\"), \"tell it\" to threat-modeler with no dispatch tool, \"Both passes run\" unsourced, and matching by category number that breaks against sast-scanner's 2023-24 numbering. Matching is now by file and line, convergence is counted only from findings the dispatch hands over, and the threat-modeler row routes through CTO Chief (changes 15, 16 and 17, with validator leftover 5: only LLM01 keeps its number). The re-read's optional leftover 5 narrowed the claim to \"of these three categories\", because the skill treats LLM09 as keeping its number.",
+          "evidence": "agents/coordinator/cto-chief.md line 464: \"`security/sast-scanner` ALWAYS\"; skills/security/sast-scanner/SKILL.md line 377; https://genai.owasp.org/llm-top-10-2023-24/: \"LLM01: Prompt Injection\"; .ctoc/audit/improvement-run-notes/s5-agent-round1-validate-d-s5-agent-r1-validate.md, leftover 5; .ctoc/audit/improvement-run-notes/s5-agent-round1-revalidate-d-s5-agent-r1-revalidate.md, leftover 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-5",
+          "kind": "new",
+          "text": "The trigger table claimed dispatch at six steps and on three configuration events and named a gate by number; the coordinators name this agent at two steps, each under a condition, and nothing dispatches on an event. Replaced with the two dispatch points and the dispatchers' exact conditions (change 5).",
+          "evidence": "agents/coordinator/cto-chief.md lines 345 and 476; agents/coordinator/ivv-chief.md line 94 (presence checks of instruction text, read 2026-10-01)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-6",
+          "kind": "new",
+          "text": "\"Watch configuration\" is an order the agent cannot carry out, \"the trigger no other watcher has\" is false (ai-code-quality-reviewer reports coding-assistant configuration and hands the capability part to this agent), and the CVE-2025-53773 wording put the toggle in \"an agent's own settings file\" rather than the editor's workspace settings file. Rewritten with the Model Context Protocol guidance and the exact file, key and score (change 6).",
+          "evidence": "https://embracethered.com/blog/posts/2025/github-copilot-remote-code-execution-via-prompt-injection/: \"can create and write to files in the workspace without user approval\"; https://cveawg.mitre.org/api/cve/CVE-2025-53773: 7.8; agents/ai-quality/ai-code-quality-reviewer.md line 43",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-7",
+          "kind": "new",
+          "text": "The severity rules contradicted the skill (five items the skill blocks were warnings here; an unpinned model revision blocked here and \"Fix soon\" there) and the wrapper contradicted itself (its table blocked an exfiltration sink its lists never named). Every finding is now critical under operating lesson 9, and the old block-versus-warn table becomes an order-of-report table (changes 20 and 23; the confidence part is in change 19).",
+          "evidence": "CLAUDE.md operating lesson 9; skill lines 559 (\"there is no soft tier on the wire\"), 564, 565 and 648",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-8",
+          "kind": "new",
+          "text": "Check 1 said the instruction \"is what hardens\" delimiters; OWASP says no fool-proof prevention is known. Separation and the instruction now reduce the risk and never close a finding alone (changes 7 and 22).",
+          "evidence": "https://genai.owasp.org/llmrisk/llm01-prompt-injection/: \"it is unclear if there are fool-proof methods of prevention for prompt injection.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-9",
+          "kind": "new",
+          "text": "Five agentic failure classes had no check (ASI03, ASI07, ASI08, ASI09, ASI10). Added check 12 with the document's entry headings, and the other five mapped onto existing checks (change 14).",
+          "evidence": "https://genai.owasp.org/download/52117/?tmstv=1765059207: \"Identity & Privilege Abuse is the agentic evolution of Excessive Agency (LLM06:2025).\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-10",
+          "kind": "new",
+          "text": "Check 5 missed token passthrough, scope minimisation, the confused deputy, consent before a configured command runs, shadow servers, secret exposure and missing audit. Added from the protocol's security guidance and the OWASP Model Context Protocol Top 10 (change 10, with validator leftovers 2 and 3, and the optional leftover 4 quoting the confused-deputy section, taken because it is sourced).",
+          "evidence": "https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices: \"MCP servers **MUST NOT** accept any tokens that were not explicitly issued for the MCP server.\"; https://owasp.org/www-project-mcp-top-10/",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-11",
+          "kind": "new",
+          "text": "Check 3 had no encoding rule, no cross-site or server-side request forgery, and did not name the exfiltration sink the old table blocked. Added from OWASP LLM05:2025 (change 8).",
+          "evidence": "https://genai.owasp.org/llmrisk/llm052025-improper-output-handling/: \"Treat the model as any other user, adopting a zero-trust approach\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-12",
+          "kind": "new",
+          "text": "Check 4 covered the functionality of tools but not their authority, and its confirmation rule is open to the human-trust exploitation OWASP records. Added \"Execute extensions in user's context\" and a confirmation that shows the exact action (change 9). The re-read's leftover 1 restored the condition on the \"Show the exact command\" quotation (the consent dialog for a local server configured in one click) and states that applying the rule to every confirmation is this file's own rule.",
+          "evidence": "https://genai.owasp.org/llmrisk/llm062025-excessive-agency/; https://genai.owasp.org/2025/12/09/owasp-top-10-for-agentic-applications-the-benchmark-for-agentic-security-in-the-age-of-autonomous-ai/: \"Confident, polished explanations misled human operators into approving harmful actions (ASI09 – Human-Agent Trust Exploitation)\"; .ctoc/audit/improvement-run-notes/s5-agent-round1-revalidate-d-s5-agent-r1-revalidate.md, leftover 1: \"Display a clear consent dialog before connecting a new local MCP server via one-click configuration. The MCP client **MUST**: Show the exact command that will be executed\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-13",
+          "kind": "new",
+          "text": "Check 6 lacked retrieval logs and the embedding-inversion case. Added from OWASP LLM08:2025 (change 11).",
+          "evidence": "https://genai.owasp.org/llmrisk/llm082025-vector-and-embedding-weaknesses/: \"Maintain detailed immutable logs of retrieval activities\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-14",
+          "kind": "new",
+          "text": "Check 9 treated consumption as cost only. Added the cost sentence and the logits and log-probabilities mitigation (change 13, with validator leftover 1 completing the quotation).",
+          "evidence": "https://genai.owasp.org/llmrisk/llm102025-unbounded-consumption/: \"Limit Exposure of Logits and Logprobs\"; raw source: \"leading to unsustainable financial burdens on the provider and risking financial ruin.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-15",
+          "kind": "new",
+          "text": "Check 7 stated its rule without a source. Added the OWASP \"Complete mediation\" sentence (change 12).",
+          "evidence": "https://genai.owasp.org/llmrisk/llm062025-excessive-agency/: \"Implement authorization in downstream systems rather than relying on an LLM to decide if an action is allowed or not\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-16",
+          "kind": "new",
+          "text": "The Related Agents table said security-scanner \"aggregates your findings\" (it aggregates the result files of the analyzers it lists, and this agent writes none), missed the ai-governance-checker skill (no agent file of that name exists) and red-team-critic, and two rows said \"exploit\" and \"runtime\" or omitted the hand-off from ai-code-quality-reviewer (change 18).",
+          "evidence": "agents/security/security-scanner.md lines 35-46; agents/iron-loop/red-team-critic.md line 3; the presence check that agents/compliance/ai-governance-checker.md does not exist (d-s5-agent-r1-research-gaps)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-17",
+          "kind": "new",
+          "text": "The system-prompt sentence rested on an unsourced causal claim (\"precisely why\") and ignored the 2026 edition. Replaced by the OWASP sentence and the Hidden Context Exposure scope, with an order never to say that entry replaces System Prompt Leakage (change 2).",
+          "evidence": "https://genai.owasp.org/llmrisk/llm072025-system-prompt-leakage/; https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM08_HiddenContextExposure.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-18",
+          "kind": "new",
+          "text": "The description named no boundary and no dispatch phrases. The existing sentence is kept byte for byte; added the boundary with four siblings and dispatch phrases copied from the skill's own when_to_load list (change 1).",
+          "evidence": "skills/ai-quality/llm-security-tester/SKILL.md lines 6-21; agents/security/sast-scanner.md line 3 (\"Dispatch when …\")",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-19",
+          "kind": "new",
+          "text": "May this agent probe a live model endpoint? Change 4 forbids it, so every finding is a path found by reading the code, at MEDIUM confidence at most. Allowing a probe is a decision on risk and spend that belongs to the human.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round1-critic-d-s5-agent-r1-critic.md, finding f-s5-agent-r1-19; skill lines 538-554 and 610",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s5-agent-r1-live-endpoint-probe"
+        },
+        {
+          "id": "f-s5-agent-r1-20",
+          "kind": "new",
+          "text": "Nothing dispatches this agent when configuration grows the surface (a tool, a Model Context Protocol server, a retrieval source or a memory writer added). Changing that means editing agents/coordinator/cto-chief.md, outside this slice.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round1-critic-d-s5-agent-r1-critic.md, finding f-s5-agent-r1-20; agents/coordinator/cto-chief.md lines 345 and 476",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s5-agent-r1-no-dispatch-on-configuration-growth"
+        },
+        {
+          "id": "f-s5-agent-r1-21",
+          "kind": "new",
+          "text": "This agent's findings bypass the security verdict layer: security-scanner builds its verdict from the result files of the analyzers it lists, and this agent writes none. Changing that means editing agents/security/security-scanner.md, outside this slice.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round1-critic-d-s5-agent-r1-critic.md, finding f-s5-agent-r1-21; agents/security/security-scanner.md lines 35-46",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s5-agent-r1-findings-bypass-security-verdict"
+        },
+        {
+          "id": "f-s5-agent-r1-22",
+          "kind": "new",
+          "text": "skills/security/sast-scanner/SKILL.md line 419 says \"8.8 per Microsoft\", while Microsoft's own data gives 7.8; its lines 43 and 377 use bare identifiers from the 2023-24 edition.",
+          "evidence": "https://api.msrc.microsoft.com/sug/v2.0/en-US/affectedProduct?$filter=cveNumber eq 'CVE-2025-53773': \"baseScore\": \"7.8\"; https://cveawg.mitre.org/api/cve/CVE-2025-53773: 7.8; .ctoc/audit/improvement-run-notes/s5-agent-round1-research-gaps-d-s5-agent-r1-research-gaps.md, finding g1",
+          "decision": "rejected",
+          "reason": "Cross-file: skills/security/sast-scanner/SKILL.md is not in this slice and has not been started; slice s76 meets it (inventory.json). An exact-text search of agents/ and skills/ finds \"8.8 per Microsoft\" only there, so no finished file needs a late correction.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-23",
+          "kind": "new",
+          "text": "The response template keeps tokens_used: null, because an agent cannot see its own token count, while the machine schema types that field as an integer; which side moves is a change to a machine-read contract (the validator's schema-divergence finding v6, decided by the session as in the previous slice).",
+          "evidence": ".ctoc/architecture/dispatch-schema.yaml line 134: \"tokens_used: { type: integer, minimum: 0 }\"; .ctoc/audit/improvement-run-notes/s5-agent-round1-validate-d-s5-agent-r1-validate.md, leftover 7",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s5-agent-r1-tokens-used-schema-mismatch"
+        },
+        {
+          "id": "f-s5-agent-r1-24",
+          "kind": "new",
+          "text": "agents/security/threat-modeler.md says this agent tests \"at runtime\" (line 64: \"confirmation from design and from runt…\"; line 180: \"Tests at runtime what you tag at design time on model-call boundaries\"), which contradicts this file's rule that it runs no probe and reports paths found by reading the code.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round1-revalidate-d-s5-agent-r1-revalidate.md, \"Observations for the next critic\", other files; agents/security/threat-modeler.md lines 64 and 180",
+          "decision": "rejected",
+          "reason": "Cross-file: agents/security/threat-modeler.md is not in this slice and has not been started; slice s78 meets it (parent index, slice table; inventory.json).",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r1-25",
+          "kind": "new",
+          "text": "agents/saas/rate-limiting.md line 157 pre-fills `agreeing_skills: [\"ai-quality/llm-security-tester\", \"cost/cloud-cost-analyzer\"]` in its output template, the pattern this round removed from this file (agreement only from findings the dispatch hands over).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round1-revalidate-d-s5-agent-r1-revalidate.md, \"Observations for the next critic\", other files; agents/saas/rate-limiting.md line 157",
+          "decision": "rejected",
+          "reason": "Cross-file: agents/saas/rate-limiting.md is not in this slice and has not been started; slice s61 meets it (parent index, slice table; inventory.json).",
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 17,
+        "VALIDATED": 11,
+        "FABRICATED": 2,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "validator_final": {
+        "examined": 81,
+        "VALIDATED": 81,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/ai-quality/llm-security-tester/SKILL.md"
+      ],
+      "seven_languages": {
+        "applies": false,
+        "reason": "The wrapper carries no code example before or after this round; code examples live in the skill and are checked in its rounds. The one command the round added, the ATLAS lookup in change 3, is an instruction the agent runs, not a language example; it was run once as written by the session.",
+        "examples_checked": [
+          {
+            "language": "Bash: the ATLAS lookup command (change 3, steps 1 and 2), GNU bash 3.2.57 with curl 8.7.1",
+            "how": "run once as written by the session on 2026-10-01, .ctoc/audit/improvement-run-notes/s5-agent-round1-session-runs.md"
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "date": "2026-10-01",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:4445b9711a86f1cf93eaadf98a217bcceffc08d6cc8e2f9b302786f9ec95660b",
+      "fingerprint_after": "sha256:063f8fd81f5118a36d9a953b9805af3f373bf8395d943c93c8ede878ae4b7105",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s5-agent-r2-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-agent-r2-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-agent-r2-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-agent-r2-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "The 2026 entry texts of LLM01 Prompt Injection, LLM03 Excessive Agency, LLM06 Unbounded Consumption and LLM10 Improper Output Handling, and whether OWASP maps 2025 entries to 2026 entries (a different angle from round 1, which read only the 2026 list and one entry)",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "The descriptions and mitigations of ASI07 to ASI10, and ASI06, in the OWASP Top 10 for Agentic Applications document itself (round 1 read only the headings)",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "The descriptions of MCP01, MCP08 and MCP09 in the OWASP Top 10 for the Model Context Protocol index (round 1 read only the entry names)",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "NIST AI 100-2 E2025: glossary terms for prompt injection, its section on the security of agents, and how it scopes governance out (round 1 cited only its title)",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "ISO/IEC 42001 and ISO/IEC 27090: status and relevance to model-calling applications",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "MITRE ATLAS: which data file is current, format version against content release, how tactics and mitigations are linked in the current format (round 1 read the deprecated file)",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "The original paper on indirect prompt injection against applications that call language models",
+          "source_class": "original paper",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM01_PromptInjection.md",
+          "read_on": "2026-10-01",
+          "bore_on": "checks 1, 2, 4, 5 and 8: the 2026 prevention sentence, the input and indirect-source lists, human confirmation, memory writes, tool descriptions; and that it lacks both 2025 sentences check 1 quotes",
+          "outcome": "supported",
+          "quote": "no reliable prevention mechanism exists today",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM03_ExcessiveAgency.md",
+          "read_on": "2026-10-01",
+          "bore_on": "line 36 caveat and change 4: the renamed mitigations and the link to three agentic entries",
+          "outcome": "supported",
+          "quote": "Within the context of agentic systems, Excessive Agency can manifest as ASI02: Tool Misuse & Exploitation, ASI03: Identity & Privilege Abuse and ASI08: Cascading Failures.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM06_UnboundedConsumption.md",
+          "read_on": "2026-10-01",
+          "bore_on": "check 9: the logits mitigation is no longer listed; extraction; agentic circuit breakers",
+          "outcome": "supported",
+          "quote": "Exposure of logits and log-probabilities significantly accelerates extraction",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM10_ImproperOutputHandling.md",
+          "read_on": "2026-10-01",
+          "bore_on": "check 3: both 2025 sentences appear; the markdown-image scenario",
+          "outcome": "supported",
+          "quote": "auto-renders Markdown images or link previews referenced in model output",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/README.md",
+          "read_on": "2026-10-01",
+          "bore_on": "line 36: the caveat that the 2026 entry texts were not read",
+          "outcome": "supported",
+          "quote": "updates the ordering, scope, examples, mitigations, and framework mappings across the list",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/initiatives/top-10-for-llm-and-genai/",
+          "read_on": "2026-10-01",
+          "bore_on": "whether OWASP maps 2025 entries to 2026 entries (it has no such sentence)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/OWASP/www-project-top-10-for-large-language-model-applications/main/2_0_vulns/LLM10_UnboundedConsumption.md",
+          "read_on": "2026-10-01",
+          "bore_on": "check 9: the 2025 text on logits and shadow models, replacing round 1's summary-only reading",
+          "outcome": "supported",
+          "quote": "Restrict or obfuscate the exposure of `logit_bias` and `logprobs` in API responses.",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/download/52117/?tmstv=1765059207",
+          "read_on": "2026-10-01",
+          "bore_on": "checks 8 and 12: ASI06 to ASI10 descriptions and mitigations, printed page numbers",
+          "outcome": "supported",
+          "quote": "Expire unverified memory to limit poison persistence.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/OWASP/www-project-mcp-top-10/main/index.md",
+          "read_on": "2026-10-01",
+          "bore_on": "check 5: the descriptions of MCP01, MCP08 and MCP09",
+          "outcome": "supported",
+          "quote": "unapproved or unsupervised deployments of Model Context Protocol instances that operate outside the organization's formal security governance",
+          "error": null
+        },
+        {
+          "url": "https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-2e2025.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "the Taxonomies section, checks 1 and 3: glossary terms, security of agents, governance out of scope, references 273 and 274",
+          "outcome": "supported",
+          "quote": "Attackers may also be able to exploit features like markdown image rendering to exfiltrate data",
+          "error": null
+        },
+        {
+          "url": "https://www.iso.org/standard/56581.html",
+          "read_on": "2026-10-01",
+          "bore_on": "ISO/IEC 27090 status",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://www.iso.org/standard/81230.html",
+          "read_on": "2026-10-01",
+          "bore_on": "ISO/IEC 42001 status",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/README.md",
+          "read_on": "2026-10-01",
+          "bore_on": "line 30: the lookup downloaded a file MITRE has deprecated",
+          "outcome": "refuted",
+          "quote": "dist/ATLAS.yaml is deprecated and will no longer be updated.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/CHANGELOG.md",
+          "read_on": "2026-10-01",
+          "bore_on": "line 24: 'never a version number' (content and format are now versioned apart); source divergence noted by the round-2 re-read: the change log heads release 2026.09 \"(2026-09-14)\", a day before the manifest's release-date, and the file credits the date to the manifest",
+          "outcome": "refuted",
+          "quote": "Starting with this release, there is a split in versioning between the ATLAS Knowledge Base content and the ATLAS Data Format.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/manifest.yaml",
+          "read_on": "2026-10-01",
+          "bore_on": "change 1 and the new lookup: the release list, its dates and data-file paths; format 5.6.0 last paired with release 2026.04 (read in full by the session)",
+          "outcome": "supported",
+          "quote": "release-date: '2026-09-15'",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/v6/ATLAS-2026.09.yaml",
+          "read_on": "2026-10-01",
+          "bore_on": "the identifier table: names, achieves links, tactic names, AML.T0053 reaching Lateral Movement, AML.TA0001 renamed (read in full by the session through the tested recipe)",
+          "outcome": "supported",
+          "quote": "version: '2026.09'",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/ATLAS.yaml",
+          "read_on": "2026-10-01",
+          "bore_on": "lines 42-53: the table labelled release v2026.09 was read from this deprecated file (read in full by the session)",
+          "outcome": "refuted",
+          "quote": "# See https://github.com/mitre-atlas/atlas-data for details on the latest data.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/dist/v6/ATLAS-2026.09.yaml",
+          "read_on": "2026-10-01",
+          "bore_on": "the current data at the tag, through the research fetch",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "content truncated at AML.T0041; relationships and mitigations not reached"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/data/mitigations.yaml",
+          "read_on": "2026-10-01",
+          "bore_on": "mitigation entries",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/dist/schemas/atlas_output_schema.json",
+          "read_on": "2026-10-01",
+          "bore_on": "the relationship format (the summariser reported the old-format schema); the research note writes this address as …/dist/schemas/atlas_output_schema.json after the v2026.09 README address, and it is written out here in full",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://api.github.com/repos/mitre-atlas/atlas-data/git/trees/v2026.09?recursive=1",
+          "read_on": "2026-10-01",
+          "bore_on": "the file layout at the tag: the v6 directory and the two latest files",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2302.12173",
+          "read_on": "2026-10-01",
+          "bore_on": "check 2: the original paper on indirect prompt injection",
+          "outcome": "supported",
+          "quote": "by strategically injecting prompts into data likely to be retrieved",
+          "error": null
+        },
+        {
+          "url": "https://aisec.cc/2023/",
+          "read_on": "2026-10-01",
+          "bore_on": "check 2: the paper is listed among the AISec 2023 accepted papers (validator leftover 4, read through the summarising model once); source divergence noted by the round-2 re-read: AISec lists Abdelnabi first, while arXiv and NIST reference 146 list Greshake first, and the file follows arXiv",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://dl.acm.org/doi/10.1145/3605764.3623985",
+          "read_on": "2026-10-01",
+          "bore_on": "the paper's ACM record",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 403"
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "sections 1-3: the deprecated file is frozen and not byte-identical to the legacy 5.6.0 file; the two latest files are symbolic links; the current file's structure; the manifest-driven recipe run once, printing release 2026.09",
+          "outcome": "supported",
+          "quote": "Output: `saved /var/folders/…/T/tmp.q6lA5G6Wmx release 2026.09` then `2026-09-30T22:59:30Z`.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 4: sub-techniques carry their own achieves links; the NIST page numbers are printed numbers, 13 below the file page",
+          "outcome": "supported",
+          "quote": "the recipe's step 2 works for a sub-technique directly",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 5: step 2 run for the sub-technique AML.T0051.001",
+          "outcome": "supported",
+          "quote": "Sub-technique keys are indented two spaces like technique keys, so the recipe's step 2 works unchanged for a sub-technique.",
+          "error": null
+        },
+        {
+          "url": "agents/coordinator/cto-chief.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 24: line 464 lists sast-scanner as ALWAYS under the secure step (a presence check of instruction text)",
+          "outcome": "supported",
+          "quote": "`security/sast-scanner` ALWAYS",
+          "error": null
+        },
+        {
+          "url": "agents/coordinator/ivv-chief.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 31: line 94 names this agent for its independent re-run",
+          "outcome": "supported",
+          "quote": "`ai-quality/llm-security-tester` IF a large-language-model is integrated with user inputs.",
+          "error": null
+        },
+        {
+          "url": "skills/ai-quality/llm-security-tester/SKILL.md",
+          "read_on": "2026-10-01",
+          "bore_on": "changes 7 and 23: the skill names AML.TA0001 \"AI Attack Staging\" and has no Lateral Movement; the five skill sections check 13 names",
+          "outcome": "supported",
+          "quote": "AI Attack Staging (AML.TA0001)",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round2-revalidate-d-s5-agent-r2-revalidate.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the re-read of the edited file (d-s5-agent-r2-revalidate): 33 changes and 5 leftovers landed, the recipe byte-identical to the session note; 89 claims examined, 89 validated; two loosely worded statements about the recipe (its leftovers 1 and 2). Two places where sources disagree with each other, neither making the file wrong: the change log heads release 2026.09 \"(2026-09-14)\" while the manifest, which the file credits, says release-date 2026-09-15; and AISec lists Abdelnabi first while arXiv and NIST reference 146 list Greshake first, the order the file follows",
+          "outcome": "supported",
+          "quote": "Round 2 landed as written.",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s5-agent-r2-1",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 1's lookup (f-s5-agent-r1-2) downloaded main/dist/ATLAS.yaml, which MITRE has deprecated and no longer updates, then stamped taxonomy_resolved_at with the current time: frozen data reported as current. Replaced by the manifest-driven recipe the session tested, byte for byte, which records the release as well as the time, names every failure branch, and never downloads the deprecated file or the two symbolic links; the manifest joins the material treated as data (changes 2, 9 and 30; validator leftover 5 added a blank line before step 2's closing paragraph). The re-read's leftovers made the recipe's description exact: it downloads the first format-6 data file the manifest lists; the release label and the file path come from two manifest lines taken on their own, which name the same release only while the newest release lists a format-6 file, and nothing checks that they do; and on a failed download curl's own error line on standard error comes first.",
+          "evidence": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/README.md: \"dist/ATLAS.yaml is deprecated and will no longer be updated.\"; .ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md, sections 1-3 and 5; .ctoc/audit/improvement-run-notes/s5-agent-round2-validate-d-s5-agent-r2-validate.md, leftover 5; .ctoc/audit/improvement-run-notes/s5-agent-round2-revalidate-d-s5-agent-r2-revalidate.md, leftovers 1 and 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-2",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 1's identifier table (f-s5-agent-r1-2) was labelled release v2026.09 but read from the deprecated file. Relabelled to the current data file dist/v6/ATLAS-2026.09.yaml and its achieves relationships; AML.T0053 gains AML.TA0015 Lateral Movement; the paragraph after the table records AML.TA0001's current name, AI Attack Adaptation, and the output examples say release 2026.09 (changes 5, 6, 7, 25 and 26).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md, section 2: \"AML.T0053 AI Agent Tool Invocation → AML.TA0005, AML.TA0012, AML.TA0015\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-3",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 1's line 24 (f-s5-agent-r1-2) said the sign of currency is 'never a version number'; 5.6.0 is a data-format version and the content release, version '2026.09', is exactly that sign. Rewritten with the change log's sentence on split versioning, the manifest's release date and the deprecated file's missing AML.T0129 (change 1).",
+          "evidence": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/CHANGELOG.md: \"Starting with this release, there is a split in versioning between the ATLAS Knowledge Base content and the ATLAS Data Format.\"; .ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md, section 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-4",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 1's caveat that the 2026 entry texts were not read (f-s5-agent-r1-2) and check 1's sources (f-s5-agent-r1-8) are out of date: four 2026 entries were read and entries sharing a name differ in text. The rule is now to quote a sentence only under the identifier of the entry it was read in; check 1 gains LLM01:2026 and NIST pages 53-54, marked as not independent; the agentic paragraph gains OWASP's link from LLM03:2026 (changes 3, 4 and 10).",
+          "evidence": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM01_PromptInjection.md: \"no reliable prevention mechanism exists today\"; https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/README.md: \"updates the ordering, scope, examples, mitigations, and framework mappings across the list\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-5",
+          "kind": "new",
+          "text": "The coverage figure divided by twelve checks while 'Checks' orders the skill's full list, so a run could report 1.0 without assessing misinformation that acts, poisoning before indexing or fine-tuning, sensitive data in a prompt, multi-turn attacks or error paths (the round-1 re-read's observation). Added check 13 for those classes, counted as assessed only when all its classes were; the denominator is thirteen and the example 12 of 13, written 0.92 because the file forbids rounding up (changes 23, 27, 28, 29 and 33).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round1-revalidate-d-s5-agent-r1-revalidate.md, \"Observations for the next critic\": \"The coverage value counts only the twelve checks\"; .ctoc/audit/improvement-run-notes/s5-agent-round2-critic-d-s5-agent-r2-critic.md, f-s5-agent-r2-5; .ctoc/audit/improvement-run-notes/s5-agent-round2-validate-d-s5-agent-r2-validate.md, change 23 (the five skill sections exist)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-6",
+          "kind": "new",
+          "text": "The description advertises 'MCP tool poisoning', but no check named a poisoned tool description. Check 5 gains a tool-description item and the order table's server row names descriptions nothing reviews (changes 14 and 32).",
+          "evidence": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM01_PromptInjection.md: \"audit tool descriptions for hidden instructions\"; skills/ai-quality/llm-security-tester/SKILL.md line 371",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-7",
+          "kind": "new",
+          "text": "The file cited NIST AI 100-2 E2025 for its vocabulary but gave none of its terms, and the governance boundary rested on this file's own reasoning though NIST sources it. Added four glossary terms, section 3.5 on agents, the governance scope sentence and references 273 and 274, with printed page numbers (change 8, with validator leftovers 1, 2 and 3: printed page numbers 13 below the file page, an ellipsis on the page 59 quotation, and reference 273 named as the initial public draft of NIST AI 600-1).",
+          "evidence": "https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-2e2025.pdf, pages 54, 59, 60, 88, 108, 110, 111; .ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md, section 4; .ctoc/audit/improvement-run-notes/s5-agent-round2-validate-d-s5-agent-r2-validate.md, leftovers 1-3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-8",
+          "kind": "correction-of-earlier-round",
+          "text": "Several passages round 1 labelled as this file's own reading can now be sourced: checks 2, 3, 4, 8 and 9, the Model Context Protocol question list in check 5 and the ASI07 to ASI10 questions in check 12. Check 2 also gains image, audio and video inputs and the Greshake paper (changes 11, 12, 13, 15, 16, 17, 18, 19, 20, 21 and 22; validator leftover 4 names the paper as NIST cites it, an arXiv preprint, and adds its listing among the AISec 2023 accepted papers).",
+          "evidence": "https://genai.owasp.org/download/52117/?tmstv=1765059207, printed pages 26-37; https://raw.githubusercontent.com/OWASP/www-project-mcp-top-10/main/index.md; https://arxiv.org/abs/2302.12173; https://aisec.cc/2023/; .ctoc/audit/improvement-run-notes/s5-agent-round2-validate-d-s5-agent-r2-validate.md, leftover 4",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-9",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 1's sast-scanner row (f-s5-agent-r1-4) said CTO Chief's text 'dispatches sast-scanner always', stating that a dispatch runs; the source is a presence check of instruction text. Reworded to 'lists sast-scanner as ALWAYS' (change 24).",
+          "evidence": "agents/coordinator/cto-chief.md line 464: \"`security/sast-scanner` ALWAYS\", under \"### Step 13 — SECURE\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-10",
+          "kind": "new",
+          "text": "'Trigger' names ivv-chief as a text that calls on this agent, but 'Related Agents' had no row for it. Added (change 31).",
+          "evidence": "agents/coordinator/ivv-chief.md line 94",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-11",
+          "kind": "new",
+          "text": "Add the ATLAS mitigation identifiers read by the research and the session to the file.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round2-critic-d-s5-agent-r2-critic.md, \"Rejected\"; .ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md, section 2",
+          "decision": "rejected",
+          "reason": "No output field and no check would use them, and only one mitigates link (AML.M0019 to M0022 against AML.T0051) was read, so mapping the rest to checks would be a reading of names only.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-12",
+          "kind": "new",
+          "text": "Add ISO/IEC 27090 and ISO/IEC 42001 as standards this agent maps to.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round2-research-d-s5-agent-r2-research.md, target 4: both iso.org pages HTTP 403",
+          "decision": "rejected",
+          "reason": "Neither page could be read (HTTP 403); a search summary is not a source.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-13",
+          "kind": "new",
+          "text": "Source check 12's mapping of ASI02, ASI03 and ASI08 through LLM03:2026's link sentence.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round2-critic-d-s5-agent-r2-critic.md, \"Rejected\"",
+          "decision": "rejected",
+          "reason": "It would present a 2026 entry as the ground of checks written against 2025 entries, breaking the rule that a sentence is quoted only under the identifier of the entry it was read in; the sentence is recorded as a fact about LLM03:2026 instead (change 4).",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-14",
+          "kind": "new",
+          "text": "The research's proposed fix: point the lookup at dist/ATLAS-latest.yaml.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md, section 1: \"raw.githubusercontent.com serves their link TEXT\"",
+          "decision": "rejected",
+          "reason": "Both ATLAS-latest.yaml files are git symbolic links, served as 20 or 18 bytes of link text, so the download would succeed and deliver no data.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-15",
+          "kind": "new",
+          "text": "Add AML.T0129 Triggers in Multimodal Inputs to the identifier table.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md, section 2",
+          "decision": "rejected",
+          "reason": "Its tactics were not read, and a table row with no tactic would be incomplete.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r2-16",
+          "kind": "new",
+          "text": "Tighten the tested recipe so the data-file path must equal v6/ATLAS-$rel.yaml.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round2-critic-d-s5-agent-r2-critic.md, \"Rejected\"",
+          "decision": "rejected",
+          "reason": "The release and the path come from the same newest manifest entry whenever it lists a format-6 file, which every release since 2026.05 does; a tighter version would be untested code.",
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 6,
+        "VALIDATED": 3,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 2
+      },
+      "validator_final": {
+        "examined": 89,
+        "VALIDATED": 89,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/ai-quality/llm-security-tester/SKILL.md"
+      ],
+      "seven_languages": {
+        "applies": false,
+        "reason": "The wrapper carries no code example before or after this round; the skill's examples are checked in its rounds. The lookup recipe and its grep commands are instructions the agent runs with Bash, not language examples; they were run as written by the session.",
+        "examples_checked": [
+          {
+            "language": "Bash: the manifest-driven ATLAS lookup (change 2, steps 1 and 2), GNU bash 3.2.57 with curl 8.7.1 on macOS 26.6.1",
+            "how": "run once as written by the session on 2026-10-01 for AML.T0051 and AML.TA0005, and step 2 again for the sub-technique AML.T0051.001, .ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md, sections 3 and 5"
+          }
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "date": "2026-10-01",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:063f8fd81f5118a36d9a953b9805af3f373bf8395d943c93c8ede878ae4b7105",
+      "fingerprint_after": "sha256:beb3ea22cfdc6650f9c92604452a4d0b5265ce4ec25753b8047c3fd90a2b9006",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s5-agent-r3-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-agent-r3-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-agent-r3-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-agent-r3-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "European Union Artificial Intelligence Act, Regulation (EU) 2024/1689, Article 15: what it requires against attacks on AI systems",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "United Kingdom National Cyber Security Centre guidance on prompt injection",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "United States Cybersecurity and Infrastructure Security Agency and joint guidance on AI data security and data poisoning",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "Raw repository text of every OWASP 2025 entry sentence the file quotes",
+          "source_class": "standards body",
+          "repeated_because": "Rounds 1 and 2 read the rendered entry pages, or one raw file, through the fetch tool's summariser; round 3 re-reads every quoted sentence in the raw repository files to check its exact form."
+        },
+        {
+          "text": "Raw repository text of every Model Context Protocol security guidance sentence the file quotes",
+          "source_class": "standards body",
+          "repeated_because": "Round 1 read the rendered page; round 3 reads the raw .mdx file to check each quotation byte for byte."
+        },
+        {
+          "text": "Does GitHub document what raw.githubusercontent.com serves for a symbolic link",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Is a mapping from the 2025 OWASP entries to the 2026 entries stated anywhere by OWASP",
+          "source_class": "standards body",
+          "repeated_because": "Round 2 found none in the README and the initiatives page; round 3 checks 2026/README.md, the resource page and the LLM08:2026 file."
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://raw.githubusercontent.com/OWASP/www-project-top-10-for-large-language-model-applications/main/2_0_vulns/LLM01_PromptInjection.md",
+          "read_on": "2026-10-01",
+          "bore_on": "check 1: the two 2025 sentences, raw",
+          "outcome": "supported",
+          "quote": "it is unclear if there are fool-proof methods of prevention for prompt injection",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/OWASP/www-project-top-10-for-large-language-model-applications/main/2_0_vulns/LLM05_ImproperOutputHandling.md",
+          "read_on": "2026-10-01",
+          "bore_on": "check 3: the two 2025 sentences, raw",
+          "outcome": "supported",
+          "quote": "can result in XSS and CSRF in web browsers as well as SSRF, privilege escalation, or remote code execution on backend systems",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/OWASP/www-project-top-10-for-large-language-model-applications/main/2_0_vulns/LLM06_ExcessiveAgency.md",
+          "read_on": "2026-10-01",
+          "bore_on": "check 4: the root causes were quoted as one string, but the raw file has three list lines",
+          "outcome": "refuted",
+          "quote": "excessive functionality;",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/OWASP/www-project-top-10-for-large-language-model-applications/main/2_0_vulns/LLM07_SystemPromptLeakage.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the Role section: the not-a-secret sentence, raw",
+          "outcome": "supported",
+          "quote": "the system prompt should not be considered a secret, nor should it be used as a security control",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/OWASP/www-project-top-10-for-large-language-model-applications/main/2_0_vulns/LLM08_VectorAndEmbeddingWeaknesses.md",
+          "read_on": "2026-10-01",
+          "bore_on": "check 6: the two 2025 sentences, raw",
+          "outcome": "supported",
+          "quote": "permission-aware vector and embedding stores",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/OWASP/www-project-top-10-for-large-language-model-applications/main/2_0_vulns/LLM10_UnboundedConsumption.md",
+          "read_on": "2026-10-01",
+          "bore_on": "check 9: the four 2025 quotations, raw",
+          "outcome": "supported",
+          "quote": "Limit Exposure of Logits and Logprobs",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/docs/docs/2026-07-28/tutorials/security/security_best_practices.mdx",
+          "read_on": "2026-10-01",
+          "bore_on": "checks 4 and 5 and the Trigger section: every Model Context Protocol quotation, raw (two differ only in nested-quote rendering)",
+          "outcome": "supported",
+          "quote": "If an MCP client supports one-click local MCP server configuration, it **MUST** implement proper consent mechanisms prior to executing commands.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/docs/docs/tutorials/security/security_best_practices.mdx",
+          "read_on": "2026-10-01",
+          "bore_on": "the unversioned path of the same guidance",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/docs/docs/2026-07-28/tutorials/security/local-server-security.mdx",
+          "read_on": "2026-10-01",
+          "bore_on": "the local-server security page",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 404"
+        },
+        {
+          "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/issues/3038",
+          "read_on": "2026-10-01",
+          "bore_on": "where the guidance moved",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/3072",
+          "read_on": "2026-10-01",
+          "bore_on": "where the guidance moved",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/README.md",
+          "read_on": "2026-10-01",
+          "bore_on": "whether OWASP maps 2025 entries to 2026 entries (it does not)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/README.md",
+          "read_on": "2026-10-01",
+          "bore_on": "whether OWASP maps 2025 entries to 2026 entries (it does not); line 22 of the agent",
+          "outcome": "supported",
+          "quote": "# OWASP Top 10 for LLM Applications 2026",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/",
+          "read_on": "2026-10-01",
+          "bore_on": "whether OWASP maps 2025 entries to 2026 entries (it does not)",
+          "outcome": "supported",
+          "quote": "August 3, 2026",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM08_HiddenContextExposure.md",
+          "read_on": "2026-10-01",
+          "bore_on": "line 22: no word saying it replaces System Prompt Leakage",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM01_PromptInjection.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 25: the 2026 entry cites \"NCSC (2025)\" (validator)",
+          "outcome": "supported",
+          "quote": "a position consistent with NIST (2025), NCSC (2025), and Debenedetti et al. (2025).",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/manifest.yaml",
+          "read_on": "2026-10-01",
+          "bore_on": "attacker rows 12 and 13: the manifest the tightened recipe reads",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/v6/ATLAS-2026.09.yaml",
+          "read_on": "2026-10-01",
+          "bore_on": "attacker rows 12 to 16: the release check, the name count and the search from relationships (run by the session on its saved copy; the research fetch was truncated before relationships)",
+          "outcome": "supported",
+          "quote": "version: '2026.09'",
+          "error": null
+        },
+        {
+          "url": "https://www.ncsc.gov.uk/blog-post/prompt-injection-is-not-sql-injection",
+          "read_on": "2026-10-01",
+          "bore_on": "check 1: separation alone never closes a finding; the bound on what a landed injection can reach",
+          "outcome": "supported",
+          "quote": "Design protections need to therefore focus more on deterministic (non-LLM) safeguards that constrain the actions of the system, rather than just attempting to prevent malicious content reaching the LLM.",
+          "error": null
+        },
+        {
+          "url": "https://www.cisa.gov/resources-tools/resources/ai-data-security-best-practices-securing-data-used-train-operate-ai-systems",
+          "read_on": "2026-10-01",
+          "bore_on": "the joint information sheet on AI data security, its resource page",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.cisa.gov/news-events/alerts/2025/05/22/new-best-practices-guide-securing-ai-data-released",
+          "read_on": "2026-10-01",
+          "bore_on": "the joint information sheet on AI data security, the agency's alert",
+          "outcome": "supported",
+          "quote": "It outlines key risks that may arise from data security and integrity issues across all phases of the AI lifecycle, from development and testing to deployment and operation.",
+          "error": null
+        },
+        {
+          "url": "https://www.fbi.gov/file-repository/cyber-alerts/ai-data-security-best-practices-for-securing-data-used-to-train-and-operate-ai-systems-052225.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "check 13, poisoning before retrieval or training: page 3, read as page images",
+          "outcome": "supported",
+          "quote": "ML models learn their decision logic from data, so an attacker who can manipulate the data can also manipulate the logic of an AI-based system.",
+          "error": null
+        },
+        {
+          "url": "https://media.defense.gov/2025/May/22/2003720601/-1/-1/0/CSI_AI_DATA_SECURITY.PDF",
+          "read_on": "2026-10-01",
+          "bore_on": "the National Security Agency's copy of the same sheet",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 403"
+        },
+        {
+          "url": "https://docs.github.com/en/rest/repos/contents",
+          "read_on": "2026-10-01",
+          "bore_on": "line 35: whether GitHub documents what raw.githubusercontent.com serves for a symbolic link (this page covers the contents interface, not the raw host)",
+          "outcome": "did-not-bear",
+          "quote": "If the content is a symlink and the symlink's target is a normal file in the repository, then the API responds with the content of the file.",
+          "error": null
+        },
+        {
+          "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202401689",
+          "read_on": "2026-10-01",
+          "bore_on": "Article 15 of the Artificial Intelligence Act, through the fetch tool (the session later read this address with curl and a browser user-agent string)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "empty content"
+        },
+        {
+          "url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng",
+          "read_on": "2026-10-01",
+          "bore_on": "Article 15 of the Artificial Intelligence Act, through the fetch tool",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "empty content"
+        },
+        {
+          "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=OJ:L_202401689",
+          "read_on": "2026-10-01",
+          "bore_on": "Article 15 of the Artificial Intelligence Act, through the fetch tool",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "empty content"
+        },
+        {
+          "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R1689",
+          "read_on": "2026-10-01",
+          "bore_on": "Article 15 of the Artificial Intelligence Act, through the fetch tool",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "completely blank"
+        },
+        {
+          "url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng/pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "check 11 and check 13: Article 15(5) of Regulation (EU) 2024/1689, page 61 of 144, downloaded by the session with curl and read with pdftotext (the fetch tool had returned only dashes from this address); source divergence noted by the final re-read: artificialintelligenceact.eu, a secondary site, reads \"training data (data poisoning)\", and the file keeps the Official Journal's \"training data set\"",
+          "outcome": "supported",
+          "quote": "The technical solutions to address AI specific vulnerabilities shall include, where appropriate, measures to prevent, detect, respond to, resolve and control for attacks trying to manipulate the training data set (data poisoning), or pre-trained components used in training (model poisoning), inputs designed to cause the AI model to make a mistake (adversarial examples or model evasion), confidentiality attacks or model flaws.",
+          "error": null
+        },
+        {
+          "url": "https://securityboulevard.com/2025/12/prompt-injection-cant-be-fully-mitigated-ncsc-says-reduce-impact-instead/",
+          "read_on": "2026-10-01",
+          "bore_on": "a secondary report of the National Cyber Security Centre post (consulted by the validator; it does not quote the sentence)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 1: Article 15(5) read from the Official Journal PDF",
+          "outcome": "supported",
+          "quote": "Recital 77 (page 27) also reads \"…including AI specific vulnerabilities such as data poisoning or adversarial attacks…\".",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 2: the research's proposed defences run against the 2026.09 data file (release check, name count, bounded tactic search, unquoted and commented release lines, the Unicode pattern with ripgrep 14)",
+          "outcome": "supported",
+          "quote": "so the bound changes nothing today and closes the attack the research describes",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 3: the tightened recipe run live in bash and zsh, offline, against five crafted manifests and a tampered data file",
+          "outcome": "supported",
+          "quote": "No temporary file left behind in any failing branch (counted before/after).",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 4: CLAUDE_PLUGIN_ROOT is empty in a dispatched CTOC agent's shell, so the skill path resolves in the repository under review",
+          "outcome": "supported",
+          "quote": "Verbatim: `root=[]` / `cwd=[/Users/account/Code/ctoc]`",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 5: a three-part release placed first in the real manifest; the tightened recipe takes the first well-formed release",
+          "outcome": "supported",
+          "quote": "the printed release is honest (the version check holds) but need not be the newest",
+          "error": null
+        },
+        {
+          "url": "agents/compliance/eu-ai-act-agent.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 27: when it runs, what it classifies, and what it defers to this agent (lines 34, 59 and 113)",
+          "outcome": "supported",
+          "quote": "This agent runs ONLY when the EU AI Act high-risk regulatory profile is active.",
+          "error": null
+        },
+        {
+          "url": "skills/compliance/ai-governance-checker/SKILL.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 29: the governance boundary, its line 3",
+          "outcome": "supported",
+          "quote": "classifies AI systems against EU AI Act risk tiers, NIST AI RMF / AI 600-1 functions, and ISO/IEC 42001 controls",
+          "error": null
+        },
+        {
+          "url": "skills/specialized/translation-checker/SKILL.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 13: the Grep tool's Unicode pattern matched a direction-control character on line 362 (the validator's run)",
+          "outcome": "supported",
+          "quote": "RTL-override (U+202E)",
+          "error": null
+        },
+        {
+          "url": "src/lib/regulatory-regime.js",
+          "read_on": "2026-10-01",
+          "bore_on": "decision f-s5-agent-r3-22: no compliance-control name from KNOWN_CONTROLS appears in the new text",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "agents/ai-quality/ai-code-quality-reviewer.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 10: the coding-assistant configuration row (line 43), read as a floor and only from CTOC's copy",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round3-revalidate-d-s5-agent-r3-revalidate.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the final re-read of the agent (d-s5-agent-r3-revalidate): 33 changes, 3 leftovers and the executor note landed with no deviation; 39 claims examined, 39 validated; 34 cross-references resolve; every command traced to a session run; contract pass with two replaceable markers; five leftovers; skill items 46-50; two paragraphs over 2,500 characters",
+          "outcome": "supported",
+          "quote": "Re-read of the language-model security tester agent after round 3",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 6: the LLM01:2026 strip sentence read raw (line 79), and the variation-selector searches run with ripgrep 14 (the plain widening matched 37 files and 81 lines of ordinary emoji; the two-character form matched the crafted hidden case, no emoji, and nothing in the repository)",
+          "outcome": "supported",
+          "quote": "repository-wide it matches 0 files",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM01_PromptInjection.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the hidden-character search: LLM01:2026 asks to strip tag-block, variation-selector and zero-width characters (read raw by the session, line 79)",
+          "outcome": "supported",
+          "quote": "Strip tag-block (U+E0000 to E007F), variation-selector (U+FE00 to FE0F), and zero-width (U+200B, U+200C, U+200D, U+2060) characters at every ingest and render boundary.",
+          "error": null
+        },
+        {
+          "url": "https://artificialintelligenceact.eu/article/15/",
+          "read_on": "2026-10-01",
+          "bore_on": "Article 15(5), a secondary site: it reads \"training data (data poisoning)\" where the Official Journal, read raw by the session, reads \"training data set (data poisoning)\"; the file keeps the Official Journal's text (source divergence recorded by the final re-read)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s5-agent-r3-1",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 2's recipe (f-s5-agent-r2-1) took the release and the path from two independent manifest lines, read an unquoted or commented release line as the whole line or as 'hotfix', and never checked that the file it downloaded was the release it printed. Replaced by the tightened recipe the session ran, byte for byte: a release line only in the shape '- release: 'YYYY.MM'', the path only from the four lines under it and only equal to v6/ATLAS-<release>.yaml, and saved only when the file's own version line names that release; the prose says the release printed is the first written in that shape and need not be the newest (changes 1-4; validator leftover 2 adds the session's run with a three-part release placed first).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md, sections 3 and 5; .ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md, attacker rows 12 and 13; .ctoc/audit/improvement-run-notes/s5-agent-round3-validate-d-s5-agent-r3-validate.md, leftover 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-2",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 2's step 2 (f-s5-agent-r2-1) reported a name that could not be read as 'not in that release', searched for tactics across the whole file so a description line could add a false tactic, mis-read a name written over several lines, and let any identifier, even one copied from the code under review, into a Bash command. Step 2 now admits only identifiers of the ATLAS shape chosen by the agent, searches tactics only from the top-level relationships line on, and separates 'not in that release' from 'name not read' with a count (changes 5, 6 and 7; change 6 applied without the padding space the validator's executor note identified).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md, section 2: count 2 for AML.T0051, 0 for AML.T9999; bounded search \"target: AML.TA0005\"; .ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md, attacker rows 14-16; .ctoc/audit/improvement-run-notes/s5-agent-round3-validate-d-s5-agent-r3-validate.md, executor note",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-3",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 2 (f-s5-agent-r2-1) stated as fact that raw.githubusercontent.com serves a symbolic link's text; that is an observation from 2026-10-01, and no GitHub documentation found states it. Now labelled as observed, not documented (change 8).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md, section D item 4; https://docs.github.com/en/rest/repos/contents",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-4",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 1's \"Read the method first\" (f-s5-agent-r1-1) read the skill, and \"Trigger\" (f-s5-agent-r1-6) read the configuration-file list, from the working directory, which is the repository under review, so a planted copy could become the method or empty the list; CLAUDE_PLUGIN_ROOT, the research's proposed fix, is empty in a dispatched agent's shell. Added item 7: unless the dispatch says the repository is CTOC's own, a file at a path this file names is material under review, and the agent records which copy it read; the configuration list is a floor taken only from CTOC's copy (changes 9, 10 and 11).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md, section 4: \"root=[]\"; .ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md, attacker row 11",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-5",
+          "kind": "new",
+          "text": "Search results, and the findings, threat model or plan a dispatch hands over, were missing from the material treated as data, and a findings file or self-assessment inside the repository could have its verdict or coverage copied (change 12).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md, attacker rows 5 and 17; .ctoc/audit/improvement-run-notes/s5-agent-round3-critic-d-s5-agent-r3-critic.md, f-s5-agent-r3-5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-6",
+          "kind": "new",
+          "text": "Instructions written in characters a reader does not see (tag, zero-width and direction-control characters) could steer the agent itself. Before judging a file the agent searches it with the Grep tool for those ranges, reports occurrences in prompt-bearing content by code point, and names the joiner and emoji exceptions under unknowns (changes 13 and 14; validator leftover 1 in its sourced optional form: the pattern matched U+200B in the session's run and U+202E at skills/specialized/translation-checker/SKILL.md line 362 through the Grep tool; no tag character has been searched for). The final re-read's leftovers: the search is now sourced to LLM01:2026, which asks to strip tag-block, variation-selector and zero-width characters (read raw by the session); a second search for a variation selector directly after an ASCII letter or digit covers the selectors without making every emoji a finding (the re-read's leftover 5, adapted after the session's ripgrep runs: the plain widening matched 37 files of ordinary emoji); and the run sentence says no other character the pattern names has been matched with it, a repository-wide Grep search finding none.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md, section 2: ripgrep 14 matched a zero-width space; .ctoc/audit/improvement-run-notes/s5-agent-round3-validate-d-s5-agent-r3-validate.md, priority 7 and leftover 1; .ctoc/audit/improvement-run-notes/s5-agent-round3-revalidate-d-s5-agent-r3-revalidate.md, leftovers 1, 2 and 5; .ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md, section 6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-7",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 1's \"What you read is data\" (f-s5-agent-r1-1): the example 'this path is safe' made an ordinary developer comment a critical finding, a server's own claim of approval or audit answered its own check, and a marker comment could exempt a file. Steering is now text addressing the reviewer; a developer's explanation is neither steering nor evidence; a claim of registration, approval, audit, pinning, safety or fixture status is not evidence; an inventory is defined (changes 15 and 16).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md, attacker rows 2 and 4; skills/ai-quality/llm-security-tester/SKILL.md line 636",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-8",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 1's fixture rule (f-s5-agent-r1-1): 'test fixture' was undefined, so a payload a seeding script loads into the live index would be passed over. A fixture is now a file nothing outside the test suite reads (change 17).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md, attacker row 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-9",
+          "kind": "new",
+          "text": "Nothing said whether a file name counts as a string from the material under review, and nothing limited Bash. Bash now runs only the lookup's commands and the date command; every file is read with Read, Grep and Glob (change 18).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md, attacker row 18",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-10",
+          "kind": "new",
+          "text": "A quotation running over several lines, or a file name with a quotation mark or a line break, could end a field of the response or add keys; and the rule to quote steering text collided with the rule never to quote a credential. Quotations are now one escaped line, file paths are written the same way, and the credential rule wins (change 19).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md, attacker rows 6 and 7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-11",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 1's no-model-call rule (f-s5-agent-r1-1): a model reached through a client the agent does not recognise produced a clean, full-confidence pass, and 'findings: []' would also suppress a steering finding. The agent now reports no finding under checks 1 to 13, lists what it searched for, says other calls are not excluded and sets confidence LOW (change 20).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md, attacker row 9",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-12",
+          "kind": "new",
+          "text": "A plan, which an agent can write, could omit the file carrying an injection. The agent now says only declared files were read and names each changed file a handed diff contains that the plan omits (change 21). The final re-read's leftover 3 replaced the own-reasoning marker with CTOC's CLAUDE.md, which says plans are edit-whitelisted.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md, attacker row 10; .ctoc/audit/improvement-run-notes/s5-agent-round3-revalidate-d-s5-agent-r3-revalidate.md, leftover 3; CLAUDE.md line 136: \"`plans/**.md` is edit-whitelisted\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-13",
+          "kind": "new",
+          "text": "A file or range not read did not lower confidence. confidence_overall is now LOW whenever a named file or a range of one was not read, and the template comment lists every LOW condition (changes 22 and 23).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md, attacker row 19",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-14",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 1's check 4 (f-s5-agent-r1-12) quoted LLM06:2025's three root causes as one string; the raw file has three list lines. Now three quotations (change 24).",
+          "evidence": "https://raw.githubusercontent.com/OWASP/www-project-top-10-for-large-language-model-applications/main/2_0_vulns/LLM06_ExcessiveAgency.md: \"* excessive functionality;\" / \"* excessive permissions;\" / \"* excessive autonomy.\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-15",
+          "kind": "new",
+          "text": "Check 1's claim that the fix bounds what a landed injection can reach was unsourced. Sourced to the United Kingdom National Cyber Security Centre, marked as not independent of LLM01:2026 (change 25).",
+          "evidence": "https://www.ncsc.gov.uk/blog-post/prompt-injection-is-not-sql-injection: \"Design protections need to therefore focus more on deterministic (non-LLM) safeguards that constrain the actions of the system\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-16",
+          "kind": "new",
+          "text": "No regulator's text was cited for poisoning. Check 11 quotes Article 15(5) of the European Union Artificial Intelligence Act as the regulation's text, says placing it under check 11 is this file's reading (validator leftover 3), and leaves whether the Act applies to eu-ai-act-agent and the ai-governance-checker skill; that agent's row says so (changes 26 and 27).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md, section 1; agents/compliance/eu-ai-act-agent.md lines 34, 59 and 113; .ctoc/audit/improvement-run-notes/s5-agent-round3-validate-d-s5-agent-r3-validate.md, leftover 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-17",
+          "kind": "new",
+          "text": "Check 13's poisoning class rested on the skill alone. Sourced to page 3 of the joint information sheet on AI data security, read from the Federal Bureau of Investigation's copy, and to Article 15(5) (change 28).",
+          "evidence": "https://www.fbi.gov/file-repository/cyber-alerts/ai-data-security-best-practices-for-securing-data-used-to-train-and-operate-ai-systems-052225.pdf, page 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-18",
+          "kind": "new",
+          "text": "The governance routing was marked as this file's own reasoning; the ai-governance-checker skill's own description sources it (change 29).",
+          "evidence": "skills/compliance/ai-governance-checker/SKILL.md line 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-19",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 1's order table (f-s5-agent-r1-7): the row scoped steering text to 'anything the application ships', while 'What you read is data' reports it anywhere in the material under review (change 30).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-critic-d-s5-agent-r3-critic.md, f-s5-agent-r3-19",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-20",
+          "kind": "new",
+          "text": "Check 13's error-path class named only the model's name or version; the skill's Discovery row also audits toolset disclosure in error paths (changes 31 and 32).",
+          "evidence": "skills/ai-quality/llm-security-tester/SKILL.md line 511",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-21",
+          "kind": "new",
+          "text": "The dispatch phrases 'LLM red team' and 'AI red teaming' route requests for live red-team runs to an agent that never sends a request. Every phrase is kept, and the description now says the agent runs no live red-team exercise (change 33).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-critic-d-s5-agent-r3-critic.md, f-s5-agent-r3-21; the open question h-s5-agent-r1-live-endpoint-probe",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-22",
+          "kind": "new",
+          "text": "Add a NOT ENFORCED marker beside the Article 15(5) quotation, as the compliance-claims check might seem to require.",
+          "evidence": "tests/compliance-claims-match-code.test.js; src/lib/regulatory-regime.js KNOWN_CONTROLS (40 names, none in the new text); .ctoc/audit/improvement-run-notes/s5-agent-round3-validate-d-s5-agent-r3-validate.md, priority 6",
+          "decision": "rejected",
+          "reason": "Decision, no change: the check fires only on a line naming one of the 40 compliance-control names, and none appears in the new text; a marker would suggest a control relationship that does not exist, and change 26 already says nothing enforces the Act.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-23",
+          "kind": "new",
+          "text": "Outside CTOC's own repository the agent cannot reach its skill: the path is relative to the working directory and CLAUDE_PLUGIN_ROOT is empty in a dispatched agent's shell, so item 6 applies and the agent runs on this file alone at LOW confidence.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md, section 4; .ctoc/audit/improvement-run-notes/s5-agent-round3-critic-d-s5-agent-r3-critic.md, \"Cross-file and for-the-human\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s5-agent-r3-skill-unreachable-outside-ctoc-repo"
+        },
+        {
+          "id": "f-s5-agent-r3-24",
+          "kind": "new",
+          "text": "agents/coordinator/cto-chief.md's dispatch of this agent never says whether the repository under review is CTOC's own, so with item 7 even CTOC's own runs fall back to item 6 until it does.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-critic-d-s5-agent-r3-critic.md, \"Cross-file and for-the-human\"; agents/coordinator/cto-chief.md lines 345 and 476",
+          "decision": "rejected",
+          "reason": "Cross-file: agents/coordinator/cto-chief.md is not in this slice and has not been started; slice s116 meets it (parent index, slice table; inventory.json).",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-25",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 1's check 12 (f-s5-agent-r1-9) quoted the agentic document's 'agentic evolution of Excessive Agency' sentence without the printed page every other agentic quotation now carries. Added '(page 15)' (the final re-read's leftover 4).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-revalidate-d-s5-agent-r3-revalidate.md, spot-check 10 and leftover 4; https://genai.owasp.org/download/52117/?tmstv=1765059207, printed page 15",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-agent-r3-26",
+          "kind": "new",
+          "text": "The description says the agent leaves credentials to secrets-detector, while the agent reports secret_in_system_prompt itself and its secrets-detector row says 'reconcile rather than defer' (the final re-read's wording observation; the same tension as skill item 17).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-agent-round3-revalidate-d-s5-agent-r3-revalidate.md, \"One wording observation with no fix proposed\"",
+          "decision": "rejected",
+          "reason": "No fix was proposed and the agent file is closed for this slice after this re-read; the tension is carried to the skill rounds as skill item 17 and recorded in the plan as a fact for the final review.",
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 22,
+        "VALIDATED": 20,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "validator_final": {
+        "examined": 39,
+        "VALIDATED": 39,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/ai-quality/llm-security-tester/SKILL.md"
+      ],
+      "seven_languages": {
+        "applies": false,
+        "reason": "The wrapper carries no code example before or after this round; the skill's examples are checked in its rounds. The recipe, the grep and sed commands and the Grep pattern are instructions the agent runs, not language examples; each was run as written by the session or, for the Grep pattern, also by the validator.",
+        "examples_checked": [
+          {
+            "language": "Bash and zsh: the tightened ATLAS lookup (change 2), GNU bash 3.2.57 and zsh 5.9 with curl 8.7.1 on macOS 26.6.1",
+            "how": "run live, offline, against five crafted manifests, a tampered data file and the real manifest with a three-part release placed first, .ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md, sections 3 and 5"
+          },
+          {
+            "language": "Bash: step 2's count and bounded tactic search (changes 6 and 7)",
+            "how": "run on the saved 2026.09 data file, .ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md, section 2"
+          },
+          {
+            "language": "ripgrep 14 regular expression (the Grep tool's engine): the hidden-character pattern (change 13)",
+            "how": "run by the session on a file holding U+200B (.ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md, section 2) and by the validator through the Grep tool (.ctoc/audit/improvement-run-notes/s5-agent-round3-validate-d-s5-agent-r3-validate.md, priority 7)"
+          }
+        ]
+      }
+    }
+  ],
+  "late_corrections": [
+    {
+      "id": "lc-s5-agent-1",
+      "date": "2026-10-01",
+      "found_by": {
+        "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "round": 1
+      },
+      "source": {
+        "url": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "quote": "The order in which findings are reported, which only says what to fix first, is the agent's (\"Order of findings in the report\"); this file sets no tier of its own."
+      },
+      "before": "trust neither your memory nor the numbers the skill pins.** The skill says its totals move between releases and must be re-resolved, yet it pins \"release 5.6.0\" and 84 techniques. / The skill's mapping table puts LLM Prompt Injection under Initial Access and Extract LLM System Prompt under Credential Access, names AML.TA0001 \"AI Attack Staging\" and has no Lateral Movement. The current data file puts the two techniques under Execution and Exfiltration, / — while its triage table still marks some rows \"Fix soon\" or \"Backlog\", and rates an unpinned model revision \"Fix soon\" there but critical in its own critic-mode section. This file resolves every such disagreement toward the stricter reading: no finding is a warning.",
+      "after": "trust neither your memory nor any number the skill prints.** / The current data file puts LLM Prompt Injection under Execution and Extract LLM System Prompt under Exfiltration, / — and no finding is a warning.",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s5-agent-2",
+      "date": "2026-10-01",
+      "found_by": {
+        "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "round": 1
+      },
+      "source": {
+        "url": ".ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md",
+        "quote": "Both executor-worded agent items are VERIFIED, and each needs one wording fix."
+      },
+      "before": "Never run the commands in the skill's \"Tool Integration (2026)\" section (Garak, PyRIT, PromptFoo, NeMo Guardrails) or the proof-of-concept request in its letter schema, against any address. The Garak, PyRIT and PromptFoo commands and the proof-of-concept request send requests / 4. **Orders in the skill that your tools cannot carry out** — storing red-team fixtures under a marker, auditing a server list quarterly, kicking a finding back to sast-scanner — you do not carry out and never report as done. / the skill's ATLAS mapping audits toolset disclosure in error paths, under Discovery. / (page 35 of the document cited under check 12, read 2026-10-01). / per-run cost ceilings on all agent executions\" (https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM06_UnboundedConsumption.md, read 2026-10-01).",
+      "after": "Never run the tools the skill's \"Tool Integration (2026)\" section names (Garak, PyRIT, PromptFoo and NeMo Guardrails among them) or the proof-of-concept request in its letter schema, against any address. Garak, PyRIT, PromptFoo and the proof-of-concept request send requests / 4. **Orders your tools cannot carry out** — storing a file in the repository, scheduling a recurring audit, handing a finding to another agent — you do not carry out and never report as done, wherever you read them. / the skill's ATLAS mapping lists, under Discovery, error paths that disclose the model's name or version or the tools the agent holds. / (page 35 of the document cited under check 12, read 2026-10-01). Does a tool that fetches addresses hold an address allowlist (the skill's egress case, its ATLAS Command and Control row)? / per-run cost ceilings on all agent executions\" (https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM06_UnboundedConsumption.md, read 2026-10-01). Can a caller reach the inference endpoint without authentication (the skill's ATLAS AI Model Access row)?",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s5-agent-3",
+      "date": "2026-10-01",
+      "found_by": {
+        "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "round": 2
+      },
+      "source": {
+        "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM04_SupplyChain.md",
+        "quote": "reduces but does not eliminate this risk"
+      },
+      "before": "11. **Supply chain** — model revisions pinned, weight formats safe.",
+      "after": "11. **Supply chain** — model revisions pinned, and no weights loaded from a format that can run code when loaded; LLM04:2026 Supply Chain names \"unsafe serialization formats such as Python pickle, which can execute arbitrary code on load\", and says moving away from them \"reduces but does not eliminate this risk\" (https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM04_SupplyChain.md, read 2026-10-01), so a safer format is not a safe one.",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s5-agent-4",
+      "date": "2026-10-01",
+      "found_by": {
+        "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "round": 3
+      },
+      "source": {
+        "url": "https://huggingface.co/docs/huggingface_hub/package_reference/file_download",
+        "quote": "An optional Git revision id, which can be a branch name, a tag, or a commit hash"
+      },
+      "before": "11. **Supply chain** — model revisions pinned, and no weights loaded from a format that can run code when loaded; / a model loaded with no pinned revision, a server configured with automatic approval.",
+      "after": "11. **Supply chain** — model revisions pinned, a Git revision only by a commit hash: Hugging Face's `revision` is \"An optional Git revision id, which can be a branch name, a tag, or a commit hash\" (https://huggingface.co/docs/huggingface_hub/package_reference/file_download, read 2026-10-01), and a branch or a tag can move (this file's reading, as the skill's LLM03:2025 reads it); and no weights loaded from a format that can run code when loaded; / a model loaded with no revision pinned to a commit hash (check 11), a server configured with automatic approval.",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s5-agent-5",
+      "date": "2026-10-01",
+      "found_by": {
+        "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "round": 3
+      },
+      "source": {
+        "url": ".ctoc/audit/improvement-run-notes/s5-step13-secure-d-s5-step13-secure.md",
+        "quote": "The hidden-character search misses a run of variation selectors after an emoji."
+      },
+      "before": "The agent at sha256:09e2972a5054524a9fa27de40a7f29797fb16be2bd3064bb2a07f39d8751aece (after lc-s5-agent-4): the description left \"credentials to secrets-detector\"; \"which hands you\" and \"and hands you\" for the coding-assistant configuration row; \"an ASCII letter or digit\" (two places); \"A selector after a symbol or emoji is ordinary text.\"; the quoting rule escaped only a line break, a double quotation mark and a backslash; the lookup compared the release with its dot unescaped, read the version line anywhere in the data file, and gave the second download 120 seconds; the prose said the dot matched any one character and described the version check by indent.",
+      "after": "The agent at sha256:c7fcec389e7e9bf7a4b962ca5e96ef4cb0040106e0b4982cbbdd144484008cd7: the description leaves \"the general credential scan to secrets-detector (a credential written into a prompt or a server's configuration it reports itself and reconciles with secrets-detector)\" (Step 11, F1); \"whose text names you for\" and \"its text names you for\" (O1); \"a basic Latin letter or digit\" (O2); \"A single selector after a symbol or emoji is ordinary text; also search for `[\\x{FE00}-\\x{FE0F}\\x{E0100}-\\x{E01EF}]{2,}` …\" (Step 13, finding 1, run by the session); the quoting rule writes a line feed as \\n and any other control character and U+0085, U+2028 and U+2029 as code points (finding 3); the lookup is the session's tested recipe with the dot escaped and the version read only from the collection block (finding 4), its second download limited to 50 seconds (finding 5); the prose states both and cites the session's 18-case and live runs.",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass",
+        "covered_by": ".ctoc/audit/improvement-run-notes/s5-npm-test-final.md (the end-of-slice npm test on the final bytes, the fifth run, agent sha256:357b4c701da3e5ee0fefa3bbe8858a7eb784a3e309d1d9a55837a76ca6563b92, skill sha256:9ebb12d21c2c3342964913a98fe8e6546a47195ff1b49bb618896ede021fd033, which carry this correction as amended by lc-s5-agent-6: 12,035 passed, 0 failed, 0 skipped, coverage 99.9% against 99, offline claims ledger PASS, exit 0). This correction's own after bytes, agent sha256:c7fcec389e7e9bf7a4b962ca5e96ef4cb0040106e0b4982cbbdd144484008cd7 and skill sha256:2464535360efbbedb00e3bfa480ba2f7aa6362c34fa9c5ddc3c65075fffed5c9, passed the fourth run with the same counts (the slice's plan, 00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md, Execution Record, \"Step 10 return after Steps 11 and 13\")."
+      },
+      "validated_by": "d-s5-step10-return-revalidate (citation-validator, on its second read, current line numbers): every passage of this correction VERIFIED — the description (line 3), the selector-run search and the LLM01:2026 sentence (line 96), the recipe prose (lines 35 to 41) and the configuration-row wording (lines 123 and 300). The quiet re-read (d-s5-step10-return-revalidate-2, over unchanging files) is the one that counts: it carried these verdicts over as verified on text that had not changed; the earlier read overlapped the second return's edits."
+    },
+    {
+      "id": "lc-s5-agent-6",
+      "date": "2026-10-01",
+      "found_by": {
+        "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "round": 3
+      },
+      "source": {
+        "url": ".ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md",
+        "quote": "Without `-q`, curl reads the user's `~/.curlrc` (manual, verified)."
+      },
+      "before": "The agent at sha256:c7fcec389e7e9bf7a4b962ca5e96ef4cb0040106e0b4982cbbdd144484008cd7 (after lc-s5-agent-5): both curl calls without -q; the second hidden-character search `[A-Za-z0-9][\\x{FE00}-\\x{FE0F}]`, said to match no emoji; the collection-block prose naming one block; no sentence for a failed mktemp; \"the 50-second limit was set after those runs\"; step 1's description of the lookup and the whole \"What you read is data\" section each one paragraph.",
+      "after": "The agent at sha256:357b4c701da3e5ee0fefa3bbe8858a7eb784a3e309d1d9a55837a76ca6563b92: both requests start with `curl -q` and the prose says so, citing curl's manual, the executor's syntax check and the session's run of that form (the re-scan's finding B; the re-read's leftovers 2 and 3); the second search is `[A-Za-z][\\x{FE00}-\\x{FE0F}]|[0-9][\\x{FE00}-\\x{FE0F}]([^\\x{20E3}]|$)`, which leaves a keycap emoji, run on the re-scan's corpus (finding A); the prose names every `collection:` block (finding D) and mktemp's message (finding E); the 50-second form is cited as run against the 18 cases in three shells and live; step 1's description is split into four paragraphs and \"What you read is data\" into five, no word changed by the split (the final review's finding 5).",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass",
+        "covered_by": ".ctoc/audit/improvement-run-notes/s5-npm-test-final.md (the fifth end-of-slice run, s5-npm-test-final-5.out, on agent sha256:357b4c701da3e5ee0fefa3bbe8858a7eb784a3e309d1d9a55837a76ca6563b92 and skill sha256:9ebb12d21c2c3342964913a98fe8e6546a47195ff1b49bb618896ede021fd033). Written before that run because the run's own record check reads this field; had the run failed it would read fail (plan decision 43)."
+      },
+      "validated_by": "d-s5-step10-return-revalidate (citation-validator, on its second read, current line numbers): the mktemp sentence, the collection-block prose, the keycap pattern and its repository result, and the three-shell and live runs of the 50-second form VERIFIED. Its three open items were sourced afterwards: \"with and without --pcre2\" by the executor's note s5-second-step10-return-executor.md (pointer added); the -q form's run by the session note s5-skill-round3-session-runs.md, \"After the second return\" (the promise replaced by the result); and what -q does by curl's manual, quoted in s5-curl-q-manual.md (the validator had no fetch left). The quiet re-read (d-s5-step10-return-revalidate-2, over unchanging files) is the one that counts; the first read overlapped the second return's edits. On the agent it examined 21 claims: 19 VERIFIED or carried over as verified (the curl manual sentence also on curl.se), 1 MISATTRIBUTED — the bash -n and zsh -n check of the -q form pointed to the session note instead of the executor note, corrected by its leftover 1 — and 1 left as labelled (\"observed, not documented\", the symbolic-link sentence)."
+    }
+  ],
+  "held": null
+}

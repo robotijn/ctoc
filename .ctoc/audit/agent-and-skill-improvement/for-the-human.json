@@ -370,6 +370,188 @@
           "cons": "Two pointers to keep in step across both files; a text change in both."
         }
       ]
+    },
+    {
+      "id": "h-s5-agent-r1-live-endpoint-probe",
+      "date": "2026-10-01",
+      "path": "agents/ai-quality/llm-security-tester.md",
+      "round": 1,
+      "kind": "tool-grant-change",
+      "evidence": "The skill's method (skills/ai-quality/llm-security-tester/SKILL.md lines 538-554 and 610) runs Garak, PyRIT, PromptFoo and a proof-of-concept request against a live model endpoint. Round 1 (critic finding f-s5-agent-r1-19, change 4) forbids the agent to send anything to a model endpoint, because those commands send traffic and can spend money and no dispatch carries the owner's consent. As a result every finding is a path found by reading the code, at MEDIUM confidence at most. The agent already holds Bash; the question is whether it may use it for this.",
+      "options": [
+        {
+          "key": "reading-only",
+          "label": "Keep the agent reading-only: no request to any model endpoint",
+          "pros": "No traffic and no spend on any live system; nothing the agent does can affect a running service.",
+          "cons": "No finding is ever confirmed by a live probe, so an injection path stays at MEDIUM confidence."
+        },
+        {
+          "key": "approved-probe",
+          "label": "Allow a probe against an endpoint the owner names and approves for each run",
+          "pros": "Findings can be confirmed by a probe and reported at HIGH confidence.",
+          "cons": "Sends traffic and can spend money on the named endpoint, and needs an approval route that a dispatch cannot supply today."
+        }
+      ]
+    },
+    {
+      "id": "h-s5-agent-r1-no-dispatch-on-configuration-growth",
+      "date": "2026-10-01",
+      "path": "agents/coordinator/cto-chief.md",
+      "round": 1,
+      "kind": "out-of-scope-file",
+      "evidence": "Adding a tool, a Model Context Protocol server, a retrieval source or a memory writer dispatches nothing: the coordinators' texts name this agent only at the threat-model step and the secure step, each on the condition that a large language model meets user input (agents/coordinator/cto-chief.md lines 345 and 476, agents/coordinator/ivv-chief.md line 94; presence checks of instruction text). This agent sees such a change only inside one of those dispatches (critic finding f-s5-agent-r1-20). Changing it means editing cto-chief.md, which is outside this slice (slice s116 meets it).",
+      "options": [
+        {
+          "key": "leave-dispatch",
+          "label": "Leave the dispatch conditions as they are",
+          "pros": "No change to the coordinator; the agent keeps its two dispatch points.",
+          "cons": "A change that only adds a tool, a server, a retrieval source or a memory writer is examined by this agent only if it falls inside one of those two dispatches."
+        },
+        {
+          "key": "add-configuration-condition",
+          "label": "Add a condition to CTO Chief's secure-step text for changes to configuration and manifests that register tools, servers, retrieval sources or memory writers",
+          "pros": "Such a change reaches this agent even when no model-calling code changed.",
+          "cons": "An edit to the coordinator, outside this slice, needing its own approved change; more dispatches of this agent."
+        }
+      ]
+    },
+    {
+      "id": "h-s5-agent-r1-findings-bypass-security-verdict",
+      "date": "2026-10-01",
+      "path": "agents/security/security-scanner.md",
+      "round": 1,
+      "kind": "out-of-scope-file",
+      "evidence": "security-scanner builds its block, warn or pass verdict at the secure step from the result files of the analyzers its table lists (agents/security/security-scanner.md lines 35-46); this agent is not among them and writes no file, so its findings reach the decision through CTO Chief, not through that verdict (critic finding f-s5-agent-r1-21). Whether security-scanner should read this agent's response is a change to security-scanner.md, outside this slice (slice s120 meets it).",
+      "options": [
+        {
+          "key": "through-cto-chief",
+          "label": "Leave it: this agent's findings reach the decision through CTO Chief",
+          "pros": "No change to security-scanner; the round-1 text already says the findings go to CTO Chief.",
+          "cons": "security-scanner's single verdict does not include this agent's findings."
+        },
+        {
+          "key": "scanner-reads-response",
+          "label": "Have security-scanner read this agent's response as one of its inputs",
+          "pros": "One verdict at the secure step covers this agent's findings too.",
+          "cons": "An edit to security-scanner, outside this slice, needing its own approved change and a defined way for it to receive this agent's response."
+        }
+      ]
+    },
+    {
+      "id": "h-s5-agent-r1-tokens-used-schema-mismatch",
+      "date": "2026-10-01",
+      "path": "agents/ai-quality/llm-security-tester.md",
+      "round": 1,
+      "kind": "pinned-contract",
+      "evidence": "The applied output format (change 19) keeps 'tokens_used: null  # not measurable from inside this agent; never estimate it' and adds the limitation line 'tokens_used is null: the count is not visible from inside this agent, and the machine schema types it as an integer — a mismatch recorded for the human, never estimated.' The machine schema, .ctoc/architecture/dispatch-schema.yaml line 134, types the field 'tokens_used: { type: integer, minimum: 0 }' and line 132 makes it required. The validator reported the divergence (d-s5-agent-r1-validate, finding v6) and chose neither side; the session kept null, as in the previous two slices (h-s3-agent-r1-tokens-used-null-versus-dispatch-schema). The template now also carries agent_version and completed_at, which the schema requires (line 88).",
+      "options": [
+        {
+          "key": "schema-allows-null",
+          "label": "Allow null for tokens_used in the dispatch schema when an agent cannot measure it",
+          "pros": "The agent never reports a number it did not measure, and the response then matches the schema.",
+          "cons": "A change to the dispatch schema, outside this slice, needing its own approved change; a reader that sums tokens must handle null."
+        },
+        {
+          "key": "keep-mismatch",
+          "label": "Keep the mismatch as it is, recorded",
+          "pros": "No schema change; the agent file states the mismatch openly.",
+          "cons": "A response from this agent does not satisfy the schema as written."
+        }
+      ]
+    },
+    {
+      "id": "h-s5-agent-r3-skill-unreachable-outside-ctoc-repo",
+      "date": "2026-10-01",
+      "path": "agents/ai-quality/llm-security-tester.md",
+      "round": 3,
+      "kind": "out-of-scope-file",
+      "evidence": "The agent reads its method at the path skills/ai-quality/llm-security-tester/SKILL.md, which resolves in the working directory, the repository under review. In a dispatched CTOC agent's shell CLAUDE_PLUGIN_ROOT was empty and the working directory was the repository (.ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md, section 4). Round 3 (change 9, item 7 of \"Read the method first\") therefore treats a copy found there as material under review unless the dispatch says the repository is CTOC's own, so in every other project the agent cannot read CTOC's copy of its skill and runs on its own file alone at LOW confidence (critic d-s5-agent-r3-critic, \"Cross-file and for-the-human\"; finding f-s5-agent-r3-23). The installed plugin's location is recorded in ~/.claude/plugins/installed_plugins.json (installPath), which the agent does not read today.",
+      "options": [
+        {
+          "key": "dispatcher-passes-path",
+          "label": "The dispatcher passes the installed skill's full path in every dispatch of this agent",
+          "pros": "The agent reads CTOC's own copy in any project, and the path comes from the dispatcher rather than from the repository under review.",
+          "cons": "A change to the coordinators' dispatch text (cto-chief.md, ivv-chief.md), outside this slice; every dispatch must carry the path."
+        },
+        {
+          "key": "agent-locates-plugin",
+          "label": "The agent locates the installed plugin itself",
+          "pros": "No change to any dispatcher; works wherever the plugin is installed.",
+          "cons": "Untested: no way of locating it from a dispatched agent has been run, and a lookup by the agent adds an instruction to this file and a file the agent must read."
+        },
+        {
+          "key": "accept-reduced-mode",
+          "label": "Accept the reduced mode outside CTOC's own repository",
+          "pros": "No further change; the agent states openly that it ran without its skill and reports LOW confidence.",
+          "cons": "Outside CTOC's own repository the agent never applies its skill's method, only its own thirteen checks."
+        }
+      ]
+    },
+    {
+      "id": "h-s5-skill-r1-effort-level-mismatch",
+      "date": "2026-10-01",
+      "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+      "round": 1,
+      "kind": "frontmatter-key-finding",
+      "evidence": "The skill declares effort_level: high; its wrapper agent declares effort: xhigh. The wrapper test's comment calls effort \"Dispatch metadata, propagated from the target skill\" (tests/cu5-s4-compliance-aiquality-wrappers.test.js line 63). This plan freezes every frontmatter key except description, when_to_load and related_skills, so neither file may change it here (backlog item 48; critic d-s5-skill-r1-critic, f-s5-skill-r1-64).",
+      "options": [
+        {
+          "key": "align-the-values",
+          "label": "Change one file's value so the skill and the agent declare the same effort",
+          "pros": "The skill and its wrapper state one effort level, as the test comment says effort is propagated from the skill.",
+          "cons": "A change to a frozen frontmatter key, outside what this plan allows; one of the two values must be chosen."
+        },
+        {
+          "key": "keep-them-apart",
+          "label": "Keep the two values as they are",
+          "pros": "No frontmatter change.",
+          "cons": "The skill and its wrapper go on declaring different effort levels."
+        }
+      ]
+    },
+    {
+      "id": "h-s5-skill-r1-pgvector-guide-rls-setting",
+      "date": "2026-10-01",
+      "path": "skills/frameworks/ai-ml/pgvector.md",
+      "round": 1,
+      "kind": "out-of-scope-guide",
+      "evidence": "skills/frameworks/ai-ml/pgvector.md lines 154-159 call row-level security keyed on current_setting('app.tenant_id') \"a database invariant\". On a throwaway PostgreSQL 18.6 cluster an unprivileged role without BYPASSRLS ran SET app.tenant_id to another tenant and the next SELECT returned that tenant's row (.ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md, section 4), so the policy stops a forgotten filter but not a statement injected on the connection. Framework guides are outside this run's scope, so no slice meets the file (finding f-s5-skill-r1-65a).",
+      "options": [
+        {
+          "key": "leave-the-guide",
+          "label": "Leave the guide as it is",
+          "pros": "No change outside this run's scope.",
+          "cons": "The guide keeps calling a setting-keyed policy an invariant."
+        },
+        {
+          "key": "correct-the-guide",
+          "label": "Correct the guide in a separate change",
+          "pros": "The guide states the limit the PostgreSQL run showed, as this skill now does.",
+          "cons": "Work outside this run, needing its own approved change."
+        }
+      ]
+    },
+    {
+      "id": "h-s5-step13-account-name-in-note-paths",
+      "date": "2026-10-01",
+      "path": null,
+      "round": null,
+      "kind": "project-rules-disagree",
+      "evidence": "The security scan of slice s5 (d-s5-step13-secure, finding 13) found that the run notes under .ctoc/audit/improvement-run-notes/ carry local absolute paths with the account name and the numeric user id (for example /Users/<account>/… and /private/tmp/claude-<id>/…); the session's note confirms every s5 note header carries them. The notes are committed with each slice. No secret is in them. The same paths also appear in this slice's plan and once in the agent's record (a quoted session output) (the final review, d-s5-step16-final-review, finding 8), and in six lines of .ctoc/audit/improvement-run-notes/s5-skill-round3-research-d-s5-skill-r3-research.md (the narrow security re-scan, d-s5-step13-secure-2, its finding 13).",
+      "options": [
+        {
+          "key": "redact-account-paths",
+          "label": "Redact the account part of local paths (/Users/<name>/ and the user id) in the committed notes",
+          "pros": "The repository no longer carries the account name or user id.",
+          "cons": "A change to many notes across slices, outside this slice; paths in the notes no longer resolve on this machine as written."
+        },
+        {
+          "key": "leave-paths",
+          "label": "Leave the paths as they are",
+          "pros": "No change; every path in the notes resolves exactly as recorded.",
+          "cons": "The committed notes keep the account name and user id."
+        }
+      ]
     }
   ]
 }

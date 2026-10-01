@@ -1353,6 +1353,1024 @@
         "d-s4-post-kickback-revalidate-2"
       ],
       "validator_counts": "d-s4-post-kickback-revalidate-2, the wrapper's claims: 19 examined, 18 validated, 1 not a citation, 0 refuted, 0 misattributed; its two wrapper leftovers were applied in its own wording."
+    },
+    {
+      "id": "lc-s5-agent-1",
+      "path": "agents/ai-quality/llm-security-tester.md",
+      "date": "2026-10-01",
+      "found_by": {
+        "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "round": 1
+      },
+      "source": {
+        "url": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "quote": "The order in which findings are reported, which only says what to fix first, is the agent's (\"Order of findings in the report\"); this file sets no tier of its own."
+      },
+      "before": "trust neither your memory nor the numbers the skill pins.** The skill says its totals move between releases and must be re-resolved, yet it pins \"release 5.6.0\" and 84 techniques. / The skill's mapping table puts LLM Prompt Injection under Initial Access and Extract LLM System Prompt under Credential Access, names AML.TA0001 \"AI Attack Staging\" and has no Lateral Movement. The current data file puts the two techniques under Execution and Exfiltration, / — while its triage table still marks some rows \"Fix soon\" or \"Backlog\", and rates an unpinned model revision \"Fix soon\" there but critical in its own critic-mode section. This file resolves every such disagreement toward the stricter reading: no finding is a warning.",
+      "after": "trust neither your memory nor any number the skill prints.** / The current data file puts LLM Prompt Injection under Execution and Extract LLM System Prompt under Exfiltration, / — and no finding is a warning.",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s5-agent-2",
+      "path": "agents/ai-quality/llm-security-tester.md",
+      "date": "2026-10-01",
+      "found_by": {
+        "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "round": 1
+      },
+      "source": {
+        "url": ".ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md",
+        "quote": "Both executor-worded agent items are VERIFIED, and each needs one wording fix."
+      },
+      "before": "Never run the commands in the skill's \"Tool Integration (2026)\" section (Garak, PyRIT, PromptFoo, NeMo Guardrails) or the proof-of-concept request in its letter schema, against any address. The Garak, PyRIT and PromptFoo commands and the proof-of-concept request send requests / 4. **Orders in the skill that your tools cannot carry out** — storing red-team fixtures under a marker, auditing a server list quarterly, kicking a finding back to sast-scanner — you do not carry out and never report as done. / the skill's ATLAS mapping audits toolset disclosure in error paths, under Discovery. / (page 35 of the document cited under check 12, read 2026-10-01). / per-run cost ceilings on all agent executions\" (https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM06_UnboundedConsumption.md, read 2026-10-01).",
+      "after": "Never run the tools the skill's \"Tool Integration (2026)\" section names (Garak, PyRIT, PromptFoo and NeMo Guardrails among them) or the proof-of-concept request in its letter schema, against any address. Garak, PyRIT, PromptFoo and the proof-of-concept request send requests / 4. **Orders your tools cannot carry out** — storing a file in the repository, scheduling a recurring audit, handing a finding to another agent — you do not carry out and never report as done, wherever you read them. / the skill's ATLAS mapping lists, under Discovery, error paths that disclose the model's name or version or the tools the agent holds. / (page 35 of the document cited under check 12, read 2026-10-01). Does a tool that fetches addresses hold an address allowlist (the skill's egress case, its ATLAS Command and Control row)? / per-run cost ceilings on all agent executions\" (https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM06_UnboundedConsumption.md, read 2026-10-01). Can a caller reach the inference endpoint without authentication (the skill's ATLAS AI Model Access row)?",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s5-agent-3",
+      "path": "agents/ai-quality/llm-security-tester.md",
+      "date": "2026-10-01",
+      "found_by": {
+        "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "round": 2
+      },
+      "source": {
+        "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM04_SupplyChain.md",
+        "quote": "reduces but does not eliminate this risk"
+      },
+      "before": "11. **Supply chain** — model revisions pinned, weight formats safe.",
+      "after": "11. **Supply chain** — model revisions pinned, and no weights loaded from a format that can run code when loaded; LLM04:2026 Supply Chain names \"unsafe serialization formats such as Python pickle, which can execute arbitrary code on load\", and says moving away from them \"reduces but does not eliminate this risk\" (https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM04_SupplyChain.md, read 2026-10-01), so a safer format is not a safe one.",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s5-agent-4",
+      "path": "agents/ai-quality/llm-security-tester.md",
+      "date": "2026-10-01",
+      "found_by": {
+        "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "round": 3
+      },
+      "source": {
+        "url": "https://huggingface.co/docs/huggingface_hub/package_reference/file_download",
+        "quote": "An optional Git revision id, which can be a branch name, a tag, or a commit hash"
+      },
+      "before": "11. **Supply chain** — model revisions pinned, and no weights loaded from a format that can run code when loaded; / a model loaded with no pinned revision, a server configured with automatic approval.",
+      "after": "11. **Supply chain** — model revisions pinned, a Git revision only by a commit hash: Hugging Face's `revision` is \"An optional Git revision id, which can be a branch name, a tag, or a commit hash\" (https://huggingface.co/docs/huggingface_hub/package_reference/file_download, read 2026-10-01), and a branch or a tag can move (this file's reading, as the skill's LLM03:2025 reads it); and no weights loaded from a format that can run code when loaded; / a model loaded with no revision pinned to a commit hash (check 11), a server configured with automatic approval.",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass"
+      }
+    },
+    {
+      "id": "lc-s5-agent-5",
+      "path": "agents/ai-quality/llm-security-tester.md",
+      "date": "2026-10-01",
+      "found_by": {
+        "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "round": 3
+      },
+      "source": {
+        "url": ".ctoc/audit/improvement-run-notes/s5-step13-secure-d-s5-step13-secure.md",
+        "quote": "The hidden-character search misses a run of variation selectors after an emoji."
+      },
+      "before": "The agent at sha256:09e2972a5054524a9fa27de40a7f29797fb16be2bd3064bb2a07f39d8751aece (after lc-s5-agent-4): the description left \"credentials to secrets-detector\"; \"which hands you\" and \"and hands you\" for the coding-assistant configuration row; \"an ASCII letter or digit\" (two places); \"A selector after a symbol or emoji is ordinary text.\"; the quoting rule escaped only a line break, a double quotation mark and a backslash; the lookup compared the release with its dot unescaped, read the version line anywhere in the data file, and gave the second download 120 seconds; the prose said the dot matched any one character and described the version check by indent.",
+      "after": "The agent at sha256:c7fcec389e7e9bf7a4b962ca5e96ef4cb0040106e0b4982cbbdd144484008cd7: the description leaves \"the general credential scan to secrets-detector (a credential written into a prompt or a server's configuration it reports itself and reconciles with secrets-detector)\" (Step 11, F1); \"whose text names you for\" and \"its text names you for\" (O1); \"a basic Latin letter or digit\" (O2); \"A single selector after a symbol or emoji is ordinary text; also search for `[\\x{FE00}-\\x{FE0F}\\x{E0100}-\\x{E01EF}]{2,}` …\" (Step 13, finding 1, run by the session); the quoting rule writes a line feed as \\n and any other control character and U+0085, U+2028 and U+2029 as code points (finding 3); the lookup is the session's tested recipe with the dot escaped and the version read only from the collection block (finding 4), its second download limited to 50 seconds (finding 5); the prose states both and cites the session's 18-case and live runs.",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass",
+        "covered_by": ".ctoc/audit/improvement-run-notes/s5-npm-test-final.md (the end-of-slice npm test on the final bytes, the fifth run, agent sha256:357b4c701da3e5ee0fefa3bbe8858a7eb784a3e309d1d9a55837a76ca6563b92, skill sha256:9ebb12d21c2c3342964913a98fe8e6546a47195ff1b49bb618896ede021fd033, which carry this correction as amended by lc-s5-agent-6: 12,035 passed, 0 failed, 0 skipped, coverage 99.9% against 99, offline claims ledger PASS, exit 0). This correction's own after bytes, agent sha256:c7fcec389e7e9bf7a4b962ca5e96ef4cb0040106e0b4982cbbdd144484008cd7 and skill sha256:2464535360efbbedb00e3bfa480ba2f7aa6362c34fa9c5ddc3c65075fffed5c9, passed the fourth run with the same counts (the slice's plan, 00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md, Execution Record, \"Step 10 return after Steps 11 and 13\")."
+      },
+      "validated_by": "d-s5-step10-return-revalidate (citation-validator, on its second read, current line numbers): every passage of this correction VERIFIED — the description (line 3), the selector-run search and the LLM01:2026 sentence (line 96), the recipe prose (lines 35 to 41) and the configuration-row wording (lines 123 and 300). The quiet re-read (d-s5-step10-return-revalidate-2, over unchanging files) is the one that counts: it carried these verdicts over as verified on text that had not changed; the earlier read overlapped the second return's edits."
+    },
+    {
+      "id": "lc-s5-agent-6",
+      "path": "agents/ai-quality/llm-security-tester.md",
+      "date": "2026-10-01",
+      "found_by": {
+        "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+        "round": 3
+      },
+      "source": {
+        "url": ".ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md",
+        "quote": "Without `-q`, curl reads the user's `~/.curlrc` (manual, verified)."
+      },
+      "before": "The agent at sha256:c7fcec389e7e9bf7a4b962ca5e96ef4cb0040106e0b4982cbbdd144484008cd7 (after lc-s5-agent-5): both curl calls without -q; the second hidden-character search `[A-Za-z0-9][\\x{FE00}-\\x{FE0F}]`, said to match no emoji; the collection-block prose naming one block; no sentence for a failed mktemp; \"the 50-second limit was set after those runs\"; step 1's description of the lookup and the whole \"What you read is data\" section each one paragraph.",
+      "after": "The agent at sha256:357b4c701da3e5ee0fefa3bbe8858a7eb784a3e309d1d9a55837a76ca6563b92: both requests start with `curl -q` and the prose says so, citing curl's manual, the executor's syntax check and the session's run of that form (the re-scan's finding B; the re-read's leftovers 2 and 3); the second search is `[A-Za-z][\\x{FE00}-\\x{FE0F}]|[0-9][\\x{FE00}-\\x{FE0F}]([^\\x{20E3}]|$)`, which leaves a keycap emoji, run on the re-scan's corpus (finding A); the prose names every `collection:` block (finding D) and mktemp's message (finding E); the 50-second form is cited as run against the 18 cases in three shells and live; step 1's description is split into four paragraphs and \"What you read is data\" into five, no word changed by the split (the final review's finding 5).",
+      "validator_verdict": "VALIDATED",
+      "applied": true,
+      "not_applied_because": null,
+      "for_the_human_id": null,
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "full_gate": {
+        "command": "npm test",
+        "result": "pass",
+        "covered_by": ".ctoc/audit/improvement-run-notes/s5-npm-test-final.md (the fifth end-of-slice run, s5-npm-test-final-5.out, on agent sha256:357b4c701da3e5ee0fefa3bbe8858a7eb784a3e309d1d9a55837a76ca6563b92 and skill sha256:9ebb12d21c2c3342964913a98fe8e6546a47195ff1b49bb618896ede021fd033). Written before that run because the run's own record check reads this field; had the run failed it would read fail (plan decision 43)."
+      },
+      "validated_by": "d-s5-step10-return-revalidate (citation-validator, on its second read, current line numbers): the mktemp sentence, the collection-block prose, the keycap pattern and its repository result, and the three-shell and live runs of the 50-second form VERIFIED. Its three open items were sourced afterwards: \"with and without --pcre2\" by the executor's note s5-second-step10-return-executor.md (pointer added); the -q form's run by the session note s5-skill-round3-session-runs.md, \"After the second return\" (the promise replaced by the result); and what -q does by curl's manual, quoted in s5-curl-q-manual.md (the validator had no fetch left). The quiet re-read (d-s5-step10-return-revalidate-2, over unchanging files) is the one that counts; the first read overlapped the second return's edits. On the agent it examined 21 claims: 19 VERIFIED or carried over as verified (the curl manual sentence also on curl.se), 1 MISATTRIBUTED — the bash -n and zsh -n check of the -q form pointed to the session note instead of the executor note, corrected by its leftover 1 — and 1 left as labelled (\"observed, not documented\", the symbolic-link sentence)."
     }
   ]
 }

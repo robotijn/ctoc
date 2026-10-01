@@ -1,0 +1,3758 @@
+{
+  "schema": 1,
+  "path": "skills/ai-quality/llm-security-tester/SKILL.md",
+  "prerequisite": null,
+  "rounds": [
+    {
+      "round": 1,
+      "date": "2026-10-01",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:8894ea70954f865f3c9dc85128ca42bc0a56bf8d8d3153cef70e7bf218b3ff99",
+      "fingerprint_after": "sha256:bfdc100c233af4680b954c4644930194ce78e4f10a40edd9f1856563a8ad85f3",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s5-skill-r1-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-skill-r1-research-gaps",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-skill-r1-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-skill-r1-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-skill-r1-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "The current request and response shapes behind each code example: Anthropic tool use and stop reasons, the Java and TypeScript SDKs, Microsoft.Extensions.AI, OpenAI structured outputs and Chat Completions, Hugging Face downloads, HtmlSanitizer and Guava",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Which Claude models accept forced tool use, and the current model identifiers",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "The original papers behind the named attacks: training-data extraction, Crescendo, Tree of Attacks with Pruning, MCPTox, the promptware kill chain, EchoLeak",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "The vulnerability records for CVE-2025-32711 and CVE-2025-54135",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "PostgreSQL row-level security: who bypasses it, and who may set a custom setting",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "The command lines and features of garak, PyRIT, promptfoo, NeMo Guardrails and DeepTeam, and what OpenAI moderation labels",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "CWE-1426 and CWE-1427",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "Go and Rust client libraries for Anthropic and OpenAI",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Sources for the frequency and ranking claims (denial of wallet as the dominant variant; why LLM02 rose)",
+          "source_class": "broad web",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://developers.openai.com/api/docs/guides/structured-outputs",
+          "read_on": "2026-10-01",
+          "bore_on": "lines 69, 255-257, 535 and 637: the shape attributed to the Responses API is the Chat Completions shape",
+          "outcome": "refuted",
+          "quote": "a refusal does not necessarily follow the schema you have supplied",
+          "error": null
+        },
+        {
+          "url": "https://developers.openai.com/api/docs/guides/moderation",
+          "read_on": "2026-10-01",
+          "bore_on": "line 532: the moderation categories; none for prompt injection",
+          "outcome": "supported",
+          "quote": "omni-moderation-latest",
+          "error": null
+        },
+        {
+          "url": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/implement-tool-use",
+          "read_on": "2026-10-01",
+          "bore_on": "every safe example forced a tool; forced tool use returns HTTP 400 on four current models (read raw by the session)",
+          "outcome": "refuted",
+          "quote": "Not every model and setting supports forced tool use.",
+          "error": null
+        },
+        {
+          "url": "https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons",
+          "read_on": "2026-10-01",
+          "bore_on": "line 134: \"guaranteed to be a tool_use\"",
+          "outcome": "refuted",
+          "quote": "Safety classifiers return this stop reason as a normal HTTP 200 response, not an error.",
+          "error": null
+        },
+        {
+          "url": "https://platform.claude.com/docs/en/api/sdks/java",
+          "read_on": "2026-10-01",
+          "bore_on": "line 166: \"Anthropic Java SDK 0.x\"",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/anthropics/anthropic-sdk-java",
+          "read_on": "2026-10-01",
+          "bore_on": "line 166: the SDK version",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/anthropics/anthropic-sdk-java/main/README.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the Java SDK version, read raw by the session",
+          "outcome": "supported",
+          "quote": "implementation(\"com.anthropic:anthropic-java:2.68.0\")",
+          "error": null
+        },
+        {
+          "url": "https://www.anthropic.com/constitution",
+          "read_on": "2026-10-01",
+          "bore_on": "line 70: \"Anthropic Claude ships with a constitutional safety layer\"",
+          "outcome": "refuted",
+          "quote": "It plays a crucial role in our training process",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/ai/microsoft-extensions-ai",
+          "read_on": "2026-10-01",
+          "bore_on": "the C# example's library",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/ai/ichatclient",
+          "read_on": "2026-10-01",
+          "bore_on": "line 141: CompleteAsync",
+          "outcome": "refuted",
+          "quote": "you can call the IChatClient.GetResponseAsync method to send a request and get a response",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/api/microsoft.extensions.ai.chatresponseformat.forjsonschema",
+          "read_on": "2026-10-01",
+          "bore_on": "line 157: ForJsonSchema<T>()",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/api/microsoft.extensions.ai.chatoptions.maxoutputtokens",
+          "read_on": "2026-10-01",
+          "bore_on": "line 158: MaxOutputTokens",
+          "outcome": "supported",
+          "quote": "Gets or sets the maximum number of tokens in the generated chat response.",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/api/microsoft.extensions.ai.chatclientstructuredoutputextensions.getresponseasync",
+          "read_on": "2026-10-01",
+          "bore_on": "line 160: GetResponseAsync<T> in place of CompleteAsync<T>",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/api/microsoft.extensions.ai.chatresponse-1.result",
+          "read_on": "2026-10-01",
+          "bore_on": "line 161: \"throws on schema mismatch\"",
+          "outcome": "refuted",
+          "quote": "If the response did not contain JSON, or if deserialization fails, this property will throw.",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/api/microsoft.extensions.ai.chatresponse-1.trygetresult",
+          "read_on": "2026-10-01",
+          "bore_on": "the C# rewrite's TryGetResult",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/mganss/HtmlSanitizer",
+          "read_on": "2026-10-01",
+          "bore_on": "line 358: HtmlSanitizer.Default",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://guava.dev/releases/snapshot-jre/api/docs/com/google/common/html/HtmlEscapers.html",
+          "read_on": "2026-10-01",
+          "bore_on": "line 179: HtmlEscapers.htmlEscaper()",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/anthropics/anthropic-sdk-typescript/main/src/resources/messages/messages.ts",
+          "read_on": "2026-10-01",
+          "bore_on": "lines 213 and 247-251: TextBlock, ToolUseBlock and ToolChoice types",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/anthropics/anthropic-sdk-typescript/main/src/client.ts",
+          "read_on": "2026-10-01",
+          "bore_on": "line 213: Anthropic.TextBlock is exported",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/anthropics/anthropic-sdk-java/main/anthropic-java-core/src/main/kotlin/com/anthropic/models/messages/ContentBlock.kt",
+          "read_on": "2026-10-01",
+          "bore_on": "lines 196-197: isToolUse() and asToolUse() exist",
+          "outcome": "supported",
+          "quote": "fun isToolUse(): Boolean = toolUse != null",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/anthropics/anthropic-sdk-java/main/anthropic-java-core/src/main/kotlin/com/anthropic/models/messages/MessageCreateParams.kt",
+          "read_on": "2026-10-01",
+          "bore_on": "line 188 .system(...); line 192: the replacement for the fabricated ToolChoice.tool(...)",
+          "outcome": "supported",
+          "quote": "fun toolToolChoice(name: String) = apply { body.toolToolChoice(name) }",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/anthropics/anthropic-sdk-java/main/anthropic-java-core/src/main/kotlin/com/anthropic/models/messages/ToolUseBlock.kt",
+          "read_on": "2026-10-01",
+          "bore_on": "change 21: ToolUseBlock exposes its input only as _input(), so the critic's typed input(Class) does not exist on main",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/anthropics/anthropic-sdk-java/main/anthropic-java-core/src/main/kotlin/com/anthropic/models/messages/Tool.kt",
+          "read_on": "2026-10-01",
+          "bore_on": "change 21: Tool.Builder.strict and InputSchema.Builder calls used by the validator's rewrite",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/anthropics/anthropic-sdk-java/main/anthropic-java-core/src/main/kotlin/com/anthropic/core/Values.kt",
+          "read_on": "2026-10-01",
+          "bore_on": "change 21: JsonValue.asObject() and asString()",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://developers.openai.com/api/reference/python/resources/chat/subresources/completions/methods/create",
+          "read_on": "2026-10-01",
+          "bore_on": "lines 69, 535 and 637: Chat Completions response_format and tool_choice \"required\"",
+          "outcome": "supported",
+          "quote": "`required` means the model must call one or more tools.",
+          "error": null
+        },
+        {
+          "url": "https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create",
+          "read_on": "2026-10-01",
+          "bore_on": "the same reference at its generic address",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "The server returned HTTP 404 Not Found."
+        },
+        {
+          "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+          "read_on": "2026-10-01",
+          "bore_on": "the model identifier claude-opus-5-5",
+          "outcome": "supported",
+          "quote": "Every Claude model ID is a pinned snapshot, including the dateless IDs used from the 4.6 generation on.",
+          "error": null
+        },
+        {
+          "url": "https://huggingface.co/docs/huggingface_hub/package_reference/file_download",
+          "read_on": "2026-10-01",
+          "bore_on": "line 302: etag_timeout presented as checksum verification",
+          "outcome": "refuted",
+          "quote": "An optional Git revision id, which can be a branch name, a tag, or a commit hash.",
+          "error": null
+        },
+        {
+          "url": "https://huggingface.co/docs/transformers/main_classes/model",
+          "read_on": "2026-10-01",
+          "bore_on": "line 303: the parameter is use_safetensors; weights_only",
+          "outcome": "refuted",
+          "quote": "Whether or not to use `safetensors` checkpoints.",
+          "error": null
+        },
+        {
+          "url": "https://www.postgresql.org/docs/current/ddl-rowsecurity.html",
+          "read_on": "2026-10-01",
+          "bore_on": "line 424: \"even an injected SQL … cannot reach another tenant\"",
+          "outcome": "refuted",
+          "quote": "Superusers and roles with the `BYPASSRLS` attribute always bypass the row security system when accessing a table.",
+          "error": null
+        },
+        {
+          "url": "https://www.postgresql.org/docs/current/functions-admin.html",
+          "read_on": "2026-10-01",
+          "bore_on": "set_config with is_local, current_setting",
+          "outcome": "supported",
+          "quote": "If is_local is true, the new value will only apply during the current transaction",
+          "error": null
+        },
+        {
+          "url": "https://www.postgresql.org/docs/current/runtime-config-custom.html",
+          "read_on": "2026-10-01",
+          "bore_on": "who may set a custom setting (the page states no limit)",
+          "outcome": "did-not-bear",
+          "quote": "PostgreSQL will accept a setting for any two-part parameter name.",
+          "error": null
+        },
+        {
+          "url": "https://www.postgresql.org/docs/current/sql-set.html",
+          "read_on": "2026-10-01",
+          "bore_on": "who may set a custom setting",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://cveawg.mitre.org/api/cve/CVE-2025-32711",
+          "read_on": "2026-10-01",
+          "bore_on": "lines 267 and 485: EchoLeak",
+          "outcome": "supported",
+          "quote": "Ai command injection in M365 Copilot allows an unauthorized attacker to disclose information over a network.",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2509.10540",
+          "read_on": "2026-10-01",
+          "bore_on": "EchoLeak's route: a crafted email, reference-style Markdown, an allowed proxy; \"mail and files\" not found",
+          "outcome": "supported",
+          "quote": "a Microsoft Teams proxy allowed by the content security policy",
+          "error": null
+        },
+        {
+          "url": "https://cveawg.mitre.org/api/cve/CVE-2025-54135",
+          "read_on": "2026-10-01",
+          "bore_on": "line 486: the \"Cursor IDE chain\" has an identifier and a mechanism",
+          "outcome": "supported",
+          "quote": "editing it requires approval but creating a new one doesn't",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2311.17035",
+          "read_on": "2026-10-01",
+          "bore_on": "line 296: the \"repeat this word forever\" attack",
+          "outcome": "supported",
+          "quote": "emit training data at a rate 150x higher than when behaving properly",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2404.01833",
+          "read_on": "2026-10-01",
+          "bore_on": "line 263: Crescendo is multi-turn",
+          "outcome": "supported",
+          "quote": "gradually escalates the dialogue by referencing the model's replies",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2312.02119",
+          "read_on": "2026-10-01",
+          "bore_on": "line 263: TAP called a multi-turn warm-up",
+          "outcome": "refuted",
+          "quote": "TAP utilizes an attacker LLM to iteratively refine candidate (attack) prompts until one of the refined prompts jailbreaks the target.",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2508.14925",
+          "read_on": "2026-10-01",
+          "bore_on": "lines 371 and 487: MCPTox listed as an incident; it is a benchmark",
+          "outcome": "refuted",
+          "quote": "malicious instructions are embedded within a tool's metadata without execution",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2601.09625",
+          "read_on": "2026-10-01",
+          "bore_on": "lines 261 and 488: the promptware kill chain",
+          "outcome": "supported",
+          "quote": "a seven-stage promptware kill chain",
+          "error": null
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/1426.html",
+          "read_on": "2026-10-01",
+          "bore_on": "line 587: CWE-1426",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/1427.html",
+          "read_on": "2026-10-01",
+          "bore_on": "the closer weakness for a prompt injection, CWE-1427",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/NVIDIA/garak",
+          "read_on": "2026-10-01",
+          "bore_on": "line 527: \"100+ probe modules\"",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://reference.garak.ai/en/latest/cliref.html",
+          "read_on": "2026-10-01",
+          "bore_on": "line 527 \"pushes findings to AVID\"; lines 540-542 the command line",
+          "outcome": "refuted",
+          "quote": "process garak report into a list of AVID reports",
+          "error": null
+        },
+        {
+          "url": "https://github.com/microsoft/PyRIT/tree/main/pyrit/cli",
+          "read_on": "2026-10-01",
+          "bore_on": "lines 549-551: python -m pyrit.cli orchestrate cannot run",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.promptfoo.dev/docs/usage/command-line/",
+          "read_on": "2026-10-01",
+          "bore_on": "lines 544-546: the promptfoo flags",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.promptfoo.dev/docs/red-team/owasp-llm-top-10/",
+          "read_on": "2026-10-01",
+          "bore_on": "the OWASP plugin in the configuration file",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/NVIDIA/NeMo-Guardrails",
+          "read_on": "2026-10-01",
+          "bore_on": "lines 530, 553 and 554: NeMo Guardrails",
+          "outcome": "supported",
+          "quote": "nemoguardrails server [--config PATH/TO/CONFIGS] [--port PORT]",
+          "error": null
+        },
+        {
+          "url": "https://www.trydeepteam.com/docs/frameworks-owasp-top-10-for-llms",
+          "read_on": "2026-10-01",
+          "bore_on": "line 536: the OWASP framework (found); an ATLAS preset and \"open-source\" (not on the page)",
+          "outcome": "supported",
+          "quote": "from deepteam.frameworks import OWASPTop10",
+          "error": null
+        },
+        {
+          "url": "https://crates.io/api/v1/crates?ids[]=async-openai&ids[]=anthropic-sdk-rust",
+          "read_on": "2026-10-01",
+          "bore_on": "line 626: the Rust crates",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://reference.langchain.com/python/langchain-core/output_parsers/pydantic",
+          "read_on": "2026-10-01",
+          "bore_on": "line 533: LangChain output parsers (only the page header rendered)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.tenable.com/blog/faq-cve-2025-54135-cve-2025-54136-vulnerabilities-in-cursor-curxecute-mcpoison",
+          "read_on": "2026-10-01",
+          "bore_on": "CVE-2025-54135, a search result only, not a source",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.giskard.ai/knowledge/owasp-top-10-for-llm-2025-understanding-the-risks-of-large-language-models",
+          "read_on": "2026-10-01",
+          "bore_on": "the LLM02 rank change, a search result only, not a source",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.scworld.com/news/owasp-warns-of-unbounded-consumption-risks-in-ai-models",
+          "read_on": "2026-10-01",
+          "bore_on": "the denial-of-wallet frequency claim, a search result only, not a source",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.schneier.com/academic/archives/2026/02/the-promptware-kill-chain-how-prompt-injections-gradually-evolved-into-a-multi-step-malware.html",
+          "read_on": "2026-10-01",
+          "bore_on": "the promptware kill chain, a search result only",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://pkg.go.dev/github.com/anthropics/anthropic-sdk-go",
+          "read_on": "2026-10-01",
+          "bore_on": "line 625: the Go client libraries (search result only; the session read the README raw)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 1: forced tool use returns HTTP 400 on four current models, read raw",
+          "outcome": "supported",
+          "quote": "any and tool return a 400 error",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 3: official Anthropic and OpenAI Go SDKs exist (line 625's \"Anthropic HTTP\" is out of date)",
+          "outcome": "supported",
+          "quote": "go get -u 'github.com/anthropics/anthropic-sdk-go@v1.78.0'",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 4: on PostgreSQL 18.6 an unprivileged role set app.tenant_id to another tenant and read its row (line 424 refuted a second way)",
+          "outcome": "supported",
+          "quote": "secret of tenant 2",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 5: the new Python, TypeScript, C and C++ examples compiled or run; Java and C# not compiled",
+          "outcome": "supported",
+          "quote": "Toolchains on this machine: Apple clang 21.0.0 (C and C++), node v24.14.1, Python 3.9.6.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 6: the Java correction, and the session_user-keyed pattern run on PostgreSQL 18.6",
+          "outcome": "supported",
+          "quote": "permission denied to set role \"tenant_b\"",
+          "error": null
+        },
+        {
+          "url": "CLAUDE.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 2: how specialists are reached; change 52: operating lesson 9",
+          "outcome": "supported",
+          "quote": "are reached by an agent reading `skills/<category>/<name>/SKILL.md` by path",
+          "error": null
+        },
+        {
+          "url": "docs/REFINEMENT_LOOP.md",
+          "read_on": "2026-10-01",
+          "bore_on": "changes 5-7, 53 and 61: the letter and critic mode as a design record",
+          "outcome": "supported",
+          "quote": "the loop is **NOT RUNNING** today",
+          "error": null
+        },
+        {
+          "url": "skills/security/sast-scanner/SKILL.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 16: section 12 numbers by the 2023-24 edition",
+          "outcome": "supported",
+          "quote": "### 12. AI / LLM Integration (OWASP LLM Top 10 v1.1, 2024)",
+          "error": null
+        },
+        {
+          "url": "skills/agent-fragments/warnings-are-critical.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 61: the shared rule allows a waiver in a plan",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the re-read of the edited skill (d-s5-skill-r1-revalidate): all 62 changes landed; 12 spot-checked quotations match; of 9 status lines 5 verified, 2 imprecise, 1 refuted as worded (Java), 1 unbacked (the unbounded-consumption parse); five Python blocks without a status line; contradictions 51 to 56; 12 leftovers",
+          "outcome": "supported",
+          "quote": "All 62 changes are in the file. 52 landed word for word.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "section 7: the session parsed all seven Python blocks with Python 3.9.6 ast, backing the parsed-not-run status lines",
+          "outcome": "supported",
+          "quote": "all seven parse",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/microsoft/PyRIT/main/pyproject.toml",
+          "read_on": "2026-10-01",
+          "bore_on": "the tool table's PyRIT entry points pyrit_scan and pyrit_shell (a third, pyrit_backend, also exists; the skill does not claim a complete list)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://pypi.org/pypi/garak/json",
+          "read_on": "2026-10-01",
+          "bore_on": "garak 0.17.0, still the current release (re-read spot-check)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s5-skill-r1-1",
+          "kind": "new",
+          "text": "related_skills match the agent's \"Skills you reuse\" table (change 1).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-1; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-2",
+          "kind": "new",
+          "text": "remove the claim that the skill loads when a file imports a language-model library (change 2).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-2; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-3",
+          "kind": "new",
+          "text": "overlap with hallucination-detector (change 3).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-3; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-4",
+          "kind": "new",
+          "text": "secrets in a prompt are reported here, not deferred (change 4).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-4; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 4",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-5",
+          "kind": "new",
+          "text": "\"emits the letter\", output handling (change 5).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-5; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-6",
+          "kind": "new",
+          "text": "\"emits the letter\", misinformation (change 6).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-6; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-7",
+          "kind": "new",
+          "text": "the Role says letters (change 7).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-7; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-8",
+          "kind": "new",
+          "text": "\"the instruction is what hardens them\" overstates the delimiter defence (change 8).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-8; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 8",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-9",
+          "kind": "new",
+          "text": "forced tool use returns HTTP 400 on current models; the Responses shape is misattributed (change 9).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-9; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 9",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-10",
+          "kind": "new",
+          "text": "\"constitutional safety layer\" is misattributed (change 10).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-10; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 10",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-11",
+          "kind": "new",
+          "text": "CVE-2025-53773, and automatic approval with no exception (change 11).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-11; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 11",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-12",
+          "kind": "new",
+          "text": "row-level security pointer (change 12).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-12; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 12",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-13",
+          "kind": "new",
+          "text": "memory expiry (change 13).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-13; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 13",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-14",
+          "kind": "new",
+          "text": "frequency claim removed (change 14).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-14; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 14",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-15",
+          "kind": "new",
+          "text": "\"new in 2025\" and \"because attackers reliably extract it\" (change 15).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-15; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 15",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-16",
+          "kind": "new",
+          "text": "sast-scanner numbers by the 2023–24 edition (change 16).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-16; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 16",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-17",
+          "kind": "new",
+          "text": "edition paragraph: unsourced \"new\"/\"reframed\" claims replaced with the edition rule (change 17).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-17; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 17",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-18",
+          "kind": "new",
+          "text": "heading with edition (change 18).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-18; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 18",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-19",
+          "kind": "new",
+          "text": "Python LLM01 example: no forcing, check `stop_reason`, validate the input, new model identifier (change 19). Code status line added as the session directed: run with a stubbed client on 2026-10-01. The re-read found its status line imprecise (the well-formed reply was accepted, and only the safe function ran); restated as its leftover 1.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-19; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 19; .ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md, \"Status lines\" and \"Leftovers\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-20",
+          "kind": "new",
+          "text": "C# example: `CompleteAsync` → `GetResponseAsync`, `TryGetResult`, and the duplicate method name (change 20). Code status line added: not compiled (no .NET SDK on the build machine); names checked against Microsoft's documentation.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-20; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 20",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-21",
+          "kind": "new",
+          "text": "Java example: SDK 2.x, no forcing, a real input schema in place of a comment, validation in code (change 21). The critic's new text was refuted by the validator (a typed input(Class) accessor does not exist on main; the properties call was disputed); replaced in full by the validator's rewrite, which uses only calls confirmed in the raw Kotlin source, with a status line: not compiled (no Java toolchain), StopReason equality and Message.content() believed. The re-read refuted the status line as worded (four calls are believed, not read, and two more were never read); restated as its leftover 2, which names all six.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-21; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 21; .ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md, \"Status lines\" and \"Leftovers\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-22",
+          "kind": "new",
+          "text": "TypeScript example: no forcing, `stop_reason`, strict zod, the OpenAI shapes, the duplicate function name (change 22). Code status line added: type-checked on 2026-10-01 with tsc --noEmit, strict.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-22; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 22",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-23",
+          "kind": "new",
+          "text": "promptware kill chain sourced; caps per tool step sourced; National Cyber Security Centre (change 23).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-23; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 23",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-24",
+          "kind": "new",
+          "text": "invisible characters sourced; direction controls stated as unsourced (change 24).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-24; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 24",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-25",
+          "kind": "new",
+          "text": "TAP is not multi-turn; the defence is labelled as this file's own (change 25). The validator's optional leftover applied: the Crescendo quotation is split at its sentence break.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-25; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 25",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-26",
+          "kind": "new",
+          "text": "LLM02 heading; unsourced causal claim removed; EchoLeak corrected (change 26).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-26; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 26",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-27",
+          "kind": "new",
+          "text": "LLM02 Python model identifier (change 27).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-27; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 27",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-28",
+          "kind": "new",
+          "text": "\"repeat this word forever\" cited; markdown-image source added (change 28).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-28; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 28",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-29",
+          "kind": "new",
+          "text": "LLM03 heading (change 29).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-29; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 29",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-30",
+          "kind": "new",
+          "text": "`etag_timeout` is not a checksum; the parameter is `use_safetensors`; `weights_only` (change 30).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-30; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 30",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-31",
+          "kind": "new",
+          "text": "unverified ATLAS technique name removed; tool poisoning sourced (change 31).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-31; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 31",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-32",
+          "kind": "new",
+          "text": "LLM04 heading; poisoning sourced (change 32).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-32; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 32",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-33",
+          "kind": "new",
+          "text": "memory expiry sourced (change 33).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-33; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 33",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-34",
+          "kind": "new",
+          "text": "LLM05 heading; request forgery and encoding; output sinks (change 34).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-34; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 34",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-35",
+          "kind": "new",
+          "text": "`HtmlSanitizer.Default` does not exist (change 35). Marked not compiled (no .NET SDK on the build machine).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-35; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 35",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-36",
+          "kind": "new",
+          "text": "configuration-file edge case: names the file, adds create-as-write (change 36).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-36; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 36",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-37",
+          "kind": "new",
+          "text": "LLM06 heading (change 37).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-37; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 37",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-38",
+          "kind": "new",
+          "text": "what a confirmation shows; configuration writes never; acting in the user's context (change 38).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-38; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 38",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-39",
+          "kind": "new",
+          "text": "tool poisoning: MCPTox is a benchmark; the description is part of the prompt (change 39).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-39; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 39",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-40",
+          "kind": "new",
+          "text": "LLM07 heading (change 40).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-40; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 40",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-41",
+          "kind": "new",
+          "text": "no deferral of secrets in a prompt (change 41).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-41; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 41",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-42",
+          "kind": "new",
+          "text": "the canary is a runtime test, not a finding (change 42).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-42; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 42",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-43",
+          "kind": "new",
+          "text": "LLM08 heading (change 43).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-43; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 43",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-44",
+          "kind": "new",
+          "text": "the row-level security example is refuted twice; rewritten so a statement on the connection cannot move the tenant (change 44). One sentence added, as the session directed: the safe pattern was run on PostgreSQL 18.6 on 2026-10-01 (session runs, section 6).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-44; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 44",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-45",
+          "kind": "new",
+          "text": "LLM09 heading (change 45).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-45; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 45",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-46",
+          "kind": "new",
+          "text": "one confirmation rule (change 46).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-46; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 46",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-47",
+          "kind": "new",
+          "text": "LLM10: frequency claims removed; cost and logits sourced (change 47).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-47; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 47",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-48",
+          "kind": "new",
+          "text": "LLM10 example: undefined `tool_calls_so_far`; the over-cap path returned a pending tool call; agentic list added (change 48). The validator's optional leftover applied (a comment that TOOLS is defined elsewhere), with a status line: the block parses (Python 3.9.6, ast), and is not run. The re-read found the parse claim unbacked; the session then parsed all seven Python blocks and recorded it (session runs, section 7), so the line is kept as written.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-48; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 48; .ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md, \"Status lines\" and \"Leftovers\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-49",
+          "kind": "new",
+          "text": "incident table: CVE-2025-53773, EchoLeak, the Cursor CVE number, MCPTox out, promptware cited, no letter (change 49). The validator's leftover 2 applied: the CVE-2025-54135 quotation is split so the disputed punctuation is not quoted.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-49; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 49",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-50",
+          "kind": "new",
+          "text": "ATLAS: release numbering, the manifest route, the corrected table (change 50).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-50; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 50",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-51",
+          "kind": "new",
+          "text": "Tool Integration: reference only; facts corrected; commands deleted (change 51). The validator's leftover 3 applied: the SARIF sentence names scan-model and code-scans run, and none for redteam run.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-51; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 51",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-52",
+          "kind": "new",
+          "text": "Severity: every finding critical; the triage table removed; this file's sections mapped to the agent's checks (change 52).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-52; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 52",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-53",
+          "kind": "new",
+          "text": "the letter schema as a design record; tactic, edition, references, CWE and confidence corrected (change 53).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-53; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 53",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-54",
+          "kind": "new",
+          "text": "seven-language section: C and C++ examples added; \"owed in v4\" and the kick-back removed (change 54). Code status lines added: both compiled and run by the session on 2026-10-01 (clang, no diagnostics). The re-read found the C++ status line imprecise (a well-formed reply was accepted); restated as its leftover 4.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-54; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 54; .ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md, \"Status lines\" and \"Leftovers\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-55",
+          "kind": "new",
+          "text": "fixture marker removed (change 55).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-55; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 55",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-56",
+          "kind": "new",
+          "text": "provider shapes: \"stricter than\" removed; Chat Completions and Responses attributed correctly (change 56).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-56; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 56",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-57",
+          "kind": "new",
+          "text": "media inputs: delimiters are not the whole defence (change 57).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-57; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 57",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-58",
+          "kind": "new",
+          "text": "messages between agents: content, not only shape (change 58).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-58; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 58",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-59",
+          "kind": "new",
+          "text": "Model Context Protocol servers: unverified ATLAS claims, the quarterly order and \"non-vetted\" removed; the protocol's own classes named (change 59).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-59; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 59",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-60",
+          "kind": "new",
+          "text": "configuration files: \"never\", not \"with approval\"; creating counts as writing (change 60).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-60; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 60",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-61",
+          "kind": "new",
+          "text": "critic mode as a design record; no waiver in a plan an agent can write (change 61).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-61; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 61",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-62",
+          "kind": "new",
+          "text": "references: wrong counts removed, PyRIT address, live addresses, new primary sources (change 62).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-62; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, change 62",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-63",
+          "kind": "new",
+          "text": "Once this round's changes 50, 51 and 52 apply, three sentences of the paired agent (lines 24, 63 and 263) describe skill text that no longer exists, and two more (lines 78 and 81) become stale. Applied to the agent as late corrections: lc-s5-agent-1, the critic's three sentences; lc-s5-agent-2, the two staleness edits, worded by the executor because the critic gave no text. The re-read verified both executor-worded agent lines, each with a wording fix (its leftovers 9 and 10), and three more agent passages were changed to close contradictions 53 and 55 (its leftovers 11 and 12); all of these are lc-s5-agent-2.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, \"Not skill edits\", f-s5-skill-r1-63; .ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, \"Changes 63–65\"; .ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md, \"The executor-worded agent lines\" and leftovers 9-12",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-64",
+          "kind": "new",
+          "text": "The skill's effort_level is high while the agent's effort is xhigh (backlog item 48). Both keys are frozen by the plan, so which value moves is the human's.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-64; skills/ai-quality/llm-security-tester/SKILL.md frontmatter; agents/ai-quality/llm-security-tester.md frontmatter",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s5-skill-r1-effort-level-mismatch"
+        },
+        {
+          "id": "f-s5-skill-r1-65a",
+          "kind": "new",
+          "text": "skills/frameworks/ai-ml/pgvector.md (lines 154-159) calls row-level security keyed on current_setting('app.tenant_id') \"a database invariant\"; the session's PostgreSQL 18.6 run showed any role can SET that setting, so a statement injected on the connection re-points the policy.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md, section 4; .ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-65",
+          "decision": "rejected",
+          "reason": "Cross-file: skills/frameworks/ai-ml/pgvector.md is a framework guide, outside this run's scope, so no slice meets it; put to the human as h-s5-skill-r1-pgvector-guide-rls-setting.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-65b",
+          "kind": "new",
+          "text": "skills/saas/multi-tenancy-row-level/SKILL.md (line 48 onward) keys its shared-role pattern on a setting read with current_setting; without a guard on the connection, that stops a forgotten filter but not an injected statement.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md, section 4; .ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-65",
+          "decision": "rejected",
+          "reason": "Cross-file: skills/saas/multi-tenancy-row-level/SKILL.md is not in this slice and has not been started; slice s60 meets it (parent index, slice table; inventory.json).",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-65c",
+          "kind": "new",
+          "text": "skills/specialized/database-reviewer/SKILL.md (lines 184-188) keys its row-level security policy on current_setting('app.tenant_id'), with FORCE; the same injected-SET route applies.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md, section 4; .ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md, f-s5-skill-r1-65",
+          "decision": "rejected",
+          "reason": "Cross-file: skills/specialized/database-reviewer/SKILL.md is not in this slice and has not been started; slice s82 meets it (parent index, slice table; inventory.json).",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-66",
+          "kind": "new",
+          "text": "Five Python blocks (the LLM02:2025, LLM03:2025, LLM05:2025, LLM06:2025 and LLM07:2025 examples) had no status line, and the SQL block's status sat only in the prose after it. Each Python block now opens with \"Parsed 2026-10-01 (Python 3.9.6, ast); not run:\" and the reason, in the form the session set; the SQL block opens with two lines saying the two policies were tested and that the pgvector column and the <-> query were not recorded as run (the re-read's leftover 5).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md, \"Status lines\" and leftover 5; .ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md, section 7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-67",
+          "kind": "new",
+          "text": "Thirteen bare 2025 identifiers remained (lines 51, 52, 76, 78, 81 and 732), although the skill's own edition paragraph forbids a bare identifier. Each now carries its edition (the re-read's leftover 6).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md, \"What rounds 2 and 3 of the skill must still do\" and leftover 6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-68",
+          "kind": "new",
+          "text": "Contradiction 52: the skill said the agent's lookup always wins over its table, while the agent lets the lookup win only when its release is later than 2026.09. The skill now defers to the agent's rule (the re-read's leftover 7).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md, contradiction 52 and leftover 7; agents/ai-quality/llm-security-tester.md line 44",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-69",
+          "kind": "new",
+          "text": "Line 340 read as if no source had been read for homoglyphs either; a semicolon now ends the direction-control clause (the re-read's leftover 8).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md, \"Readability\" and leftover 8",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-70",
+          "kind": "new",
+          "text": "Contradiction 53: the skill placed egress from tool calls under the agent's check 4 and an unauthenticated caller reaching the inference endpoint under its check 9, which named neither. The agent's checks 4 and 9 now ask both questions (lc-s5-agent-2), and the skill's sentence now says the agent names them there (the re-read's leftover 12).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md, contradiction 53 and leftover 12",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r1-71",
+          "kind": "new",
+          "text": "The status lines the executor wrote said \"SDK\"; the project's wording rule spells terms out. Written as \"software development kit\" (the session's direction); the older abbreviations in the file are left to rounds 2 and 3.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md, \"Contract\", spelled-out terms",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 59,
+        "VALIDATED": 25,
+        "FABRICATED": 8,
+        "UNSOURCEABLE": 14,
+        "MISATTRIBUTED": 12
+      },
+      "validator_final": {
+        "examined": 21,
+        "VALIDATED": 17,
+        "FABRICATED": 1,
+        "UNSOURCEABLE": 1,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-census.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-ledger-gate.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/critic-warnings-are-critical.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/plugin-skill-discovery.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/test-gate-ledger-wiring.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.jstests/skill-loading.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "agents/ai-quality/llm-security-tester.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "It applies: code that calls a language model is written in all seven. Before this round the skill covered C#, Java, Python, TypeScript and SQL, skipped C and C++ and deferred Go and Rust; after it, each of the seven has a bad and a safe example, and Go and Rust are stated as outside the rule. Java and C# could not be compiled on the build machine; the session directed that they be added, marked not compiled, with their names checked against the vendors' sources.",
+        "examples_checked": [
+          {
+            "language": "Python (LLM01:2025 example)",
+            "how": "run by the session on 2026-10-01 with a stubbed client (Python 3.9.6, anthropic 0.125.0); every crafted reply failed closed (.ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md, section 5)"
+          },
+          {
+            "language": "Python (LLM02:2025 and LLM10:2025 examples)",
+            "how": "parsed by the executor on 2026-10-01 with Python 3.9.6 ast; not run (helpers defined elsewhere)"
+          },
+          {
+            "language": "TypeScript (typescript 7.0.2, @anthropic-ai/sdk 0.131.0, zod 4.6.5)",
+            "how": "type-checked by the session on 2026-10-01, tsc --noEmit with strict (.ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md, section 5)"
+          },
+          {
+            "language": "C (C17, cJSON 1.x)",
+            "how": "compiled by the session on 2026-10-01 with clang -std=c17 -Wall -Wextra -pedantic, no diagnostics, and run on a hostile description (.ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md, section 5)"
+          },
+          {
+            "language": "C++ (C++20, nlohmann/json)",
+            "how": "compiled by the session on 2026-10-01 with clang++ -std=c++20 -Wall -Wextra, no diagnostics, and run on crafted replies (.ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md, section 5)"
+          },
+          {
+            "language": "SQL (PostgreSQL 18.6 with pgvector syntax)",
+            "how": "the refuted setting-keyed policy and the new session_user-keyed pattern run on a throwaway PostgreSQL 18.6 cluster (.ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md, sections 4 and 6)"
+          },
+          {
+            "language": "Java (Java 21 and later, Anthropic Java SDK 2.x)",
+            "how": "not compiled (no Java toolchain on the build machine); every call checked against the SDK's raw Kotlin source on main, read 2026-10-01 (.ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md, leftover 1; .ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md, sections 5 and 6)"
+          },
+          {
+            "language": "C# (.NET 9, Microsoft.Extensions.AI)",
+            "how": "not compiled (no .NET SDK on the build machine); names checked against Microsoft's documentation, read 2026-10-01 (.ctoc/audit/improvement-run-notes/s5-skill-round1-research-gaps-d-s5-skill-r1-research-gaps.md, rows 3a-3c)"
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "date": "2026-10-01",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:bfdc100c233af4680b954c4644930194ce78e4f10a40edd9f1856563a8ad85f3",
+      "fingerprint_after": "sha256:efe03577b042e2c54ad68051c9953af5aed173bd39f79df68be1fe19c98b4610",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s5-skill-r2-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-skill-r2-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-skill-r2-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-skill-r2-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "Anthropic strict tool use: where strict goes, what it guarantees, which schema keywords are supported, and when output can still break the schema",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "The 2026 entry texts for LLM02, LLM04, LLM05, LLM07 and LLM09 (round 1 read only the 2026 list and LLM01, LLM03, LLM06 and LLM10 through the agent)",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "NIST AI 100-2 E2025 on poisoning, availability, training-data extraction and system-prompt extraction, read as page images",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "LangChain output parsers in source: does the Pydantic parser and the Zod parser fail closed",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Sandboxes for model-written code: Firecracker, gVisor, rootless Docker and WebAssembly, from each project's own pages",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Embedding inversion: the attack papers and what they say about defences",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "What model-observability tools log by default (LangSmith)",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Every technique name in the skill's ATLAS table against the release 2026.09 data file",
+          "source_class": "publisher",
+          "repeated_because": "Round 1 checked six identifiers against the data file; round 2 checks every other name in the table."
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/strict-tool-use",
+          "read_on": "2026-10-01",
+          "bore_on": "change 4: where strict goes and what it guarantees; \"No need to validate and retry tool calls\"",
+          "outcome": "supported",
+          "quote": "as a top-level property in your tool definition",
+          "error": null
+        },
+        {
+          "url": "https://platform.claude.com/docs/en/build-with-claude/structured-outputs",
+          "read_on": "2026-10-01",
+          "bore_on": "change 4: the supported schema subset, the 400 error, and output that can break the schema after a refusal or at max_tokens",
+          "outcome": "supported",
+          "quote": "If you use an unsupported feature, you'll receive a 400 error with details.",
+          "error": null
+        },
+        {
+          "url": "https://api.github.com/repos/GenAI-Security-Project/GenAI-LLM-Top10/contents/2026/final",
+          "read_on": "2026-10-01",
+          "bore_on": "the 2026 entry file names",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM02_SensitiveInformationDisclosure.md",
+          "read_on": "2026-10-01",
+          "bore_on": "changes 3, 15, 16 and 20: logging by default, system-prompt hygiene, embeddings-only backups, observable inference properties",
+          "outcome": "supported",
+          "quote": "Observability platforms (Langfuse, LangSmith, Datadog LLM Observability) log full prompts, completions, chunks, and traces by default.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM04_SupplyChain.md",
+          "read_on": "2026-10-01",
+          "bore_on": "changes 7 and 8: pickle runs code on load; safer is not safe; agentic supply chain sits under ASI04",
+          "outcome": "supported",
+          "quote": "unsafe serialization formats such as Python pickle, which can execute arbitrary code on load",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM05_DataModelPoisoning.md",
+          "read_on": "2026-10-01",
+          "bore_on": "changes 10 to 13: poisoning in agentic deployments, trigger-probing after alignment, retrieval trust boundaries, lineage",
+          "outcome": "supported",
+          "quote": "In agentic deployments, poisoning risks extend to tool integrations, persistent memory stores, and RLHF feedback loops.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM07_Misinformation.md",
+          "read_on": "2026-10-01",
+          "bore_on": "changes 18 and 19: grounding and runtime verification before high-impact actions",
+          "outcome": "supported",
+          "quote": "The core risk is that the incorrect output is trusted and acted upon.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM09_VectorAndEmbeddingWeaknesses.md",
+          "read_on": "2026-10-01",
+          "bore_on": "changes 2, 16 and 17: tenant scoping inside the index query, inversion, retrieval logs",
+          "outcome": "supported",
+          "quote": "Stored embeddings can be inverted to recover source text.",
+          "error": null
+        },
+        {
+          "url": "https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-2e2025.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "changes 6, 10, 11, 14 and 20: training-data extraction, practical poisoning, backdoors that survive tuning, system-prompt extraction, injection-driven denial of service (page images, printed pages)",
+          "outcome": "supported",
+          "quote": "requiring a relatively small portion of the total dataset",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/langchain-ai/langchain/master/libs/core/langchain_core/output_parsers/pydantic.py",
+          "read_on": "2026-10-01",
+          "bore_on": "change 24: the Python parser fails closed except with partial=True",
+          "outcome": "supported",
+          "quote": "If the result is not valid JSON or does not conform to the Pydantic model",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/langchain-ai/langchainjs/main/libs/langchain-core/src/output_parsers/structured.ts",
+          "read_on": "2026-10-01",
+          "bore_on": "change 24: the JavaScript parser takes a Zod schema and throws on failure",
+          "outcome": "supported",
+          "quote": "Creates a new StructuredOutputParser from a Zod schema.",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2310.06816",
+          "read_on": "2026-10-01",
+          "bore_on": "change 16: inversion recovers text exactly, not approximately; Gaussian noise as a partial measure",
+          "outcome": "supported",
+          "quote": "recover 92% of 32-token text inputs exactly",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2602.01757",
+          "read_on": "2026-10-01",
+          "bore_on": "change 16: line 488's rotation and inversion-resistant training as defences",
+          "outcome": "refuted",
+          "quote": "standard defenses, such as differential privacy, fail to effectively mitigate this adaptive threat",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/pdf/2509.17302",
+          "read_on": "2026-10-01",
+          "bore_on": "TextCrafter, a newer inversion defence (search result only, not read)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/html/2602.07090v1",
+          "read_on": "2026-10-01",
+          "bore_on": "SPARSE, a newer inversion defence (search result only, not read)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://docs.langchain.com/langsmith/mask-inputs-outputs",
+          "read_on": "2026-10-01",
+          "bore_on": "change 3: LangSmith's switches for hiding inputs and outputs (no default stated)",
+          "outcome": "supported",
+          "quote": "LANGSMITH_HIDE_INPUTS=true",
+          "error": null
+        },
+        {
+          "url": "https://firecracker-microvm.github.io/",
+          "read_on": "2026-10-01",
+          "bore_on": "change 1: Firecracker (the session's byte-level read confirms the quotation with \"that is\")",
+          "outcome": "supported",
+          "quote": "purpose-built for creating and managing secure, multi-tenant container and function-based services",
+          "error": null
+        },
+        {
+          "url": "https://gvisor.dev/docs/",
+          "read_on": "2026-10-01",
+          "bore_on": "change 1: gVisor",
+          "outcome": "supported",
+          "quote": "gVisor provides a strong layer of isolation between running applications and the host operating system.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/google/gvisor/master/README.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 1: line 75 listed rootless Docker as a sandbox on a par with the others",
+          "outcome": "refuted",
+          "quote": "Containers are not a sandbox.",
+          "error": null
+        },
+        {
+          "url": "https://docs.docker.com/engine/security/rootless/",
+          "read_on": "2026-10-01",
+          "bore_on": "change 1: what rootless mode is for (the daemon and runtime, not isolation)",
+          "outcome": "supported",
+          "quote": "to mitigate potential vulnerabilities in the daemon and the container runtime",
+          "error": null
+        },
+        {
+          "url": "https://webassembly.org/docs/security/",
+          "read_on": "2026-10-01",
+          "bore_on": "change 1: WebAssembly",
+          "outcome": "supported",
+          "quote": "Each WebAssembly module executes within a sandboxed environment separated from the host runtime using fault isolation techniques.",
+          "error": null
+        },
+        {
+          "url": "https://embracethered.com/blog/posts/2025/github-copilot-remote-code-execution-via-prompt-injection/",
+          "read_on": "2026-10-01",
+          "bore_on": "change 21: the product in the researcher's post is VS Code",
+          "outcome": "supported",
+          "quote": "full system compromise of the developer's machine in GitHub Copilot and VS Code",
+          "error": null
+        },
+        {
+          "url": "https://cveawg.mitre.org/api/cve/CVE-2025-53773",
+          "read_on": "2026-10-01",
+          "bore_on": "change 21: Microsoft's record names GitHub Copilot and Visual Studio",
+          "outcome": "supported",
+          "quote": "in GitHub Copilot and Visual Studio allows an unauthorized attacker to execute code locally.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round2-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the ATLAS table against release 2026.09: 20 of 23 names exact; \"Inference API Access\" and \"Poison Training Data\" are paraphrases; \"Reverse Shell\" is not in the release",
+          "outcome": "refuted",
+          "quote": "does NOT exist in ATLAS 2026.09",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round2-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the raw re-read of the critic's OWASP 2026 quotations: 17 of 20 verbatim, three LLM05:2026 quotations cut where the sentence continues; the LLM03:2025 block parses",
+          "outcome": "supported",
+          "quote": "17 of 20 are present verbatim",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round2-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "after the validation: the Firecracker page read at the byte level, with \"that is\"; \"Reverse Shell\" present in the deprecated dist/ATLAS.yaml",
+          "outcome": "supported",
+          "quote": "WITH \"that is\"",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round2-revalidate-d-s5-skill-r2-revalidate.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the re-read of the edited skill (d-s5-skill-r2-revalidate): 28 changes and the agent sentence landed with no deviation; 22 claims examined, 21 validated, 1 not verifiable in that dispatch (from_pretrained passing weights_only on to load_state_dict); 7 sources spot-checked; contradictions 57 to 59; two optional tidy-ups",
+          "outcome": "supported",
+          "quote": "I found no deviation.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round2-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "after the re-read: weights_only flows from from_pretrained (line 3838) through lines 4333 and 4431 to torch.load in load_state_dict (line 369), with the safety check skipped when it is False — read raw by the session",
+          "outcome": "supported",
+          "quote": "with `weights_only=False` the safety check is skipped and `torch.load` runs with the unrestricted unpickler",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/huggingface/transformers/main/src/transformers/modeling_utils.py",
+          "read_on": "2026-10-01",
+          "bore_on": "change 9: the bad example passes use_safetensors=False and weights_only=False; load_state_dict and its torch.load call",
+          "outcome": "supported",
+          "quote": "if weights_only: check_torch_load_is_safe()",
+          "error": null
+        },
+        {
+          "url": "https://huggingface.co/docs/transformers/main_classes/model",
+          "read_on": "2026-10-01",
+          "bore_on": "change 9: from_pretrained takes use_safetensors and weights_only as separate parameters (v5.17.0)",
+          "outcome": "supported",
+          "quote": "When set to False, we can load wrapper tensor subclass weights.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/firecracker-microvm/firecracker-microvm.github.io/main/index.html",
+          "read_on": "2026-10-01",
+          "bore_on": "change 1: the Firecracker sentence appears twice on the page, with and without \"that is\"",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s5-skill-r2-1",
+          "kind": "new",
+          "text": "the sandbox list: rootless Docker is not an equal sandbox (D2) (change 1). The validator's leftover 4 (dropping \"that is\" from the Firecracker quotation) was not applied: the session's byte-level read of the page shows \"that is\" in the source. The re-read settled the Firecracker dispute: the page carries the sentence both with and without \"that is\", so the skill's form is correct.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-1; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 1; .ctoc/audit/improvement-run-notes/s5-skill-round2-revalidate-d-s5-skill-r2-revalidate.md, spot-checks",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-2",
+          "kind": "new",
+          "text": "tenant filtering at query time, sourced under LLM09:2026 (change 2).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-2; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-3",
+          "kind": "new",
+          "text": "observability logging sourced; abbreviations spelled out (change 3). The validator's optional leftover 7 applied: the unsourced list names Datadog's application performance monitoring, since OWASP names Datadog LLM Observability.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-3; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-4",
+          "kind": "new",
+          "text": "one sourced paragraph on strict tool use where the examples are introduced (priority 6, D4) (change 4).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-4; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 4",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-5",
+          "kind": "new",
+          "text": "the LLM02 bad-example comment claims what its code does not show (change 5).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-5; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-6",
+          "kind": "new",
+          "text": "training-data extraction defined by NIST (change 6).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-6; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-7",
+          "kind": "correction-of-earlier-round",
+          "text": "pickle risk sourced; safetensors is \"safer\", not \"safe\" (D3) (change 7). Corrects f-s5-skill-r1-30.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-7; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-8",
+          "kind": "new",
+          "text": "supply chain of Model Context Protocol servers sits under ASI04 in the 2026 numbering (D6) (change 8).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-8; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 8",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-9",
+          "kind": "new",
+          "text": "the LLM03 bad example loads no pickle (priority 7, D3) (change 9). The status line reads \"Parsed 2026-10-01 (Python 3.9.6, ast); not run: …\" (the validator's leftover 5): the session parsed the block, and so did the executor. The re-read confirmed from_pretrained accepts both parameters together; the session read the raw source and found weights_only passed through to torch.load, with the safety check skipped when it is False.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-9; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 9; .ctoc/audit/improvement-run-notes/s5-skill-round2-revalidate-d-s5-skill-r2-revalidate.md, \"Does from_pretrained accept …\"; .ctoc/audit/improvement-run-notes/s5-skill-round2-session-runs.md, \"After the round-2 re-read\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-10",
+          "kind": "new",
+          "text": "poisoning: how practical it is, and memory as a poisoning target (change 10).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-10; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 10",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-11",
+          "kind": "new",
+          "text": "fine-tuning canary: backdoors survive tuning; \"threshold\" made explicit (change 11). The LLM05:2026 quotation runs to its real sentence end, \"(Hubinger et al., 2024).\" as the session read it raw (the validator gave only the shortened form).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-11; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 11",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-12",
+          "kind": "new",
+          "text": "Garak does not scan documents before indexing (change 12). The LLM05:2026 quotation runs to its real sentence end (the validator's leftover 2, full form).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-12; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 12",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-13",
+          "kind": "new",
+          "text": "lineage of datasets and models (change 13). The LLM05:2026 quotation runs to its real sentence end (the validator's leftover 3, full form).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-13; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 13",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-14",
+          "kind": "new",
+          "text": "system-prompt extraction measured (change 14).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-14; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 14",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-15",
+          "kind": "correction-of-earlier-round",
+          "text": "secrets in a system prompt, the 2026 wording (change 15). Corrects f-s5-skill-r1-41.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-15; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 15",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-16",
+          "kind": "new",
+          "text": "embedding inversion: strip \"inversion-resistant\", drop rotation, treat embeddings as the documents, add Gaussian noise with its limit (D1) (change 16). The validator's optional leftover 6 applied: that rotation does not help is labelled this file's reading.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-16; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 16",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-17",
+          "kind": "new",
+          "text": "what a retrieval log holds, under LLM09:2026 (change 17).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-17; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 17",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-18",
+          "kind": "new",
+          "text": "grounding sourced under LLM07:2026; abbreviations spelled out (change 18).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-18; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 18",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-19",
+          "kind": "new",
+          "text": "runtime verification before an action, under LLM07:2026 (change 19).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-19; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 19",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-20",
+          "kind": "new",
+          "text": "log-probabilities as a disclosure surface; injection-driven denial of service (change 20).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-20; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 20",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-21",
+          "kind": "correction-of-earlier-round",
+          "text": "the product named in CVE-2025-53773 (change 21). Corrects f-s5-skill-r1-49.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-21; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 21",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-22",
+          "kind": "correction-of-earlier-round",
+          "text": "ATLAS table: two renames, \"Reverse Shell\" replaced, an identifier in every row (priority 1) (change 22). Corrects f-s5-skill-r1-50.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-22; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 22",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-23",
+          "kind": "correction-of-earlier-round",
+          "text": "the note under the ATLAS table, restated as fully checked (change 23). Corrects f-s5-skill-r1-50.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-23; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 23",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-24",
+          "kind": "new",
+          "text": "LangChain parsers: fail-closed, except Python's `partial=True` (D5) (change 24).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-24; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 24",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-25",
+          "kind": "new",
+          "text": "the agent-check mapping row follows the rename in change 3 (change 25).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-25; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 25",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-26",
+          "kind": "correction-of-earlier-round",
+          "text": "the tactic of AML.T0129 is now read (change 26). Corrects f-s5-skill-r1-57.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-26; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 26",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-27",
+          "kind": "new",
+          "text": "unvalidated secondary references removed (1 of 2) (change 27).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-27; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 27",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-28",
+          "kind": "new",
+          "text": "unvalidated secondary references removed (2 of 2) (change 28).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-28; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, change 28",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-29",
+          "kind": "new",
+          "text": "no change: `maxLength` is in no strict schema (priority 5)",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, f-s5-skill-r2-29; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, item 29",
+          "decision": "rejected",
+          "reason": "Decision, no change: verified.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-30",
+          "kind": "new",
+          "text": "The agent's check 11 said \"weight formats safe\", while change 7 makes the skill say safetensors is safer, not safe, as LLM04:2026 says. Applied to the agent as late correction lc-s5-agent-3.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md, \"Agent late-correction proposal\"; .ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md, item 30",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-31",
+          "kind": "new",
+          "text": "The unbounded-consumption example carried two comment lines saying TOOLS is defined elsewhere; the first, duplicating the status line under it, is deleted (the re-read's optional tidy-up 1).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-revalidate-d-s5-skill-r2-revalidate.md, \"Leftovers\", optional tidy-up 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r2-32",
+          "kind": "new",
+          "text": "The C# example under LLM05:2025 carried its status only at the end of a code line; the status now opens the block, as in every other block (the re-read's optional tidy-up 2).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round2-revalidate-d-s5-skill-r2-revalidate.md, \"Leftovers\", optional tidy-up 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 49,
+        "VALIDATED": 41,
+        "FABRICATED": 3,
+        "UNSOURCEABLE": 1,
+        "MISATTRIBUTED": 2
+      },
+      "validator_final": {
+        "examined": 22,
+        "VALIDATED": 22,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-census.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-ledger-gate.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/critic-warnings-are-critical.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/plugin-skill-discovery.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/test-gate-ledger-wiring.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.jstests/skill-loading.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "agents/ai-quality/llm-security-tester.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "It applies, and coverage is unchanged and complete: the file covers C#, Java, Python, C, C++, TypeScript and SQL. This round changed Python only: the LLM03:2025 example and one comment in the LLM02:2025 example.",
+        "examples_checked": [
+          {
+            "language": "Python (LLM03:2025 and LLM02:2025 examples)",
+            "how": "parsed 2026-10-01 with Python 3.9.6 ast by the session (.ctoc/audit/improvement-run-notes/s5-skill-round2-session-runs.md) and by the executor (all seven Python blocks); not run: they need transformers, the Hugging Face Hub or symbols defined elsewhere"
+          }
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "date": "2026-10-01",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:efe03577b042e2c54ad68051c9953af5aed173bd39f79df68be1fe19c98b4610",
+      "fingerprint_after": "sha256:9ebb12d21c2c3342964913a98fe8e6546a47195ff1b49bb618896ede021fd033",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s5-skill-r3-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-skill-r3-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-skill-r3-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-skill-r3-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-step10-return-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s5-step10-return-revalidate-2",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "Reading the skill's examples as an attacker who controls the code under review: replies that pass every check but mislead (two tool calls, enum casing, Markdown in reasoning), and holes in the SQL safe pattern",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Anthropic's parallel tool use page: several tool_use blocks in one reply, and disable_parallel_tool_use",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Raw re-read of every round-2 quotation: structured outputs, strict tool use, the sandbox pages, LangSmith, LangChain, Morris and Zero2Text",
+          "source_class": "vendor documentation",
+          "repeated_because": "Rounds 1 and 2 read several of these only through a summarising fetch; round 3 re-reads each to check its exact form and its sentence ends."
+        },
+        {
+          "text": "PostgreSQL CREATE VIEW and row-level security: whose policies a view applies",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "MITRE ATLAS case studies of poisoned Model Context Protocol servers in release 2026.09",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "Sources for the unsourced claims: retrieval-corpus poisoning by similarity, re-embedding and purged chunks, a confidence floor for misinformation, Llama Guard",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "A practitioner's account of embedding-model migration and deleted content",
+          "source_class": "broad web",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://platform.claude.com/docs/en/build-with-claude/structured-outputs",
+          "read_on": "2026-10-01",
+          "bore_on": "change 13: enum casing under strict decoding, and the full output_format sentence",
+          "outcome": "supported",
+          "quote": "Compare enum values case-insensitively",
+          "error": null
+        },
+        {
+          "url": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools",
+          "read_on": "2026-10-01",
+          "bore_on": "changes 9, 42 and 86: the page's current address; the forcing table and the tool-use system prompt",
+          "outcome": "supported",
+          "quote": "constructs a special system prompt from the tool definitions, tool configuration, and any user-specified system prompt",
+          "error": null
+        },
+        {
+          "url": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/strict-tool-use",
+          "read_on": "2026-10-01",
+          "bore_on": "the strict tool use quotations, re-read as full markdown",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use",
+          "read_on": "2026-10-01",
+          "bore_on": "the safe examples acted on the first tool call of a reply that can hold several",
+          "outcome": "refuted",
+          "quote": "can contain several `tool_use` blocks in a single assistant turn",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/google/gvisor/master/README.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the gVisor README quotations, re-read",
+          "outcome": "supported",
+          "quote": "Containers are not a sandbox",
+          "error": null
+        },
+        {
+          "url": "https://gvisor.dev/docs/",
+          "read_on": "2026-10-01",
+          "bore_on": "the gVisor documentation quotation, re-read",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://webassembly.org/docs/security/",
+          "read_on": "2026-10-01",
+          "bore_on": "the WebAssembly quotation, re-read",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://docs.langchain.com/langsmith/mask-inputs-outputs",
+          "read_on": "2026-10-01",
+          "bore_on": "the LangSmith page title and switches, re-read",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/langchain-ai/langchain/master/libs/core/langchain_core/output_parsers/pydantic.py",
+          "read_on": "2026-10-01",
+          "bore_on": "the Python parser's partial=True behaviour, re-read",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/langchain-ai/langchainjs/main/libs/langchain-core/src/output_parsers/structured.ts",
+          "read_on": "2026-10-01",
+          "bore_on": "change 63: the JavaScript parser's error message carries the whole model output",
+          "outcome": "supported",
+          "quote": "Failed to parse. Text: \"${text}\". Error: ${e}",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2602.01757",
+          "read_on": "2026-10-01",
+          "bore_on": "the Zero2Text quotation, re-read",
+          "outcome": "supported",
+          "quote": "standard defenses, such as differential privacy, fail to effectively mitigate this adaptive threat",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2310.06816",
+          "read_on": "2026-10-01",
+          "bore_on": "change 47: the noise sentence continues with a caveat the skill dropped",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/html/2310.06816",
+          "read_on": "2026-10-01",
+          "bore_on": "change 47: the noise sentence in full (the validator's read)",
+          "outcome": "supported",
+          "quote": "although it is possible that training with noise could in theory help Vec2Text recover more accurately",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2310.19156",
+          "read_on": "2026-10-01",
+          "bore_on": "change 46: retrieval-corpus poisoning by similarity, replacing an unsourced sentence",
+          "outcome": "supported",
+          "quote": "for queries that were not seen by the attacker",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/OWASP/www-project-top-10-for-large-language-model-applications/main/2_0_vulns/LLM09_Misinformation.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 51: whether LLM09:2025 proposes a confidence floor",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/meta-llama/PurpleLlama/main/Llama-Guard4/12B/MODEL_CARD.md",
+          "read_on": "2026-10-01",
+          "bore_on": "change 62: what Llama Guard 4 classifies; \"Open-weight\" had no source",
+          "outcome": "supported",
+          "quote": "(prompt classification) and in LLM responses (response classification)",
+          "error": null
+        },
+        {
+          "url": "https://www.postgresql.org/docs/current/sql-createview.html",
+          "read_on": "2026-10-01",
+          "bore_on": "changes 49 and 50: a view applies its owner's row-level security policies",
+          "outcome": "supported",
+          "quote": "the row-level security policies of the view owner are applied",
+          "error": null
+        },
+        {
+          "url": "https://formation.dev/blog/embedding-model-upgrade-migration",
+          "read_on": "2026-10-01",
+          "bore_on": "change 35: re-embedding and deleted chunks coming back (a practitioner's blog post; headline, page title and byline read raw by the session)",
+          "outcome": "supported",
+          "quote": "the safe default is to treat the result as a new vector space",
+          "error": null
+        },
+        {
+          "url": "https://huggingface.co/docs/transformers/main_classes/model",
+          "read_on": "2026-10-01",
+          "bore_on": "change 34: attn_implementation accepts Hub kernel references",
+          "outcome": "supported",
+          "quote": "Accept HF kernel references",
+          "error": null
+        },
+        {
+          "url": "https://prompt.security/blog/the-embedded-threat-in-your-llm-poisoning-rag-pipelines-via-vector-embeddings",
+          "read_on": "2026-10-01",
+          "bore_on": "retrieval poisoning (a search result only, not a source)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://blogs.oracle.com/developers/how-to-detect-rag-index-drift-deleted-docs-stale-chunks-and-duplicate-embeddings",
+          "read_on": "2026-10-01",
+          "bore_on": "index drift and deleted chunks (a search result only, not a source)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the research's code spliced into the current examples and run: Python and C++ reject two tool calls, TypeScript type-checks, safe_log redacts and is bounded",
+          "outcome": "supported",
+          "quote": "TWO `submit_review` calls (approve first, reject second)",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "PostgreSQL 18.6: a superuser-owned view showed both tenants' rows to one tenant; a reused role name read the old tenant's row",
+          "outcome": "supported",
+          "quote": "returned **2 rows to tenant_a** (both tenants)",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "after the critique: the raw reads (enum casing, define-tools address, CREATE VIEW, Zhong, Llama Guard, structured.ts, ToolChoiceAuto.kt, Formation, ATLAS case studies, transformers) and the safe_log re-run with the widened key pattern",
+          "outcome": "supported",
+          "quote": "is confirmed in the source, not only on the vendor's page",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "after the validation: the Formation page's headline, page title and the post's own byline date",
+          "outcome": "supported",
+          "quote": "Embedding Model Upgrades Are Data Migrations, Not Rollouts",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round3-revalidate-d-s5-skill-r3-revalidate.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the final re-read of both files (d-s5-skill-r3-revalidate): 0 deviations; 54 claims examined (7 web quotations, 15 references to other files or sections, 15 status lines, 17 quoted phrases), 54 validated; 22 markers all still needed; only contradiction 51 open; four leftovers",
+          "outcome": "supported",
+          "quote": "READY for Step 11, Step 13 and Step 16.",
+          "error": null
+        },
+        {
+          "url": "https://export.arxiv.org/api/query?id_list=2310.06816",
+          "read_on": "2026-10-01",
+          "bore_on": "the Morris abstract through arXiv's export interface (the re-read finished the check through arxiv.org/abs instead)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "The server returned HTTP 429 Too Many Requests."
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-step11-review-d-s5-step11-review.md",
+          "read_on": "2026-10-01",
+          "bore_on": "Step 11's review (d-s5-step11-review): no kick-back; F1 to F3, the record-keeping items B1 to B6, and O1 and O2",
+          "outcome": "supported",
+          "quote": "no kick-back from this review",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-step13-secure-d-s5-step13-secure.md",
+          "read_on": "2026-10-01",
+          "bore_on": "Step 13's scan (d-s5-step13-secure): WARN; 18 crafted cases in three shells; findings 1 to 13",
+          "outcome": "supported",
+          "quote": "Neither file contains a secret.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md",
+          "read_on": "2026-10-01",
+          "bore_on": "after Steps 11 and 13: the scan's fixes 1, 2 and 4 run by the session — the fixed lookup against the 18 cases and live, the selector-run pattern across the repository, the strip step in the Python example",
+          "outcome": "supported",
+          "quote": "Adopt the fixed recipe.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-step16-final-review-d-s5-step16-final-review.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the final review (d-s5-step16-final-review): a narrow return to Step 10, findings 1 to 10",
+          "outcome": "supported",
+          "quote": "Verdict: KICKBACK to Step 10, a narrow return.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the narrow security re-scan (d-s5-step13-secure-2): warn; findings A to G and the status of 1 to 13",
+          "outcome": "supported",
+          "quote": "I found no critical or high finding and no secret.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-step10-return-revalidate-d-s5-step10-return-revalidate.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the re-read of the returned passages of both files (d-s5-step10-return-revalidate): every verdict VERIFIED except five, all sourced or applied afterwards; its read overlapped the second return's edits (its finding f1)",
+          "outcome": "supported",
+          "quote": "Every verdict below is against my second read, using current line numbers.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-curl-q-manual.md",
+          "read_on": "2026-10-01",
+          "bore_on": "what curl -q does, from the manual installed with curl 8.7.1 (the agent's lookup; the re-scan's finding B)",
+          "outcome": "supported",
+          "quote": "If used as the first parameter on the command line, the curlrc config file is not read or used.",
+          "error": null
+        },
+        {
+          "url": ".ctoc/audit/improvement-run-notes/s5-step10-return-revalidate-2-d-s5-step10-return-revalidate-2.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the quiet re-read of the returned passages over unchanging files (d-s5-step10-return-revalidate-2), the re-read that counts: every verdict VERIFIED or carried over, two leftovers",
+          "outcome": "supported",
+          "quote": "First finding: nothing moved.",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/aspnet/core/security/cross-site-scripting",
+          "read_on": "2026-10-01",
+          "bore_on": "the C# example's HtmlEncoder.Default encodes characters outside Basic Latin (read by d-s5-step10-return-revalidate-2)",
+          "outcome": "supported",
+          "quote": "All characters outside of the indicated range are encoded as their character code equivalents.",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s5-skill-r3-1",
+          "kind": "new",
+          "text": "the `description` without abbreviations (list F) (change 1).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-1; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-2",
+          "kind": "new",
+          "text": "the title (not in F; found by this critic) (change 2).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-2; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-3",
+          "kind": "new",
+          "text": "line 53 (F) (change 3).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-3; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-4",
+          "kind": "new",
+          "text": "line 57 (F) (change 4).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-4; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 4",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-5",
+          "kind": "new",
+          "text": "line 59 (F) (change 5).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-5; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-6",
+          "kind": "new",
+          "text": "line 60 (F) (change 6).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-6; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-7",
+          "kind": "new",
+          "text": "line 61 (F) (change 7).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-7; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-8",
+          "kind": "new",
+          "text": "line 66 (F) (change 8).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-8; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 8",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-9",
+          "kind": "correction-of-earlier-round",
+          "text": "the address of \"Define tools\", first of three places (table B) (change 9). Corrects f-s5-skill-r1-9.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-9; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 9",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-10",
+          "kind": "new",
+          "text": "line 77 (F; the label is renamed with f-65 and f-76) (change 10).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-10; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 10",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-11",
+          "kind": "new",
+          "text": "line 80, \"prompts/hr\" (not in F; found by this critic) (change 11).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-11; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 11",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-12",
+          "kind": "new",
+          "text": "the section heading (F) (change 12).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-12; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 12",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-13",
+          "kind": "correction-of-earlier-round",
+          "text": "two tool calls, enum casing, a reply that only has the right shape (A1, A2, A3 as prose P1), and the `output_format` sentence completed (table B) (change 13). The validator's optional readability point applied: \"settle the capitalisation of an `enum` value\". Corrects f-s5-skill-r2-4.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-13; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 13",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-14",
+          "kind": "correction-of-earlier-round",
+          "text": "the Python example's status line, after the session's run of C1 (change 14). Corrects f-s5-skill-r1-19.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-14; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 14",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-15",
+          "kind": "correction-of-earlier-round",
+          "text": "the Python SAFE comment (A2) (change 15). Corrects f-s5-skill-r1-19.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-15; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 15",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-16",
+          "kind": "correction-of-earlier-round",
+          "text": "Python: disable parallel tool use (C1) (change 16). Corrects f-s5-skill-r1-19.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-16; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 16",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-17",
+          "kind": "correction-of-earlier-round",
+          "text": "Python: exactly one tool call (C1) (change 17). Corrects f-s5-skill-r1-19.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-17; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 17",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-18",
+          "kind": "new",
+          "text": "C#: the limitation the research could not settle (A9) (change 18).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-18; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 18",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-19",
+          "kind": "correction-of-earlier-round",
+          "text": "Java status line, after C3 (change 19). Written as the validator's corrected block (its leftover 1): ToolChoiceAuto.builder().disableParallelToolUse(true) is confirmed in ToolChoiceAuto.kt (line 116, the session's raw read). Corrects f-s5-skill-r1-21.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-19; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 19",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-20",
+          "kind": "correction-of-earlier-round",
+          "text": "Java SAFE comment (A2) (change 20). Corrects f-s5-skill-r1-21.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-20; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 20",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-21",
+          "kind": "correction-of-earlier-round",
+          "text": "Java: disable parallel tool use (C3) (change 21). Corrects f-s5-skill-r1-21.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-21; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 21",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-22",
+          "kind": "correction-of-earlier-round",
+          "text": "Java: exactly one tool call (C3) (change 22). Corrects f-s5-skill-r1-21.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-22; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 22",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-23",
+          "kind": "correction-of-earlier-round",
+          "text": "TypeScript status line (change 23). Corrects f-s5-skill-r1-22.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-23; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 23",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-24",
+          "kind": "correction-of-earlier-round",
+          "text": "TypeScript SAFE comment (A2) (change 24). Corrects f-s5-skill-r1-22.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-24; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 24",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-25",
+          "kind": "correction-of-earlier-round",
+          "text": "TypeScript: disable parallel tool use (C2) (change 25). Corrects f-s5-skill-r1-22.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-25; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 25",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-26",
+          "kind": "correction-of-earlier-round",
+          "text": "TypeScript: exactly one tool call (C2) (change 26). Corrects f-s5-skill-r1-22.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-26; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 26",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-27",
+          "kind": "new",
+          "text": "line 341 (F) (change 27).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-27; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 27",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-28",
+          "kind": "correction-of-earlier-round",
+          "text": "LLM02:2025 status line, after the session's run of E (change 28). Written with the validator's recommended wording (its leftover 5), naming the 42-character key. Corrects f-s5-skill-r1-66.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-28; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 28",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-29",
+          "kind": "new",
+          "text": "`safe_log` rewritten (E), with two adversarial corrections by this critic (change 29).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-29; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 29",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-30",
+          "kind": "new",
+          "text": "`safe_log` is now called (E) (change 30).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-30; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 30",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-31",
+          "kind": "new",
+          "text": "line 377, \"LLM observability\" (not in F; found by this critic) (change 31).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-31; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 31",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-32",
+          "kind": "new",
+          "text": "line 377, \"UI\" (F) (change 32).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-32; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 32",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-33",
+          "kind": "new",
+          "text": "line 381 (F) (change 33).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-33; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 33",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-34",
+          "kind": "new",
+          "text": "optional: kernels fetched from the Hub (A16, a lead only) (change 34).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-34; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 34",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-35",
+          "kind": "new",
+          "text": "\"re-introduce poisoned chunks\" sourced, labelled as a practitioner source (D), and \"RAG\" (F) (change 35). The citation names the post's headline \"Embedding Model Upgrades Are Data Migrations, Not Rollouts\", its page title, and its own byline date, 10 September 2026: the session's raw read of the page settles the validator's leftovers 2 and 3 (the other September dates belong to other posts).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-35; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 35",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-36",
+          "kind": "new",
+          "text": "line 386, the parenthetical acronym (F) (change 36).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-36; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 36",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-37",
+          "kind": "new",
+          "text": "line 387 (F) (change 37).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-37; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 37",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-38",
+          "kind": "new",
+          "text": "line 409 (F) (change 38).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-38; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 38",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-39",
+          "kind": "new",
+          "text": "line 413 (F) (change 39).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-39; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 39",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-40",
+          "kind": "new",
+          "text": "model-written SQL: columns and operators allowlisted too (A13) (change 40).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-40; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 40",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-41",
+          "kind": "new",
+          "text": "line 457 (F) (change 41).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-41; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 41",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-42",
+          "kind": "correction-of-earlier-round",
+          "text": "the address of \"Define tools\", second place (table B) (change 42). Corrects f-s5-skill-r1-39.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-42; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 42",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-43",
+          "kind": "new",
+          "text": "line 460 (F) (change 43).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-43; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 43",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-44",
+          "kind": "new",
+          "text": "line 481, \"auth\" (not in F; found by this critic) (change 44).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-44; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 44",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-45",
+          "kind": "new",
+          "text": "line 498 (F) (change 45).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-45; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 45",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-46",
+          "kind": "new",
+          "text": "the similarity-attack sentence sourced (D) (change 46). The validator's optional readability point applied: the sentence after it now begins \"Because an embedding can be inverted, treat …\" (the old \"So treat …\" text was present once).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-46; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 46",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-47",
+          "kind": "correction-of-earlier-round",
+          "text": "Morris: the noise caveat completed (table B) (change 47). Corrects f-s5-skill-r2-16.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-47; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 47",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-48",
+          "kind": "correction-of-earlier-round",
+          "text": "SQL status header covers the new comment (change 48). Corrects f-s5-skill-r1-66.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-48; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 48",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-49",
+          "kind": "new",
+          "text": "the safe pattern's two holes, as an SQL comment (A11, A12; S1) (change 49).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-49; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 49",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-50",
+          "kind": "new",
+          "text": "the two runs in prose, splitting the long PostgreSQL paragraph (A11, A12; readability item) (change 50).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-50; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 50",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-51",
+          "kind": "new",
+          "text": "\"confidence floor\" labelled as this file's own (D) (change 51).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-51; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 51",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-52",
+          "kind": "new",
+          "text": "the per-user budget check races (new; this critic's adversarial finding) (change 52).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-52; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 52",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-53",
+          "kind": "new",
+          "text": "cap each tool result (A14) (change 53).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-53; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 53",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-54",
+          "kind": "new",
+          "text": "line 601 (F) (change 54).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-54; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 54",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-55",
+          "kind": "new",
+          "text": "line 615 (F) (change 55).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-55; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 55",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-56",
+          "kind": "new",
+          "text": "case study AML.CS0053 in the incident table (change 56).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-56; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 56",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-57",
+          "kind": "new",
+          "text": "case study AML.CS0054 under the tool-poisoning line (change 57).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-57; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 57",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-58",
+          "kind": "correction-of-earlier-round",
+          "text": "contradictions 57 and 58: what the agent's table lacks (change 58). Corrected as the validator's leftover 4: the agent's section also names AML.TA0001. Corrects f-s5-skill-r2-22.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-58; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 58",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-59",
+          "kind": "new",
+          "text": "line 652 (F) (change 59).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-59; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 59",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-60",
+          "kind": "new",
+          "text": "line 654, \"RAG\" (F) (change 60).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-60; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 60",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-61",
+          "kind": "new",
+          "text": "line 654, \"PR\" and \"LLM code\" (F) (change 61).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-61; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 61",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-62",
+          "kind": "new",
+          "text": "the Llama Guard row sourced; \"Open-weight\" stripped (D) (change 62).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-62; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 62",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-63",
+          "kind": "correction-of-earlier-round",
+          "text": "the LangChain parse error carries the completion (A15) (change 63). Corrects f-s5-skill-r2-24.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-63; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 63",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-64",
+          "kind": "new",
+          "text": "line 661 (F; the product's framework name is kept) (change 64).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-64; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 64",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-65",
+          "kind": "new",
+          "text": "the check-mapping row follows the two renamed labels (F) (change 65).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-65; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 65",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-66",
+          "kind": "new",
+          "text": "a status line inside the letter-schema block (the open status-line gap) (change 66).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-66; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 66",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-67",
+          "kind": "correction-of-earlier-round",
+          "text": "the letter's `suggested_fix` follows the examples (A2) (change 67). Corrects f-s5-skill-r1-53.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-67; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 67",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-68",
+          "kind": "new",
+          "text": "line 740, \"SAST\" and \"LLM\" (F; \"PoC\" kept, because the agent quotes it) (change 68).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-68; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 68",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-69",
+          "kind": "correction-of-earlier-round",
+          "text": "contradiction 59, skill side: a pinned revision means a commit hash (change 69). Corrects f-s5-skill-r1-30.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-69; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 69",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-70",
+          "kind": "correction-of-earlier-round",
+          "text": "C: a description cut short at a zero byte (A6) (change 70). Corrects f-s5-skill-r1-54.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-70; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 70",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-71",
+          "kind": "correction-of-earlier-round",
+          "text": "C: escaping can grow the input (A7) (change 71). The validator's optional readability point applied: \"five times as long\". Corrects f-s5-skill-r1-54.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-71; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 71",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-72",
+          "kind": "correction-of-earlier-round",
+          "text": "C++ status line, after the session's run of C4 (change 72). Corrects f-s5-skill-r1-54.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-72; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 72",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-73",
+          "kind": "correction-of-earlier-round",
+          "text": "C++ SAFE comment (A2) (change 73). Corrects f-s5-skill-r1-54.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-73; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 73",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-74",
+          "kind": "correction-of-earlier-round",
+          "text": "C++: exactly one tool call, and the input must be an object (A2, A8; C4) (change 74). Corrects f-s5-skill-r1-54.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-74; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 74",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-75",
+          "kind": "new",
+          "text": "line 859 (F) (change 75).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-75; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 75",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-76",
+          "kind": "new",
+          "text": "line 861, the label (F) (change 76).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-76; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 76",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-77",
+          "kind": "new",
+          "text": "line 873 (F) (change 77).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-77; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 77",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-78",
+          "kind": "new",
+          "text": "References: the 2025 entry pages cited inline (change 78).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-78; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 78",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-79",
+          "kind": "new",
+          "text": "References: the ATLAS data file, the README at its tag, and the release page (change 79).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-79; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 79",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-80",
+          "kind": "new",
+          "text": "References: the 2026 README and entry files (change 80).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-80; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 80",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-81",
+          "kind": "new",
+          "text": "References: the agentic document (change 81).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-81; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 81",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-82",
+          "kind": "new",
+          "text": "References: the NIST publication itself (change 82).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-82; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 82",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-83",
+          "kind": "new",
+          "text": "References: the inversion and retrieval-poisoning papers (change 83).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-83; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 83",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-84",
+          "kind": "new",
+          "text": "References: PromptFoo's command-line page (change 84).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-84; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 84",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-85",
+          "kind": "new",
+          "text": "References: the Llama Guard 4 model card (change 85).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-85; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 85",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-86",
+          "kind": "correction-of-earlier-round",
+          "text": "References: the \"Define tools\" address (third place, table B) and Anthropic's other pages cited inline (change 86). Corrects f-s5-skill-r1-62.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-86; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 86",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-87",
+          "kind": "new",
+          "text": "References: the remaining inline sources from rounds 1–3, one line each (change 87). The Formation line names the headline and page title as f-35 does.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-87; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, change 87",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-88",
+          "kind": "new",
+          "text": "no change: zod's `.strict()` is not deprecated",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-88; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, \"No-change records\"",
+          "decision": "rejected",
+          "reason": "Decision, no change: verified.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-89",
+          "kind": "new",
+          "text": "no change: attacks the examples already defend",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-89; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, \"No-change records\"",
+          "decision": "rejected",
+          "reason": "Decision, no change: verified.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-90",
+          "kind": "new",
+          "text": "agent check 11 says what \"pinned\" means. Applied to the agent as late correction lc-s5-agent-4 (contradiction 59).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-90; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, f-90",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-91",
+          "kind": "new",
+          "text": "the agent's high-confidence row follows check 11. Applied to the agent as late correction lc-s5-agent-4, paired with change 69.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md, f-s5-skill-r3-91; .ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md, f-91",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-92",
+          "kind": "new",
+          "text": "The final re-read's four leftovers: \"AI governance\" spelled out as \"Governance of artificial intelligence\"; the unused \"(TAP)\" and \"(SARIF)\" dropped; and the SQL status line says the setting-keyed policy was run on a text column without the uuid cast, so its wording no longer outruns the run.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-revalidate-d-s5-skill-r3-revalidate.md, \"Leftovers\" 1-4 and the note on line 525",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-93",
+          "kind": "new",
+          "text": "skills/saas/multi-tenancy-row-level/SKILL.md keys its one-role-per-tenant policy on current_user, which SET ROLE moves, while this skill keys its safe pattern on session_user, which SET ROLE does not; this skill's line saying the sibling \"keys the policy to the role\" is true but hides that weaker variant.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-skill-round3-revalidate-d-s5-skill-r3-revalidate.md, \"Cross-references\", the note on the multi-tenancy skill",
+          "decision": "rejected",
+          "reason": "Cross-file: skills/saas/multi-tenancy-row-level/SKILL.md is not in this slice and has not been started; slice s60 meets it (parent index, slice table; inventory.json).",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-94",
+          "kind": "correction-of-earlier-round",
+          "text": "Step 11's F2: the cross-link said the multi-tenancy skill's one-role-per-tenant pattern \"keys the policy to the role\", while that pattern keys it to current_user, which SET ROLE moves; the sentence now says so and points to session_user, as this file's safe pattern does. The sibling's own text stays with slice s60 (f-s5-skill-r3-93).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step11-review-d-s5-step11-review.md, F2; skills/saas/multi-tenancy-row-level/SKILL.md line 52",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-95",
+          "kind": "new",
+          "text": "Step 13's finding 2: the Python safe example passed tag, zero-width and direction-control characters to the model, though this file quotes LLM01:2026 asking to strip them at every ingest boundary. It now strips them (HIDDEN, written with escapes, not literal characters) before escaping, its status line records the run with the strip step, and the paragraph on misleading replies says the TypeScript, Java, C# and C examples need the same step and do not show it.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step13-secure-d-s5-step13-secure.md, finding 2; .ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md, \"After Steps 11 and 13\"; the executor's stub run, 2026-10-01",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-96",
+          "kind": "new",
+          "text": "Step 13's findings 6, 7 and 8: the safe_log comment names the other credential shapes that pass the pattern; safe_log returns repr(...) so a line break in the question cannot forge a log line; and the comment states, as a known limit of this example, that the cut at 8,000 characters can split a long secret so it no longer matches. The LLM02:2025 status line records the run after the repr change. The final review (finding 6) changed \"an accepted limit\" to \"a known limit of this example\" in the comment and here.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step13-secure-d-s5-step13-secure.md, findings 6, 7 and 8; the executor's run of safe_log, 2026-10-01",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-97",
+          "kind": "new",
+          "text": "Step 13's finding 9: a SECURITY DEFINER function or a materialized view over tenant_docs owned by a role that bypasses row-level security shows every row, like the view; one comment line, marked as this file's reading, not run.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step13-secure-d-s5-step13-secure.md, finding 9",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-98",
+          "kind": "new",
+          "text": "Step 13's finding 10: an identifier not of the allowed shape would break out of the lookup's single quotes and run a command (the scan created a file this way).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step13-secure-d-s5-step13-secure.md, finding 10",
+          "decision": "rejected",
+          "reason": "Info, no change: the agent forbids such identifiers twice, and no guard at the shell level is possible.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-99",
+          "kind": "new",
+          "text": "Step 13's finding 11: every outcome of the lookup exits 0; the agent reads the printed line, and curl's errors cannot print \"saved\".",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step13-secure-d-s5-step13-secure.md, finding 11",
+          "decision": "rejected",
+          "reason": "Info, no change: 54 of 54 runs behaved as the text says.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-100",
+          "kind": "new",
+          "text": "Step 13's finding 12: the agent's real shell is a third context, where grep is a function calling an embedded ugrep.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step13-secure-d-s5-step13-secure.md, finding 12",
+          "decision": "rejected",
+          "reason": "Info, no change: the outcomes there matched bash and zsh.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-101",
+          "kind": "new",
+          "text": "Step 13's finding 13: the committed run notes carry local paths with the account name and user id.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step13-secure-d-s5-step13-secure.md, finding 13; .ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md, \"After Steps 11 and 13\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s5-step13-account-name-in-note-paths"
+        },
+        {
+          "id": "f-s5-skill-r3-102",
+          "kind": "new",
+          "text": "The security re-scan's finding A: the agent's second hidden-character search matched a keycap emoji (a digit, U+FE0F, U+20E3), so its clause \"which no emoji produces\" was false. The pattern now leaves a digit that U+20E3 follows, and both clauses say so. Applied to the agent as late correction lc-s5-agent-6.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md, finding A; the executor's ripgrep run on the re-scan's corpus.txt, 2026-10-01",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-103",
+          "kind": "new",
+          "text": "The security re-scan's finding B: without -q, curl reads the user's configuration file, which can add retries, turn off certificate checks or add an address. Both requests in the agent's lookup now start with -q, and its prose says so. Applied to the agent as late correction lc-s5-agent-6.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md, finding B",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-104",
+          "kind": "new",
+          "text": "The security re-scan's finding C: the cited 2026 entry asks to strip at every ingest and render boundary, and the Python example returned reasoning with any tag characters still in it. review_pr now strips reasoning before returning it, and the strict-tool-use paragraph names both boundaries; the status line records the run. The re-read (d-s5-step10-return-revalidate) found no run record for the status-line sentence; its run is in s5-second-step10-return-executor.md, and the sentence now points there (leftover 4).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md, finding C; the executor's stub run, 2026-10-01",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-105",
+          "kind": "new",
+          "text": "The security re-scan's finding D (information): the sed reads every top-level collection: block, not only the first. The agent's prose now says so; the sed is kept. Applied to the agent as late correction lc-s5-agent-6.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md, finding D",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-106",
+          "kind": "new",
+          "text": "The security re-scan's finding E (information): when mktemp fails, its message comes before the recipe's line. The agent's prose now says so. Applied to the agent as late correction lc-s5-agent-6.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md, finding E",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-107",
+          "kind": "new",
+          "text": "The final review's finding 2 and the security re-scan's finding F: the comment over HIDDEN credited LLM01:2026 with ranges it does not name, and did not say what else the strip removes. It now says LLM01:2026 names the tag, variation-selector and zero-width ranges and the supplementary selectors and direction controls are this file's addition, and that an emoji's own selector, a joiner inside an emoji or a script that uses one, and an ideographic selector go too. The re-read (d-s5-step10-return-revalidate) confirmed the ranges against the raw LLM01:2026 page and verified the new comment.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step16-final-review-d-s5-step16-final-review.md, finding 2; .ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md, finding F",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-108",
+          "kind": "new",
+          "text": "The security re-scan's finding G (information): U+FEFF, U+2061 to U+2064, U+00AD and U+180E are also invisible and are not in the strip or the agent's searches.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md, finding G",
+          "decision": "rejected",
+          "reason": "Decision, no change: the set follows the cited LLM01:2026 sentence and this file's marked additions; the re-scan says the four are not required by that source, and adding them is a new rule no source here asks for.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-109",
+          "kind": "new",
+          "text": "The re-read's leftover 5: the LLM09:2026 quotation on the row-level security line carried no address; the raw address the validator read is now written in.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step10-return-revalidate-d-s5-step10-return-revalidate.md, leftover 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s5-skill-r3-110",
+          "kind": "new",
+          "text": "The quiet re-read's leftover 2: the sentence written with f-s5-skill-r3-95 labelled as a belief that .NET's HtmlEncoder encodes the hidden characters; Microsoft's page says the default encoder's safe list is Basic Latin and every other character is encoded, so the belief label is replaced by that statement, its two sentences and its address. Corrects the belief label written with f-s5-skill-r3-95 in this round.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s5-step10-return-revalidate-2-d-s5-step10-return-revalidate-2.md, leftover 2 and finding f2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 34,
+        "VALIDATED": 27,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 4,
+        "MISATTRIBUTED": 0
+      },
+      "validator_final": {
+        "examined": 20,
+        "VALIDATED": 19,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-census.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-ledger-gate.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/critic-warnings-are-critical.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-s4-compliance-aiquality-wrappers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/plugin-skill-discovery.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/test-gate-ledger-wiring.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.jstests/skill-loading.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "agents/ai-quality/llm-security-tester.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "It applies, and coverage stays complete: C#, Java, Python, C, C++, TypeScript and SQL each have a bad and a safe example. This round changed the Python, TypeScript, Java, C++, C and C# examples, the SQL comments, and the letter-schema block (a design record).",
+        "examples_checked": [
+          {
+            "language": "Python 3.9.6 (LLM01:2025 and LLM02:2025 examples)",
+            "how": "run by the session on 2026-10-01: the one-call check with a stubbed client, and REDACT and safe_log on sample strings (.ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md); all seven Python blocks parsed by the executor with ast after apply"
+          },
+          {
+            "language": "TypeScript 7.0.2 with @anthropic-ai/sdk 0.131.0 and zod 4.6.5",
+            "how": "type-checked by the session after splicing the one-call check, and by the executor on the applied block (npx tsc -p tsconfig.json, strict, exit 0), 2026-10-01"
+          },
+          {
+            "language": "C++20 with nlohmann/json",
+            "how": "compiled and run by the session after splicing the one-call and object checks (.ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md)"
+          },
+          {
+            "language": "C17",
+            "how": "comment lines only; not recompiled"
+          },
+          {
+            "language": "Java 21 and later, Anthropic Java SDK 2.x",
+            "how": "not compiled (no Java toolchain); the new calls confirmed in the raw Kotlin source, ToolChoiceAuto.kt line 116 among them (.ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md)"
+          },
+          {
+            "language": "C# (.NET 9)",
+            "how": "not compiled (no .NET software development kit); the new comment asserts nothing about System.Text.Json"
+          },
+          {
+            "language": "SQL (PostgreSQL 18.6)",
+            "how": "the view and role-name cases in the new comment run by the session (.ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md); the pgvector column and the <-> query not run"
+          }
+        ]
+      }
+    }
+  ],
+  "late_corrections": [],
+  "held": null
+}
