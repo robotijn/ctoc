@@ -52,14 +52,17 @@ const BODY_REFERENCED = new Map([
 
 const NEW_CATEGORIES = ['safety', 'legal', 'realtime'];
 
-// Always-available Claude Code format skills that live at the top level
-// (skills/<name>/SKILL.md) and are exposed to Claude directly as an ambient
-// skill — NOT as a Tier-2 dispatch specialist. These are intentionally not
-// reached through an agent wrapper or rich agent: Claude Code surfaces them by
-// their skill name at all times. Documented here so the coverage gate stays
-// loud for every genuine dispatch skill while acknowledging this distinct kind.
+// Always-available skills that live at the top level (skills/<name>/SKILL.md) and
+// are exposed to Claude directly by their skill name — NOT as a Tier-2 dispatch
+// specialist and never through an agent wrapper or rich agent. Two members: the
+// ask-me-questions decision format, and the deepthink background research skill
+// (it launches the existing citation-validator agent itself, so no agent wraps it).
+// Documented here so the coverage gate stays loud for every genuine dispatch skill
+// while acknowledging this distinct kind. Every name must be a real top-level
+// skill; the assertion below fails on a missing or misspelled one.
 const ALWAYS_AVAILABLE_FORMAT_SKILLS = new Set([
   'ask-me-questions',
+  'deepthink',
 ]);
 
 // ── real-file walkers ──────────────────────────────────────────────────
@@ -149,6 +152,13 @@ describe('CU5-s5 — coverage completeness (real corpus)', () => {
       [],
       `Silently uncovered skills (no wrapper, no rich agent, no documented NO-WRAP):\n  ${unwrapped.join('\n  ')}`
     );
+  });
+
+  it('every always-available skill on the exemption list is a real top-level skill', () => {
+    const missing = [...ALWAYS_AVAILABLE_FORMAT_SKILLS].filter(
+      (name) => !fs.existsSync(path.join(ROOT, 'skills', name, 'SKILL.md'))
+    );
+    assert.deepEqual(missing, [], `The exemption names a skill that does not exist at skills/<name>/SKILL.md:\n  ${missing.join('\n  ')}`);
   });
 
   it('gdpr-compliance-checker is covered by the rich gdpr-agent (thin wrapper deleted per EC2-s3)', () => {

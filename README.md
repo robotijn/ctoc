@@ -6,14 +6,14 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.14.75-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.14.76-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-124-orange">
-  <img alt="Skills" src="https://img.shields.io/badge/skills-429-blue">
+  <img alt="Skills" src="https://img.shields.io/badge/skills-430-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
-CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **124 agents** across **24 categories** route through a **3-tier architecture** (CTO Chief → sub-orchestrators → Opus watchers), with **4 mandatory human gates**. The **429-file skill library** (101 specialist bodies + 328 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. A **local semantic plan-index** gives you meaning-based search, related-plan surfacing, duplicate-guarding, and conflict detection over your plan corpus, and an **advisory EU-compliance program** (GDPR + EU AI Act) flags regulatory exposure as you build — always advising, never overriding a human gate. The result: production-quality code — held to that standard not by a perfect first pass, but because adversarial review and the four human gates catch what a first pass misses.
+CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **124 agents** across **24 categories** route through a **3-tier architecture** (CTO Chief → sub-orchestrators → Opus watchers), with **4 mandatory human gates**. The **430-file skill library** (102 specialist bodies + 328 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. A **local semantic plan-index** gives you meaning-based search, related-plan surfacing, duplicate-guarding, and conflict detection over your plan corpus, and an **advisory EU-compliance program** (GDPR + EU AI Act) flags regulatory exposure as you build — always advising, never overriding a human gate. The result: production-quality code — held to that standard not by a perfect first pass, but because adversarial review and the four human gates catch what a first pass misses.
 
 ---
 
@@ -56,7 +56,7 @@ This README is written as a **course**, not a feature list. It follows what the 
 > [!TIP]
 > Enable auto-update: `/plugin` → Marketplaces tab → `robotijn` → Enable auto-update.
 
-**You know it worked when** typing `/ctoc` offers three commands — `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and the one skill you invoke by name, `/ctoc:ask-me-questions`. Those are the only three slash commands CTO Chief ships; everything else is reached through the dashboard, and no specialist skill appears in the picker.
+**You know it worked when** typing `/ctoc` offers three commands — `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and the two skills you invoke by name, `/ctoc:ask-me-questions` and `/ctoc:deepthink`. Those are the only three slash commands CTO Chief ships; everything else is reached through the dashboard, and no specialist skill appears in the picker.
 
 > CTO Chief is **always** installed from the marketplace. Never point the plugin at a local checkout — `/ctoc:update` (Lesson 8) is how you get a newer version.
 
@@ -135,7 +135,7 @@ Answer them once; both choices are remembered. "Keep defaults, stop asking" and 
 **Worked example.** The classic pipeline overview (`Open the dashboard` on the first screen) of a busy project — this is a real capture of the CTO Chief repository itself:
 
 ```
-CTOC v6.14.75
+CTOC v6.14.76
 ────────────────────────────────────────────────────────────
 
 ▼ Business (2)
@@ -612,7 +612,7 @@ CTO Chief ships exactly **3 slash commands**. Everything else — vision, planni
 | `/ctoc:push` | Quality checks (lint, typecheck, tests, security), then push on success. Options: `--dry-run`, `--force`, `--skip-tests`. |
 | `/ctoc:update` | Update to the latest version from GitHub (then restart Claude Code). |
 
-Beside the three commands, the picker offers only the skills a human invokes by name — today `/ctoc:ask-me-questions`. The plugin manifest registers just the skills directly under `skills/`, so the specialist skills never appear there; the pipeline's agents read them.
+Beside the three commands, the picker offers only the skills a human invokes by name — today `/ctoc:ask-me-questions` and `/ctoc:deepthink`. The plugin manifest registers just the skills directly under `skills/`, so the specialist skills never appear there; the pipeline's agents read them.
 
 **Dashboard routes** you can say by name: `dashboard` · `menu commands` · `browse <stage>` · `plan <stage>/<file>` · `validate <stage>/<file>` · `stubs <slug>` · `inbox questions|decisions|gates|escalations|stale|verify|cleanup` · `tasks` · `task <id>`.
 
@@ -724,7 +724,7 @@ Triggered on `effort: high` plans or when a risk-surface glob matches (auth, bil
 - **Collaborative planning, automated execution** — Steps 1-7: agents ask questions and you decide. Steps 8-16: agents execute and you review the result.
 - **Streaming gate decisions** — the dashboard asks you the pending decisions one at a time, most critical first, with pros and cons precomputed in the background; you never wait for a critique
 - **124 agents** across 24 categories — testing, security, quality, infrastructure, SaaS, product, compliance, AI quality, safety, legal, realtime, and more
-- **429 skill files** — 101 specialist skill bodies (engineered through the websearch → update → critique → update loop) + 50 language refs + 211 framework refs (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile) + 61 per-language quality configs + 6 shared agent fragments
+- **430 skill files** — 102 specialist skill bodies (engineered through the websearch → update → critique → update loop) + 50 language refs + 211 framework refs (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile) + 61 per-language quality configs + 6 shared agent fragments
 - **Iron Loop methodology** — 16 steps across 4 phases with 4 human gates
 - **Refinement loop** — critic → test-writer → implementer cycle with tiered K-budgets (critical K=3 · medium K=5 · low K=7 · final sweep K=∞) that drives findings to zero (warnings included) — see [REFINEMENT_LOOP.md](docs/REFINEMENT_LOOP.md)
 - **3-tier agent architecture** — CTO Chief (Tier 0, sole dispatcher) → 20 sub-orchestrators (Tier 1) → 99 Opus watchers (Tier 2) — see [AGENT_ARCHITECTURE.md](docs/AGENT_ARCHITECTURE.md)
@@ -977,17 +977,17 @@ Agents spawn conditionally based on your project and current Iron Loop step. No 
 
 > Every specialist skill is reached through the pipeline's agents, which read its `SKILL.md` by path: most through a wrapper agent that names it, `gdpr-compliance-checker` through `gdpr-agent` (which reads it in full), and `ai-governance-checker` through `eu-ai-act-agent` (which extends it). One has no agent of its own: `workos-sso`, which CTO Chief's implement step orders read from `skills/saas/workos-sso/SKILL.md` and which `clerk-auth` lists as a skill it reuses. That is an instruction-level route, the weakest of them.
 
-**How skills reach you after install.** Claude Code auto-discovers the slash commands, agents and hooks the plugin ships, per the [Claude Code Plugins reference](https://code.claude.com/docs/en/plugins-reference). Of the skills, it registers only those directly under `skills/` — the ones a human invokes by name, today `/ctoc:ask-me-questions` — because the plugin manifest lists only that folder. The specialist `SKILL.md` files are not registered: they reach your work through the pipeline — CTO Chief dispatches a Tier-1 sub-orchestrator, which dispatches the Tier-2 specialist's agent, and that agent reads the specialist's file by path. The `when_to_load` phrases in each skill's frontmatter (for example `"SBOM"`, `"prompt injection"`) are the trigger vocabulary the skill declares; they load nothing by themselves.
+**How skills reach you after install.** Claude Code auto-discovers the slash commands, agents and hooks the plugin ships, per the [Claude Code Plugins reference](https://code.claude.com/docs/en/plugins-reference). Of the skills, it registers only those directly under `skills/` — the ones a human invokes by name, today `/ctoc:ask-me-questions` and `/ctoc:deepthink` — because the plugin manifest lists only that folder. The specialist `SKILL.md` files are not registered: they reach your work through the pipeline — CTO Chief dispatches a Tier-1 sub-orchestrator, which dispatches the Tier-2 specialist's agent, and that agent reads the specialist's file by path. The `when_to_load` phrases in each skill's frontmatter (for example `"SBOM"`, `"prompt injection"`) are the trigger vocabulary the skill declares; they load nothing by themselves.
 
 ---
 
 ## Skills
 
-**429 skill files** — [browse all →](skills/). Loaded on demand based on your stack and the current Iron Loop step.
+**430 skill files** — [browse all →](skills/). Loaded on demand based on your stack and the current Iron Loop step.
 
 There are two kinds of skills:
 
-1. **Tier-2 specialist skill bodies (101)** — the actual expert agents that run during Iron Loop and refinement-loop steps: 99 Tier-2 specialists plus the ambient `ask-me-questions` decision format and the preloaded gate-lens skill. Each lives at `skills/<category>/<name>/SKILL.md` with a structured findings contract.
+1. **Tier-2 specialist skill bodies (102)** — the actual expert agents that run during Iron Loop and refinement-loop steps: 99 Tier-2 specialists, the two ambient skills at the top of `skills/` — the `ask-me-questions` decision format and the `deepthink` background research skill — and the preloaded gate-lens skill. Each lives at `skills/<category>/<name>/SKILL.md` with a structured findings contract.
 2. **Knowledge skills (328)** — a web-verified reference library: 50 language guides, 211 framework guides (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile), 61 per-language quality-config references, and 6 shared agent fragments (the honest-status rule, plain gate words, warnings-are-critical, and their siblings). Each guide was brought current against 2026 authoritative sources — no invented statistics. Guides declare their checkable version and link claims in a machine-readable block; `node src/scripts/verify-claims.js` checks the declared ones against the live registries, and a census reports how many guides still declare nothing, so partial coverage is never mistaken for coverage.
 
 **The quality bar.** Every specialist body went through an explicit improvement loop — `websearch → update → critique → update` (a second critique round for brand-new skills). Every `SKILL.md` ships YAML frontmatter with `when_to_load` triggers and an effort level, a `## 2026 Best Practices` section with sourced citations, 7-language coverage (C#, Java, Python, C, C++, JS/TS, SQL) of BAD/SAFE pattern pairs where it applies, a tool-integration matrix with current commands, a severity block (every finding is `critical` on the wire — warnings are bugs), and a machine-readable letter schema for the refinement loop.
@@ -1107,7 +1107,7 @@ node --test tests/*.test.js   # fast pass only — does NOT enforce the floor
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.14.75'
+getVersion()       // → '6.14.76'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -1135,7 +1135,7 @@ ctoc/
 │   ├── scripts/     10 build/release utilities
 │   └── data/        Static data files
 ├── agents/          124 agent definitions across 24 categories
-├── skills/          429 skill files: 101 specialist bodies (SKILL.md)
+├── skills/          430 skill files: 102 specialist bodies (SKILL.md)
 │                    + 328 reference files (50 langs, 211 frameworks,
 │                    61 quality configs, 6 agent-fragments/ — the cross-cutting
 │                    rules every agent carries: ancestry-read, async-choice-protocol,
@@ -1176,6 +1176,6 @@ Use CTO Chief freely for any project. You may not offer CTO Chief itself or a de
 
 ---
 
-**6.14.75** · Built by [@robotijn](https://github.com/robotijn)
+**6.14.76** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>
