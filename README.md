@@ -6,14 +6,14 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.14.76-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.14.77-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
-  <img alt="Agents" src="https://img.shields.io/badge/agents-124-orange">
+  <img alt="Agents" src="https://img.shields.io/badge/agents-125-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-430-blue">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-green">
 </p>
 
-CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **124 agents** across **24 categories** route through a **3-tier architecture** (CTO Chief → sub-orchestrators → Opus watchers), with **4 mandatory human gates**. The **430-file skill library** (102 specialist bodies + 328 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. A **local semantic plan-index** gives you meaning-based search, related-plan surfacing, duplicate-guarding, and conflict detection over your plan corpus, and an **advisory EU-compliance program** (GDPR + EU AI Act) flags regulatory exposure as you build — always advising, never overriding a human gate. The result: production-quality code — held to that standard not by a perfect first pass, but because adversarial review and the four human gates catch what a first pass misses.
+CTO Chief is a Claude Code plugin that turns AI coding from "generate and pray" into disciplined engineering. Every feature follows a **16-step Iron Loop** — plan before code, test before ship, secure before deploy — wrapped by a **refinement loop** that drives findings (warnings included) to zero before you ever see the result. **125 agents** across **24 categories** route through a **3-tier architecture** (CTO Chief → sub-orchestrators → Opus watchers), with **4 mandatory human gates**. The **430-file skill library** (102 specialist bodies + 328 reference files) has been brought to 2026 best-practices quality through a websearch → update → critique → update loop on every specialist — no invented statistics, sourced citations, 7-language coverage. A **local semantic plan-index** gives you meaning-based search, related-plan surfacing, duplicate-guarding, and conflict detection over your plan corpus, and an **advisory EU-compliance program** (GDPR + EU AI Act) flags regulatory exposure as you build — always advising, never overriding a human gate. The result: production-quality code — held to that standard not by a perfect first pass, but because adversarial review and the four human gates catch what a first pass misses.
 
 ---
 
@@ -135,7 +135,7 @@ Answer them once; both choices are remembered. "Keep defaults, stop asking" and 
 **Worked example.** The classic pipeline overview (`Open the dashboard` on the first screen) of a busy project — this is a real capture of the CTO Chief repository itself:
 
 ```
-CTOC v6.14.76
+CTOC v6.14.77
 ────────────────────────────────────────────────────────────
 
 ▼ Business (2)
@@ -723,7 +723,7 @@ Triggered on `effort: high` plans or when a risk-surface glob matches (auth, bil
 - **Ideation-first workflow** — Vision Advisor and Product Owner explore your idea, ask the minimum questions, and shape it into plans before any code is written
 - **Collaborative planning, automated execution** — Steps 1-7: agents ask questions and you decide. Steps 8-16: agents execute and you review the result.
 - **Streaming gate decisions** — the dashboard asks you the pending decisions one at a time, most critical first, with pros and cons precomputed in the background; you never wait for a critique
-- **124 agents** across 24 categories — testing, security, quality, infrastructure, SaaS, product, compliance, AI quality, safety, legal, realtime, and more
+- **125 agents** across 24 categories — testing, security, quality, infrastructure, SaaS, product, compliance, AI quality, safety, legal, realtime, and more
 - **430 skill files** — 102 specialist skill bodies (engineered through the websearch → update → critique → update loop) + 50 language refs + 211 framework refs (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile) + 61 per-language quality configs + 6 shared agent fragments
 - **Iron Loop methodology** — 16 steps across 4 phases with 4 human gates
 - **Refinement loop** — critic → test-writer → implementer cycle with tiered K-budgets (critical K=3 · medium K=5 · low K=7 · final sweep K=∞) that drives findings to zero (warnings included) — see [REFINEMENT_LOOP.md](docs/REFINEMENT_LOOP.md)
@@ -939,7 +939,7 @@ Each strategy is really executed — `git-branch` pushes to the environment bran
 
 ## Agents
 
-**124 agents across 24 categories** — [browse all →](agents/)
+**125 agents across 24 categories** — [browse all →](agents/)
 
 <details>
 <summary><strong>Full agent list</strong></summary>
@@ -956,7 +956,7 @@ Each strategy is really executed — `git-branch` pushes to the environment bran
 | [Compliance](agents/compliance/) | 6 | [gdpr-agent](agents/compliance/gdpr-agent.md), [eu-ai-act-agent](agents/compliance/eu-ai-act-agent.md), [eu-solution-recommender](agents/compliance/eu-solution-recommender.md), [audit-log-checker](agents/compliance/audit-log-checker.md), [license-scanner](agents/compliance/license-scanner.md), [sbom-cra-checker](agents/compliance/sbom-cra-checker.md) |
 | [Iron Loop](agents/iron-loop/) | 8 | [integrator](agents/iron-loop/iron-loop-integrator.md), [critic](agents/iron-loop/iron-loop-critic.md), [executor](agents/iron-loop/iron-loop-executor.md), [premortem-critic](agents/iron-loop/premortem-critic.md), [devils-advocate-critic](agents/iron-loop/devils-advocate-critic.md), [red-team-critic](agents/iron-loop/red-team-critic.md), [advocate-critic](agents/iron-loop/advocate-critic.md), [gate-critic](agents/iron-loop/gate-critic.md) |
 | [Pipeline](agents/pipeline/) | 5 | [agent-writer](agents/pipeline/agent-writer.md), [agent-critic](agents/pipeline/agent-critic.md), [agent-tester](agents/pipeline/agent-tester.md), [agent-qa](agents/pipeline/agent-qa.md), [agent-publisher](agents/pipeline/agent-publisher.md) |
-| [AI Quality](agents/ai-quality/) | 4 | [hallucination-detector](agents/ai-quality/hallucination-detector.md), [ai-code-quality-reviewer](agents/ai-quality/ai-code-quality-reviewer.md), [citation-validator](agents/ai-quality/citation-validator.md), [llm-security-tester](agents/ai-quality/llm-security-tester.md) |
+| [AI Quality](agents/ai-quality/) | 5 | [hallucination-detector](agents/ai-quality/hallucination-detector.md), [ai-code-quality-reviewer](agents/ai-quality/ai-code-quality-reviewer.md), [citation-validator](agents/ai-quality/citation-validator.md), [llm-security-tester](agents/ai-quality/llm-security-tester.md), [deepthink-researcher](agents/ai-quality/deepthink-researcher.md) |
 | [Safety](agents/safety/) | 3 | [fault-tree-builder](agents/safety/fault-tree-builder.md), [fmeda-analyzer](agents/safety/fmeda-analyzer.md), [redundancy-pattern-picker](agents/safety/redundancy-pattern-picker.md) |
 | [Coordinator](agents/coordinator/) | 3 | [cto-chief](agents/coordinator/cto-chief.md) (Tier 0), [ivv-chief](agents/coordinator/ivv-chief.md), [synthesizer](agents/coordinator/synthesizer.md) |
 | [Data/ML](agents/data-ml/) | 3 | [data-quality-checker](agents/data-ml/data-quality-checker.md), [ml-model-validator](agents/data-ml/ml-model-validator.md), [feature-store-validator](agents/data-ml/feature-store-validator.md) |
@@ -1058,7 +1058,7 @@ There are two kinds of skills:
 | Iterative refinement to zero findings | Refinement loop (incl. warnings) | None | None | None |
 | Human approval gates | 4 mandatory checkpoints | None | None | None |
 | Quality verification | Automated gate (Step 14) | Manual | Manual | None |
-| Specialist agents | 124 across 24 categories | None | DIY | None |
+| Specialist agents | 125 across 24 categories | None | DIY | None |
 | Specialist skill library (engineered, sourced) | 99 SKILL.md bodies through critique loop | None | None | None |
 | Production-readiness checklist | SaaS templates with 20+ block-severity checks | None | None | None |
 | Post-launch product loop | KPI library + experiment designer | None | None | None |
@@ -1107,7 +1107,7 @@ node --test tests/*.test.js   # fast pass only — does NOT enforce the floor
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.14.76'
+getVersion()       // → '6.14.77'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -1134,7 +1134,7 @@ ctoc/
 │   ├── tabs/        4 legacy tab modules kept for drill-in flows
 │   ├── scripts/     10 build/release utilities
 │   └── data/        Static data files
-├── agents/          124 agent definitions across 24 categories
+├── agents/          125 agent definitions across 24 categories
 ├── skills/          430 skill files: 102 specialist bodies (SKILL.md)
 │                    + 328 reference files (50 langs, 211 frameworks,
 │                    61 quality configs, 6 agent-fragments/ — the cross-cutting
@@ -1176,6 +1176,6 @@ Use CTO Chief freely for any project. You may not offer CTO Chief itself or a de
 
 ---
 
-**6.14.76** · Built by [@robotijn](https://github.com/robotijn)
+**6.14.77** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

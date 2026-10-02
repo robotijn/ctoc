@@ -7,7 +7,8 @@
   "maxLegacy": 122,
   "conforming": [
     "agents/iron-loop/advocate-critic.md",
-    "agents/ai-quality/citation-validator.md"
+    "agents/ai-quality/citation-validator.md",
+    "agents/ai-quality/deepthink-researcher.md"
   ],
   "legacy": [
     "agents/ai-quality/ai-code-quality-reviewer.md",

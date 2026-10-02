@@ -127,6 +127,34 @@ const WEB_ENABLED = new Set([
   'agents/ai-quality/citation-validator.md',
 ]);
 
+/**
+ * WEB-ONLY readers — agents whose security property is that they CANNOT read a file.
+ * The owner's decision of 2026-10-02 ("an extra agent is not an issue"): deepthink's
+ * reading agent holds web tools and no file-reading tool, so an instruction hidden in a
+ * page can never reach a local credential. For these agents the Read/Grep requirement is
+ * replaced by a STRICTER rule — the tools line holds exactly WebSearch and WebFetch — and
+ * every other rule (no mutation tool, model floor, headings, schema reference) is unchanged.
+ *
+ * Why the test and not the code: the template rule "tools must include Read and Grep"
+ * asserts the opposite of that decision for this one agent; giving the agent Read would
+ * reopen the high finding, and listing it as legacy is what the ratchet forbids. What newly
+ * fails: a web-only agent holding any tool but WebSearch and WebFetch, Read included, and a
+ * web-only entry that is not on disk or not conforming.
+ */
+const WEB_ONLY = new Set([
+  'agents/ai-quality/deepthink-researcher.md',
+]);
+
+/**
+ * The top-level frontmatter keys a web-only reader may declare, exactly. The second security
+ * scan of deepthink's slice 5 (finding 9) found that a line-by-line reading misses keys the
+ * plugin loader reads as YAML: a "---" inside a value ends the loader's frontmatter, an indented
+ * line continues the tools value, and a spaced, quoted or merged memory key is still a memory
+ * key. This tightens the same contract — a file or command tool added to a web-only reader fails
+ * by name — by reading the frontmatter as the loader does.
+ */
+const WEB_ONLY_KEYS = ['name', 'description', 'tools', 'model', 'effort', 'tier', 'reports_to', 'dispatch_protocol', 'category', 'reads_ancestry', 'confidence_calibration', 'parallel_safe', 'effort_budget', 'color', 'maxTurns'];
+
 /** Fields the dispatch schema already defines. Restating them here would be the
  *  forty-sixth copy — the duplication that rots. */
 const SCHEMA_FIELDS = [
@@ -200,17 +228,59 @@ function shapeViolations(text, label) {
         );
       }
     }
-    for (const required of ['Read', 'Grep']) {
-      if (!declared.includes(required)) {
-        v.push(`${label}: tools must include "${required}"`);
+    if (WEB_ONLY.has(label)) {
+      // A web-only reader holds exactly WebSearch and WebFetch: no file tool, nothing else.
+      // Slice 5's security scan, finding 1: the rule above reads the first tools line only, and
+      // the plugin agent loader adds Read, Write and Edit for a `memory:` key. The contract is
+      // the plan's criterion that a file or command tool added to the reader fails by name; the
+      // test changes because it read one line where the loader reads the whole frontmatter;
+      // what newly fails is a web-only reader with a memory key or a second tools line.
+      if (/^memory:/m.test(frontmatter)) {
+        v.push(`${label}: a web-only reader may not declare "memory:" — the loader adds Read, Write and Edit for it`);
       }
-    }
-    const allowed = WEB_ENABLED.has(label) ? [...READONLY_ALLOWED, ...WEB_TOOLS] : READONLY_ALLOWED;
-    const extra = declared.filter((t) => !allowed.includes(t));
-    if (extra.length) {
-      v.push(
-        `${label}: tools may only be ${allowed.join(', ')}; found: ${extra.join(', ')}`
-      );
+      const toolsLines = frontmatter.split(/\r?\n/).filter((line) => /^tools:/.test(line));
+      if (toolsLines.length !== 1) {
+        v.push(`${label}: a web-only reader must declare exactly one "tools:" line; found ${toolsLines.length}`);
+      }
+      // Read the frontmatter as the plugin loader does: cut at the first "---", parse as YAML.
+      const loaderCut = /^---\s*\n([\s\S]*?)---\s*\n?/.exec(text.replace(/\r\n/g, '\n'));
+      if (!loaderCut || loaderCut[1].trim() !== frontmatter.replace(/\r\n/g, '\n').trim()) {
+        v.push(`${label}: a value holds "---", so the loader would end the frontmatter there and grant every tool`);
+      }
+      if (loaderCut) {
+        let parsed = null;
+        try {
+          parsed = require('js-yaml').load(loaderCut[1]);
+        } catch (error) {
+          v.push(`${label}: the frontmatter does not parse as YAML, so the loader would grant every tool`);
+        }
+        if (parsed && typeof parsed === 'object') {
+          const keys = Object.keys(parsed).sort();
+          if (keys.join(', ') !== [...WEB_ONLY_KEYS].sort().join(', ')) {
+            v.push(`${label}: as the loader parses it, a web-only reader's keys must be exactly ${WEB_ONLY_KEYS.join(', ')}; found: ${keys.join(', ')}`);
+          }
+          const parsedTools = String(parsed.tools).split(',').map((tool) => tool.trim()).filter(Boolean).sort();
+          if (parsedTools.join(', ') !== [...WEB_TOOLS].sort().join(', ')) {
+            v.push(`${label}: as the loader parses it, a web-only reader's tools must be exactly ${WEB_TOOLS.join(', ')}; found: ${parsedTools.join(', ')}`);
+          }
+        }
+      }
+      if ([...declared].sort().join(', ') !== [...WEB_TOOLS].sort().join(', ')) {
+        v.push(`${label}: a web-only reader's tools must be exactly ${WEB_TOOLS.join(', ')}; found: ${declared.join(', ')}`);
+      }
+    } else {
+      for (const required of ['Read', 'Grep']) {
+        if (!declared.includes(required)) {
+          v.push(`${label}: tools must include "${required}"`);
+        }
+      }
+      const allowed = WEB_ENABLED.has(label) ? [...READONLY_ALLOWED, ...WEB_TOOLS] : READONLY_ALLOWED;
+      const extra = declared.filter((t) => !allowed.includes(t));
+      if (extra.length) {
+        v.push(
+          `${label}: tools may only be ${allowed.join(', ')}; found: ${extra.join(', ')}`
+        );
+      }
     }
   }
 
@@ -383,5 +453,41 @@ describe('watcher shape fence', () => {
       failures.push(...schemaRestatementViolations(text, rel));
     }
     assert.deepEqual(failures, [], `One source of truth for the finding shape:\n  - ${failures.join('\n  - ')}`);
+  });
+
+  it('case 7: every web-only reader is a conforming agent on disk, and the web-only rule refuses a file tool', () => {
+    const baseline = readBaseline();
+    for (const rel of WEB_ONLY) {
+      assert.ok(fs.existsSync(path.join(ROOT, rel)), `${rel} is listed as web-only but does not exist`);
+      assert.ok(baseline.conforming.includes(rel), `${rel} is web-only but not in conforming, so case 4 never checks its shape`);
+      const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+      assert.deepEqual(shapeViolations(text, rel), [], `${rel} as written must conform`);
+      const withRead = text.replace(/^tools:.*$/m, 'tools: WebSearch, WebFetch, Read');
+      assert.notEqual(withRead, text, `${rel} has no tools line to replace`);
+      const violations = shapeViolations(withRead, rel);
+      assert.ok(violations.some((line) => line.includes('Read')), `the web-only rule did not refuse Read: ${violations.join(' | ')}`);
+      const withMemory = text.replace(/^tools:.*$/m, (line) => `${line}\nmemory: user`);
+      assert.ok(shapeViolations(withMemory, rel).some((line) => line.includes('memory:')), 'the web-only rule did not refuse a memory key');
+      const twoToolsLines = text.replace(/^tools:.*$/m, (line) => `${line}\ntools: Read`);
+      assert.ok(shapeViolations(twoToolsLines, rel).some((line) => line.includes('exactly one "tools:" line')), 'the web-only rule did not refuse a second tools line');
+    }
+  });
+
+  it('case 8: the web-only rule reads the frontmatter as the loader does, and refuses every route the second security scan found', () => {
+    for (const rel of WEB_ONLY) {
+      const text = fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
+      assert.deepEqual(shapeViolations(text, rel), [], `${rel} as written must conform`);
+      const routes = {
+        'a "---" inside the description': text.replace(/^description: /m, 'description: before --- after. '),
+        'an indented continuation of the tools line': text.replace(/^tools: WebSearch, WebFetch$/m, 'tools: WebSearch, WebFetch,\n  Read, Bash'),
+        'a memory key with a space before its colon': text.replace(/^tools:.*$/m, (line) => `${line}\nmemory : user`),
+        'a quoted memory key': text.replace(/^tools:.*$/m, (line) => `${line}\n"memory": user`),
+        'a merge key carrying memory': text.replace(/^tools:.*$/m, (line) => `${line}\n<<: {memory: user}`),
+      };
+      for (const [route, variant] of Object.entries(routes)) {
+        assert.notEqual(variant, text, `the ${route} variant changed nothing`);
+        assert.ok(shapeViolations(variant, rel).length > 0, `the web-only rule missed ${route}`);
+      }
+    }
   });
 });

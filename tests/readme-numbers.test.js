@@ -241,24 +241,30 @@ describe('Ground truth — project counts (sanity checks)', () => {
 // ─────────────────────────────────────────────────────────────────────
 
 describe('README — explicit numeric claims match reality', () => {
-  it('badge: agents-124', () => {
-    assert.match(README, /agents-124-orange/);
+  // Slice 5 of deepthink-ships-with-ctoc derived the six agent pins below from the disk. The
+  // contract, from outside the test: this file's own rule that the README's counts are a claim
+  // about the tree, and the owner's decision of 2026-10-02, which adds an agent. Why the test and
+  // not the code: the README must state the true count, and a literal pin fails on a true README
+  // the moment an agent is added. What newly fails: a README agent count that differs from the
+  // disk after any agent is added or removed.
+  it('badge: agents-<count> (derived from disk)', () => {
+    assert.match(README, new RegExp(`agents-${counts.agents}-orange`));
   });
 
   it('badge: skills-<count> (derived from disk)', () => {
     assert.match(README, new RegExp(`skills-${counts.skills}-blue`));
   });
 
-  it('lead paragraph: 124 agents across 24 categories', () => {
-    assert.match(README, /\*\*124 agents\*\* across \*\*24 categories\*\*/);
+  it('lead paragraph: <count> agents across 24 categories (derived from disk)', () => {
+    assert.match(README, new RegExp(`\\*\\*${counts.agents} agents\\*\\* across \\*\\*24 categories\\*\\*`));
   });
 
-  it('Compare table: 124 across 24 categories', () => {
-    assert.match(README, /124 across 24 categories/);
+  it('Compare table: <count> across 24 categories (derived from disk)', () => {
+    assert.match(README, new RegExp(`\\b${counts.agents} across 24 categories`));
   });
 
-  it('Key Features: 124 agents across 24 categories', () => {
-    assert.match(README, /\*\*124 agents\*\* across 24 categories/);
+  it('Key Features: <count> agents across 24 categories (derived from disk)', () => {
+    assert.match(README, new RegExp(`\\*\\*${counts.agents} agents\\*\\* across 24 categories`));
   });
 
   it('Key Features: skill-file total (derived from disk)', () => {
@@ -324,16 +330,16 @@ describe('README — explicit numeric claims match reality', () => {
     assert.match(README, new RegExp(`^CTOC v${VERSION.replace(/\./g, '\\.')}$`, 'm'));
   });
 
-  it('Project structure: 124 agent definitions across 24 categories', () => {
-    assert.match(README, /124 agent definitions across 24 categories/);
+  it('Project structure: <count> agent definitions across 24 categories (derived from disk)', () => {
+    assert.match(README, new RegExp(`\\b${counts.agents} agent definitions across 24 categories`));
   });
 
   it('Project structure: skill files (derived from disk)', () => {
     assert.match(README, new RegExp(`${counts.skills} skill files`));
   });
 
-  it('Agents intro: 124 agents across 24 categories', () => {
-    assert.match(README, /\*\*124 agents across 24 categories\*\*/);
+  it('Agents intro: <count> agents across 24 categories (derived from disk)', () => {
+    assert.match(README, new RegExp(`\\*\\*${counts.agents} agents across 24 categories\\*\\*`));
   });
 
   it('Skills intro: skill-file total (derived from disk)', () => {

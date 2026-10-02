@@ -1,0 +1,9 @@
+{
+  "content_sha256": "c9b777a19749dcf24ca6732d5a6154809b3cc3e0f3cef30f8708219c5233be42",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-02T08:25:34.743Z",
+  "approved_by": "human",
+  "plan_basename": "00415-deepthink-ships-with-ctoc-s5-web-only-reading-agent"
+}

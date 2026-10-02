@@ -45,3 +45,6 @@ opus48-operating-pack.zip
 .ctoc/sweep-*.log
 .ctoc/sweep-STOP
 .ctoc/sweep-AUTOSTART-STOP
+
+# Deepthink's paper library (the owner's ruling of 2026-10-02: papers ignored, briefs not)
+.ctoc/papers/

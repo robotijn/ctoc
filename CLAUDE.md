@@ -699,7 +699,7 @@ ctoc/
     scripts/             Build utilities (release.js, move-plan.js, coverage map)
     tabs/                4 dashboard tab files (overview, vision, review, tools; functional removed with assignDirectly R5-B/C; implementation/todo/progress removed earlier)
     data/                Static data files
-  agents/                124 agent definitions across 24 categories
+  agents/                125 agent definitions across 24 categories
   skills/                430 skill files (102 SKILL.md bodies = 99 Tier-2 specialists + 2 ambient skills, the decision format and deepthink, + 1 preloaded lens skill; + 328 reference)
   tests/                 545 test files
   .ctoc/                 Config, templates, operations

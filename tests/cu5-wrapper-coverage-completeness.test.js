@@ -56,7 +56,7 @@ const NEW_CATEGORIES = ['safety', 'legal', 'realtime'];
 // are exposed to Claude directly by their skill name — NOT as a Tier-2 dispatch
 // specialist and never through an agent wrapper or rich agent. Two members: the
 // ask-me-questions decision format, and the deepthink background research skill
-// (it launches the existing citation-validator agent itself, so no agent wraps it).
+// (it launches its own reading agent, deepthink-researcher, which reads the web for it and does not load the skill, so no agent wraps it).
 // Documented here so the coverage gate stays loud for every genuine dispatch skill
 // while acknowledging this distinct kind. Every name must be a real top-level
 // skill; the assertion below fails on a missing or misspelled one.

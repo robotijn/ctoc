@@ -49,7 +49,7 @@ module.exports = [
 
   // Project-wide language options and rule tuning.
   {
-    files: ['src/**/*.js', 'tests/**/*.js', 'evals/**/*.js'],
+    files: ['src/**/*.js', 'tests/**/*.js', 'evals/**/*.js', 'skills/**/*.cjs'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'commonjs',
