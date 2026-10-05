@@ -1,11 +1,9 @@
 {
-  "content_sha256": "dd8cfba0ed4585a561a85e9d7870d0984c46d002288d787004baaaecdf5a626d",
+  "content_sha256": "5d6147e86c620e5cffc324f7374d41e1a26d96c40c277d72bc6ecc675c71acb4",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-05T20:56:09.638Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-05T21:16:37.667Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "Owner, 2026-10-05: a) re-approve slice 2 once: add CLAUDE.md, agents/coordinator/cto-chief.md and docs/IRON_LOOP.md to files (they still said the two agents run on Sonnet) and reword the quoted old vision-advisor text the plan checker misread as a file to create.",
   "plan_basename": "plan-writing-agents-can-edit-and-search"
 }
