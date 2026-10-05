@@ -3,7 +3,7 @@
  * (TUI code, src/commands/start.js) keep working during the A3 transition.
  *
  * NEW CODE: import from `./areas` directly. This shim is for backward compat only.
- * See: /Users/account/Code/ctoc/plans/in-progress/A3-menu-rethink-impl.md (I6 refinement)
+ * See: plans/in-progress/A3-menu-rethink-impl.md (I6 refinement)
  */
 
 const {

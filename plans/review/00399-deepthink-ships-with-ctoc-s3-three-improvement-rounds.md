@@ -483,9 +483,9 @@ Ready for round 1's research and critique.
   - `git diff -U0` on the test now shows one removed line, the old forbidden-string list, replaced by the stronger check. It is the only removed line.
 - **Tests.** The skill is unchanged at `sha256:7b42b8f4…738f32c`. The plan's list plus the improvement record check gave tests 459, pass 459, fail 0, skipped 0, and check 24 passes.
 
-### Completion, release sync and the gate; the commit held
+### Completion, release sync, the gate and the commit
 
 - **Completion.** `menu task complete t125` returned `ok: true`: the plan moved to `plans/review/`, and Step 14 ran lint, typecheck and `npm test`, all passing. The evidence is written to `.ctoc/state/verify/` (`passed: true`, "VERIFY passed — ran: lint, typecheck, tests"). The app-launch check reports not applicable.
 - **Release sync.** `VERSION` is 6.14.78 and `node src/scripts/release.js` ran. It changed only version lines: `package.json`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, and four lines of `README.md` (the badge, the banner, the `getVersion()` example and the footer). It changed no count, and `CLAUDE.md` is unchanged.
 - **Gate.** `npm test` exits 0: tests 12,071, pass 12,071, fail 0, cancelled 0, skipped 0, todo 0. Coverage is 99.89% of lines, 93.28% of branches and 99.41% of functions, against the 99% floor. The gate printed `PASS`.
-- **Commit held.** The personal-information census of the 46 files to stage counts 0 everywhere except `.claude-plugin/marketplace.json`, which holds the plugin author's email address on line 5. It was already committed at `6a569d0f` and is unchanged by this slice; the release sync touches only the version line. The owner's rule of 2026-10-05 says not to commit while any count is above 0, so the commit waits for the owner.
+- **Committed.** The slice was committed at `d59048d4` on 2026-10-05, after the owner ruled that the plugin author's work email address in `.claude-plugin/marketplace.json` (line 5) may stay public.

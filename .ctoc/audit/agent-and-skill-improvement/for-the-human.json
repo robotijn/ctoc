@@ -7,7 +7,7 @@
       "path": "agents/ai-quality/ai-code-quality-reviewer.md",
       "round": 1,
       "kind": "instrument-list",
-      "evidence": "The agent critic that ran this round is the installed plugin copy, version 6.14.65, whose tools line reads 'tools: Read, Grep' (/Users/account/.claude/plugins/cache/robotijn/ctoc/6.14.65/agents/pipeline/agent-critic.md, line 4). The repository copy, at VERSION 6.14.69, reads 'tools: Read, Grep, WebSearch, WebFetch'. So the critic could not research the web itself: the citation validator (installed 6.14.65 copy, which holds web tools) did the research under dispatch d-s3-agent-r1-research, and the critic, dispatch d-s3-agent-r1-critic, critiqued against that report. Every later round of every file meets the same limit until the installed plugin carries the approved grant. The human already chose to keep going with the installed versions; this entry records the limitation so it is visible, not a new request to stop. Whether a marketplace version 6.14.68 or later is published was not checked.",
+      "evidence": "The agent critic that ran this round is the installed plugin copy, version 6.14.65, whose tools line reads 'tools: Read, Grep' (<home>/.claude/plugins/cache/robotijn/ctoc/6.14.65/agents/pipeline/agent-critic.md, line 4). The repository copy, at VERSION 6.14.69, reads 'tools: Read, Grep, WebSearch, WebFetch'. So the critic could not research the web itself: the citation validator (installed 6.14.65 copy, which holds web tools) did the research under dispatch d-s3-agent-r1-research, and the critic, dispatch d-s3-agent-r1-critic, critiqued against that report. Every later round of every file meets the same limit until the installed plugin carries the approved grant. The human already chose to keep going with the installed versions; this entry records the limitation so it is visible, not a new request to stop. Whether a marketplace version 6.14.68 or later is published was not checked.",
       "options": [
         {
           "key": "keep-installed",
@@ -550,6 +550,172 @@
           "label": "Leave the paths as they are",
           "pros": "No change; every path in the notes resolves exactly as recorded.",
           "cons": "The committed notes keep the account name and user id."
+        }
+      ]
+    },
+    {
+      "id": "h-s6-agent-r1-checker-side-of-the-boundary",
+      "date": "2026-10-01",
+      "path": "agents/quality/architecture-checker.md",
+      "round": 1,
+      "kind": "out-of-scope-file",
+      "evidence": "Round 1 of agents/architecture/dependency-analyzer.md (finding f-s6-agent-r1-24) wrote into the analyzer that it owns the graph and the metrics and that quality/architecture-checker decides whether a cycle blocks or warns and whether it is new. The checker's agent still names dependency-analyzer only as \"Detailed dependency graph analysis\" (line 285), its skill's related_skills do not name the analyzer, and both pairs carry the dispatch phrases \"circular dependency\" and \"module boundary\". Source: .ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, \"For the human\" item 1.",
+      "options": [
+        {
+          "key": "state-the-split-in-the-checker",
+          "label": "Edit the architecture checker's agent and skill to state the same split (the analyzer owns the graph and metrics; the checker owns new-versus-existing and block-or-warn)",
+          "pros": "Both sides of the boundary say the same thing; a reader of either file finds the owner.",
+          "cons": "Changes files outside this slice; the checker's own rounds (a later slice) would meet the change, or a scope widening is needed now."
+        },
+        {
+          "key": "leave-the-checker-as-is",
+          "label": "Leave the architecture checker's files as they are",
+          "pros": "No change outside this slice; the checker is reworked in its own slice.",
+          "cons": "Until then only one side states the boundary, and both agents still answer to \"circular dependency\"."
+        }
+      ]
+    },
+    {
+      "id": "h-s6-agent-r1-two-layer-configurations",
+      "date": "2026-10-01",
+      "path": "agents/quality/architecture-checker.md",
+      "round": 1,
+      "kind": "out-of-scope-file",
+      "evidence": "The dependency analyzer reads layer rules from .dependency-rules.json; the architecture checker reads .ctoc/architecture-rules.yaml. They treat a domain-to-repositories import oppositely (the checker's \"business\" layer may import \"data\"; the analyzer forbids it) and grade controller-to-repository differently (round 1 made it medium in the analyzer, matching the checker's example). Sources: .ctoc/audit/improvement-run-notes/s6-agent-round1-research-d-s6-agent-r1-research.md, section 4; .ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, \"For the human\" item 2.",
+      "options": [
+        {
+          "key": "one-shared-rules-file",
+          "label": "Make one rules file the single source that both agents read",
+          "pros": "One answer to \"is this import allowed\"; no disagreement between two reports on the same edge.",
+          "cons": "Changes both agents and the file format one of them reads; a decision and edits across slices."
+        },
+        {
+          "key": "keep-two-rules-files",
+          "label": "Keep the two files, each agent reading its own",
+          "pros": "No cross-agent change.",
+          "cons": "The two agents can report opposite verdicts on the same import."
+        }
+      ]
+    },
+    {
+      "id": "h-s6-agent-r1-checker-import-depth-and-tier-wording",
+      "date": "2026-10-01",
+      "path": "agents/quality/architecture-checker.md",
+      "round": 1,
+      "kind": "out-of-scope-file",
+      "evidence": "agents/quality/architecture-checker.md gives the maximum import depth as 5 at its line 275 and warns at depth > 7 at its line 297, and its prose says \"Tier 3\" and names a \"ctoc quality --tier3\" command. Sources: .ctoc/audit/improvement-run-notes/s6-agent-round1-research-d-s6-agent-r1-research.md, section 4 item 4 and section 5 \"Labels and gate numbers\"; .ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, \"For the human\" item 3.",
+      "options": [
+        {
+          "key": "fix-in-the-checker-now",
+          "label": "Correct the checker's import-depth figures and wording now, through a scope widening",
+          "pros": "The contradiction is gone before the checker is next dispatched.",
+          "cons": "Edits a file outside this slice before its own rounds."
+        },
+        {
+          "key": "leave-for-the-checker-slice",
+          "label": "Leave it for the checker's own slice",
+          "pros": "No change outside this slice.",
+          "cons": "The checker keeps two depth limits and the wording until then."
+        }
+      ]
+    },
+    {
+      "id": "h-s6-agent-r1-wrapper-duplicates-skill",
+      "date": "2026-10-01",
+      "path": "agents/architecture/dependency-analyzer.md",
+      "round": 1,
+      "kind": "merge-remove-or-rename",
+      "evidence": "The wrapper agent carries a full body (1,132 lines after round 1) parallel to its skill. Reducing it to defer to the skill would bring in the skill's claims that no round has yet verified: the refinement-loop \"critic mode\", the efferent-coupling budgets and the D > 0.5 rule. Source: .ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, \"For the human\" item 4.",
+      "options": [
+        {
+          "key": "keep-two-bodies",
+          "label": "Keep a full body in the wrapper and in the skill",
+          "pros": "Each file stands on its own; the wrapper keeps the corrections round 1 made.",
+          "cons": "Two bodies to keep in agreement; they can drift apart again."
+        },
+        {
+          "key": "reduce-the-wrapper",
+          "label": "Reduce the wrapper to a short body that defers to the skill",
+          "pros": "One body to maintain.",
+          "cons": "The agent then carries whatever the skill says, including claims not yet verified, until the skill's rounds correct them."
+        }
+      ]
+    },
+    {
+      "id": "h-s6-agent-r2-how-to-tell-a-cycle-is-new",
+      "date": "2026-10-01",
+      "path": "agents/quality/architecture-checker.md",
+      "round": 2,
+      "kind": "out-of-scope-file",
+      "evidence": "The architecture checker decides whether a cycle is new or pre-existing. After round 2 the dependency analyzer reports one finding per strongly connected component (its node set, every import inside it and one shortest ring through each import), while madge, which the checker names, counts rings: on six files forming two components madge 8.0.0 printed \"Found 4 circular dependencies!\" (.ctoc/audit/improvement-run-notes/s6-agent-round2-session-runs.md, run 2). A new ring added inside an existing component leaves the analyzer's count unchanged. Which unit the checker compares between two runs is a decision across agents, and the checker is met in slice s44. Source: .ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, \"For the human\" item 1 (finding f-s6-agent-r2-13).",
+      "options": [
+        {
+          "key": "compare-component-node-sets",
+          "label": "The checker compares component node sets",
+          "pros": "Stable from run to run, and matches the analyzer's count of cycle findings.",
+          "cons": "Misses a new ring added inside a component that already existed."
+        },
+        {
+          "key": "compare-rings",
+          "label": "The checker compares rings",
+          "pros": "Catches a new ring inside an existing component.",
+          "cons": "The number of rings in a component can grow exponentially with its size."
+        },
+        {
+          "key": "compare-imports-inside-components",
+          "label": "The checker compares the imports inside components",
+          "pros": "Catches any added import that keeps or closes a cycle.",
+          "cons": "Noisier when a file moves or is renamed, because its imports change identity."
+        }
+      ]
+    },
+    {
+      "id": "h-s6-agent-r3-which-rules-file-governs",
+      "date": "2026-10-02",
+      "path": "agents/quality/architecture-checker.md",
+      "round": 3,
+      "kind": "out-of-scope-file",
+      "evidence": "The dependency analyzer reads layer rules from .dependency-rules.json; quality/architecture-checker reads .ctoc/architecture-rules.yaml (agents/quality/architecture-checker.md lines 75-94), with a different schema and layer design: its example puts src/models/** in a \"data\" layer that \"presentation\" may not import, while the analyzer's defaults let a controller import a model. Round 3 (finding f-s6-agent-r3-14) makes the analyzer's report header disclose the YAML file when it exists, but which file governs both agents spans two agents and is the owner's. This refines the round-1 item h-s6-agent-r1-two-layer-configurations. Source: .ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, \"For the human\" item 1.",
+      "options": [
+        {
+          "key": "analyzer-also-reads-yaml",
+          "label": "The dependency analyzer also reads .ctoc/architecture-rules.yaml",
+          "pros": "One layer verdict for both agents.",
+          "cons": "The YAML has no allowedCycles or ignorePaths, so the two schemas need mapping."
+        },
+        {
+          "key": "checker-reads-dependency-rules",
+          "label": "The architecture checker reads .dependency-rules.json",
+          "pros": "The analyzer stays as it is.",
+          "cons": "The change lands in the checker's slice (s44)."
+        },
+        {
+          "key": "keep-both-disclosed",
+          "label": "Keep both files; each agent states which one it read (what round 3 does)",
+          "pros": "No change across agents.",
+          "cons": "Two verdicts on the same import can differ."
+        }
+      ]
+    },
+    {
+      "id": "h-s6-agent-r3-structured-output-schema",
+      "date": "2026-10-02",
+      "path": "agents/architecture/dependency-analyzer.md",
+      "round": 3,
+      "kind": "output-contract-change",
+      "evidence": "The agent's report is a fixed Markdown template with no structured schema and no confidence per finding. The round-3 critic states that this is the third consecutive round the absence caps the Integration dimension (the critics scored Integration 3, 6 and 6 of 10 in rounds 1, 2 and 3; round 1 named free-form Markdown with no self-assessment, rounds 2 and 3 named the missing schema) and, under its rule for an issue that recurs three rounds, escalates it as a design question about how the wrapper is structured; round 2's critic tied it to the open item h-s6-agent-r1-wrapper-duplicates-skill. Adding a schema changes the output another agent reads, which this slice may not change on its own. Source: .ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, \"For the human\" item 2 and the score tables.",
+      "options": [
+        {
+          "key": "add-structured-schema",
+          "label": "Give the agent a structured output schema with a confidence per finding",
+          "pros": "Machine-readable findings that cto-chief and the architecture checker can consume and compare between runs.",
+          "cons": "An output-contract change across agents, and a decision on what confidence means for deterministic graph facts."
+        },
+        {
+          "key": "keep-markdown-template",
+          "label": "Keep the fixed Markdown template",
+          "pros": "No contract change; the report stays readable as it is.",
+          "cons": "Findings stay free text, and the critic's Integration cap stays."
         }
       ]
     }

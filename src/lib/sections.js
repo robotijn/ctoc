@@ -9,7 +9,7 @@
  *   Implementation = implementation · todo          (HOW + ready-to-execute)
  *   Execution      = in-progress · review · done    (doing · verifying · shipped)
  *
- * See: /Users/account/Code/ctoc/plans/done/ctoc-v7-business-first-architecture.md
+ * See: plans/done/ctoc-v7-business-first-architecture.md
  *      CLAUDE.md "Pipeline Philosophy" section
  */
 

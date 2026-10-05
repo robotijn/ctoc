@@ -1,0 +1,2479 @@
+{
+  "schema": 1,
+  "path": "agents/architecture/dependency-analyzer.md",
+  "prerequisite": null,
+  "rounds": [
+    {
+      "round": 1,
+      "date": "2026-10-01",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:db58971fa46ec854be34a6c019892196841deb58d901147ab2f5b1922184d6df",
+      "fingerprint_after": "sha256:fcd686431f9f131a20335484c85b83c425086f8f4e5a5f9e9888b737abdd7597",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s6-agent-r1-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s6-agent-r1-research-gaps",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s6-agent-r1-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s6-agent-r1-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s6-agent-r1-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "Robert C. Martin's own definitions of afferent coupling, efferent coupling and instability, the unit he counts, and whether he gives any threshold on instability (1994 paper and 2000 text)",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "Martin on dependency cycles between packages: the acyclic-dependencies rule, and whether severity depends on a cycle's length",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "Martin's stable-dependencies rule and his reading of instability 0 and 1",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "TypeScript: which import forms are erased (import type versus an inline type modifier under verbatimModuleSyntax), how a .js specifier resolves to a .ts file, and how a package's \"exports\" field is used",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Node.js: what a circular require() does at runtime, whether native ECMAScript modules resolve a directory index, and how # subpath imports are declared",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Python: which circular-import forms fail, and imports placed inside functions",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Java Language Specification SE 25 chapter 7: same-package scope without an import, and module dependence cycles",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "C# using directive: global using, using static and the project-file <Using> item",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "madge: default file extensions, --extensions, --warning, the shape of --circular --json output, its exit code when it finds a cycle, skipTypeImports, and the current version",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "eslint-plugin-import: the no-cycle and no-restricted-paths rules, the current release and its date, ESLint 10 support, and the eslint-plugin-import-x fork",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Graphviz dot command-line flags -T and -o",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "actions/checkout: current major version and whether a v7 tag exists",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Current versions and what they do for the dependency-graph tools of other languages: dependency-cruiser, import-linter, pydeps, tach, grimp, ArchUnit, JDepend, ArchUnitNET, NsDepCop, jdeps, jQAssistant, include-what-you-use",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Go specification: is an import cycle between packages illegal",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "madge 8.0.0 release date and the Go specification sentence, retried in the gaps pass",
+          "source_class": "vendor documentation",
+          "repeated_because": "the first research pass got a truncated registry document and only a search snippet of the Go specification"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://linux.ime.usp.br/~joaomm/mac499/arquivos/referencias/oodmetrics.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "afferent and efferent coupling as Martin defines them, in classes and across the category boundary (old lines 176-177 and 236-237 counted files and modules and never said 'outside'; new Step 6 quotes the 1994 definitions)",
+          "outcome": "supported",
+          "quote": "The number of classes outside this category that depend upon classes within this category.",
+          "error": null
+        },
+        {
+          "url": "https://linux.ime.usp.br/~joaomm/mac499/arquivos/referencias/oodmetrics.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "old lines 241-243 and 597: I = 0 called good, and 'Ideal: Core modules I < 0.3, feature modules I > 0.7'",
+          "outcome": "refuted",
+          "quote": "Such a category is not desirable because it is rigid.",
+          "error": null
+        },
+        {
+          "url": "https://linux.ime.usp.br/~joaomm/mac499/arquivos/referencias/oodmetrics.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "no numeric threshold on instability in the source (old lines 32, 243 and 673); new Step 6 uses none and quotes this caveat",
+          "outcome": "supported",
+          "quote": "a metric is not a god; it is merely a measurement against an arbitrary standard.",
+          "error": null
+        },
+        {
+          "url": "https://staff.cs.utu.fi/~jounsmed/doos_06/material/DesignPrinciplesAndPatterns.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "cycle severity graded by length (old lines 28-29, 195-197 and 655-661): Martin calls one cycle through five packages disastrous",
+          "outcome": "refuted",
+          "quote": "This is clearly disastrous.",
+          "error": null
+        },
+        {
+          "url": "https://staff.cs.utu.fi/~jounsmed/doos_06/material/DesignPrinciplesAndPatterns.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "the acyclic-dependencies rule quoted in new section 1, with the source typo",
+          "outcome": "supported",
+          "quote": "The dependencies betwen packages must not form cycles.",
+          "error": null
+        },
+        {
+          "url": "https://staff.cs.utu.fi/~jounsmed/doos_06/material/DesignPrinciplesAndPatterns.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "old lines 241-242 ('many depend on it', 'depends on many'): I = 0 means no outgoing dependency, I = 1 no incoming one",
+          "outcome": "refuted",
+          "quote": "If there are no outgoing dependencies, then I will be zero and the package is stable.",
+          "error": null
+        },
+        {
+          "url": "https://staff.cs.utu.fi/~jounsmed/doos_06/material/DesignPrinciplesAndPatterns.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "the stable-dependencies rule added in new Step 6",
+          "outcome": "supported",
+          "quote": "Depend upon packages whose I metric is lower than yours.",
+          "error": null
+        },
+        {
+          "url": "https://staff.cs.utu.fi/~jounsmed/doos_06/material/DesignPrinciplesAndPatterns.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "old lines 32 and 673, a penalty for I > 0.8",
+          "outcome": "refuted",
+          "quote": "Indeed, we greatly desire that portions of our software be instable.",
+          "error": null
+        },
+        {
+          "url": "https://www.typescriptlang.org/tsconfig/verbatimModuleSyntax.html",
+          "read_on": "2026-10-01",
+          "bore_on": "old line 200: a declaration-level import type is erased",
+          "outcome": "supported",
+          "quote": "// Erased away entirely. import type { A } from \"a\";",
+          "error": null
+        },
+        {
+          "url": "https://www.typescriptlang.org/tsconfig/verbatimModuleSyntax.html",
+          "read_on": "2026-10-01",
+          "bore_on": "old lines 789-794: an inline type modifier import is type-only",
+          "outcome": "refuted",
+          "quote": "// Rewritten to 'import {} from \"xyz\";' import { type xyz } from \"xyz\";",
+          "error": null
+        },
+        {
+          "url": "https://www.typescriptlang.org/docs/handbook/modules/reference.html",
+          "read_on": "2026-10-01",
+          "bore_on": "extension substitution in new Step 3 rule 1 (the critic quoted a sentence about a specifier without an extension; the validator gave this supporting sentence)",
+          "outcome": "supported",
+          "quote": "This means that TypeScript can resolve to a `.ts` or `.d.ts` file even if the module specifier explicitly uses a `.js` file extension",
+          "error": null
+        },
+        {
+          "url": "https://www.typescriptlang.org/docs/handbook/modules/reference.html",
+          "read_on": "2026-10-01",
+          "bore_on": "old lines 739-741, a workspace package resolved to packages/shared/src/index.ts; the 'exports' sentence holds only under a condition the critic's quotation dropped",
+          "outcome": "refuted",
+          "quote": "TypeScript follows Node.js's package.json `\"exports\"` spec when resolving from a package directory triggered by a bare specifier `node_modules` package lookup.",
+          "error": null
+        },
+        {
+          "url": "https://www.typescriptlang.org/docs/handbook/modules/reference.html",
+          "read_on": "2026-10-01",
+          "bore_on": "old lines 704-716, path aliases from tsconfig paths: a compile-time resolution",
+          "outcome": "supported",
+          "quote": "The `paths` option does _not_ change the import path in the code emitted by TypeScript.",
+          "error": null
+        },
+        {
+          "url": "https://nodejs.org/api/modules.html",
+          "read_on": "2026-10-01",
+          "bore_on": "old line 522 'may cause initialization issues' for CommonJS; quoted in new section 1 and in the example's Impact line",
+          "outcome": "supported",
+          "quote": "When there are circular `require()` calls, a module might not have finished executing when it is returned.",
+          "error": null
+        },
+        {
+          "url": "https://nodejs.org/api/esm.html",
+          "read_on": "2026-10-01",
+          "bore_on": "old line 394, a directory import resolves to its index file: true for CommonJS, not for Node's native ECMAScript modules",
+          "outcome": "refuted",
+          "quote": "Directory indexes (e.g. `'./startup/index.js'`) must also be fully specified.",
+          "error": null
+        },
+        {
+          "url": "https://nodejs.org/api/esm.html",
+          "read_on": "2026-10-01",
+          "bore_on": "the critic's proposed quotation on '#' specifiers (PACKAGE_IMPORTS_RESOLVE), attributed to this page: not found on the page by the validator",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/doc/api/esm.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the same proposed quotation, read raw by the session: no line contains 'starts with \"#\"' and none contains PACKAGE_IMPORTS_RESOLVE",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://nodejs.org/api/packages.html",
+          "read_on": "2026-10-01",
+          "bore_on": "new Step 3 rule 3 and the internal classification of # subpath imports (the validator's replacement quotation; also read raw by the session in doc/api/packages.md on the Node.js main branch, line 542, the sentence ending on the next line; the session note gives no address for that raw read)",
+          "outcome": "supported",
+          "quote": "Entries in the `\"imports\"` field must always start with `#` to ensure they are disambiguated from external package specifiers.",
+          "error": null
+        },
+        {
+          "url": "https://nodejs.org/api/cli.html",
+          "read_on": "2026-10-01",
+          "bore_on": "new Step 3: node - reads the script from standard input",
+          "outcome": "supported",
+          "quote": "Alias for stdin.",
+          "error": null
+        },
+        {
+          "url": "https://docs.python.org/3/faq/programming.html",
+          "read_on": "2026-10-01",
+          "bore_on": "new section 1, the Python impact of a cycle; new Step 2, imports inside functions",
+          "outcome": "supported",
+          "quote": "Circular imports are fine where both modules use the \"import <module>\" form of import.",
+          "error": null
+        },
+        {
+          "url": "https://docs.oracle.com/javase/specs/jls/se25/html/jls-7.html",
+          "read_on": "2026-10-01",
+          "bore_on": "new Step 2: a type in the same package needs no import, so Java nodes are packages",
+          "outcome": "supported",
+          "quote": "including all those in the current compilation unit, as their scope",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/using-directive",
+          "read_on": "2026-10-01",
+          "bore_on": "new Step 2: global using and the project-file <Using> item give an edge from every file",
+          "outcome": "supported",
+          "quote": "The `global` modifier has the same effect as adding the same `using` directive to every source file in your project.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/pahen/madge/master/README.md",
+          "read_on": "2026-10-01",
+          "bore_on": "old lines 1066 and 1087: madge without --extensions reads only .js files; new recipes pass the extension list and quote fileExtensions and skipTypeImports",
+          "outcome": "supported",
+          "quote": "Valid file extensions used to find files in directories",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/pahen/madge/master/bin/cli.js",
+          "read_on": "2026-10-01",
+          "bore_on": "madge exits 1 when it finds a cycle; --extensions takes a comma-separated list",
+          "outcome": "supported",
+          "quote": "if (circular.length) { exitCode = 1; }",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/pahen/madge/master/lib/output.js",
+          "read_on": "2026-10-01",
+          "bore_on": "the shape of --circular --json output, an array of cycles (the gaps pass's reading that .length counts them was overridden by the session's jq run: jq '.length' errors on an array)",
+          "outcome": "supported",
+          "quote": "if (opts.json) { return printJSON(circular); }",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/pahen/madge/master/CHANGELOG.md",
+          "read_on": "2026-10-01",
+          "bore_on": "madge 8.0.0 release date: the 8.0.0 heading carries no date",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://registry.npmjs.org/madge",
+          "read_on": "2026-10-01",
+          "bore_on": "madge 8.0.0 release date, through the fetch tool (research and gaps passes)",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "content appears to be truncated and does not include a \"time\" object"
+        },
+        {
+          "url": "https://registry.npmjs.org/madge",
+          "read_on": "2026-10-01",
+          "bore_on": "madge 8.0.0 release date and latest tag, read raw by the session with curl and jq",
+          "outcome": "supported",
+          "quote": "2024-08-05T07:49:35.718Z",
+          "error": null
+        },
+        {
+          "url": "https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-cycle.md",
+          "read_on": "2026-10-01",
+          "bore_on": "old line 1101, import/no-cycle (kept)",
+          "outcome": "supported",
+          "quote": "Ensures that there is no resolvable path back to this module via its dependencies.",
+          "error": null
+        },
+        {
+          "url": "https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-restricted-paths.md",
+          "read_on": "2026-10-01",
+          "bore_on": "old lines 1102-1117, import/no-restricted-paths zones (kept)",
+          "outcome": "supported",
+          "quote": "message: Optional. Displayed in case of rule violation.",
+          "error": null
+        },
+        {
+          "url": "https://github.com/import-js/eslint-plugin-import/releases",
+          "read_on": "2026-10-01",
+          "bore_on": "old line 645, eslint-plugin-import exists and is released",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/import-js/eslint-plugin-import/main/CHANGELOG.md",
+          "read_on": "2026-10-01",
+          "bore_on": "the year of eslint-plugin-import 2.32.0; ESLint 10 support appears only under Unreleased",
+          "outcome": "supported",
+          "quote": "## [2.32.0] - 2025-06-20",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/un-ts/eslint-plugin-import-x/master/package.json",
+          "read_on": "2026-10-01",
+          "bore_on": "the maintained fork, not named by the file",
+          "outcome": "did-not-bear",
+          "quote": "\"version\": \"4.17.1\"",
+          "error": null
+        },
+        {
+          "url": "https://www.npmjs.com/package/eslint-plugin-import-x",
+          "read_on": "2026-10-01",
+          "bore_on": "the maintained fork, search listing only",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://libraries.io/npm/eslint-plugin-import",
+          "read_on": "2026-10-01",
+          "bore_on": "eslint-plugin-import release history",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://graphviz.org/doc/info/command.html",
+          "read_on": "2026-10-01",
+          "bore_on": "old lines 937 and 940, dot -Tpng and -Tsvg (kept)",
+          "outcome": "supported",
+          "quote": "Set output language to one of the supported formats.",
+          "error": null
+        },
+        {
+          "url": "https://graphviz.org/download/",
+          "read_on": "2026-10-01",
+          "bore_on": "Graphviz current version (not used in the file)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/actions/checkout/releases",
+          "read_on": "2026-10-01",
+          "bore_on": "old line 1061, actions/checkout@v4: still maintained, three majors behind v7.0.1",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/actions/checkout/tags",
+          "read_on": "2026-10-01",
+          "bore_on": "new workflow, actions/checkout@v7: the v7 tag exists apart from v7.0.1",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.npmjs.com/package/babel-plugin-module-resolver",
+          "read_on": "2026-10-01",
+          "bore_on": "old line 708, babel-plugin-module-resolver: seen in a search listing only, not fetched; the line is unchanged",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://go.dev/ref/spec",
+          "read_on": "2026-10-01",
+          "bore_on": "Go package cycles, through the fetch tool in the gaps pass: the page came back truncated",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "I cannot find the \"Import declarations\" section"
+        },
+        {
+          "url": "https://go.dev/ref/spec",
+          "read_on": "2026-10-01",
+          "bore_on": "Go package cycles, read raw by the session (no Go cycle claim is in the file this round)",
+          "outcome": "did-not-bear",
+          "quote": "It is illegal for a package to import itself, directly or indirectly, or to directly import a package without referring to any of its exported identifiers.",
+          "error": null
+        },
+        {
+          "url": "https://github.com/sverweij/dependency-cruiser/releases",
+          "read_on": "2026-10-01",
+          "bore_on": "dependency-cruiser, named by the skill and the architecture checker, not by this file",
+          "outcome": "did-not-bear",
+          "quote": "adds support recognizing type-only imports",
+          "error": null
+        },
+        {
+          "url": "https://pypi.org/project/import-linter/",
+          "read_on": "2026-10-01",
+          "bore_on": "a Python import-contract tool, not named by this file",
+          "outcome": "did-not-bear",
+          "quote": "allows you to impose constraints on the imports between your Python modules.",
+          "error": null
+        },
+        {
+          "url": "https://pypi.org/project/pydeps/",
+          "read_on": "2026-10-01",
+          "bore_on": "pydeps, through the fetch tool in the research pass",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "Fetch failed (error page)"
+        },
+        {
+          "url": "https://pypi.org/pypi/pydeps/json",
+          "read_on": "2026-10-01",
+          "bore_on": "pydeps, not named by this file",
+          "outcome": "did-not-bear",
+          "quote": "Display module dependencies",
+          "error": null
+        },
+        {
+          "url": "https://pypi.org/pypi/tach/json",
+          "read_on": "2026-10-01",
+          "bore_on": "tach, not named by this file",
+          "outcome": "did-not-bear",
+          "quote": "A Python tool to maintain a modular package architecture.",
+          "error": null
+        },
+        {
+          "url": "https://pypi.org/pypi/grimp/json",
+          "read_on": "2026-10-01",
+          "bore_on": "grimp, not named by this file",
+          "outcome": "did-not-bear",
+          "quote": "Builds a queryable graph of the imports within one or more Python packages.",
+          "error": null
+        },
+        {
+          "url": "https://docs.oracle.com/en/java/javase/25/docs/specs/man/jdeps.html",
+          "read_on": "2026-10-01",
+          "bore_on": "jdeps has no cycle-detection option; not named by this file",
+          "outcome": "did-not-bear",
+          "quote": "Recursively traverses all run-time dependences.",
+          "error": null
+        },
+        {
+          "url": "https://github.com/jQAssistant/jqassistant",
+          "read_on": "2026-10-01",
+          "bore_on": "jQAssistant, tagline only",
+          "outcome": "did-not-bear",
+          "quote": "Your Software. Your Structures. Your Rules.",
+          "error": null
+        },
+        {
+          "url": "https://github.com/realvizu/NsDepCop",
+          "read_on": "2026-10-01",
+          "bore_on": "NsDepCop, not named by this file",
+          "outcome": "did-not-bear",
+          "quote": "NsDepCop is a static code analysis tool that enforces namespace and assembly dependency rules in C# projects.",
+          "error": null
+        },
+        {
+          "url": "https://github.com/TNG/ArchUnit/releases",
+          "read_on": "2026-10-01",
+          "bore_on": "ArchUnit, not named by this file",
+          "outcome": "did-not-bear",
+          "quote": "Support Java 27 / class file major version 71",
+          "error": null
+        },
+        {
+          "url": "https://github.com/clarkware/jdepend",
+          "read_on": "2026-10-01",
+          "bore_on": "JDepend, not named by this file",
+          "outcome": "did-not-bear",
+          "quote": "JDepend traverses Java class and source file directories and generates design quality metrics for each Java package.",
+          "error": null
+        },
+        {
+          "url": "https://github.com/TNG/ArchUnitNET/releases",
+          "read_on": "2026-10-01",
+          "bore_on": "ArchUnitNET, not named by this file",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/include-what-you-use/include-what-you-use/releases",
+          "read_on": "2026-10-01",
+          "bore_on": "include-what-you-use, not named by this file",
+          "outcome": "did-not-bear",
+          "quote": "Compatible with Clang 22.",
+          "error": null
+        },
+        {
+          "url": "https://staff.cs.utu.fi/~jounsmed/doos_06/material/DesignPrinciplesAndPatterns.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "the re-read's check of the folded leftover 1 (line 196): one added dependency, releasing one package meant building with six others, verified; 'a cycle through five packages' misattributed, since Figure 2-22 shows two rings of four packages, five in all (corrected by re-read pair 5)",
+          "outcome": "supported",
+          "quote": "due to one single little dependency that got out of control.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/pahen/madge/master/README.md",
+          "read_on": "2026-10-01",
+          "bore_on": "re-read pair 27: madge reads a .madgerc at the project root (the re-read through the fetch tool; the session read it raw at line 236 and ran madge with a .madgerc holding skipTypeImports under the ts key: the type-only ring was no longer reported)",
+          "outcome": "supported",
+          "quote": "You can use configuration file either in `.madgerc` in your project or home folder or directly in `package.json`.",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s6-agent-r1-1",
+          "kind": "new",
+          "text": "The Role named no sibling, gave no read-only rule and no rule that analyzed files are data; the graph-export recipe wrote a file into the repository. The Role now states that the agent owns the graph and its metrics and reports cycles as facts, that whether a cycle blocks or warns and whether it is new belongs to quality/architecture-checker, that pattern naming belongs to architecture/pattern-detector and third-party packages to security/dependency-checker, that it changes nothing, and that everything it reads is data.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-1; research report section 4 and section 5 \"Untrusted input\"; plans/in-progress/00266-every-agent-and-specialist-skill-improved-three-times-s6-dependency-analyzer.md, Execution Record, \"Who owns circular-dependency findings today\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-2",
+          "kind": "new",
+          "text": "The description claimed 'instability mismatches', which the body never computed. It now names what the agent computes and that quality/architecture-checker decides block or warn; one line, the old dispatch sentence kept byte for byte, no ': ' and no ' #' in the value.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-2; research report row for frontmatter line 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-3",
+          "kind": "new",
+          "text": "Cycle severity fell with cycle length, an instability threshold of 0.8 had no source, an upward import was rated milder than a layer skip, two penalties were missing from the quick-reference table, test-file handling contradicted itself, and the priority formula used inputs nothing measures. Severity now follows the kind of cycle (runtime high; type-only and test-only low; accepted listed by name at no penalty), an upward layer import is high and any other forbidden import medium, the instability-size penalty is replaced by one per stable-dependencies violation, the weights are labelled as the file's own, and priority uses only graph counts (pairs a to d). Validator leftover 1 corrected the cycle size in the Martin sentence (five packages, six others to build with); leftover 18 renamed the table header so it no longer repeats the skill.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-3; .ctoc/audit/improvement-run-notes/s6-agent-round1-validate-d-s6-agent-r1-validate.md, leftovers 1 and 18; research report rows for lines 195-197, 655-661, 32, 673 and 26-34",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-4",
+          "kind": "new",
+          "text": "Martin's metrics were misapplied: counted in files in one place and modules in another, I = 0 read as 'many depend on it', ideal thresholds with no source, two score formulas, no definition for an isolated module, and no stable-dependencies check. Step 6 now gives the 1994 definitions counted in files (stated as the file's own choice), defines an isolated module, adds the stable-dependencies check, uses no threshold, and the direction violation is counted once as a layer violation (pairs a and b). Leftover 10 corrected the reason for counting files (Java and C# nodes are packages and namespaces); leftover 20 renamed the step heading.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-4; .ctoc/audit/improvement-run-notes/s6-agent-round1-validate-d-s6-agent-r1-validate.md, leftovers 10 and 20; research report rows for lines 176-177, 236-237, 241-243 and section 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-5",
+          "kind": "new",
+          "text": "The depth-first cycle search, with a fresh visited set per start node, reported rotations of the same cycle and could miss cycles. Step 4 now finds strongly connected components, one finding per component with one shortest path as evidence, and a second pass for type-only cycles. Leftover 20 renamed the step heading.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-5; .ctoc/audit/improvement-run-notes/s6-agent-round1-validate-d-s6-agent-r1-validate.md, leftover 20; research report section 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-6",
+          "kind": "new",
+          "text": "Import extraction was line-based Grep with an invalid type list (type=\"ts,js\"; session run 7) and missed side-effect imports, indented Python imports, Java same-package edges and static imports, and C# global using and using static. Extraction moves into the script, Grep is a spot check with one type per call, and every missing form is listed. Leftover 8 added what happens when Python is not installed; leftover 16 marked export type as type-only.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-6; .ctoc/audit/improvement-run-notes/s6-agent-round1-validate-d-s6-agent-r1-validate.md, leftovers 8 and 16; .ctoc/audit/improvement-run-notes/s6-agent-round1-session-runs.md, run 7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-7",
+          "kind": "new",
+          "text": "Resolution was undefined ('Resolve I to absolute path'), unresolved imports vanished so 'no cycles' could mean 'could not look', and nothing said the work is done in a script. Step 3 now has one script run through Bash on standard input, resolution rules in a fixed order, Java and C# nodes as packages and namespaces, and a mandatory could-not-resolve list. Leftover 2 replaced a misattributed TypeScript quotation and the unsourced .jsx pair; leftover 3 replaced a Node.js quotation not found on the page it was attributed to (confirmed absent by the session's raw read) with the packages page's sentence; leftover 7 sent Go, Rust and PHP imports to the could-not-resolve list instead of 'external'; leftover 20 renamed the step heading.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-7; .ctoc/audit/improvement-run-notes/s6-agent-round1-validate-d-s6-agent-r1-validate.md, leftovers 2, 3, 7 and 20; .ctoc/audit/improvement-run-notes/s6-agent-round1-session-runs.md, \"Raw reads and one run after the validation pass\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-8",
+          "kind": "new",
+          "text": "The default layer table let no layer import domain, matched none of the diagram's other names, and indexed an undefined layer for a file in no layer. domain is now importable from the layers above it, aliases cover the diagram's names, get_layer is defined, files with no layer are counted and skipped, and each violation carries its direction. Leftover 12 treats controllers and handlers as one level; leftover 20 renamed the step heading.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-8; .ctoc/audit/improvement-run-notes/s6-agent-round1-validate-d-s6-agent-r1-validate.md, leftovers 12 and 20; research report section 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-9",
+          "kind": "new",
+          "text": "An inline type modifier import was called type-only, but TypeScript keeps the statement (verbatimModuleSyntax page). Only a declaration-level import type is type-only; an inline type import is a runtime edge marked inline-type, and what happens without verbatimModuleSyntax is stated as not checked.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-9; research report row for lines 789-794",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-10",
+          "kind": "new",
+          "text": "Both shipped madge recipes reported a pass whatever the code contained: no --extensions read 0 TypeScript files and exited 0, jq '.length' errors on an array so the count was empty, and the hook passed when madge was missing (session runs 1 to 6). The recipes now fail closed (explicit extensions, zero source files fail, madge's exit code 1, jq 'length', an empty or non-numeric count fails), pin madge@8, move checkout to v7, and the 'CI/CD' heading is spelled out; the invented threshold-configuration file is deleted (pair b). Leftover 5 limited the skipTypeImports sentence to what is documented and added the tsx key as not checked; leftover 6 limited 'fails closed' to the two madge recipes. The new hook was run by the session in four states (cycle, no cycle, madge absent, empty src/) with the expected exit codes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-10; .ctoc/audit/improvement-run-notes/s6-agent-round1-validate-d-s6-agent-r1-validate.md, leftovers 5 and 6; .ctoc/audit/improvement-run-notes/s6-agent-round1-session-runs.md, runs 1 to 7 and \"The critic's proposed pre-commit hook, run in four states\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-11",
+          "kind": "new",
+          "text": "The worked example report contradicted its own rules: an infrastructure violation the default rules cannot produce, a direction matrix whose violations differed from the listed ones, I = 0 called 'Good!', an unsourced tree-shaking claim, unexpanded abbreviations, and no limits block. The example now follows findings 3, 4 and 7, scores 6.8 (Fair) and ends with a 'Limits of this run' block (pairs a to j). Leftover 13 relabelled the stable-dependencies recommendation Low; leftover 15 added the inventory/ module to the coupling table and said each src/modules directory has an index.ts; leftover 17 named the score 'Overall Score' in the summary; leftover 19 changed the summary table's header and the layer-violations row so they no longer repeat the skill.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-11; .ctoc/audit/improvement-run-notes/s6-agent-round1-validate-d-s6-agent-r1-validate.md, leftovers 13, 15, 17 and 19; research report section 5 and rows for lines 522, 590 and 597",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-12",
+          "kind": "new",
+          "text": ".dependency-rules.json could silently suppress cycle findings through allowedCycles. The file is now data: an accepted cycle matches its files exactly and is listed by name with its reason, each ignorePaths pattern is counted, and a file that does not parse falls back to the default rules with the parse error in the header.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-12; research report section 5 \"Untrusted input\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-13",
+          "kind": "new",
+          "text": "The size guidance ordered sampling, an unnamed cache and changed-files-only graphs, with time limits from no source. The section now builds the whole graph every run, never samples, keeps no cache, and labels a partial result.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-13; research report section 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-14",
+          "kind": "new",
+          "text": "Comparison Mode needed an earlier run that nothing stores, with invented 2024 dates. It now runs only when the dispatch supplies an earlier report, with placeholder dates and numbers aligned to finding 11. Validator leftover 14, a pair of its own against the agent file (old lines 882-891), replaced the resolved and new issues that contradicted the worked report; leftover 17 named the score row \"Overall Score\".",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-14; .ctoc/audit/improvement-run-notes/s6-agent-round1-validate-d-s6-agent-r1-validate.md, leftovers 14 and 17 (defect 7)",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-15",
+          "kind": "new",
+          "text": "Directory and barrel resolution skipped \"main\", had no rule for a cycle through a barrel, and used the invalid Grep type list. It now resolves \"main\" then the index file (stating that Node's native modules do not look up an index), keeps re-export edges, counts a cycle through a barrel as runtime, and spot-checks with one type per Grep call.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-15; research report row for line 394 and section 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-16",
+          "kind": "new",
+          "text": "Workspace packages were resolved by guessing src/index.ts. They now resolve through the package's \"exports\" then \"main\", and fall back to a package-level node. Leftover 4 restored the condition the critic's TypeScript quotation had dropped; leftover 9 sends a never-built entry point to the could-not-resolve list as well.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-16; .ctoc/audit/improvement-run-notes/s6-agent-round1-validate-d-s6-agent-r1-validate.md, leftovers 4 and 9; research report row for lines 739-740",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-17",
+          "kind": "new",
+          "text": "# subpath imports were missing from internal dependencies, and external dependencies were \"analyzed separately\" by no one named. Both are now stated; external packages belong to security/dependency-checker.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-17; research report row for lines 761-762",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-18",
+          "kind": "new",
+          "text": "Step 1's exclusions disagreed with the full list, an empty input could read as clean, .mjs and .cjs were not globbed, and C, C++ and SQL files passed unseen. Step 1 now excludes the full list and ignorePaths, stops on zero files, globs .mts/.cts/.mjs/.cjs, and lists C, C++ and SQL under 'Limits of this run' as present but not analyzed.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-18; research report section 5 \"Language coverage\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-19",
+          "kind": "new",
+          "text": "'3+ related source files' was undefined and modules did not partition the files. The vague clause is removed and each file belongs to exactly one module. Leftover 11 says this partition wins over the per-language lists above it.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-19; .ctoc/audit/improvement-run-notes/s6-agent-round1-validate-d-s6-agent-r1-validate.md, leftover 11",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-20",
+          "kind": "new",
+          "text": "The language patterns section read as a way to build the graph. It now opens by saying the patterns are spot checks for single-line forms and names what they miss.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-20; research report section 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-21",
+          "kind": "new",
+          "text": "The graph export told the agent to write dependencies.dot into the repository. It is now text for the human to save and run.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-21",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-22",
+          "kind": "new",
+          "text": "The impact analysis asserted 'None detected', 'No breaking API changes', 'Easy to rollback' and 'Risk assessment: LOW', which no procedure produces. It now answers only from the graph: the changed files, the files and test files that import them.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-22",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-23",
+          "kind": "new",
+          "text": "Python's test-file naming test_*.py was missing, so a Python test-only cycle would be graded high. It is added to the test-file patterns.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, finding f-s6-agent-r1-23",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-24",
+          "kind": "new",
+          "text": "The architecture checker's own files do not state the boundary this round wrote into the analyzer: agents/quality/architecture-checker.md line 285 names dependency-analyzer only as 'Detailed dependency graph analysis', its skill's related_skills omit it, and both pairs carry the dispatch phrases 'circular dependency' and 'module boundary'. Those files are outside this slice.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, \"For the human\" item 1; agents/quality/architecture-checker.md line 285",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s6-agent-r1-checker-side-of-the-boundary"
+        },
+        {
+          "id": "f-s6-agent-r1-25",
+          "kind": "new",
+          "text": "Two layer configurations conflict: this agent reads .dependency-rules.json, the architecture checker reads .ctoc/architecture-rules.yaml; they treat domain-to-repositories oppositely and grade controller-to-repository differently (this round made it medium here, matching the checker's example). Which file is the single source is a decision across agents.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, \"For the human\" item 2; .ctoc/audit/improvement-run-notes/s6-agent-round1-research-d-s6-agent-r1-research.md, section 4",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s6-agent-r1-two-layer-configurations"
+        },
+        {
+          "id": "f-s6-agent-r1-26",
+          "kind": "new",
+          "text": "The architecture checker contradicts itself on import depth (5 at its line 275, 7 at its line 297), and its prose says 'Tier 3' and names a 'ctoc quality --tier3' command. That file is outside this slice.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, \"For the human\" item 3; .ctoc/audit/improvement-run-notes/s6-agent-round1-research-d-s6-agent-r1-research.md, section 4 item 4 and section 5 \"Labels and gate numbers\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s6-agent-r1-checker-import-depth-and-tier-wording"
+        },
+        {
+          "id": "f-s6-agent-r1-27",
+          "kind": "new",
+          "text": "The wrapper carries a full body parallel to its skill. Slimming it to defer to the skill would import the skill's unverified claims (the refinement-loop critic mode, the efferent-coupling budgets, D > 0.5); whether to keep two bodies or reduce the wrapper is a structural call.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-critic-d-s6-agent-r1-critic.md, \"For the human\" item 4",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s6-agent-r1-wrapper-duplicates-skill"
+        },
+        {
+          "id": "f-s6-agent-r1-28",
+          "kind": "new",
+          "text": "The re-read of the edited file found the 39 pairs and 20 folded leftovers all landed, one citation detail wrong, thirteen passages that contradicted the new rules (including the executor's two: PHP extraction and skipTypeImports) and seven lines still shared with the skill. Its 27 pairs were applied in the order given: pair 5 (the Martin detail: two rings of four packages, five in all); pairs 2 (test files stay in the graph), 3 (PHP extraction in the script, Grep as a spot check), 4 (the could-not-resolve list's two missing sources), 6 (a stylesheet is not a node), 7 (index.js), 9 (the parse error in the header), 10, 11 and 12 (severity words in the summary), 16 (the coupling table shows only src/modules), 17 (cross-package findings), 18 (export type), 21 and 22 (a previous score the formula can produce: 5.5 and +1.3, with complete issue lists), 23 to 25 (the JSON export's module, kind and line), 26 (the fix-order tie-break) and 27 (skipTypeImports set through .madgerc, which the recipes do not do); pairs 1, 8, 13, 14, 15, 19 and 20 (the Step 1 heading, the report heading, the three cycle diagrams with the import line moved onto the path line and \"(back to the start)\", the AuthHelpers fix line, and the type-only section heading). After them the agent and skill bodies share no trimmed line of 25 characters or more.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round1-revalidate-d-s6-agent-r1-revalidate.md, sections 2, 3, 4 and 6; .ctoc/audit/improvement-run-notes/s6-agent-round1-session-runs.md, section \"After the re-read\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-29",
+          "kind": "new",
+          "text": "Exact-text search of agents/ and skills/ for the statements this round removed: the architecture checker's agent (lines 35 and 46) and skill (lines 140 and 150) recommend 'npx madge --circular src/' for JavaScript and TypeScript without --extensions, which reads no TypeScript file (session runs 1 and 4). Neither file has started its rounds.",
+          "evidence": "agents/quality/architecture-checker.md lines 35 and 46; skills/quality/architecture-checker/SKILL.md lines 140 and 150; .ctoc/audit/improvement-run-notes/s6-agent-round1-session-runs.md, runs 1 and 4",
+          "decision": "rejected",
+          "reason": "Cross-file: both files are met by slice s44 (the inventory's slice for the architecture checker pair), which has not started; no late correction.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r1-30",
+          "kind": "new",
+          "text": "The gaps pass refuted jdeps as a cycle-detection tool: the JDK 25 jdeps manual has no cycle-detection option and never uses the word \"cycle\"; --check reports module dependencies and unused qualified exports. The architecture checker lists jdeps as the Java tool for finding circular dependencies, in its agent (line 38) and its skill (line 143, `jdeps -summary`). Neither file has started its rounds.",
+          "evidence": "https://docs.oracle.com/en/java/javase/25/docs/specs/man/jdeps.html, read 2026-10-01: \"Recursively traverses all run-time dependences.\" (no option for cycles); .ctoc/audit/improvement-run-notes/s6-agent-round1-research-gaps-d-s6-agent-r1-research-gaps.md, item 5a; agents/quality/architecture-checker.md line 38; skills/quality/architecture-checker/SKILL.md line 143; confirmed raw by the session: .ctoc/audit/improvement-run-notes/s6-agent-round1-session-runs.md, section \"jdeps manual, raw read\" (curl of the same address, tags stripped, 16,078 bytes: 0 occurrences of \"cycl\"; the recursive option spelled \"-R or --recursive Recursively traverses all run-time dependences.\"; the word \"split\" does not occur on the page; the --check paragraph quoted in the session output)",
+          "decision": "rejected",
+          "reason": "Cross-file: both files are met by slice s44 (the inventory's slice for the architecture checker pair), which has not started; no late correction.",
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 27,
+        "VALIDATED": 9,
+        "FABRICATED": 7,
+        "UNSOURCEABLE": 6,
+        "MISATTRIBUTED": 1
+      },
+      "validator_final": {
+        "examined": 24,
+        "VALIDATED": 23,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 1
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/architecture/dependency-analyzer/SKILL.md",
+        "agents/quality/architecture-checker.md",
+        "skills/quality/architecture-checker/SKILL.md",
+        "agents/architecture/pattern-detector.md",
+        "skills/architecture/pattern-detector/SKILL.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "Every one of the seven languages has an import or include mechanism, so the domain applies to all seven. After this round the file covers JavaScript and TypeScript, Python, Java and C# (and Go, Rust and PHP, whose imports now go to the could-not-resolve list until a resolution rule is written). C, C++ and SQL are now surfaced under 'Limits of this run' as present but not analyzed (finding 18); their full treatment awaits research on #include, C++20 import and foreign-key graphs, which the research passes list as not verified. Java and C# examples were not compiled: there is no JDK and no .NET on this machine.",
+        "examples_checked": [
+          {
+            "language": "POSIX sh: the new pre-commit hook (finding 10), with madge 8.0.0 through npx -y madge@8 and jq 1.7.1, on macOS",
+            "how": "run by the session in four states (a cycle, no cycle, madge absent, an empty src/), .ctoc/audit/improvement-run-notes/s6-agent-round1-session-runs.md, section \"The critic's proposed pre-commit hook, run in four states\"; the executor confirmed the hook in the file is byte for byte the text the session ran and syntax-checked it with sh -n (exit 0); after the re-read's pairs the hook is still byte for byte that text"
+          },
+          {
+            "language": "Shell command lines: the madge invocations the new text relies on (default extensions, --extensions, --warning, --json, a ./b.js specifier resolving to b.ts)",
+            "how": "run by the session, .ctoc/audit/improvement-run-notes/s6-agent-round1-session-runs.md, runs 1 to 4 and \"Raw reads and one run after the validation pass\""
+          },
+          {
+            "language": "YAML: the GitHub Actions workflow (finding 10)",
+            "how": "parsed by the executor with js-yaml 4.2.0 (three steps: actions/checkout@v7 and two run steps), after the critic's pairs and again after the re-read's pairs; not run, because there is no Ubuntu runner on this machine"
+          },
+          {
+            "language": "Python 3.9.6: the ast module and typing.TYPE_CHECKING behaviour the new Step 2 relies on",
+            "how": "run by the session, .ctoc/audit/improvement-run-notes/s6-agent-round1-session-runs.md, \"Other items from the critic's not verified list\""
+          },
+          {
+            "language": "TypeScript: the two-line type-only example (finding 9)",
+            "how": "not compiled; its behaviour rests on the two quotations from the verbatimModuleSyntax page, validated by d-s6-agent-r1-validate"
+          },
+          {
+            "language": "JSON: the graph export example (re-read pairs 23 to 25)",
+            "how": "parsed by the executor with JSON.parse (Node.js v24.14.1) after the pairs were applied"
+          },
+          {
+            "language": "madge configuration: a .madgerc at the project root holding skipTypeImports under the ts key (re-read pair 27)",
+            "how": "run by the session with madge 8.0.0 on the four-file tree, .ctoc/audit/improvement-run-notes/s6-agent-round1-session-runs.md, section \"After the re-read\"; the tsx key was not run (the tree has no .tsx file)"
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "date": "2026-10-01",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:fcd686431f9f131a20335484c85b83c425086f8f4e5a5f9e9888b737abdd7597",
+      "fingerprint_after": "sha256:ee5dec7d2c7e3337665d784b6142cd490df584c875021af1af5062e585747c6c",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s6-agent-r2-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s6-agent-r2-research-gaps",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s6-agent-r2-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s6-agent-r2-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s6-agent-r2-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "Peer-reviewed studies of harm from dependency cycles between packages or classes, and whether that harm depends on a cycle's length or its place in the package tree (Falleri and others 2011; Oyetoyan and others 2015; Oyetoyan, Cruzes and Conradi 2013; Melton and Tempero 2007; Al-Mutawa and others 2014; Oyetoyan, Conradi and Cruzes 2013)",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "What evidence a strongly connected component needs before a person can fix it, and whether every cycle in it can be listed",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "Empirical validation of Martin's package metrics and any threshold on instability (Elish and others 2011; Elish 2010; Petrić, Hall and Bowes 2020)",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "ISO/IEC 5055:2021 maintainability weaknesses for circular dependencies and layer-skipping calls, the Object Management Group text it was prepared from, its detection patterns, and how its measure scores (counts or weights)",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "Common Weakness Enumeration entries CWE-1047 and CWE-1054 and their category",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "ISO/IEC 25010 maintainability and modularity, and its current edition's names",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "NIST SP 800-218 on third-party software components, for the boundary with security/dependency-checker",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "Vendor rules that report cycles and the unit they count: SonarQube S7027 and S7091, ArchUnit beFreeOfCycles, dependency-cruiser circular and its type-only exclusion",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "madge's parsers: how precinct passes detectiveOptions per file type (the tsx key), what detective-typescript's skipTypeImports skips, and which detective-typescript version madge 8.0.0 installs",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "pytest's default test-file discovery",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Melton and Tempero 2007 and Al-Mutawa and others 2014: their abstracts, through publisher-independent records",
+          "source_class": "broad web",
+          "repeated_because": "the research pass reached both only as search snippets"
+        },
+        {
+          "text": "SonarQube S7027 and S7091: default severity and deprecation",
+          "source_class": "vendor documentation",
+          "repeated_because": "the research pass had search snippets only and the rule page failed with a DNS error"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://rmod-files.lille.inria.fr/Team/Texts/Papers/Fall11a-Tools2011-UndesirableCycles.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "page 2: a component alone \"does not provide further information to understand and remove the cycles\" (finding 1)",
+          "outcome": "supported",
+          "quote": "The above algorithm becomes useless in such cases as it does not provide further information to understand and remove the cycles.",
+          "error": null
+        },
+        {
+          "url": "https://rmod-files.lille.inria.fr/Team/Texts/Papers/Fall11a-Tools2011-UndesirableCycles.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "page 5: one shortest cycle per dependency, and the exponential number of elementary cycles (finding 1)",
+          "outcome": "supported",
+          "quote": "Therefore our final solution is to select for each dependency one of the shortest cycles going through the dependency.",
+          "error": null
+        },
+        {
+          "url": "https://rmod-files.lille.inria.fr/Team/Texts/Papers/Fall11a-Tools2011-UndesirableCycles.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "page 9 (the critic cited page 10; corrected by leftover 4): the published ranking by distance in the package tree, the counter-position in finding 2",
+          "outcome": "supported",
+          "quote": "We assume that the further away are the packages involved in a cycle, the more undesired the cycle seems.",
+          "error": null
+        },
+        {
+          "url": "https://rmod-files.lille.inria.fr/Team/Texts/Papers/Fall11a-Tools2011-UndesirableCycles.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "page 10: the tie-break that ranks smaller cycles first, from which finding 3 departs; page 5's \"a long cycle is harder to understand\" justifies short cycles inside a component, not that tie-break (leftover 7)",
+          "outcome": "supported",
+          "quote": "(the less packages it has, the better it is ranked)",
+          "error": null
+        },
+        {
+          "url": "https://rmod-files.lille.inria.fr/Team/Texts/Papers/Fall11a-Tools2011-UndesirableCycles.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "page 2: a package such as ui.internal in a cycle with ui (finding 2)",
+          "outcome": "supported",
+          "quote": "a package such as ui.internal can be in cyclic dependency with ui without much consequences",
+          "error": null
+        },
+        {
+          "url": "https://api.archives-ouvertes.fr/search/?q=halId_s:hal-01203525&fl=abstract_s",
+          "read_on": "2026-10-01",
+          "bore_on": "Oyetoyan and others 2015, abstract, read raw by the session: location in the package tree and subtype knowledge do not separate critical from harmless cycles (findings 2 and 3). The author order differs between this record (Oyetoyan, Dietrich, Falleri, Jezek) and Crossref's, which the validator read (Oyetoyan, Falleri, Dietrich, Jezek; the note gives no Crossref address), so the file names no order",
+          "outcome": "supported",
+          "quote": "neither subtype knowledge nor the location of the cycle within the package containment tree are suitable criteria to distinguish between critical and harmless cycles.",
+          "error": null
+        },
+        {
+          "url": "https://api.archives-ouvertes.fr/search/?q=halId_s:hal-01203525&fl=abstract_s",
+          "read_on": "2026-10-01",
+          "bore_on": "Oyetoyan and others 2015: cycles and the change-proneness of nearby classes (finding 3, worded by leftover 8)",
+          "outcome": "supported",
+          "quote": "the presence of cycles can have a significant impact on the change proneness of the classes near these cycles",
+          "error": null
+        },
+        {
+          "url": "https://www.sintef.no/en/publications/publication/1061195/",
+          "read_on": "2026-10-01",
+          "bore_on": "Oyetoyan, Cruzes and Conradi 2013, abstract, read raw by the session (findings 2 and 3); its volume, issue and identifier were checked by the validator in Crossref (no address given in the note)",
+          "outcome": "supported",
+          "quote": "Our results show that most defects and defective components are concentrated in cyclic-dependent components, either directly or indirectly.",
+          "error": null
+        },
+        {
+          "url": "https://cdn.standards.iteh.ai/samples/80623/df09ef29b30644ae9921f30c955fa939/ISO-IEC-5055-2021.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "ISO/IEC 5055:2021 preview, contents pages: clauses 7.1.11 (CWE-1054) and 7.1.25 (CWE-1047) under the maintainability category (findings 2 and 5), and the foreword naming the Object Management Group text",
+          "outcome": "supported",
+          "quote": "This document was prepared by the Object Management Group (OMG) (as Automated Source Code Quality Measures [ASCQM], Version 1.0)",
+          "error": null
+        },
+        {
+          "url": "https://www.omg.org/spec/ASCQM/1.0/PDF",
+          "read_on": "2026-10-01",
+          "bore_on": "clause 7.1.25 and detection pattern 8.2.113, pages 210 to 211: a module cycle, with no length, size or grade (finding 2, cited precisely by leftover 5)",
+          "outcome": "supported",
+          "quote": "the <Module> module cycles back to itself",
+          "error": null
+        },
+        {
+          "url": "https://www.omg.org/spec/ASCQM/1.0/PDF",
+          "read_on": "2026-10-01",
+          "bore_on": "clause 7.1.11 and detection pattern 8.2.44, page 144: the layer design is the application's own (finding 5)",
+          "outcome": "supported",
+          "quote": "The architectural blueprint defining layers, components, or subsystems is application dependent.",
+          "error": null
+        },
+        {
+          "url": "https://www.omg.org/spec/ASCQM/1.0/PDF",
+          "read_on": "2026-10-01",
+          "bore_on": "clause 9.1, page 229: the measure counts occurrences, unweighted (finding 10)",
+          "outcome": "supported",
+          "quote": "Detection pattern score is the count of occurrences, / Weakness score is its detection pattern score, / Quality characteristic score is the sum of its weakness scores.",
+          "error": null
+        },
+        {
+          "url": "https://www.omg.org/spec/ASCQM/1.0/PDF",
+          "read_on": "2026-10-01",
+          "bore_on": "clause 10.1, page 231: weighting by severity is not normative (finding 10)",
+          "outcome": "supported",
+          "quote": "these weighting schemes are not derived from any existing standards and are therefore not normative.",
+          "error": null
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/1047.html",
+          "read_on": "2026-10-01",
+          "bore_on": "CWE-1047, modules with circular dependencies, no length condition (finding 2)",
+          "outcome": "supported",
+          "quote": "The product contains modules in which one module has references that cycle back to itself, i.e., there are circular dependencies.",
+          "error": null
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/1054.html",
+          "read_on": "2026-10-01",
+          "bore_on": "CWE-1054, the layer-skipping call (finding 5)",
+          "outcome": "supported",
+          "quote": "The code at one architectural layer invokes code that resides at a deeper layer than the adjacent layer",
+          "error": null
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/1307.html",
+          "read_on": "2026-10-01",
+          "bore_on": "the category listing 1047, 1048 and 1054 (not cited in the file)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://eprints.lancs.ac.uk/id/eprint/148032/1/QUATIC_2020_Relationship_Between_Faults_and_Design_Metrics.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "Petrić, Hall and Bowes 2020, \"Zones of Pain\": no threshold on instability, an inconsistent effect (finding 11; title added by leftover 20); the year 2020 was confirmed by the re-read from the Lancaster repository record, \"QUATIC 2020, … September 9–11, 2020\" (the note gives no address for the record)",
+          "outcome": "supported",
+          "quote": "Our results show that architecture has an inconsistent impact on defect–proneness.",
+          "error": null
+        },
+        {
+          "url": "https://docs.pytest.org/en/stable/explanation/goodpractices.html",
+          "read_on": "2026-10-01",
+          "bore_on": "pytest's default test-file discovery, read raw by the session (finding 7); conftest.py is not mentioned there, so the \"fixture file\" parenthetical was removed (leftover 13)",
+          "outcome": "supported",
+          "quote": "test_*.py or *_test.py files, imported by their test package name.",
+          "error": null
+        },
+        {
+          "url": "https://unpkg.com/detective-typescript/index.js",
+          "read_on": "2026-10-01",
+          "bore_on": "detective-typescript 15.0.1 (the latest release), function isTypeNode: what skipTypeImports skips; not the version madge 8.0.0 installs (validator)",
+          "outcome": "did-not-bear",
+          "quote": "function isTypeNode(node, kind) { return node[kind] === 'type'",
+          "error": null
+        },
+        {
+          "url": "https://unpkg.com/detective-typescript@14/index.js",
+          "read_on": "2026-10-01",
+          "bore_on": "detective-typescript 14.1.2, the version madge 8.0.0 installs, functions isTypeImports and isTypeExports, read raw by the session in the installed copy (finding 4, as the session replaced leftover 11; the address is the one the session gave for the file)",
+          "outcome": "supported",
+          "quote": "function isTypeImports(node) { if (node.importKind === 'type') return true;",
+          "error": null
+        },
+        {
+          "url": "https://unpkg.com/madge@8.0.0/package.json",
+          "read_on": "2026-10-01",
+          "bore_on": "madge 8.0.0's dependency range for dependency-tree (validator)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://unpkg.com/precinct@12/package.json",
+          "read_on": "2026-10-01",
+          "bore_on": "precinct 12's dependency range for detective-typescript (validator)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/dependents/node-precinct/main/index.js",
+          "read_on": "2026-10-01",
+          "bore_on": "precinct passes detectiveOptions by file type, so a .tsx file needs a tsx key (finding 4; also run in round 1)",
+          "outcome": "supported",
+          "quote": "dependencies = detective(ast, options[type]);",
+          "error": null
+        },
+        {
+          "url": "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-218.pdf",
+          "read_on": "2026-10-01",
+          "bore_on": "PW.4.4: third-party components are a separate vetting concern; considered by the critic and not applied, because the boundary is already stated and which agent owns it is a design choice",
+          "outcome": "supported",
+          "quote": "Verify that acquired commercial, open-source, and all other third-party software components comply with the requirements, as defined by the organization, throughout their life cycles.",
+          "error": null
+        },
+        {
+          "url": "https://www.iso25000.com/index.php/en/iso-25000-standards/iso-25010?limit=3&start=6",
+          "read_on": "2026-10-01",
+          "bore_on": "ISO/IEC 25010 modularity, through a secondary site; not cited",
+          "outcome": "did-not-bear",
+          "quote": "Degree to which a system or computer program is composed of discrete components such that a change to one component has minimal impact on other components.",
+          "error": null
+        },
+        {
+          "url": "https://community.sonarsource.com/t/advanced-class-cycle-detection-for-java/127500",
+          "read_on": "2026-10-01",
+          "bore_on": "SonarQube cycle rules count cycles; not cited",
+          "outcome": "did-not-bear",
+          "quote": "Multiple cycles in your classes are also reported.",
+          "error": null
+        },
+        {
+          "url": "https://docs.sonarsource.com/sonarqube-server/2026.1/server-update-and-maintenance/lta-to-lta-release-notes",
+          "read_on": "2026-10-01",
+          "bore_on": "SonarQube S7027 and S7091 deprecated, pending removal in January 2026; not cited",
+          "outcome": "did-not-bear",
+          "quote": "The cycle detection and architecture as code for Java and JS/TS are deprecated (S7027, S7091, S7134, S7197), pending removal in January 2026.",
+          "error": null
+        },
+        {
+          "url": "https://www.archunit.org/userguide/html/000_Index.html",
+          "read_on": "2026-10-01",
+          "bore_on": "ArchUnit counts cycles between slices, capped at 100 by default; not cited",
+          "outcome": "did-not-bear",
+          "quote": "This will limit the maximum number of cycles to detect and thus required CPU and heap.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/sverweij/dependency-cruiser/main/doc/rules-reference.md",
+          "read_on": "2026-10-01",
+          "bore_on": "dependency-cruiser circular and its type-only exclusion; not cited by this file",
+          "outcome": "did-not-bear",
+          "quote": "A Boolean indicating whether or not to match module dependencies that end up where you started",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/sverweij/dependency-cruiser/main/src/cli/init-config/config-template.mjs",
+          "read_on": "2026-10-01",
+          "bore_on": "dependency-cruiser's starter no-circular rule does not exclude type-only edges; not cited by this file",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/sverweij/dependency-cruiser/issues/1082",
+          "read_on": "2026-10-01",
+          "bore_on": "swc parser and the type-only flag: title seen by search only, not read",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://api.crossref.org/works/10.1007/s10664-006-9033-1",
+          "read_on": "2026-10-01",
+          "bore_on": "Melton and Tempero 2007: metadata only; the 45% and 10% figures remain search snippets and are not used",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://api.openalex.org/works/doi:10.1007/s10664-006-9033-1",
+          "read_on": "2026-10-01",
+          "bore_on": "Melton and Tempero 2007 abstract, retried in the gaps pass: no abstract in the record",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.semanticscholar.org/paper/On-the-Shape-of-Circular-Dependencies-in-Java-Al-Mutawa-Dietrich/70a0303cde703bf14406329908f9744217a66235",
+          "read_on": "2026-10-01",
+          "bore_on": "Al-Mutawa and others 2014, through the research pass",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 429"
+        },
+        {
+          "url": "https://api.crossref.org/works/10.1109/ASWEC.2014.15",
+          "read_on": "2026-10-01",
+          "bore_on": "Al-Mutawa and others 2014 metadata (gaps pass); no abstract, so its \"package local\" sentence is not used",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://api.semanticscholar.org/graph/v1/paper/DOI:10.1109/ASWEC.2014.15?fields=title,abstract,year,venue,authors",
+          "read_on": "2026-10-01",
+          "bore_on": "Al-Mutawa and others 2014 abstract (gaps pass): null",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://ieeexplore.ieee.org/document/6648180/",
+          "read_on": "2026-10-01",
+          "bore_on": "Oyetoyan, Conradi and Cruzes, SCAM 2013: search result only, not fetched",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://dblp.uni-trier.de/rec/journals/jot/LavalFVD12.html",
+          "read_on": "2026-10-01",
+          "bore_on": "the 2012 journal version of the Falleri paper: not read",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.researchgate.net/publication/220292117_Empirical_comparison_of_three_metrics_suites_for_fault_prediction_in_packages_of_object-oriented_systems_A_case_study_of_Eclipse",
+          "read_on": "2026-10-01",
+          "bore_on": "Elish and others 2011: listing only",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://api.openalex.org/works?filter=title.search:three%20metrics%20suites%20fault%20prediction%20packages%20eclipse&select=title,doi,publication_year,abstract_inverted_index&per-page=3",
+          "read_on": "2026-10-01",
+          "bore_on": "Elish and others 2011 abstract (gaps pass): null; venue verified",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://link.springer.com/chapter/10.1007/978-3-030-58793-2_11",
+          "read_on": "2026-10-01",
+          "bore_on": "the Springer chapter of Zones of Pain: search result only",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.researchgate.net/publication/220277742_An_empirical_study_of_cycles_among_classes_in_Java",
+          "read_on": "2026-10-01",
+          "bore_on": "Melton and Tempero 2007 listing: search result only",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://docs.python.org/3/tutorial/modules.html",
+          "read_on": "2026-10-01",
+          "bore_on": "the re-read's pair 4: a name the package itself defines is bound before any submodule is loaded; read raw by the session (section 6.4 Packages; the rendered page drops the code formatting around \"import\")",
+          "outcome": "supported",
+          "quote": "The import statement first tests whether the item is defined in the package; if not, it assumes it is a module and attempts to load it.",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s6-agent-r2-1",
+          "kind": "correction-of-earlier-round",
+          "text": "One shortest path per component explains little in a large component, test-only was undefined for Java and C# (whose nodes are packages and namespaces), and a self-import was not covered by \"2 or more nodes\". Step 4 now lists every import inside a component and one shortest ring through each, in three passes (runtime, Java and C# test-only, type-only), and a self-import is a component. Leftover 1 made the ring search deterministic (neighbours in sorted order); leftover 2 made the \"Circular Dependencies\" count the findings of kind runtime cycle. Corrects f-s6-agent-r1-5.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, finding f-s6-agent-r2-1; .ctoc/audit/improvement-run-notes/s6-agent-round2-validate-d-s6-agent-r2-validate.md, leftovers 1 and 2; .ctoc/audit/improvement-run-notes/s6-agent-round2-research-d-s6-agent-r2-research.md, row for lines 124-138; .ctoc/audit/improvement-run-notes/s6-agent-round2-session-runs.md, run 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r2-2",
+          "kind": "new",
+          "text": "The length rule had no empirical basis and named no standard. It now cites ISO/IEC 5055 clause 7.1.25 (CWE-1047) and the Object Management Group detection pattern with no length or grade, states the published disagreement on location (Oyetoyan and others 2015 against Falleri and others 2011), and keeps every runtime cycle high. Leftover 4 corrected the Falleri page to 9 and removed a full stop inside the quotation; leftover 5 cited the detection pattern precisely (clause 8.2.113, pages 210 to 211); leftover 6 limited the subtype sentence to what the abstract says; the session replaced leftover 3, so the 2015 paper is cited as \"Oyetoyan and others\", because its HAL and Crossref records give different author orders.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, finding f-s6-agent-r2-2; .ctoc/audit/improvement-run-notes/s6-agent-round2-validate-d-s6-agent-r2-validate.md, leftovers 4 to 6; .ctoc/audit/improvement-run-notes/s6-agent-round2-session-runs.md, section 6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r2-3",
+          "kind": "new",
+          "text": "The \"most files first\" priority departed from the one published ranking without saying so, and the use of importer counts was uncited. The departure is now stated with its reason, and the two studies are cited for the tie-break, which is labelled the file's own step. Leftover 7 corrected a \"because\" the paper does not give; leftover 8 quoted the 2015 abstract in full; leftover 9 limited the statement to the two abstracts; leftover 10 left test files out of the afferent count, as in Step 6.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, finding f-s6-agent-r2-3; .ctoc/audit/improvement-run-notes/s6-agent-round2-validate-d-s6-agent-r2-validate.md, leftovers 7 to 10; .ctoc/audit/improvement-run-notes/s6-agent-round2-research-d-s6-agent-r2-research.md, row for line 1003",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r2-4",
+          "kind": "correction-of-earlier-round",
+          "text": "The madge configuration advice over-claimed in the dangerous direction: skipTypeImports also skips an import whose every name carries an inline type modifier, which this agent counts as runtime, so with the setting the recipes can pass a cycle this agent rates high; the tsx key was marked unchecked although a run had settled it; and the hook printed madge's cycle count as \"circular dependencies\". The recipes stay unset, the claim is corrected, the tsx key is stated as verified by run, and the hook's two messages now say \"cycle count from madge\". The session replaced leftover 11: the sentence now names detective-typescript 14.1.2, the version madge 8.0.0 installs, its functions isTypeImports and isTypeExports, and the runs of 2026-10-01 for the export type and inline type cases; the critic's next sentence was shortened because its run is now in that sentence. The new hook text is the one the session ran in four states. Corrects f-s6-agent-r1-10 and f-s6-agent-r1-28 (pair 27).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, finding f-s6-agent-r2-4; .ctoc/audit/improvement-run-notes/s6-agent-round2-validate-d-s6-agent-r2-validate.md, leftover 11 (replaced); .ctoc/audit/improvement-run-notes/s6-agent-round2-session-runs.md, sections 1, 2, 5 and 6; the tsx key: .ctoc/audit/improvement-run-notes/s6-agent-round1-session-runs.md, section \"The `tsx` key for `skipTypeImports`\" (the three-run table: none, \"ts\" only and \"ts\" and \"tsx\"), confirmed by the re-read",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r2-5",
+          "kind": "new",
+          "text": "The controller-to-repository finding now carries its standard name, CWE-1054 in ISO/IEC 5055 clause 7.1.11, and the default layer design is stated as the file's own, citing the Object Management Group detection pattern that leaves the design to the application.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, finding f-s6-agent-r2-5; .ctoc/audit/improvement-run-notes/s6-agent-round2-research-gaps-d-s6-agent-r2-research-gaps.md, row 3c",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r2-6",
+          "kind": "new",
+          "text": "A file that failed to parse disappeared silently. It now goes under \"Limits of this run\" with its path, line and error type, never its source text; counts are qualified as among the files that parsed; and the typing.TYPE_CHECKING form is recognised. Leftover 12: if no file parsed, the report says \"no file could be parsed\", never \"no source files found\". The ast grammar premise was run by the session (a match statement fails under Python 3.9.6).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, finding f-s6-agent-r2-6; .ctoc/audit/improvement-run-notes/s6-agent-round2-validate-d-s6-agent-r2-validate.md, leftover 12; .ctoc/audit/improvement-run-notes/s6-agent-round2-session-runs.md, section 4",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r2-7",
+          "kind": "new",
+          "text": "Test-file recognition missed .NET test project directories, pytest's convention was uncited, and test files moved every tested module's instability. The .NET pattern is added as the file's own choice, pytest is cited, conftest.py is treated as test code by the file's own choice, and Step 6 leaves test files out, which the report states. Leftover 13 removed the unsourced \"fixture file\" parenthetical.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, finding f-s6-agent-r2-7; .ctoc/audit/improvement-run-notes/s6-agent-round2-validate-d-s6-agent-r2-validate.md, leftover 13; .ctoc/audit/improvement-run-notes/s6-agent-round2-session-runs.md, section 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r2-8",
+          "kind": "correction-of-earlier-round",
+          "text": "Java and C# resolution cut a fixed number of parts off a name, losing nested-class imports as external and turning an import of a file's own package into a self-cycle, and get_layer was defined for files only. Resolution now uses the longest declared leading part, an own-package import gives no edge, and get_layer reads the dotted name. Leftovers 14 and 15 send a name whose next part is not a scanned type to the could-not-resolve list; leftover 16 compares names without regard to letter case. Corrects f-s6-agent-r1-7.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, finding f-s6-agent-r2-8; .ctoc/audit/improvement-run-notes/s6-agent-round2-validate-d-s6-agent-r2-validate.md, leftovers 14 to 16",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r2-9",
+          "kind": "correction-of-earlier-round",
+          "text": "Python `from M import n` pointed at the package's __init__.py, missing the edge to n and able to invent a cycle; parent packages' __init__.py edges were missing. The edge now goes to the submodule's file when one exists, and to each parent package not containing the importing file. Leftover 17 records each imported name with the import. Both Python facts were run by the session. Corrects f-s6-agent-r1-7.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, finding f-s6-agent-r2-9; .ctoc/audit/improvement-run-notes/s6-agent-round2-validate-d-s6-agent-r2-validate.md, leftover 17; .ctoc/audit/improvement-run-notes/s6-agent-round2-session-runs.md, section 4",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r2-10",
+          "kind": "new",
+          "text": "The scoring section now cites the standard's unweighted count (Object Management Group clause 9.1) and its statement that weighting is not normative (clause 10.1), and the Summary always gives the counts beside the score. Leftover 18 narrowed that to the kinds the score penalizes.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, finding f-s6-agent-r2-10; .ctoc/audit/improvement-run-notes/s6-agent-round2-validate-d-s6-agent-r2-validate.md, leftover 18; .ctoc/audit/improvement-run-notes/s6-agent-round2-research-gaps-d-s6-agent-r2-research-gaps.md, row 3a",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r2-11",
+          "kind": "new",
+          "text": "\"Use no threshold on I\" now also cites a 2020 study of defects against Martin's metrics that gives no threshold on instability. Leftovers 19 and 20 corrected \"faults\" to \"defects\" and added the paper's title.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, finding f-s6-agent-r2-11; .ctoc/audit/improvement-run-notes/s6-agent-round2-validate-d-s6-agent-r2-validate.md, leftovers 19 and 20; .ctoc/audit/improvement-run-notes/s6-agent-round2-research-gaps-d-s6-agent-r2-research-gaps.md, row 7a",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r2-12",
+          "kind": "correction-of-earlier-round",
+          "text": "The worked report contradicted the ring rule: its three diagrams and the Cycle 1 table did not start at the first node in sorted order (the validator's consistency finding C1), and the quick-reference row \"cycle made only of test files\" no longer covered the Java and C# test-only definition (C11). The validator's additional pairs A1 to A4 reorder the diagrams and the table, and A5 renames the row \"test-only cycle (Step 4)\". Corrects f-s6-agent-r1-28 (pairs 13, 15 and 20) and f-s6-agent-r1-3.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-validate-d-s6-agent-r2-validate.md, section 4, C1, C11 and pairs A1 to A5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r2-13",
+          "kind": "new",
+          "text": "How to tell whether a cycle is new: the architecture checker decides new or pre-existing, while this agent reports one finding per component and madge reports rings, so a new ring inside an existing component leaves this agent's count unchanged. Which unit the checker compares is a decision across agents, in the checker's slice.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, \"For the human\" item 1; .ctoc/audit/improvement-run-notes/s6-agent-round2-session-runs.md, run 2",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s6-agent-r2-how-to-tell-a-cycle-is-new"
+        },
+        {
+          "id": "f-s6-agent-r2-14",
+          "kind": "new",
+          "text": "Considered and not applied: NIST SP 800-218 PW.4.4 for the boundary with security/dependency-checker; and the sources the gaps pass excluded (Melton and Tempero's figures, Al-Mutawa's \"package local\" sentence, SonarQube's rules, dependency-cruiser and ArchUnit's count unit).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-critic-d-s6-agent-r2-critic.md, \"Considered and not applied\"; .ctoc/audit/improvement-run-notes/s6-agent-round2-research-gaps-d-s6-agent-r2-research-gaps.md, items 1, 2b, 4a, 4b and 5",
+          "decision": "rejected",
+          "reason": "Decision, no change: the boundary is already stated in the Role and which agent owns third-party risk is a design choice the framework does not make; the excluded sources were read only as metadata or search snippets, or are deprecated.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r2-15",
+          "kind": "correction-of-earlier-round",
+          "text": "The re-read of the round-2 file found every pair and leftover landed and every cited claim verified, and left 17 consistency pairs, all applied: pairs 1 and 16 start the quick-reference ring and the Comparison Mode ring at the first node in sorted order; pairs 2, 3 and 8 make Step 2 record each Java file's package and top-level types and each C# file's namespaces and types, and the graph keep each Java and C# edge's importing file; pair 4 sends the edge for a name the package itself binds to the package's own file (Python tutorial section 6.4, read raw by the session); pairs 5 and 6 settle the Java `*` import and the own-package precedence, and pair 7 adds those imports to the could-not-resolve list; pair 9 gives the clause and page of the Object Management Group quotation; pair 10 keeps an all-test module out of the coupling table; pairs 11 and 15 define accepted cycles for Java and C# by package or namespace; pair 12 replaces \"low priority\" for test cycles with the severity and Step 6 rules; pair 13 aligns the Files Analyzed header with the parse-failure rule; pair 14 puts the type-only import on line 4, as the other examples do; pair 17 says the parser skips type imports only when the setting is on. Corrects f-s6-agent-r2-1, -4, -5, -6, -7, -8, -9 and -12, and round 1's f-s6-agent-r1-3, -11, -12 and -14 (the mapping pair by pair is in the plan, decision 18).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round2-revalidate-d-s6-agent-r2-revalidate.md, sections 3 and 6; .ctoc/audit/improvement-run-notes/s6-agent-round2-session-runs.md, section 7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 14,
+        "VALIDATED": 5,
+        "FABRICATED": 1,
+        "UNSOURCEABLE": 2,
+        "MISATTRIBUTED": 0
+      },
+      "validator_final": {
+        "examined": 24,
+        "VALIDATED": 24,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/architecture/dependency-analyzer/SKILL.md",
+        "agents/quality/architecture-checker.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "The domain applies to all seven languages, because each has an import or include mechanism. Analysed: JavaScript and TypeScript, Python, Java and C#; this round corrects Java and C# resolution and test classification, and Python's submodule resolution. Detected but not analysed: C, C++ and SQL (Step 1); no round-2 source gives a verified rule for #include, C++ modules or foreign keys. No new code example in any language. Java and C# are not compiled: there is no JDK and no .NET on this machine.",
+        "examples_checked": [
+          {
+            "language": "POSIX sh: the pre-commit hook with the two messages finding 4 changed",
+            "how": "run by the session in four states, .ctoc/audit/improvement-run-notes/s6-agent-round2-session-runs.md, section 5; the executor confirmed the hook in the file is the round-1 hook with only the critic's pair 4b changed, byte for byte, and syntax-checked it with sh -n (exit 0); the re-read's 17 pairs left the hook unchanged"
+          },
+          {
+            "language": "Python 3.9.6: parent packages' __init__.py, from M import n, and ast on a newer grammar (findings 6 and 9)",
+            "how": "run by the session, .ctoc/audit/improvement-run-notes/s6-agent-round2-session-runs.md, section 4"
+          },
+          {
+            "language": "madge 8.0.0: skipTypeImports on inline type and export type, and the cycle count on six files (findings 1 and 4)",
+            "how": "run by the session, .ctoc/audit/improvement-run-notes/s6-agent-round2-session-runs.md, sections 1, 2 and 6"
+          },
+          {
+            "language": "YAML: the GitHub Actions workflow (unchanged this round)",
+            "how": "parsed by the executor with js-yaml 4.2.0 after this round's pairs and again after the re-read's 17 pairs; not run, because there is no Ubuntu runner on this machine"
+          },
+          {
+            "language": "JSON: the graph export example (unchanged this round)",
+            "how": "parsed by the executor with JSON.parse (Node.js v24.14.1) after this round's pairs and again after the re-read's 17 pairs"
+          },
+          {
+            "language": "madge 8.0.0: skipTypeImports under the ts key alone and under ts and tsx, on two .tsx files (finding 4)",
+            "how": "run by the session, .ctoc/audit/improvement-run-notes/s6-agent-round1-session-runs.md, section \"The `tsx` key for `skipTypeImports`\" (three runs)"
+          },
+          {
+            "language": "Python: a name bound by the package itself against a submodule of that name (the re-read's pair 4)",
+            "how": "the sentence read raw by the session, .ctoc/audit/improvement-run-notes/s6-agent-round2-session-runs.md, section 7; not run"
+          }
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "date": "2026-10-02",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:ee5dec7d2c7e3337665d784b6142cd490df584c875021af1af5062e585747c6c",
+      "fingerprint_after": "sha256:4a101c93f2e34e5cfcffe8beb6baf0a39587e3ab28019b12cc6f9984ba86c286",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s6-agent-r3-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s6-agent-r3-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s6-agent-r3-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s6-agent-r3-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "Martin 1994 and 2000, Falleri and others 2011 and the Object Management Group text: do the quotations in the file match the page, read as page images rather than through a summary",
+          "source_class": "original paper",
+          "repeated_because": "round 3 re-reads the earlier rounds' citations by a different route (raw bytes and page images instead of summarised fetches)"
+        },
+        {
+          "text": "TypeScript (verbatimModuleSyntax, the modules reference and its extension-substitution table), Node.js packages.md and the Java Language Specification: do the quotations match the raw source",
+          "source_class": "vendor documentation",
+          "repeated_because": "round 3 re-reads the earlier rounds' citations from raw source files"
+        },
+        {
+          "text": "TypeScript paths precedence, baseUrl and extends, for inherited and commented tsconfig files",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Node.js conditional exports and subpath encapsulation, for packages whose exports name no scanned file",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Python namespace packages and the execution of parent packages' __init__.py",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Java Language Specification: files in the unnamed package",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "C# namespace declarations, nested and file-scoped namespaces, and how a using directive inside a namespace is resolved",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "madge: the tsConfig option and the --ts-config flag, its exit code, and how npx matches madge@8",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "MITRE Common Weakness Enumeration entries 1047 and 1054: status, mapping usage and supporting sentences",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "Object Management Group Automated Source Code Quality Measures: what conformance requires",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "Public-sector technology standards that name ISO/IEC 5055",
+          "source_class": "regulator",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://linux.ime.usp.br/~joaomm/mac499/arquivos/referencias/oodmetrics.pdf",
+          "read_on": "2026-10-02",
+          "bore_on": "Martin 1994, pages 6, 7 and 8, re-read as page images: the coupling definitions, the A=0 I=0 sentence and the metric caveat match",
+          "outcome": "supported",
+          "quote": "However, a metric is not a god; it is merely a measurement against an arbitrary standard.",
+          "error": null
+        },
+        {
+          "url": "https://staff.cs.utu.fi/~jounsmed/doos_06/material/DesignPrinciplesAndPatterns.pdf",
+          "read_on": "2026-10-02",
+          "bore_on": "Martin 2000, pages 18, 20 and 24, re-read: all verbatim; Figure 2-22 confirms two rings of four, five packages, six others",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://rmod-files.lille.inria.fr/Team/Texts/Papers/Fall11a-Tools2011-UndesirableCycles.pdf",
+          "read_on": "2026-10-02",
+          "bore_on": "Falleri and others 2011, pages 2 and 5, re-read: verbatim",
+          "outcome": "supported",
+          "quote": "The above algorithm becomes useless in such cases as it does not provide further information to understand and remove the cycles.",
+          "error": null
+        },
+        {
+          "url": "https://www.omg.org/spec/ASCQM/1.0/PDF",
+          "read_on": "2026-10-02",
+          "bore_on": "clauses 9.1 and 10.1 re-read; clause 2 Conformance: the file claims no conformance and calls its score its own heuristic, so nothing changes",
+          "outcome": "supported",
+          "quote": "Implementations of this specification should be able to demonstrate the following attributes in order to claim conformance—automated, objective, transparent, and verifiable.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-Website/v2/packages/tsconfig-reference/copy/en/options/verbatimModuleSyntax.md",
+          "read_on": "2026-10-02",
+          "bore_on": "the two verbatimModuleSyntax quotations: match, except that the source has a line break where the file has a space",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-Website/v2/packages/documentation/copy/en/modules-reference/Reference.md",
+          "read_on": "2026-10-02",
+          "bore_on": "extension substitution: the table puts the substituted extensions before the path as written, so rule 1's \"as TypeScript does\" was false (finding 6; the .js row also read raw by the session at line 558)",
+          "outcome": "refuted",
+          "quote": "| /mod.js | /mod.ts | /mod.tsx | /mod.d.ts | /mod.js | ./mod.jsx |",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-Website/v2/packages/documentation/copy/en/modules-reference/Reference.md",
+          "read_on": "2026-10-02",
+          "bore_on": "paths precedence, the next path in the array, and baseUrl (finding 2)",
+          "outcome": "supported",
+          "quote": "When multiple patterns match a module specifier, the pattern with the longest matching prefix before any `*` token is used",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-Website/v2/packages/tsconfig-reference/copy/en/options/extends.md",
+          "read_on": "2026-10-02",
+          "bore_on": "TypeScript extends (new this round, read by the validator): backs finding 2's step 2, which the critic had labelled not checked (correction 5)",
+          "outcome": "supported",
+          "quote": "All relative paths found in the configuration file will be resolved relative to the configuration file they originated in.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/doc/api/packages.md",
+          "read_on": "2026-10-02",
+          "bore_on": "conditional exports and subpath encapsulation (finding 7); the subpath-imports sentence re-read",
+          "outcome": "supported",
+          "quote": "During condition matching, earlier entries have higher priority and take precedence over later entries.",
+          "error": null
+        },
+        {
+          "url": "https://docs.python.org/3/reference/import.html",
+          "read_on": "2026-10-02",
+          "bore_on": "section 5.2.1, parent packages run first (read raw by the session), and section 5.2.2, namespace packages (finding 8)",
+          "outcome": "supported",
+          "quote": "With namespace packages, there is no `parent/__init__.py` file.",
+          "error": null
+        },
+        {
+          "url": "https://docs.oracle.com/javase/specs/jls/se25/html/jls-7.html",
+          "read_on": "2026-10-02",
+          "bore_on": "section 7.4.2, the unnamed package (finding 9); the same-package scope sentence re-read",
+          "outcome": "supported",
+          "quote": "is part of an _unnamed package_.",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/namespace",
+          "read_on": "2026-10-02",
+          "bore_on": "file-scoped namespaces (finding 3)",
+          "outcome": "supported",
+          "quote": "You can't declare a nested namespace or a second file-scoped namespace",
+          "error": null
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/namespaces",
+          "read_on": "2026-10-02",
+          "bore_on": "how a using directive inside a namespace resolves its name (finding 3); the lookup order the file uses is inferred from this, not taken from an example",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/pahen/madge/master/README.md",
+          "read_on": "2026-10-02",
+          "bore_on": "the tsConfig option, default null (finding 4, correction 2)",
+          "outcome": "supported",
+          "quote": "TypeScript config for resolving aliased modules - Either a path to a tsconfig file or an object containing the config",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/pahen/madge/master/bin/cli.js",
+          "read_on": "2026-10-02",
+          "bore_on": "madge sets a failing exit code only when it finds a cycle; an unresolvable import is skipped",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://docs.npmjs.com/cli/v11/commands/npm-exec",
+          "read_on": "2026-10-02",
+          "bore_on": "npx matches a local package only on the exact version; madge@8 is a range (finding 4)",
+          "outcome": "supported",
+          "quote": "Package names with a specifier will only be considered a match if they have the exact same name and version as the local dependency",
+          "error": null
+        },
+        {
+          "url": "https://cwe-api.mitre.org/api/v1/cwe/weakness/1047,1054",
+          "read_on": "2026-10-02",
+          "bore_on": "status \"Incomplete\", mapping usage \"Prohibited\", and the Java and vertical-utility sentences (finding 15)",
+          "outcome": "supported",
+          "quote": "This entry is primarily a quality issue with no direct security implications.",
+          "error": null
+        },
+        {
+          "url": "https://watech.wa.gov/sites/default/files/2023-09/CodingStandards_6.28.23.pdf",
+          "read_on": "2026-10-02",
+          "bore_on": "Washington State Technology Solutions standards list ISO/IEC 5055 and 25010 by name only",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "f-s6-agent-r3-1",
+          "kind": "correction-of-earlier-round",
+          "text": "Rule 9 sent every bare specifier it did not claim to \"external\", so an alias from an unread tsconfig disappeared and the report could say a bare \"no cycles found\". A bare specifier is now external only when it is a declared dependency or a Node.js built-in; any other goes on the could-not-resolve list, and an import into an excluded file is listed with \"target excluded\". Validator correction 3 names every reason the list now holds. Corrects f-s6-agent-r1-7 and f-s6-agent-r1-17.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-1; .ctoc/audit/improvement-run-notes/s6-agent-round3-validate-d-s6-agent-r3-validate.md, correction 3; .ctoc/audit/improvement-run-notes/s6-agent-round3-research-d-s6-agent-r3-research.md, section 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-2",
+          "kind": "new",
+          "text": "The alias algorithm was three vague lines with no reading rule, no extends and no precedence. It is now an exact procedure: nearest tsconfig or jsconfig, comments and trailing commas removed outside strings (the file's own choice), extends followed, TypeScript's longest-prefix precedence, and anything unread sent to the could-not-resolve list. Corrections 4, 5 and 6: paths and baseUrl are taken from the nearest file that sets each; the extends rule now cites TypeScript's own extends page; an alias that is itself a declared dependency or built-in stays external.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-2; .ctoc/audit/improvement-run-notes/s6-agent-round3-validate-d-s6-agent-r3-validate.md, corrections 4 to 6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-3",
+          "kind": "correction-of-earlier-round",
+          "text": "A C# using inside a namespace was matched literally and lost as external, and the namespace shapes were undefined. The directive is now looked up from the enclosing namespace outward (labelled the file's reading, not checked against a compiler), and the node a using comes from, nested blocks and the global namespace are defined. Corrects f-s6-agent-r2-8.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-3; .ctoc/audit/improvement-run-notes/s6-agent-round3-research-d-s6-agent-r3-research.md, section 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-4",
+          "kind": "correction-of-earlier-round",
+          "text": "The madge recipes passed a cycle that closes through a tsconfig alias (session run 1), never read four extensions (run 2), and called themselves fail-closed too broadly. They now pass --ts-config only when a root tsconfig.json exists: the critic's unconditional form stopped every commit in a project without one (session section 5), so the GitHub Actions step takes the validator's three-line conditional and the pre-commit hook the session's TSCONFIG block and command lines byte for byte (pre-commit-r3b.sh). The prose states what the recipes still miss and that madge@8 is a range. Correction 1 replaced the untested \"delete that option\" sentence with the runs; correction 2 cites madge's tsConfig option. At the session's direction the status sentence also names the sixth run: a tsconfig.json with comments and trailing commas is read by madge 8.0.0. The hook was run by the session in five states, and the command the hook prints for details in a sixth (the executor's first wording, \"the hook's madge command ... as tsc --init writes it\", named the wrong command and carried an unsourced phrase; the re-read's pair 8 corrected both, finding f-s6-agent-r3-21); the GitHub Actions step was not run. Corrects f-s6-agent-r1-10 and f-s6-agent-r2-4.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-4; .ctoc/audit/improvement-run-notes/s6-agent-round3-validate-d-s6-agent-r3-validate.md, section 3 and corrections 1 and 2; .ctoc/audit/improvement-run-notes/s6-agent-round3-session-runs.md, sections 1, 2, 5 and 6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-5",
+          "kind": "correction-of-earlier-round",
+          "text": "A module whose imports were never resolved (every Go, Rust and PHP module) was reported as \"isolated\". It is now \"instability not known - N imports could not be resolved\", other isolated modules are qualified when the list is not empty, and modules with an unresolved import are marked in the coupling table. Corrects f-s6-agent-r1-4.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-5; .ctoc/audit/improvement-run-notes/s6-agent-round3-research-d-s6-agent-r3-research.md, section 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-6",
+          "kind": "correction-of-earlier-round",
+          "text": "Rule 1 claimed TypeScript's substitution order but reversed it (session run 3, raw), and letter case could split one file into two nodes. The substitutions now come before the path as written, declaration files are skipped as the file's own choice, and candidates are compared with the directory listing. Correction 12: a type-only import that only a declaration file answers gives a type-only edge. Corrects f-s6-agent-r1-7, whose validator leftover 2 wrote the rule 1 wording.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-6; .ctoc/audit/improvement-run-notes/s6-agent-round3-validate-d-s6-agent-r3-validate.md, correction 12; .ctoc/audit/improvement-run-notes/s6-agent-round3-session-runs.md, section 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-7",
+          "kind": "correction-of-earlier-round",
+          "text": "exports conditions had no defined fallback, pattern keys were not handled, and \"main\" was used for subpaths exports hides. Pattern keys and nested conditions are handled, the fallback key order is defined as the file's own pick, an unexported subpath goes on the could-not-resolve list as \"not exported\", and rule 3 reads imports the same way. Corrections 13 and 14: the longest matching pattern key wins, and the fallback looks inside nested objects. Corrects f-s6-agent-r1-16.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-7; .ctoc/audit/improvement-run-notes/s6-agent-round3-validate-d-s6-agent-r3-validate.md, corrections 13 and 14",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-8",
+          "kind": "correction-of-earlier-round",
+          "text": "Python namespace packages and second source roots were not handled, and the parent-package rule was uncited. A namespace package gives no edge, an absolute import matching a scanned name outside the source root is listed rather than external, and section 5.2.1 is cited (read raw by the session). Correction 11 keeps a subpackage such as src/app/logging/ from catching `import logging`. Corrects f-s6-agent-r2-9.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-8; .ctoc/audit/improvement-run-notes/s6-agent-round3-validate-d-s6-agent-r3-validate.md, correction 11; .ctoc/audit/improvement-run-notes/s6-agent-round3-session-runs.md, section 4",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-9",
+          "kind": "correction-of-earlier-round",
+          "text": "The Java unnamed package had no node, and only C# was called a lower bound. The unnamed-package node is named, citing the Java Language Specification section 7.4.2, and the Java graph is a lower bound too, including packages that only excluded generated sources declare. Corrects f-s6-agent-r2-8.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-9; .ctoc/audit/improvement-run-notes/s6-agent-round3-research-d-s6-agent-r3-research.md, section 2 and pair C7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-10",
+          "kind": "correction-of-earlier-round",
+          "text": "\"One script\" contradicted the separate Python part, and nothing governed symbolic links or how the script gets its file list. The script now lists files itself, follows no symbolic link, and reports skipped links and any difference from Step 1's count. Corrects f-s6-agent-r1-7.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-10; .ctoc/audit/improvement-run-notes/s6-agent-round3-research-d-s6-agent-r3-research.md, section 2 and pair C6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-11",
+          "kind": "new",
+          "text": "Whether an import inside a branch counts was left to inference. The script evaluates no condition apart from Python's TYPE_CHECKING rule.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-11; .ctoc/audit/improvement-run-notes/s6-agent-round3-research-d-s6-agent-r3-research.md, section 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-12",
+          "kind": "correction-of-earlier-round",
+          "text": "Nothing covered scale or cut output, a false green on large repositories. The script uses an iterative component search (the file's own choice), prints the number of files read, ends with \"records printed: N\", and never reports from cut output. Correction 9: a middle cut is caught by comparing N with the lines received, and each re-run section ends with its own count. Corrects f-s6-agent-r1-13.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-12; .ctoc/audit/improvement-run-notes/s6-agent-round3-validate-d-s6-agent-r3-validate.md, correction 9",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-13",
+          "kind": "correction-of-earlier-round",
+          "text": "A root manifest or a src/index.ts collapsed every file into one module, and modules were keyed by name. The repository root and the source root are never module boundaries by themselves, and modules are keyed by repository-relative path. Corrects f-s6-agent-r1-19.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-13; .ctoc/audit/improvement-run-notes/s6-agent-round3-research-d-s6-agent-r3-research.md, section 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-14",
+          "kind": "correction-of-earlier-round",
+          "text": "The architecture checker's rules file went unmentioned, and allowedCycles entries could silently never match. The header now discloses .ctoc/architecture-rules.yaml and that the checker's verdicts can differ; which file governs both agents is put to the human; allowedCycles entries are normalised, glob entries match nothing, and unmatched entries are listed. Corrects f-s6-agent-r1-12.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-14; agents/quality/architecture-checker.md lines 75-94; .ctoc/audit/improvement-run-notes/s6-agent-round3-research-d-s6-agent-r3-research.md, section 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-15",
+          "kind": "new",
+          "text": "MITRE classes CWE-1047 and CWE-1054 as quality issues with no direct security implications (status \"Incomplete\", mapping usage \"Prohibited\"), so the file now says never to present a cycle or layer violation as a security weakness; CWE-1047's Java sentence backs the package graph and CWE-1054's vertical-utility sentence backs the defaults for utils only.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-15; .ctoc/audit/improvement-run-notes/s6-agent-round3-research-d-s6-agent-r3-research.md, section 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-16",
+          "kind": "correction-of-earlier-round",
+          "text": "The report template had no place for items the text promises. The Limits block gains slots for files with no layer, ignorePaths patterns, unmatched allowedCycles entries, unreadable tsconfig files, skipped symbolic links, letter case and graph lower bounds; an accepted-cycles section and a low-severity cycle row are added. Corrections 7 and 8: the tsconfig slot covers extends targets and files not found, and the lower-bound slot is added. Corrects f-s6-agent-r1-11.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-16; .ctoc/audit/improvement-run-notes/s6-agent-round3-validate-d-s6-agent-r3-validate.md, corrections 7 and 8; .ctoc/audit/improvement-run-notes/s6-agent-round3-research-d-s6-agent-r3-research.md, pairs C3, C4 and C9",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-17",
+          "kind": "new",
+          "text": "Five small contradictions (research pairs C1, C2, C8, C11 and C12): the type-only cycle counted in a heading, the defaults also apply when the rules file does not parse, the Clean or Hexagonal qualifier, \"Critical\" used as a fix label, and an exported cycle with no kind.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-17; .ctoc/audit/improvement-run-notes/s6-agent-round3-research-d-s6-agent-r3-research.md, pairs C1, C2, C8, C11 and C12",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-18",
+          "kind": "correction-of-earlier-round",
+          "text": "Comparison Mode graded cycles as new or unchanged with no matching rule, against the Role. It now states the presence check and an exact-node-set matching rule as the file's own, and leaves the verdict to quality/architecture-checker. Correction 10: a grown component is not also listed as resolved, layer and stable-dependencies violations get their own matching rules, and the Role is reconciled explicitly. Corrects f-s6-agent-r1-14.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, finding f-s6-agent-r3-18; .ctoc/audit/improvement-run-notes/s6-agent-round3-validate-d-s6-agent-r3-validate.md, correction 10; .ctoc/audit/improvement-run-notes/s6-agent-round3-research-d-s6-agent-r3-research.md, pair C5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "f-s6-agent-r3-19",
+          "kind": "new",
+          "text": "Which rules file governs layers when both .dependency-rules.json and .ctoc/architecture-rules.yaml exist: the two use different schemas and give opposite verdicts on a controller importing a model. Finding 14 only discloses the second file; the choice spans two agents.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, \"For the human\" item 1; agents/quality/architecture-checker.md lines 75-94",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s6-agent-r3-which-rules-file-governs"
+        },
+        {
+          "id": "f-s6-agent-r3-20",
+          "kind": "new",
+          "text": "The structured output schema and a confidence per finding: for the third consecutive round the critic caps Integration on their absence, so under its escalation rule (\"same issue three rounds\") it goes to the dispatcher as a design question about how the wrapper is structured.",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-critic-d-s6-agent-r3-critic.md, \"For the human\" item 2 and the Integration rows of the three rounds' scores",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-s6-agent-r3-structured-output-schema"
+        },
+        {
+          "id": "f-s6-agent-r3-21",
+          "kind": "correction-of-earlier-round",
+          "text": "The re-read of the round-3 file found every pair and correction landed, every quotation verified and both hook blocks equal to the tested bytes, and left eight pairs, all applied: pair 8 corrects the sixth-run sentence, which named the hook's counting command although the session ran the command the hook prints for details (no --json), and called the commented tsconfig.json \"as tsc --init writes it\", a phrase no source backs (the session wrote that file by hand); pairs 2 to 4 give the Incremental Analysis table full module keys, as finding 13 requires; pairs 5 and 6 add template slots for modules whose instability is not known and for languages whose imports were extracted but not resolved; pair 7 names \"the algorithm's step 2\" so it is not read as Step 2; pair 1 (optional, taken) gives the first could-not-resolve category its reason, \"no such file\". Corrects f-s6-agent-r3-1 (pair 1), -2 (pair 7), -4 (pair 8), -5 (pair 5), -13 (pairs 2 to 4) and -16 (pair 6).",
+          "evidence": ".ctoc/audit/improvement-run-notes/s6-agent-round3-revalidate-d-s6-agent-r3-revalidate.md, sections 2, 3 and 6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 15,
+        "VALIDATED": 12,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 1
+      },
+      "validator_final": {
+        "examined": 21,
+        "VALIDATED": 19,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 1,
+        "MISATTRIBUTED": 1
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-contract-load.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-dispatch-resolution.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-honest-status-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-layer-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-model-floor.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-modernization.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-resolver.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-shared-not-dispatchable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-slots.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/compliance-seam-is-executable.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cto-chief-toplevel.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/export-reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/gate-numbers-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/instruction-surfaces-say-the-moment.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/iron-loop-enforcer.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-tier-3.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability-surface-scan-is-linear.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/refinement-loop-claims-match-code.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/registry-integrity.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-hook.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/session-start-question-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/streaming-render.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/tier1-no-peer-dispatch.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/unexecutable-instruction-fence.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/w10-live-agent-reconcile.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/watcher-shape.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/architecture/dependency-analyzer/SKILL.md",
+        "agents/quality/architecture-checker.md"
+      ],
+      "seven_languages": {
+        "applies": true,
+        "reason": "The domain applies to all seven languages, because each has an import or include mechanism. Analysed: TypeScript and JavaScript, Python, Java and C#; this round fixes TypeScript and JavaScript bare specifiers, aliases, exports, substitution order and letter case, Python namespace packages and second source roots, the Java unnamed package and lower bound, and C# namespace lookup and shapes. Extracted but unresolved: Go, Rust and PHP, every import on the could-not-resolve list, their modules now reading \"instability not known\" instead of the false \"isolated\". Detected but not analysed: C, C++ and SQL (Step 1); no round-3 source gives a verified rule for them. No new code example in any language. The Java and C# rules are not compiled: there is no JDK and no .NET on this machine.",
+        "examples_checked": [
+          {
+            "language": "POSIX sh: the pre-commit hook with the conditional --ts-config (finding 4)",
+            "how": "run by the session in five states (two cycles without a tsconfig.json, a clean tree, an alias cycle with a tsconfig.json, an empty src/, madge absent), .ctoc/audit/improvement-run-notes/s6-agent-round3-session-runs.md, section 5, and the command the hook prints for details (no --json) in a sixth, on a tsconfig.json with // and /* */ comments and trailing commas, section 6; the executor confirmed the hook in the file equals the session's tested pre-commit-r3b.sh byte for byte and syntax-checked it with sh -n (exit 0); unchanged by the re-read's eight pairs"
+          },
+          {
+            "language": "YAML: the GitHub Actions workflow with the conditional run step (finding 4)",
+            "how": "parsed by the executor after the critic's pairs and again after the re-read's eight pairs with js-yaml 4.2.0; the run step parses to the three lines of the conditional; not run, because there is no Ubuntu runner on this machine"
+          },
+          {
+            "language": "JSON: the graph export example (finding 17e adds \"kind\")",
+            "how": "parsed by the executor after the critic's pairs and again after the re-read's eight pairs with JSON.parse (Node.js v24.14.1)"
+          },
+          {
+            "language": "madge 8.0.0: alias cycles with and without --ts-config, .mts files, --ts-config with --json and with no tsconfig.json (finding 4)",
+            "how": "run by the session, .ctoc/audit/improvement-run-notes/s6-agent-round3-session-runs.md, sections 1, 2 and 5"
+          },
+          {
+            "language": "Node.js 24.14.1: require('node:module').builtinModules (finding 1)",
+            "how": "run by the session, .ctoc/audit/improvement-run-notes/s6-agent-round3-session-runs.md, section 5"
+          }
+        ]
+      }
+    }
+  ],
+  "late_corrections": [],
+  "held": null
+}
