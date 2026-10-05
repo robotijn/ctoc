@@ -1,0 +1,9 @@
+{
+  "content_sha256": "290d150f6b7e8ae5c61bc9285d065ffcdc42faa5867126b5fc7e77aeb48fbe1f",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-05T19:26:55.562Z",
+  "approved_by": "human",
+  "plan_basename": "settings-files-cannot-turn-edit-protection-off"
+}

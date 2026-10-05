@@ -1,0 +1,9 @@
+{
+  "content_sha256": "203652c79486088337414c6ac66ebf0084b845c1871adccf08a3d614a1ee257e",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-05T19:26:55.620Z",
+  "approved_by": "human",
+  "plan_basename": "the-test-gate-fails-on-a-suite-that-crashes-while-loading"
+}

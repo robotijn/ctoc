@@ -1,0 +1,9 @@
+{
+  "content_sha256": "990878d6badccd0f278070152aeeba099c1e472fc9443dd6d9b2959ae6f4fc99",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-05T14:58:03.518Z",
+  "approved_by": "human",
+  "plan_basename": "agent-tool-grants"
+}

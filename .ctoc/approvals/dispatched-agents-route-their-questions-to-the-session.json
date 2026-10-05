@@ -1,0 +1,9 @@
+{
+  "content_sha256": "ffa541c4e34ca0dad6f49cd8780f2ba0b5b5d1734700795e236cf4cdf4fae5fb",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-05T19:26:55.505Z",
+  "approved_by": "human",
+  "plan_basename": "dispatched-agents-route-their-questions-to-the-session"
+}

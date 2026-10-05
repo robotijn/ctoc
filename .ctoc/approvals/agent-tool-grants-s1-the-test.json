@@ -1,0 +1,11 @@
+{
+  "content_sha256": "0a4cf2cbdc73851f294d5b1894f1f9c92a360bf6600632bdecbbf2c250bba0d9",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-05T19:25:16.518Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "Owner granted scope growth 1791226690486-rxjfsg on 2026-10-05: 'a) Yes: add the separate limits file to slice 1.'",
+  "plan_basename": "agent-tool-grants-s1-the-test"
+}
