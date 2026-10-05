@@ -15,7 +15,7 @@ related_skills:
   - security/secrets-detector
   - security/security-scanner
 effort_level: medium
-tools: Read, Grep, Bash
+tools: Read, Grep, Bash, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1

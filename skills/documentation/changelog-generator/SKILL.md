@@ -15,7 +15,7 @@ related_skills:
   - documentation/documentation-updater
   - versioning/backwards-compatibility-checker
 effort_level: low
-tools: Bash, Read
+tools: Bash, Read, Write, Edit, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1
@@ -70,21 +70,22 @@ A draft changelog is wrong — and the skill emits a `critical` letter — if an
 git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:"%H|%s|%b" --no-merges
 
 # conventional-changelog (Angular preset → Keep a Changelog-ish output)
-# maintained `conventional-changelog` v8+ bin; `-i` is read-and-write-back
-# (outfile defaults to infile). The old `conventional-changelog-cli` package
-# and its `-s/--same-file` flag are deprecated — do not use them.
-npx conventional-changelog -p angular -i CHANGELOG.md
+# maintained `conventional-changelog` v8+ bin. Without `-i` it prints the draft
+# and writes no file; the agent's `Edit` is the writer. The old
+# `conventional-changelog-cli` package and its `-s/--same-file` flag are
+# deprecated — do not use them. `npx --no` never downloads a package.
+npx --no conventional-changelog -p angular
 
 # semantic-release (dry-run shows next version + changelog)
-npx semantic-release --dry-run
+npx --no semantic-release --dry-run
 
 # Changesets (monorepo-friendly, intent-based)
-npx changeset                # author writes the changeset
-npx changeset version        # consume changesets → bump versions + write CHANGELOG.md
-npx changeset publish        # publish + tag
+npx --no changeset           # author writes the changeset
+npx --no changeset version   # consume changesets → bump versions + write CHANGELOG.md
+npx --no changeset publish   # publish + tag
 
 # release-please (Google — generates release PRs)
-npx release-please release-pr --token=$GITHUB_TOKEN --repo-url=$REPO
+npx --no release-please release-pr --token=$GITHUB_TOKEN --repo-url=$REPO
 
 # git-cliff (Rust, language-agnostic, highly templatable)
 git cliff --tag v2.3.0 --output CHANGELOG.md
@@ -95,7 +96,7 @@ cz bump --changelog                # bump version + update CHANGELOG.md
 towncrier build --version 2.3.0
 
 # Validate Keep a Changelog 1.1 structure
-npx @metamask/auto-changelog validate            # maintained validator (add --rc for release candidates)
+npx --no @metamask/auto-changelog validate            # maintained validator (add --rc for release candidates)
 ```
 
 ## Conventional Commits → Keep a Changelog Section + Semver
@@ -217,7 +218,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ```yaml
 # Conventional-changelog + commit on release branch
 - name: Generate Changelog
-  run: npx conventional-changelog -p angular -i CHANGELOG.md -r 0   # -r 0 regenerates the whole file (outfile defaults to infile)
+  run: npx --no conventional-changelog -p angular -i CHANGELOG.md -r 0   # -r 0 regenerates the whole file (outfile defaults to infile)
 - name: Commit Changelog
   run: |
     git add CHANGELOG.md

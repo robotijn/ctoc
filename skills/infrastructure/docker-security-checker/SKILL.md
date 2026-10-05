@@ -16,7 +16,7 @@ related_skills:
   - security/dependency-auditor
   - security/sast-scanner
 effort_level: medium
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1

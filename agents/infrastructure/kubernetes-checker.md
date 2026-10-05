@@ -4,7 +4,7 @@ description: Audits Kubernetes manifests, Helm charts, and Kustomize overlays be
 type: wrapper
 target_skill: infrastructure/kubernetes-checker
 extends_skill: infrastructure/kubernetes-checker
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: opus
 effort: xhigh
 confidence_calibration: enabled
@@ -210,6 +210,10 @@ into a real report.
 4. Create NetworkPolicy to restrict pod communication
 5. Add PodDisruptionBudget for high-availability
 ```
+
+## Searching the repository (shared rule)
+
+Build every list of call sites, readers, writers or occurrences with Grep over the whole repository, never only from the files you happened to open, and read each match before you count it. Under any claim that nothing else in the repository does something, cite the search that shows it: the pattern, the path searched and how many files matched. A match shows where a name is written, not that the code runs.
 
 ## Honest status (shared rule)
 

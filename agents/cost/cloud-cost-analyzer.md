@@ -237,6 +237,10 @@ and instance rates change continually and vary by region and account.
 | **Optimized** | - | **$6,448** | **$3,552** |
 ```
 
+## Searching the repository (shared rule)
+
+Build every list of call sites, readers, writers or occurrences with Grep over the whole repository, never only from the files you happened to open, and read each match before you count it. Under any claim that nothing else in the repository does something, cite the search that shows it: the pattern, the path searched and how many files matched. A match shows where a name is written, not that the code runs.
+
 ## Honest status (shared rule)
 
 - [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you have none. Never invent a time, a deadline, or a subsystem's activity.

@@ -1,7 +1,7 @@
 ---
 name: docker-security-checker
 description: Scans Dockerfiles and images for security vulnerabilities and 2026 hardening best practices. Dispatch when the request mentions docker security, Dockerfile review, container image scan, docker check, container security, or docker hardening.
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: opus
 effort: xhigh
 tier: 2
@@ -185,6 +185,10 @@ CMD ["node", "dist/app.js"]
 4. Add HEALTHCHECK instruction
 5. Pin all package versions
 ```
+
+## Searching the repository (shared rule)
+
+Build every list of call sites, readers, writers or occurrences with Grep over the whole repository, never only from the files you happened to open, and read each match before you count it. Under any claim that nothing else in the repository does something, cite the search that shows it: the pattern, the path searched and how many files matched. A match shows where a name is written, not that the code runs.
 
 ## Honest status (shared rule)
 

@@ -1,7 +1,7 @@
 ---
 name: ci-pipeline-checker
 description: Validates CI/CD pipelines for supply chain security and 2026 best practices. Dispatch when the request mentions CI pipeline check, ci/cd validation, github actions audit, gitlab ci review, pipeline security, or ci pipeline.
-tools: Read, Grep, Bash
+tools: Read, Grep, Bash, Glob
 model: opus
 effort: xhigh
 tier: 2
@@ -199,6 +199,10 @@ jobs:
        node: [22, 24]
    ```
 ```
+
+## Searching the repository (shared rule)
+
+Build every list of call sites, readers, writers or occurrences with Grep over the whole repository, never only from the files you happened to open, and read each match before you count it. Under any claim that nothing else in the repository does something, cite the search that shows it: the pattern, the path searched and how many files matched. A match shows where a name is written, not that the code runs.
 
 ## Honest status (shared rule)
 

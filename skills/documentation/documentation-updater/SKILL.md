@@ -12,7 +12,7 @@ when_to_load:
 related_skills:
   - documentation/changelog-generator
 effort_level: medium
-tools: Read, Write, Edit
+tools: Read, Write, Edit, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1

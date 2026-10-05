@@ -15,7 +15,7 @@ related_skills:
   - specialized/health-check-validator
   - security/secrets-detector
 effort_level: high
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1

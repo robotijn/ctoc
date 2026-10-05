@@ -17,7 +17,7 @@ related_skills:
   - security/secrets-detector
   - cost/cloud-cost-analyzer
 effort_level: high
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1
