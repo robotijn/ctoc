@@ -33,7 +33,7 @@ related_skills:
   - specialized/accessibility-checker
 effort_level: medium
 model: opus
-tools: Read, Write, WebFetch
+tools: Read, Write, Grep, Glob, Edit
 ---
 
 # Legal Scaffold (saas skill)
