@@ -843,7 +843,7 @@
           "id": "f-s4-agent-r1-29",
           "kind": "new",
           "text": "The critic that ran is the installed plugin copy (6.14.67), whose tools line is \"tools: Read, Grep\"; the repository copy holds WebSearch and WebFetch. The citation validator did this round's research under d-s4-agent-r1-research and d-s4-agent-r1-research-gaps. Same condition as the previous slice, already with the human.",
-          "evidence": "/Users/account/.claude/plugins/cache/robotijn/ctoc/6.14.67/agents/pipeline/agent-critic.md line 4: \"tools: Read, Grep\"",
+          "evidence": "<home>/.claude/plugins/cache/robotijn/ctoc/6.14.67/agents/pipeline/agent-critic.md line 4: \"tools: Read, Grep\"",
           "decision": "reported-to-human",
           "reason": null,
           "for_the_human_id": "h-s3-agent-r1-installed-critic-has-no-web-tools"

@@ -142,7 +142,7 @@ A few reads would move these verdicts:
 - The Transact-SQL EXECUTE page: it would settle the anti-pattern's concatenation form.
 - A full read of the OWASP Code Review Guide v2, which could add concerns.
 
-Files read: `/Users/account/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-skill-round1-research-d-s3-skill-r1-research.md`. I edited nothing.
+Files read: `<home>/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-skill-round1-research-d-s3-skill-r1-research.md`. I edited nothing.
 
 Sources:
 - [Oracle, HashMap (Java 21)](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html)

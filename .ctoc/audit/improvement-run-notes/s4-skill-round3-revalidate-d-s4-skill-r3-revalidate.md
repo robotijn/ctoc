@@ -135,6 +135,6 @@ metadata: { tokens_used: null, tool_calls: 9 }
 `tokens_used` is null because I have no reading of it, and the schema requires an integer.
 
 Files:
-- `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
-- `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`
-- `/Users/account/.claude/plugins/marketplaces/robotijn/skills/ai-quality/hallucination-detector/SKILL.md`, the pre-edit copy compared against
+- `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
+- `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`
+- `<home>/.claude/plugins/marketplaces/robotijn/skills/ai-quality/hallucination-detector/SKILL.md`, the pre-edit copy compared against

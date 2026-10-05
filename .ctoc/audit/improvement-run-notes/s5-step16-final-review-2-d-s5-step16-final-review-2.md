@@ -101,9 +101,9 @@ The agent and the skill are ready to ship. One audit record is not: it still cal
 ```
 
 Files:
-- /Users/account/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/late-corrections.json
-- /Users/account/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/agents/ai-quality/llm-security-tester.md.json
-- /Users/account/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md
-- /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
-- /Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-npm-test-final.md
+- <home>/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/late-corrections.json
+- <home>/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/agents/ai-quality/llm-security-tester.md.json
+- <home>/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md
+- <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
+- <home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-npm-test-final.md

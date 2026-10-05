@@ -68,7 +68,7 @@ Read the three Microsoft Learn pages as the page itself, so those quotes are byt
   - [LangChain JavaScript StructuredOutputParser (version 0.2)](https://v02.api.js.langchain.com/classes/langchain.output_parsers.StructuredOutputParser.html)
   - [LangChain Python pydantic parser page](https://python.langchain.com/docs/modules/model_io/output_parsers/pydantic)
 
-Files: `/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-research-d-s5-skill-r1-research.md`
+Files: `<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-research-d-s5-skill-r1-research.md`
 
 ```yaml
 dispatch_id: d-s5-skill-r1-research-gaps

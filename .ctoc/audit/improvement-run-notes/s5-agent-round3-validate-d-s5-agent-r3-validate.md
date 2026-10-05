@@ -135,24 +135,24 @@
 - [Joint information sheet, the Federal Bureau of Investigation's copy](https://www.fbi.gov/file-repository/cyber-alerts/ai-data-security-best-practices-for-securing-data-used-to-train-and-operate-ai-systems-052225.pdf)
 - [Security Boulevard (consulted; it did not quote the sentence)](https://securityboulevard.com/2025/12/prompt-injection-cant-be-fully-mitigated-ncsc-says-reduce-impact-instead/)
 - Repository files:
-  - `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round3-critic-d-s5-agent-r3-critic.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md`
-  - `/Users/account/Code/ctoc/agents/compliance/eu-ai-act-agent.md`
-  - `/Users/account/Code/ctoc/skills/compliance/ai-governance-checker/SKILL.md`
-  - `/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
-  - `/Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md`
-  - `/Users/account/Code/ctoc/tests/compliance-claims-match-code.test.js`
-  - `/Users/account/Code/ctoc/src/lib/regulatory-regime.js`
-  - `/Users/account/Code/ctoc/skills/specialized/translation-checker/SKILL.md`
+  - `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round3-critic-d-s5-agent-r3-critic.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md`
+  - `<home>/Code/ctoc/agents/compliance/eu-ai-act-agent.md`
+  - `<home>/Code/ctoc/skills/compliance/ai-governance-checker/SKILL.md`
+  - `<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
+  - `<home>/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md`
+  - `<home>/Code/ctoc/tests/compliance-claims-match-code.test.js`
+  - `<home>/Code/ctoc/src/lib/regulatory-regime.js`
+  - `<home>/Code/ctoc/skills/specialized/translation-checker/SKILL.md`
 
 ```yaml
 dispatch_response:   # finding shape per .ctoc/architecture/dispatch-schema.yaml
   dispatch_id: d-s5-agent-r3-validate
   agent: ai-quality/citation-validator
-  target: /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
+  target: <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
   fingerprint_checked: false            # no hashing tool; 326 lines read
   structure: {olds_verbatim: 33, olds_unique: 33, pairwise_disjoint: true, change2_new_byte_identical_to_note_s3: true, change2_old_byte_identical_to_round2_note_and_agent_line33: true}
   claims: {checked: 39, verified: 39, refuted: 0, misattributed: 0, unverifiable: 0}

@@ -302,12 +302,12 @@ response:
 ```
 
 **Files read locally:**
-- `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
-- `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round2-critic-d-s4-skill-r2-critic.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-research-d-s4-agent-r3-research.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round1-session-runs.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round2-session-runs.md`
+- `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
+- `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round2-critic-d-s4-skill-r2-critic.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-research-d-s4-agent-r3-research.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round1-session-runs.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round2-session-runs.md`
 - Matching lines only, from the agent round-3 critic, validation and re-validation notes.
 
 Sources:

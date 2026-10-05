@@ -31,7 +31,7 @@ Dispatch d-deepthink-s1-step13-secure, received 2026-10-01 17:01 CEST. Verdict: 
   - Change "lists each such element in one line" to "lists each such element in one line, with where it came from".
 
 **3. Low — your account path is in the plan's approved implementation details (not in the execution record).**
-- **Where:** `plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md`, line 35 ("`/Users/account/.claude/skills/` and pointing into `/Users/account/.claude-skills/`") and line 104 ("no command writes under `/Users/account/.claude/` or `/Users/account/.claude-skills/`").
+- **Where:** `plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md`, line 35 ("`<home>/.claude/skills/` and pointing into `<home>/.claude-skills/`") and line 104 ("no command writes under `<home>/.claude/` or `<home>/.claude-skills/`").
 - **The exposure already exists:**
   - 90 tracked files at the current commit carry `Users/account`.
   - 9 of them were on the remote main branch as of the last fetch. I did not fetch, so the live remote is unchecked.

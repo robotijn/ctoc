@@ -59,7 +59,7 @@ How this was gathered: the agent that wrote this plan holds four tools (read a f
 
 ### The registration
 
-`.claude-plugin/` holds exactly three files: `hooks.json`, `marketplace.json`, `plugin.json`. There is no `hooks/` directory in the working tree, and none in the installed copy at `/Users/account/.claude/plugins/cache/robotijn/ctoc/6.14.67/` (the only version directory there). The installed copy has `.claude-plugin/hooks.json` and no root `hooks/`.
+`.claude-plugin/` holds exactly three files: `hooks.json`, `marketplace.json`, `plugin.json`. There is no `hooks/` directory in the working tree, and none in the installed copy at `<home>/.claude/plugins/cache/robotijn/ctoc/6.14.67/` (the only version directory there). The installed copy has `.claude-plugin/hooks.json` and no root `hooks/`.
 
 The manifest is this, in full:
 
@@ -124,18 +124,18 @@ I cannot establish that the registration was ever loaded. Three kinds of evidenc
 The enforcement log now holds 30 lines: 22 for the edit tools, 8 for the write tool, none from the shell hook, none from dispatch. The 30th line is the hand run made in the observed session:
 
 ```json
-{"timestamp":"2026-09-30T16:42:20.721Z","tool":"Write","target_file":"/Users/account/Code/ctoc/src/__hook_probe.txt","project_is_ctoc":true,"plan_matched":null,"escape_phrase":null,"outcome":"block","mode":"strict","mode_source":"settings.yaml"}
+{"timestamp":"2026-09-30T16:42:20.721Z","tool":"Write","target_file":"<home>/Code/ctoc/src/__hook_probe.txt","project_is_ctoc":true,"plan_matched":null,"escape_phrase":null,"outcome":"block","mode":"strict","mode_source":"settings.yaml"}
 ```
 
 The newest line before it is 2026-08-31T12:55:50Z. Lines that look like real work exist on 2026-06-15, 2026-07-17, 2026-07-23 and 2026-08-31, for example:
 
 ```json
-{"timestamp":"2026-08-31T12:52:31.952Z","tool":"Edit","target_file":"/Users/account/Code/ctoc/README.md","project_is_ctoc":true,"plan_matched":null,"escape_phrase":null,"outcome":"block","mode":"strict","mode_source":"settings.yaml"}
+{"timestamp":"2026-08-31T12:52:31.952Z","tool":"Edit","target_file":"<home>/Code/ctoc/README.md","project_is_ctoc":true,"plan_matched":null,"escape_phrase":null,"outcome":"block","mode":"strict","mode_source":"settings.yaml"}
 ```
 
 The log cannot tell a harness run from a hand run, because a hand run writes an identical line. Several lines are plainly hand-fired: seven of the twelve lines from 2026-07-08 have no target at all; targets named for probing exist (`zz-probe-does-not-exist.js`, `zz2.js`, `totally-unplanned-file.js`); three writes on 2026-08-31 landed within about 150 milliseconds of each other, one of them in the session's scratch directory. So the log neither proves nor excludes that the harness ever invoked the edit hook.
 
-An independent witness that hand runs do not contaminate: the after-tool hook stamps `.ctoc/state/hook-beacon.json` on every tool call. The installed 6.14.67 copy of that hook contains the stamping function and calls it first in its main routine (I read both). The stamp file does not exist in this project, in its parent `/Users/account/Code/`, or in `/Users/account/.ctoc/state/`. A machine-wide search for it timed out, so "it exists nowhere on this machine" is not established. The dispatch hook's slot store `.ctoc/state/agent-slots.json` is also absent, although the brief reports subagents were launched today; that witness is weaker, because it would also be absent if the `Task` name no longer matches the launch tool (see the vendor section).
+An independent witness that hand runs do not contaminate: the after-tool hook stamps `.ctoc/state/hook-beacon.json` on every tool call. The installed 6.14.67 copy of that hook contains the stamping function and calls it first in its main routine (I read both). The stamp file does not exist in this project, in its parent `<home>/Code/`, or in `<home>/.ctoc/state/`. A machine-wide search for it timed out, so "it exists nowhere on this machine" is not established. The dispatch hook's slot store `.ctoc/state/agent-slots.json` is also absent, although the brief reports subagents were launched today; that witness is weaker, because it would also be absent if the `Task` name no longer matches the launch tool (see the vendor section).
 
 Two earlier plans measured the same silence without finding the cause. The plan titled "Nothing proves the dispatch hook ever runs" (review stage, measurement recorded as taken on 2026-07-20) found that the dispatch hook had left no slot store and no log line, and recorded that the installed copy carried the registration in the same place. The plan titled "The edit protection says out loud when it has stopped running" (review stage) measured 24 lines as the complete lifetime record and named "session staleness" as consistent with the evidence and verified by none of it. Neither asked whether Claude Code reads the place the registration sits in.
 
@@ -507,7 +507,7 @@ Technical dependencies (what must exist before what): the consequence record and
 - The contents of the streaming screen builders, `README.md`, `docs/IRON_LOOP.md`, the golden-corpus registry and the operating-lessons template.
 - The user-level Claude settings file, which I did not open; the brief's statement that it holds only a session-start entry naming nothing from CTOC is not re-checked.
 - The git history search in the brief; I hold no way to run git.
-- Whether the 18,150 files in `/Users/account/.ctoc/state/` (the count the listing reported) matter here. They are noted, not examined.
+- Whether the 18,150 files in `<home>/.ctoc/state/` (the count the listing reported) matter here. They are noted, not examined.
 
 ## Decisions Taken Under Ambiguity
 

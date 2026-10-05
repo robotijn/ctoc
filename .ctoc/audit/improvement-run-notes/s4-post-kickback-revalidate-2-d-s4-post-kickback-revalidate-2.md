@@ -6,7 +6,7 @@ The two files now agree on all four points you named: the PyPI placeholder label
 
 I used 6 of the 15 fetches. No fetched page addressed a reviewer.
 
-## Wrapper: `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`
+## Wrapper: `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`
 
 | Line | Claim | Verdict | Source sentence |
 |---|---|---|---|
@@ -30,7 +30,7 @@ I used 6 of the 15 fetches. No fetched page addressed a reviewer.
 | 317 | moment falls back to the native `this.toDate().toISOString()` "(same file)" | VERIFIED as code; the wording can be misread (recommended leftover 1) | format.js today: `var utc = keepOffset !== true,` / `m = utc ? this.clone().utc() : this;` / `if (m.year() < 0 \|\| m.year() > 9999) {` / `if (isFunction(Date.prototype.toISOString)) {` / `if (utc) {` / `return this.toDate().toISOString();` / otherwise `return new Date(this.valueOf() + this.utcOffset() * 60 * 1000)`. The native call is the Coordinated Universal Time branch, for years 0 to 9999. "in that case" comes straight after "unless called with `keepOffset` true", so it reads as the keepOffset case, which returns the other expression. |
 | 317 | Node.js 24 gave "2026-09-30T10:00:00.000Z" in a time zone two hours ahead | VERIFIED; rests on recorded runs | Note line 47: "gave `2026-09-30T10:00:00.000Z` at an offset of −120 minutes". Line 52: "Repeated the Node run under TZ=Europe/Amsterdam: `2026-09-30T10:00:00.000Z -120`". An offset of −120 means local time is two hours ahead, and 12:00 local is 10:00 Coordinated Universal Time, so the figures agree. |
 
-## Skill: `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
+## Skill: `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
 
 | Line | Claim | Verdict | Source sentence |
 |---|---|---|---|
@@ -111,4 +111,4 @@ Sources:
 - [moment format.js](https://raw.githubusercontent.com/moment/moment/develop/src/lib/moment/format.js)
 - [Well-formed JSON.stringify proposal (QuoteJSONString)](https://tc39.es/proposal-well-formed-stringify/)
 
-Files: `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`, `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`, `/Users/account/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/skills/ai-quality/hallucination-detector/SKILL.md.json`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-step13-secure-2-d-s4-step13-secure-2.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round3-session-runs.md`
+Files: `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`, `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`, `<home>/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/skills/ai-quality/hallucination-detector/SKILL.md.json`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-step13-secure-2-d-s4-step13-secure-2.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round3-session-runs.md`

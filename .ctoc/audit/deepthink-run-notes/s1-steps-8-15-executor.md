@@ -51,12 +51,12 @@ Steps 8, 9, 10, 12, 14 and 15 of the decision-format slice are done. The lettere
 - A possible tension for review: Step 1 still says the text response has "four parts in this exact order", while the new sections add the new-ideas block and the menu after them. The plan deliberately left Step 1 untouched.
 
 Files:
-- `/Users/account/Code/ctoc/skills/ask-me-questions/SKILL.md`
-- `/Users/account/Code/ctoc/.ctoc/ask-me-questions.md`
-- `/Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
-- `/Users/account/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md`
-- `/Users/account/Code/ctoc/CLAUDE.md`
-- `/Users/account/Code/ctoc/README.md`
+- `<home>/Code/ctoc/skills/ask-me-questions/SKILL.md`
+- `<home>/Code/ctoc/.ctoc/ask-me-questions.md`
+- `<home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
+- `<home>/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md`
+- `<home>/Code/ctoc/CLAUDE.md`
+- `<home>/Code/ctoc/README.md`
 
 The `npm test` output and the other run logs are in `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/deepthink/`.
 
@@ -112,10 +112,10 @@ The return to the test step is done: all four review findings and security findi
 - The final review and the narrow security repeat, which you dispatch.
 
 Files:
-- `/Users/account/Code/ctoc/skills/ask-me-questions/SKILL.md`
-- `/Users/account/Code/ctoc/.ctoc/ask-me-questions.md`
-- `/Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
-- `/Users/account/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md`
+- `<home>/Code/ctoc/skills/ask-me-questions/SKILL.md`
+- `<home>/Code/ctoc/.ctoc/ask-me-questions.md`
+- `<home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
+- `<home>/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md`
 
 The run outputs (`red-run-2.txt`, `green-run-2.txt`, `after-20-2.txt`, `npm-test-2.txt`, `release-diff.txt`) are in `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/deepthink/`.
 
@@ -175,9 +175,9 @@ Then I byte-copied the file to `.ctoc/ask-me-questions.md`, and `cmp` exited 0. 
 - The second final review, which you dispatch.
 
 Files:
-- `/Users/account/Code/ctoc/skills/ask-me-questions/SKILL.md`
-- `/Users/account/Code/ctoc/.ctoc/ask-me-questions.md`
-- `/Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
-- `/Users/account/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md`
+- `<home>/Code/ctoc/skills/ask-me-questions/SKILL.md`
+- `<home>/Code/ctoc/.ctoc/ask-me-questions.md`
+- `<home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
+- `<home>/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md`
 
 The run outputs (`red-run-3.txt`, `green-run-3.txt`, `after-20-3.txt`, `npm-test-3.txt`) are in `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/deepthink/`.

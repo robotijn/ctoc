@@ -93,10 +93,10 @@ No per-finding letters are emitted, because no open finding is critical or high.
 - I did not write the machine-readable results file or the human report, because this dispatch is read-only.
 
 The relevant files are:
-- `/Users/account/Code/ctoc/skills/ask-me-questions/SKILL.md`
-- `/Users/account/Code/ctoc/.ctoc/ask-me-questions.md`
-- `/Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
-- `/Users/account/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/deepthink-run-notes/s1-step13-secure-d-deepthink-s1-step13-secure.md`
+- `<home>/Code/ctoc/skills/ask-me-questions/SKILL.md`
+- `<home>/Code/ctoc/.ctoc/ask-me-questions.md`
+- `<home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
+- `<home>/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md`
+- `<home>/Code/ctoc/.ctoc/audit/deepthink-run-notes/s1-step13-secure-d-deepthink-s1-step13-secure.md`
 
 **What would change this verdict:** a deep analyzer reporting something I missed, or a full `npm test` run that fails.

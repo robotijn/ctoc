@@ -81,7 +81,7 @@ own block message, is a silent regression to zero protection dressed as full
 protection. The same is true of a maintainer whose own hand-maintained
 `CLAUDE.md` is being rewritten every session without their knowledge: the file
 they believe they control is drifting under them. CTOC's own project `CLAUDE.md`
-(`/Users/account/Code/ctoc/CLAUDE.md`, "Mandatory Pipeline Use (v7)" section, item
+(`<home>/Code/ctoc/CLAUDE.md`, "Mandatory Pipeline Use (v7)" section, item
 4) already *documents* the intended contract correctly — "Escape phrase in
 recent user messages (allow)... Case-insensitive, word-bounded" — the defects
 below are where the code fails to implement what CTOC's own documentation

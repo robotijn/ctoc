@@ -190,7 +190,7 @@ response:
     tool_calls: 16
 ```
 
-Files: `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round2-revalidate-d-s4-agent-r2-revalidate.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round1-revalidate-d-s4-agent-r1-revalidate.md`, `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
+Files: `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round2-revalidate-d-s4-agent-r2-revalidate.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round1-revalidate-d-s4-agent-r1-revalidate.md`, `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
 
 Sources:
 - [Node lib/internal/fs/utils.js](https://raw.githubusercontent.com/nodejs/node/main/lib/internal/fs/utils.js)

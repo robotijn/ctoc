@@ -99,8 +99,8 @@ I wrote nothing into the repository and sent nothing to any registry. Both files
 My test files are in `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/secure2/`. I removed three temporary files in the system temp folder that my own termination tests had left.
 
 Files:
-- `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`
-- `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md`
-- `/Users/account/Code/ctoc/plans/in-progress/00264-every-agent-and-specialist-skill-improved-three-times-s4-hallucination-detector.md`
+- `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`
+- `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md`
+- `<home>/Code/ctoc/plans/in-progress/00264-every-agent-and-specialist-skill-improved-three-times-s4-hallucination-detector.md`

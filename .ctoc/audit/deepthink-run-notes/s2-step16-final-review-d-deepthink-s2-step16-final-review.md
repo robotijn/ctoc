@@ -167,10 +167,10 @@ I hold only Read and Grep. Everything below comes from reading files. I ran noth
 ```
 
 Files:
-- /Users/account/Code/ctoc/skills/deepthink/SKILL.md
-- /Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js
-- /Users/account/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md
-- /Users/account/Code/ctoc/plans/todo/00399-deepthink-ships-with-ctoc-s3-three-improvement-rounds.md
-- /Users/account/Code/ctoc/plans/implementation/deepthink-ships-with-ctoc.md
-- /Users/account/Code/ctoc/src/lib/continuation-queue.js
-- /Users/account/Code/ctoc/.ctoc/inbox/questions/1790877923785-g7rtsc.md
+- <home>/Code/ctoc/skills/deepthink/SKILL.md
+- <home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js
+- <home>/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md
+- <home>/Code/ctoc/plans/todo/00399-deepthink-ships-with-ctoc-s3-three-improvement-rounds.md
+- <home>/Code/ctoc/plans/implementation/deepthink-ships-with-ctoc.md
+- <home>/Code/ctoc/src/lib/continuation-queue.js
+- <home>/Code/ctoc/.ctoc/inbox/questions/1790877923785-g7rtsc.md

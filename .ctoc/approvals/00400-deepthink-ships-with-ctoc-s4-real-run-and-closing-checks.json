@@ -1,9 +1,11 @@
 {
-  "content_sha256": "60800cde86972302216645e614669d5e06727d2fc582320ec80821cd1d5793b2",
+  "content_sha256": "fa19c1a7dd3830472ef377b3d306e22c7b2d7339a6443e64af83afd5e606b5e2",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-09-30T11:39:25.455Z",
+  "approved_at": "2026-10-05T09:13:43.269Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "Re-recorded at the owner's word on 2026-10-05, answering whether to re-record the approvals the privacy rewrite changed: \"what is the difference just fix it\". Redaction-only change: the home-folder path in the plan text was replaced by a placeholder; nothing the owner ruled on changed.",
   "plan_basename": "00400-deepthink-ships-with-ctoc-s4-real-run-and-closing-checks"
 }

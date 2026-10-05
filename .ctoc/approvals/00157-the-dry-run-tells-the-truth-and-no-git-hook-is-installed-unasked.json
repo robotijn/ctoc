@@ -1,9 +1,11 @@
 {
-  "content_sha256": "769d1b7bd57c887e101cbc8540fd233d40a37534949345706fca9db3d7cb360f",
+  "content_sha256": "c1ac24f78c5b1b9e56efc91de8d7b14b9ad373b6fb8be16abd6b26c366d8371f",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-07-20T12:36:58.807Z",
+  "approved_at": "2026-10-05T09:13:43.341Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "Re-recorded at the owner's word on 2026-10-05, answering whether to re-record the approvals the privacy rewrite changed: \"what is the difference just fix it\". Redaction-only change: the home-folder path in the plan text was replaced by a placeholder; nothing the owner ruled on changed.",
   "plan_basename": "00157-the-dry-run-tells-the-truth-and-no-git-hook-is-installed-unasked"
 }

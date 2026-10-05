@@ -119,10 +119,10 @@ When these get fixed is the owner's call. Technically, slice 5 is the natural pl
 Clarity is 4 until corrections A–E are made. Security is 4 because the agent can still read local files, a high finding that stands in this slice's files until slice 5 lands. The owner has answered it, and it cannot be fixed within this slice's files, so it does not block review.
 
 Files:
-- /Users/account/Code/ctoc/skills/deepthink/SKILL.md
-- /Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js
-- /Users/account/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md
-- /Users/account/Code/ctoc/.ctoc/audit/deepthink-run-notes/s2-steps-8-15-executor.md
-- /Users/account/Code/ctoc/.ctoc/inbox/questions/1790877923785-g7rtsc.md
-- /Users/account/Code/ctoc/plans/todo/00399-deepthink-ships-with-ctoc-s3-three-improvement-rounds.md
-- /Users/account/Code/ctoc/plans/implementation/NNNNN-deepthink-ships-with-ctoc-s5-web-only-reading-agent.md
+- <home>/Code/ctoc/skills/deepthink/SKILL.md
+- <home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js
+- <home>/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md
+- <home>/Code/ctoc/.ctoc/audit/deepthink-run-notes/s2-steps-8-15-executor.md
+- <home>/Code/ctoc/.ctoc/inbox/questions/1790877923785-g7rtsc.md
+- <home>/Code/ctoc/plans/todo/00399-deepthink-ships-with-ctoc-s3-three-improvement-rounds.md
+- <home>/Code/ctoc/plans/implementation/NNNNN-deepthink-ships-with-ctoc-s5-web-only-reading-agent.md

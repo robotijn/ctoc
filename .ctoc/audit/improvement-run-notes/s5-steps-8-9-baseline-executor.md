@@ -122,6 +122,6 @@ Both files grant `tools: Bash, Read, Grep, Glob, WebSearch`: no web page fetchin
 - Line 640: "Audit … quarterly". The agent cannot schedule anything.
 - Lines 646–650: "the letter you write to CTO Chief" and findings that "block phase advancement". The loop is not running, and there is no Write tool.
 
-The plan is at `/Users/account/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md`. The test lists and raw outputs are in the session scratchpad: `s5-agent-tests.txt`, `s5-skill-tests.txt`, `s5-baseline-tests.txt` and `s5-base-{agent,skill,record,union}.out`.
+The plan is at `<home>/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md`. The test lists and raw outputs are in the session scratchpad: `s5-agent-tests.txt`, `s5-skill-tests.txt`, `s5-baseline-tests.txt` and `s5-base-{agent,skill,record,union}.out`.
 
 The C#, Java, TypeScript and command-line doubts above are from memory, not checked. Only the NameError at line 474 and the conflicts between the files were confirmed against the repository.

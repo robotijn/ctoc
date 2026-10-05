@@ -198,7 +198,7 @@ Nothing else is outside the tools the file grants (Bash, Read, Grep, Glob, WebSe
 - https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM01_PromptInjection.md · …/LLM03_ExcessiveAgency.md · …/LLM06_UnboundedConsumption.md · …/LLM10_ImproperOutputHandling.md · https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/README.md
 - https://genai.owasp.org/initiatives/top-10-for-llm-and-genai/
 - https://raw.githubusercontent.com/OWASP/www-project-top-10-for-large-language-model-applications/main/2_0_vulns/LLM10_UnboundedConsumption.md
-- https://genai.owasp.org/download/52117/?tmstv=1765059207 (saved copy: `/Users/account/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790808415371-uzxr9m.pdf`)
+- https://genai.owasp.org/download/52117/?tmstv=1765059207 (saved copy: `<home>/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790808415371-uzxr9m.pdf`)
 - https://raw.githubusercontent.com/OWASP/www-project-mcp-top-10/main/index.md
 - https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-2e2025.pdf (saved copy: `…/tool-results/webfetch-1790808432780-t9gl78.pdf`)
 - https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/README.md · …/CHANGELOG.md · …/dist/manifest.yaml · …/dist/v6/ATLAS-2026.09.yaml · …/dist/schemas/atlas_output_schema.json · https://api.github.com/repos/mitre-atlas/atlas-data/git/trees/v2026.09?recursive=1
@@ -209,7 +209,7 @@ Nothing else is outside the tools the file grants (Bash, Read, Grep, Glob, WebSe
 dispatch_response:
   dispatch_id: d-s5-agent-r2-research
   agent: ai-quality/citation-validator
-  target: /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
+  target: <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
   fingerprint_read: "not computed (no hashing tool); the file changed during the run (line 30, the validator's edit)"
   read_date: 2026-10-01
   source_class: "standards bodies and specifications (OWASP repositories, MITRE atlas-data, NIST); one arXiv preprint"

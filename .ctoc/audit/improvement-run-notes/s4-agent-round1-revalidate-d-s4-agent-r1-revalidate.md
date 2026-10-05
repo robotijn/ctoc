@@ -213,4 +213,4 @@ response:
     tool_calls: 24
 ```
 
-Files: `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`, `/Users/account/Code/ctoc/.ctoc/architecture/dispatch-schema.yaml`, `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`, `/Users/account/Code/ctoc/docs/DISPATCH_PROTOCOL.md`, `/Users/account/Code/ctoc/docs/REFINEMENT_LOOP.md`
+Files: `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`, `<home>/Code/ctoc/.ctoc/architecture/dispatch-schema.yaml`, `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`, `<home>/Code/ctoc/docs/DISPATCH_PROTOCOL.md`, `<home>/Code/ctoc/docs/REFINEMENT_LOOP.md`

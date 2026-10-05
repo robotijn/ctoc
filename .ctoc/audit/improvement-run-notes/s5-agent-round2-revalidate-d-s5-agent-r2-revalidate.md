@@ -112,27 +112,27 @@ Two statements are loose:
 - [arXiv 2302.12173](https://arxiv.org/abs/2302.12173) · [AISec 2023](https://aisec.cc/2023/) (two reads)
 - Saved documents, read as page images:
   - NIST AI 100-2 E2025: `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/nist-ai-100-2e2025.pdf` (file pages 66, 67, 72, 73, 88, 101, 123, 124)
-  - OWASP agentic document: `/Users/account/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790808415371-uzxr9m.pdf` (file pages 2–3, 27–29, 31–34, 36–38)
+  - OWASP agentic document: `<home>/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790808415371-uzxr9m.pdf` (file pages 2–3, 27–29, 31–34, 36–38)
 - Repository files:
-  - `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md`
-  - `/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-critic-d-s5-agent-r2-critic.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-validate-d-s5-agent-r2-validate.md`
-  - `/Users/account/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md`
-  - `/Users/account/Code/ctoc/agents/coordinator/cto-chief.md`
-  - `/Users/account/Code/ctoc/agents/coordinator/ivv-chief.md`
-  - `/Users/account/Code/ctoc/agents/security/security-scanner.md`
-  - `/Users/account/Code/ctoc/docs/REFINEMENT_LOOP.md`
-  - `/Users/account/Code/ctoc/docs/DISPATCH_PROTOCOL.md`
-  - `/Users/account/Code/ctoc/skills/security/sast-scanner/SKILL.md`
-  - `/Users/account/Code/ctoc/tests/cu5-s4-compliance-aiquality-wrappers.test.js`
+  - `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md`
+  - `<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-critic-d-s5-agent-r2-critic.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-validate-d-s5-agent-r2-validate.md`
+  - `<home>/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md`
+  - `<home>/Code/ctoc/agents/coordinator/cto-chief.md`
+  - `<home>/Code/ctoc/agents/coordinator/ivv-chief.md`
+  - `<home>/Code/ctoc/agents/security/security-scanner.md`
+  - `<home>/Code/ctoc/docs/REFINEMENT_LOOP.md`
+  - `<home>/Code/ctoc/docs/DISPATCH_PROTOCOL.md`
+  - `<home>/Code/ctoc/skills/security/sast-scanner/SKILL.md`
+  - `<home>/Code/ctoc/tests/cu5-s4-compliance-aiquality-wrappers.test.js`
 
 ```yaml
 dispatch_response:   # finding shape per .ctoc/architecture/dispatch-schema.yaml
   dispatch_id: d-s5-agent-r2-revalidate
   agent: ai-quality/citation-validator
-  target: /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
+  target: <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
   fingerprint_checked: false          # no hashing tool
   landing: {changes_confirmed: 33, leftovers_confirmed: 5, deviations: 0}
   recipe_byte_identical_to_session_note: true

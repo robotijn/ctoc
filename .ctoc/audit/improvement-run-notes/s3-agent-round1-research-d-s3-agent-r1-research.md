@@ -3,9 +3,9 @@
 # Citation validation report: dispatch d-s3-agent-r1-research
 
 Files checked, read-only:
-- `/Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md`
-- `/Users/account/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md`
-- For comparison: `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`, line 57
+- `<home>/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md`
+- `<home>/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md`
+- For comparison: `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`, line 57
 
 **Result:** 34 claims examined. 21 are validated, 3 are fabricated, 7 have no source that could be found, and 3 name the wrong source or date.
 - **The two tool-integration rows are fabricated.** The "GitHub Copilot review filters" row (line 418) describes features GitHub does not document. The Cursor row (line 420) is contradicted by Cursor's own help centre.

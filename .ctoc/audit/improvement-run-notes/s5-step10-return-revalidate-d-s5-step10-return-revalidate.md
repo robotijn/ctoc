@@ -127,7 +127,7 @@ dispatch_response:
   metadata: {tool_calls: 80, tokens_used: "not measured"}
 ```
 
-Files: `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md`, `/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-step10-return-after-steps-11-and-13-executor.md`
+Files: `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md`, `<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-step10-return-after-steps-11-and-13-executor.md`
 
 Sources:
 - [OWASP LLM01:2026 Prompt Injection (raw)](https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM01_PromptInjection.md)

@@ -132,7 +132,7 @@ const LEDGER_EVAL_TOKENS = [
 
 The script exports its `run` function. So by reading, an inline evaluation that requires the script and calls `run` with the same arguments is not denied. Scenario 28 turns that into an observation.
 
-**4. An older copy of the script exists on this machine (a directory listing, today).** `/Users/account/.claude/plugins/cache/robotijn/ctoc/6.14.67/src/scripts/ledger-backfill.js` exists; the repository is at 6.14.71. I read lines 96 to 235 of the older copy: the parser, vision mode and single-plan mode read the same as the current file. It takes `--root`, so it can be pointed at this project. Any fix inside the script alone is therefore bypassed by running the older copy by its path.
+**4. An older copy of the script exists on this machine (a directory listing, today).** `<home>/.claude/plugins/cache/robotijn/ctoc/6.14.67/src/scripts/ledger-backfill.js` exists; the repository is at 6.14.71. I read lines 96 to 235 of the older copy: the parser, vision mode and single-plan mode read the same as the current file. It takes `--root`, so it can be pointed at this project. Any fix inside the script alone is therefore bypassed by running the older copy by its path.
 
 **5. This project has no migration marker (reading that path, today).** The file `.ctoc/approvals/.migration-complete.json` does not exist. The marker is what arms the revert of a plan with no ledger entry; without it the sweep only reports.
 

@@ -508,9 +508,9 @@ No other agent sentence becomes false. The agent refers to the skill's egress ca
 **Copy fence.** The test checks whether any trimmed skill line of 25 characters or more appears anywhere in the agent body, as a substring (`body.includes(line)`). I checked: no new line of 25 characters or more in these changes is a substring of the agent body.
 
 Files:
-- /Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
-- /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-research-d-s5-skill-r2-research.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-session-runs.md
+- <home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
+- <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-research-d-s5-skill-r2-research.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-session-runs.md
 - /private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/ATLAS-2026.09.yaml
 - /private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/ATLAS-legacy-5.6.0.yaml

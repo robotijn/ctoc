@@ -109,22 +109,22 @@ A note on dates: the recipe's time stamp `2026-09-30T22:59:30Z` is in Coordinate
 - [ATLAS change log, tag v2026.09](https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/CHANGELOG.md) · [ATLAS README, tag v2026.09](https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/README.md) · [deprecated `dist/ATLAS.yaml`, head only](https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/ATLAS.yaml)
 - [arXiv:2302.12173](https://arxiv.org/abs/2302.12173) · [AISec 2023](https://aisec.cc/2023/) · [ACM record](https://dl.acm.org/doi/10.1145/3605764.3623985) (HTTP 403)
 - NIST AI 100-2 E2025, saved copy `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/nist-ai-100-2e2025.pdf`, file pages 66, 67, 72, 73, 88, 101, 121, 123 and 124
-- OWASP agentic document, saved copy `/Users/account/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790808415371-uzxr9m.pdf`, file pages 27–29, 31, 33, 34 and 36–38
+- OWASP agentic document, saved copy `<home>/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790808415371-uzxr9m.pdf`, file pages 27–29, 31, 33, 34 and 36–38
 - Repository files:
-  - `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md`
-  - `/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
-  - `/Users/account/Code/ctoc/agents/coordinator/cto-chief.md`
-  - `/Users/account/Code/ctoc/agents/coordinator/ivv-chief.md`
-  - `/Users/account/Code/ctoc/tests/cu5-s4-compliance-aiquality-wrappers.test.js`
-  - `/Users/account/Code/ctoc/tests/watcher-shape.test.js`
-  - `/Users/account/Code/ctoc/.ctoc/watcher-baseline.json`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md`
+  - `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md`
+  - `<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
+  - `<home>/Code/ctoc/agents/coordinator/cto-chief.md`
+  - `<home>/Code/ctoc/agents/coordinator/ivv-chief.md`
+  - `<home>/Code/ctoc/tests/cu5-s4-compliance-aiquality-wrappers.test.js`
+  - `<home>/Code/ctoc/tests/watcher-shape.test.js`
+  - `<home>/Code/ctoc/.ctoc/watcher-baseline.json`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md`
 
 ```yaml
 dispatch_response:   # finding shape per .ctoc/architecture/dispatch-schema.yaml
   dispatch_id: d-s5-agent-r2-validate
   agent: ai-quality/citation-validator
-  target: /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
+  target: <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
   fingerprint_checked: false   # no hashing tool
   old_strings: {verbatim: 33, unique: 33, pairwise_disjoint: true}
   recipe_byte_identical_to_session_note: true

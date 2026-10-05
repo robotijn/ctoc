@@ -121,19 +121,19 @@ I could not recompute the file's fingerprint.
 - [ATLAS release v2026.09](https://github.com/mitre-atlas/atlas-data/releases/tag/v2026.09) · [ATLAS releases](https://github.com/mitre-atlas/atlas-data/releases) · [NIST AI 100-2 E2025](https://csrc.nist.gov/pubs/ai/100/2/e2025/final)
 - [Embrace The Red on CVE-2025-53773](https://embracethered.com/blog/posts/2025/github-copilot-remote-code-execution-via-prompt-injection/) · [CVE-2025-53773 record](https://cveawg.mitre.org/api/cve/CVE-2025-53773) · [Microsoft Security Update Guide interface](https://api.msrc.microsoft.com/sug/v2.0/en-US/affectedProduct?$filter=cveNumber%20eq%20%27CVE-2025-53773%27)
 - Repository files:
-  - /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
-  - /Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
-  - /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-critic-d-s5-agent-r1-critic.md
-  - /Users/account/Code/ctoc/agents/coordinator/cto-chief.md
-  - /Users/account/Code/ctoc/agents/coordinator/ivv-chief.md
-  - /Users/account/Code/ctoc/agents/security/security-scanner.md
-  - /Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md
-  - /Users/account/Code/ctoc/agents/iron-loop/red-team-critic.md
-  - /Users/account/Code/ctoc/skills/security/sast-scanner/SKILL.md
-  - /Users/account/Code/ctoc/docs/DISPATCH_PROTOCOL.md
-  - /Users/account/Code/ctoc/.ctoc/architecture/dispatch-schema.yaml
-  - /Users/account/Code/ctoc/docs/REFINEMENT_LOOP.md
-  - /Users/account/Code/ctoc/tests/cu5-s4-compliance-aiquality-wrappers.test.js
+  - <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
+  - <home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
+  - <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-critic-d-s5-agent-r1-critic.md
+  - <home>/Code/ctoc/agents/coordinator/cto-chief.md
+  - <home>/Code/ctoc/agents/coordinator/ivv-chief.md
+  - <home>/Code/ctoc/agents/security/security-scanner.md
+  - <home>/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md
+  - <home>/Code/ctoc/agents/iron-loop/red-team-critic.md
+  - <home>/Code/ctoc/skills/security/sast-scanner/SKILL.md
+  - <home>/Code/ctoc/docs/DISPATCH_PROTOCOL.md
+  - <home>/Code/ctoc/.ctoc/architecture/dispatch-schema.yaml
+  - <home>/Code/ctoc/docs/REFINEMENT_LOOP.md
+  - <home>/Code/ctoc/tests/cu5-s4-compliance-aiquality-wrappers.test.js
 
 ```yaml
 dispatch_response:
@@ -142,7 +142,7 @@ dispatch_response:
   agent: ai-quality/citation-validator
   agent_version: "not visible to this agent"
   completed_at: null                          # date 2026-10-01; no clock read this run
-  target: /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-critic-d-s5-agent-r1-critic.md
+  target: <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-critic-d-s5-agent-r1-critic.md
   counts:
     claims_checked: 62
     verified: 54

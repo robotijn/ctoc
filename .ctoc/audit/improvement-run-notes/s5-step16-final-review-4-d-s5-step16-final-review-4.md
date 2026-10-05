@@ -86,9 +86,9 @@ This return makes the count 2 to Step 10, 3 to Step 15, 5 in total. That is the 
 ```
 
 Files:
-- /Users/account/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-npm-test-final.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-step10-return-revalidate-d-s5-step10-return-revalidate.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-step10-return-revalidate-2-d-s5-step10-return-revalidate-2.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-second-step10-return-executor.md
-- /Users/account/Code/ctoc/src/lib/plan-validator.js
+- <home>/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-npm-test-final.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-step10-return-revalidate-d-s5-step10-return-revalidate.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-step10-return-revalidate-2-d-s5-step10-return-revalidate-2.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-second-step10-return-executor.md
+- <home>/Code/ctoc/src/lib/plan-validator.js

@@ -25,7 +25,7 @@ gate_crossed: implementation → todo
 
 **Scope (one line):** write `skills/deepthink/SKILL.md`, adapted from the human's personal skill as the parent's decisions say, with its checks written first; and in the same unit tighten every count the new file moves in README.md and CLAUDE.md, and add deepthink to the coverage gate's list of always-available top-level skills.
 
-Read the parent plan in full first — all of it, because the skill is its decisions made into text. The personal skill it adapts, at `/Users/account/.claude/skills/deepthink/SKILL.md`, is read only.
+Read the parent plan in full first — all of it, because the skill is its decisions made into text. The personal skill it adapts, at `<home>/.claude/skills/deepthink/SKILL.md`, is read only.
 
 ## Implementation Details
 

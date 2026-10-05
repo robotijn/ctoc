@@ -80,7 +80,7 @@ The mode shows how each answer reached me:
 | 35 | https://www.postgresql.org/docs/current/contrib.html | summary | See Part B |
 
 **Local page-image reads (not fetches):**
-- The USENIX paper, `/Users/account/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790790330893-6989qo.pdf`, PDF pages 12–15 (printed 3697–3700).
+- The USENIX paper, `<home>/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790790330893-6989qo.pdf`, PDF pages 12–15 (printed 3697–3700).
 - The ENISA final advisory, `…/tool-results/webfetch-1790792186381-c1nfvx.pdf`, printed pages 1–3, 16–21 and 25–26.
 
 **Injection check.** No fetched page spoke to a reviewer or gave instructions.
@@ -312,12 +312,12 @@ response:
 ```
 
 Files:
-- `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round1-revalidate-d-s4-skill-r1-revalidate.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md`
-- `/Users/account/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790790330893-6989qo.pdf` (the USENIX paper)
-- `/Users/account/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790792186381-c1nfvx.pdf` (ENISA's final advisory, version 1.1)
+- `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round1-revalidate-d-s4-skill-r1-revalidate.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md`
+- `<home>/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790790330893-6989qo.pdf` (the USENIX paper)
+- `<home>/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790792186381-c1nfvx.pdf` (ENISA's final advisory, version 1.1)
 
 Sources:
 - [ConanCenter zlib config](https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes/zlib/config.yml) · [vcpkg fmt port](https://raw.githubusercontent.com/microsoft/vcpkg/master/ports/fmt/vcpkg.json)

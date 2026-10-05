@@ -359,6 +359,6 @@ After the proposed edits, this agent applies its paired skill body, so the valid
 - Line 420: "the current Cursor docs define project rules solely as `.mdc` files there and no longer document the legacy single-file `.cursorrules`, which is deprecated".
 - Version facts at lines 189, 193, 201, 202, 293, 295 and 300: `ReactDOM.render` "removed in React 19"; `distutils` "removed in 3.12"; `BinaryFormatter` "disabled by default since .NET 5"; `WebRequest.Create` "obsolete since .NET 6"; `useFormState` "React 19 renamed/replaced this"; `useFormStatus` "React 19+ only"; `TimeProvider` ".NET 8+".
 
-Files: `/Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md`, `/Users/account/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md`, `/Users/account/Code/ctoc/agents/pipeline/agent-critic.md`, `/Users/account/.claude/plugins/cache/robotijn/ctoc/6.14.65/agents/pipeline/agent-critic.md`.
+Files: `<home>/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md`, `<home>/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md`, `<home>/Code/ctoc/agents/pipeline/agent-critic.md`, `<home>/.claude/plugins/cache/robotijn/ctoc/6.14.65/agents/pipeline/agent-critic.md`.
 
 What would change this: re-running the round with web tools could turn up a documented defect class that is missing, or refute one of the skill's statistics. It would not change the structural findings about the wrapper.

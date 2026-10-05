@@ -340,11 +340,11 @@ response:
 ```
 
 Files:
-- `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
-- `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`
-- `/Users/account/Code/ctoc/tests/critic-warnings-are-critical.test.js`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md`
-- `/Users/account/.claude/plugins/marketplaces/robotijn/skills/ai-quality/hallucination-detector/SKILL.md` (the copy I believe is pre-edit)
+- `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
+- `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`
+- `<home>/Code/ctoc/tests/critic-warnings-are-critical.test.js`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round1-critic-final-d-s4-skill-r1-critic.md`
+- `<home>/.claude/plugins/marketplaces/robotijn/skills/ai-quality/hallucination-detector/SKILL.md` (the copy I believe is pre-edit)
 
 Sources:
 - [Veracode 2025 GenAI Code Security Report](https://www.veracode.com/resources/analyst-reports/2025-genai-code-security-report/) · [Veracode blog, July 2025](https://www.veracode.com/blog/genai-code-security-report/)

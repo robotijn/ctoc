@@ -159,13 +159,13 @@ Nothing is required. Two optional tidy-ups:
 - [LangSmith masking](https://docs.langchain.com/langsmith/mask-inputs-outputs) · [Structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) · [Zero2Text, arXiv 2602.01757](https://arxiv.org/abs/2602.01757)
 
 Files:
-- /Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
-- /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-session-runs.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md
-- /Users/account/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md
+- <home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
+- <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-validate-d-s5-skill-r2-validate.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-session-runs.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md
+- <home>/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md
 
 ```yaml
 dispatch_id: d-s5-skill-r2-revalidate

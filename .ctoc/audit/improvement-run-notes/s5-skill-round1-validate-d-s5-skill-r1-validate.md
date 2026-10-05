@@ -201,7 +201,7 @@ The critic's note above its Java change, the list headed "Believed, not read", i
 - OpenAI: [moderation](https://developers.openai.com/api/docs/guides/moderation) · [structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs) · [chat completions create](https://developers.openai.com/api/reference/python/resources/chat/subresources/completions/methods/create)
 - Other: [CWE-1427](https://cwe.mitre.org/data/definitions/1427.html) · [PostgreSQL row security](https://www.postgresql.org/docs/current/ddl-rowsecurity.html) · [PostgreSQL admin functions](https://www.postgresql.org/docs/current/functions-admin.html)
 
-Files: `/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`, `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md`, `/Users/account/Code/ctoc/tests/cu5-s4-compliance-aiquality-wrappers.test.js`
+Files: `<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`, `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md`, `<home>/Code/ctoc/tests/cu5-s4-compliance-aiquality-wrappers.test.js`
 
 ```yaml
 dispatch_id: d-s5-skill-r1-validate

@@ -32,7 +32,7 @@ Read the parent plan in full first (`plans/implementation/deepthink-ships-with-c
 
 Recorded in this slice's execution record before any file changes:
 
-1. **Content fingerprints of the human's two personal files**, read at their link targets and read only: the personal deepthink skill and the personal decision-question skill, both reached through `/Users/account/.claude/skills/` and pointing into `/Users/account/.claude-skills/`. Nothing under either folder is ever written, moved or deleted.
+1. **Content fingerprints of the human's two personal files**, read at their link targets and read only: the personal deepthink skill and the personal decision-question skill, both reached through `<home>/.claude/skills/` and pointing into `<home>/.claude-skills/`. Nothing under either folder is ever written, moved or deleted.
 2. **Content fingerprints of the three improvement-run files this plan must leave alone:** `.ctoc/audit/agent-and-skill-improvement/inventory.json`, `plans/implementation/every-agent-and-specialist-skill-improved-three-times.md` and `tests/agent-and-skill-improvement-record.test.js`.
 3. **The comparison repeated with a real difference program**, read only, its output recorded in full: the personal decision-question copy against `skills/ask-me-questions/SKILL.md`. The parent's comparison table was made by reading; this run is its machine record. A difference between the program's output and the parent's table is recorded as a finding for the human and is not acted on here.
 
@@ -101,7 +101,7 @@ No module is added. The decision format is reached through the plugin manifest's
 
 ### Security review
 
-- The personal files are read for a fingerprint and a comparison only; no command writes under `/Users/account/.claude/` or `/Users/account/.claude-skills/`. The test never reads them.
+- The personal files are read for a fingerprint and a comparison only; no command writes under `<home>/.claude/` or `<home>/.claude-skills/`. The test never reads them.
 - No secret enters any file or any recorded output.
 
 ### Acceptance criteria

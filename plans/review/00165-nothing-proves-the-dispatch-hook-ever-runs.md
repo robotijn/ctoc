@@ -50,9 +50,9 @@ The installed plugin was checked as well, because that — not this source tree 
 what actually executes:
 
 ```
-/Users/account/.claude/plugins/cache/robotijn/ctoc/6.12.97/.claude-plugin/hooks.json
+<home>/.claude/plugins/cache/robotijn/ctoc/6.12.97/.claude-plugin/hooks.json
     → PreToolUse matcher "Task" → src/hooks/PreToolUse.Task.js        [WIRED]
-/Users/account/.claude/plugins/cache/robotijn/ctoc/6.12.97/src/hooks/PreToolUse.Task.js
+<home>/.claude/plugins/cache/robotijn/ctoc/6.12.97/src/hooks/PreToolUse.Task.js
                                                                       [PRESENT]
 ```
 

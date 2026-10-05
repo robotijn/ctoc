@@ -169,14 +169,14 @@ This review does not need to run again unless the re-validation changes text.
 - **Believed, not checked:** that npm's installer drops symbolic links from package archives; whether an ordinary publisher can add the user `npm` as a maintainer (the file itself says this was not checked).
 
 Files:
-- /Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md
-- /Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md
-- /Users/account/Code/ctoc/plans/in-progress/00264-every-agent-and-specialist-skill-improved-three-times-s4-hallucination-detector.md
-- /Users/account/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/skills/ai-quality/hallucination-detector/SKILL.md.json
-- /Users/account/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/for-the-human.json
-- /Users/account/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/late-corrections.json
-- /Users/account/Code/ctoc/.ctoc/inbox/questions/1790801303564-1rhgy4.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round3-session-runs.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md
+- <home>/Code/ctoc/agents/ai-quality/hallucination-detector.md
+- <home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md
+- <home>/Code/ctoc/plans/in-progress/00264-every-agent-and-specialist-skill-improved-three-times-s4-hallucination-detector.md
+- <home>/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/skills/ai-quality/hallucination-detector/SKILL.md.json
+- <home>/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/for-the-human.json
+- <home>/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/late-corrections.json
+- <home>/Code/ctoc/.ctoc/inbox/questions/1790801303564-1rhgy4.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round3-session-runs.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-step11-review-d-s4-step11-review.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md

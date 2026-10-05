@@ -60,10 +60,10 @@ I had no shell, so I did not recompute any fingerprint or re-run any test. Mirro
 **Not verified by anyone:** a live session following the new rules, and a checkout with Windows line endings.
 
 Files:
-- /Users/account/Code/ctoc/skills/ask-me-questions/SKILL.md
-- /Users/account/Code/ctoc/.ctoc/ask-me-questions.md
-- /Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js
-- /Users/account/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md
-- /Users/account/Code/ctoc/.ctoc/audit/deepthink-run-notes/s1-steps-8-15-executor.md
-- /Users/account/.claude/plugins/cache/robotijn/ctoc/6.14.67/.ctoc/ask-me-questions.md (the before-state I compared against)
+- <home>/Code/ctoc/skills/ask-me-questions/SKILL.md
+- <home>/Code/ctoc/.ctoc/ask-me-questions.md
+- <home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js
+- <home>/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md
+- <home>/Code/ctoc/.ctoc/audit/deepthink-run-notes/s1-steps-8-15-executor.md
+- <home>/.claude/plugins/cache/robotijn/ctoc/6.14.67/.ctoc/ask-me-questions.md (the before-state I compared against)
 - /private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/deepthink/npm-test-3.txt

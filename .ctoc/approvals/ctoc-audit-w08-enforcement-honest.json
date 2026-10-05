@@ -1,7 +1,11 @@
 {
-  "content_sha256": "559bcbd06b9717a50cc69413188e1d461304b6f19eb455ed50d18473323b1aa2",
+  "content_sha256": "e0fc9cb5514125761ca6e57ae188e09d1bb7c0f63bda599aaef60fb5c111b914",
+  "hash_scope": "file",
   "stage_from": "review",
   "stage_to": "done",
-  "approved_at": "2026-07-13T20:53:24.890Z",
-  "approved_by": "human"
+  "approved_at": "2026-10-05T09:13:43.220Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "Re-recorded at the owner's word on 2026-10-05, answering whether to re-record the approvals the privacy rewrite changed: \"what is the difference just fix it\". Redaction-only change: the home-folder path in the plan text was replaced by a placeholder; nothing the owner ruled on changed.",
+  "plan_basename": "ctoc-audit-w08-enforcement-honest"
 }

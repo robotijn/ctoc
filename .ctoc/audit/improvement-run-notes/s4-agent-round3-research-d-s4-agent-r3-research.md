@@ -280,9 +280,9 @@ response:
     tool_calls: 45
 ```
 
-Files read locally: `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round2-critic-d-s4-agent-r2-critic.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round2-research-d-s4-agent-r2-research.md` and `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round2-session-runs.md`. I only searched `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md` for its provenance lines; I did not read it in full.
+Files read locally: `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round2-critic-d-s4-agent-r2-critic.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round2-research-d-s4-agent-r2-research.md` and `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round2-session-runs.md`. I only searched `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md` for its provenance lines; I did not read it in full.
 
-The saved documents are in `/Users/account/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/`:
+The saved documents are in `<home>/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/`:
 - `webfetch-1790791019505-h3ynwq.pdf` — CISA roadmap
 - `webfetch-1790791044903-fssqxw.pdf` — the French–German report
 - `webfetch-1790791170907-5p8o00.pdf` — the European Union Agency for Cybersecurity's AI-assisted development draft

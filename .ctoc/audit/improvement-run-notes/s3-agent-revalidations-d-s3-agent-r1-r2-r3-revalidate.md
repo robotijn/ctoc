@@ -2,19 +2,19 @@
 
 # Re-validation of the edited agent file: dispatch d-s3-agent-r1-revalidate
 
-File read in full: `/Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md`, 130 lines. I could not confirm the fingerprint (sha256:07d69318…): Read and Grep cannot compute a hash. I found no text in the file aimed at the validator.
+File read in full: `<home>/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md`, 130 lines. I could not confirm the fingerprint (sha256:07d69318…): Read and Grep cannot compute a hash. I found no text in the file aimed at the validator.
 
-**Result:** 30 claims examined. 29 are validated and 1 names its source's scope wrongly (row 16). None is fabricated and none lacks a source. All three operating-lesson quotes match `/Users/account/Code/ctoc/CLAUDE.md` on disk.
+**Result:** 30 claims examined. 29 are validated and 1 names its source's scope wrongly (row 16). None is fabricated and none lacks a source. All three operating-lesson quotes match `<home>/Code/ctoc/CLAUDE.md` on disk.
 
 "Reuse" means I read that source earlier this session, on 2026-09-30, and relied on that reading.
 
 | # | Line | Claim | Verdict | Source and evidence | Correct-to |
 |---|---|---|---|---|---|
-| 1 | 25 | `docs/REFINEMENT_LOOP.md` says "the loop is **NOT RUNNING** today" | VALIDATED | `/Users/account/Code/ctoc/docs/REFINEMENT_LOOP.md`:8, "## Status: this is a design record — the loop is **NOT RUNNING** today" | — |
-| 2 | 25 | The skill has "Refinement Loop — critic mode" and "Letter schema" sections, and a letter rule in "Severity" | VALIDATED | `/Users/account/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md` lines 427–486. Reuse: not re-read after any later edit. | — |
+| 1 | 25 | `docs/REFINEMENT_LOOP.md` says "the loop is **NOT RUNNING** today" | VALIDATED | `<home>/Code/ctoc/docs/REFINEMENT_LOOP.md`:8, "## Status: this is a design record — the loop is **NOT RUNNING** today" | — |
+| 2 | 25 | The skill has "Refinement Loop — critic mode" and "Letter schema" sections, and a letter rule in "Severity" | VALIDATED | `<home>/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md` lines 427–486. Reuse: not re-read after any later edit. | — |
 | 3 | 26 | The skill has a "Tool Integration (2026)" table | VALIDATED | Same skill file, line 412. Reuse. | — |
-| 4 | 41 | code-reviewer blocks a test with no assertion, a swallowed error, or a silent skip | VALIDATED | `/Users/account/Code/ctoc/agents/quality/code-reviewer.md`:165–196: "**BLOCK** if you find", "Tests without assertions", "Fixtures that swallow errors", "Conditional skips without clear reason" | — |
-| 5 | 34–45 | The 14 agents named in the table and handoff paragraph exist | VALIDATED | Each has a `name:` line under `/Users/account/Code/ctoc/agents/` | — |
+| 4 | 41 | code-reviewer blocks a test with no assertion, a swallowed error, or a silent skip | VALIDATED | `<home>/Code/ctoc/agents/quality/code-reviewer.md`:165–196: "**BLOCK** if you find", "Tests without assertions", "Fixtures that swallow errors", "Conditional skips without clear reason" | — |
+| 5 | 34–45 | The 14 agents named in the table and handoff paragraph exist | VALIDATED | Each has a `name:` line under `<home>/Code/ctoc/agents/` | — |
 | 6 | 45 | An async callback passed to forEach "does not wait for promises" (MDN) | VALIDATED | MDN, reuse: "`forEach()` expects a synchronous function — it does not wait for promises." | — |
 | 7 | 49 | Five of the classes carry a measurement | VALIDATED | Lines 51–53 cover exactly five: misread request, incomplete output, missing edge cases, hallucinated imports, tests changed to pass. Caveat: Tambon's percentages are shares of 333 bugs, not of all code; line 51 states that. | — |
 | 8 | 51 | Tambon et al. classified 333 bugs from CodeGen, PanGu-Coder and Codex | VALIDATED | arxiv.org/pdf/2403.08937, reuse (PDF read directly): "a random sample of 333 bugs" | — |
@@ -35,10 +35,10 @@ File read in full: `/Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-r
 | 23 | 57 | Sonar: "The models consistently introduced severe bugs like resource leaks and API contract violations, …" | VALIDATED | sonarsource.com blog, reuse | — |
 | 24 | 57 | Sonar "compares models with each other and gives no human baseline" | VALIDATED | Report PDF, page 4, read now. The "Our approach" section lists six models and "over 4,442 distinct Java programming assignments", with no set of human-written code. Pages 6–21 not read. | — |
 | 25 | 62 | "`false`: Claude Code adds no commit trailer" | VALIDATED | code.claude.com/docs/en/settings-reference.md, reuse | — |
-| 26 | 74 | `docs/DISPATCH_PROTOCOL.md` has five severity levels | VALIDATED | `/Users/account/Code/ctoc/docs/DISPATCH_PROTOCOL.md`:97, "# critical \| high \| medium \| low \| info" | — |
-| 27 | 74 | Lesson 9: "Deprecations, compiler/linter warnings, and vulnerabilities of any severity are critical" | VALIDATED | `/Users/account/Code/ctoc/CLAUDE.md`:921–922 (the sentence wraps across two lines) | — |
-| 28 | 74 | Lesson 7: "Never leave stubs or TODOs." | VALIDATED | `/Users/account/Code/ctoc/CLAUDE.md`:918 | — |
-| 29 | 74 | Lesson 14: "Weakening an assertion, widening a range, deleting a case, or whitelisting without a justified reason is green-washing, not fixing." | VALIDATED | `/Users/account/Code/ctoc/CLAUDE.md`:937 (heading of lesson 14), 942–943 (sentence) | — |
+| 26 | 74 | `docs/DISPATCH_PROTOCOL.md` has five severity levels | VALIDATED | `<home>/Code/ctoc/docs/DISPATCH_PROTOCOL.md`:97, "# critical \| high \| medium \| low \| info" | — |
+| 27 | 74 | Lesson 9: "Deprecations, compiler/linter warnings, and vulnerabilities of any severity are critical" | VALIDATED | `<home>/Code/ctoc/CLAUDE.md`:921–922 (the sentence wraps across two lines) | — |
+| 28 | 74 | Lesson 7: "Never leave stubs or TODOs." | VALIDATED | `<home>/Code/ctoc/CLAUDE.md`:918 | — |
+| 29 | 74 | Lesson 14: "Weakening an assertion, widening a range, deleting a case, or whitelisting without a justified reason is green-washing, not fixing." | VALIDATED | `<home>/Code/ctoc/CLAUDE.md`:937 (heading of lesson 14), 942–943 (sentence) | — |
 | 30 | 84 | The output follows the response schema of `docs/DISPATCH_PROTOCOL.md` | VALIDATED | That file, lines 88–155: `dispatch_id`, `protocol_version`, `agent`, `findings`, `confidence_rationale`, `self_assessment` (`coverage`, `confidence_overall`, `limitations`, `unknowns`), `metadata` (`tokens_used`, `tool_calls`). Not checked: whether the file's `tokens_used: null` is allowed; the protocol's example uses a number and line 149 lists the field as required. | — |
 
 **Counts:** examined 30 · VALIDATED 29 · FABRICATED 0 · UNSOURCEABLE 0 · MISATTRIBUTED 1 (row 16).
@@ -57,10 +57,10 @@ File read in full: `/Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-r
 
 **All 59 citation-shaped claims validated; none fabricated, unsourced or misattributed.** Rows 1–30 are the claims I validated in the two earlier passes. Rows 31–59 are new in round 2.
 
-I read `/Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md` in full. It is 132 lines, which matches the dispatch. I cannot confirm the fingerprint: Read and Grep do not compute a hash.
+I read `<home>/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md` in full. It is 132 lines, which matches the dispatch. I cannot confirm the fingerprint: Read and Grep do not compute a hash.
 
 - **Reuse:** I read that source earlier this session and relied on that reading.
-- **Round-2 reuse:** I relied on the round-2 researcher's reading in `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-agent-round2-research-d-s3-agent-r2-research.md`.
+- **Round-2 reuse:** I relied on the round-2 researcher's reading in `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-agent-round2-research-d-s3-agent-r2-research.md`.
 - **"(Part 1/Part 2 text)":** the quote appears in that report's Part 1 or Part 2 prose, not in its research_log quote field.
 
 | # | Line | Claim | Verdict | Source and basis |
@@ -91,7 +91,7 @@ I read `/Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md` 
 | 24 | 57 | Sonar compares models with each other and gives no human baseline | VALIDATED | Report PDF, page 4, "Our approach". Reuse. Pages 6–21 not read. |
 | 25 | 64 | "`false`: Claude Code adds no commit trailer" | VALIDATED | code.claude.com/docs/en/settings-reference.md. Reuse. |
 | 26 | 76 | `docs/DISPATCH_PROTOCOL.md` has five severity levels | VALIDATED | That file, line 97. Reuse. |
-| 27 | 76 | Lesson 9 quote | VALIDATED | `/Users/account/Code/ctoc/CLAUDE.md`:921–922. Reuse of this session's on-disk read. |
+| 27 | 76 | Lesson 9 quote | VALIDATED | `<home>/Code/ctoc/CLAUDE.md`:921–922. Reuse of this session's on-disk read. |
 | 28 | 76 | Lesson 7 quote | VALIDATED | Same file, line 918. Reuse. |
 | 29 | 76 | Lesson 14 quote | VALIDATED | Same file, lines 937 and 942–943. Reuse. |
 | 30 | 86–123 | The output follows the `docs/DISPATCH_PROTOCOL.md` response schema | VALIDATED | That file, lines 88–155. Reuse. |
@@ -141,7 +141,7 @@ Not examined this pass: whether each of the 16 handed-on agents' own definitions
 
 **83 of 84 claims are validated. The commit-trailer quote (row 25) is still wrong, because the page's own wording keeps changing.** Rows 1–59 are the claims from the earlier passes, with their current line numbers. Rows 60–84 are new in round 3.
 
-I read `/Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md` in full. It is 133 lines, which matches the dispatch. I cannot confirm the fingerprint: Read and Grep do not compute a hash.
+I read `<home>/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md` in full. It is 133 lines, which matches the dispatch. I cannot confirm the fingerprint: Read and Grep do not compute a hash.
 
 How each row was checked:
 - **Reuse:** my own earlier reading this session.
@@ -176,7 +176,7 @@ How each row was checked:
 | 24 | 57 | Sonar compares models with each other and gives no human baseline | VALIDATED | Report PDF, page 4. Reuse. Pages 6–21 not read. |
 | 25 | 65 | Settings reference offers "`false` to omit the trailer from every commit Claude Code makes" | **MISATTRIBUTED** | I re-read code.claude.com/docs/en/settings-reference.md this pass. The `attribution.commit` section now reads "Set this key to a custom string to replace the trailer text, or to `false` to hide it." and "`false`: Claude Code hides the trailer". Neither the round-3 wording nor my round-1 wording is there. The default trailer text also differs between my two reads ("Co-authored-by: Claude <claude@anthropic.com>" earlier, "Co-Authored-By: Claude Code <claude-code@anthropic.com>" now). Either the live page changed during the day or the fetch tool's reading model reworded it. The fact is stable across all three readings; the verbatim quote is not. Confidence medium.<br>**Correct-to:** state it without quotation marks: "Claude Code's settings reference documents setting `attribution.commit` to `false` to hide the commit trailer (https://code.claude.com/docs/en/settings-reference.md, read 2026-09-30)". |
 | 26 | 77 | `docs/DISPATCH_PROTOCOL.md` has five severity levels | VALIDATED | That file, line 97. Reuse. |
-| 27 | 77 | Lesson 9 quote | VALIDATED | `/Users/account/Code/ctoc/CLAUDE.md`:921–922. Reuse. |
+| 27 | 77 | Lesson 9 quote | VALIDATED | `<home>/Code/ctoc/CLAUDE.md`:921–922. Reuse. |
 | 28 | 77 | Lesson 7 quote | VALIDATED | Same file, line 918. Reuse. |
 | 29 | 77 | Lesson 14 quote | VALIDATED | Same file, lines 937 and 942–943. Reuse. |
 | 30 | 87–124 | The output follows the `docs/DISPATCH_PROTOCOL.md` response schema | VALIDATED | That file, lines 88–155. Reuse. |

@@ -18,7 +18,7 @@ I applied all the fixes the review and the security scan sent back, in both file
 - Record check: 16 of 16, run after the last record write.
 - The new lookup recipe: `bash -n` and `zsh -n` both exit 0, and its line matches line 2 of the session's tested recipe byte for byte.
 - All seven Python blocks in the skill parse. I ran the new prompt-injection example against a stub client: one tool call is accepted; two calls, a `max_tokens` stop and an answer outside the allowed list are all rejected; the hidden characters are gone from the text sent. I also ran `safe_log`: it wrote a line break as `\n` and still redacted an email address and a key.
-- **`npm test`:** exit 0; 12,035 passed, 0 failed, 0 cancelled, 0 skipped, 0 todo; coverage 99.9% against the floor of 99; offline claims ledger PASS; `[CTOC test-gate] PASS`. The output is at `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/s5-npm-test-final-4.out`. This is the run that `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-npm-test-final.md` names.
+- **`npm test`:** exit 0; 12,035 passed, 0 failed, 0 cancelled, 0 skipped, 0 todo; coverage 99.9% against the floor of 99; offline claims ledger PASS; `[CTOC test-gate] PASS`. The output is at `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/s5-npm-test-final-4.out`. This is the run that `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-npm-test-final.md` names.
 
 **Records:**
 - The agent's late correction for this return, `lc-s5-agent-5`, is written in the agent record and in `late-corrections.json`.

@@ -176,7 +176,7 @@ I could not recompute the fingerprint `sha256:6ac515dd…` because I have no Bas
 - **Step 2:** the anchored search works on the file's `- id: AML.T0051` form (session: line 1791). The sub-technique rule is correct (sub-technique entries have no `tactics` key). But the tactic values are list items under `tactics:` (second leftover).
 - **Step 3** is fine on success. On failure, step 1 leaves the temporary file behind with no printed path (third leftover).
 
-## 4. Skill lines to reconcile (`/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`)
+## 4. Skill lines to reconcile (`<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`)
 
 The critic's items 1–15 still stand. Two of them need widening:
 - item 2 should also cover lines 305 and 640;
@@ -248,21 +248,21 @@ Sources:
 - [ATLAS v2026.09 release](https://github.com/mitre-atlas/atlas-data/releases/tag/v2026.09) · [ATLAS releases](https://github.com/mitre-atlas/atlas-data/releases) · [data file at the tag](https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/dist/ATLAS.yaml) · [data file on main](https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/ATLAS.yaml) · [atlas.mitre.org](https://atlas.mitre.org/)
 - [CVE-2025-53773 record](https://cveawg.mitre.org/api/cve/CVE-2025-53773) · [Embrace The Red](https://embracethered.com/blog/posts/2025/github-copilot-remote-code-execution-via-prompt-injection/)
 - Repository files read:
-  - /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
-  - /Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
-  - /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-critic-d-s5-agent-r1-critic.md
-  - /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-validate-d-s5-agent-r1-validate.md
-  - /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-session-runs.md
-  - /Users/account/Code/ctoc/agents/coordinator/cto-chief.md
-  - /Users/account/Code/ctoc/agents/coordinator/ivv-chief.md
-  - /Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md
-  - /Users/account/Code/ctoc/agents/security/security-scanner.md
-  - /Users/account/Code/ctoc/agents/iron-loop/red-team-critic.md
-  - /Users/account/Code/ctoc/skills/security/sast-scanner/SKILL.md
-  - /Users/account/Code/ctoc/skills/compliance/ai-governance-checker/SKILL.md
-  - /Users/account/Code/ctoc/docs/REFINEMENT_LOOP.md
-  - /Users/account/Code/ctoc/docs/DISPATCH_PROTOCOL.md
-  - /Users/account/Code/ctoc/.ctoc/architecture/dispatch-schema.yaml
+  - <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
+  - <home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
+  - <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-critic-d-s5-agent-r1-critic.md
+  - <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-validate-d-s5-agent-r1-validate.md
+  - <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-session-runs.md
+  - <home>/Code/ctoc/agents/coordinator/cto-chief.md
+  - <home>/Code/ctoc/agents/coordinator/ivv-chief.md
+  - <home>/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md
+  - <home>/Code/ctoc/agents/security/security-scanner.md
+  - <home>/Code/ctoc/agents/iron-loop/red-team-critic.md
+  - <home>/Code/ctoc/skills/security/sast-scanner/SKILL.md
+  - <home>/Code/ctoc/skills/compliance/ai-governance-checker/SKILL.md
+  - <home>/Code/ctoc/docs/REFINEMENT_LOOP.md
+  - <home>/Code/ctoc/docs/DISPATCH_PROTOCOL.md
+  - <home>/Code/ctoc/.ctoc/architecture/dispatch-schema.yaml
 
 ```yaml
 dispatch_response:
@@ -271,7 +271,7 @@ dispatch_response:
   agent: ai-quality/citation-validator
   agent_version: "not visible to this agent"
   completed_at: null            # no clock read this run; date 2026-10-01
-  target: /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
+  target: <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
   counts:
     examined: 81
     validated: 77

@@ -62,7 +62,7 @@ Runs 1, 2, 3 and 5 cover the plan's test, the agent-shape test and the README co
 - The error code for a folder created over a file on other platforms. I observed `EEXIST` here only, and check 20 asserts "not fetched", not the code.
 - Anything on Windows.
 
-The files are in `/Users/account/Code/ctoc/`: the two new files, the ten changed files listed above, and the plan at `plans/in-progress/00415-deepthink-ships-with-ctoc-s5-web-only-reading-agent.md`. Run outputs are `s5-run1.txt`–`s5-run5.txt`, `s5-partA-list.txt`, `s5-list-final.txt` and `s5-npm-test.txt` in `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/deepthink/`.
+The files are in `<home>/Code/ctoc/`: the two new files, the ten changed files listed above, and the plan at `plans/in-progress/00415-deepthink-ships-with-ctoc-s5-web-only-reading-agent.md`. Run outputs are `s5-run1.txt`–`s5-run5.txt`, `s5-partA-list.txt`, `s5-list-final.txt` and `s5-npm-test.txt` in `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/deepthink/`.
 
 
 ---
@@ -124,7 +124,7 @@ The scan's verdict is recorded as warn, with the earlier high finding closed by 
 - Whether `WebFetch` can reach an internal address.
 - Anything on Windows; the symbolic-link cases are left out there by design.
 
-The changed files are under `/Users/account/Code/ctoc/`: the agent, the skill, the program, the plan's test, the agent-shape test, and the plan at `plans/in-progress/00415-deepthink-ships-with-ctoc-s5-web-only-reading-agent.md`. Run outputs are in `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/deepthink/`: `s5r-red.txt`, `s5r-probe-before.txt`, `s5r-probe-after.txt`, `s5r-green.txt`, `s5r-list.txt` and `s5r-npm-test.txt`.
+The changed files are under `<home>/Code/ctoc/`: the agent, the skill, the program, the plan's test, the agent-shape test, and the plan at `plans/in-progress/00415-deepthink-ships-with-ctoc-s5-web-only-reading-agent.md`. Run outputs are in `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/deepthink/`: `s5r-red.txt`, `s5r-probe-before.txt`, `s5r-probe-after.txt`, `s5r-green.txt`, `s5r-list.txt` and `s5r-npm-test.txt`.
 
 
 ---
@@ -183,4 +183,4 @@ Slice 5's second return is done. Re-scan findings 9, 10 and 11 and the final rev
 - The new agent and the plugin program in a live session.
 - Anything on Windows.
 
-The changed files are `/Users/account/Code/ctoc/skills/deepthink/fetch-papers.cjs`, `/Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`, `/Users/account/Code/ctoc/tests/watcher-shape.test.js` and the plan at `/Users/account/Code/ctoc/plans/in-progress/00415-deepthink-ships-with-ctoc-s5-web-only-reading-agent.md`. Run outputs (`s5t2-red.txt`, `s5t-routes-before.txt`, `s5t-routes-after.txt`, `s5t2-green.txt`, `s5t2-list.txt`, `s5t2-npm-test.txt`) and the variant files (`s5t-variants/`) are in `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/deepthink/`.
+The changed files are `<home>/Code/ctoc/skills/deepthink/fetch-papers.cjs`, `<home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`, `<home>/Code/ctoc/tests/watcher-shape.test.js` and the plan at `<home>/Code/ctoc/plans/in-progress/00415-deepthink-ships-with-ctoc-s5-web-only-reading-agent.md`. Run outputs (`s5t2-red.txt`, `s5t-routes-before.txt`, `s5t-routes-after.txt`, `s5t2-green.txt`, `s5t2-list.txt`, `s5t2-npm-test.txt`) and the variant files (`s5t-variants/`) are in `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/deepthink/`.

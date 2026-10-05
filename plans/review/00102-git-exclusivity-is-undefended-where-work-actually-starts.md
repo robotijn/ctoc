@@ -539,7 +539,7 @@ evidence artifact is honest and has NOT been touched. What it records:
 
 ```
 ✖ ESLint reports zero errors across the codebase
-  /Users/account/Code/ctoc/tests/deployment.test.js
+  <home>/Code/ctoc/tests/deployment.test.js
     285:10  error  'testStrategyFailurePathShape' is defined but never used
 [CTOC test-gate] coverage 99.04% (threshold 99%), skipped 0, failed 1
 ```

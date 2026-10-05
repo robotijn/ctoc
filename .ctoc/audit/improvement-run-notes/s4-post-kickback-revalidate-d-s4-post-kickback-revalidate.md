@@ -18,7 +18,7 @@ The claims you named specifically hold:
 
 I made 23 fetches and 1 search, out of the 30 allowed. No fetched page contained text aimed at a reviewer.
 
-## Wrapper: `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`
+## Wrapper: `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`
 
 | Line | Claim | Verdict | Source sentence |
 |---|---|---|---|
@@ -48,7 +48,7 @@ I made 23 fetches and 1 search, out of the 30 allowed. No fetched page contained
 | 317 | date-fns `formatISO` returns "The formatted date string (in local time zone)" at `date-fns@4.4.0` | VERIFIED | unpkg: "@returns The formatted date string (in local time zone)". The registry has `"version": "4.4.0"` |
 | 350 | "could be re-registered by threat actors" (CISA and MITRE); PyPI, crates.io and Maven Central recipes print no maintainers | VERIFIED | MITRE today: "This may also include abandoned packages, which in some cases could be re-registered by threat actors after being removed by adversaries." Recipe code. There is a lead below |
 
-## Skill: `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
+## Skill: `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
 
 | Line | Claim | Verdict | Source sentence |
 |---|---|---|---|
@@ -108,7 +108,7 @@ Each `old` below occurs exactly once in its file, confirmed with exact-string se
 - **Anything run.** I ran none of the recipes and did not re-run the C17 compile; those rest on the session and executor notes.
 - **The re-registration case itself.** I did not check whether npm keeps `created` when someone else registers a name after it was unpublished.
 
-Files: `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`, `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round3-session-runs.md`
+Files: `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`, `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-step13-secure-d-s4-step13-secure.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round3-session-runs.md`
 
 ```yaml
 response:

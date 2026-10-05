@@ -188,16 +188,16 @@ The recommended one is **f-28**: its status line leaves out the 42-character key
 - [Morris and others, arXiv HTML](https://arxiv.org/html/2310.06816)
 - [Formation blog post](https://formation.dev/blog/embedding-model-upgrade-migration)
 - Local files:
-  - `/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
-  - `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-research-d-s5-skill-r3-research.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-revalidate-d-s5-skill-r2-revalidate.md`
-  - `/Users/account/Code/ctoc/tests/cu5-s4-compliance-aiquality-wrappers.test.js`
-  - `/Users/account/Code/ctoc/tests/skill-loading.test.js`
+  - `<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
+  - `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-research-d-s5-skill-r3-research.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-revalidate-d-s5-skill-r1-revalidate.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-revalidate-d-s5-skill-r2-revalidate.md`
+  - `<home>/Code/ctoc/tests/cu5-s4-compliance-aiquality-wrappers.test.js`
+  - `<home>/Code/ctoc/tests/skill-loading.test.js`
   - `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/ATLAS-2026.09.yaml` (lines 9001–9048)
 
 ```yaml

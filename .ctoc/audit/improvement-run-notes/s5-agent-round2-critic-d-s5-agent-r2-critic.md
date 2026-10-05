@@ -432,4 +432,4 @@ critique:
 33. **Lines 263 and 638: media inputs can now be sourced.** The LLM01:2026 definition includes "image, audio, or video content". AML.T0129 Triggers in Multimodal Inputs is present in the current data; its tactics were not read.
 34. **Lines 296, 362 and 485: markdown-image exfiltration can now be sourced.** NIST AI 100-2 E2025 page 53: "Attackers may also be able to exploit features like markdown image rendering to exfiltrate data".
 
-Files: `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md` (target), `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md` (the authoritative raw reads and the tested recipe), `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-research-d-s5-agent-r2-research.md`.
+Files: `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md` (target), `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md` (the authoritative raw reads and the tested recipe), `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-research-d-s5-agent-r2-research.md`.

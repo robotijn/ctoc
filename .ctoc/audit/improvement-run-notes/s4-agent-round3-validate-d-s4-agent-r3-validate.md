@@ -39,7 +39,7 @@ No fetched page addressed a reviewer or validator. The agency's draft contains s
 | 5 | 2a | "Flag unnecessary or risky installation behaviour, such as unusual install scripts, post-install hooks…" | VALIDATED | Draft, table 5, printed page 21, row "Usage of secure practices" | "…post-install hooks or excessive dependency chains." The ellipsis is faithful. | — |
 | 6 | 2a, 8b, 9 | "version 0.4, draft, September 2026, table 5" | VALIDATED | Draft, cover and page headers | Header "Version: 0.4", a "DRAFT" watermark, cover "SEPTEMBER 2026", "Table 5: recommendation-to-instruction" | Precision, optional: table 5 is "Example skill content", and the page says "The wording is illustrative and should be adapted". The locator could read "table 5, example skill content". |
 | 7 | 2a | bcrypt's `"install": "node-gyp-build"` | VALIDATED | bcrypt `latest` (6.0.0) | `{"test":"jest","build":"prebuildify --napi --tag-libc --strip","install":"node-gyp-build"}` | Same JSON value; the only difference is the space after the colon. |
-| 8 | 2a, 2b | dependency-auditor owns "install-time hook abuse" | VALIDATED | `/Users/account/Code/ctoc/agents/security/dependency-auditor.md` line 3 | "flags typosquats, install-time hook abuse and unmaintained packages" | — |
+| 8 | 2a, 2b | dependency-auditor owns "install-time hook abuse" | VALIDATED | `<home>/Code/ctoc/agents/security/dependency-auditor.md` line 3 | "flags typosquats, install-time hook abuse and unmaintained packages" | — |
 | 9 | 4a | "A valid name consists only of ASCII letters and numbers, period, underscore and hyphen." | VALIDATED | Packaging specification, live today, and a character comparison with round-2 validation line 66 | Identical (one exact-literal Grep matched in both notes) | — |
 | 10 | 6d | Scoped downloads body `{"downloads":116807845,"start":"2026-09-22","end":"2026-09-28","package":"@isaacs/cliui"}` | VALIDATED | api.npmjs.org, `%2f` form | Identical | — |
 | 11 | 6d | sigstore fields; `repository` `{"url":"git+https://github.com/sigstore/sigstore-js.git","type":"git"}` | VALIDATED | `sigstore/latest` (5.0.0) | The repository value is identical. `dist.attestations`, `_npmUser.trustedPublisher` (`"id":"github"`) and `maintainers` (`bdehamer`) are all present. | — |
@@ -138,9 +138,9 @@ response:
 ```
 
 Files:
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-critic-d-s4-agent-r3-critic.md`
-- `/Users/account/Code/ctoc/agents/security/dependency-auditor.md`
-- Saved PDFs, under `/Users/account/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/`:
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-critic-d-s4-agent-r3-critic.md`
+- `<home>/Code/ctoc/agents/security/dependency-auditor.md`
+- Saved PDFs, under `<home>/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/`:
   - `webfetch-1790792100709-2lz2kx.pdf` (joint report)
   - `webfetch-1790792116507-xbjxsi.pdf` (draft advisory on AI-assisted development)
   - `webfetch-1790792186381-c1nfvx.pdf` (final package-manager advisory)

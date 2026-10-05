@@ -125,10 +125,10 @@ Item 2: option 1 (line 564) lists no cost.
 - **Not verified by anyone:** a live session following the new rules, and a checkout with Windows line endings.
 
 Files:
-- /Users/account/Code/ctoc/skills/ask-me-questions/SKILL.md
-- /Users/account/Code/ctoc/.ctoc/ask-me-questions.md
-- /Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js
-- /Users/account/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md
-- /Users/account/Code/ctoc/.ctoc/audit/deepthink-run-notes/s1-step13-secure-2-d-deepthink-s1-step13-secure-2.md
-- /Users/account/Code/ctoc/evals/lib/graders.js
-- /Users/account/Code/ctoc/src/lib/approval-ledger.js
+- <home>/Code/ctoc/skills/ask-me-questions/SKILL.md
+- <home>/Code/ctoc/.ctoc/ask-me-questions.md
+- <home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js
+- <home>/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md
+- <home>/Code/ctoc/.ctoc/audit/deepthink-run-notes/s1-step13-secure-2-d-deepthink-s1-step13-secure-2.md
+- <home>/Code/ctoc/evals/lib/graders.js
+- <home>/Code/ctoc/src/lib/approval-ledger.js

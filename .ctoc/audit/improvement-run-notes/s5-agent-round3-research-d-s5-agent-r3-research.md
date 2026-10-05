@@ -155,7 +155,7 @@ This supports line 22's "No source read for this file says that entry replacesâ€
 dispatch_response:   # finding shape per .ctoc/architecture/dispatch-schema.yaml
   dispatch_id: d-s5-agent-r3-research
   agent: ai-quality/citation-validator
-  target: /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
+  target: <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
   fingerprint_checked: false          # no hashing tool; 326 lines read at dispatch start
   raw_rereads: {owasp_2025_quotes: 14, verbatim: 13, words_verbatim_not_contiguous: 1, mcp_quotes: 7, mcp_verbatim: 5, mcp_nested_quote_rendering: 2}
   findings:

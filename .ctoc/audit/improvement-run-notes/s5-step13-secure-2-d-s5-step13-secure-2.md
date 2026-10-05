@@ -6,7 +6,7 @@ Dispatch d-s5-step13-secure-2, received 2026-10-01 12:42 CEST. Saved by the sess
 
 **Verdict: warn.** I found no critical or high finding and no secret. All five recipe cases that your earlier form accepted now fail closed, and no temporary file is left on any failing branch. Two of the three earlier medium findings (1 and 3) are fully closed. The third (2) is closed for the place the model reads the text, and one new low finding covers what it leaves open. Neither `.ctoc/security-policy.yaml` nor `.security/baseline.sarif` exists, so the default policy applies: block on critical, high or a verified secret, otherwise warn. That leaves three new low findings and four informational ones.
 
-## A. ATLAS lookup recipe, `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md` lines 32–35
+## A. ATLAS lookup recipe, `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md` lines 32–35
 
 I extracted lines 32–33 with the indent removed: 978 bytes, sha256 `7aeeecb8…`. It is byte-identical to `recipe-v3-50.sh`. I ran it under your curl and mktemp stand-ins with a fresh temp folder for each run, one case per Bash call. Each case ran in `/bin/bash` 3.2 and `zsh -f`, and seven ran again in the Bash tool's own shell, where `grep` is the embedded ugrep. There were 90 recipe runs in all, and every one exited 0.
 
@@ -95,7 +95,7 @@ Your brief describes 6–9 as recipe findings. In my report they were skill find
 10. **Informational, unchanged.** I did not re-test it; step 2 is outside this re-scan.
 11. **Re-confirmed.** All 90 runs exited 0.
 12. **Re-confirmed.** The tool shell gave the same results as bash and zsh, except the NUL-in-data case, where ugrep's `-I` gives release mismatch.
-13. **Still open; your call.** Six lines in `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-research-d-s5-skill-r3-research.md` contain the account name or user id.
+13. **Still open; your call.** Six lines in `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-research-d-s5-skill-r3-research.md` contain the account name or user id.
 
 Line 35's disclosure "the 50-second limit was set after those runs" is now superseded: this scan ran the 50-second form against all 18 cases and once live.
 

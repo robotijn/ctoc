@@ -142,29 +142,29 @@ One wording observation with no fix proposed: the description says the agent "le
 - [Microsoft Security Update Guide data](https://api.msrc.microsoft.com/sug/v2.0/en-US/affectedProduct?$filter=cveNumber%20eq%20'CVE-2025-53773')
 - MITRE ATLAS: [manifest](https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/manifest.yaml) · [README at v2026.09](https://raw.githubusercontent.com/mitre-atlas/atlas-data/v2026.09/README.md) · [data file for release 2026.09](https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/v6/ATLAS-2026.09.yaml) · [deprecated data file](https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/ATLAS.yaml)
 - [Top 10 for the Model Context Protocol, index](https://raw.githubusercontent.com/OWASP/www-project-mcp-top-10/main/index.md)
-- Agentic document, saved copy `/Users/account/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790808415371-uzxr9m.pdf`, file pages 2, 3 and 16
+- Agentic document, saved copy `<home>/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790808415371-uzxr9m.pdf`, file pages 2, 3 and 16
 - Article 15: [artificialintelligenceact.eu (secondary; differs)](https://artificialintelligenceact.eu/article/15/) · [Official Journal, a result of the web search](https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=OJ%3AL_202401689) · [eur-lex ELI page, a result of the web search](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng)
 - Repository files:
-  - `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md`
-  - `/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
-  - `/Users/account/Code/ctoc/tests/cu5-s4-compliance-aiquality-wrappers.test.js`
-  - `/Users/account/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md`
-  - `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/` (the round 1–3 session notes, the round-3 critique and validation, the round-1 and round-2 re-reads)
-  - `/Users/account/Code/ctoc/CLAUDE.md`
-  - `/Users/account/Code/ctoc/agents/coordinator/cto-chief.md`
-  - `/Users/account/Code/ctoc/agents/coordinator/ivv-chief.md`
-  - `/Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md`
-  - `/Users/account/Code/ctoc/agents/security/security-scanner.md`
-  - `/Users/account/Code/ctoc/agents/iron-loop/red-team-critic.md`
-  - `/Users/account/Code/ctoc/docs/REFINEMENT_LOOP.md`
-  - `/Users/account/Code/ctoc/skills/specialized/translation-checker/SKILL.md`
-  - `/Users/account/Code/ctoc/skills/agent-fragments/honest-status.md`
+  - `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md`
+  - `<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
+  - `<home>/Code/ctoc/tests/cu5-s4-compliance-aiquality-wrappers.test.js`
+  - `<home>/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md`
+  - `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/` (the round 1–3 session notes, the round-3 critique and validation, the round-1 and round-2 re-reads)
+  - `<home>/Code/ctoc/CLAUDE.md`
+  - `<home>/Code/ctoc/agents/coordinator/cto-chief.md`
+  - `<home>/Code/ctoc/agents/coordinator/ivv-chief.md`
+  - `<home>/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md`
+  - `<home>/Code/ctoc/agents/security/security-scanner.md`
+  - `<home>/Code/ctoc/agents/iron-loop/red-team-critic.md`
+  - `<home>/Code/ctoc/docs/REFINEMENT_LOOP.md`
+  - `<home>/Code/ctoc/skills/specialized/translation-checker/SKILL.md`
+  - `<home>/Code/ctoc/skills/agent-fragments/honest-status.md`
 
 ```yaml
 dispatch_response:   # finding shape per .ctoc/architecture/dispatch-schema.yaml
   dispatch_id: d-s5-agent-r3-revalidate
   agent: ai-quality/citation-validator
-  target: /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
+  target: <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
   fingerprint_checked: false            # no hashing tool
   landing: {changes_confirmed: 33, leftovers_confirmed: 3, executor_note_confirmed: 1, deviations: 0, recipe_byte_identical_three_files: true}
   claims: {examined: 39, validated: 39, refuted: 0, misattributed: 0, unverifiable: 0, source_divergences_recorded: 1}

@@ -166,17 +166,17 @@ Kept by earlier decisions, not leftovers: the "Coding-agent config files" label 
 - https://export.arxiv.org/api/query?id_list=2310.06816 (HTTP 429)
 
 Local files:
-- `/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
-- `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md`, `s5-skill-round2-session-runs.md`, `s5-skill-round3-session-runs.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md`
-- `/Users/account/Code/ctoc/skills/security/sast-scanner/SKILL.md`
-- `/Users/account/Code/ctoc/skills/saas/multi-tenancy-row-level/SKILL.md`
-- `/Users/account/Code/ctoc/docs/REFINEMENT_LOOP.md`
-- `/Users/account/Code/ctoc/skills/agent-fragments/warnings-are-critical.md`
-- `/Users/account/Code/ctoc/.ctoc/architecture/refinement-loop-schema.json`
+- `<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
+- `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-critic-d-s5-skill-r3-critic.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-validate-d-s5-skill-r3-validate.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md`, `s5-skill-round2-session-runs.md`, `s5-skill-round3-session-runs.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md`
+- `<home>/Code/ctoc/skills/security/sast-scanner/SKILL.md`
+- `<home>/Code/ctoc/skills/saas/multi-tenancy-row-level/SKILL.md`
+- `<home>/Code/ctoc/docs/REFINEMENT_LOOP.md`
+- `<home>/Code/ctoc/skills/agent-fragments/warnings-are-critical.md`
+- `<home>/Code/ctoc/.ctoc/architecture/refinement-loop-schema.json`
 
 ```yaml
 dispatch_id: d-s5-skill-r3-revalidate

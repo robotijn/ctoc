@@ -90,7 +90,7 @@ assert.ok(source.includes(STEP_TWO_QUESTION_BULLET), 'Step 2 must name the quest
    - The menu's "Recommended." sits outside the inner matrix block, so the matrix grader does not count it.
    - The new template block contains no vertical-line character, so the example finder still finds the example.
    - "Reply with a letter." is the last non-empty line.
-8. **The execution record is honest and complete,** apart from finding 4 and the comment claim covered in finding 3. The fingerprints, the full 234-line comparison with the home folder shortened, the failing run, the "Not verified" list and decisions 12–14 are all candid. The shortening turns `a/Users/account/...` into `a<home>/...`, which line 197 discloses.
+8. **The execution record is honest and complete,** apart from finding 4 and the comment claim covered in finding 3. The fingerprints, the full 234-line comparison with the home folder shortened, the failing run, the "Not verified" list and decisions 12–14 are all candid. The shortening turns `a<home>/...` into `a<home>/...`, which line 197 discloses.
 9. **I would not let it ship until findings 1–3 are fixed.** Two more points are not blocking:
    - **Optional drift guard.** In check 6, add: `assert.ok(fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'instruction-gate-words-scan.js'), 'utf8').includes('const GATE_DIGIT = ' + String(GATE_DIGIT) + ';'), 'the restated GATE_DIGIT has drifted from its source');`
    - **Before the commit.** The executor did not compare what else changed inside `README.md` and `CLAUDE.md`. I confirmed the three count lines read 545 (`README.md` line 1143, `CLAUDE.md` lines 321 and 704) but could not see the rest of their changes. The working tree also holds uncommitted work from the dependency-analyzer improvement build (`agents/architecture/dependency-analyzer.md`, `HANDOFF.md`, its deleted to-do plan). The commit must stage only this build's changes.
@@ -104,7 +104,7 @@ assert.ok(source.includes(STEP_TWO_QUESTION_BULLET), 'Step 2 must name the quest
 - **Does the letter b clash with Back?** On dashboard screens "b" means Back (`src/commands/start.md` line 373, and his menu-keys note). A discussion question asked from the menu now ends with "b) option two".
 
 Files:
-- `/Users/account/Code/ctoc/skills/ask-me-questions/SKILL.md`
-- `/Users/account/Code/ctoc/.ctoc/ask-me-questions.md`
-- `/Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
-- `/Users/account/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md`
+- `<home>/Code/ctoc/skills/ask-me-questions/SKILL.md`
+- `<home>/Code/ctoc/.ctoc/ask-me-questions.md`
+- `<home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
+- `<home>/Code/ctoc/plans/in-progress/00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in.md`

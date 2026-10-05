@@ -396,10 +396,10 @@ Every Bash and Grep line I add is one the session ran, with section 3 or section
   - The unescaped dot in the release lets one other character stand in the path. The release check still applies.
 
 Files:
-- `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md`
-- `/Users/account/Code/ctoc/tests/compliance-claims-match-code.test.js`
-- `/Users/account/Code/ctoc/agents/compliance/eu-ai-act-agent.md`
-- `/Users/account/Code/ctoc/skills/compliance/ai-governance-checker/SKILL.md`
+- `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round2-session-runs.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round3-research-d-s5-agent-r3-research.md`
+- `<home>/Code/ctoc/tests/compliance-claims-match-code.test.js`
+- `<home>/Code/ctoc/agents/compliance/eu-ai-act-agent.md`
+- `<home>/Code/ctoc/skills/compliance/ai-governance-checker/SKILL.md`

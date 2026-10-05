@@ -188,11 +188,11 @@ Sources:
 - [garak on PyPI](https://pypi.org/pypi/garak/json) · [PyRIT command-line directory](https://github.com/microsoft/PyRIT/tree/main/pyrit/cli) · [PyRIT pyproject.toml](https://raw.githubusercontent.com/microsoft/PyRIT/main/pyproject.toml)
 
 Files:
-- /Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
-- /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md
+- <home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
+- <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-session-runs.md
 
 ```yaml
 dispatch_id: d-s5-skill-r1-revalidate

@@ -12,7 +12,7 @@ All 21 `old:` strings occur exactly once in the current file.
 2. pubs.opengroup.org, `basedefs/V1_chap09.html`
 3. slsa.dev/spec/v1.1/threats
 4. doc.rust-lang.org, reference page on extern crates
-5. The USENIX PDF. It was saved to `/Users/account/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790790330893-6989qo.pdf`. I read PDF pages 1–3, 7, 10 and 12 myself as page images. Their printed page numbers are 3687, 3688, 3692, 3695 and 3697.
+5. The USENIX PDF. It was saved to `<home>/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790790330893-6989qo.pdf`. I read PDF pages 1–3, 7, 10 and 12 myself as page images. Their printed page numbers are 3687, 3688, 3692, 3695 and 3697.
 6. The USENIX presentation page
 7. The OpenSSF Concise Guide
 8. The OpenSSF guide for AI code assistant instructions

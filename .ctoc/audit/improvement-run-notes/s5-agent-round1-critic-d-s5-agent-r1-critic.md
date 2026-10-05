@@ -1046,12 +1046,12 @@ Adding a tool, a Model Context Protocol server, a retrieval source or a memory w
 - **Order table:** change 23.
 
 Files read for this critique:
-- `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md`
-- `/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
-- `/Users/account/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-research-d-s5-agent-r1-research.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-research-gaps-d-s5-agent-r1-research-gaps.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-session-runs.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-steps-8-9-baseline-executor.md`
+- `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md`
+- `<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
+- `<home>/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-research-d-s5-agent-r1-research.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-research-gaps-d-s5-agent-r1-research-gaps.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-session-runs.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-steps-8-9-baseline-executor.md`
 
 **Risk.** The largest risk is the verbatim `old` for change 19, which spans 98 lines; any whitespace drift makes the edit fail loudly rather than silently. The next is whether Bash has network access at run time, which the file now handles by writing "not resolved". Every web fact comes second-hand from the research notes and must pass the validator. My own presence checks were limited to exact-string searches.

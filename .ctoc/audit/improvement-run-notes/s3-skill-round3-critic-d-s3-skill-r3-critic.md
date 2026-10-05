@@ -267,7 +267,7 @@ On the disputed spelling: I read printed page 9 again. As I read the page image,
       "id": "f-s3-skill-r3-21",
       "kind": "new",
       "text": "The disputed spelling on the regulator's page 9, which the agent file quotes. I read printed page 9 of the saved PDF as an image this round. As I read it, the page prints 'incorrect or completetly hallucinated, which might lead to security issues and reduce code maintenability', which is what the agent file quotes. The round-3 researcher read 'completly'. Both readings are of a page image; neither is a text extraction, and I have no tool that extracts the PDF's text layer. So I propose no change and rate my reading medium confidence. A correction on my own part: in the agent's round 3 (f-s3-agent-r3-8) I wrote 'completely', silently fixing the source's typo. The executor's re-validation replaced it with the source's spelling.",
-      "evidence": "/Users/account/.claude/projects/-Users-account-Code-ctoc/26a2fcc0-aa46-4510-a665-3c2f0ee314f5/tool-results/webfetch-1790763462989-llcq7m.pdf, printed page 9, read 2026-09-30; agents/ai-quality/ai-code-quality-reviewer.md:62 ('completetly hallucinated'); round-3 report Part 3 item 9",
+      "evidence": "<home>/.claude/projects/-Users-account-Code-ctoc/26a2fcc0-aa46-4510-a665-3c2f0ee314f5/tool-results/webfetch-1790763462989-llcq7m.pdf, printed page 9, read 2026-09-30; agents/ai-quality/ai-code-quality-reviewer.md:62 ('completetly hallucinated'); round-3 report Part 3 item 9",
       "proposed_change": null,
       "needs_human": false
     }

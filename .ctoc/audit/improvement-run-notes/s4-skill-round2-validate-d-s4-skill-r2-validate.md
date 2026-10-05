@@ -120,8 +120,8 @@ All five are the summarising tool's word, not a byte search:
 - **The critic's "Carried to round 3" items:** out of scope for this dispatch.
 
 Files relevant to this validation:
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round2-critic-d-s4-skill-r2-critic.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round2-session-runs.md`
-- `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
-- `/Users/account/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790798686019-qwmypr.pdf` (the European Union Agency for Cybersecurity's advisory, version 1.1, fetched today)
-- `/Users/account/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790798726657-3vzlq7.pdf` (the USENIX paper, fetched today)
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round2-critic-d-s4-skill-r2-critic.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round2-session-runs.md`
+- `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
+- `<home>/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790798686019-qwmypr.pdf` (the European Union Agency for Cybersecurity's advisory, version 1.1, fetched today)
+- `<home>/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790798726657-3vzlq7.pdf` (the USENIX paper, fetched today)

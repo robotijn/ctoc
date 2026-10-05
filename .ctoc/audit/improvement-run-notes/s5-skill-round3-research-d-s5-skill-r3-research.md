@@ -243,12 +243,12 @@ I checked the agent file: it does not use the labels "MCP server hygiene" or "MC
 - Search results consulted: [Prompt Security blog](https://prompt.security/blog/the-embedded-threat-in-your-llm-poisoning-rag-pipelines-via-vector-embeddings), [Oracle, RAG index drift](https://blogs.oracle.com/developers/how-to-detect-rag-index-drift-deleted-docs-stale-chunks-and-duplicate-embeddings)
 
 Local files read:
-- /Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
-- /Users/account/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md
-- /Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md
+- <home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md
+- <home>/Code/ctoc/plans/in-progress/00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md
+- <home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round3-session-runs.md
 - /private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/ATLAS-2026.09.yaml (lines 8995–9070)
-- /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md (searched for section labels only)
+- <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md (searched for section labels only)
 
 ```yaml
 dispatch_id: d-s5-skill-r3-research

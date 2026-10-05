@@ -175,7 +175,7 @@ The session already verified AML.T0034, T0051 (sub-techniques .000, .001, .002),
 - [LangSmith masking](https://docs.langchain.com/langsmith/mask-inputs-outputs)
 - [Firecracker](https://firecracker-microvm.github.io/) · [gVisor docs](https://gvisor.dev/docs/) · [gVisor README](https://raw.githubusercontent.com/google/gvisor/master/README.md) · [Docker rootless](https://docs.docker.com/engine/security/rootless/) · [WebAssembly security](https://webassembly.org/docs/security/)
 
-Files: `/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md`, `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/nist-ai-100-2e2025.pdf`, and the Vec2Text PDF saved at `/Users/account/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790818841207-c202bg.pdf`
+Files: `<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-critic-d-s5-skill-r1-critic.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round1-validate-d-s5-skill-r1-validate.md`, `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/nist-ai-100-2e2025.pdf`, and the Vec2Text PDF saved at `<home>/.claude/projects/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/tool-results/webfetch-1790818841207-c202bg.pdf`
 
 ```yaml
 dispatch_id: d-s5-skill-r2-research

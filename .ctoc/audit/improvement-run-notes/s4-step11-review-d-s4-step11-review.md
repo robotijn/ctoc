@@ -170,7 +170,7 @@
 
 ## What I did not read or run
 
-- **No diff.** I could not run git and found no diff the session prepared. As the pre-edit copy I used the marketplace copies under `/Users/account/.claude/plugins/marketplaces/robotijn/`. I did not check that they are byte-identical to the committed files.
+- **No diff.** I could not run git and found no diff the session prepared. As the pre-edit copy I used the marketplace copies under `<home>/.claude/plugins/marketplaces/robotijn/`. I did not check that they are byte-identical to the committed files.
 - **Nothing executed.** I ran no test, hashed no file, fetched no web source and ran no recipe. Every fingerprint and test result above is taken from the plan and the notes.
 - **Partial record reading.**
   - Skill record: round 1 and round 3 findings and sources, beyond the count lines.
@@ -180,13 +180,13 @@
 - **Believed, not checked:** the download order behind item 3, and the time-zone behaviour behind item 19.
 
 Files:
-- `/Users/account/Code/ctoc/plans/in-progress/00264-every-agent-and-specialist-skill-improved-three-times-s4-hallucination-detector.md`
-- `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`
-- `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/agents/ai-quality/hallucination-detector.md.json`
-- `/Users/account/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/skills/ai-quality/hallucination-detector/SKILL.md.json`
-- `/Users/account/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/late-corrections.json`
-- `/Users/account/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/for-the-human.json`
-- `/Users/account/Code/ctoc/.ctoc/inbox/questions/1790801303564-1rhgy4.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round2-revalidate-d-s4-skill-r2-revalidate.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round3-revalidate-d-s4-skill-r3-revalidate.md`
+- `<home>/Code/ctoc/plans/in-progress/00264-every-agent-and-specialist-skill-improved-three-times-s4-hallucination-detector.md`
+- `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`
+- `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
+- `<home>/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/agents/ai-quality/hallucination-detector.md.json`
+- `<home>/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/skills/ai-quality/hallucination-detector/SKILL.md.json`
+- `<home>/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/late-corrections.json`
+- `<home>/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/for-the-human.json`
+- `<home>/Code/ctoc/.ctoc/inbox/questions/1790801303564-1rhgy4.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round2-revalidate-d-s4-skill-r2-revalidate.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round3-revalidate-d-s4-skill-r3-revalidate.md`

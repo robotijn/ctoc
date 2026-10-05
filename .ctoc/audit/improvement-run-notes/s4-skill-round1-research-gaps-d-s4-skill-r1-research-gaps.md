@@ -175,7 +175,7 @@ metadata:
   subagents_dispatched: 0
 ```
 
-I changed no files. The files involved are `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md` and `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round1-research-d-s4-skill-r1-research.md`.
+I changed no files. The files involved are `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md` and `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round1-research-d-s4-skill-r1-research.md`.
 
 **What would change these results:**
 - **Row 22:** a browser read of Veracode's primary release, which returned 403 here.

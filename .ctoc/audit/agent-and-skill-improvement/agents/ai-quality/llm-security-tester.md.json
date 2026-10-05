@@ -1959,7 +1959,7 @@
           "read_on": "2026-10-01",
           "bore_on": "section 4: CLAUDE_PLUGIN_ROOT is empty in a dispatched CTOC agent's shell, so the skill path resolves in the repository under review",
           "outcome": "supported",
-          "quote": "Verbatim: `root=[]` / `cwd=[/Users/account/Code/ctoc]`",
+          "quote": "Verbatim: `root=[]` / `cwd=[<home>/Code/ctoc]`",
           "error": null
         },
         {

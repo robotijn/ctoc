@@ -131,4 +131,4 @@ Fences that walk every agent file:
 - **TanStack Query's version 5 reference for `throwOnError`.** Only the migration guide was read.
 - **Byte-exactness of every quote,** because each one passed through the fetch tool's model.
 
-Files: `/Users/account/Code/ctoc/.ctoc/architecture/dispatch-schema.yaml`, `/Users/account/Code/ctoc/docs/DISPATCH_PROTOCOL.md`, `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`, `/Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md`, `/Users/account/Code/ctoc/node_modules/@types/node/fs.d.ts`
+Files: `<home>/Code/ctoc/.ctoc/architecture/dispatch-schema.yaml`, `<home>/Code/ctoc/docs/DISPATCH_PROTOCOL.md`, `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`, `<home>/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md`, `<home>/Code/ctoc/node_modules/@types/node/fs.d.ts`

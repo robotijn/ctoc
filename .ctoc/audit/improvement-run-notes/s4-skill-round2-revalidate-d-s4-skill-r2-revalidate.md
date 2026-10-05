@@ -116,7 +116,7 @@ No page contained instructions aimed at the reader.
 - **Plain words, not requested this time:** unexpanded abbreviations remain in prose, all from before round 2 — LLM, RAG, AST, NVD, CVE, GPG, SQL, sumdb and API. Some of them sit inside protected items (the triage table), which must stay byte-identical.
 
 Files:
-- `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
-- `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`
-- `/Users/account/Code/ctoc/tests/critic-warnings-are-critical.test.js`
-- `/Users/account/.claude/plugins/marketplaces/robotijn/skills/ai-quality/hallucination-detector/SKILL.md` (the pre-edit copy compared against)
+- `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
+- `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`
+- `<home>/Code/ctoc/tests/critic-warnings-are-critical.test.js`
+- `<home>/.claude/plugins/marketplaces/robotijn/skills/ai-quality/hallucination-detector/SKILL.md` (the pre-edit copy compared against)

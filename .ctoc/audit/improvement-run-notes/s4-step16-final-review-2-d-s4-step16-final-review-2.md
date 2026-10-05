@@ -28,4 +28,4 @@ Suggested text for the boxes:
 - I did not run the record check; the 16/16 is the executor's report.
 - I read only the edited lines and the validator counts of rounds 1 and 2 of the skill record. I did not re-read either instruction file, and I did not open the Step 16 note file beyond checking that it exists.
 
-Files: `/Users/account/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/skills/ai-quality/hallucination-detector/SKILL.md.json`, `/Users/account/Code/ctoc/plans/in-progress/00264-every-agent-and-specialist-skill-improved-three-times-s4-hallucination-detector.md`, `/Users/account/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/for-the-human.json`
+Files: `<home>/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/skills/ai-quality/hallucination-detector/SKILL.md.json`, `<home>/Code/ctoc/plans/in-progress/00264-every-agent-and-specialist-skill-improved-three-times-s4-hallucination-detector.md`, `<home>/Code/ctoc/.ctoc/audit/agent-and-skill-improvement/for-the-human.json`

@@ -475,7 +475,7 @@ Case 5's red evidence — the file setup wrote into a repository nobody asked:
 # >>> CTOC post-commit >>>
 # CTOC post-commit hook - triggers background quality agent
 # CTOC hook is NON-BLOCKING - commit always succeeds instantly.
-node "/Users/account/Code/ctoc/src/hooks/post-commit.js" 2>/dev/null &
+node "<home>/Code/ctoc/src/hooks/post-commit.js" 2>/dev/null &
 # <<< CTOC post-commit <<<
 ```
 

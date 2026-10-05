@@ -123,7 +123,7 @@ From the French Cybersecurity Agency and German Federal Office for Information S
    - Page 9: "It might be beneficial to "deconstruct" AI-generated code and the used prompts in public code reviews within the company." This supports category H's comparison with the request.
    - Page 9: "Automated vulnerability scanners or approaches like chatbots that critically question the generated source code ("source code critics") can reduce the risk." This supports the hand-on to sast-scanner.
    - The organisational items on pages 9 and 12, such as security teams scaling to handle the extra code, are outside the skill's scope.
-9. **A misquote in the agent file, not the skill.** `/Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md` line 62 quotes page 9 as "completetly hallucinated" and adds "(the source's spelling)". The page 9 image reads "incorrect or completly hallucinated, which might lead to security issues and reduce code maintenability." Recommended action: correct it to "completly". Confidence is medium-high, because it rests on one reading of a page image.
+9. **A misquote in the agent file, not the skill.** `<home>/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md` line 62 quotes page 9 as "completetly hallucinated" and adds "(the source's spelling)". The page 9 image reads "incorrect or completly hallucinated, which might lead to security issues and reduce code maintenability." Recommended action: correct it to "completly". Confidence is medium-high, because it rests on one reading of a page image.
 
 **NIST SP 800-218, Secure Software Development Framework version 1.1, practice PW.7** (printed page 14):
 - **What bears on generated code:** "Review and/or Analyze Human-Readable Code to Identify Vulnerabilities and Verify Compliance with Security Requirements (PW.7): Help identify vulnerabilities so that they can be corrected before the software is released to prevent exploitation. ... Human-readable code includes source code, scripts, and any other form of code that an organization deems human-readable."
@@ -164,9 +164,9 @@ Sources:
 - [NIST SP 800-218](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-218.pdf)
 
 Files read:
-- `/Users/account/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-skill-round2-research-d-s3-skill-r2-research.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-skill-round1-research-d-s3-skill-r1-research.md` (searched, not read in full)
-- `/Users/account/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md` (searched, not read in full)
-- `/Users/account/.claude/projects/-Users-account-Code-ctoc/26a2fcc0-aa46-4510-a665-3c2f0ee314f5/tool-results/webfetch-1790763462989-llcq7m.pdf` (the French and German report)
-- `/Users/account/.claude/projects/-Users-account-Code-ctoc/26a2fcc0-aa46-4510-a665-3c2f0ee314f5/tool-results/webfetch-1790776007400-1vqh14.pdf` (NIST SP 800-218)
+- `<home>/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-skill-round2-research-d-s3-skill-r2-research.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-skill-round1-research-d-s3-skill-r1-research.md` (searched, not read in full)
+- `<home>/Code/ctoc/agents/ai-quality/ai-code-quality-reviewer.md` (searched, not read in full)
+- `<home>/.claude/projects/-Users-account-Code-ctoc/26a2fcc0-aa46-4510-a665-3c2f0ee314f5/tool-results/webfetch-1790763462989-llcq7m.pdf` (the French and German report)
+- `<home>/.claude/projects/-Users-account-Code-ctoc/26a2fcc0-aa46-4510-a665-3c2f0ee314f5/tool-results/webfetch-1790776007400-1vqh14.pdf` (NIST SP 800-218)

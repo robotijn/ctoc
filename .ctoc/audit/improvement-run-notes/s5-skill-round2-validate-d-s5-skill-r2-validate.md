@@ -123,9 +123,9 @@
 - The saved NIST AI 100-2 E2025 PDF, file pages 55, 60, 64 and 126 (printed pages 42, 47, 51 and 113)
 
 Files:
-- `/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
-- `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md`
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md`
+- `<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`
+- `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round2-critic-d-s5-skill-r2-critic.md`
 - `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/ATLAS-2026.09.yaml`
 - `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/ATLAS-legacy-5.6.0.yaml`
 - `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/nist-ai-100-2e2025.pdf`

@@ -71,12 +71,12 @@ No network request was made and nothing was written under a topic folder. The in
 - That the program's redirect handling refuses a download whose last redirect leads to a non-`https` address; no network was used.
 
 Files:
-- `/Users/account/Code/ctoc/skills/deepthink/SKILL.md`
-- `/Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
-- `/Users/account/Code/ctoc/tests/cu5-wrapper-coverage-completeness.test.js`
-- `/Users/account/Code/ctoc/README.md`
-- `/Users/account/Code/ctoc/CLAUDE.md`
-- `/Users/account/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md`
+- `<home>/Code/ctoc/skills/deepthink/SKILL.md`
+- `<home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
+- `<home>/Code/ctoc/tests/cu5-wrapper-coverage-completeness.test.js`
+- `<home>/Code/ctoc/README.md`
+- `<home>/Code/ctoc/CLAUDE.md`
+- `<home>/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md`
 
 The run outputs (`s2-run1.txt`, `s2-run2.txt`, `s2-run3.txt`, `s2-verify-list-2.txt`, `s2-npm-test.txt`, `refusal-run/`) are in `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/deepthink/`.
 
@@ -157,10 +157,10 @@ The stalled-server case exposed a defect: the program printed `error 23`, a time
 - A host name that switches to an internal address between the check and the request.
 
 Files:
-- `/Users/account/Code/ctoc/skills/deepthink/SKILL.md`
-- `/Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
-- `/Users/account/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md`
-- `/Users/account/Code/ctoc/.ctoc/inbox/questions/1790877923785-g7rtsc.md`
+- `<home>/Code/ctoc/skills/deepthink/SKILL.md`
+- `<home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
+- `<home>/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md`
+- `<home>/Code/ctoc/.ctoc/inbox/questions/1790877923785-g7rtsc.md`
 
 The run outputs (`s2r-red.txt`, `s2r-green.txt`, `s2r-probe-old.txt`, `s2r-stub-runs.txt`, `s2r-stub-hang-2.txt`, `s2r-verify-list.txt`, `s2r-npm-test.txt`) are in `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/deepthink/`.
 
@@ -179,7 +179,7 @@ I've recorded your 2026-10-02 answers in the slice 2 plan and ticked review and 
 - **Decision 27:** the parent plan's "no new agent" decision is replaced by your answer to item (i). This slice adds no agent; slice 5 does.
 - **Plan checks:** the plan's approval fingerprint is unchanged (`9de8934f…`), and the plan still passes its review validator.
 
-The plan is `/Users/account/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md`.
+The plan is `<home>/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md`.
 
 **Not verified** (unchanged from my last report):
 - `CLAUDE_PLUGIN_ROOT` in the session's shell.
@@ -246,8 +246,8 @@ I left the review's last three items (O1–O3: holding slice 3 behind slice 5 on
 - A host name that changes to an internal address between the check and the request.
 
 Files:
-- `/Users/account/Code/ctoc/skills/deepthink/SKILL.md`
-- `/Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
-- `/Users/account/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md`
+- `<home>/Code/ctoc/skills/deepthink/SKILL.md`
+- `<home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
+- `<home>/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md`
 
 The run outputs (`s2t-red-2.txt`, `s2t-green.txt`, `s2t-probe-before-2.txt`, `s2t-probe-after.txt`, `s2t-verify-list.txt`, `s2t-npm-test.txt`) are in `/private/tmp/claude-uid/-Users-account-Code-ctoc/b1c5a29e-f445-4461-8294-b84832a0154b/scratchpad/deepthink/`.

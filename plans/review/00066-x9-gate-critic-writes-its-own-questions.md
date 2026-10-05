@@ -631,7 +631,7 @@ Recorded red evidence, verbatim:
 ```
 Error: Cannot find module '../src/lib/streaming-questions-sweeper.js'
 Require stack:
-- /Users/account/Code/ctoc/tests/streaming-questions-sweeper.test.js
+- <home>/Code/ctoc/tests/streaming-questions-sweeper.test.js
     at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
   code: 'MODULE_NOT_FOUND',
 ✖ tests/streaming-questions-sweeper.test.js (21.294875ms)

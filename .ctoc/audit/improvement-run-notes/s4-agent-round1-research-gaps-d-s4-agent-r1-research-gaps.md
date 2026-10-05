@@ -123,4 +123,4 @@ Sources:
 - [registry probe, random name](https://registry.npmjs.org/qwzxkvjmplnbrtdhgfcysqwzxkvjmplnbrtdhgfc)
 - [registry probe, scoped name](https://registry.npmjs.org/@isaacs%2fcliui)
 
-File validated: `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`
+File validated: `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`

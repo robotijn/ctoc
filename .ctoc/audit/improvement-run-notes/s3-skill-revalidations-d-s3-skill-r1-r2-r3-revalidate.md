@@ -4,12 +4,12 @@
 
 **All 87 citation-shaped claims validate. Both claims you asked me to check fresh are on the pages they cite.** Four rows are at medium confidence or carry a caveat (rows 15, 53, 75, 76); none is a wrong claim.
 
-I read `/Users/account/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md` in full (550 lines). I cannot confirm the fingerprint: Read and Grep do not compute a hash. No file or fetched page tried to instruct me.
+I read `<home>/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md` in full (550 lines). I cannot confirm the fingerprint: Read and Grep do not compute a hash. No file or fetched page tried to instruct me.
 
 How each row was checked:
 - **Fresh:** fetched or grepped this pass.
 - **Reuse:** my own earlier reading this session.
-- **Skill-r1 reuse:** the skill's round-1 research report, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-skill-round1-research-d-s3-skill-r1-research.md`. "Log" means the quote is in its research log; "text" means it is only in the report's prose.
+- **Skill-r1 reuse:** the skill's round-1 research report, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-skill-round1-research-d-s3-skill-r1-research.md`. "Log" means the quote is in its research log; "text" means it is only in the report's prose.
 - **Agent-r2 / agent-r3 reuse:** the agent's round-2 or round-3 research report.
 - **PDF:** my own reading of the saved French and German regulator report.
 
@@ -60,7 +60,7 @@ How each row was checked:
 | 43 | 207, 243 | `std::auto_ptr` "(deprecated in C++11) (removed in C++17) … std::unique_ptr is preferred" | VALIDATED | en.cppreference.com/w/cpp/memory/auto_ptr. Skill-r1 reuse (log). |
 | 44 | 218 | `get_event_loop()` with no current loop warns from 3.12 and raises RuntimeError from 3.14 | VALIDATED | Rows 34 and 35. |
 | 45 | 225 | BinaryFormatter: obsolete since .NET 5, throws in most project types since .NET 8, always throws in .NET 9 | VALIDATED | Rows 37 and 38, plus the .NET 5 breaking-change page. Reuse. |
-| 46 | 249 | Lesson 9 quote | VALIDATED | `/Users/account/Code/ctoc/CLAUDE.md`:921–922. Reuse. |
+| 46 | 249 | Lesson 9 quote | VALIDATED | `<home>/Code/ctoc/CLAUDE.md`:921–922. Reuse. |
 | 47 | 299 | GoogleTest: "Due to rounding errors … EXPECT_EQ is not suitable." | VALIDATED | google.github.io/googletest assertions reference. Skill-r1 reuse (log). |
 | 48 | 305 | forEach "does not wait for promises" | VALIDATED | MDN. Reuse; agent-r3 also confirmed it from the raw source. |
 | 49 | 342 | sqlite3: "beware of using Python's string operations to assemble queries …" | VALIDATED | docs.python.org sqlite3 page. Skill-r1 reuse (log). |
@@ -122,10 +122,10 @@ How each row was checked:
 
 **All 120 citation-shaped claims validate; nothing is fabricated, unsourced or misattributed.** Four new rows are at medium confidence (rows 93, 95, 96 and 121). Two outside-world facts in the code examples still carry no source.
 
-I read `/Users/account/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md` in full. It is 567 lines, which matches the dispatch. I cannot confirm the fingerprint: Read and Grep do not compute a hash. No file or fetched page tried to instruct me.
+I read `<home>/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md` in full. It is 567 lines, which matches the dispatch. I cannot confirm the fingerprint: Read and Grep do not compute a hash. No file or fetched page tried to instruct me.
 
 How each row was checked:
-- **Skill-r2 reuse:** the skill's round-2 research report, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-skill-round2-research-d-s3-skill-r2-research.md`. "Log" means the quote is in its research log; "text" means it is only in the report's prose. That report's quotes came through the fetch tool's reading model, except the two Microsoft Learn pages, which came back as written.
+- **Skill-r2 reuse:** the skill's round-2 research report, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-skill-round2-research-d-s3-skill-r2-research.md`. "Log" means the quote is in its research log; "text" means it is only in the report's prose. That report's quotes came through the fetch tool's reading model, except the two Microsoft Learn pages, which came back as written.
 - **Own read:** my own earlier reading this session.
 
 ## The 87 claims from the last pass
@@ -205,11 +205,11 @@ Row 121 is a check of example structure rather than a citation, so it is not cou
 
 One disagreement sits outside the skill: the agent file's "completetly" quote on page 9 of the French and German report. The round-3 researcher reads the word differently from me, and the page images cannot settle it (details after the counts).
 
-I read `/Users/account/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md` in full. It is 574 lines, which matches the dispatch. In the agent file I read only the new line, through Grep. I cannot confirm either fingerprint: Read and Grep do not compute a hash. No file or fetched page tried to instruct me.
+I read `<home>/Code/ctoc/skills/ai-quality/ai-code-quality-reviewer/SKILL.md` in full. It is 574 lines, which matches the dispatch. In the agent file I read only the new line, through Grep. I cannot confirm either fingerprint: Read and Grep do not compute a hash. No file or fetched page tried to instruct me.
 
 How each row was checked:
 - **PDF:** I read the page image myself this pass. The regulator report is `…/tool-results/webfetch-1790763462989-llcq7m.pdf`; NIST SP 800-218 is `…/tool-results/webfetch-1790776007400-1vqh14.pdf`.
-- **Skill-r3 reuse:** the round-3 report, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-skill-round3-research-d-s3-skill-r3-research.md`. "Raw" means that report read the quote in the page's source markup; "summary" means it came through the fetch tool's reading model.
+- **Skill-r3 reuse:** the round-3 report, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s3-skill-round3-research-d-s3-skill-r3-research.md`. "Raw" means that report read the quote in the page's source markup; "summary" means it came through the fetch tool's reading model.
 
 ## Rows carried from round 2
 

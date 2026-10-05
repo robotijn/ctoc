@@ -105,4 +105,4 @@ I wrote nothing and made no registry queries. No analyzer output exists for this
 - No secrets-detector, static-analysis or dependency-checker run happened, and no baseline exists.
 - The per-run results file and report under `.ctoc/quality-state/` and `.security/runs/` were not written, because this dispatch is read-only.
 
-Files: `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`, `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md`
+Files: `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`, `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-agent-round3-session-runs.md`

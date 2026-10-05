@@ -76,7 +76,7 @@ The data file lists 16 tactics, which matches the change log's newest entry: "Th
 - https://msrc.microsoft.com/update-guide/vulnerability/CVE-2025-53773 (a JavaScript shell with no data)
 - [Search result: atlas-data CHANGELOG.md on the main branch](https://github.com/mitre-atlas/atlas-data/blob/main/CHANGELOG.md) (found by the search, not fetched)
 
-Local files: `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-research-d-s5-agent-r1-research.md`, `/Users/account/Code/ctoc/agents/iron-loop/red-team-critic.md`, `/Users/account/Code/ctoc/skills/compliance/ai-governance-checker/SKILL.md`, `/Users/account/Code/ctoc/skills/security/sast-scanner/SKILL.md` (line 419), `/Users/account/Code/ctoc/.ctoc/architecture/dispatch-schema.yaml`.
+Local files: `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-agent-round1-research-d-s5-agent-r1-research.md`, `<home>/Code/ctoc/agents/iron-loop/red-team-critic.md`, `<home>/Code/ctoc/skills/compliance/ai-governance-checker/SKILL.md`, `<home>/Code/ctoc/skills/security/sast-scanner/SKILL.md` (line 419), `<home>/Code/ctoc/.ctoc/architecture/dispatch-schema.yaml`.
 
 ```yaml
 dispatch_response:
@@ -85,7 +85,7 @@ dispatch_response:
   agent: citation-validator
   agent_version: unknown   # not visible to this agent
   completed_at: null       # date 2026-10-01; clock time not visible to this agent
-  target: /Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md
+  target: <home>/Code/ctoc/agents/ai-quality/llm-security-tester.md
   read_date: 2026-10-01
   budget: { fetches_used: 14, fetches_allowed: 14, searches_used: 1, searches_allowed: 4 }
   degraded_reads:

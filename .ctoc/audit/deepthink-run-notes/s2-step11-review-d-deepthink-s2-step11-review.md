@@ -18,7 +18,7 @@ I hold only Read and Grep, so everything below comes from reading files. I ran n
 ## Must fix
 
 **1. The program crashes in projects that use ECMAScript modules.** This came in with decision 13.
-- **Where:** `/Users/account/Code/ctoc/skills/deepthink/SKILL.md` lines 170–174.
+- **Where:** `<home>/Code/ctoc/skills/deepthink/SKILL.md` lines 170–174.
 - **Current:** "…to `.ctoc/papers/fetch-papers.js`, replacing any earlier copy…" and `node .ctoc/papers/fetch-papers.js .ctoc/papers/.incoming-<slug>.json`
 - **Proposed:** use `.ctoc/papers/fetch-papers.cjs` in both places, and the same name in decision 13 of the plan.
 - **Why:** Node treats a `.js` file as an ECMAScript module when the nearest `package.json` declares `"type": "module"`. Projects scaffolded by Vite, SvelteKit or Astro do. In that case `require` does not exist and line 190 throws. I am confident of this Node behaviour but did not run it here. The `.cjs` extension always loads as CommonJS. The old `node -e` sketch did not have this problem, and the scratch-directory run could not catch it because no `package.json` sits above it.
@@ -85,7 +85,7 @@ I hold only Read and Grep, so everything below comes from reading files. I ran n
 - **Fix, otherwise:** reword line 177 so it is true: "Only `https` addresses are requested, and a download whose final address after redirects is not `https` is discarded; a redirect hop in between is not checked."
 
 **10. Check 3 can pass on nothing.**
-- **Where:** `/Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`, after line 336.
+- **Where:** `<home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`, after line 336.
 - **Why:** if the agent's `tools:` ever becomes a YAML list, the line parses to `['']` and the check passes while the agent holds `Write`.
 - **Proposed:** `assert.ok(tools.includes('WebSearch') && tools.includes('WebFetch'), \`citation-validator's tools line no longer reads as an inline list holding WebSearch and WebFetch: ${toolsLine}\`);`
 
@@ -110,7 +110,7 @@ I hold only Read and Grep, so everything below comes from reading files. I ran n
 - **Why:** it needs no network. Against the current `.js` instruction it fails because of item 1. This is the repository's own rule that a shipped recipe is proven by running it.
 
 **13. The execution record miscounts.**
-- **Where:** `/Users/account/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md` line 320.
+- **Where:** `<home>/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md` line 320.
 - **Current:** "the coverage gate's other five cases passed"
 - **Proposed:** "the coverage gate's other six cases passed"
 - **Why:** the coverage file has seven cases, and 13 passed = 6 + 1 + 6.
@@ -162,18 +162,18 @@ I hold only Read and Grep, so everything below comes from reading files. I ran n
 **Not verified, and not in the record's own list:** whether Claude Code fills in `${CLAUDE_PLUGIN_ROOT}` inside a skill body. Deepthink is the first skill to use it (agents and commands already do). Slice 4 has to observe this, along with the redirect behaviour in item 9.
 
 Files read:
-- `/Users/account/Code/ctoc/skills/deepthink/SKILL.md`
-- `/Users/account/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
-- `/Users/account/Code/ctoc/tests/cu5-wrapper-coverage-completeness.test.js`
-- `/Users/account/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md`
-- `/Users/account/Code/ctoc/plans/implementation/deepthink-ships-with-ctoc.md`
-- `/Users/account/Code/ctoc/agents/ai-quality/citation-validator.md`
-- `/Users/account/Code/ctoc/src/commands/start.md`
-- `/Users/account/Code/ctoc/src/commands/start.js`
-- `/Users/account/Code/ctoc/src/lib/menu-screens.js`
-- `/Users/account/Code/ctoc/src/lib/task-reconcile.js`
-- `/Users/account/Code/ctoc/src/lib/task-registry.js`
-- `/Users/account/Code/ctoc/tests/plugin-skill-discovery.test.js`
-- `/Users/account/Code/ctoc/README.md`
-- `/Users/account/Code/ctoc/CLAUDE.md`
-- `/Users/account/.claude/skills/deepthink/SKILL.md` (read only)
+- `<home>/Code/ctoc/skills/deepthink/SKILL.md`
+- `<home>/Code/ctoc/tests/deepthink-ships-with-ctoc.test.js`
+- `<home>/Code/ctoc/tests/cu5-wrapper-coverage-completeness.test.js`
+- `<home>/Code/ctoc/plans/in-progress/00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts.md`
+- `<home>/Code/ctoc/plans/implementation/deepthink-ships-with-ctoc.md`
+- `<home>/Code/ctoc/agents/ai-quality/citation-validator.md`
+- `<home>/Code/ctoc/src/commands/start.md`
+- `<home>/Code/ctoc/src/commands/start.js`
+- `<home>/Code/ctoc/src/lib/menu-screens.js`
+- `<home>/Code/ctoc/src/lib/task-reconcile.js`
+- `<home>/Code/ctoc/src/lib/task-registry.js`
+- `<home>/Code/ctoc/tests/plugin-skill-discovery.test.js`
+- `<home>/Code/ctoc/README.md`
+- `<home>/Code/ctoc/CLAUDE.md`
+- `<home>/.claude/skills/deepthink/SKILL.md` (read only)

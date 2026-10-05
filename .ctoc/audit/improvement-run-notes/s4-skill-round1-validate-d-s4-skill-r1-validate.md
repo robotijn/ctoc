@@ -222,12 +222,12 @@ response:
 ```
 
 Files:
-- `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round1-critic-d-s4-skill-r1-critic.md`
-- `/Users/account/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
-- `/Users/account/Code/ctoc/agents/ai-quality/hallucination-detector.md`
-- `/Users/account/Code/ctoc/tests/critic-warnings-are-critical.test.js`
-- `/Users/account/Code/ctoc/tests/skill-loading.test.js`
-- `/Users/account/Code/ctoc/docs/REFINEMENT_LOOP.md`
+- `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s4-skill-round1-critic-d-s4-skill-r1-critic.md`
+- `<home>/Code/ctoc/skills/ai-quality/hallucination-detector/SKILL.md`
+- `<home>/Code/ctoc/agents/ai-quality/hallucination-detector.md`
+- `<home>/Code/ctoc/tests/critic-warnings-are-critical.test.js`
+- `<home>/Code/ctoc/tests/skill-loading.test.js`
+- `<home>/Code/ctoc/docs/REFINEMENT_LOOP.md`
 
 Sources:
 - npm: [npm-ci](https://docs.npmjs.com/cli/v11/commands/npm-ci) · [scripts](https://docs.npmjs.com/cli/v11/using-npm/scripts) · [provenance](https://docs.npmjs.com/generating-provenance-statements) · [registry signatures](https://docs.npmjs.com/verifying-registry-signatures) · [issue 8736](https://github.com/npm/cli/issues/8736) · [zod](https://registry.npmjs.org/zod/latest) · [react-codeshift](https://registry.npmjs.org/react-codeshift) · [react-smart-cache](https://registry.npmjs.org/react-smart-cache)

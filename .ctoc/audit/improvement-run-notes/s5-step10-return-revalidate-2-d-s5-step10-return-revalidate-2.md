@@ -110,7 +110,7 @@ dispatch_response:
   metadata: {tool_calls: 44, tokens_used: "not measured"}
 ```
 
-Files: `/Users/account/Code/ctoc/agents/ai-quality/llm-security-tester.md`, `/Users/account/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-second-step10-return-executor.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-curl-q-manual.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md`, `/Users/account/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md`
+Files: `<home>/Code/ctoc/agents/ai-quality/llm-security-tester.md`, `<home>/Code/ctoc/skills/ai-quality/llm-security-tester/SKILL.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-second-step10-return-executor.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-curl-q-manual.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-skill-round3-session-runs.md`, `<home>/Code/ctoc/.ctoc/audit/improvement-run-notes/s5-step13-secure-2-d-s5-step13-secure-2.md`
 
 Sources:
 - [curl manual page](https://curl.se/docs/manpage.html)
