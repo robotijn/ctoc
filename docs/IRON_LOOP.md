@@ -656,7 +656,7 @@ Model assignments indicate recommended complexity tier. Actual model depends on 
 | Agent | Model | Steps | Role |
 |-------|-------|-------|------|
 | cto-chief | opus | 1-16 | Coordinator |
-| product-owner | sonnet | 2-4 | BDD Specs (Product Owner) |
+| product-owner | opus | 2-4 | BDD Specs (Product Owner) |
 | functional-reviewer | opus | 4 | Review Gate |
 | implementation-planner | opus | 5-7 | Technical Planning |
 | implementation-plan-reviewer | opus | 7 | Review Gate |

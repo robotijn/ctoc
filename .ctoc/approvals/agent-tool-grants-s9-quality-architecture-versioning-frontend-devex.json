@@ -1,0 +1,9 @@
+{
+  "content_sha256": "f33dd0bf3796ba78bfd2788341fb7573dc91df6736f48cb57fff168b7b732b0b",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-05T20:27:07.018Z",
+  "approved_by": "human",
+  "plan_basename": "agent-tool-grants-s9-quality-architecture-versioning-frontend-devex"
+}

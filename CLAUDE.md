@@ -736,9 +736,9 @@ ctoc/
 
 | Step | Label | Agent | Phase |
 |------|-------|-------|-------|
-| 1 | IDEATE | vision-advisor, product-owner (sonnet) | Ideation — Gate 0: User approves vision |
-| 2 | ASSESS | product-owner (sonnet) | Phase 1: Functional |
-| 3 | ALIGN | product-owner (sonnet) | |
+| 1 | IDEATE | vision-advisor, product-owner (opus) | Ideation — Gate 0: User approves vision |
+| 2 | ASSESS | product-owner (opus) | Phase 1: Functional |
+| 3 | ALIGN | product-owner (opus) | |
 | 4 | CAPTURE | iron-loop-critic (opus) | Gate 1: User approves plan |
 | 5 | PLAN | implementation-planner (opus) | Phase 2: Technical |
 | 6 | DESIGN | implementation-planner (opus) | |

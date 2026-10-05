@@ -169,10 +169,6 @@ const SONNET_EXEMPT = {
     'Actuator — writes docs. Does not read code and emit findings.',
   'infrastructure/ci-runner-setup': 'Actuator — configures CI. Not a watcher.',
   'infrastructure/deployment-setup': 'Actuator — configures deployment. Not a watcher.',
-  'planning/product-owner':
-    'Asks the human questions to build context. Does not read code and emit findings. Raising it is a separate owner decision.',
-  'planning/vision-advisor':
-    'Asks the human questions to build context. Does not read code and emit findings. Raising it is a separate owner decision.',
   'saas/inngest-jobs': 'Scheduled for demotion to a skill by plan W2; raising a doomed file is waste.',
   'saas/posthog-analytics': 'Scheduled for demotion to a skill by plan W2; raising a doomed file is waste.',
   'saas/rate-limiting': 'Scheduled for demotion to a skill by plan W2; raising a doomed file is waste.',

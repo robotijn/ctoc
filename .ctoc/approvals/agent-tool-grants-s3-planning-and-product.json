@@ -1,0 +1,9 @@
+{
+  "content_sha256": "98f4614c8e711a3fa7518638189d141737f2b42eb2774d221c7bc63934c6b8e2",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-05T20:27:06.808Z",
+  "approved_by": "human",
+  "plan_basename": "agent-tool-grants-s3-planning-and-product"
+}

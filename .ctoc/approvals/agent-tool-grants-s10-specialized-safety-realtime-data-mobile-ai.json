@@ -1,0 +1,9 @@
+{
+  "content_sha256": "fbdfdfff1e5a1ec3cbc21803d3fbc9b4a697e8842ea02902426cb67dc99859cc",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-05T20:27:06.768Z",
+  "approved_by": "human",
+  "plan_basename": "agent-tool-grants-s10-specialized-safety-realtime-data-mobile-ai"
+}

@@ -1,0 +1,9 @@
+{
+  "content_sha256": "b538e7e49ff53ae79a0066ebe24ea6db2fa7df6b41e79d74f43f1d3385d7bec8",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-05T20:27:06.952Z",
+  "approved_by": "human",
+  "plan_basename": "agent-tool-grants-s7-iron-loop-pipeline-coordinator"
+}

@@ -214,7 +214,7 @@ User outcome: the user gives their OK to start turning the explored vision into 
 
 ### Step 2 — ASSESS (Functional planning)
 
-Owner sub-orchestrator: `product-owner` (planning, sonnet).
+Owner sub-orchestrator: `product-owner` (planning, opus).
 
 Tier-2 skills:
 
@@ -225,7 +225,7 @@ Tier-2 skills:
 
 ### Step 3 — ALIGN (Functional planning)
 
-Owner sub-orchestrator: `product-owner` (planning, sonnet).
+Owner sub-orchestrator: `product-owner` (planning, opus).
 
 Tier-2 skills: none — alignment is collaborative scope refinement with the user.
 

@@ -16,8 +16,8 @@ files:
   - CLAUDE.md
   - README.md
 approved_by: human
-approved_at: 2026-10-05T14:58:03.528Z
-gate_crossed: implementation → todo
+approved_at: 2026-10-05T20:27:03.382Z
+gate_crossed: review → done
 ---
 
 # The tool-grant test, written first

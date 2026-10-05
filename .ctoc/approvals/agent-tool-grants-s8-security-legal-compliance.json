@@ -1,0 +1,9 @@
+{
+  "content_sha256": "e76389ae77740df44077a5f7a576e39042a6c74417179fe5919360b65ce291ab",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-05T20:27:06.986Z",
+  "approved_by": "human",
+  "plan_basename": "agent-tool-grants-s8-security-legal-compliance"
+}
