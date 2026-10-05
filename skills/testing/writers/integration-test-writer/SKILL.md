@@ -15,7 +15,7 @@ related_skills:
   - testing/writers/e2e-test-writer
   - specialized/api-contract-validator
 effort_level: high
-tools: Read, Write, Edit, Bash
+tools: Read, Write, Edit, Bash, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1

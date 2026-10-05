@@ -16,7 +16,7 @@ related_skills:
   - testing/quality-gate-runner
   - testing/runners/unit-test-runner
 effort_level: medium
-tools: Bash, Read, Write, Grep, Glob
+tools: Bash, Read, Write, Grep, Glob, Edit
 model: opus
 tier: 2
 dispatch_protocol: v1
@@ -104,11 +104,11 @@ Use the language-native smart runner first; fall back to graph-based monorepo to
 ### TypeScript / JavaScript
 ```bash
 # Vitest — derives related tests from the static import graph (misses dynamic imports); respects transitive imports
-npx vitest related src/file1.ts src/file2.ts
+npx --no -- vitest related src/file1.ts src/file2.ts
 # Equivalent watch mode: vitest --changed picks up git diff vs HEAD
 
 # Jest — same idea, different flag
-npx jest --findRelatedTests src/file1.ts src/file2.ts
+npx --no -- jest --findRelatedTests src/file1.ts src/file2.ts
 ```
 
 ### Python
@@ -179,11 +179,11 @@ pg_prove --recurse --ext .sql tests/changed/
 ### Monorepo / cross-package graph
 ```bash
 # Nx — task graph derived from the workspace dependency DAG
-npx nx affected -t test --base=origin/main --head=HEAD
+npx --no -- nx affected -t test --base=origin/main --head=HEAD
 # Bazel — content-addressed cache + dependency DAG; caches test results by default
 bazel test //... --test_tag_filters=smoke
 # Turborepo — caches by content hash, runs tasks only for changed packages
-npx turbo run test --filter="...[origin/main]"
+npx --no -- turbo run test --filter="...[origin/main]"
 ```
 
 ## Flaky Test Detection

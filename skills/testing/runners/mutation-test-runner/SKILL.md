@@ -16,7 +16,7 @@ related_skills:
   - testing/writers/unit-test-writer
   - testing/quality-gate-runner
 effort_level: high
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1
@@ -84,9 +84,9 @@ Seven-language coverage. SQL is excluded — there is no production-grade mutati
 
 ### Stryker — JavaScript / TypeScript
 ```bash
-npx stryker run
+npx --no -- stryker run
 # Incremental (PR/CI mode) — store results and re-run only new or changed mutants
-npx stryker run --incremental
+npx --no -- stryker run --incremental
 ```
 `stryker.conf.js`:
 ```javascript

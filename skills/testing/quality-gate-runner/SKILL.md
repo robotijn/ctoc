@@ -77,8 +77,8 @@ CTOC's stance, aligned with GitHub Actions / GitLab CI / CircleCI / Dagger / Arg
 - **Artifact passthrough between stages.** Each gate stage uploads its raw output (SARIF, JUnit XML, coverage XML, lint logs) as a CI artifact. Downstream stages (and the aggregator gate) pull these instead of re-running the underlying tools. GitHub Actions `actions/upload-artifact@v4` + `actions/download-artifact@v4`, GitLab CI `artifacts:paths:`, CircleCI `persist_to_workspace` / `attach_workspace`.
 - **PR-stage budget: 5–10 minutes.** Anything that can't fit goes to a scheduled (nightly) workflow, not PR-blocking. Per [[quality/quality-gate]]: mutation testing, full E2E, deep SAST DB rebuilds are nightly. The PR-blocking runner shards aggressively (split-by-file-count or split-by-historic-duration) to hit the budget.
 - **Each gate is independently re-runnable.** GitHub Actions "Re-run failed jobs," GitLab's "Retry job," CircleCI "Rerun from failed." This requires that each gate consume only declared inputs (artifacts + commit SHA) — no implicit cache reads from outside the gate.
-- **E2E ≤ 30 minutes — shard aggressively.** `npx playwright test --shard=N/M`, pytest-xdist with `-n auto`, `cargo test` with `--test-threads`, `go test -parallel`. Critical-path-only on PRs; full matrix nightly.
-- **Flaky test quarantine, 2-week SLA.** Auto-flag any test that fails then passes on retry. Maintain `.ctoc/quality-state/flaky-tests.json`. After 2 weeks unresolved → the gate blocks until the test is fixed or deleted. The runner is the component that detects flake (re-runs once on failure and compares).
+- **E2E ≤ 30 minutes — shard aggressively.** `npx --no -- playwright test --shard=N/M`, pytest-xdist with `-n auto`, `cargo test` with `--test-threads`, `go test -parallel`. Critical-path-only on PRs; full matrix nightly.
+- **Flaky test quarantine, 2-week SLA.** Auto-flag any test that fails then passes on retry. Give each entry for `.ctoc/quality-state/flaky-tests.json` in your report for the executor to add (you hold neither Write nor Edit). After 2 weeks unresolved → the gate blocks until the test is fixed or deleted. The runner is the component that detects flake (re-runs once on failure and compares).
 - **Mutation testing as a Tier 3 nightly check.** Coverage thresholds are necessary but not sufficient. Stryker/mutmut/Pitest run on a schedule, the runner tracks the mutation score trend separately from per-commit coverage.
 
 ## CRITICAL: LOCAL FIRST, ALWAYS
@@ -97,7 +97,7 @@ CTOC's stance, aligned with GitHub Actions / GitLab CI / CircleCI / Dagger / Arg
 │   Backend Lint       →  ruff check .                        │
 │   Backend Types      →  mypy .                              │
 │   Backend Tests      →  pytest                              │
-│   Playwright E2E     →  npx playwright test                 │
+│   Playwright E2E     →  npx --no -- playwright test                 │
 │   Security Audit     →  npm audit / pip-audit               │
 │                                                              │
 │   ANY failure = DO NOT PUSH                                 │
@@ -129,7 +129,7 @@ npm run lint          || echo "FRONTEND LINT FAILED"
 npm run typecheck     || echo "FRONTEND TYPES FAILED"
 npm run test          || echo "FRONTEND TESTS FAILED"
 (cd backend && ruff check . && mypy . && pytest)
-[ -f "playwright.config.ts" ] && npx playwright test
+[ -f "playwright.config.ts" ] && npx --no -- playwright test
 ```
 
 Rule: ANY failure → FIX IT → re-run ALL → push only when ALL pass. **NO EXCEPTIONS.**
@@ -427,18 +427,18 @@ If the runner sees `${{ secrets.AWS_ACCESS_KEY_ID }}` or equivalents in workflow
 | Format | `prettier --check` | `ruff format --check` | `gofmt -l` | `cargo fmt --check` | `dotnet format` | `spotlessCheck` | `clang-format --dry-run -Werror` | `sqlfluff format --check` | YES |
 | Security | `npm audit` | `pip-audit` | `govulncheck` | `cargo audit` | `dotnet list package --vulnerable` | `gradle dependencyCheckAnalyze` | `cppcheck --addon=cert` | (n/a — schema review) | YES |
 | Integration | `npm run test:int` | `pytest tests/integration` | `go test -tags=integration` | `cargo test --features=integration` | `dotnet test --filter Category=Integration` | `gradle integrationTest` | `ctest -L integration` | migration round-trip | IF EXISTS |
-| E2E | `npx playwright test` | — | — | — | — | — | — | — | IF EXISTS |
-| Playwright | `npx playwright test` | — | — | — | — | — | — | — | IF EXISTS |
+| E2E | `npx --no -- playwright test` | — | — | — | — | — | — | — | IF EXISTS |
+| Playwright | `npx --no -- playwright test` | — | — | — | — | — | — | — | IF EXISTS |
 
 ## Playwright in the Gate
 
 ```bash
 if [ -f "playwright.config.ts" ] || [ -f "playwright.config.js" ]; then
-  (npx playwright test --reporter=list 2>&1 | tee "$RESULTS_DIR/playwright.log"; echo $? > "$RESULTS_DIR/playwright.exit") &
+  (npx --no -- playwright test --reporter=list 2>&1 | tee "$RESULTS_DIR/playwright.log"; echo $? > "$RESULTS_DIR/playwright.exit") &
 fi
 ```
 
-Shard for parallel CI: `npx playwright test --shard=1/4` across 4 nodes. Critical-path E2E should fit in 30 minutes total.
+Shard for parallel CI: `npx --no -- playwright test --shard=1/4` across 4 nodes. Critical-path E2E should fit in 30 minutes total.
 
 ## Output Format
 
@@ -488,7 +488,7 @@ case $MODE in
 esac
 
 # Jest
-npx jest --coverage --coverageThreshold='{"global":{"lines":'$LINE',"branches":'$BRANCH'}}'
+npx --no -- jest --coverage --coverageThreshold='{"global":{"lines":'$LINE',"branches":'$BRANCH'}}'
 # pytest
 pytest --cov=src --cov-fail-under=$LINE --cov-branch
 # Go

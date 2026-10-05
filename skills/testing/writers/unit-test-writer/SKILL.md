@@ -16,7 +16,7 @@ related_skills:
   - testing/writers/property-test-writer
   - testing/runners/mutation-test-runner
 effort_level: high
-tools: Read, Write, Edit, Bash
+tools: Read, Write, Edit, Bash, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1

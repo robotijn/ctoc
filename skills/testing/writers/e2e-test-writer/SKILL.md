@@ -14,7 +14,7 @@ related_skills:
   - testing/runners/e2e-test-runner
   - testing/writers/integration-test-writer
 effort_level: high
-tools: Read, Write, Edit, Bash
+tools: Read, Write, Edit, Bash, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1
@@ -322,7 +322,7 @@ These are the categories this skill emits as critic findings. Severity reconcili
 | **Storybook test-runner** | Run interaction + a11y tests against every Storybook story. Catches component regressions an order of magnitude faster than a browser-level E2E. | Component-level checks |
 | **Percy / Chromatic** | Visual regression as a **supplement** — diff the shell and critical landing screens; do not diff every E2E page. | Supplement only |
 | **Lighthouse via Playwright** (`playwright-lighthouse`) | Performance / a11y / SEO budgets on critical landing routes. | Pre-deploy budget gate |
-| **GitHub Actions matrix sharding** | `strategy.matrix.shard: [1,2,3,4,5,6,7,8]` with `npx playwright test --shard=${{ matrix.shard }}/8` and the `blob` reporter merged via `playwright merge-reports`. | Always, from day one |
+| **GitHub Actions matrix sharding** | `strategy.matrix.shard: [1,2,3,4,5,6,7,8]` with `npx --no -- playwright test --shard=${{ matrix.shard }}/8` and the `blob` reporter merged via `playwright merge-reports`. | Always, from day one |
 
 ```yaml
 # .github/workflows/e2e.yml — illustrative; pin versions in real projects
@@ -337,8 +337,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
       - run: npm ci
-      - run: npx playwright install --with-deps
-      - run: npx playwright test --shard=${{ matrix.shard }}/8 --reporter=blob
+      - run: npx --no -- playwright install --with-deps
+      - run: npx --no -- playwright test --shard=${{ matrix.shard }}/8 --reporter=blob
       - uses: actions/upload-artifact@v4
         with: { name: blob-${{ matrix.shard }}, path: blob-report }
   merge-reports:
@@ -347,7 +347,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
-      - run: npx playwright merge-reports --reporter=html ./blob-*
+      - run: npx --no -- playwright merge-reports --reporter=html ./blob-*
 ```
 
 ## User Journeys to Test (the typical 10–30)
@@ -411,8 +411,8 @@ jobs:
 - [ ] CI matrix shards configured (--shard=X/Y); blob reporter merged via playwright merge-reports
 - [ ] `retries: 1` in CI, `retries: 0` locally; flaky-retry report exported
 
-**Run Command**: `npx playwright test`
-**CI Command**: `npx playwright test --shard=${SHARD}/8 --reporter=blob`
+**Run Command**: `npx --no -- playwright test`
+**CI Command**: `npx --no -- playwright test --shard=${SHARD}/8 --reporter=blob`
 
 **Notes**:
 - Tests run in Chromium, Firefox, WebKit

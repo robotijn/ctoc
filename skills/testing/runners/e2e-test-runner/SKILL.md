@@ -15,7 +15,7 @@ related_skills:
   - testing/writers/e2e-test-writer
   - testing/quality-gate-runner
 effort_level: high
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1
@@ -61,7 +61,7 @@ These patterns must be flagged when the runner encounters them — they break th
 E2E is the highest-flake layer by far. Workflow:
 
 1. Test fails. Playwright retries (cap at 2 retries; default in this skill is 1).
-2. Test passes on retry → emit warning, append to `.ctoc/quality-state/flaky-tests.json` with `quarantined_at: <date>` and `sla_expires: <date+14d>`.
+2. Test passes on retry → emit warning, and give the entry for `.ctoc/quality-state/flaky-tests.json` in your report, with `quarantined_at: <date>` and `sla_expires: <date+14d>`, for the executor to add (you hold neither Write nor Edit).
 3. Quarantined tests continue to run but do not block Step 14 for 14 days while owner fixes the root cause.
 4. SLA expires without fix → test is **deleted**, not extended. Never carry "known flaky" tests forever.
 5. Test fails on all retries → BLOCK Step 14. Fix root cause; do not mark "known flaky".
@@ -71,49 +71,49 @@ E2E is the highest-flake layer by far. Workflow:
 ### Playwright
 ```bash
 # All E2E
-npx playwright test
+npx --no -- playwright test
 
 # Specific file
-npx playwright test e2e/auth.spec.ts
+npx --no -- playwright test e2e/auth.spec.ts
 
 # UI debugging mode
-npx playwright test --ui
+npx --no -- playwright test --ui
 
 # Specific browser
-npx playwright test --project=chromium
+npx --no -- playwright test --project=chromium
 
 # HTML report
-npx playwright test --reporter=html
+npx --no -- playwright test --reporter=html
 
 # Sharded for CI (one of 4 shards)
-npx playwright test --shard=1/4
+npx --no -- playwright test --shard=1/4
 
 # Blob reporter for sharded CI (merged later)
-npx playwright test --shard=1/4 --reporter=blob
+npx --no -- playwright test --shard=1/4 --reporter=blob
 
 # Only changed (Git-aware)
-npx playwright test --only-changed
+npx --no -- playwright test --only-changed
 
 # Workers tuned for CI (e.g., 2 on a 4-vCPU runner)
-npx playwright test --workers=2
+npx --no -- playwright test --workers=2
 
 # Merge blob reports from all shards into one HTML report
-npx playwright merge-reports --reporter=html ./all-blob-reports
+npx --no -- playwright merge-reports --reporter=html ./all-blob-reports
 ```
 
 ### Cypress
 ```bash
 # Headless
-npx cypress run
+npx --no -- cypress run
 
 # Interactive
-npx cypress open
+npx --no -- cypress open
 
 # Specific spec
-npx cypress run --spec "cypress/e2e/auth.cy.ts"
+npx --no -- cypress run --spec "cypress/e2e/auth.cy.ts"
 
 # Parallel via Cypress Cloud / Currents
-npx cypress run --record --parallel --key <key> --ci-build-id $GITHUB_RUN_ID
+npx --no -- cypress run --record --parallel --key <key> --ci-build-id $GITHUB_RUN_ID
 ```
 
 ## CI Configuration
@@ -141,9 +141,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps
+      - run: npx --no -- playwright install --with-deps
       - name: Run shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
-        run: npx playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --reporter=blob
+        run: npx --no -- playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --reporter=blob
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -165,7 +165,7 @@ jobs:
           path: all-blob-reports
           pattern: blob-report-*
           merge-multiple: true
-      - run: npx playwright merge-reports --reporter=html ./all-blob-reports
+      - run: npx --no -- playwright merge-reports --reporter=html ./all-blob-reports
       - uses: actions/upload-artifact@v4
         with:
           name: html-report
@@ -289,7 +289,7 @@ services:
 docker build -t app:e2e .
 docker compose -f docker-compose.e2e.yml up -d
 ./scripts/wait-for-health.sh http://localhost:3000/health
-BASE_URL=http://localhost:3000 npx playwright test
+BASE_URL=http://localhost:3000 npx --no -- playwright test
 docker compose -f docker-compose.e2e.yml down -v
 ```
 
@@ -343,14 +343,14 @@ Authoritative runners per language. C / C++ / SQL are intentionally **not covere
 
 ```bash
 # Already covered above as the canonical example
-npx playwright test --shard=1/4 --reporter=blob
+npx --no -- playwright test --shard=1/4 --reporter=blob
 ```
 
 ### TypeScript / JavaScript — Cypress
 
 ```bash
 # Parallel via Cypress Cloud (or self-hostable open-source sorry-cypress; Currents is the commercial alternative)
-npx cypress run --record --parallel \
+npx --no -- cypress run --record --parallel \
   --key $CYPRESS_RECORD_KEY \
   --ci-build-id $GITHUB_RUN_ID \
   --browser chrome

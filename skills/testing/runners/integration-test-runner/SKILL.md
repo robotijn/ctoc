@@ -14,7 +14,7 @@ related_skills:
   - testing/quality-gate-runner
   - testing/runners/unit-test-runner
 effort_level: medium
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1
@@ -109,10 +109,10 @@ pytest tests/integration --cov=src --cov-report=term --cov-fail-under=80
 npm run test:integration -- --maxWorkers=4
 
 # Vitest — threads pool; per-file isolation is on by default (opt out with --no-isolate)
-npx vitest run --pool=threads tests/integration
+npx --no -- vitest run --pool=threads tests/integration
 
 # Playwright component / API integration
-npx playwright test tests/integration --workers=4 --reporter=line
+npx --no -- playwright test tests/integration --workers=4 --reporter=line
 ```
 
 ### Go

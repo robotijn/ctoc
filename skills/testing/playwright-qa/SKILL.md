@@ -43,7 +43,7 @@ The 2026 Playwright doctrine is **"test the user, not the implementation"** — 
 - **Locators over selectors.** `page.locator()`, `page.getByRole()`, `page.getByLabel()`, `page.getByText()`, `page.getByTestId()` are the *only* sanctioned entry points. They auto-wait, retry, and re-query on every action. `page.$()`, `page.$$()`, `page.waitForSelector()` are flagged **`discouraged`** in Playwright's own API docs — they return `ElementHandle`s that do not auto-wait. Playwright does not runtime-deprecate them and emits no deprecation warning, but the official `eslint-plugin-playwright` errors on them (`no-element-handle`, `no-wait-for-selector`), and **under the warnings-are-bugs rule this skill treats each such lint error as a critical-severity finding**.
 - **Auto-waiting kills sleeps.** Playwright performs actionability checks (visible, stable, enabled, receives events) before every action. Any `page.waitForTimeout(N)` / `setTimeout` / `Thread.sleep` / `time.sleep` / `Task.Delay` in a test is a flake source — replace with `expect(locator).toBeVisible()` or `expect(locator).toHaveText(...)`.
 - **Accessibility-tree assertions.** Prefer `getByRole('button', { name: 'Submit' })` over `getByTestId('submit-btn')`. Why: roles reflect how users *and assistive technology* perceive the page; CSS classes and even test-ids change. The 2026 selector priority is **role > label > placeholder > text > test-id > CSS**. test-id is the fallback when the component has no accessible name.
-- **Trace viewer is the debugger.** `trace: 'on-first-retry'` in `playwright.config.ts` is non-negotiable in CI. Locally use `--trace=on` while debugging. The trace contains DOM snapshots, network log, console log, action log, screenshots — analyze with `npx playwright show-trace trace.zip`.
+- **Trace viewer is the debugger.** `trace: 'on-first-retry'` in `playwright.config.ts` is non-negotiable in CI. Locally use `--trace=on` while debugging. The trace contains DOM snapshots, network log, console log, action log, screenshots — analyze with `npx --no -- playwright show-trace trace.zip`.
 - **Sharding + workers.** `fullyParallel: true` runs files in parallel via workers; `--shard=N/M` runs slices across M CI machines. Combined throughput on a 1000-test suite is typically 8–32× a single-machine sequential run — the exact factor depends on tests, hardware, and contention; measure before claiming a number.
 - **Network mocking is mandatory.** Real third-party calls in E2E are the #1 flake source. Use `page.route()` for in-context mocking; use MSW (Mock Service Worker) when you want the same mock graph to power dev + unit + E2E. Stripe, Auth0, analytics, email — never hit the real service from a test run.
 - **Fixtures over global state.** Playwright's `test.extend({...})` fixture system replaces `beforeEach` global setup. Each fixture gets isolated per-test storage state, browser context, and auth. No shared user, no shared DB row, no shared cookie.
@@ -361,7 +361,7 @@ void stopTrace(TestInfo info) {
 }
 ```
 
-Analyze with `npx playwright show-trace trace.zip` (works regardless of source language — the zip format is universal).
+Analyze with `npx --no -- playwright show-trace trace.zip` (works regardless of source language — the zip format is universal).
 
 ### 5. No parallel sharding (slow CI)
 
@@ -387,14 +387,14 @@ strategy:
   matrix:
     shard: [1/4, 2/4, 3/4, 4/4]
 steps:
-  - run: npx playwright test --shard=${{ matrix.shard }}
+  - run: npx --no -- playwright test --shard=${{ matrix.shard }}
   - uses: actions/upload-artifact@v4
     if: ${{ !cancelled() }}
     with:
       name: blob-report-${{ strategy.job-index }}
       path: blob-report
   # then a "merge-reports" job downloads all blob-report-* and calls:
-  # npx playwright merge-reports --reporter=html ./all-blob-reports
+  # npx --no -- playwright merge-reports --reporter=html ./all-blob-reports
 ```
 
 ```python
@@ -721,7 +721,7 @@ test('product card renders correctly', async ({ page }) => {
 });
 ```
 
-Update with `npx playwright test --update-snapshots` and **always review `git diff snapshots/` before merging** — visual diffs are easy to rubber-stamp and let regressions through. Tools: built-in `toHaveScreenshot` for free; Percy or Chromatic for managed visual diff with team review UI.
+Update with `npx --no -- playwright test --update-snapshots` and **always review `git diff snapshots/` before merging** — visual diffs are easy to rubber-stamp and let regressions through. Tools: built-in `toHaveScreenshot` for free; Percy or Chromatic for managed visual diff with team review UI.
 
 ## Authentication via Storage State
 
@@ -793,7 +793,7 @@ For deeper Web Vitals, drive Lighthouse via `playwright-lighthouse` (CommonJS) o
 
 1. Reproduce locally with `--repeat-each=10 --workers=1` on the failing test
 2. Enable trace with `--trace=on`
-3. Open trace with `npx playwright show-trace trace.zip`
+3. Open trace with `npx --no -- playwright show-trace trace.zip`
 4. Look in order: action log → DOM snapshot at the failure → network log → console log
 5. The trace will show one of: (a) element not found because never rendered (b) element clicked but action raced ahead (c) network call timed out (d) different DOM state in CI vs local (env diff)
 6. Fix the *cause*, not the symptom. If the fix is "add a sleep" or "add a retry inside the test", the analysis is incomplete.
@@ -805,10 +805,10 @@ For deeper Web Vitals, drive Lighthouse via `playwright-lighthouse` (CommonJS) o
 
 | Tool | Strengths | Trade-offs | When |
 |------|-----------|-----------|------|
-| **Playwright CLI** (`npx playwright …`) | Single binary, all commands (`test`, `codegen`, `show-trace`, `install`, `merge-reports`) | TS-centric; other-language SDKs ship parallel CLIs | Every project |
-| **Trace Viewer** (`npx playwright show-trace`) | DOM snapshots, action log, network log, console — best E2E debugger in the ecosystem | Trace files are large (50–500 MB per run); store in CI artifacts, not the repo | Every failed test |
+| **Playwright CLI** (`npx --no -- playwright …`) | Single binary, all commands (`test`, `codegen`, `show-trace`, `install`, `merge-reports`) | TS-centric; other-language SDKs ship parallel CLIs | Every project |
+| **Trace Viewer** (`npx --no -- playwright show-trace`) | DOM snapshots, action log, network log, console — best E2E debugger in the ecosystem | Trace files are large (50–500 MB per run); store in CI artifacts, not the repo | Every failed test |
 | **VS Code Playwright extension** | Inline test gutter, debug-while-recording, locator picker, trace viewer integration | VS Code-only | Local authoring |
-| **GitHub Actions integration** | Official `microsoft/playwright-github-action` (deprecated — use Node setup + `npx playwright install --with-deps`); `actions/upload-artifact` for traces; merge-reports for sharded runs | Storage costs for traces add up | Every CI run |
+| **GitHub Actions integration** | Official `microsoft/playwright-github-action` (deprecated — use Node setup + `npx --no -- playwright install --with-deps`); `actions/upload-artifact` for traces; merge-reports for sharded runs | Storage costs for traces add up | Every CI run |
 | **Allure reporter** (`allure-playwright`) | Rich HTML reports with history, trends, attachments per step | Requires Java for the CLI; adds a build step | Teams that want trend dashboards |
 | **axe-playwright** (`@axe-core/playwright`) | Industry-standard a11y rule engine, WCAG 2.1/2.2 tag filtering, exclusion lists | Automated rules catch a subset of WCAG issues (Deque documents this explicitly) — manual review and screen-reader testing still required | Every page-level spec |
 | **Lighthouse via Playwright** (`playwright-lighthouse`) | Web Vitals (LCP, CLS, INP), perf budgets, accessibility score, SEO | Lighthouse adds 5–15 s per run; throttling makes results variable; CommonJS-only at present | Critical pages, scheduled runs |
@@ -823,21 +823,21 @@ dotnet add package Microsoft.Playwright.NUnit      # C# / .NET
 mvn ... com.microsoft.playwright:playwright       # Java (Maven coordinate)
 
 # Run
-npx playwright test                                # all tests, all browsers
-npx playwright test --shard=1/4                    # shard 1 of 4
-npx playwright test --grep @smoke                  # tag filter
-npx playwright test --trace=on                     # collect traces
+npx --no -- playwright test                                # all tests, all browsers
+npx --no -- playwright test --shard=1/4                    # shard 1 of 4
+npx --no -- playwright test --grep @smoke                  # tag filter
+npx --no -- playwright test --trace=on                     # collect traces
 
 # Debug
-npx playwright codegen https://example.com         # record-and-replay starter
-npx playwright show-trace trace.zip                # open trace viewer
-npx playwright show-report                         # open last HTML report
+npx --no -- playwright codegen https://example.com         # record-and-replay starter
+npx --no -- playwright show-trace trace.zip                # open trace viewer
+npx --no -- playwright show-report                         # open last HTML report
 
 # Merge sharded reports
-npx playwright merge-reports --reporter=html ./all-blob-reports
+npx --no -- playwright merge-reports --reporter=html ./all-blob-reports
 
 # Update snapshots
-npx playwright test --update-snapshots
+npx --no -- playwright test --update-snapshots
 ```
 
 Aggregate Playwright HTML report + Allure (optional) + SARIF (from axe-playwright) into the same CI tab. Fail the build on any of: test failure, new a11y violation, new visual diff above threshold, performance budget regression.

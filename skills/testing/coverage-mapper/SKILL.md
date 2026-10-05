@@ -18,7 +18,7 @@ related_skills:
   - testing/smart-test-runner
   - testing/runners/unit-test-runner
 effort_level: medium
-tools: Bash, Read, Write, Grep, Glob
+tools: Bash, Read, Write, Grep, Glob, Edit
 model: sonnet
 tier: 2
 dispatch_protocol: v1
@@ -397,7 +397,7 @@ function analyzeTestImports(testFile) {
 
 ```javascript
 async function getPerTestCoverage(testFile) {
-  await exec(`npx jest ${testFile} --coverage --coverageReporters=json`);
+  await exec(`npx --no -- jest ${testFile} --coverage --coverageReporters=json`);
   const coverage = JSON.parse(fs.readFileSync('coverage/coverage-final.json'));
   return Object.keys(coverage);
 }
@@ -431,7 +431,7 @@ function needsRebuild(coverageMap) {
 async function incrementalUpdate(changedTestFiles) {
   const coverageMap = loadCoverageMap();
   for (const testFile of changedTestFiles) {
-    await exec(`npx jest ${testFile} --coverage --coverageReporters=json`);
+    await exec(`npx --no -- jest ${testFile} --coverage --coverageReporters=json`);
     const coverage = JSON.parse(fs.readFileSync('coverage/coverage-final.json'));
     coverageMap.tests[testFile] = {
       covers: Object.keys(coverage),

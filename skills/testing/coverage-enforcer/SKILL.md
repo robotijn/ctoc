@@ -21,7 +21,7 @@ related_skills:
   - testing/runners/mutation-test-runner
   - quality/quality-gate
 effort_level: medium
-tools: Bash, Read, Grep
+tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1
@@ -443,7 +443,7 @@ diff-cover coverage.xml --compare-branch=origin/main --fail-under=80 --format ht
 
 | Language | Engine | Threshold gate |
 |----------|--------|----------------|
-| JavaScript / TypeScript | **Stryker** | `npx stryker run` — set `"thresholds": { "high": 85, "low": 75, "break": 70 }` in `stryker.conf.json` (below `break` exits 1; `thresholds` has no CLI form) |
+| JavaScript / TypeScript | **Stryker** | `npx --no -- stryker run` — set `"thresholds": { "high": 85, "low": 75, "break": 70 }` in `stryker.conf.json` (below `break` exits 1; `thresholds` has no CLI form) |
 | .NET (C# / F# / VB) | **Stryker.NET** | `dotnet stryker --break-at 70` |
 | Java / Kotlin | **PIT** | `mvn pitest:mutationCoverage -DmutationThreshold=80` |
 | Python | **mutmut** / Cosmic Ray | `mutmut run` (paths in `[tool.mutmut]`); threshold via report parsing |

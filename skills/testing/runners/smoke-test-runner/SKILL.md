@@ -16,7 +16,7 @@ related_skills:
   - testing/runners/integration-test-runner
   - specialized/health-check-validator
 effort_level: low
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1
@@ -152,7 +152,7 @@ test('@smoke sign-in reaches dashboard', async ({ page }) => {
 
 ```bash
 # Run only smoke, no retries, fail fast
-npx playwright test --project=smoke --reporter=line
+npx --no -- playwright test --project=smoke --reporter=line
 echo "exit=$?"   # non-zero triggers rollback
 ```
 

@@ -17,7 +17,7 @@ related_skills:
   - testing/quality-gate-runner
   - testing/smart-test-runner
 effort_level: medium
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1
@@ -317,7 +317,7 @@ pg_prove --jobs $(nproc) \
 1. **Test results**: total / passed / failed / skipped / cached + failure details with stack traces and the seed used.
 2. **Coverage**: line %, branch %, function %, uncovered files/functions, delta vs. last green.
 3. **Performance**: total wall-clock, per-shard wall-clock, slowest 10 tests, files that timed out.
-4. **Flake signal**: any test that passed on retry — appended to `.ctoc/quality-state/flaky-tests.json`.
+4. **Flake signal**: any test that passed on retry, with its entry for `.ctoc/quality-state/flaky-tests.json` given in the report for the executor to add.
 5. **Cache hit rate**: percent of test files that were content-hash cached vs. re-run.
 
 ## Coverage Thresholds
@@ -485,7 +485,7 @@ it.skip('some test', () => { ... });  // NO — bare skip without platform guard
 If a test fails intermittently:
 1. Retry up to 2 times automatically with the recorded seed.
 2. If still fails → report as flaky and BLOCK.
-3. Append to `.ctoc/quality-state/flaky-tests.json` with `first_seen`, `last_seen`, `retry_count`, `seed`.
+3. Give the entry for `.ctoc/quality-state/flaky-tests.json` in your report, with `first_seen`, `last_seen`, `retry_count`, `seed`, for the executor to add (you hold neither Write nor Edit).
 4. 3 flakes in 7 days → auto-quarantine with a 2-week SLA.
 5. After SLA: delete or fix. Never "pre-existing"-ignore.
 6. Fix root cause (async timing, shared state, port reuse, unseeded random).
