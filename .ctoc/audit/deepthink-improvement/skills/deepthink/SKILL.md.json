@@ -1,0 +1,2310 @@
+{
+  "schema": 1,
+  "path": "skills/deepthink/SKILL.md",
+  "prerequisite": null,
+  "rounds": [
+    {
+      "round": 1,
+      "date": "2026-10-02",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:4668a026ed3a53d3504e4d59f30ff76258f7bce4334aa8e026fdbca203e580a0",
+      "fingerprint_after": "sha256:4e7b11362c07bcf46f0ca1e8d8569d7892439d8e25ca51c1337aeb6b74381870",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        },
+        {
+          "path": "agents/iron-loop/iron-loop-executor.md",
+          "fingerprint": "sha256:4cc48f51cf8ccc25dbbb0fb93beaecc68e543512b8399071f4a9e9cd0fee4516"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s3-r1-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-r1-research-gaps",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-r1-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-r1-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-r1-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "Claude Code hooks PreToolUse matcher \"Agent\" tool renamed from \"Task\"",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "claude-code CHANGELOG.md \"Task\" \"Agent\" rename hook matcher backward compatible alias (limited to github.com, raw.githubusercontent.com, code.claude.com)",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "OWASP Top 10 for LLM Applications 2026 edition LLM01 prompt injection (limited to genai.owasp.org, owasp.org)",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "OWASP Top 10 for Agentic Applications 2026 ASI01 Agent Goal Hijack (limited to genai.owasp.org)",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "\"LLM01:2026\"",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "export.arxiv.org mirror automated harvesting PDF \"export.arxiv.org\" arXiv help (limited to info.arxiv.org, arxiv.org)",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "arXiv deep research agents benchmark citation accuracy evaluation 2025",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "PDF header \"%PDF-\" within first 1024 bytes ISO 32000 PDF Association",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "undici fetch redirect manual returns actual response location header Node.js deviates from spec",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "OpenAI deep research citations hallucinate limitations \"deep research\" introducing",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Adobe PDF Reference implementation note \"Acrobat viewers require only that the header appear somewhere within the first 1024 bytes\"",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Claude Code WebFetch tool large pages truncated summarized small fast model content limit",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Anthropic Claude Research feature citations \"Research\" agentic search announcement",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Validation: every source the seventeen proposed changes and the nine owner entries rest on, re-read at the source (Claude Code tools reference, permissions, sub-agents, hooks and skills pages; Meta; OWASP; arXiv; Node; MDN; GitHub)",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Re-validation: Claude Code permission modes and auto mode, Node .cjs loading, Microsoft reserved device names",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://code.claude.com/docs/en/tools-reference",
+          "read_on": "2026-10-02",
+          "bore_on": "the rerun rule assumed the shell tool stops the program at its time limit; it moves it to the background (r1-f3). Also WebFetch answers through a small model on a truncated page (r1-f4), and background subagents surface permission prompts from v2.1.186 (r1-f7)",
+          "outcome": "refuted",
+          "quote": "When a foreground command reaches its timeout without finishing, Claude Code moves it to the background instead of stopping it",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/permissions",
+          "read_on": "2026-10-02",
+          "bore_on": "web fetches and searches need permission, with preapproved documentation domains and permanent per-repository answers (r1-f7)",
+          "outcome": "supported",
+          "quote": "except a built-in set of preapproved documentation domains",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/permission-modes",
+          "read_on": "2026-10-02",
+          "bore_on": "round 1's own corrected sentence that no prompt reaches the owner in auto mode (the re-read's leftover 1)",
+          "outcome": "refuted",
+          "quote": "if the classifier blocks an action 3 times in a row or 20 times total, auto mode pauses and Claude Code resumes prompting",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/sub-agents",
+          "read_on": "2026-10-02",
+          "bore_on": "the agent type name ctoc:ai-quality:deepthink-researcher; the launch tool's rename from Task to Agent (owner entry on the launch fence matcher)",
+          "outcome": "supported",
+          "quote": "In version 2.1.63, the Task tool was renamed to Agent.",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/hooks",
+          "read_on": "2026-10-02",
+          "bore_on": "whether a hook matcher of letters only matches the old tool name (owner entry on the launch fence matcher); no alias is named",
+          "outcome": "supported",
+          "quote": "`Bash` matches only the Bash tool",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/skills",
+          "read_on": "2026-10-02",
+          "bore_on": "the skill frontmatter key tools: is not read by Claude Code; allowed-tools does not restrict tools (owner entry on the tools key)",
+          "outcome": "supported",
+          "quote": "It does not restrict which tools are available",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/changelog",
+          "read_on": "2026-10-02",
+          "bore_on": "the rename of Task to Agent; the extraction showed no rename line, probably because the page was truncated",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/anthropics/claude-code/issues/29677",
+          "read_on": "2026-10-02",
+          "bore_on": "the hook payload's tool_name changed from Task to Agent (owner entry on the launch fence matcher)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/k21993/hookcompat/pull/3",
+          "read_on": "2026-10-02",
+          "bore_on": "whether a Task matcher still fires; the pull request says it is not yet verified",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://github.com/anthropics/claude-code/issues/95127",
+          "read_on": "2026-10-02",
+          "bore_on": "WebFetch may return only part of a long page without a mark (r1-f4)",
+          "outcome": "supported",
+          "quote": "returning 39,415 of 502,907 characters",
+          "error": null
+        },
+        {
+          "url": "https://ai.meta.com/blog/practical-ai-agent-security/",
+          "read_on": "2026-10-02",
+          "bore_on": "the Rule of Two: an agent holding all three properties needs supervision (r1-f7; owner entry on the gate-critic paraphrase)",
+          "outcome": "supported",
+          "quote": "at a minimum requires supervision — via human-in-the-loop approval or another reliable means of validation",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/llm-top-10/",
+          "read_on": "2026-10-02",
+          "bore_on": "which OWASP edition is current; the page still shows the 2025 edition as the latest and is stale (owner entry on the edition)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/2026/09/01/owasp-genai-security-project-unveils-2026-top-10-for-llm-applications-new-agent-control-standard-and-sponsors-as-community-tops-30000-members/",
+          "read_on": "2026-10-02",
+          "bore_on": "the 2026 edition is published and current (owner entry on the edition)",
+          "outcome": "supported",
+          "quote": "the latest edition of the project's flagship guidance",
+          "error": null
+        },
+        {
+          "url": "https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/",
+          "read_on": "2026-10-02",
+          "bore_on": "the 2026 edition was released on 3 August 2026, final (owner entry on the edition)",
+          "outcome": "supported",
+          "quote": "Final (version 1.0)",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM01_PromptInjection.md",
+          "read_on": "2026-10-02",
+          "bore_on": "a provenance-labelled channel for external content (r1-f13); the entry title LLM01:2026",
+          "outcome": "supported",
+          "quote": "Pass external content through a structurally separate, provenance-labeled channel so the model can distinguish data from instructions",
+          "error": null
+        },
+        {
+          "url": "https://info.arxiv.org/help/api/tou.html",
+          "read_on": "2026-10-02",
+          "bore_on": "arXiv's request rate for its programming interface, not stated for /pdf/ (owner entry on the download pace)",
+          "outcome": "supported",
+          "quote": "Make no more than one request every three seconds",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/robots.txt",
+          "read_on": "2026-10-02",
+          "bore_on": "the /pdf/ allowance and a 15-second crawl delay, seen only through the fetch tool extraction and not re-read by the validator (owner entry on the download pace)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://info.arxiv.org/help/robots.html",
+          "read_on": "2026-10-02",
+          "bore_on": "repeated requests after a 403 are treated as an attack; automated downloads are not permitted (owner entry on the download pace)",
+          "outcome": "supported",
+          "quote": "Continued rapid-fire requests from any site after access has been denied",
+          "error": null
+        },
+        {
+          "url": "https://info.arxiv.org/help/bulk_data.html",
+          "read_on": "2026-10-02",
+          "bore_on": "harvesting goes to export.arxiv.org; read by the research only (owner entry on the download pace)",
+          "outcome": "supported",
+          "quote": "set aside for programmatic access",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2604.03173",
+          "read_on": "2026-10-02",
+          "bore_on": "deep research agents hallucinate citation addresses (r1-f5)",
+          "outcome": "supported",
+          "quote": "3--13% of citation URLs are hallucinated",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2506.11763",
+          "read_on": "2026-10-02",
+          "bore_on": "citation accuracy is measured separately from citation count (r1-f2)",
+          "outcome": "supported",
+          "quote": "effective citation count and overall citation accuracy",
+          "error": null
+        },
+        {
+          "url": "https://www.anthropic.com/engineering/multi-agent-research-system",
+          "read_on": "2026-10-02",
+          "bore_on": "search rank is not source quality (r1-f17); citation accuracy as its own measure (r1-f2)",
+          "outcome": "supported",
+          "quote": "our early agents consistently chose SEO-optimized content farms over authoritative but less highly-ranked sources like academic PDFs or personal blogs",
+          "error": null
+        },
+        {
+          "url": "https://openai.com/index/introducing-deep-research/",
+          "read_on": "2026-10-02",
+          "bore_on": "OpenAI's own documentation of its research feature",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "403 Forbidden"
+        },
+        {
+          "url": "https://www.rfc-editor.org/rfc/rfc8118.html",
+          "read_on": "2026-10-02",
+          "bore_on": "the file header %PDF at byte 0, which the skill keeps (the rejected 1,024-byte candidate)",
+          "outcome": "supported",
+          "quote": "All PDF files start with the characters \"%PDF-\"",
+          "error": null
+        },
+        {
+          "url": "https://kb.datalogics.com/article/is-there-a-simple-way-to-identify-a-file-as-being-a-pdf-9.html",
+          "read_on": "2026-10-02",
+          "bore_on": "readers that accept bytes before the header (the rejected 1,024-byte candidate)",
+          "outcome": "supported",
+          "quote": "the \"%PDF-\" string is not required to be at the beginning of the file",
+          "error": null
+        },
+        {
+          "url": "https://nodejs.org/api/globals.html",
+          "read_on": "2026-10-02",
+          "bore_on": "Node's fetch ships without a flag from version 18 and is built on undici",
+          "outcome": "supported",
+          "quote": "No longer behind `--experimental-fetch` CLI flag.",
+          "error": null
+        },
+        {
+          "url": "https://undici.nodejs.org/",
+          "read_on": "2026-10-02",
+          "bore_on": "redirect: 'manual' returns the redirect answer with its Location header, which the program relies on",
+          "outcome": "supported",
+          "quote": "Undici returns the actual response instead of an `opaqueredirect` filtered one",
+          "error": null
+        },
+        {
+          "url": "https://undici.nodejs.org/api/Fetch",
+          "read_on": "2026-10-02",
+          "bore_on": "the default redirect mode and the redirect maximum; neither is given",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://nodejs.org/api/packages.html",
+          "read_on": "2026-10-02",
+          "bore_on": "a .cjs file runs as CommonJS whatever package.json declares",
+          "outcome": "supported",
+          "quote": "Files ending with `.cjs` are always loaded as CommonJS regardless of the nearest parent `package.json`.",
+          "error": null
+        },
+        {
+          "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/toISOString",
+          "read_on": "2026-10-02",
+          "bore_on": "the date command gives the universal-time day (r1-f12; owner entry on the calendar day)",
+          "outcome": "supported",
+          "quote": "The timezone is always UTC",
+          "error": null
+        },
+        {
+          "url": "https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch",
+          "read_on": "2026-10-02",
+          "bore_on": "the abort signal also stops reading the body (r1-f9)",
+          "outcome": "supported",
+          "quote": "attempting to read the response body will reject with an `AbortError` exception",
+          "error": null
+        },
+        {
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html",
+          "read_on": "2026-10-02",
+          "bore_on": "the pinned sentence that a hop that is not https or is internal is never requested: the check and the connection look the name up separately (owner entry on the lookups)",
+          "outcome": "refuted",
+          "quote": "a DNS resolution will be made when the business code will be executed",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/lib/internal/fs/utils.js",
+          "read_on": "2026-10-02",
+          "bore_on": "rmSync without force throws on a missing path, so a second run on a removed staging file stops (r1-f3)",
+          "outcome": "supported",
+          "quote": "throwIfNoEntry: !options.force",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/lib/fs.js",
+          "read_on": "2026-10-02",
+          "bore_on": "rmSync calls validateRmOptionsSync (r1-f3)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://nodejs.org/api/fs.html",
+          "read_on": "2026-10-02",
+          "bore_on": "rmSync without force; the fetch tool cut the page off before that section",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "cut off by the fetch tool before rmSync"
+        },
+        {
+          "url": "https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/autolinked-references-and-urls",
+          "read_on": "2026-10-02",
+          "bore_on": "a viewer turns a bare address into a link (r1-f15)",
+          "outcome": "supported",
+          "quote": "GitHub automatically creates links from standard URLs.",
+          "error": null
+        },
+        {
+          "url": "https://github.github.com/gfm/",
+          "read_on": "2026-10-02",
+          "bore_on": "the autolink extension; the fetch tool cut the page off before section 6.9",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "cut off by the fetch tool before section 6.9"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file",
+          "read_on": "2026-10-02",
+          "bore_on": "Windows reserved device names, which the program's name rule refuses",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "r1-f1",
+          "kind": "new",
+          "text": "The brief carries the shape of the result: the session pastes the result shapes, the recommendation rule, the waiting budget, the rule on obvious choices and the decision-question format's sections after the brief, because the reading agent cannot read a file. The re-read's leftover 5 names the format's three sections by their exact headings.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f1; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f1; .ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, leftover 5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f2",
+          "kind": "new",
+          "text": "\"Downloaded and verified\" said more than the program checks: a downloaded file is checked only by its first bytes and its size, and is a copy to read, never proof of the claim.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f2; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f3",
+          "kind": "new",
+          "text": "A program run the shell tool moves to the background has not stopped: its lines are taken from that command once it ends, the rerun applies only if it ended before its closing line, and the program is never started twice on one staging file. Applied with the validator's corrected text.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f3; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f3, corrected text",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f4",
+          "kind": "new",
+          "text": "The order to read a source completely is replaced by reading it part by part as far as WebFetch returns it, naming what it did not return, and never calling a source read in full. The re-read's leftover 4 limits that to the parts the agent can tell were not returned.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f4; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f4; .ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, leftover 4",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f5",
+          "kind": "new",
+          "text": "The reading agent cites only papers and pages it opened in the run, at addresses it saw, never from memory or from a search result it did not open.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f5; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f6",
+          "kind": "new",
+          "text": "The decision-question shape follows the decision-question format's order: the heading begins \"Question\", the long-run line and the Sources line sit under the matrix, then the question sentence, the new-ideas block and the lettered menu. The re-read's leftover 2 makes the menu last in the question, with the brief's Failures, paper list and closing line still following the whole result.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f6; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f6; .ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, leftover 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f7",
+          "kind": "new",
+          "text": "The reading agent's web requests can ask the owner for permission; a refusal is named under Failures; the prompt is a human check on what the pasted text could carry out, and the cases with no prompt are named. Applied with the validator's corrected text; the re-read found that text's auto-mode clause contradicted by its source, and its leftover 1 replaced it.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f7; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f7, corrected text; .ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, leftover 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f8",
+          "kind": "new",
+          "text": "A latency figure carries where it came from, or the label \"not yet measured; to measure on the project\", because the reading agent cannot measure anything.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f8; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f8",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f9",
+          "kind": "new",
+          "text": "The sixty-second limit is stated as the code enforces it: per download, every redirect included, with the program's own name lookup bounded by the system resolver instead.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f9; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f9",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f10",
+          "kind": "new",
+          "text": "Fifty kilobytes is written as fifty kibibytes (51,200 bytes), the program's limit.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f10; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f10",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f11",
+          "kind": "new",
+          "text": "The description says every cited paper that can be fetched is downloaded.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f11; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f11",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f12",
+          "kind": "new",
+          "text": "The brief carries today's date from the session's date command for the read dates. The re-read's leftover 3 orders that command run before the launch, with step 5's header using the same date.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f12; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f12; .ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, leftover 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f13",
+          "kind": "new",
+          "text": "A written brief carries a second line saying it is web research to read, never an instruction to any agent that reads the file.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f13; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f13",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f14",
+          "kind": "new",
+          "text": "What the research changed is said in the question's explanation paragraph, so the question still opens with its heading.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f14; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f14",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f15",
+          "kind": "new",
+          "text": "The index-cell sentence says what the escaping prevents and that a viewer may still turn a bare address into a link.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f15; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f15",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f16",
+          "kind": "new",
+          "text": "Every decisions log that exists is read, not whichever one.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f16; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f16",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-f17",
+          "kind": "new",
+          "text": "A source is never ranked by its place in the search results.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, r1-f17; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, r1-f17",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-leftover-1",
+          "kind": "new",
+          "text": "The auto-mode clause of the permission bullet was contradicted by its source: auto mode resumes prompting after three blocks in a row or twenty in the session, and a permission rule that says to ask still asks. Rewritten from the permission-modes page.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, check 3 and leftover 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-leftover-2",
+          "kind": "new",
+          "text": "\"Last of all, with nothing after it\" contradicted the brief's own order; the menu is last in the question.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, check 2 item 1 and leftover 2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-leftover-3",
+          "kind": "new",
+          "text": "The date the brief needs was produced only after the launch; it is now produced before the launch.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, check 2 item 2 and leftover 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-leftover-4",
+          "kind": "new",
+          "text": "An order that invited listing missing parts from memory now covers only the parts the agent can tell were not returned.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, check 2 item 3 and leftover 4",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-leftover-5",
+          "kind": "new",
+          "text": "The decision-question format's sections are named by their exact headings, suffixes included, as they stand in skills/ask-me-questions/SKILL.md lines 95, 131 and 146 (the session's correction to the re-read's wording).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, check 2 item 4 and leftover 5; skills/ask-me-questions/SKILL.md lines 95, 131 and 146",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-h1",
+          "kind": "new",
+          "text": "The launch fence matches the old tool name Task; whether it fires for the renamed Agent tool is not documented and not tested at runtime.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, owner entries",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r1-launch-fence-matcher"
+        },
+        {
+          "id": "r1-h2",
+          "kind": "new",
+          "text": "The pinned sentence that a non-https or internal hop is never requested is true of the check, not of the connection, which looks the name up again. Evidence corrected by the validator; line number updated by the re-read's leftover 6.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, leftover 6",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r1-check-and-connect-lookups"
+        },
+        {
+          "id": "r1-h3",
+          "kind": "new",
+          "text": "The program requests papers back to back and keeps requesting a host after a 403, which arXiv names as an attack.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, owner entries",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r1-arxiv-pace-after-refusal"
+        },
+        {
+          "id": "r1-h4",
+          "kind": "new",
+          "text": "The program prints \"fifty kilobytes\" for a limit of fifty kibibytes, and the test pins that line.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, owner entries",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r1-fifty-kilobytes-wording"
+        },
+        {
+          "id": "r1-h5",
+          "kind": "new",
+          "text": "The pinned frontmatter key tools: is not read by Claude Code and restricts nothing.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, owner entries",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r1-tools-key-unread"
+        },
+        {
+          "id": "r1-h6",
+          "kind": "new",
+          "text": "gate-critic paraphrases Meta's Rule of Two without \"change state\" and \"within a session\". The re-read's leftover 9 corrected what the entry said about the parent plan's wording.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, leftover 9",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r1-rule-of-two-paraphrase"
+        },
+        {
+          "id": "r1-h7",
+          "kind": "new",
+          "text": "Eight agent files cite LLM01:2025 while the 2026 edition is current.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, row a and owner entries",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r1-owasp-edition"
+        },
+        {
+          "id": "r1-h8",
+          "kind": "new",
+          "text": "The long-run line names an option under owner decisions too, which the decision-question format forbids; the parent settled it. Line numbers updated by the re-read's leftover 8.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, leftover 8",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r1-long-run-line-on-owner-decisions"
+        },
+        {
+          "id": "r1-h9",
+          "kind": "new",
+          "text": "The date command gives the universal-time day, not the owner's. Line number updated by the re-read's leftover 7.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round1-validate-d-s3-r1-validate.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md, leftover 7",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r1-which-calendar-day"
+        },
+        {
+          "id": "r1-h10",
+          "kind": "new",
+          "text": "Whether CTOC's plan readers take a brief under plans/vision/deepthink/ for a plan: measured by running them on a temporary project; none did, and nothing pins it.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, closing question; plans/in-progress/00399-deepthink-ships-with-ctoc-s3-three-improvement-rounds.md, Execution Record, \"Round 1 — apply\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r1-briefs-under-plans-vision"
+        },
+        {
+          "id": "r1-r1",
+          "kind": "new",
+          "text": "Send the cut-off rerun rule to the owner as a pinned contract.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, \"Researcher candidates I rejected or corrected\"",
+          "decision": "rejected",
+          "reason": "The pinned rerun sentence is conditional on the program having stopped, and a run moved to the background has not stopped; r1-f3 states the difference without touching the pinned text.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-r2",
+          "kind": "new",
+          "text": "Check all five header bytes %PDF- instead of four.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, \"Researcher candidates I rejected or corrected\"",
+          "decision": "rejected",
+          "reason": "It makes no practical difference to which files are kept.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-r3",
+          "kind": "new",
+          "text": "Accept the file header anywhere in the first 1,024 bytes.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, \"Researcher candidates I rejected or corrected\"",
+          "decision": "rejected",
+          "reason": "RFC 8118 says every portable document format file starts with it.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-r4",
+          "kind": "new",
+          "text": "Have the program request every cited web page to confirm it exists.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, \"Researcher candidates I rejected or corrected\"",
+          "decision": "rejected",
+          "reason": "The cause is the reading agent citing addresses it never opened, which r1-f5 fixes at the source; the proposal would add outbound requests to arbitrary addresses in the fixed program.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-r5",
+          "kind": "new",
+          "text": "Reword the CommonJS sentence.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, \"Researcher candidates I rejected or corrected\"",
+          "decision": "rejected",
+          "reason": "It is true as written.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "r1-r6",
+          "kind": "new",
+          "text": "Write the ten-minute shell time limit into the skill.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round1-critic-d-s3-r1-critic.md, \"Researcher candidates I rejected or corrected\"",
+          "decision": "rejected",
+          "reason": "It is a configurable vendor default, so the skill states the per-paper limit instead.",
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 42,
+        "VALIDATED": 34,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 6,
+        "MISATTRIBUTED": 0
+      },
+      "validator_final": {
+        "examined": 27,
+        "VALIDATED": 26,
+        "FABRICATED": 1,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [
+        {
+          "claim": "The permission bullet's auto-mode sentence as the re-read's leftover 1 wrote it: auto mode is the starting mode of an interactive terminal session from Claude Code 2.1.283, a classifier reviews each request unless a permission rule says to ask, and prompting resumes after three blocks in a row or twenty in the session",
+          "verified_on": "2026-10-02",
+          "reason": "The one claim validator_final counts as FABRICATED was the earlier wording; the re-validator wrote this replacement from its own reading of https://code.claude.com/docs/en/permission-modes on 2026-10-02, and the file was not read again after the replacement was applied. Round 2's validation reads it."
+        },
+        {
+          "claim": "The re-read's leftovers 2 to 5 as applied (the menu last in the question, the date before the launch, the parts WebFetch did not return, the decision-question format's three section headings)",
+          "verified_on": "2026-10-02",
+          "reason": "Wording, not citations, written by the re-validator; the three headings were checked against skills/ask-me-questions/SKILL.md lines 95, 131 and 146 by the apply script, and the file was not read again by the validator after the apply. Round 2's validation reads it."
+        }
+      ],
+      "fences": [
+        {
+          "test": "tests/deepthink-ships-with-ctoc.test.js",
+          "result": "fail"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/plugin-skill-discovery.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-census.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-ledger-gate.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/ask-me-questions/SKILL.md",
+        "agents/ai-quality/deepthink-researcher.md",
+        "skills/deepthink/fetch-papers.cjs",
+        "tests/deepthink-ships-with-ctoc.test.js"
+      ],
+      "seven_languages": {
+        "applies": false,
+        "reason": "Not applicable: the file teaches no programming-language examples. Its code is four recipes the session runs exactly as written (two node -e lines and two node lines under the plugin root) and one name pattern; none teaches an idiom that would have to be carried into another language. The program is JavaScript, read-only for these rounds, and not taught.",
+        "examples_checked": []
+      }
+    },
+    {
+      "round": 2,
+      "date": "2026-10-02",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:4e7b11362c07bcf46f0ca1e8d8569d7892439d8e25ca51c1337aeb6b74381870",
+      "fingerprint_after": "sha256:26222c3c78ba37f326c9d9c7f7fefd608600a92cc085621c975f293d24d27d91",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        },
+        {
+          "path": "agents/iron-loop/iron-loop-executor.md",
+          "fingerprint": "sha256:4cc48f51cf8ccc25dbbb0fb93beaecc68e543512b8399071f4a9e9cd0fee4516"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s3-r2-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-r2-research-gaps",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-r2-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-r2-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-r2-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "Round 2's angle: standards bodies, government agencies, peer-reviewed work and the runtime's own documentation, after round 1's vendor documentation and original papers. Claude Code permission-modes page: the auto-mode starting version, the classifier, the repeated-block thresholds, ask rules, subagents",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "The two special-purpose address registries of the Internet Assigned Numbers Authority (version four and version six)",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "RFC 9110: redirect loops, the old five-redirect note, a relative Location",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "RFC 6761 (localhost), RFC 6762 (.local) and RFC 8375 (home.arpa); the ICANN board reservation of .internal",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "The binary prefixes kibi and mebi at the National Institute of Standards and Technology",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "ISO 32000-2 clause 7.5.2, the file header: the Library of Congress format page and the PDF Association",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "NIST AI 100-2 E2025 and NIST AI 600-1 section 2.9 on indirect prompt injection",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "The United Kingdom National Cyber Security Centre on prompt injection (a government agency; the record's closed list has no agency class, so it is recorded as regulator)",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "Peer-reviewed work: Greshake and others on indirect prompt injection; Liu, Zhang and Liang on citation faithfulness; AgentDojo; Walters and Wilder",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "The International Patient Decision Aid Standards on balanced presentation of options",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "Node doc/api/net.md (BlockList), Node src/node_sockaddr.cc and the WHATWG URL Standard (the IPv4 parser and the host table)",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Claude Code pages permission-modes, tools-reference, permissions and data-usage, read raw: what WebFetch refuses, how auto mode routes web requests",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Defaults and how the order of options sways choices: Martin and others 2021, Johnson and Goldstein 2003, Davidai, Gilovich and Ross 2012",
+          "source_class": "original paper",
+          "repeated_because": null
+        },
+        {
+          "text": "The OWASP Server-Side Request Forgery Prevention Cheat Sheet, for whether a number-form host can pass the internal-address check",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "Validation and re-validation: every source the sixteen changes and the four owner entries rest on, re-read raw where the page allowed it, and a live WebFetch of a digital object identifier link to see the cross-host redirect report",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://code.claude.com/docs/en/permission-modes",
+          "read_on": "2026-10-02",
+          "bore_on": "auto mode's routing of web requests, its starting version and conditions, the block thresholds, the review of a subagent at its start and of its report (r2-f1, f2, f3, f13); read raw as permission-modes.md by the validator and the re-validator",
+          "outcome": "supported",
+          "quote": "When the classifier is unavailable for the review, the report arrives with a note to verify",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/tools-reference",
+          "read_on": "2026-10-02",
+          "bore_on": "WebFetch answers through a separate model call (r2-f8), does not follow a cross-host redirect (r2-f9), refuses host names without a dot, and the private-address refusal sits under the Monitor tool only (r2-f13); read raw as tools-reference.md",
+          "outcome": "supported",
+          "quote": "Claude receives the result of that call rather than the raw page",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/permissions",
+          "read_on": "2026-10-02",
+          "bore_on": "web fetches and searches need permission, remembered per repository (round 1's permission sentence, re-read)",
+          "outcome": "supported",
+          "quote": "Permanently per repository",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/data-usage",
+          "read_on": "2026-10-02",
+          "bore_on": "WebFetch's domain safety check sends only the host name to a blocklist (the validator's correction of r2-f13)",
+          "outcome": "supported",
+          "quote": "sends the requested hostname to `api.anthropic.com` to check it against a safety blocklist maintained by Anthropic",
+          "error": null
+        },
+        {
+          "url": "https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml",
+          "read_on": "2026-10-02",
+          "bore_on": "the version four classes the pinned internal-address sentence names",
+          "outcome": "supported",
+          "quote": "198.18.0.0/15",
+          "error": null
+        },
+        {
+          "url": "https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml",
+          "read_on": "2026-10-02",
+          "bore_on": "the version six benchmarking range the program does not refuse (owner entry h-deepthink-r2-version-six-benchmark-range)",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry-1.csv",
+          "read_on": "2026-10-02",
+          "bore_on": "the registry row for 2001:2::/48, quoted in the owner entry (the validator's correction)",
+          "outcome": "refuted",
+          "quote": "2001:2::/48,Benchmarking,[RFC5180][RFC Errata 1752],2008-04,N/A,True,True,True,False,False",
+          "error": null
+        },
+        {
+          "url": "https://www.rfc-editor.org/rfc/rfc6761.html",
+          "read_on": "2026-10-02",
+          "bore_on": "the .localhost ending in the pinned internal-address sentence",
+          "outcome": "supported",
+          "quote": "The domain \"localhost.\" and any names falling within \".localhost.\" are special",
+          "error": null
+        },
+        {
+          "url": "https://www.rfc-editor.org/rfc/rfc6762.html",
+          "read_on": "2026-10-02",
+          "bore_on": "the .local ending",
+          "outcome": "supported",
+          "quote": "any fully qualified name ending in \".local.\" is link-local",
+          "error": null
+        },
+        {
+          "url": "https://www.rfc-editor.org/rfc/rfc8375.html",
+          "read_on": "2026-10-02",
+          "bore_on": "the .home.arpa ending",
+          "outcome": "supported",
+          "quote": "'home.arpa.' is designated for non-unique use in residential home networks.",
+          "error": null
+        },
+        {
+          "url": "https://www.icann.org/en/board-activities-and-meetings/materials/approved-resolutions-special-meeting-of-the-icann-board-29-07-2024-en",
+          "read_on": "2026-10-02",
+          "bore_on": "the .internal ending",
+          "outcome": "supported",
+          "quote": "the Board reserves .INTERNAL from delegation in the DNS root zone permanently",
+          "error": null
+        },
+        {
+          "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+          "read_on": "2026-10-02",
+          "bore_on": "redirect loops and a relative Location; the fetch tool cut the text off at section 6.4.2, and the quotes came through the search tool only",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "cut off by the fetch tool at section 6.4.2"
+        },
+        {
+          "url": "https://physics.nist.gov/cuu/Units/binary.html",
+          "read_on": "2026-10-02",
+          "bore_on": "one hundred mebibytes is 104,857,600 bytes (r2-f14)",
+          "outcome": "supported",
+          "quote": "1 MiB = 2^20 B = 1 048 576 B",
+          "error": null
+        },
+        {
+          "url": "https://www.loc.gov/preservation/digital/formats/fdd/fdd000474.shtml",
+          "read_on": "2026-10-02",
+          "bore_on": "the version 2.0 file signature; it gives no byte offset",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.600-1.pdf",
+          "read_on": "2026-10-02",
+          "bore_on": "indirect prompt injection and data theft (round 1's \"reduces the risk without removing it\"); page 11 read as a rendered page",
+          "outcome": "supported",
+          "quote": "Indirect prompt injection attacks occur when adversaries remotely",
+          "error": null
+        },
+        {
+          "url": "https://www.ncsc.gov.uk/blog-post/prompt-injection-is-not-sql-injection",
+          "read_on": "2026-10-02",
+          "bore_on": "the risk can be reduced, not removed (candidate d9, rejected as r2-r2)",
+          "outcome": "supported",
+          "quote": "it's very possible that prompt injection attacks may never be totally mitigated",
+          "error": null
+        },
+        {
+          "url": "https://arxiv.org/abs/2302.12173",
+          "read_on": "2026-10-02",
+          "bore_on": "data theft through retrieved content; an older primary paper (r2-f16)",
+          "outcome": "supported",
+          "quote": "LLM-Integrated Applications blur the line between data and instructions",
+          "error": null
+        },
+        {
+          "url": "https://aclanthology.org/2023.findings-emnlp.467/",
+          "read_on": "2026-10-02",
+          "bore_on": "citations often do not support their sentence (r2-f7)",
+          "outcome": "supported",
+          "quote": "only 74.5% of citations support their associated sentence",
+          "error": null
+        },
+        {
+          "url": "https://doi.org/10.18653/v1/2023.findings-emnlp.467",
+          "read_on": "2026-10-02",
+          "bore_on": "a live WebFetch by the validator: the cross-host redirect is reported with its target labelled server-supplied, which corrected r2-f9's framing",
+          "outcome": "supported",
+          "quote": "server-supplied, not verified",
+          "error": null
+        },
+        {
+          "url": "https://decisionaid.ohri.ca/IPDAS/ipdas-chapter-i.pdf",
+          "read_on": "2026-10-02",
+          "bore_on": "balanced presentation of options (candidate d8, rejected as r2-r1)",
+          "outcome": "supported",
+          "quote": "Balance occurs when there is equal emphasis on presenting positive and negative information",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/doc/api/net.md",
+          "read_on": "2026-10-02",
+          "bore_on": "a mapped address matching a four-part rule added with addAddress (owner entry h-deepthink-r2-mapped-address-untested); through the fetch tool's answer",
+          "outcome": "supported",
+          "quote": "console.log(blockList.check('::ffff:7b7b:7b7b', 'ipv6')); // Prints: true",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/src/node_sockaddr.cc",
+          "read_on": "2026-10-02",
+          "bore_on": "the path for a mapped address against a four-part subnet rule, which did not come back through the fetch tool",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://url.spec.whatwg.org/",
+          "read_on": "2026-10-02",
+          "bore_on": "a number-form host reaches the program in dotted form, and a mapped address is written in shortest lowercase hexadecimal (owner entry h-deepthink-r2-mapped-address-untested); through the fetch tool's answer",
+          "outcome": "supported",
+          "quote": "represented as the shortest possible lowercase hexadecimal number",
+          "error": null
+        },
+        {
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3458339/",
+          "read_on": "2026-10-02",
+          "bore_on": "a default option sways choices, which supports keeping a recommendation off owner decisions",
+          "outcome": "supported",
+          "quote": "Rates of participation in organ donation programs are known to be powerfully influenced by the relevant default policy in effect",
+          "error": null
+        },
+        {
+          "url": "https://journals.sagepub.com/doi/full/10.1177/0272989X211021397",
+          "read_on": "2026-10-02",
+          "bore_on": "Martin and others 2021, the balance update of the decision aid standards",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "403 Forbidden"
+        },
+        {
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html",
+          "read_on": "2026-10-02",
+          "bore_on": "compare the parser's output, not the raw text; the separate name lookups (round 1's owner entry, rejected here as a duplicate, r2-r3)",
+          "outcome": "supported",
+          "quote": "Use the output value of the method/library as the IP address to compare against the allowlist.",
+          "error": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "r2-f1",
+          "kind": "correction-of-earlier-round",
+          "text": "Round 1's auto-mode sentence narrowed to web searches and fetches: a rule that allows or denies settles the request, a rule that asks still asks, the classifier takes the rest; plus the classifier's review of the launch and of the report. Applied with the validator's corrected text (a refused review also brings the security warning; only an unavailable classifier brings the note).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f1; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f1, corrected text",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f2",
+          "kind": "new",
+          "text": "A launch refused for any other reason, for example by auto mode's classifier, closes the task as failed, writes no brief and is launched again only when the owner says to.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f2; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f3",
+          "kind": "new",
+          "text": "A security warning or a note to verify that comes with the returned text is not part of the result; it is named under Failures. Applied with the validator's corrected text (the note comes with the report; where it sits is not documented).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f3; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f3, corrected text",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f4",
+          "kind": "correction-of-earlier-round",
+          "text": "A researched question is presented only once the owner has said they are satisfied with the current one, opens with its heading and ends with its menu; the Evidence summary and Failures reach the owner through the explanation paragraph; a source or topic brief is presented without its questions, which follow one per message.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f4; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f4",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f5",
+          "kind": "new",
+          "text": "A question the rule on obvious choices leaves with one option is written as its heading, its explanation paragraph and a \"Derived, no question needed\" section, with no matrix and no menu.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f5; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f5",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f6",
+          "kind": "new",
+          "text": "Such a question is reported, not asked: no menu, and a sentence that the option is not the owner's answer until the owner confirms it and that the owner may reopen the choice. Applied with the validator's corrected text, which follows the owner's sourced ruling instead of asking.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f6; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f6, corrected text",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f7",
+          "kind": "new",
+          "text": "Every claim names where in its source it stands when the tool shows it; a number with no source read in the run and none in the pasted text is marked [unverified] and listed as a proposal to check.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f7; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f8",
+          "kind": "new",
+          "text": "WebFetch's answer that a page does not say something is not evidence of absence: ask a narrower question first, and say when a quotation came through the tool's answer. Applied with the validator's corrected text, which quotes the tools reference as it stands (the critic's quote and the word small are not on the page).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f8; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f8, corrected text",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f9",
+          "kind": "new",
+          "text": "A cross-host redirect WebFetch reports names an address the server supplied: fetch it only when it is a public https address the agent would have chosen for the same source. Applied with the validator's corrected text, after the validator's live fetch showed the target labelled server-supplied.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f9; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f9, corrected text",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f10",
+          "kind": "new",
+          "text": "The reading agent gives the address of the paper's file itself, because that address is what the session downloads; a landing page is marked not fetched.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f10; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f10",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f11",
+          "kind": "new",
+          "text": "The program's printed lines are described as they are: a kept line names its paper by path and size, the other lines quote the address, and a non-object entry is refused with no address.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f11; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f11",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f12",
+          "kind": "new",
+          "text": "The brief check reads the header's ending, '; in progress', on a first line split on either line ending. Run by the executor through zsh on 2026-10-02 on two sample briefs: the in-progress header printed 93 true; a finished header whose item is 'the work in progress limit for the scheduler', with Windows line endings, printed 2718 false, where the check before round 2 printed 2718 true.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f12; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f12; plans/in-progress/00399-deepthink-ships-with-ctoc-s3-three-improvement-rounds.md, Execution Record, \"Round 2 — apply\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f13",
+          "kind": "new",
+          "text": "WebFetch refuses localhost and host names without a dot; a refusal of private addresses is documented only for the Monitor tool, and the domain safety check sends only the host name; so the guards this skill relies on for private addresses are the permission prompt and the brief's rule. Applied with the validator's corrected text, which adds the domain safety check.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f13; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f13, corrected text",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f14",
+          "kind": "new",
+          "text": "One hundred mebibytes is written with its byte count, 104,857,600.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f14; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f14",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f15",
+          "kind": "new",
+          "text": "\"These two places\" named the wrong two things after round 1; the paper library and the brief folder are named.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f15; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f15",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-f16",
+          "kind": "new",
+          "text": "An older paper may be cited where it is the primary source for a point; the owner's \"from 2024 on\" is kept.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, r2-f16; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, r2-f16",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-leftover-1",
+          "kind": "new",
+          "text": "The one-option exception is worded as the one exception this skill adds to the decision-question format's menu, because the format names its own one exception (the screen after a further explanation).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-revalidate-d-s3-r2-revalidate.md, check 2 and leftover 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-h1",
+          "kind": "new",
+          "text": "The pinned internal-address sentence names a benchmark network, and the program refuses the version four benchmarking range only, not 2001:2::/48. Evidence corrected by the validator (the registry row from its comma-separated form); line numbers updated by the re-read's leftover 2.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, owner entry 1; .ctoc/audit/deepthink-run-notes/s3-round2-revalidate-d-s3-r2-revalidate.md, leftover 2",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r2-version-six-benchmark-range"
+        },
+        {
+          "id": "r2-h2",
+          "kind": "new",
+          "text": "No test proves a mapped address such as [::ffff:127.0.0.1] is refused. Session-run fact, measured by the executor on Node v24.14.1 on 2026-10-02 with the program's own block list built from its source text: ::ffff:7f00:1, ::ffff:a00:1 and ::ffff:c0a8:101 are refused and ::ffff:808:808 is not; the program's version six rules alone refuse neither of the first two, and the four-part rules alone refuse both. The re-read's leftover 5 corrected the as-is option's cons to say the behaviour is documented only for a single-address rule and was measured once, outside the suite.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, owner entry 2; .ctoc/audit/deepthink-run-notes/s3-round2-revalidate-d-s3-r2-revalidate.md, leftover 5; plans/in-progress/00399-deepthink-ships-with-ctoc-s3-three-improvement-rounds.md, Execution Record, \"Round 2 — apply\"",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r2-mapped-address-untested"
+        },
+        {
+          "id": "r2-h3",
+          "kind": "new",
+          "text": "The 12 September quotation is the owner's own words, cut mid-sentence, from a note no reader of the shipped skill can open. Line number updated by the re-read's leftover 3.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, owner entry 3; .ctoc/audit/deepthink-run-notes/s3-round2-revalidate-d-s3-r2-revalidate.md, leftover 3",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r2-obvious-choice-quotation"
+        },
+        {
+          "id": "r2-h4",
+          "kind": "new",
+          "text": "An option between three seconds and a minute is inside or outside the waiting budget at the reading agent's choice. Evidence corrected by the validator (what the literal-interpretation principle says); line numbers updated by the re-read's leftover 4.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md, owner entry 4; .ctoc/audit/deepthink-run-notes/s3-round2-revalidate-d-s3-r2-revalidate.md, leftover 4",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r2-waiting-budget-threshold"
+        },
+        {
+          "id": "r2-r1",
+          "kind": "new",
+          "text": "Always offer a leave-as-is option (research candidate d8).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, \"The researchers' candidates\" and the rejected list",
+          "decision": "rejected",
+          "reason": "The decision-question format owns the option set and already allows a leave-as-is option; a patient decision-aid standard is a weak transfer; \"whenever that is a real option\" cannot be checked.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-r2",
+          "kind": "new",
+          "text": "Cite the National Cyber Security Centre in the permission sentence (research candidate d9).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, \"The researchers' candidates\" and the rejected list",
+          "decision": "rejected",
+          "reason": "The fragment drops the source's hedge \"it's very possible that\"; the claim is already validated; a dated citation inside an operational sentence adds upkeep and changes no behaviour.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "r2-r3",
+          "kind": "new",
+          "text": "Report the two name lookups before a connection (gaps candidate f1).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md, \"The researchers' candidates\" and the rejected list",
+          "decision": "rejected",
+          "reason": "Duplicate of h-deepthink-r1-check-and-connect-lookups; the certificate-verification remark is the researcher's belief, not a read source.",
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 50,
+        "VALIDATED": 43,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 4,
+        "MISATTRIBUTED": 3
+      },
+      "validator_final": {
+        "examined": 33,
+        "VALIDATED": 33,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [
+        {
+          "claim": "The one-option exception as the re-read's leftover 1 worded it: the one exception this skill adds to the decision-question format's lettered menu",
+          "verified_on": "2026-10-02",
+          "reason": "Wording written by the re-validator after its final count; the file was not read again by the validator after the leftover was applied. Round 3's validation reads it."
+        }
+      ],
+      "fences": [
+        {
+          "test": "tests/deepthink-ships-with-ctoc.test.js",
+          "result": "fail"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/plugin-skill-discovery.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-census.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-ledger-gate.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/ask-me-questions/SKILL.md",
+        "agents/ai-quality/deepthink-researcher.md",
+        "skills/deepthink/fetch-papers.cjs",
+        "tests/deepthink-ships-with-ctoc.test.js",
+        "src/commands/start.md"
+      ],
+      "seven_languages": {
+        "applies": false,
+        "reason": "Not applicable: the file teaches no programming-language idiom. Its code is two node -e recipes (the date, and the brief check that r2-f12 edits), one node command for the program, the record command that runs the plugin's own entry point, one name pattern and one JSON shape; none is carried into another language. The program is JavaScript and read-only for these rounds.",
+        "examples_checked": []
+      }
+    },
+    {
+      "round": 3,
+      "date": "2026-10-02",
+      "resumed_after_unrecorded_edit": false,
+      "fingerprint_before": "sha256:26222c3c78ba37f326c9d9c7f7fefd608600a92cc085621c975f293d24d27d91",
+      "fingerprint_after": "sha256:7b42b8f465a83c37547fd0a591dd88f0d434aa7585364ad8ec685d565738f32c",
+      "instruments": [
+        {
+          "path": "agents/pipeline/agent-critic.md",
+          "fingerprint": "sha256:8ef32ac31d91fd9fbc209fbe9a2f27668e4ed2fe8357859e26e98fb11a62682f"
+        },
+        {
+          "path": "agents/ai-quality/citation-validator.md",
+          "fingerprint": "sha256:0b99b97bb8530375a56e59203769d2a8c9a7d97d92f0c7c90cd5b358b0f7dc23"
+        },
+        {
+          "path": "agents/iron-loop/iron-loop-executor.md",
+          "fingerprint": "sha256:4cc48f51cf8ccc25dbbb0fb93beaecc68e543512b8399071f4a9e9cd0fee4516"
+        }
+      ],
+      "dispatches": [
+        {
+          "id": "d-s3-r3-research",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-r3-critic",
+          "agent": "pipeline/agent-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-r3-validate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-r3-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-r3-quiet-reread",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-step11-review",
+          "agent": "iron-loop/iron-loop-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-step13-secure",
+          "agent": "security/security-scanner",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-step11-13-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-step11-13-final-reread",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-step16-final-review",
+          "agent": "iron-loop/iron-loop-critic",
+          "purpose": "research-and-critique",
+          "declared_effort": "xhigh"
+        },
+        {
+          "id": "d-s3-step16-revalidate",
+          "agent": "ai-quality/citation-validator",
+          "purpose": "re-validate",
+          "declared_effort": "xhigh"
+        }
+      ],
+      "queries": [
+        {
+          "text": "In all three rounds the web research was done by citation-validator, in the research-and-critique dispatches listed before agent-critic's; the installed agent-critic (plugin version 6.14.67) holds Read and Grep and no web tool, so it critiqued from that research and researched nothing itself (plan decision 6); the Step 11 and Step 13 dispatches recorded as research-and-critique researched nothing on the web either. Round 3's angle: raw re-reads of every source the file rests on, adversarial traces of attacks through the file's own flow, guidance from regulators, and consistency between the skill, its program, its reading agent and the decision-question format. Joint guidance on agentic artificial intelligence security from the cyber agencies of five countries",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "\"Careful adoption of agentic AI services\", limited to cisa.gov, cyber.gov.au, ncsc.gov.uk, media.defense.gov, cyber.gc.ca and ncsc.govt.nz",
+          "source_class": "regulator",
+          "repeated_because": null
+        },
+        {
+          "text": "Raw re-reads for drift: Claude Code permission-modes, tools-reference, sub-agents, data-usage, permissions and hooks pages",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Node packages and globals documentation, and undici's Fetch documentation, for the .cjs sentence, the sixty-second limit and decompression",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "RFC 8118 and Unicode Standard Annex number 9 (the bidirectional algorithm), for the file header and the direction marks in index cells",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "arXiv's robots help page, for drift in the owner entry on download pace",
+          "source_class": "publisher",
+          "repeated_because": null
+        },
+        {
+          "text": "The OWASP 2026 prompt-injection entry, raw, for data leaving through an address and showing the exact action to a person",
+          "source_class": "standards body",
+          "repeated_because": null
+        },
+        {
+          "text": "Validation: undici's fetch implementation and the Fetch Standard for counted after decompression; the plugin manifest reference for the plugin root; Unicode 18.0.0 chapter 23 for character names; Node's net documentation for the default lookup",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Final re-validation and quiet re-read: the Agent Software Development Kit's agent-loop page for what a turn is; MDN's trim and lexical grammar pages for what .trim() removes",
+          "source_class": "vendor documentation",
+          "repeated_because": null
+        },
+        {
+          "text": "Steps 11 and 13, under plan decision 7: the special-purpose address registries for the ranges the check does not refuse, the Unicode blocks for the second variation-selector range, and Claude Code's permission-modes and sandboxing pages for line 63's claims",
+          "source_class": "standards body",
+          "repeated_because": null
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://code.claude.com/docs/en/permission-modes.md",
+          "read_on": "2026-10-02",
+          "bore_on": "auto mode's starting version, the order of rules and classifier, the block thresholds and the review of subagents: re-read raw, no drift",
+          "outcome": "supported",
+          "quote": "if the classifier blocks an action 3 times in a row or 20 times total, auto mode pauses and Claude Code resumes prompting",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/tools-reference.md",
+          "read_on": "2026-10-02",
+          "bore_on": "the pinned 'no other tool' sentence is stale in auto mode: Claude Code adds the report-handback tool (r3-f2); the turn limit marks a result partial (r3-f3); re-read raw by the research and the validator",
+          "outcome": "refuted",
+          "quote": "Claude Code also gives the subagent that tool, even if you leave it out of `tools` or list it in `disallowedTools`",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/sub-agents.md",
+          "read_on": "2026-10-02",
+          "bore_on": "the turn limit, partial output and resuming a subagent (owner entry on the turn limit); through the fetch tool's answer",
+          "outcome": "supported",
+          "quote": "The partial marking requires Claude Code v2.1.246 or later",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/data-usage.md",
+          "read_on": "2026-10-02",
+          "bore_on": "WebFetch's domain safety check sends only the host name: no drift",
+          "outcome": "supported",
+          "quote": "Only the hostname is sent, not the full URL, path, or page contents.",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/permissions.md",
+          "read_on": "2026-10-02",
+          "bore_on": "how long a \"don't ask again\" answer lasts, per tool: no drift",
+          "outcome": "supported",
+          "quote": "Permanently per repository and domain",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/hooks.md",
+          "read_on": "2026-10-02",
+          "bore_on": "whether the launch fence matcher Task matches the Agent tool; nothing new, the round 1 owner entry stands",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/plugins-reference.md",
+          "read_on": "2026-10-02",
+          "bore_on": "the plugin root resolves anywhere in a skill's body, so the plugin-file paths carry it (r3-f9, r3-validator-sweep-2)",
+          "outcome": "supported",
+          "quote": "Anywhere in the Markdown body",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/agent-sdk/agent-loop",
+          "read_on": "2026-10-02",
+          "bore_on": "round 3's own clause that what counts as one turn is not documented (removed by final-1); the quiet re-read read it again",
+          "outcome": "refuted",
+          "quote": "A turn is one round trip inside the loop",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/doc/api/packages.md",
+          "read_on": "2026-10-02",
+          "bore_on": "the .cjs sentence",
+          "outcome": "supported",
+          "quote": "Files ending with `.cjs` are always loaded as CommonJS regardless of the nearest parent `package.json`.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/doc/api/globals.md",
+          "read_on": "2026-10-02",
+          "bore_on": "the sixty-second limit",
+          "outcome": "supported",
+          "quote": "Returns a new `AbortSignal` which will be aborted in `delay` milliseconds.",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/undici/main/docs/docs/api/Fetch.md",
+          "read_on": "2026-10-02",
+          "bore_on": "counted after decompression; the page does not cover it",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/undici/main/lib/web/fetch/index.js",
+          "read_on": "2026-10-02",
+          "bore_on": "counted after decompression: under redirect manual the decoders are piped into the body (the validator's source; the critic's replacement was therefore not applied)",
+          "outcome": "supported",
+          "quote": "body: decoders.length ? pipeline(this.body, ...decoders,",
+          "error": null
+        },
+        {
+          "url": "https://fetch.spec.whatwg.org/",
+          "read_on": "2026-10-02",
+          "bore_on": "counted after decompression, a second independent route; the page came back cut off before its network-fetch section",
+          "outcome": "supported",
+          "quote": "Return the result of decoding bytes with codings",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/node/main/doc/api/net.md",
+          "read_on": "2026-10-02",
+          "bore_on": "the connection looks the name up again with dns.lookup by default (r3-validator-sweep-1)",
+          "outcome": "supported",
+          "quote": "**Default:** `dns.lookup()`",
+          "error": null
+        },
+        {
+          "url": "https://www.rfc-editor.org/rfc/rfc8118.txt",
+          "read_on": "2026-10-02",
+          "bore_on": "the %PDF header: no drift",
+          "outcome": "supported",
+          "quote": "All PDF files start with the characters \"%PDF-\" followed by the PDF version number",
+          "error": null
+        },
+        {
+          "url": "https://www.unicode.org/reports/tr9/",
+          "read_on": "2026-10-02",
+          "bore_on": "the index-cell sentence said cells hold no direction mark; the three marks are outside the program's list (r3-f4)",
+          "outcome": "refuted",
+          "quote": "Left-to-right zero-width character",
+          "error": null
+        },
+        {
+          "url": "https://www.unicode.org/versions/Unicode18.0.0/core-spec/chapter-23/",
+          "read_on": "2026-10-02",
+          "bore_on": "the names of the characters r3-f4 lists, and those it says reach a cell",
+          "outcome": "supported",
+          "quote": "U+FEFF ZERO WIDTH NO-BREAK SPACE",
+          "error": null
+        },
+        {
+          "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/trim",
+          "read_on": "2026-10-02",
+          "bore_on": "round 3's own 'reach a cell unchanged': .trim() removes three of the characters at a cell's edges (narrowed by final-2)",
+          "outcome": "refuted",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Lexical_grammar",
+          "read_on": "2026-10-02",
+          "bore_on": "U+FEFF is white space and U+2028 and U+2029 are line terminators, which .trim() removes (final-2)",
+          "outcome": "supported",
+          "quote": null,
+          "error": null
+        },
+        {
+          "url": "https://info.arxiv.org/help/robots.html",
+          "read_on": "2026-10-02",
+          "bore_on": "the owner entry on download pace: no drift",
+          "outcome": "supported",
+          "quote": "Indiscriminate automated downloads from this site are not permitted",
+          "error": null
+        },
+        {
+          "url": "https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM01_PromptInjection.md",
+          "read_on": "2026-10-02",
+          "bore_on": "data leaving through an address; showing the exact action to a person (owner entry on the paper list)",
+          "outcome": "supported",
+          "quote": "surfacing the exact rendered action rather than a summary to the reviewer",
+          "error": null
+        },
+        {
+          "url": "https://www.cyber.gc.ca/en/guidance/careful-adoption-agentic-ai",
+          "read_on": "2026-10-02",
+          "bore_on": "joint guidance 'Careful adoption of agentic AI' on data leaving through an agent's tools (owner entry on the paper list); through the fetch tool's answer",
+          "outcome": "supported",
+          "quote": "Malicious or compromised agents could use tools as a stealthy way to exfiltrate data.",
+          "error": null
+        },
+        {
+          "url": "https://media.defense.gov/2026/Apr/30/2003922823/-1/-1/0/CAREFULADOPTIONOFAGENTICAISERVICES_FINAL.PDF",
+          "read_on": "2026-10-02",
+          "bore_on": "the same joint guidance as a portable document format file",
+          "outcome": "unreachable",
+          "quote": null,
+          "error": "HTTP 403 Forbidden"
+        },
+        {
+          "url": "https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml",
+          "read_on": "2026-10-02",
+          "bore_on": "the version six ranges line 207 now names as not refused (r3-step13-7)",
+          "outcome": "supported",
+          "quote": "5f00::/16 | Segment Routing (SRv6) SIDs | RFC 9602",
+          "error": null
+        },
+        {
+          "url": "https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml",
+          "read_on": "2026-10-02",
+          "bore_on": "the version four documentation range line 207 now names (r3-step13-7)",
+          "outcome": "supported",
+          "quote": "192.0.2.0/24 | Documentation (TEST-NET-1) | RFC 5737",
+          "error": null
+        },
+        {
+          "url": "https://www.unicode.org/Public/UCD/latest/ucd/Blocks.txt",
+          "read_on": "2026-10-02",
+          "bore_on": "the second variation-selector range line 230 now names (r3-step13-3)",
+          "outcome": "supported",
+          "quote": "E0100..E01EF; Variation Selectors Supplement",
+          "error": null
+        },
+        {
+          "url": "https://code.claude.com/docs/en/sandboxing.md",
+          "read_on": "2026-10-02",
+          "bore_on": "whether a request outside the sandbox's network boundary gets a prompt; only a preview of about two kilobytes came back, so line 63 was narrowed to the WebFetch prompt (r3-step13-revalidate-1)",
+          "outcome": "did-not-bear",
+          "quote": null,
+          "error": "the page came back at about 90 kilobytes and was saved outside the repository; only the preview was read"
+        }
+      ],
+      "findings": [
+        {
+          "id": "r3-f1",
+          "kind": "new",
+          "text": "The paper list is a second way out: the program requests a listed paper's address on any public host from this machine, and the brief's rule covers those addresses too. Applied with the validator's corrected text, as its own bullet after the auto-mode sentence, so the prompt sentence is not read as covering the program's requests.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, r3-f1; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, r3-f1, corrected text",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-f2",
+          "kind": "new",
+          "text": "In auto mode, from Claude Code 2.1.271 on, Claude Code also gives the reading agent a tool that hands its final report to the session, whatever its tools line says; added after the pinned sentence, which is untouched.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, r3-f2; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, r3-f2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-f3",
+          "kind": "new",
+          "text": "The reading agent is told its run stops after 80 turns and a stopped result is thrown away, and counts every search and fetch, making none after the seventieth. Applied with the validator's corrected text; final-1 then removed its clause that a turn is undocumented.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, r3-f3; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, r3-f3, corrected text; .ctoc/audit/deepthink-run-notes/s3-round3-revalidate-d-s3-r3-revalidate.md, final-1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-f4",
+          "kind": "new",
+          "text": "The index-cell sentence states what the program turns into a space and names the characters it does not. Applied with the validator's corrected text, which adds the zero-width no-break space and the line and paragraph separators; final-2 then narrowed 'reach a cell unchanged' to 'can reach a cell'.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, r3-f4; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, r3-f4, corrected text; .ctoc/audit/deepthink-run-notes/s3-round3-revalidate-d-s3-r3-revalidate.md, final-2",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-f5",
+          "kind": "new",
+          "text": "The tool's answer about the source asked for counts as reading it; an error, a sign-in or consent page, or a page that is not that source is a failed fetch. Applied with the validator's corrected text, so a same-site redirect to the same source is not a failure.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, r3-f5; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, r3-f5, corrected text",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-f6",
+          "kind": "new",
+          "text": "The program has printed its closing words only when a line of its output begins with them; the same words inside a quoted address do not count.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, r3-f6; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, r3-f6",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-f7",
+          "kind": "new",
+          "text": "When the item has no number, the reading agent numbers its questions 1, 2 and so on, so no heading reads \"Question none\".",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, r3-f7; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, r3-f7",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-f8",
+          "kind": "new",
+          "text": "What the research changed is said within the two to four sentences the decision-question format allows an explanation paragraph.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, r3-f8; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, r3-f8",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-f9",
+          "kind": "new",
+          "text": "The dispatch record goes in a file under .ctoc/audit/dispatches/<date>/ in this project, as the protocol under the plugin root describes. Applied with the validator's corrected text, which names the protocol through the plugin root, because a user's project holds no docs folder of CTOC's.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, r3-f9; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, r3-f9, corrected text",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-f10",
+          "kind": "new",
+          "text": "Every other menu task command runs after the same node prefix, and menu task fail takes the task's id and --summary as menu task complete does.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, r3-f10; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, r3-f10",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-validator-sweep-1",
+          "kind": "new",
+          "text": "The internal-address check's two known gaps are stated beside the pinned sentences: the version six benchmark range is not refused, and the connection looks the name up again. The validator's own edit.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, sweep edit 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-validator-sweep-2",
+          "kind": "new",
+          "text": "The plugin-file paths on lines 19, 20, 26, 52 and 110 carry the plugin root, because in a user's project those paths do not exist where a literal reader would look. Applied on the condition the session set: the plan's test was run with it and every pinned string still matched.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, \"Sweep of the rest of the skill\"; plans/in-progress/00399-deepthink-ships-with-ctoc-s3-three-improvement-rounds.md, Execution Record, \"Round 3 — apply\"",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-final-1",
+          "kind": "new",
+          "text": "The clause saying what counts as one turn is not documented is removed: the Agent Software Development Kit's agent-loop page defines a turn. Fabricated as written; the quiet re-read confirmed the corrected line.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-revalidate-d-s3-r3-revalidate.md, final-1; .ctoc/audit/deepthink-run-notes/s3-round3-quiet-reread-d-s3-r3-quiet-reread.md, item 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-final-2",
+          "kind": "new",
+          "text": "'reach a cell unchanged' is narrowed to 'can reach a cell': the program's .trim() removes three of the named characters at a cell's edges. Fabricated as written; the quiet re-read confirmed the corrected line against the code.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-revalidate-d-s3-r3-revalidate.md, final-2; .ctoc/audit/deepthink-run-notes/s3-round3-quiet-reread-d-s3-r3-quiet-reread.md, item 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-h1",
+          "kind": "new",
+          "text": "The program requests every paper address from the owner's machine and no step shows the addresses to a person first. Evidence corrected by the validator (the guidance's title, the addresses sentence, its re-reads) and by the final re-validation's final-3 to final-7 (line numbers, the program's reason, the as-stated option's cons).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round3-revalidate-d-s3-r3-revalidate.md, final-3 to final-7",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r3-paper-list-unprompted-requests"
+        },
+        {
+          "id": "r3-h2",
+          "kind": "new",
+          "text": "The pinned 'no other tool' sentences in the skill and the agent file are literally false in auto mode. The validator's raw re-read appended; final-8 dated the line number.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round3-revalidate-d-s3-r3-revalidate.md, final-8",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r3-report-handback-tool"
+        },
+        {
+          "id": "r3-h3",
+          "kind": "new",
+          "text": "A run cut off at the agent's 80-turn limit is failed and relaunched under the pinned rule. Evidence corrected by the validator, and by final-9 and final-10, which add the Agent Software Development Kit's definition of a turn.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round3-revalidate-d-s3-r3-revalidate.md, final-9 and final-10",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r3-turn-limit-relaunch"
+        },
+        {
+          "id": "r3-h4",
+          "kind": "new",
+          "text": "The program's comment says it removes direction marks, and three of them pass through. Evidence corrected by the validator (character names from Unicode 18.0.0 chapter 23).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, owner entries",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r3-index-direction-marks"
+        },
+        {
+          "id": "r3-h5",
+          "kind": "new",
+          "text": "The agent file's own rules send every fetch to Failures and ask for any https address, where the brief now says otherwise. Line numbers dated by final-11.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, owner entries; .ctoc/audit/deepthink-run-notes/s3-round3-revalidate-d-s3-r3-revalidate.md, final-11",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-r3-researcher-file-wording"
+        },
+        {
+          "id": "r3-r1",
+          "kind": "new",
+          "text": "The closing line counts only as the last line of the returned text (research candidate 7).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, \"Candidates 1 to 12\"",
+          "decision": "rejected",
+          "reason": "A strict last-line rule would fail a valid run whenever Claude Code puts its note to verify after the report; where that note sits is undocumented, and the brief's 'nothing after it' already defines the closing line.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-r2",
+          "kind": "new",
+          "text": "Name the byte count for \"two kilobytes\" in the pinned failed-run sentence (research candidate 8).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, \"Candidates 1 to 12\"",
+          "decision": "rejected",
+          "reason": "The check exists to catch an empty or header-only brief; a header line is 93 bytes as measured in round 2, so the 48-byte gap between 2,000 and 2,048 changes no verdict on any brief the check is meant to catch.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-r3",
+          "kind": "new",
+          "text": "\"Already in the library\" may be a different paper (research candidate 11).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, \"Candidates 1 to 12\"",
+          "decision": "rejected",
+          "reason": "The skill already says nothing checks that a file is the paper cited, and step 6 lists such a file as already in the library under that file name, so no statement is false.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-r4",
+          "kind": "new",
+          "text": "Replace 'counted after decompression' with 'of the body it reads' (the critic's ready replacement).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-round3-critic-d-s3-r3-critic.md, \"Claims the validator must check\", item 9; .ctoc/audit/deepthink-run-notes/s3-round3-validate-d-s3-r3-validate.md, the paragraph on check item 9",
+          "decision": "rejected",
+          "reason": "The validator sourced the existing claim: undici's fetch implementation pipes the content decoders into the body under redirect manual, and the Fetch Standard decodes content codings; a sourced claim is kept.",
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step13-2a",
+          "kind": "new",
+          "text": "A report that carries Claude Code's security warning or note to verify keeps it word for word at the top of the result; no staging file is written and the program is not run; every paper is marked not fetched with the reason \"the report carried a security warning\"; the notice reads research finished with a security warning; papers are downloaded only on the owner's word (line 103).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step13-secure-d-s3-step13-secure.md, finding 2; .ctoc/audit/deepthink-run-notes/s3-step11-13-revalidate-d-s3-step11-13-revalidate.md; .ctoc/audit/deepthink-run-notes/s3-step11-13-final-reread-d-s3-step11-13-final-reread.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step13-2b",
+          "kind": "new",
+          "text": "The one-line notice names the security-warning form beside research finished (line 249).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step13-secure-d-s3-step13-secure.md, finding 2; .ctoc/audit/deepthink-run-notes/s3-step11-13-revalidate-d-s3-step11-13-revalidate.md, leftover 3",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step13-3",
+          "kind": "new",
+          "text": "The index-cell sentence names the second variation-selector range and other invisible format characters, and says hidden text can survive inside a cell, measured with the program's own cell() (line 230).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step13-secure-d-s3-step13-secure.md, finding 3; .ctoc/audit/deepthink-run-notes/s3-step11-13-revalidate-d-s3-step11-13-revalidate.md, line 230",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step13-6",
+          "kind": "new",
+          "text": "The paper addresses pass through no permission prompt of the reading agent's fetch tool and no per-request classifier review, and the program's name lookup sends a host name out before the addresses are checked (line 63); narrowed by r3-step13-revalidate-1 and -2.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step13-secure-d-s3-step13-secure.md, finding 6; .ctoc/audit/deepthink-run-notes/s3-step11-13-revalidate-d-s3-step11-13-revalidate.md, line 63; .ctoc/audit/deepthink-run-notes/s3-step11-13-final-reread-d-s3-step11-13-final-reread.md, section 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step13-7",
+          "kind": "new",
+          "text": "The other special-purpose ranges the check does not refuse are named: 2001:db8::/32, 192.0.2.0/24, 100::/64, 2001::/32 and 5f00::/16, each measured with the program's own block list (line 207; plan decision 9).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step13-secure-d-s3-step13-secure.md, finding 7; .ctoc/audit/deepthink-run-notes/s3-step11-13-revalidate-d-s3-step11-13-revalidate.md, line 207",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step13-8",
+          "kind": "new",
+          "text": "The rule that returned text is data says it is an instruction to the session that reduces the risk without removing it (line 59).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step13-secure-d-s3-step13-secure.md, finding 8; .ctoc/audit/deepthink-run-notes/s3-step11-13-revalidate-d-s3-step11-13-revalidate.md, line 59",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step11-11a",
+          "kind": "new",
+          "text": "The waiting-budget section is named with its heading's suffix, (Tijn, 12 September 2026) (line 112).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step11-review-d-s3-step11-review.md, finding 11; .ctoc/audit/deepthink-run-notes/s3-step11-13-revalidate-d-s3-step11-13-revalidate.md, line 112",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step11-11b",
+          "kind": "new",
+          "text": "The brief asks for the paper's file address, never a page about it when that page offers the file (line 143).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step11-review-d-s3-step11-review.md, finding 11; .ctoc/audit/deepthink-run-notes/s3-step11-13-revalidate-d-s3-step11-13-revalidate.md, line 143",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step11-11c",
+          "kind": "new",
+          "text": "The sentence on when no prompt reaches the owner is split in two, its words unchanged (line 61).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step11-review-d-s3-step11-review.md, finding 11; .ctoc/audit/deepthink-run-notes/s3-step11-13-revalidate-d-s3-step11-13-revalidate.md, line 61",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step13-revalidate-1",
+          "kind": "new",
+          "text": "\"no web permission prompt\" narrowed to the WebFetch prompt, because whether the sandbox prompts for a request outside its boundary could not be read (line 63). Unsourceable as first written.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step11-13-revalidate-d-s3-step11-13-revalidate.md, leftover 1; .ctoc/audit/deepthink-run-notes/s3-step11-13-final-reread-d-s3-step11-13-final-reread.md, section 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step13-revalidate-2",
+          "kind": "new",
+          "text": "\"before the program decides anything\" corrected to \"before the program checks the addresses that name resolves to\": the program checks https, credentials, the name rule and local-only names before any lookup (line 63). Fabricated as first written.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step11-13-revalidate-d-s3-step11-13-revalidate.md, leftover 2; .ctoc/audit/deepthink-run-notes/s3-step11-13-final-reread-d-s3-step11-13-final-reread.md, section 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step13-revalidate-3",
+          "kind": "new",
+          "text": "The notice's security-warning form no longer depends on \"when the report carried one\", so line 249 agrees with line 103 when only a note to verify came back.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step11-13-revalidate-d-s3-step11-13-revalidate.md, leftover 3; .ctoc/audit/deepthink-run-notes/s3-step11-13-final-reread-d-s3-step11-13-final-reread.md",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step13-h4",
+          "kind": "new",
+          "text": "Words and the file name of the owner's private memory note for another project are quoted in committed files; the owner decides whether they stay. In the same pass, at the Step 11 review's findings 1, 10 and 12, the entries on the two name lookups, the version six benchmark range, the fifty-kilobytes wording, the calendar day and the long-run line were brought up to date.",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step13-secure-d-s3-step13-secure.md, finding 4; .ctoc/audit/deepthink-run-notes/s3-step11-review-d-s3-step11-review.md, findings 1, 10 and 12",
+          "decision": "reported-to-human",
+          "reason": null,
+          "for_the_human_id": "h-deepthink-s3-private-memory-quotations"
+        },
+        {
+          "id": "r3-step16-1",
+          "kind": "new",
+          "text": "The description says cited papers are downloaded into the paper library, no longer \"every cited paper that can be fetched\", which read as a promise the security-warning hold on line 103 can break (line 3).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step16-final-review-d-s3-step16-final-review.md, finding A; .ctoc/audit/deepthink-run-notes/s3-step16-revalidate-d-s3-step16-revalidate.md, section 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step16-2",
+          "kind": "new",
+          "text": "The rule that always applies, \"Every cited paper is downloaded when it can be\", is removed; the sentence keeps that a downloaded file is checked only by its first bytes and its size (line 268).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step16-final-review-d-s3-step16-final-review.md, finding A; .ctoc/audit/deepthink-run-notes/s3-step16-revalidate-d-s3-step16-revalidate.md, section 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        },
+        {
+          "id": "r3-step16-3",
+          "kind": "new",
+          "text": "The explanation paragraph counts the papers that \"were not fetched\", so papers held by a security warning are not reported as ones that could not be fetched (line 253).",
+          "evidence": ".ctoc/audit/deepthink-run-notes/s3-step16-final-review-d-s3-step16-final-review.md, finding A; .ctoc/audit/deepthink-run-notes/s3-step16-revalidate-d-s3-step16-revalidate.md, section 1",
+          "decision": "applied",
+          "reason": null,
+          "for_the_human_id": null
+        }
+      ],
+      "nothing_found": false,
+      "validator": {
+        "examined": 68,
+        "VALIDATED": 64,
+        "FABRICATED": 1,
+        "UNSOURCEABLE": 1,
+        "MISATTRIBUTED": 1
+      },
+      "validator_final": {
+        "examined": 97,
+        "VALIDATED": 97,
+        "FABRICATED": 0,
+        "UNSOURCEABLE": 0,
+        "MISATTRIBUTED": 0
+      },
+      "not_reverified": [],
+      "fences": [
+        {
+          "test": "tests/deepthink-ships-with-ctoc.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/skill-loading.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/plugin-skill-discovery.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/architecture-invariants.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/no-model-optimized-for.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/cu5-wrapper-coverage-completeness.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-census.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/claim-ledger-gate.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/readme-numbers.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/corpus-audit-ledger.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/reachability.test.js",
+          "result": "pass"
+        },
+        {
+          "test": "tests/agent-and-skill-improvement-record.test.js",
+          "result": "pass"
+        }
+      ],
+      "paired_files_compared": [
+        "skills/ask-me-questions/SKILL.md",
+        "agents/ai-quality/deepthink-researcher.md",
+        "skills/deepthink/fetch-papers.cjs",
+        "tests/deepthink-ships-with-ctoc.test.js",
+        "docs/DISPATCH_PROTOCOL.md",
+        "src/commands/start.md"
+      ],
+      "seven_languages": {
+        "applies": false,
+        "reason": "Not applicable: the file teaches no idiom in any programming language. Round 3 changes no recipe and adds no code example; r3-f10 only names the command prefix the session already uses. Its code is the same as before: two node -e recipes, the program command, the record command, one name pattern and one data shape.",
+        "examples_checked": []
+      }
+    }
+  ],
+  "late_corrections": [],
+  "held": null
+}

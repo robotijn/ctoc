@@ -1,0 +1,535 @@
+{
+  "schema": 1,
+  "entries": [
+    {
+      "id": "h-deepthink-r1-launch-fence-matcher",
+      "date": "2026-10-02",
+      "path": ".claude-plugin/hooks.json",
+      "round": 1,
+      "kind": "out-of-scope-file",
+      "evidence": "hooks.json line 76 matches \"Task\" for src/hooks/PreToolUse.Task.js, whose line 191 also defaults the tool name to 'Task'. The sub-agents page (read 2026-10-02): 'In version 2.1.63, the Task tool was renamed to Agent. Existing Task(...) references in settings and agent definitions still work as aliases'; hook matchers are not named there. The tools reference: tool names 'are the exact strings you use in … hook matchers', and the launch tool's row is Agent. The hooks page: a matcher of letters only is an exact string. Issue anthropics/claude-code#29677: the hook payload's tool_name changed from Task to Agent. Not tested at runtime. If the matcher does not fire, the launch fence sees no agent launch anywhere in CTOC. The skill's pinned refused-launch sentence stays true because it is conditional. Changing hook behaviour needs the owner's approval.",
+      "options": [
+        {
+          "key": "match-both",
+          "label": "Match Task|Agent, with a test that feeds an Agent payload",
+          "pros": "The fence fires under either name, whichever the installed version uses.",
+          "cons": "A hook change through its own approved plan; whether the hook reads an Agent payload's fields the same way is unread and needs that test."
+        },
+        {
+          "key": "measure-first",
+          "label": "Run one live launch on the installed version and record whether the Task matcher fires, then decide",
+          "pros": "Nothing changes until the runtime answers.",
+          "cons": "Until then every launch may go through unfenced; the measurement needs a session with hook logging on."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r1-check-and-connect-lookups",
+      "date": "2026-10-02",
+      "path": "skills/deepthink/fetch-papers.cjs",
+      "round": 1,
+      "kind": "pinned-contract",
+      "evidence": "The skill's line 197 (after round 1's edits), pinned at tests line 258, says '…a hop that is not is never requested.' The program checks the host with dns.lookup (lines 58-64), then fetch looks the name up again (lines 75-76). A name that gives a public address to the check and an internal one to the connection is still connected to. The Open Worldwide Application Security Project's Server-Side Request Forgery cheat sheet (read 2026-10-02): 'still vulnerable to the DNS pinning bypass … a DNS resolution will be made when the business code will be executed.' This round corrects the researchers' 'fabricated' and 'high': the claim is true of the check. Believed, not read this round: only https is requested and the server certificate is verified, so an ordinary request to an internal service fails at the handshake; the connection and the first handshake message still reach the internal address and any port the address names. The tests replace both the lookup and fetch (tests 710-718), so they cannot exercise this. Severity medium. Round 3's sweep edit 1 added skill line 207, beside the pinned sentence and without changing it: 'the request is made to the host name, not to the address the check found, so the connection looks the name up again, and a name whose address changes between the two lookups can still be reached at an internal address.' A program fix must remove that sentence.",
+      "options": [
+        {
+          "key": "one-lookup",
+          "label": "Refuse internal addresses inside the connection's own lookup; the pinned sentence stays",
+          "pros": "The pinned sentence becomes exactly true.",
+          "cons": "The built-in fetch takes no lookup function without the undici package (a new dependency) (believed, not read); the built-in https.request with a lookup option does not decompress (believed, not read), so the wording changes and the download and its tests are rewritten."
+        },
+        {
+          "key": "say-what-is-true",
+          "label": "Keep the program; change the pinned sentence and its test pin to say the check runs on its own lookup and a name that answers differently between the two is not caught",
+          "pros": "A text and test change only.",
+          "cons": "The gap stays open, narrowed by the certificate check."
+        },
+        {
+          "key": "as-qualified",
+          "label": "Keep the program, the pinned sentence and its pin; skill line 207 states the gap",
+          "pros": "No change; the skill already says what the check does not catch.",
+          "cons": "Line 204 still reads 'never requested' and is corrected only by line 207; the gap stays open."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r1-arxiv-pace-after-refusal",
+      "date": "2026-10-02",
+      "path": "skills/deepthink/fetch-papers.cjs",
+      "round": 1,
+      "kind": "out-of-scope-file",
+      "evidence": "Lines 233-285 request papers one after another with no pause per host, and after a 403 the next paper on that host is still requested. arXiv's robots help page (read 2026-10-02): 'Continued rapid-fire requests from any site after access has been denied (i.e. with 403: Access denied HTTP response) will be interpreted as an attack.' The same page, https://info.arxiv.org/help/robots.html (read 2026-10-02 by the validator): 'Indiscriminate automated downloads from this site are not permitted'. The terms of use (https://info.arxiv.org/help/api/tou.html, read 2026-10-02) limit 'OAI-PMH, RSS, and the arXiv API' to 'one request every three seconds', and do not state that limit for /pdf/. Reported by the research and not re-read by the validator this round: arXiv's robots file allowing /pdf/, its 15-second crawl delay (seen only through the fetch tool's extraction), and the bulk-data page sending harvesting to export.arxiv.org.",
+      "options": [
+        {
+          "key": "pause-and-stop",
+          "label": "Three seconds between requests to one host, and no further request to a host for the rest of the run once it answers 403",
+          "pros": "The strictest published rate the research read; never repeats a request after a denial.",
+          "cons": "About a minute longer for twenty arXiv papers, which brings the shell tool's time limit closer; the program and its tests change."
+        },
+        {
+          "key": "stop-only",
+          "label": "No pause; only stop requesting a host after it answers 403",
+          "pros": "No added time; removes the behaviour arXiv names as an attack.",
+          "cons": "Requests to one host still go back to back."
+        },
+        {
+          "key": "as-is",
+          "label": "Leave the program as it is",
+          "pros": "No change.",
+          "cons": "The behaviour arXiv names as an attack stays possible."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r1-fifty-kilobytes-wording",
+      "date": "2026-10-02",
+      "path": "skills/deepthink/fetch-papers.cjs",
+      "round": 1,
+      "kind": "out-of-scope-file",
+      "evidence": "Lines 13 and 271 refuse a file at or under 51,200 bytes (fifty times 1,024) and print 'over fifty kilobytes'. Tests lines 864 and 872 pin that printed line. Finding r1-f10 corrects only the skill's own words.",
+      "options": [
+        {
+          "key": "words-to-kibibytes",
+          "label": "The program prints 'fifty kibibytes'; the two pinned test lines change",
+          "pros": "Words and code agree; the limit is unchanged.",
+          "cons": "A pinned program output changes."
+        },
+        {
+          "key": "limit-to-fifty-thousand",
+          "label": "The limit becomes 50,000 bytes, so 'fifty kilobytes' is true",
+          "pros": "The printed words stay.",
+          "cons": "The limit changes, the boundary tests move, and r1-f10 was applied in round 1, so the skill's '51,200 bytes' must change again."
+        },
+        {
+          "key": "leave",
+          "label": "Leave the program and the test",
+          "pros": "No change.",
+          "cons": "The skill and the program name one limit in two units."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r1-tools-key-unread",
+      "date": "2026-10-02",
+      "path": "skills/deepthink/SKILL.md",
+      "round": 1,
+      "kind": "pinned-contract",
+      "evidence": "Frontmatter line 9, pinned at tests line 421; the same test forbids allowed-tools; the parent plan (line 343) chose 'a tools: line and never allowed-tools:'. The skills page (https://code.claude.com/docs/en/skills, read 2026-10-02) lists no tools field and says 'Claude Code ignores a field it doesn't recognize without reporting an error'. allowed-tools means 'Tools Claude can use without asking permission during the turn that invokes this skill' and 'It does not restrict which tools are available'. The key that removes tools is disallowed-tools. From the same page: when_to_load and type are not Claude Code fields either (Claude Code's field is when_to_use); whether CTOC's own code reads them was not checked. The line also names Task, which is now an alias of Agent.",
+      "options": [
+        {
+          "key": "keep-and-say",
+          "label": "Keep the line; add one body sentence saying it records the tools used and limits nothing",
+          "pros": "No pinned change; a reader is not misled.",
+          "cons": "A sentence that calls a frontmatter key decorative."
+        },
+        {
+          "key": "keep-as-is",
+          "label": "Keep as the parent decided",
+          "pros": "No change.",
+          "cons": "A reader may think the session is held to these six tools while the skill runs."
+        },
+        {
+          "key": "allowed-tools",
+          "label": "Replace it with allowed-tools",
+          "pros": "Claude Code reads the key.",
+          "cons": "Lets Task, Read, Write, Bash, Glob and Grep run without a prompt during the invoking turn and restricts nothing; reverses the parent's decision and the test."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r1-rule-of-two-paraphrase",
+      "date": "2026-10-02",
+      "path": "agents/iron-loop/gate-critic.md",
+      "round": 1,
+      "kind": "out-of-scope-file",
+      "evidence": "Line 89: 'Meta's Rule of Two (never combine untrusted input, sensitive data, and external communication in one agent)', with no address. Meta (https://ai.meta.com/blog/practical-ai-agent-security/, 31 October 2025, read 2026-10-02): 'no more than two of the following three properties within a session … [C] … change state or communicate externally'. The paraphrase leaves out 'change state' and 'within a session'. gate-critic holds Read, Grep and Write (line 4), so by Meta's own wording it can hold all three properties. The parent plan (deepthink-ships-with-ctoc.md line 307) cites the rule through the gate-critic definition in a third wording, 'never combines untrusted web input, file writing and a shell in one agent'.",
+      "options": [
+        {
+          "key": "quote-meta",
+          "label": "State the three properties as Meta does, add the address, and say how gate-critic is supervised",
+          "pros": "The citation matches its source.",
+          "cons": "gate-critic's own grant then reads as needing supervision, a design question for that agent."
+        },
+        {
+          "key": "own-rule",
+          "label": "Keep the narrower rule as CTOC's own, without attributing it to Meta",
+          "pros": "No misattribution, no design question.",
+          "cons": "Loses the source's authority; 'change state' stays outside the rule."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r1-owasp-edition",
+      "date": "2026-10-02",
+      "path": "agents/ai-quality/citation-validator.md",
+      "round": 1,
+      "kind": "out-of-scope-file",
+      "evidence": "The 2026 edition is published and current: https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/ (read 2026-10-02) shows 'OWASP GenAI LLM Top 10 2026', released August 3, 2026, 'Final (version 1.0)'; the publisher's announcement of 2026-09-01 calls it 'the latest edition of the project's flagship guidance'; the final entry file on GitHub is titled 'LLM01:2026 Prompt Injection'. The page https://genai.owasp.org/llm-top-10/ still shows the 2025 edition as the latest; that page is stale. A presence check only, not read in context: 'LLM01:2025' appears 18 times in 8 agent files: citation-validator.md line 52, agent-critic.md line 50, llm-security-tester.md lines 52, 96, 131, 159 and 222, premortem-critic.md line 143, gate-critic.md lines 89 and 484, advocate-critic.md line 91, devils-advocate-critic.md line 61, red-team-critic.md lines 39, 47, 122, 268, 281 and 299. The 2025 label is true of that edition; it is drift only where it reads as the current ranking. citation-validator is also edited by the improvement run's slice 00375.",
+      "options": [
+        {
+          "key": "move-to-2026",
+          "label": "Change every reference to LLM01:2026",
+          "pros": "Current citation.",
+          "cons": "Touches eight agent files, some of which other slices also edit."
+        },
+        {
+          "key": "edition-free",
+          "label": "Cite 'LLM01, Prompt Injection' without the year, naming the edition once beside its address",
+          "pros": "Does not drift at the next edition.",
+          "cons": "A reader cannot tell at a glance which edition a ranking came from."
+        },
+        {
+          "key": "keep-2025",
+          "label": "Keep as is",
+          "pros": "True of the 2025 edition; no change.",
+          "cons": "Reads as the current ranking after a newer edition exists."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r1-long-run-line-on-owner-decisions",
+      "date": "2026-10-02",
+      "path": "skills/deepthink/SKILL.md",
+      "round": 1,
+      "kind": "project-rules-disagree",
+      "evidence": "SKILL.md lines 169-173 (after round 1's edits) put 'Best quality in the long run: <option>' under every matrix where the evidence separates the options, not only under quality decisions. ask-me-questions rule 8 (line 125): for an owner decision 'never invent one, and never smuggle a preference in'; Operating Lesson 17 says never tilt an owner decision. The parent plan (line 327) settled that the line 'may still be stated where it is a fact the evidence supports'. Since round 1's change r1-f1, the session pastes the decision-question format's matrix rules 7 and 8 into the same brief as this skill's long-run line, so the reading agent receives both instructions in one prompt.",
+      "options": [
+        {
+          "key": "quality-only",
+          "label": "The long-run line appears only under a quality decision",
+          "pros": "Matches rule 8 and Lesson 17 literally.",
+          "cons": "The owner loses the research's read of long-run quality on his own decisions, which the parent kept on purpose."
+        },
+        {
+          "key": "keep",
+          "label": "Keep as the parent settled",
+          "pros": "The owner sees the evidence's long-run read on every question.",
+          "cons": "On an owner decision the line names one option, which works as the recommendation the format forbids."
+        },
+        {
+          "key": "as-facts",
+          "label": "On an owner decision, put the long-run evidence into each option's pros and cons and name no option",
+          "pros": "The evidence reaches the owner without a named winner.",
+          "cons": "Changes the fixed recommendation rule."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r1-which-calendar-day",
+      "date": "2026-10-02",
+      "path": "skills/deepthink/SKILL.md",
+      "round": 1,
+      "kind": "project-rules-disagree",
+      "evidence": "The skill's line 95 (after round 1's edits) runs new Date().toISOString().slice(0, 10), which gives the universal-time day (the Mozilla Developer Network documentation, read 2026-10-02). If the owner's clock is on Central European Summer Time (universal time plus two hours; the owner's zone was not read from a source), a brief written between midnight and two in the morning carries the previous day's date. The gaps researcher found the same universal-time day in six files under src/ (presence only).",
+      "options": [
+        {
+          "key": "universal-labelled",
+          "label": "Keep the command; the header says '(universal time)'",
+          "pros": "One convention, the same as src/.",
+          "cons": "The owner sees the previous day on a brief written just after midnight."
+        },
+        {
+          "key": "local-day",
+          "label": "Use the machine's local day: node -e \"console.log(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10))\" (believed correct; getTimezoneOffset was not read this run)",
+          "pros": "The date the owner actually lived.",
+          "cons": "Differs from src/'s convention; dates depend on which machine ran them."
+        },
+        {
+          "key": "unlabelled",
+          "label": "Keep as is",
+          "pros": "No change.",
+          "cons": "The date's time zone is not stated anywhere."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r1-briefs-under-plans-vision",
+      "date": "2026-10-02",
+      "path": "plans/vision/deepthink/",
+      "round": 1,
+      "kind": "out-of-scope-file",
+      "evidence": "Measured by running CTOC's own code, not by a text search. A temporary project held one brief at plans/vision/deepthink/a-probe-item.md (header 'Prepared 2026-10-02 for deepthink; a probe item; not yet asked') and, as a control, one vision plan directly at plans/vision/control-vision-plan.md. Results on 2026-10-02 at version 6.14.77: state.readPlans(plans/vision) returned [control-vision-plan]; tabs/vision.js readVisions returned [control-vision-plan], getVisionCounts {total: 1}, and its render named the control plan and not the brief; the dashboard (node src/commands/start.js menu dashboard) showed 'Vision 1'; streaming-gate.pendingGateDecisions, streaming-precompute.plansNeedingQuestions (what the session-start hook uses to tell the session to launch question-writing agents) and inbox.listPlansAtGates returned empty lists; stale-detector.scanCheapCandidates returned count 0, unreadCount 0; the session-start hook run in that project printed no line naming the brief and no launch directive. So no scanner run here reads the brief: every reader lists only the *.md files directly inside a stage folder, and the gate scanners walk only the functional, implementation and review folders. Not measured: an agent told to read plans/vision/ itself with a file-search tool, which would reach the brief as it reaches any file; and nothing pins this invisibility, so a later reader that walks plans/ at any depth would pick the brief up without any check failing.",
+      "options": [
+        {
+          "key": "pin-it",
+          "label": "Keep the briefs under plans/vision/deepthink/ and add a test that runs these readers on a project holding a brief and fails if any of them lists it",
+          "pros": "The measured behaviour becomes a checked one; the placement the parent settled is kept.",
+          "cons": "A test file outside this slice, through its own approved plan; it covers the readers named in it, not one written later that the test does not call."
+        },
+        {
+          "key": "move-out-of-plans",
+          "label": "Move the briefs out of plans/ to a folder no plan reader walks",
+          "pros": "No plan reader can ever take a brief for a plan, whatever it is changed to do.",
+          "cons": "Reverses the parent's settled placement; the skill, its test and the write-path rule change, and the briefs leave the place the owner reads plans."
+        },
+        {
+          "key": "as-is",
+          "label": "Leave it as measured",
+          "pros": "No change; nothing reads a brief as a plan today.",
+          "cons": "Nothing fails if a later reader starts doing so."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r2-version-six-benchmark-range",
+      "date": "2026-10-02",
+      "path": "skills/deepthink/fetch-papers.cjs",
+      "round": 2,
+      "kind": "pinned-contract",
+      "evidence": "The skill's line 203 (after round 2's edits), pinned at the test's line 308, says an internal address includes a 'benchmark' network; the program's comment (lines 18-19) says the same. The program refuses the version four benchmarking range 198.18.0.0/15 (line 26). Its version six list (lines 28-33) is ::/128, ::1/128, fc00::/7, fe80::/10, ff00::/8, ::/96, ::ffff:0:0:0/96, 64:ff9b::/96, 64:ff9b:1::/48, 2002::/16 and fec0::/10. It does not hold 2001:2::/48, which the version six special-purpose address registry of the Internet Assigned Numbers Authority (https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml, read 2026-10-02) lists; the registry's comma-separated form (https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry-1.csv, read 2026-10-02): \"2001:2::/48,Benchmarking,[RFC5180][RFC Errata 1752],2008-04,N/A,True,True,True,False,False\", Globally Reachable False. So 'benchmark' is true of version four only. The same registry lists blocks that the sentence does not name and the program does not refuse: 2001:db8::/32 and 3fff::/20 (documentation), 100::/64 (discard-only) and 2001::/23 (protocol assignments, which holds the Teredo block 2001::/32). Because the range is not globally reachable, the practical exposure is small. This is separate from h-deepthink-r1-check-and-connect-lookups, which is about the two name lookups behind the skill's line 202 (after round 2's edits). Round 3's sweep edit 1 added skill line 207, beside the pinned sentence and without changing it: 'of the benchmark networks it refuses only the version four range, not the version six range `2001:2::/48`'. A program fix must remove that part of the sentence. The security scan at Step 13 added to the same line the other special-purpose ranges the check does not refuse (`2001:db8::/32`, `192.0.2.0/24`, `100::/64`, `2001::/32` and `5f00::/16`, each measured by running the program's own check).",
+      "options": [
+        {
+          "key": "add-ranges",
+          "label": "Add 2001:2::/48 to the program's version six list with a test case, and optionally the unnamed blocks above",
+          "pros": "The pinned sentence becomes exactly true without changing it.",
+          "cons": "The program and the test change through their own approved plan, and skill line 207 must lose its first gap."
+        },
+        {
+          "key": "narrow-words",
+          "label": "Change the pinned sentence and its test pin to name the version four benchmark network only",
+          "pros": "A text and test change only; the program is untouched.",
+          "cons": "The version six benchmarking range stays requestable."
+        },
+        {
+          "key": "as-is",
+          "label": "Leave the program, the sentence and the pin",
+          "pros": "No change.",
+          "cons": "Line 205 still names a benchmark network the program does not refuse in its version six form; line 207 states the exception, so the two must be read together."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r2-mapped-address-untested",
+      "date": "2026-10-02",
+      "path": "tests/deepthink-ships-with-ctoc.test.js",
+      "round": 2,
+      "kind": "out-of-scope-file",
+      "evidence": "The program's comment (fetch-papers.cjs lines 19-20) says 'An address of the form ::ffff:a.b.c.d is checked against the four-part rules as well'. Its version six list holds ['::ffff:0:0:0', 96] (line 30), the old translated form, not the mapped form ::ffff:0:0/96. So refusing https://[::ffff:127.0.0.1]/, which the address parser writes as [::ffff:7f00:1] (the URL Standard's IPv6 serializer appends each piece \"represented as the shortest possible lowercase hexadecimal number\", https://url.spec.whatwg.org/, read 2026-10-02 through the fetch tool's answer), rests entirely on Node's net.BlockList matching a mapped address against a version four subnet rule. Node's documentation (https://raw.githubusercontent.com/nodejs/node/main/doc/api/net.md, read 2026-10-02 through the fetch tool's summary) shows the mapped form matching a rule added with addAddress. The source path for a rule added with addSubnet, which the program uses, did not come back (src/node_sockaddr.cc, read 2026-10-02 through the fetch tool's summary). The hardening test (lines 1047-1071) covers the compatible, translated, old translated, local translated, six-to-four and site-local forms, and no mapped form. Measured on Node v24.14.1 by the session's executor on 2026-10-02, building the program's own block list from its source text and calling its check as the program does: https://[::ffff:127.0.0.1]/ gives the host ::ffff:7f00:1 and https://[::ffff:10.0.0.1]/ gives ::ffff:a00:1, and both are refused as internal (check returns true as ipv6); https://[::ffff:192.168.1.1]/ is refused too, and https://[::ffff:8.8.8.8]/ is not. A list holding only the program's version six rules refuses neither ::ffff:7f00:1 nor ::ffff:a00:1, and a list holding only the four-part rules for 127.0.0.0/8 and 10.0.0.0/8 refuses both, so on this Node the refusal comes from the mapped form matching the four-part rules, as the program's comment says. This was a measurement outside the suite: no test holds it, so a Node that matched differently would not fail any check.",
+      "options": [
+        {
+          "key": "add-cases",
+          "label": "Add test cases for https://[::ffff:127.0.0.1]/ and https://[::ffff:10.0.0.1]/ that expect 'not fetched, an internal address' and no request",
+          "pros": "Proves the behaviour on the Node that runs the suite; no program change.",
+          "cons": "A test change through its own approved plan; if a case fails, the program has to change as well."
+        },
+        {
+          "key": "add-range-and-cases",
+          "label": "Also add ['::ffff:0:0', 96] to the program's version six list",
+          "pros": "The refusal no longer depends on Node's mapped matching.",
+          "cons": "The program and the test change; a public address written in the mapped form is refused too."
+        },
+        {
+          "key": "as-is",
+          "label": "Leave the program and the test",
+          "pros": "No change.",
+          "cons": "The refusal rests on behaviour Node documents only for a single-address rule and that was measured once, outside the suite, on Node v24.14.1; nothing tests it."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r2-obvious-choice-quotation",
+      "date": "2026-10-02",
+      "path": "skills/deepthink/SKILL.md",
+      "round": 2,
+      "kind": "project-rules-disagree",
+      "evidence": "The skill's line 265 (after round 2's edits) quotes the owner: \"choose the most obvious choice, with the algorithm do deepthink\" (12 September 2026). In the repository these words appear only in the skill and in round notes; the parent plan (plans/implementation/deepthink-ships-with-ctoc.md line 344) carries the gist, not the words. Outside the repository, read 2026-10-02 by this critic: the owner's private note for another project (its file name removed at the owner's decision of 2026-10-05) line 10 holds the full sentence, \"choose the most obvious choice, with the algorithm do deepthink … (from the owner's private note for another project; quotation removed at the owner's decision of 2026-10-05)\" The words are the owner's. The quotation is cut mid-sentence, and its second half belongs to the rule that an algorithmic choice gets a deepthink run, not to the obvious-choice rule it is attached to. No reader of the shipped skill can open the source. The honest-status rule asks that only what was verified be asserted; the parent kept both rulings attributed by name and date.",
+      "options": [
+        {
+          "key": "keep",
+          "label": "Keep the quotation as it stands",
+          "pros": "No change; the words are the owner's own.",
+          "cons": "A fragment cut mid-sentence, half of it about another rule, whose source no reader of the shipped skill can open."
+        },
+        {
+          "key": "full-sentence",
+          "label": "Quote the whole sentence once, covering both rulings of that day",
+          "pros": "The owner's complete words; neither rule shows half of the other.",
+          "cons": "Still a source no reader of the shipped skill can open; the sentence is informal and in lower case."
+        },
+        {
+          "key": "paraphrase",
+          "label": "Attribute both rulings by name and date in plain words, without quotation marks",
+          "pros": "Nothing is presented as verbatim that a reader cannot check.",
+          "cons": "The owner's own words leave the shipped skill."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r2-waiting-budget-threshold",
+      "date": "2026-10-02",
+      "path": "skills/deepthink/SKILL.md",
+      "round": 2,
+      "kind": "project-rules-disagree",
+      "evidence": "The skill's lines 275-278 (after round 2's edits): 'a person can wait a second or two or three for a search or an answer to start, never a minute. An option that needs a minute is out for the build in hand'. Line 278 chooses the long-run line 'among the options that stay inside the budget'. An option that needs ten or thirty seconds is neither within 'a second or two or three' nor named as out, so the reading agent decides on its own whether it is inside, and the long-run line depends on that decision. The project's literal-interpretation principle (CLAUDE.md, \"Literal interpretation\") says vague prompts produce silent drift and every agent prompt must be explicit; the ruling is the owner's and the parent kept it. The clause 'a search-only build is not one' comes from the context of the ruling: the note cited in h-deepthink-r2-obvious-choice-quotation says so (from the owner's private note for another project; quotation removed at the owner's decision of 2026-10-05). Either change below can keep or drop that clause.",
+      "options": [
+        {
+          "key": "three-seconds",
+          "label": "The budget ends at three seconds from the person's action to the first visible result",
+          "pros": "One number, taken from 'a second or two or three'.",
+          "cons": "An option at five or ten seconds is out, which 'never a minute' does not require."
+        },
+        {
+          "key": "under-a-minute",
+          "label": "Anything under a minute is inside the budget, with its time stated",
+          "pros": "Matches 'never a minute' literally.",
+          "cons": "Admits waits of thirty seconds that 'a second or two or three' does not describe."
+        },
+        {
+          "key": "keep",
+          "label": "Keep the words as they are",
+          "pros": "The owner's ruling is carried unchanged.",
+          "cons": "An option between three seconds and a minute is in or out at the reading agent's choice."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r3-paper-list-unprompted-requests",
+      "date": "2026-10-02",
+      "path": "skills/deepthink/fetch-papers.cjs",
+      "round": 3,
+      "kind": "out-of-scope-file",
+      "evidence": "The program reads every paper address from the staging file (SKILL.md lines 189-197 (after round 3's edits); the command names only the staging file) and checks an address only for https (fetch-papers.cjs line 242), a user name or password (line 246) and an internal host (lines 74-75, every redirect hop included), then requests it with fetch (line 76) from the owner's machine; no step shows the addresses to a person before the program requests them (a paper that is not fetched is named afterwards under Failures with the program's reason, and the program's own output line for that paper quotes its address: SKILL.md lines 212-215 (after round 3's edits), fetch-papers.cjs line 266). Round 3's r3-f1 states this in the skill. The Open Worldwide Application Security Project's 2026 prompt-injection entry (https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM01_PromptInjection.md, read 2026-10-02 by round 3's research through the fetch tool's answer, and again by round 3's validator, also through the fetch tool's answer): 'Require explicit human confirmation before any privileged, irreversible, or externally visible action, surfacing the exact rendered action rather than a summary to the reviewer.' The joint guidance 'Careful adoption of agentic AI' (https://www.cyber.gc.ca/en/guidance/careful-adoption-agentic-ai, read 2026-10-02 by round 3's research through the fetch tool's answer, and again by round 3's validator, also through the fetch tool's answer): 'Malicious or compromised agents could use tools as a stealthy way to exfiltrate data.' The brief already forbids putting its text into a web address (SKILL.md line 122 (after round 3's edits)) and allows only paper addresses the reading agent saw on a page it opened (line 145 (after round 3's edits)); this entry concerns a reading agent that does not obey. Not run live: no request was sent to a test host.",
+      "options": [
+        {
+          "key": "host-allow-list",
+          "label": "The program requests papers only from a fixed list of publisher hosts written in the program",
+          "pros": "An address on any other host is never requested, whatever the list holds.",
+          "cons": "A paper hosted elsewhere is marked not fetched; the host list needs upkeep; the program and its tests change through their own plan."
+        },
+        {
+          "key": "owner-sees-hosts",
+          "label": "Before running the program, the session shows the owner the distinct hosts in the list and runs it only on the owner's word",
+          "pros": "A person sees every host before a request leaves the machine.",
+          "cons": "The papers wait for the owner; the skill's run order changes; the owner sees hosts, not whether an address path carries pasted text."
+        },
+        {
+          "key": "as-stated",
+          "label": "Keep the program and the run order; the skill states the channel",
+          "pros": "No program or flow change.",
+          "cons": "An address on any public host is still requested with no step of the skill showing it to a person first."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r3-report-handback-tool",
+      "date": "2026-10-02",
+      "path": "tests/deepthink-ships-with-ctoc.test.js",
+      "round": 3,
+      "kind": "pinned-contract",
+      "evidence": "The skill's line 55 (after round 3's edits, which left its number unchanged), pinned at the test's lines 317-318: 'The reading agent holds WebSearch and WebFetch and no other tool'. The agent's line 39, pinned at the test's line 329: 'I hold WebSearch and WebFetch and nothing else'; its description (line 3) says the same and is not pinned. The tools reference (https://code.claude.com/docs/en/tools-reference.md, read raw 2026-10-02 by round 3's research): 'Where the conditions in the SubagentHandback tools-table entry hold, Claude Code also gives the subagent that tool, even if you leave it out of tools or list it in disallowedTools', and the row: 'Delivers a subagent's final report to whichever conversation receives that subagent's result. Provided only in auto mode, to subagents that the Agent tool runs locally other than forks … Requires Claude Code v2.1.271 or later'. In auto mode the pinned words are not literally true; the row does not contradict the second half of either sentence (no file read, no write, no command, no launch). Round 3's r3-f2 adds a sentence after the skill's pinned one; the agent file is outside this slice. The test's check that the agent's tools line is exactly 'tools: WebSearch, WebFetch' (line 449) is unaffected, because the tool is not declared. Re-read raw on 2026-10-02 by round 3's validator; the row and the sentence are word for word as quoted.",
+      "options": [
+        {
+          "key": "amend-pins",
+          "label": "Change the skill's and the agent's pinned sentences, the agent's description and the two test pins to name the report-handback tool Claude Code adds in auto mode",
+          "pros": "The pinned words are true in every mode.",
+          "cons": "Two pins, the agent file and its description change through their own plan; the wording then names a vendor tool that may change again."
+        },
+        {
+          "key": "keep-pins",
+          "label": "Keep the pins and the agent file; the skill carries round 3's added sentence",
+          "pros": "No pin or agent-file change.",
+          "cons": "The pinned words, and the agent's description of itself, stay literally false in auto mode, corrected only by the skill's next sentence."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r3-turn-limit-relaunch",
+      "date": "2026-10-02",
+      "path": "skills/deepthink/SKILL.md",
+      "round": 3,
+      "kind": "pinned-contract",
+      "evidence": "The agent's frontmatter holds maxTurns: 80 (line 17, pinned at the test's line 644). The tools reference (read raw 2026-10-02 by round 3's research): 'When the subagent reaches the limit, Claude Code marks the returned result as partial output, and Claude can resume the subagent to continue.' The sub-agents page (https://code.claude.com/docs/en/sub-agents.md, read 2026-10-02 by round 3's research through the fetch tool's answer): 'The partial marking requires Claude Code v2.1.246 or later' and 'Claude uses the SendMessage tool with the agent's ID or name as the to field to resume it.' A result cut off at the limit ends before the closing line the brief puts last, so the pinned failed-run sentence (line 242 (after round 3's edits), pinned at the test's lines 347-348) fails the run and relaunches it from recording, and a second failure waits for the owner. Round 3's r3-f3 tells the reading agent to make no search or fetch after the seventieth, which narrows this without removing it; the skill's 80 copies the agent's pinned value and must change with it. Neither page says what one turn is (the raw tools reference searched for every use of the word, and the sub-agents page asked narrowly, round 3's validator, 2026-10-02), so r3-f3 states its count as the brief's own rule. The Agent Software Development Kit documentation's page on the agent loop does define one (https://code.claude.com/docs/en/agent-sdk/agent-loop, read 2026-10-02 by round 3's final re-validation; the fetch tool returned the page's text in full): 'A turn is one round trip inside the loop: Claude produces output that includes tool calls, the SDK executes those tools, and the results feed back to Claude automatically', and 'You can cap the loop with `max_turns` / `maxTurns`, which counts tool-use turns only'. Whether Claude Code counts a subagent's maxTurns the same way was not read. Under that definition one turn can hold several searches or fetches, so the brief's count of searches and fetches is never lower than the number of turns spent on them. The final re-validation removed the skill's clause that what counts as one turn is not documented. The sub-agents page adds: 'For subagents that return an agent ID, Claude Code also notes in the result that Claude can message the subagent to continue from where it stopped.'",
+      "options": [
+        {
+          "key": "resume-once",
+          "label": "When the result is marked partial at the turn limit, resume the same reading agent once, asking it to write the result from what it read, before counting the run failed",
+          "pros": "The research already done is kept.",
+          "cons": "The pinned sentence and its test change; how the record-first rule and the task's state apply to a resumed agent is not settled; the resume tool the sub-agents page names, SendMessage, is not on the skill's tools line, a line Claude Code does not read (h-deepthink-r1-tools-key-unread); whether the session can use SendMessage was not checked."
+        },
+        {
+          "key": "fresh-relaunch",
+          "label": "Keep the pinned rule: a cut-off run fails and is relaunched from recording",
+          "pros": "No change.",
+          "cons": "A run cut off at the limit loses its research, and a relaunch that hits the same limit fails twice and waits for the owner."
+        },
+        {
+          "key": "raise-limit",
+          "label": "Raise maxTurns in the agent file and its pin, and the skill's number with it",
+          "pros": "Fewer runs reach the limit.",
+          "cons": "Longer runs; the agent file and its pin change through their own plan, and the skill's number with them."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r3-index-direction-marks",
+      "date": "2026-10-02",
+      "path": "skills/deepthink/fetch-papers.cjs",
+      "round": 3,
+      "kind": "out-of-scope-file",
+      "evidence": "The program's hidden-character list (lines 103-106) is 0x00-0x1f, 0x7f-0x9f, 0x200b-0x200d, 0x2060, 0x202a-0x202e, 0x2066-0x2069, 0xfe00-0xfe0f and 0xe0000-0xe007f; its comment (lines 100-101) says it covers 'direction marks and overrides'. The left-to-right mark (U+200E), the right-to-left mark (U+200F) and the Arabic letter mark (U+061C) are outside every range; Unicode Standard Annex number 9, section 2.6 (https://www.unicode.org/reports/tr9/, revision 52, read 2026-10-02 by round 3's research through the fetch tool's answer) names those three as marks, each a 'zero-width character'. Also outside every range, from the code: U+FEFF, U+2028 and U+2029 (the zero width no-break space, the line separator and the paragraph separator, by their names in the Unicode Standard 18.0.0, chapter 23, https://www.unicode.org/versions/Unicode18.0.0/core-spec/chapter-23/, read 2026-10-02 by round 3's validator through the fetch tool's answer; the same page gives the second variation-selector range, U+E0100 to U+E01EF, also outside the program's list). Round 3's r3-f4 corrects the skill's index sentence to what the code removes and names these characters as reaching a cell; the program's comment stays false until the program changes. The test pins none of these characters. The security scan at Step 13 (finding 3) ran the program's own cell() and found these also survive inside a cell: U+2061 to U+2064, U+00AD, U+034F, U+3164, U+206A to U+206F, U+FFF9 to U+FFFB and U+180E; skill line 230 now says hidden text can survive inside a cell, and the add-marks option as written does not cover them.",
+      "options": [
+        {
+          "key": "add-marks",
+          "label": "Add the three marks, and optionally U+FEFF, U+2028 and U+2029, to the program's list, with a test case",
+          "pros": "The program's comment becomes true and no index cell holds those characters.",
+          "cons": "The program and the test change through their own plan; the skill sentence round 3 corrected must widen again."
+        },
+        {
+          "key": "comment-only",
+          "label": "Leave the list; correct the program's comment to name what it removes",
+          "pros": "One comment line changes; behaviour is unchanged.",
+          "cons": "The marks still reach an index cell; the program file still changes through its own plan."
+        },
+        {
+          "key": "as-is",
+          "label": "Leave the program and its comment",
+          "pros": "No change.",
+          "cons": "The program's comment says it removes direction marks, and it does not."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-r3-researcher-file-wording",
+      "date": "2026-10-02",
+      "path": "agents/ai-quality/deepthink-researcher.md",
+      "round": 3,
+      "kind": "out-of-scope-file",
+      "evidence": "Lines 75-78 put under Failures 'a fetch that fails, times out, is blocked or returns something other than the page'. The tools reference (read raw 2026-10-02 by round 2's validator and by round 3's research) says that for most fetches 'Claude receives the result of that call rather than the raw page', so read literally every such fetch returns something other than the page, and line 78 ('I never describe a source I did not read') then reaches every source. Line 85 asks for each paper's 'https address'; the brief (SKILL.md lines 142-143 (after round 3's edits)) asks for the address of the paper's file itself, because that address is what the program downloads. Neither passage is pinned: the test pins lines 39, 49, 58, 67, 89 and 93 and the file-name phrase on line 86. Round 3's r3-f5 clarifies the fetch rule inside the brief; the brief already carries the file-address rule.",
+      "options": [
+        {
+          "key": "align-agent",
+          "label": "Edit the agent file's two passages to match the brief",
+          "pros": "The agent's standing rules and the brief agree when either is read alone.",
+          "cons": "The agent file changes through its own plan."
+        },
+        {
+          "key": "brief-only",
+          "label": "Leave the agent file; the brief, pasted into every launch, carries both rules",
+          "pros": "No agent-file change.",
+          "cons": "Read alone, the agent's standing rules still send every fetch to Failures and ask for any https address."
+        }
+      ]
+    },
+    {
+      "id": "h-deepthink-s3-private-memory-quotations",
+      "date": "2026-10-02",
+      "path": ".ctoc/audit/deepthink-improvement/for-the-human.json",
+      "round": 3,
+      "kind": "project-rules-disagree",
+      "evidence": "The security scan at Step 13 (finding 4) found words from the owner's private memory note for another of the owner's projects, and that note's file name, quoted in files this slice commits to a repository that ships publicly. The other project's name was redacted in all of them; the note's file name and some of its words were not. The occurrences the scan listed: this list's entries h-deepthink-r2-obvious-choice-quotation and h-deepthink-r2-waiting-budget-threshold; .ctoc/audit/deepthink-run-notes/s3-round2-critic-d-s3-r2-critic.md lines 298 and 308; .ctoc/audit/deepthink-run-notes/s3-round2-validate-d-s3-r2-validate.md line 93; and, found by a presence check at the final review, .ctoc/audit/deepthink-run-notes/s3-round1-revalidate-d-s3-r1-revalidate.md lines 34 and 121 and .ctoc/audit/deepthink-run-notes/s3-step13-secure-d-s3-step13-secure.md lines 6 and 29; this entry names the file as well. The skill itself already carries one fragment of the note's words, the 12 September quotation. The note was read by a web-holding agent at the session's own brief (plan decision 8). Answered by the owner on 2026-10-05: cut-down. Every file this slice commits was then cut down to the fragment the skill already quotes; each removed quotation reads \"(from the owner's private note for another project; quotation removed at the owner's decision of 2026-10-05)\" and each removed file name \"(its file name removed at the owner's decision of 2026-10-05)\", and every edited run note ends with a redaction marker. The list's entry shape has no answer field, and the improvement run's list records no answered entry, so the answer is written here.",
+      "options": [
+        {
+          "key": "keep",
+          "label": "Keep the quotations as they are",
+          "pros": "The owner list and the run notes keep the full evidence for the two entries that rest on the note.",
+          "cons": "Words and the file name of a private note from another project ship in a public repository."
+        },
+        {
+          "key": "cut-down",
+          "label": "Cut them down to the words already in the skill and drop the memory file's name",
+          "pros": "Nothing of the private note ships beyond the fragment the skill already quotes.",
+          "cons": "The two entries that rest on the note lose part of their evidence, and the verbatim run notes are edited again, with a marker saying so."
+        }
+      ]
+    }
+  ]
+}
