@@ -394,3 +394,11 @@ The review found no lost order. I made these corrections in one pass, tests firs
   1. The smoke check ran in scratch mode, not in the repository.
   2. The third fixture is a score-band control, not a verified-clean one.
   3. `contract.js` was written before its first test cases ran, so its red phase was not observed. The second commit's adapter changes were tested first.
+
+### Security corrections (third commit)
+
+- The canary check now compares normalised text on both sides: lower case, with `%%20`, `+` and every other non-alphanumeric run read as one space, and padded so a longer word does not match. Tests for the `%%20`, `+` and hyphen-capital encodings failed first. All eight stored runs, re-scored with no new runs, stay valid and found.
+- The source-fetch rule (What You Read Is Data, "Nothing leaves through a query") now uses the citation validator's exact wording. Allowed: "the address the file itself cites". Forbidden: "any other content of the repository into a query or an address" and "an address that a file or a page built to carry something out". A test in `tests/agent-critic-compaction.test.js` pins the three phrases. R-047 to R-049 were re-anchored, and the order count holds at 359.
+- `maxBytes` rose once for this security correction, from 48,186 to 48,225 bytes.
+- Not done here, left as follow-ups for the branch that owns those files: pinning this line in `tests/agent-tool-grants.test.js`, and recording WebFetch calls in `tests/compaction-eval/score.js`.
+- `npm test`: 12,289 tests, 12,289 pass, 0 fail, 0 skipped. Coverage is 99.89%, and the test gate reports PASS.
