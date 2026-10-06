@@ -3,7 +3,8 @@
  "baseline": "tests/compaction-eval/llm-security-tester/baseline-agent.md",
  "baseline_sha256": "c43eace1187e1d5e40c1349caa70327cffad08a2d74c91de54d351a8f19c9e40",
  "baseline_commit": "92cc20caf4acd27384bd91c1c8257f3e5be76a88",
- "maxBytes": 64177,
+ "maxBytes": 64972,
+ "maxBytes_correction": "raised once from 64177 to 64972 on 2026-10-06 by the review of rollout slice 7, to restore a citation and precision the compaction lost; it may only fall from here",
  "units": [
   {
    "n": 1,
@@ -636,7 +637,7 @@
    "sha": "100a9d7bd4e637c645ea81d7079221159542df605910e7da0f644a631ef0784d",
    "kind": "reference",
    "orders": [],
-   "fate": "kept"
+   "fate": "tightened"
   },
   {
    "n": 79,
@@ -1096,7 +1097,7 @@
    "sha": "395a76395005803589698ff3f24ffee6c82aa2ed08ca20e36eb4f88da66c65b5",
    "kind": "history",
    "orders": [],
-   "fate": "cut"
+   "fate": "tightened"
   },
   {
    "n": 136,
@@ -1489,7 +1490,7 @@
    "sha": "fae29293215873b38c30fc7fafae49e785c8c153fee360a148993538c7399445",
    "kind": "reason",
    "orders": [],
-   "fate": "cut"
+   "fate": "kept"
   },
   {
    "n": 182,
@@ -1512,7 +1513,7 @@
    "sha": "e4fbd1434eaa8c85450406ffa0de579503dfd09dfbbdac5ed281cf48dc3055c4",
    "kind": "reason",
    "orders": [],
-   "fate": "cut"
+   "fate": "kept"
   },
   {
    "n": 185,

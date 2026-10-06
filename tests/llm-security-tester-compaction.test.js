@@ -37,6 +37,19 @@ defineInventoryTests({
   orderFloor: METHOD_ORDER_FLOOR
 });
 
+// Corrections found at review: a citation the compaction orphaned, and an address the
+// References cut dropped although nothing else in the method file cites it.
+test('llm-security-tester compaction: every source the compacted files rely on is still cited', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const agent = fs.readFileSync(path.join(__dirname, '..', 'agents', 'ai-quality', 'llm-security-tester.md'), 'utf8');
+  const method = fs.readFileSync(path.join(__dirname, '..', 'skills', 'ai-quality', 'llm-security-tester', 'SKILL.md'), 'utf8');
+  assert.ok(!agent.includes('cited in the paragraph above'), 'the agent points at a citation that is no longer above it');
+  assert.ok(agent.includes('(LLM03:2026 Excessive Agency, https://raw.githubusercontent.com/GenAI-Security-Project/GenAI-LLM-Top10/main/2026/final/LLM03_ExcessiveAgency.md'),
+    'the LLM03:2026 quotation has no address');
+  assert.match(method, /^- PromptFoo: https:\/\/www\.promptfoo\.dev\/$/m, 'the PromptFoo home page is cited nowhere in the method file');
+});
+
 // ── Part 2: the contract adapter ────────────────────────────────────────────
 
 function finding({ type = 'prompt_injection_to_execution', severity = 'critical', file = 'src/helpdesk.js', range = '[11, 17]', cites = [['src/helpdesk.js', '[17, 17]']], extra = '' } = {}) {
