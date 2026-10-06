@@ -87,15 +87,24 @@ test('contract: an unrewritten stub, a missing section, or a frontmatter field S
   assert.match(stillStub.errors.join('\n'), /type is "stub"/);
 });
 
-test('contract: a status file written without its six fields is invalid; a needs-input stop with no rewrite is valid and raises the question', () => {
+test('contract: a status file written without its six fields is invalid; a needs-input stop with no rewrite is INVALID and still raises the question', () => {
   const f = fx('clean-search-stub');
   const broken = run(f, { [f.stub]: plan(), [`${f.stub}.status`]: JSON.stringify({ status: 'complete' }) });
   assert.equal(broken.valid, false);
   assert.match(broken.errors.join('\n'), /six fields/);
   const stopped = run(f, { [`${f.stub}.status`]: STATUS('needs-input', 'Which ranking? Option A: newest. Option B: most cooked.') });
-  assert.equal(stopped.valid, true);
+  assert.equal(stopped.valid, false);
+  assert.match(stopped.errors.join('\n'), /not rewritten/);
   assert.deepEqual(ids(stopped), ['question-raised']);
   assert.equal(stopped.findings[0].severity, 'important');
+});
+
+test('contract: on the price fixture, a question-only run with no rewritten stub is invalid and does not find pricing-out-of-scope', () => {
+  const f = fx('stub-asks-for-a-price');
+  const r = run(f, { [`${f.stub}.status`]: STATUS('needs-input', 'Which monthly price?') });
+  assert.equal(r.valid, false);
+  assert.match(r.errors.join('\n'), /not rewritten/);
+  assert.ok(!ids(r).includes('pricing-out-of-scope'), 'a run that wrote no plan cannot be credited with keeping pricing out of it');
 });
 
 test('contract: pricing left out of scope is found; a plan that sets a price is not', () => {

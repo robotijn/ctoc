@@ -237,7 +237,7 @@ Write the refined plan into the stub file with `Edit`, one section at a time, af
 - Insert each section the stub does not have yet (`## Business Alignment`, `## User Stories`, `## Risks`, `## Priority`) with an `Edit` whose `old_string` is the heading of the section it must come before in the Output Format order and whose `new_string` is the new section followed by that same heading. A section that comes last is appended with an `Edit` whose `old_string` is the file's last line.
 - `Read` the file again after the last `Edit` and check that every section of the Output Format is present exactly once.
 
-Never `Write` an existing plan file. A rewrite can drop text the file held, and any unintended change to an approved plan's frontmatter or body breaks its approval (`computeSpecHash` in `src/lib/approval-ledger.js`); an `Edit` changes only the text it names. `Write` is for a file that does not exist yet and for the `<stubPath>.status` file (the status protocol).
+Never `Write` an existing plan file. A rewrite can drop text the file held, and any change to an approved plan's frontmatter or body breaks its approval (`computeSpecHash` in `src/lib/approval-ledger.js`); an `Edit` changes only the text it names. `Write` is for a file that does not exist yet and for the `<stubPath>.status` file (the status protocol).
 
 The finished file contains:
 1. Updated frontmatter (from Step 7)
@@ -393,7 +393,7 @@ risk_level: MEDIUM
 2. **Untestable Acceptance Criteria:** Run the quality gate in Step 3c. Every criterion must have a concrete, binary pass/fail check. "Loads fast" fails. "Page loads in under 2 seconds on 3G" passes.
 3. **Scope Creep via Implicit Requirements:** Everything in Acceptance Criteria must map to an In Scope item. If a new requirement appears, it goes to In Scope first, then gets a criterion. If it does not fit, it goes to Out of Scope.
 4. **Stories Without Value:** INVEST Valuable check -- the "so that" must describe a benefit to the end user, not the developer. Technical tasks are valid work but are not user stories. Flag them as technical enablers and attach them to the story they enable.
-5. **Gold Plating:** Criteria describe WHAT the user experiences, not HOW it is built; UI elements, API endpoints and database schemas belong in the implementation plan.
+5. **Gold Plating:** Criteria describe WHAT the user experiences, not HOW it is built; prescribed UI elements, API endpoints and database schemas belong in the implementation plan.
 6. **Orphaned Stubs:** Step 2 alignment check. If the stub cannot be traced to a vision goal, it is orphaned. Ask the user whether to update the vision or remove the stub.
 7. **Overlapping Sibling Stubs:** Step 2 overlap check. Read all sibling stubs and compare scope. If overlap is found, escalate to user with merge/split options.
 8. **Copy-Paste Criteria:** Every scenario must reference the specific Actor, specific action, and specific outcome for THIS stub. If a scenario could apply to any feature without changes, it is too generic. Rewrite with concrete details.

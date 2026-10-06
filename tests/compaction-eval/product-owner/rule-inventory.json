@@ -3135,23 +3135,32 @@
   {
    "n": 380,
    "sha": "878cd192d8a09690113458bef06303d135d7290dcea9c9f125619f9d40922efe",
-   "kind": "description",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "R-197",
+    "R-210"
+   ],
+   "fate": "merged"
   },
   {
    "n": 381,
    "sha": "9346cbf3224082d0bd645e1fcfbf6779424dbcc5978e5979ae5bed5d91d4e88f",
-   "kind": "reference",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "R-217",
+    "R-220"
+   ],
+   "fate": "merged"
   },
   {
    "n": 382,
    "sha": "13bbd3fdebd6b974bb1c90f51f0b2ae1b540f6f97eaece8746af9aed216f221b",
-   "kind": "description",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "R-049",
+    "R-050"
+   ],
+   "fate": "merged"
   },
   {
    "n": 383,

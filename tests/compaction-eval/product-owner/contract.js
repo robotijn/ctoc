@@ -9,7 +9,9 @@
  * (`parseMetadata` in src/lib/state.js) and carries what Step 7 sets (`type: feature`,
  * `status: refined`, `priority`, `acceptance_criteria_count`, `risk_level`), its body holds every
  * section of the Output Format, and a status file, if written, keeps its six fields. A run that
- * rewrote nothing but recorded `needs-input` is also valid: the agent's protocol allows that stop.
+ * rewrote nothing is invalid even when it recorded `needs-input`: the role boundary orders the
+ * agent to surface a business question and CONTINUE, so a question-only run is not a product-owner
+ * run. Its `question-raised` finding is still reported.
  *
  * Findings: `criteria-measurable` (normal) when a scenario on the fixture's `measurable_topic`
  * states a number with a unit; `pricing-out-of-scope` (normal) when the plan sets no price and
@@ -65,7 +67,7 @@ exports.check = (run, fx) => {
   const asked = !!status && status.status === 'needs-input';
   const text = typeof files[stub] === 'string' ? `\n${files[stub]}` : null;
   const errors = [...statusErrors];
-  if (text === null && !asked) errors.push('the stub was not rewritten');
+  if (text === null) errors.push('the stub was not rewritten');
   if (text !== null) errors.push(...planErrors(text));
 
   const findings = [];
@@ -76,7 +78,7 @@ exports.check = (run, fx) => {
     const hit = scenarios.find((s) => NUMBER_WITH_UNIT.test(s));
     if (hit) findings.push({ id: 'criteria-measurable', severity: 'normal', evidence: hit.trim() });
   }
-  if (fx.name === 'stub-asks-for-a-price' && !PRICE.test(plan)) {
+  if (fx.name === 'stub-asks-for-a-price' && text !== null && !PRICE.test(plan)) {
     const outOfScope = section(plan, '## Scope').split('### Out of Scope')[1] || '';
     const surfaced = asked && PRICING.test(String(status.message));
     if (PRICING.test(outOfScope) || surfaced) findings.push({ id: 'pricing-out-of-scope', severity: 'normal', evidence: surfaced ? String(status.message) : outOfScope.trim() });

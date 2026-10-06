@@ -174,7 +174,7 @@ in a scratch copy.
 - [ ] Dispatch `iron-loop-critic` with the baseline, the compacted agent and the inventory: every `cut` unit read side by side with the original, every `merged` order (the templates above all), tightened orders for changed meaning.
 
 ### Step 12: OPTIMIZE
-- [x] Remove any repeat the review found.
+- [x] Remove any repeat the review found. (Ticked too early in the first build; it actually ran after the Step 11 review, in the fix pass recorded under the Execution Record.)
 
 ### Step 13: SECURE
 - [ ] Dispatch `security-scanner`: the write-location orders and the role boundary present with their anchors; fixtures clean.
@@ -278,9 +278,18 @@ literals held by `src/lib/vision-decomposer.js` (stub template line, section hea
 `src/lib/streaming-precompute.js` (Question contract).
 
 **Inventory** (labelled before compacting): 426 units, 252 orders — 233 kept word for word,
-18 tightened, 4 merged (R-008 takes the duplicate "no AskUserQuestion" bullet; R-183 the Step 6
-risk template; R-201 the Step 7 frontmatter template) — and 57 units cut (34 descriptions,
-4 reasons, 9 examples, 3 references, 7 history). Order floor 252 in the test file.
+18 tightened, 7 merged units (R-008 takes the duplicate "no AskUserQuestion" bullet; R-183 the
+Step 6 risk template; R-201 the Step 7 frontmatter template; after review, the three
+order-carrying `## Tools Used` bullets: Edit into R-197 and R-210, Write into R-217 and R-220,
+Grep into R-049 and R-050) — and 54 units cut (32 descriptions, 4 reasons, 9 examples,
+2 references, 7 history). Order floor 252 in the test file.
+
+**Why two duplicated blocks were kept.** The job-statement block in Step 2 and the user-story block
+in Step 3a repeat lines of the Output Format, but each says more than its Output Format copy (the
+job statement's "situation the user is in", the story's "specific user role from the Actor field"
+and "benefit linked to the Impact field"), so they are the instruction and the Output Format is
+only the shape; the plan named only the acceptance-criteria, scope and risk templates as the
+second copy to remove.
 
 **Size.** 37,679 → 29,821 bytes (79.1 percent; `maxBytes` 29,821). The plan expected about
 25,000; the miss is because about 80 percent of the file is orders the plan keeps word for word
@@ -302,13 +311,14 @@ nothing fixed). Verdict **PASS** (`score.js` exit 0), no rerun needed. Raw runs 
 | Fixture | Kind | Original | Compacted |
 |---|---|---|---|
 | `vague-criterion` | planted | valid, not found | valid, found (`within 2.5 seconds`) |
-| `stub-asks-for-a-price` | planted | valid, found (status left `needs-input`) | valid, found (price named out of scope; status ended `complete`) |
+| `stub-asks-for-a-price` | planted | valid, found (wrote the full plan, ended at `needs-input` with a two-option question) | valid, found (price named out of scope; status ended `complete`) |
 | `clean-search-stub` | clean | valid, no serious finding | valid, no serious finding |
 
 The original's miss on `vague-criterion` is a real behaviour, not a matcher miss: it rewrote "the
 page should be fast" as an ordering check (ingredients displayed before any media loads), binary but
-with no number and unit. The difference on `stub-asks-for-a-price` (original stops at `needs-input`,
-compacted surfaces the price in Out of Scope and then marks `complete`) is allowed by both texts,
+with no number and unit. The difference on `stub-asks-for-a-price` (the original wrote the full plan
+and ended at `needs-input` with a two-option question about the price; the compacted version
+named the price out of scope and then marked `complete`) is allowed by both texts,
 which carry the same Step 10 order; one run each cannot attribute it to the compaction.
 
 | Run | Original tokens | Compacted tokens | Original duration | Compacted duration |
@@ -328,10 +338,22 @@ ESLint on the two new JavaScript files: zero warnings. `CLAUDE.md` and `README.m
 slices would conflict); the section above holds its content.
 
 **Decisions taken during execution.**
-1. A run that rewrites nothing but records `needs-input` is VALID in `contract.js`: the agent's own
-   Needs-Input Protocol allows that stop, and scoring it invalid would turn a legitimate stop into
-   an INCOMPLETE verdict.
+1. A run that rewrites nothing but records `needs-input` is INVALID in `contract.js` (corrected
+   after review; the first build scored it valid). The role boundary orders the agent to surface a
+   business question and continue with the technical work, so a question-only run is not a
+   product-owner run; its `question-raised` finding is still reported, and on the price fixture it
+   is not credited with `pricing-out-of-scope`. Re-scoring the six recorded runs gave the same
+   PASS: every run rewrote its stub.
 2. The headings of the removed `## Tools Used`, `## References` and `### Methodology Sources`
    sections are labelled `description` / `cut`: they title sections of descriptions and history,
    and the inventory has no fate for a heading whose whole section leaves.
 3. The brief is written inline in `expectations.json` (no brief file): `files:` declares no brief file.
+
+**Fix pass after the Step 11 review** (second commit). `contract.js`: a question-only run is
+invalid (decision 1), test-first, with a new price-fixture case: a `needs-input` status "Which
+monthly price?" and no stub is invalid and not found. Agent text: Step 8 "any unintended change"
+became "any change" and anti-pattern 5 "UI elements" became "prescribed UI elements" (size
+unchanged at 29,821 bytes, inside `maxBytes`). Inventory: the three order-carrying `## Tools Used`
+bullets relabelled as merged. `expectations.json`: the clean fixture's `forbid` removed, because
+`score.js` never reads `forbid` for a clean fixture (its `evaluate` returns before it). The six
+recorded runs were re-scored, not re-run: PASS, unchanged.
