@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "module": "commonjs",
+    "target": "es2022",
+    "resolveJsonModule": true,
+    "types": [
+      "node"
+    ],
+    "maxNodeModuleJsDepth": 0
+  },
+  "include": [
+    "src"
+  ]
+}
