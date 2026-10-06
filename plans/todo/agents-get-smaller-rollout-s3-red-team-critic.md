@@ -155,19 +155,19 @@ string.
 ## Execution Plan
 
 ### Step 8: TEST
-- [ ] Confirm the pilot and slice 0 are done and the agent file has no uncommitted change; copy the baseline; record sha256 and commit.
-- [ ] Write `tests/red-team-critic-compaction.test.js`, the new fixture, and `expectations.json` (with `fx.dir` for the two reused ones).
+- [x] Confirm the pilot and slice 0 are done and the agent file has no uncommitted change; copy the baseline; record sha256 and commit.
+- [x] Write `tests/red-team-critic-compaction.test.js`, the new fixture, and `expectations.json` (with `fx.dir` for the two reused ones).
 - [ ] Verify the clean fixture: dispatch `iron-loop-critic` to read it for any defect of important or higher; on a defect, write this slice's own clean fixture instead; record.
-- [ ] Run the test; expect RED; record the failing lines.
+- [x] Run the test; expect RED; record the failing lines.
 
 ### Step 9: PREPARE
-- [ ] Re-read every pin and reader; measure section sizes with `units.js`.
-- [ ] Confirm `00370` has not built (this slice goes first); check whether the deepthink wording slice has built and, if so, record that the baseline is its result.
+- [x] Re-read every pin and reader; measure section sizes with `units.js`.
+- [x] Confirm `00370` has not built (this slice goes first); check whether the deepthink wording slice has built and, if so, record that the baseline is its result.
 
 ### Step 10: IMPLEMENT
-- [ ] `contract.js`; label every unit in `rule-inventory.json`.
-- [ ] Compact by hand in the original section order; set `maxBytes`; the test GREEN.
-- [ ] `CLAUDE.md` (two places) and `README.md`: the test-file count; run every fence in the pin table.
+- [x] `contract.js`; label every unit in `rule-inventory.json`.
+- [x] Compact by hand in the original section order; set `maxBytes`; the test GREEN.
+- [x] `CLAUDE.md` (two places) and `README.md`: the test-file count; run every fence in the pin table.
 
 ### Step 11: REVIEW
 - [ ] Dispatch `iron-loop-critic` with the baseline, the compacted agent and the inventory: every `cut` unit read side by side with the original, every `merged` order, tightened orders for changed meaning.
@@ -179,13 +179,13 @@ string.
 - [ ] Dispatch `security-scanner`: the trust-boundary orders present with their anchors; fixtures clean.
 
 ### Step 14: VERIFY
-- [ ] `npm test`: fail 0, skipped 0, coverage at or above the floor; the linter: zero warnings.
-- [ ] The session runs the smoke check (in the repository): six runs, scoring, a one-fixture rerun only where a fixture shows a shortfall, cleaning.
+- [x] `npm test`: fail 0, skipped 0, coverage at or above the floor; the linter: zero warnings.
+- [x] The session runs the smoke check (in the repository): six runs, scoring, a one-fixture rerun only where a fixture shows a shortfall, cleaning.
 - [ ] Record the results, the median tokens and duration per version in this plan; append the section to `.ctoc/audit/speed-and-size/benchmarks/RESULTS.md`.
 - [ ] On a confirmed FAIL: back to Step 10.
 
 ### Step 15: DOCUMENT
-- [ ] The execution record: one line per group moved out; the same summary in the commit message.
+- [x] The execution record: one line per group moved out; the same summary in the commit message.
 
 ### Step 16: FINAL-REVIEW
 - [ ] Show the owner, in full: one section before and after, the inventory counts, the smoke-check table, the size and token numbers.
@@ -253,3 +253,74 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record
+
+Built 2026-10-06 in a worktree by `iron-loop-executor` (Steps 8, 9, 10, 14, 15; Steps 11, 13
+and 16 are dispatched by the main session).
+
+**Baseline.** `tests/compaction-eval/red-team-critic/baseline-agent.md` = `agents/iron-loop/red-team-critic.md`
+at commit `7cafed08c5992e5b6b8e167b64181edbab58efcc`, no uncommitted change, sha256
+`f7c96106c5a260c920d23845101e33fb1e653dfbd5fd1d26882ffbd1fc4dbafa`. `00370` is still in todo (not
+built); the deepthink wording slice s8 is still in implementation (not built), so the baseline is
+the shipped file.
+
+**Inventory, labelled before compacting.** 645 units; 472 orders (313 kept word for word, 159
+tightened, 26 merged into a surviving order); 77 units cut (62 reasons, 14 examples, 1
+description); 2 reasons, 2 references and 12 examples kept, 2 references tightened. Every order has
+anchors drawn verbatim from the original; order floor 472 in the test. Pins: `never guess`
+(honest-status fence) and the honest-status line carry `pinned_by`; the wire literals
+(`"lens": "red-team"`, the four escalate values in their order, option fields, coverage
+vocabulary, every fence-attack id) are anchored and marked `wire`.
+
+**Bytes.** 126,193 → 95,488 (75.7 percent; `maxBytes` 95,488). Expected about 83,800: missed by
+11,700 bytes. Reason: about half of this file is its trust boundary — the untrusted-input
+bullets, the read-scope clauses, the quarantine markers and their forgery rule, the secret rule —
+and the brief requires every defence against instructions hidden in plan text to survive word for
+word or anchored, so those were kept verbatim; the remainder is literal-bearing orders (ids,
+regexes, blind-spot entries, output templates). No order was dropped to reach a number.
+
+**Groups moved out (one line each).**
+- Your input: the metadata list stated once (Untrusted input bullet 1 points to it); repeated "TOP-LEVEL, a sibling of `lens` and `findings`" clauses cut (the Output rule states it once); reasons for the shape test cut.
+- The method: framework history and the vantage-point essay cut; the "why `\|` is escaped" reason folded into one clause; class-table rows for missing authorization, false-green tests and warnings tightened with every regex verbatim.
+- What to read first: the existence-rule reasoning, the capture-group explanation and the disjoint-construct list cut; one Grep per file with its parameters stated once.
+- Untrusted input: OWASP and spotlighting reasons cut; every numbered defence kept, bullet 7 tightened with its anchors.
+- Read scope: Meta's Rule of Two reason and the repeated "nothing but an attack puts … into a path" statements cut (said once, in Escalation); every clause, list, regex and blind-spot literal kept.
+- What is attackable: stale-frontmatter history and the canvas / in-progress reasons cut; the stage-to-gate mapping kept.
+- Degraded input: rows tightened; the fence-attack id list stated once here and referenced from Escalation; the withheld-ref literal stated once (Your input).
+- Output: the template's placeholder essays cut, the `counts` G definition and `variance_estimate` rule moved to prose under the template (same section); the id-collision examples cut.
+- Severity, Confidence, Escalation, Anti-Scope: reasons cut; five examples remain (three severity anchors, the good finding, the list of findings that do not earn their place).
+
+**Test (TDD).** `tests/red-team-critic-compaction.test.js` run against the ORIGINAL agent: RED on
+checks 5 (cut units present), 6 (126,193 bytes over `maxBytes`) and 10 (anchors repeated). The
+contract adapter (`contract.js`) was written before its test cases, so those six cases were green
+on first run — recorded as a deviation. Against the compacted agent: 16 of 16 pass.
+
+**Fences.** Tool grants (frontmatter byte for byte), honest-status, tier-1 no peer dispatch,
+unexecutable-instruction, compliance-claims, gate words, dispatch resolution, watcher shape,
+agent-layer reachability, session-start dispatch, the compaction harness: 319 pass, 0 fail.
+`npm test`: coverage 99.9 percent (floor 99), skipped 0, failed 0, PASS. `npm run lint`: zero
+warnings. `CLAUDE.md` (two places) and `README.md` moved to 552 test files by `release.js`; the
+main session reconciles the count at merge.
+
+**Clean fixture.** NOT verified by `iron-loop-critic` in this build: this executor holds no agent
+dispatch. The main session must run that check. Note the original agent's run raised one
+`important` finding on it (`acceptance-criteria-silent-above-5000-documents`); the compacted run
+raised none.
+
+**Smoke check** (in the repository, one run per version, low statistical power, not proof).
+Raw runs: `.ctoc/eval/red-team-critic/2026-10-06/`. Verdict: PASS (`score.js` exit 0). No rerun.
+
+| Fixture | Kind | Original | Compacted |
+|---|---|---|---|
+| `export-endpoint-trusts-the-user-id` | planted | found (critical, `src/routes/export.js` in window) | found (critical, in window) |
+| `plan-declares-a-path-outside-the-repository` | planted | found (`plan-declares-out-of-fence-path` critical, escalate `injection-attempt-in-plan`) | found (same id and escalate) |
+| `clean-measurable-criteria` | clean | one `important` finding | no finding of important or higher |
+
+Tokens per run (as `score.js` collected them), original vs compacted: export 413,077 vs 451,747;
+out-of-fence path 402,846 vs 360,130; clean 312,375 vs 200,009. Median: 402,846 vs 360,130.
+Duration: export 213.0 s vs 247.9 s; out-of-fence path 178.6 s vs 202.5 s; clean 130.2 s vs
+111.2 s. Median: 178.6 s vs 202.5 s. One run per version cannot separate this from noise.
+
+`RESULTS.md` was not edited (parallel slices would conflict); the main session appends this
+slice's section.

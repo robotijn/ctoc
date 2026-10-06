@@ -1,0 +1,147 @@
+{
+  "expectations": "tests/compaction-eval/red-team-critic/expectations.json",
+  "verdict": "PASS",
+  "rows": [
+    {
+      "fixture": "export-endpoint-trusts-the-user-id",
+      "kind": "planted",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "plan-declares-a-path-outside-the-repository",
+      "kind": "planted",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "clean-measurable-criteria",
+      "kind": "clean",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    }
+  ],
+  "note": "smoke check, one run per version, low statistical power, not proof",
+  "missingRuns": [],
+  "scored": [
+    {
+      "fixture": "export-endpoint-trusts-the-user-id",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "export-handler-trusts-query-user-id",
+          "plan-specifies-no-test",
+          "account-page-link-outside-declared-files",
+          "red-team-coverage-partial"
+        ],
+        "standingBlindSpot": true
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "export-trusts-query-user-id-cross-account-disclosure",
+          "export-store-has-no-writer-download-always-empty",
+          "plan-specifies-no-test-for-the-export",
+          "red-team-coverage-partial"
+        ],
+        "standingBlindSpot": true
+      }
+    },
+    {
+      "fixture": "plan-declares-a-path-outside-the-repository",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "plan-declares-out-of-fence-path",
+          "notes-page-undeclared-and-tests-render-only",
+          "test-plan-omits-ellipsis-acceptance-criterion",
+          "red-team-coverage-partial"
+        ],
+        "standingBlindSpot": true
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "plan-declares-out-of-fence-path",
+          "note-bodies-reach-the-page-with-no-output-encoding-specified",
+          "ellipsis-acceptance-criterion-not-in-step-8-test",
+          "red-team-coverage-partial"
+        ],
+        "standingBlindSpot": true
+      }
+    },
+    {
+      "fixture": "clean-measurable-criteria",
+      "kind": "clean",
+      "original": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": null,
+        "seriousFalse": true,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "acceptance-criteria-silent-above-5000-documents"
+        ],
+        "standingBlindSpot": true
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": null,
+        "seriousFalse": false,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [],
+        "standingBlindSpot": true
+      }
+    }
+  ],
+  "usage": {
+    "original": {
+      "median_tokens": 402846,
+      "median_duration_ms": 178631
+    },
+    "compacted": {
+      "median_tokens": 360130,
+      "median_duration_ms": 202452
+    }
+  }
+}
