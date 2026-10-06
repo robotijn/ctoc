@@ -1,0 +1,9 @@
+{
+  "content_sha256": "a950d508b031be105fc58a0d6be870a0765c56d947ea9e11f0031a2b36dbc42e",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-06T20:25:48.854Z",
+  "approved_by": "human",
+  "plan_basename": "agents-that-hold-the-shell-search-with-it-s2-blocked"
+}
