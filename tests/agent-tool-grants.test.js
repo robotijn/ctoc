@@ -33,7 +33,16 @@
  * the exact Bun build Claude Code embeds is unpublished, so re-run that comparison on
  * each Claude Code update. No second YAML reader is used (no new dependency).
  *
- * DEBT, WRITE_EDIT_DEBT, RULE6_EXCEPTIONS, HELD_REMOVALS, MATCH_IS_DATA_DEBT and METHOD_TOOLS_DEBT only shrink. Each list's
+ * Check 15, the search fallback (2026-10-06). Since Claude Code 2.1.117, the native builds
+ * for macOS, Linux and WSL replace the Grep and Glob tools with an embedded ugrep and bfs
+ * reached through Bash: an agent whose grant holds Bash gets neither tool there (Windows
+ * and npm-installed builds are unchanged). So every agent that holds Bash with Grep or Glob
+ * and whose body — code blocks included — orders a search tool or limits its Bash in one
+ * of SEARCH_ORDER_SHAPES' four closed forms must carry SEARCH_WITHOUT_THE_TOOLS verbatim.
+ * SEARCH_FALLBACK_DEBT names the three agents slice 2 fixes. It cannot see a search order
+ * phrased outside those four shapes; it under-reports by design.
+ *
+ * DEBT, WRITE_EDIT_DEBT, RULE6_EXCEPTIONS, HELD_REMOVALS, MATCH_IS_DATA_DEBT, METHOD_TOOLS_DEBT and SEARCH_FALLBACK_DEBT only shrink. Each list's
  * size must EQUAL its maximum here, and each maximum has a ceiling stated a second time
  * in its own file, tests/agent-tool-grants-maxima.test.js, which fails unless each
  * maximum here equals it: lowering or raising one means editing both files in the same
@@ -306,6 +315,23 @@ const MATCH_IS_DATA =
 // Only shrinks; each slice clears its own agents. The comment names that slice.
 const MATCH_IS_DATA_DEBT = new Set([]);
 const MAX_MATCH_IS_DATA_DEBT = 0;
+
+// Check 15: since Claude Code 2.1.117, the native builds for macOS, Linux and WSL give an
+// agent whose grant holds Bash no Grep and no Glob tool; it searches through Bash. An agent
+// that holds Bash with Grep or Glob and whose body orders a search tool by one of
+// SEARCH_ORDER_SHAPES (or limits its Bash) carries this sentence, verbatim.
+const SEARCH_WITHOUT_THE_TOOLS = 'Where this file has you search with Grep or Glob and you do not have that tool (Claude Code\'s native builds for macOS, Linux and WSL leave both out of an agent that holds Bash), run the same search through Bash, and that search is a use of your Bash beyond any this file names elsewhere: only `grep -rn` (adding only `-E`, `-i`, `-l`, `-c` or `--include`) or `find` (with only `-name`, `-path` and `-type`), always from `.`, the repository you were dispatched in, and never from any other path, narrowing the search with `--include`, `-name` or `-path` instead. Every operand goes in single quotes — the pattern you wrote yourself after `-e`, each `--include=` value, each `-name` and `-path` value — with `.` in place of any quote character you need to match, and a file name or glob you read in the repository goes into `--include`, `-name` or `-path` only when it is made of letters, digits and `@ / . _ -`.';
+const SEARCH_ORDER_SHAPES = Object.freeze([
+  /\bthe `?(Grep|Glob)`?(?: and `?(Grep|Glob)`?)? tools?\b/,
+  /\b(Grep|Glob)\(/,
+  /\bwith Read, Grep\b/,
+  /\bBash (only for|runs only|is for)\b/,
+]);
+// Agents that match a shape and do not yet carry the sentence: slice 2
+// (agents-that-hold-the-shell-search-with-it-s2-blocked) clears all three. Only shrinks.
+const SEARCH_FALLBACK_DEBT = new Set(['ai-quality/hallucination-detector', 'ai-quality/llm-security-tester', 'architecture/dependency-analyzer']);
+const MAX_SEARCH_FALLBACK_DEBT = 3;
+const MIN_SEARCH_FALLBACK_BOUND = 50;
 
 // Check 13 (slice 12, from slice 10's security scan): an agent reads its method file in
 // full, so the method file's tools line is an instruction to it and must equal the
@@ -1201,6 +1227,40 @@ function matchIsDataFailures(list, debt) {
 }
 
 /**
+ * Check 15 over a list of agents: every agent holding Bash with Grep or Glob whose body,
+ * code blocks included and every copy of SEARCH_WITHOUT_THE_TOOLS removed, matches a
+ * SEARCH_ORDER_SHAPE carries that sentence, outside `debt`. Fails closed on an unreadable
+ * grant and on fewer than `minBound` bound agents.
+ */
+function searchFallbackFailures(list, debt, minBound = MIN_SEARCH_FALLBACK_BOUND) {
+  const out = [];
+  const keys = new Set(list.map((a) => a.key));
+  const sentence = squash(SEARCH_WITHOUT_THE_TOOLS);
+  let bound = 0;
+  for (const a of list) {
+    const tools = toolsOf(a.text);
+    if (tools === null) { out.push(`${a.key}: ${CANNOT_READ}, so its search orders cannot be checked`); continue; }
+    const binds = tools.includes('Bash') && (tools.includes('Grep') || tools.includes('Glob'));
+    if (!binds) {
+      if (debt.has(a.key)) out.push(`${a.key}: no longer holds Bash with Grep or Glob; remove it from SEARCH_FALLBACK_DEBT and lower MAX_SEARCH_FALLBACK_DEBT`);
+      continue;
+    }
+    bound += 1;
+    const body = squash(splitAgent(a.text).body);
+    const order = SEARCH_ORDER_SHAPES.map((re) => re.exec(body.split(sentence).join(' '))).find(Boolean);
+    const failing = Boolean(order) && !body.includes(sentence);
+    if (debt.has(a.key)) {
+      if (!failing) out.push(`${a.key}: no longer fails; remove it from SEARCH_FALLBACK_DEBT and lower MAX_SEARCH_FALLBACK_DEBT`);
+    } else if (failing) {
+      out.push(`${a.key}: holds Bash, so a native build gives it no Grep or Glob tool, and its body reads "${order[0]}" without "${SEARCH_WITHOUT_THE_TOOLS.slice(0, 70)}…"`);
+    }
+  }
+  for (const k of debt) if (!keys.has(k)) out.push(`${k}: no such agent; remove it from SEARCH_FALLBACK_DEBT and lower MAX_SEARCH_FALLBACK_DEBT`);
+  if (bound < minBound) out.push(`only ${bound} agents hold Bash with Grep or Glob; at least ${minBound} expected`);
+  return out;
+}
+
+/**
  * Every agent definition under `dir`, read through `io` (the file system, or a fixture's
  * stand-in). Nothing is skipped silently: a directory that cannot be listed, a file that
  * cannot be read, a symbolic link or any other non-regular entry is a named problem.
@@ -1853,6 +1913,48 @@ describe('every agent holds the tools its own orders need, and no more', () => {
     assert.deepEqual(methodSentenceFailures({ 'f/x': ['A.'] }, fromMap({})), ['f/x: skills/f/x/SKILL.md does not exist']);
     assert.deepEqual(methodSentenceFailures({ 'f/x': ['A.'] }, fromMap({ 'skills/f/x/SKILL.md': Object.assign(new Error('locked'), { code: 'EACCES' }) })), ['f/x: skills/f/x/SKILL.md cannot be read (EACCES)']);
     assert.match(methodSentenceFailures({ 'f/../x': ['A.'] }, fromMap({})).join('\n'), /not a path of letters/);
+  });
+
+  it('15. every agent that holds Bash with Grep or Glob and orders a search tool carries the search fallback, outside its debt list', () => {
+    const failures = searchFallbackFailures(all, SEARCH_FALLBACK_DEBT);
+    assert.deepEqual(failures, [], `agents ordered to use a search tool a native build does not give them:\n  ${failures.join('\n  ')}`);
+    assert.equal(SEARCH_FALLBACK_DEBT.size, MAX_SEARCH_FALLBACK_DEBT, `SEARCH_FALLBACK_DEBT holds ${SEARCH_FALLBACK_DEBT.size} agents and MAX_SEARCH_FALLBACK_DEBT is ${MAX_SEARCH_FALLBACK_DEBT}; they move together, and only down`);
+  });
+
+  it('15.1 the search-fallback check bites: each order without the fallback fails by name, each passing shape passes', () => {
+    const bash = 'tools: Bash, Read, Grep, Glob';
+    const one = (fm, body, debt = new Set(), minBound = 0) => searchFallbackFailures([{ key: 'f/x', text: fixture(fm, body) }], debt, minBound);
+    const orders = [
+      ['Run the hidden-character scan with the Grep tool.', 'the Grep tool'],
+      ['Map the tree:\n\n```\nGlob("**/*.ts")\n```', 'Glob('],
+      ['You read no web page. Your Bash is for the aggregation itself.', 'Bash is for'],
+    ];
+    for (const [body, hit] of orders) {
+      assert.deepEqual(one(bash, body), [`f/x: holds Bash, so a native build gives it no Grep or Glob tool, and its body reads "${hit}" without "${SEARCH_WITHOUT_THE_TOOLS.slice(0, 70)}…"`], body);
+      assert.deepEqual(one(bash, `${body}\n${SEARCH_WITHOUT_THE_TOOLS}`), [], body);
+      // wrapped across lines, the sentence still counts
+      assert.deepEqual(one(bash, `${body}\n${SEARCH_WITHOUT_THE_TOOLS.replace(/ /g, (m, i) => (i % 97 === 0 ? '\n' : m))}`), [], body);
+      // a debt-listed agent is excused; once it carries the sentence the entry is reported
+      assert.deepEqual(one(bash, body, new Set(['f/x'])), []);
+      assert.deepEqual(one(bash, `${body}\n${SEARCH_WITHOUT_THE_TOOLS}`, new Set(['f/x'])), ['f/x: no longer fails; remove it from SEARCH_FALLBACK_DEBT and lower MAX_SEARCH_FALLBACK_DEBT']);
+    }
+    // the other shapes bite too: "the Grep and Glob tools", "with Read, Grep", "Bash only for", "Bash runs only"
+    for (const body of ['run that search with the `Grep` and `Glob` tools', 'You search with Read, Grep and Glob.', 'You use Bash only for the registry.', 'Bash runs only the lookup.']) {
+      assert.equal(one(bash, body).length, 1, body);
+    }
+    // the sentence alone is not an order: it names Grep and Glob, never "the Grep tool"
+    assert.deepEqual(one(bash, SEARCH_WITHOUT_THE_TOOLS), []);
+    // no Bash: the agent keeps its Grep tool
+    assert.deepEqual(one('tools: Read, Grep, Glob', orders[0][0]), []);
+    // the shared search sentence alone binds nothing
+    assert.deepEqual(one(bash, 'Build every list of files with Grep over the whole repository, never from a list you remember.'), []);
+    // the debt list: an agent that no longer holds Bash, and a name that is no agent, are reported
+    assert.deepEqual(one('tools: Read, Grep, Glob', orders[0][0], new Set(['f/x'])), ['f/x: no longer holds Bash with Grep or Glob; remove it from SEARCH_FALLBACK_DEBT and lower MAX_SEARCH_FALLBACK_DEBT']);
+    assert.deepEqual(one(bash, '', new Set(['ghost'])), ['ghost: no such agent; remove it from SEARCH_FALLBACK_DEBT and lower MAX_SEARCH_FALLBACK_DEBT']);
+    // fail closed: an unreadable grant, and too few bound agents
+    assert.match(one('model: opus', orders[0][0]).join('\n'), /f\/x: its grant cannot be read, so its search orders cannot be checked/);
+    assert.deepEqual(one(bash, '', new Set(), 2), ['only 1 agents hold Bash with Grep or Glob; at least 2 expected']);
+    assert.deepEqual(one('tools: Read, Grep, Glob', '', new Set(), 1), ['only 0 agents hold Bash with Grep or Glob; at least 1 expected']);
   });
 
   // The second statement of each maximum, and the check that none rises above it, live in

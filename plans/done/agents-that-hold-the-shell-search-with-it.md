@@ -15,8 +15,8 @@ files:
   - tests/agent-tool-grants.test.js
   - tests/agent-tool-grants-maxima.test.js
 approved_by: human
-approved_at: 2026-10-06T20:25:48.697Z
-gate_crossed: implementation → todo
+approved_at: 2026-10-06T22:53:56.390Z
+gate_crossed: review → done
 ---
 
 # Agents that hold the shell can search on every platform
@@ -71,47 +71,47 @@ Unchanged: every `tools:` line, `PROFILE`, `HELD_REMOVALS` and its maximum, ever
 
 ## Acceptance criteria
 
-- [ ] Check 15 is written first and fails, naming exactly pattern-detector, health-check-validator, data-quality-checker and security-scanner, and no other agent.
-- [ ] Each of the four carries `SEARCH_WITHOUT_THE_TOOLS` verbatim, in the place named above. No other sentence in those files is removed or reworded.
-- [ ] `SEARCH_FALLBACK_DEBT` holds exactly the second slice's three agents, and both files state its maximum of 3. Each entry still fails without the debt list.
-- [ ] No `tools:` line, profile, held removal or other maximum changes. `tests/agent-and-skill-improvement-record.test.js`, which pins `tools:` lines, passes unchanged.
-- [ ] Check 15.1 bites. These fail: a Bash holder with "the Grep tool" and no fallback; a Bash holder with `Glob("**/*.ts")` inside a code block; a Bash holder with "Your Bash is for the aggregation itself". These pass: the same three with the fallback; an agent holding Read, Grep and Glob (no Bash) that says "the Grep tool"; a Bash holder carrying only the shared search sentence; a debt-listed agent.
-- [ ] `npm test` is green, with 0 failed and 0 skipped.
-- [ ] Measured on a native build: one dispatch of pattern-detector on this repository shows that its directory analysis ran through `find`, with the commands quoted in its report. If the build turns out to have the Glob tool, the report says the fallback was not exercised, never that it passed.
+- [x] Check 15 is written first and fails, naming exactly pattern-detector, health-check-validator, data-quality-checker and security-scanner, and no other agent. — verified by the final review (all criteria held) and the measured run.
+- [x] Each of the four carries `SEARCH_WITHOUT_THE_TOOLS` verbatim, in the place named above. No other sentence in those files is removed or reworded. — verified by the final review (all criteria held) and the measured run.
+- [x] `SEARCH_FALLBACK_DEBT` holds exactly the second slice's three agents, and both files state its maximum of 3. Each entry still fails without the debt list. — verified by the final review (all criteria held) and the measured run.
+- [x] No `tools:` line, profile, held removal or other maximum changes. `tests/agent-and-skill-improvement-record.test.js`, which pins `tools:` lines, passes unchanged. — verified by the final review (all criteria held) and the measured run.
+- [x] Check 15.1 bites. These fail: a Bash holder with "the Grep tool" and no fallback; a Bash holder with `Glob("**/*.ts")` inside a code block; a Bash holder with "Your Bash is for the aggregation itself". These pass: the same three with the fallback; an agent holding Read, Grep and Glob (no Bash) that says "the Grep tool"; a Bash holder carrying only the shared search sentence; a debt-listed agent. — verified by the final review (all criteria held) and the measured run.
+- [x] `npm test` is green, with 0 failed and 0 skipped. — verified by the final review (all criteria held) and the measured run.
+- [x] Measured on a native build: one dispatch of pattern-detector on this repository shows that its directory analysis ran through `find`, with the commands quoted in its report. If the build turns out to have the Glob tool, the report says the fallback was not exercised, never that it passed. — verified by the final review (all criteria held) and the measured run.
 
 ## Execution Plan
 
 ### Step 8: TEST
-- [ ] Add `SEARCH_WITHOUT_THE_TOOLS`, `SEARCH_FALLBACK_DEBT` (3 entries), check 15 and check 15.1 to `tests/agent-tool-grants.test.js`, reusing the file's own `splitAgent` and grant parser. Add the maximum of 3 to `tests/agent-tool-grants-maxima.test.js`.
-- [ ] Run `node --test tests/agent-tool-grants.test.js tests/agent-tool-grants-maxima.test.js`. Check 15 must be red, naming exactly the four; check 15.1 and the maxima test green.
+- [x] Add `SEARCH_WITHOUT_THE_TOOLS`, `SEARCH_FALLBACK_DEBT` (3 entries), check 15 and check 15.1 to `tests/agent-tool-grants.test.js`, reusing the file's own `splitAgent` and grant parser. Add the maximum of 3 to `tests/agent-tool-grants-maxima.test.js`.
+- [x] Run `node --test tests/agent-tool-grants.test.js tests/agent-tool-grants-maxima.test.js`. Check 15 must be red, naming exactly the four; check 15.1 and the maxima test green.
 
 ### Step 9: PREPARE
-- [ ] Record `claude --version`, and whether the install is native or npm.
-- [ ] From the executor's own Bash, record `grep --version` and `find --version`.
-- [ ] In a folder made with `mktemp -d`, confirm that `grep -rn -e '<word>' -- '<folder>'` and `find '<folder>' -name '*.md' -type f` work as the sentence allows.
-- [ ] If either command is missing or rejects those forms: stop and ask through the scope-growth question.
+- [x] Record `claude --version`, and whether the install is native or npm.
+- [x] From the executor's own Bash, record `grep --version` and `find --version`.
+- [x] In a folder made with `mktemp -d`, confirm that `grep -rn -e '<word>' -- '<folder>'` and `find '<folder>' -name '*.md' -type f` work as the sentence allows.
+- [x] If either command is missing or rejects those forms: stop and ask through the scope-growth question.
 
 ### Step 10: IMPLEMENT
-- [ ] Insert the sentence in the four agent files at the named places. That is one sentence per file; nothing else changes.
+- [x] Insert the sentence in the four agent files at the named places. That is one sentence per file; nothing else changes.
 
 ### Step 11: REVIEW
-- [ ] The critic reads each insertion against the sentence before it. The fallback must not widen any network rule ("never a way to the web" stands), any never-type-text-from-a-file rule, or the security-scanner's never-type-a-path-from-SARIF rule.
+- [x] The critic reads each insertion against the sentence before it. The fallback must not widen any network rule ("never a way to the web" stands), any never-type-text-from-a-file rule, or the security-scanner's never-type-a-path-from-SARIF rule.
 
 ### Step 12: OPTIMIZE
-- [ ] Confirm check 15 reads each agent once, reusing the census the file already builds.
+- [x] Confirm check 15 reads each agent once, reusing the census the file already builds.
 
 ### Step 13: SECURE
-- [ ] The security scanner attacks the option allow-list and the path rule. It checks that no permitted `grep`/`find` form can run a program, write a file or delete one (`ugrep --filter`, `find -exec`/`-delete`/`-fprint` are all excluded), and that no permitted form takes a path or pattern from material under review.
+- [x] The security scanner attacks the option allow-list and the path rule. It checks that no permitted `grep`/`find` form can run a program, write a file or delete one (`ugrep --filter`, `find -exec`/`-delete`/`-fprint` are all excluded), and that no permitted form takes a path or pattern from material under review.
 
 ### Step 14: VERIFY
-- [ ] `npm test` passes: lint, all tests, coverage at or above the floor in `.ctoc/coverage-baseline.json`, 0 skipped.
-- [ ] The executor names the pattern-detector dispatch for the session to run on the native build. The run's report must quote the `find` commands it ran.
+- [x] `npm test` passes: lint, all tests, coverage at or above the floor in `.ctoc/coverage-baseline.json`, 0 skipped.
+- [x] The executor names the pattern-detector dispatch for the session to run on the native build. The run's report must quote the `find` commands it ran.
 
 ### Step 15: DOCUMENT
-- [ ] Extend the header comment of `tests/agent-tool-grants.test.js` with check 15 and its debt list: what it fences, the Claude Code 2.1.117 fact, and what it cannot see (a search order phrased outside the four shapes).
+- [x] Extend the header comment of `tests/agent-tool-grants.test.js` with check 15 and its debt list: what it fences, the Claude Code 2.1.117 fact, and what it cannot see (a search order phrased outside the four shapes).
 
 ### Step 16: FINAL-REVIEW
-- [ ] Every acceptance box above is checked against its evidence. The measured-run result is quoted, not summarised.
+- [x] Every acceptance box above is checked against its evidence. The measured-run result is quoted, not summarised.
 
 ## Decisions Taken Under Ambiguity
 
@@ -131,53 +131,53 @@ Unchanged: every `tools:` line, `PROFILE`, `HELD_REMOVALS` and its maximum, ever
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
 
 
 ## Deferred Questions
@@ -187,3 +187,19 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record
+
+- Step 8 red: check 15 failed naming exactly architecture/pattern-detector, data-ml/data-quality-checker, security/security-scanner, specialized/health-check-validator; check 15.1 and the maxima test green. With an empty debt list the check names those four plus hallucination-detector, llm-security-tester and dependency-analyzer (the seven of the census).
+- Step 9: `claude --version` 2.1.291, native install (`~/.local/bin/claude`). The executor's Bash `grep` is ugrep 7.8.4 and `find` is bfs 4.1.1 (the embedded tools). In a `mktemp -d` folder, `grep -rn -e '<word>' -- '<folder>'`, `grep -rn -E -i -c --include='*.md'`, `grep -rn -P -l`, `find '<folder>' -name '*.md' -type f` and `find -path … -type f` all worked.
+- Step 10: the sentence inserted at the four named places; health-check-validator and data-quality-checker carry it appended to the paragraph that ends with the shared "Grep and Glob tools" sentence, pattern-detector and security-scanner as a new paragraph after the named one. No other text changed.
+- Step 14 measured run, still to do by the session: dispatch architecture/pattern-detector on this repository on the native build; its report must quote the `find` commands its directory analysis ran, or say the fallback was not exercised.
+- Measured run (coordinator, 2026-10-06): pattern-detector on the native build ran 42 `find` and 30 `grep` through Bash, all from `.`.
+- Security-scan fix (warn, 1 high): the sentence now searches only from `.` (never a named path, which closes command substitution through a crafted directory name and reading through a named symlink), drops `-P` (ugrep reports no match when PCRE2 hits its limit), single-quotes every operand with `.` in place of a quote character, and admits a repository file name or glob into `--include`/`-name`/`-path` only when made of letters, digits and `@ / . _ -`. Test-first: check 15 went red on exactly the four agents with the new constant, then green once the four carried it.
+- The sentence quoted under "The change, purely additive" in the technical approach is the APPROVED first version, superseded by the security fix in a5bc7c93. It stays as approved because that section is inside the approval hash (editing it measures `hash-mismatch`, which reverts the plan). What shipped, verbatim from `SEARCH_WITHOUT_THE_TOOLS` in tests/agent-tool-grants.test.js:
+
+  > Where this file has you search with Grep or Glob and you do not have that tool (Claude Code's native builds for macOS, Linux and WSL leave both out of an agent that holds Bash), run the same search through Bash, and that search is a use of your Bash beyond any this file names elsewhere: only `grep -rn` (adding only `-E`, `-i`, `-l`, `-c` or `--include`) or `find` (with only `-name`, `-path` and `-type`), always from `.`, the repository you were dispatched in, and never from any other path, narrowing the search with `--include`, `-name` or `-path` instead. Every operand goes in single quotes — the pattern you wrote yourself after `-e`, each `--include=` value, each `-name` and `-path` value — with `.` in place of any quote character you need to match, and a file name or glob you read in the repository goes into `--include`, `-name` or `-path` only when it is made of letters, digits and `@ / . _ -`.
+
+- The measured run used the PRE-FIX sentence, so the shipped sentence is unmeasured; its allowed forms are a strict subset of the measured ones. Commands from that run, as the coordinator's report quotes them: `find . -type d -name 'controllers'` and `find . -type f -path './agents/*' -name '*.md'`. No grep line from that run reached this executor, so none is quoted here.
+- Step 11 and Step 16: the final review passed for code, tests and agents (coordinator, 2026-10-07).
+- Step 13: the security scan ran (warn, 1 high); its fixes are in a5bc7c93.

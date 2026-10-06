@@ -1,9 +1,9 @@
 {
-  "content_sha256": "8c70581b5b753438cab4274536bc0e37b51bfede646e18f09e2df248710cfd80",
+  "content_sha256": "58491c88eb7d3c12b4e46b0d830e97295b91acdb3fe14112e84bba4f663e70dc",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T20:25:48.733Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T22:53:56.518Z",
   "approved_by": "human",
   "plan_basename": "agents-that-hold-the-shell-search-with-it"
 }
