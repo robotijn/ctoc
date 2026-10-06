@@ -1,9 +1,9 @@
 {
-  "content_sha256": "f99368d1fb31c9be748564a206e3449939141c426f76f04ad6c9a44ac8d00092",
+  "content_sha256": "ef5f604069c3fbcf7271bdeb3037a3f0cc77440577058f66638f68d032e7d058",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T18:01:53.435Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T23:54:37.014Z",
   "approved_by": "human",
   "plan_basename": "agents-get-smaller-rollout-s11-hallucination-detector"
 }
