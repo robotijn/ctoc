@@ -1,0 +1,9 @@
+{
+  "content_sha256": "47e3a25bdbd17070eea907c835d557488461411e1454f6e2fe6d601fc9f21a45",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-06T18:01:53.302Z",
+  "approved_by": "human",
+  "plan_basename": "agents-get-smaller-rollout-s1-implementation-planner"
+}

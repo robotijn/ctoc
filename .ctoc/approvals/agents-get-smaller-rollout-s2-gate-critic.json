@@ -1,0 +1,9 @@
+{
+  "content_sha256": "b864582513f3192b53abfe66c3566bbc4ef9df17bb3aec2cd47e98fa7b61ebc6",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-06T18:01:53.496Z",
+  "approved_by": "human",
+  "plan_basename": "agents-get-smaller-rollout-s2-gate-critic"
+}

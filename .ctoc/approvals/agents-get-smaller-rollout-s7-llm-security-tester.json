@@ -1,0 +1,9 @@
+{
+  "content_sha256": "993558c57bc660c0fb2a4da053739bd6a51e503fb6187127aa57cb4f38155d1d",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-06T18:01:53.831Z",
+  "approved_by": "human",
+  "plan_basename": "agents-get-smaller-rollout-s7-llm-security-tester"
+}
