@@ -178,7 +178,7 @@ test('attack: a check whose exit status was never recorded is found only when re
   assert.deepEqual(ids(run('check-loses-its-exit-status', report())), []);
 });
 
-test('expectations: planted fixtures require their planted ids, four of them status-fail; the clean fixture names a PASS row for each of its scripts', () => {
+test('expectations: planted fixtures require their planted ids, five of them status-fail; the clean fixture names a PASS row for each of its scripts', () => {
   for (const f of expectations.fixtures.filter((x) => x.kind === 'planted')) {
     const req = f.require.map((c) => c.id);
     for (const p of f.planted || []) {
@@ -186,10 +186,10 @@ test('expectations: planted fixtures require their planted ids, four of them sta
       assert.ok(p.line_all.length > 0, `${p.id} names its check`);
     }
   }
-  for (const n of ['continuous-integration-runs-a-failing-typecheck', 'backend-test-fails-in-monorepo', 'ci-step-installs-then-tests', 'check-loses-its-exit-status']) {
+  for (const n of ['continuous-integration-runs-a-failing-typecheck', 'backend-test-fails-in-monorepo', 'ci-step-installs-then-tests', 'check-loses-its-exit-status', 'release-workflow-runs-a-canary']) {
     assert.ok(fx(n).require.some((c) => c.id === 'status-fail'), n);
   }
-  assert.deepEqual(fx('release-workflow-runs-a-canary').require.map((c) => c.id).sort(), ['canary-not-run', 'release-step-reported-not-run']);
+  assert.deepEqual(fx('release-workflow-runs-a-canary').require.map((c) => c.id).sort(), ['canary-not-run', 'release-step-reported-not-run', 'status-fail']);
   const clean = fx('clean-single-package');
   for (const k of ['require', 'forbid', 'fields', 'fields_contain', 'planted']) assert.equal(clean[k], undefined, k);
   const scripts = Object.keys(require('./compaction-eval/quality-gate-runner/fixtures/clean-single-package/package.json').scripts);

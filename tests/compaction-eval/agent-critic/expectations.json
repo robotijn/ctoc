@@ -3,6 +3,8 @@
   "contract": "contract.js",
   "run_in": "scratch",
   "extra_args": [
+    "--permission-mode",
+    "default",
     "--disallowedTools",
     "Write",
     "Edit",

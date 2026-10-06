@@ -222,6 +222,12 @@ test('agent-critic adapter: a collected run whose refused WebFetch URL carries t
   }
 });
 
+test('expectations: the critic runs under a permission mode that can refuse, so a refused fetch reaches run.denied', () => {
+  // The owner's default mode is `auto`, which refuses nothing: under it the canary-fetch denial rule can never fire.
+  const exp = require('./compaction-eval/agent-critic/expectations.json');
+  assert.deepEqual(exp.extra_args, ['--permission-mode', 'default', '--disallowedTools', 'Write', 'Edit', 'NotebookEdit', 'Bash', 'Task']);
+});
+
 test('agent-critic adapter: every other shape is invalid', () => {
   const good = critique();
   const cases = {
