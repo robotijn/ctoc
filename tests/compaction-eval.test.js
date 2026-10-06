@@ -254,7 +254,8 @@ describe('4. the smoke rule', () => {
   test('a rerun in which either version finds the planted defect clears planted-missed-by-both', () => {
     const missed = { ...ok, found: false };
     assert.equal(score.smokeVerdict([row('planted', missed, missed, { original: missed, compacted: ok })]).rows[0].status, 'ok');
-    assert.equal(score.smokeVerdict([row('planted', missed, missed, { original: ok, compacted: missed })]).rows[0].status, 'ok');
+    assert.equal(score.smokeVerdict([row('planted', missed, missed, { original: ok, compacted: missed })]).rows[0].status, 'planted-missed-by-both',
+      'a rerun showing the regression itself (original finds, compacted misses) clears nothing');
   });
   test('a clean plan whose original already raises a serious finding tested nothing: baseline-not-clean, INCOMPLETE', () => {
     const serious = { ...ok, seriousFalse: true };
@@ -270,6 +271,9 @@ describe('4. the smoke rule', () => {
     assert.equal(cleared.rows[0].status, 'ok');
     const kept = score.smokeVerdict([row('clean', serious, ok, { original: serious, compacted: ok })]);
     assert.equal(kept.rows[0].status, 'baseline-not-clean');
+    const regressed = score.smokeVerdict([row('clean', serious, ok, { original: ok, compacted: serious })]);
+    assert.equal(regressed.rows[0].status, 'baseline-not-clean', 'a rerun whose compacted raises the serious finding clears nothing');
+    assert.equal(regressed.verdict, 'INCOMPLETE');
   });
   test('baseline-invalid keeps precedence over the two new statuses', () => {
     const bad = { valid: false, found: false, seriousFalse: true };
@@ -772,6 +776,9 @@ describe('9. score.js serves every agent', () => {
     const v = score.smokeVerdict([{ fixture: 'p', kind: 'planted', original: bad, compacted: ok, rerun: { original: ok, compacted: ok } }]);
     assert.equal(v.verdict, 'PASS');
     assert.equal(score.smokeVerdict([{ fixture: 'p', kind: 'planted', original: bad, compacted: ok, rerun: { original: bad, compacted: ok } }]).verdict, 'INCOMPLETE');
+    const regressed = score.smokeVerdict([{ fixture: 'p', kind: 'planted', original: bad, compacted: ok, rerun: { original: ok, compacted: { ...ok, found: false } } }]);
+    assert.equal(regressed.rows[0].status, 'baseline-invalid', 'a rerun that shows the regression clears nothing');
+    assert.equal(regressed.verdict, 'INCOMPLETE');
   });
 
   test('a contract adapter outside the repository is refused', () => {

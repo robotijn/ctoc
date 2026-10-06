@@ -486,11 +486,15 @@ const TESTED_NOTHING = ['baseline-invalid', 'baseline-not-clean', 'planted-misse
  * The pass rule. A shortfall on a plan stands only when that plan's single rerun repeats it.
  * A row that tested nothing — an invalid original, a clean plan the original already flags
  * important or worse, a planted defect neither version found — makes the verdict INCOMPLETE
- * unless its rerun clears it; `baseline-invalid` takes precedence over the other two.
+ * unless its rerun clears it — a rerun clears only when it is itself free of shortfalls;
+ * `baseline-invalid` takes precedence over the other two.
  * @param {{ fixture: string, kind: string, original: object, compacted: object, rerun?: { original: object, compacted: object } }[]} rows
  * @returns {{ verdict: 'PASS'|'FAIL'|'RERUN'|'INCOMPLETE', rows: object[], note: string }}
  */
 function smokeVerdict(rows) {
+  // A rerun clears a tested-nothing row only when it passes the row's test AND is itself free
+  // of shortfalls: a rerun that shows the regression must never turn the row into a PASS.
+  const clearedBy = (r, test) => r.rerun && test(r.rerun) && !shortfalls(r.kind, r.rerun.original, r.rerun.compacted).length;
   const out = rows.map((r) => {
     const s = shortfalls(r.kind, r.original, r.compacted);
     let status = s.length ? 'needs-rerun' : 'ok';
@@ -498,10 +502,10 @@ function smokeVerdict(rows) {
       const again = shortfalls(r.kind, r.rerun.original, r.rerun.compacted);
       status = s.some((x) => again.includes(x)) ? 'confirmed' : 'cleared-by-rerun';
     }
-    if (r.kind === 'clean' && r.original.seriousFalse && !(r.rerun && !r.rerun.original.seriousFalse)) status = 'baseline-not-clean';
+    if (r.kind === 'clean' && r.original.seriousFalse && !clearedBy(r, (x) => !x.original.seriousFalse)) status = 'baseline-not-clean';
     if (r.kind === 'planted' && !r.original.found && !r.compacted.found
-      && !(r.rerun && (r.rerun.original.found || r.rerun.compacted.found))) status = 'planted-missed-by-both';
-    if (!r.original.valid && !(r.rerun && r.rerun.original.valid)) status = 'baseline-invalid';
+      && !clearedBy(r, (x) => x.original.found || x.compacted.found)) status = 'planted-missed-by-both';
+    if (!r.original.valid && !clearedBy(r, (x) => x.original.valid)) status = 'baseline-invalid';
     return { fixture: r.fixture, kind: r.kind, shortfalls: s, status };
   });
   const verdict = out.some((r) => TESTED_NOTHING.includes(r.status)) ? 'INCOMPLETE'
