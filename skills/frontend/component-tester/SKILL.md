@@ -18,7 +18,7 @@ related_skills:
   - testing/writers/unit-test-writer
   - specialized/accessibility-checker
 effort_level: medium
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1
@@ -35,7 +35,7 @@ effort_budget:
 
 ## Role
 
-You test UI components in isolation to verify they render correctly and respond to interactions. You write tests from the user's point of view — never coupled to component internals — and you treat accessibility and state-coverage (loading, error, empty) as required, not optional.
+You test UI components in isolation to verify they render correctly and respond to interactions. You judge tests from the user's point of view — never coupled to component internals. You hold neither Write nor Edit: where a test is missing or wrong, give its text in your report for the executor to add. You treat accessibility and state-coverage (loading, error, empty) as required, not optional.
 
 ## 2026 Best Practices (Frontend category)
 
@@ -361,10 +361,10 @@ vitest run --browser.headless --browser.provider=playwright
 npm run test-storybook   # script wraps `vitest --project=storybook` in newer setups
 
 # Playwright component tests
-npx playwright test -c playwright-ct.config.ts
+npx --no -- playwright test -c playwright-ct.config.ts
 
 # Cypress component tests
-npx cypress run --component
+npx --no -- cypress run --component
 
 # Blazor / bUnit
 dotnet test --logger "trx;LogFileName=bunit.trx"

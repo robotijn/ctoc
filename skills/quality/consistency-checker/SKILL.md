@@ -280,7 +280,7 @@ Read `.editorconfig`, `.prettierrc*`, `pyproject.toml` ([tool.black], [tool.ruff
 
 ### Phase 2: Sample-then-grep
 
-Pick 5 representative files per language. Identify the apparent dominant convention. Then `grep`/`rg` for the minority pattern across the whole tree — that's the inconsistency surface.
+Pick 5 representative files per language. Identify the apparent dominant convention. Then search for the minority pattern across the whole tree with Grep — that's the inconsistency surface. You hold no command tool: the shell lines below show the patterns to search for, and you count the matches yourself.
 
 ```bash
 # Python: count snake_case vs camelCase function defs
@@ -334,7 +334,7 @@ CI baseline (every PR):
 ```bash
 pre-commit run --all-files                       # formatters + linters in parallel
 editorconfig-checker .                            # whitespace / EOL invariants
-npx commitlint --from=origin/main --to=HEAD       # commit-message check
+npx --no -- commitlint --from=origin/main --to=HEAD       # commit-message check
 # language-specific --check variants
 prettier --check "**/*.{ts,tsx,js,jsx,json,md,yaml}"
 ruff check . && ruff format --check .

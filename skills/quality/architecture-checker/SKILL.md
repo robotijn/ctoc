@@ -146,8 +146,8 @@ Find import cycles that create tight coupling.
 | C / C++ | `cinclude2dot`, `cpp-dependencies` (TomTom) |
 
 ```bash
-npx dependency-cruiser --validate .dependency-cruiser.cjs src/
-npx madge --circular src/
+npx --no -- dependency-cruiser --validate .dependency-cruiser.cjs src/
+npx --no -- madge --circular src/
 lint-imports                     # import-linter (Python)
 go mod graph | tsort 2>&1 | grep -i cycle
 ./gradlew test --tests "*ArchitectureTest*"   # ArchUnit
@@ -318,7 +318,7 @@ Trace import chains; max 5 levels deep before flagging. Long chains indicate acc
   };
   ```
 - **`eslint-plugin-boundaries`** and **`eslint-plugin-import`** `no-restricted-paths` provide editor-time feedback.
-- **Run**: `npx depcruise --validate .dependency-cruiser.cjs src` in CI.
+- **Run**: `npx --no -- depcruise --validate .dependency-cruiser.cjs src` in CI.
 
 ### SQL — schema boundaries
 
@@ -424,7 +424,7 @@ metadata:
 
 ## Quality State Cache
 
-Writes `.ctoc/quality-state/architecture-results.json` with `analyzedAt`, `gitHead`, `status`, `style`, `circularDeps`, `layerViolations`, `forbiddenImports`, `moduleBoundaryViolations`, `blastRadius`.
+Give the content of `.ctoc/quality-state/architecture-results.json` in your report, for `quality-gate` or the executor to write (you hold neither Write nor Edit), with `analyzedAt`, `gitHead`, `status`, `style`, `circularDeps`, `layerViolations`, `forbiddenImports`, `moduleBoundaryViolations`, `blastRadius`.
 
 ## Severity reconciliation
 

@@ -495,15 +495,16 @@ rg --no-filename -o '(process\.env|os\.environ\[|os\.getenv\()[^A-Za-z0-9]?[A-Z_
     done
 
 # scan for real-looking secrets (rough; pair with secrets-detector for full coverage)
-rg -nE '=(sk_live_|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36,}|xox[abp]-)' .env.example \
-  | awk '{print "SECRET-IN-EXAMPLE: " $0}'
+rg -n -e '=(sk_live_|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36,}|xox[abp]-)' .env.example | cut -d: -f1 \
+  | awk '{print "SECRET-IN-EXAMPLE: line " $0}'
 ```
 
 ### 4. Bootstrap script runs clean
 
 ```bash
-# in CI: spin up a clean container, then run the project's bootstrap script
-docker run --rm -v "$PWD":/repo -w /repo \
+# spin up a clean container whose only mount is the fresh clone — never the working tree
+# the agent was dispatched in — then run the project's bootstrap script
+docker run --rm -v '<the path of the fresh clone>':/repo -w /repo \
   mcr.microsoft.com/devcontainers/base:ubuntu-24.04 \
   bash -c 'apt-get update >/dev/null && ./scripts/bootstrap.sh' \
   || echo "BOOTSTRAP_FAILED"

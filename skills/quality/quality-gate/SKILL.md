@@ -23,7 +23,7 @@ related_skills:
   - testing/smart-test-runner
   - testing/quality-gate-runner
 effort_level: high
-tools: Bash, Read, Write, Grep, Glob, Task
+tools: Bash, Read, Write, Grep, Glob, Task, Edit
 model: opus
 tier: 2
 dispatch_protocol: v1
@@ -107,7 +107,7 @@ Each category emits a letter (see schema below) and feeds the aggregate decision
    └── duplicate-code-detector
 5. Aggregate results, diff against baseline
 6. Update quality state cache
-7. Decision: pass → auto-push; fail → notify with specific gate + baseline delta
+7. Decision: pass → report `action: push` (the push is the owner's, never the agent's); fail → notify with specific gate + baseline delta
 ```
 
 ### On Stage Transition (Tier 3)
@@ -412,7 +412,7 @@ quality_gate_result:
             baseline_expires_at: "2026-08-01"
 
   action: "push" | "block" | "warn"
-  message: "Tier 1 passed. Tier 2 has 3 complexity warnings (all in baseline, no regression). Pushing."
+  message: "Tier 1 passed. Tier 2 has 3 complexity warnings (all in baseline, no regression). Decision: push (the owner's to make)."
 
 metadata:
   agent: "quality-gate"
@@ -456,7 +456,7 @@ exceptions:
     threshold: 10
     reason: "Refactor planned in plans/todo/refactor-order-processor.md"
     expires_at: 2026-08-01    # MANDATORY — no permanent exceptions
-    approved_by: human
+    approved_by: human        # written by the human, never by the agent
     approved_at: 2026-05-15
 ```
 
@@ -510,9 +510,9 @@ jobs:
       - name: Coverage (diff coverage on changed lines)
         run: |
           npm run test -- --coverage
-          npx diff-cover coverage/lcov.info --compare-branch=origin/main --fail-under=80
+          npx --no -- diff-cover coverage/lcov.info --compare-branch=origin/main --fail-under=80
       - name: Complexity (vs baseline)
-        run: npx complexity-report --baseline=.ctoc/quality-state/complexity-baseline.json
+        run: npx --no -- complexity-report --baseline=.ctoc/quality-state/complexity-baseline.json
 ```
 
 ### GitLab CI

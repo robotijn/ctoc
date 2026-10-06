@@ -300,7 +300,7 @@ SELECT region, COUNT(*) FROM active_users GROUP BY region;
 ### Phase 1: Token-based quick pass (every PR)
 ```bash
 # jscpd — 223+ formats, Rabin-Karp tokenizer
-npx jscpd src/ --min-lines 5 --min-tokens 50 --reporters json,sarif --output reports/
+npx --no -- jscpd src/ --min-lines 5 --min-tokens 50 --reporters json,sarif --output reports/
 # PMD CPD — token-aware across many languages; reports N-way duplicates as one group
 pmd cpd --dir src/ --minimum-tokens 50 --format xml > reports/cpd.xml
 # Simian — fast cross-language line-based detector
@@ -326,7 +326,7 @@ For each candidate clone group:
 4. Propose extraction OR suppress with documented reason.
 
 ### Phase 5: Baseline diff
-Persist a baseline at `.quality/baseline.duplication.json` after the first scan. Subsequent runs diff against it:
+After the first scan, give the baseline for `.quality/baseline.duplication.json` in your report for the executor to save: you hold neither Write nor Edit. Subsequent runs diff against it:
 - `new` — group not in baseline → flag normally
 - `regressed` — group is in baseline but its `lines_duplicated` or `instance_count` grew → flag with higher confidence
 - `unchanged` — already accepted, integrator may defer
@@ -399,7 +399,7 @@ These tiers are the **internal triage view** used in human-readable reports. Whe
 
 ```bash
 # JS/TS — jscpd with SARIF for GitHub code-scanning aggregation
-npx jscpd src/ --min-lines 5 --min-tokens 50 \
+npx --no -- jscpd src/ --min-lines 5 --min-tokens 50 \
     --reporters json,sarif --ignore "**/*.test.ts,**/node_modules/**,**/generated/**" \
     --output reports/
 
@@ -408,7 +408,7 @@ pmd cpd --dir src/ --language java --minimum-tokens 75 --format xml > reports/cp
 
 # Python — pylint duplicate-code check + jscpd cross-check
 pylint --disable=all --enable=duplicate-code src/
-npx jscpd src/ --format python --min-lines 5
+npx --no -- jscpd src/ --format python --min-lines 5
 
 # C# / .NET — PMD CPD for cross-project clones (dotnet format/Roslyn analyzers
 # fix style and quality rules but do NOT detect clones)
@@ -419,7 +419,7 @@ pmd cpd --dir src/ --language cpp --minimum-tokens 75 --format xml > reports/cpd
 nicad6 functions c src/ default-report
 
 # SQL — jscpd treats SQL as a first-class language; also look for repeated CTEs by grep
-npx jscpd "**/*.sql" --min-lines 3 --min-tokens 30
+npx --no -- jscpd "**/*.sql" --min-lines 3 --min-tokens 30
 ```
 
 Feed jscpd's SARIF (and SonarQube's findings) into the GitHub code-scanning dashboard so duplicates collapse across tools; PMD CPD emits XML/CSV, so convert it before aggregating. Pin a CI step that fails when this skill emits any letter — per warnings-are-bugs, every finding is `critical` on the wire.

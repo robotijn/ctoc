@@ -19,7 +19,7 @@ related_skills:
   - versioning/technical-debt-tracker
   - security/dependency-auditor
 effort_level: medium
-tools: Bash, Read, Grep
+tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1
@@ -252,7 +252,7 @@ Same pattern in MySQL (`CHANGE COLUMN`, `CREATE VIEW`), Snowflake (`COMMENT` + f
 ### Static analysis
 ```bash
 tsc --noEmit 2>&1 | grep -iE 'deprecated|@deprecated'
-npx eslint . --rule '@typescript-eslint/no-deprecated: error'   # eslint-plugin-deprecation is archived; the rule moved into typescript-eslint v8+
+npx --no -- eslint . --rule '@typescript-eslint/no-deprecated: error'   # eslint-plugin-deprecation is archived; the rule moved into typescript-eslint v8+
 python -W error::DeprecationWarning -c "import mymodule"   # promote to error in CI
 javac -Xlint:deprecation -Werror Foo.java                  # Java: error on deprecation
 dotnet build /warnaserror /p:TreatWarningsAsErrors=true    # .NET: treat [Obsolete] use as error
@@ -265,13 +265,13 @@ clang -Wdeprecated-declarations -Werror foo.c              # C/C++
 oasdiff breaking openapi.v1.yaml openapi.v2.yaml --deprecation-days-stable=180
 
 # Validate Sunset header presence
-curl -sI https://api.example.com/v1/users | grep -iE '^(Sunset|Deprecation|Link):'
+curl -sI 'https://api.example.com/v1/users' | grep -iE '^(Sunset|Deprecation|Link):'
 ```
 
 ### Package analysis
 ```bash
 npm outdated --json | jq 'to_entries[] | select(.value.wanted != .value.latest)'
-npm info <pkg> deprecated
+npm view -- '<pkg>' deprecated
 pip list --outdated --format=json
 ```
 

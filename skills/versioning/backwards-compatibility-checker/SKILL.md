@@ -15,7 +15,7 @@ related_skills:
   - devex/api-deprecation-checker
   - specialized/api-contract-validator
 effort_level: high
-tools: Bash, Read, Grep
+tools: Bash, Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1
@@ -90,14 +90,14 @@ You detect breaking changes between versions to ensure proper semantic versionin
 
 ```bash
 # Microsoft API Extractor — declarative .api.md report committed to repo, diffed in PR.
-npx api-extractor run --local
-git diff --exit-code etc/<package>.api.md   # fails CI if surface drifted without commit
+npx --no -- api-extractor run --local
+git diff --exit-code -- 'etc/<package>.api.md'   # fails CI if surface drifted without commit
 
 # tsd — type assertions for type-level regression
-npx tsd
+npx --no -- tsd
 
 # attw — verifies "Are The Types Wrong?" for dual-package / ESM/CJS exports
-npx --package=@arethetypeswrong/cli attw <package>.tgz
+npx --no -- attw '<package>.tgz'
 ```
 
 ### Python
@@ -284,7 +284,7 @@ Correct version: **2.0.0** — breaking changes require MAJOR bump per semver.or
 - name: Check API compatibility (TypeScript)
   run: |
     npm run build
-    npx api-extractor run --local
+    npx --no -- api-extractor run --local
     git diff --exit-code etc/
 
 - name: Check API compatibility (Rust)

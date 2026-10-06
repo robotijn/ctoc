@@ -1,9 +1,11 @@
 {
-  "content_sha256": "f33dd0bf3796ba78bfd2788341fb7573dc91df6736f48cb57fff168b7b732b0b",
+  "content_sha256": "db8c672a636d544dc3abca8a36349b31c94ffd4b1338bca2c3b43b7b33c6baef",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-10-05T20:27:07.018Z",
+  "approved_at": "2026-10-06T01:06:08.533Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "Owner, 2026-10-06: \"fix all agents and skills\" — twenty method files added to files. Session (CTO Chief), 2026-10-06: agents/architecture/dependency-analyzer.md removed from files because the in-progress plan 00266 is editing it; this slice does not touch it.",
   "plan_basename": "agent-tool-grants-s9-quality-architecture-versioning-frontend-devex"
 }

@@ -210,7 +210,7 @@ pytest --benchmark-only --benchmark-json=pyt.json --benchmark-warmup=on \
 node --expose-gc bench/parse.bench.mjs > bench.json
 
 # Bundle size
-npx size-limit --json > size.json
+npx --no -- size-limit --json > size.json
 
 # Continuous benchmarking persistence
 bencher run --project ctoc --adapter rust_criterion \

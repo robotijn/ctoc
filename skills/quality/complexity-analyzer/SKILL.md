@@ -604,7 +604,7 @@ gocyclo -over 10 -avg ./...
 gocognit -over 15 ./...
 
 # JS/TS — eslint with all four limits
-npx eslint --rule 'complexity: ["error", 10]' \
+npx --no -- eslint --rule 'complexity: ["error", 10]' \
            --rule 'max-lines-per-function: ["error", 50]' \
            --rule 'max-params: ["error", 5]' \
            --rule 'max-depth: ["error", 4]' \
@@ -620,7 +620,7 @@ category/java/design.xml/ExcessiveParameterList \
 # C# / .NET — Roslyn analyzers via build with AnalysisMode=All
 dotnet build /p:AnalysisMode=All /p:TreatWarningsAsErrors=true
 # Optional: standalone CA rule run
-dotnet format analyzers --diagnostics CA1502 CA1505 CA1501 CA1506
+dotnet format analyzers --verify-no-changes --diagnostics CA1502 CA1505 CA1501 CA1506
 
 # C / C++ — clang-tidy
 clang-tidy -checks='readability-function-cognitive-complexity,readability-function-size' \

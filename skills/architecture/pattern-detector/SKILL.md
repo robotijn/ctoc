@@ -28,7 +28,7 @@ effort_budget:
 
 > Converted from agents/architecture/pattern-detector.md as part of CTOC v7 B2 leaf-node sweep.
 > Auto-loaded when the user prompt matches a when_to_load trigger.
-> **Detect vs. enforce**: this skill *detects* the pattern in use from folder structure, import graph, and naming conventions. The companion skill [[quality/architecture-checker]] *enforces* the rules of the detected (or chosen) pattern. Run detector first, write the detected pattern into the project's `CLAUDE.md`, then let architecture-checker hold the line.
+> **Detect vs. enforce**: this skill *detects* the pattern in use from folder structure, import graph, and naming conventions. The companion skill [[quality/architecture-checker]] *enforces* the rules of the detected (or chosen) pattern. Run detector first; the team or the executor writes the detected pattern into the project's `CLAUDE.md` (you hold neither Write nor Edit: say in your report what that section must hold, and never write it through Bash); then architecture-checker holds the line.
 
 ## Role
 

@@ -15,7 +15,7 @@ related_skills:
   - quality/complexity-analyzer
   - security/dependency-auditor
 effort_level: high
-tools: Read, Grep, Bash
+tools: Read, Grep, Bash, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1
@@ -273,14 +273,14 @@ rg -n --pcre2 '\b(TODO|FIXME|HACK)\b(?!\((\d{4}-\d{2}-\d{2}),\s*[A-Z]+-\d+\))' s
 trunk check --upstream=origin/main --output=sarif > trunk.sarif
 
 # ESLint — no-warning-comments + custom marker rule
-npx eslint --rule 'no-warning-comments: [error, { terms: ["todo", "fixme", "hack", "xxx"], location: "anywhere" }]' .
+npx --no -- eslint --rule 'no-warning-comments: [error, { terms: ["todo", "fixme", "hack", "xxx"], location: "anywhere" }]' .
 
 # Cargo + clippy — flags `todo!()` / `unimplemented!()` macros as warnings
 cargo clippy -- -W clippy::todo -W clippy::unimplemented -W clippy::dbg_macro
 
 # Complexity + duplication signals
-npx complexity-report src/ --format json
-npx jscpd src/ --reporters json
+npx --no -- complexity-report src/ --format json
+npx --no -- jscpd src/ --reporters json
 
 # Dependency layer
 npm outdated --json

@@ -14,7 +14,7 @@ related_skills:
   - testing/playwright-qa
   - specialized/accessibility-checker
 effort_level: medium
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1
@@ -230,7 +230,7 @@ If a C/C++ GUI project needs visual checks, dispatch a separate native-rendering
 
 If changes are intentional, regenerate baselines from a CI build (not local):
 
-    npx playwright test --update-snapshots --project=chromium-desktop
+    npx --no -- playwright test --update-snapshots --project=chromium-desktop
 
 Then open the resulting PR — a human reviewer (not a bot) approves the new baselines.
 ```

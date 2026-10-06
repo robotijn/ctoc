@@ -157,7 +157,7 @@ import { oneFunctionINeed } from 'legacy-utils';
 import { oneFunctionINeed } from 'modern-utils';
 ```
 
-How to detect: `npx @arethetypeswrong/cli --pack .` (the `attw` CLI; `--pack` runs it against a local directory) and `npx publint` flag dual-package hazards. `npm ls --json | jq` for `"type": "commonjs"` entries. In Vite, `optimizeDeps` warnings about CJS interop are a red flag.
+How to detect: `npx --no -- @arethetypeswrong/cli --pack .` (the `attw` CLI; `--pack` runs it against a local directory) and `npx --no -- publint` flag dual-package hazards. `npm ls --json | jq` for `"type": "commonjs"` entries. In Vite, `optimizeDeps` warnings about CJS interop are a red flag.
 
 ### 4. Bundle budget regression on PR
 
@@ -173,7 +173,7 @@ jobs:
       - uses: actions/setup-node@v4
       - run: npm ci
       - run: npm run build
-      - run: npx size-limit              # exits non-zero if any entry exceeds
+      - run: npx --no -- size-limit              # exits non-zero if any entry exceeds
 ```
 
 ```javascript
@@ -203,7 +203,7 @@ build: {
   sourcemap: 'hidden',             // emits .map but no //# sourceMappingURL=
 }
 // Upload step (Sentry example):
-// npx sentry-cli sourcemaps upload --release=$GIT_SHA dist/
+// npx --no -- sentry-cli sourcemaps upload --release=$GIT_SHA dist/
 // Then exclude dist/**/*.map from the deploy artifact.
 ```
 
@@ -212,7 +212,7 @@ Datadog RUM: upload via `datadog-ci sourcemaps upload --service=<name> --release
 ### 6. Unused-but-bundled dependencies
 
 Cross-link with [[dead-code-detector]]. Patterns:
-- `dependencies` entry never imported anywhere in `src/` (run `npx depcheck`)
+- `dependencies` entry never imported anywhere in `src/` (run `npx --no -- depcheck`)
 - Polyfills loaded eagerly when `browserslist` already excludes the targets
 - Internationalization packages bundling all locales (`moment/locale/*` is the classic — use `dayjs` and import only needed locales)
 - Icon libraries shipping the full set when only a handful are used (`@mui/icons-material` whole-package import, `lucide-react` without per-icon imports on older versions)
@@ -265,7 +265,7 @@ await esbuild.build({
   metafile: true,                   // writes meta.json
   minify: true,
 });
-// Analyze: npx esbuild-visualizer --metadata meta.json --filename report.html
+// Analyze: npx --no -- esbuild-visualizer --metadata meta.json --filename report.html
 
 // Rollup: same metafile via rollup-plugin-visualizer
 import { visualizer } from 'rollup-plugin-visualizer';
@@ -328,20 +328,20 @@ grep -l "\"bun\"" package.json && echo "Bun"
 ANALYZE=true npm run build                                          # @next/bundle-analyzer
 
 # Vite
-npx vite-bundle-visualizer                                          # or rollup-plugin-visualizer in vite.config
+npx --no -- vite-bundle-visualizer                                          # or rollup-plugin-visualizer in vite.config
 
 # Webpack 5
-npx webpack --json > stats.json && npx webpack-bundle-analyzer stats.json
+npx --no -- webpack --json > stats.json && npx --no -- webpack-bundle-analyzer stats.json
 
 # esbuild
-node build.mjs && npx esbuild-visualizer --metadata meta.json --filename report.html
+node build.mjs && npx --no -- esbuild-visualizer --metadata meta.json --filename report.html
 
 # Rollup standalone
-npx rollup -c && open stats.html                                    # rollup-plugin-visualizer output
+npx --no -- rollup -c && open stats.html                                    # rollup-plugin-visualizer output
 
 # Bun
 bun build src/main.tsx --outdir=dist --splitting --target=browser
-npx source-map-explorer dist/*.js
+npx --no -- source-map-explorer dist/*.js
 
 # Blazor WASM
 dotnet publish -c Release && du -sh bin/Release/net9.0/publish/wwwroot/_framework/
@@ -351,13 +351,13 @@ dotnet publish -c Release && du -sh bin/Release/net9.0/publish/wwwroot/_framewor
 
 ```bash
 # size-limit — pre-PR gate
-npx size-limit --json > size-report.json
+npx --no -- size-limit --json > size-report.json
 
 # bundlemon — alternative with PR comments
-npx bundlemon --config bundlemon.config.json
+npx --no -- bundlemon --config bundlemon.config.json
 
 # Lighthouse CI — broader performance budget, not just bundle bytes
-npx @lhci/cli autorun --config=lighthouserc.json
+npx --no -- @lhci/cli autorun --config=lighthouserc.json
 ```
 
 ### Phase 4: RUM verification (post-deploy)
@@ -366,8 +366,8 @@ npx @lhci/cli autorun --config=lighthouserc.json
 # Vercel Speed Insights — automatic on Vercel projects; reads navigation timing + LCP/CLS/INP
 # Confirm enabled: vercel.json or Next.js layout includes @vercel/speed-insights
 
-# Datadog RUM — tag deploys with Git SHA so bundle changes correlate with Web Vitals deltas
-datadog-ci sourcemaps upload --service=web --release-version=$GIT_SHA dist/
+# Datadog RUM — the release pipeline tags deploys with the Git SHA. Confirm its configuration holds this step; the agent never runs it:
+# datadog-ci sourcemaps upload --service=web --release-version=$GIT_SHA dist/
 ```
 
 ## Size Thresholds (internal triage)

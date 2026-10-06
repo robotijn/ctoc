@@ -23,7 +23,7 @@ related_skills:
   - versioning/technical-debt-tracker
   - quality/dead-code-detector
 effort_level: medium
-tools: Read, Grep
+tools: Read, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1
@@ -93,7 +93,7 @@ const isStale = (flag, now) => {
 
 ## Detection patterns (regex starting points)
 
-Pattern scans surface candidates; semantic verification (cross-checking against the provider's flag registry, when available) confirms or downgrades each one. Treat unverified pattern hits as `confidence: low`.
+Pattern scans surface candidates; semantic verification (cross-checking against the provider's flag registry, when an export of it is in the repository or handed to you in your brief — you call no provider API) confirms or downgrades each one. Treat unverified pattern hits as `confidence: low`.
 
 ```javascript
 const flagPatterns = [

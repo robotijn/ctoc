@@ -20,7 +20,7 @@ related_skills:
   - testing/writers/unit-test-writer
   - quality/dead-code-detector
 effort_level: high
-tools: Read, Grep
+tools: Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1
@@ -94,7 +94,7 @@ The catalog below is the canonical set this skill recommends. The first column m
 ## Analysis Process
 
 ### Step 1: Verify test coverage prerequisite
-- Read coverage report (or `Bash`-confirm via `pytest --cov` / `dotnet test /p:CollectCoverage=true` / `jest --coverage`).
+- Read the coverage report. You hold no command tool: where there is no report, name the coverage command (`pytest --cov` / `dotnet test /p:CollectCoverage=true` / `jest --coverage`) in your report for the executor to run, and never write a percentage you did not see.
 - If coverage at the target function < 80%, emit a letter recommending `unit-test-writer` first and STOP. Do not produce a refactor plan against untested code.
 
 ### Step 2: Calculate current complexity
@@ -395,7 +395,7 @@ function handle(e: Event) { HANDLERS[e.kind](e.payload as never); }
 // CC = 1; missing handler is a compile error, not a runtime throw.
 ```
 
-Codemod recipe: jscodeshift transform matching `SwitchStatement` where the discriminant is a member expression on a discriminated-union variable — rewrite to a `const` object + index call. For TypeScript projects prefer `ts-morph` so the rewrite is type-aware. No canonical published codemod package owns this transform as of 2026 — author the transform in the project's `codemods/` folder.
+Codemod recipe: jscodeshift transform matching `SwitchStatement` where the discriminant is a member expression on a discriminated-union variable — rewrite to a `const` object + index call. For TypeScript projects prefer `ts-morph` so the rewrite is type-aware. No canonical published codemod package owns this transform as of 2026 — write the full transform in your report, naming the path under the project's `codemods/` folder where the build step will save it.
 
 ### SQL — nested-CTE / fat stored procedure → flat CTE chain + small SPs
 

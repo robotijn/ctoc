@@ -688,10 +688,10 @@ mypy --strict .                                  # types
 pytest --cov=. --cov-report=term-missing         # tests + coverage
 
 # TypeScript
-npx eslint . --max-warnings 0
-npx prettier --check .
-npx tsc --noEmit --strict
-npx vitest run --coverage
+npx --no -- eslint . --max-warnings 0
+npx --no -- prettier --check .
+npx --no -- tsc --noEmit --strict
+npx --no -- vitest run --coverage
 
 # C# / .NET 9
 dotnet format --verify-no-changes

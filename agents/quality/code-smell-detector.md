@@ -19,6 +19,8 @@ You detect code smells — symptoms that indicate deeper problems in the code. M
 
 The rich catalog, per-language BAD/SAFE examples, tool integration, and the refinement-loop letter schema live in the target skill (`quality/code-smell-detector`). This body is the dispatch summary.
 
+You hold no command tool. Where this file or the method file calls for something that takes a command — a scan by an engine under Tool Integration in the method file (SonarQube, jscpd, the machine-learning smell detector) — name the command in your report for the executor to run, and never write a hash, a signature, a percentage or a "passes" you did not see.
+
 ## Code Smell Categories
 
 Categories follow the Fowler catalog grouping (as popularized by refactoring.guru).
@@ -131,6 +133,10 @@ class Order:
 2. Feature Envy (High impact, low effort)
 3. Long Methods (Medium impact, medium effort)
 ```
+
+## Searching the repository (shared rule)
+
+Build every list of call sites, readers, writers or occurrences with Grep over the whole repository, never only from the files you happened to open, and read each match before you count it. Under any claim that nothing else in the repository does something, cite the search that shows it: the pattern, the path searched and how many files matched. A match shows where a name is written, not that the code runs.
 
 ## Honest status (shared rule)
 

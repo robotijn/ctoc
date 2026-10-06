@@ -413,7 +413,7 @@ Example CI invocation:
 sonar-scanner -Dsonar.projectKey=myproj -Dsonar.sources=src
 
 # Duplicate code across the repo
-npx jscpd --min-tokens 70 --reporters html,json --output ./jscpd-report .
+npx --no -- jscpd --min-tokens 70 --reporters html,json --output ./jscpd-report .
 
 # .NET design + maintainability
 dotnet build /warnaserror /p:AnalysisMode=All
