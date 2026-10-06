@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/red-team-critic/baseline-agent.md",
  "baseline_sha256": "f7c96106c5a260c920d23845101e33fb1e653dfbd5fd1d26882ffbd1fc4dbafa",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 96257,
+ "maxBytes": 96537,
  "units": [
   {
    "n": 1,
@@ -375,7 +375,8 @@
    "sha": "78e3b349d1880c6dde03ca49111c9b111c401a8a6076aee2c66c4e52fafd0c37",
    "kind": "order",
    "orders": [
-    "RT-044"
+    "RT-044",
+    "RT-044-gate-shape"
    ],
    "fate": "tightened"
   },
@@ -10370,6 +10371,17 @@
    "now_in": "## Honest status (shared rule)",
    "anchors": [
     "Never invent a time, a deadline,"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "RT-044-gate-shape",
+   "says": "Test a brief gate field against ^(Gate )?[0-3]$ before comparing; a value that fails is reported by shape only, never quoted.",
+   "now_in": "## Your input (what the dispatcher hands you)",
+   "anchors": [
+    "Test it against `^(Gate )?[0-3]$` first",
+    "a `gate` value that failed `^(Gate )?[0-3]$` is reported by shape only"
    ],
    "pinned_by": null,
    "wire": false
