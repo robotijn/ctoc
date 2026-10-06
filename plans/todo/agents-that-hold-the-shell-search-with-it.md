@@ -82,33 +82,33 @@ Unchanged: every `tools:` line, `PROFILE`, `HELD_REMOVALS` and its maximum, ever
 ## Execution Plan
 
 ### Step 8: TEST
-- [ ] Add `SEARCH_WITHOUT_THE_TOOLS`, `SEARCH_FALLBACK_DEBT` (3 entries), check 15 and check 15.1 to `tests/agent-tool-grants.test.js`, reusing the file's own `splitAgent` and grant parser. Add the maximum of 3 to `tests/agent-tool-grants-maxima.test.js`.
-- [ ] Run `node --test tests/agent-tool-grants.test.js tests/agent-tool-grants-maxima.test.js`. Check 15 must be red, naming exactly the four; check 15.1 and the maxima test green.
+- [x] Add `SEARCH_WITHOUT_THE_TOOLS`, `SEARCH_FALLBACK_DEBT` (3 entries), check 15 and check 15.1 to `tests/agent-tool-grants.test.js`, reusing the file's own `splitAgent` and grant parser. Add the maximum of 3 to `tests/agent-tool-grants-maxima.test.js`.
+- [x] Run `node --test tests/agent-tool-grants.test.js tests/agent-tool-grants-maxima.test.js`. Check 15 must be red, naming exactly the four; check 15.1 and the maxima test green.
 
 ### Step 9: PREPARE
-- [ ] Record `claude --version`, and whether the install is native or npm.
-- [ ] From the executor's own Bash, record `grep --version` and `find --version`.
-- [ ] In a folder made with `mktemp -d`, confirm that `grep -rn -e '<word>' -- '<folder>'` and `find '<folder>' -name '*.md' -type f` work as the sentence allows.
-- [ ] If either command is missing or rejects those forms: stop and ask through the scope-growth question.
+- [x] Record `claude --version`, and whether the install is native or npm.
+- [x] From the executor's own Bash, record `grep --version` and `find --version`.
+- [x] In a folder made with `mktemp -d`, confirm that `grep -rn -e '<word>' -- '<folder>'` and `find '<folder>' -name '*.md' -type f` work as the sentence allows.
+- [x] If either command is missing or rejects those forms: stop and ask through the scope-growth question.
 
 ### Step 10: IMPLEMENT
-- [ ] Insert the sentence in the four agent files at the named places. That is one sentence per file; nothing else changes.
+- [x] Insert the sentence in the four agent files at the named places. That is one sentence per file; nothing else changes.
 
 ### Step 11: REVIEW
 - [ ] The critic reads each insertion against the sentence before it. The fallback must not widen any network rule ("never a way to the web" stands), any never-type-text-from-a-file rule, or the security-scanner's never-type-a-path-from-SARIF rule.
 
 ### Step 12: OPTIMIZE
-- [ ] Confirm check 15 reads each agent once, reusing the census the file already builds.
+- [x] Confirm check 15 reads each agent once, reusing the census the file already builds.
 
 ### Step 13: SECURE
 - [ ] The security scanner attacks the option allow-list and the path rule. It checks that no permitted `grep`/`find` form can run a program, write a file or delete one (`ugrep --filter`, `find -exec`/`-delete`/`-fprint` are all excluded), and that no permitted form takes a path or pattern from material under review.
 
 ### Step 14: VERIFY
-- [ ] `npm test` passes: lint, all tests, coverage at or above the floor in `.ctoc/coverage-baseline.json`, 0 skipped.
-- [ ] The executor names the pattern-detector dispatch for the session to run on the native build. The run's report must quote the `find` commands it ran.
+- [x] `npm test` passes: lint, all tests, coverage at or above the floor in `.ctoc/coverage-baseline.json`, 0 skipped.
+- [x] The executor names the pattern-detector dispatch for the session to run on the native build. The run's report must quote the `find` commands it ran.
 
 ### Step 15: DOCUMENT
-- [ ] Extend the header comment of `tests/agent-tool-grants.test.js` with check 15 and its debt list: what it fences, the Claude Code 2.1.117 fact, and what it cannot see (a search order phrased outside the four shapes).
+- [x] Extend the header comment of `tests/agent-tool-grants.test.js` with check 15 and its debt list: what it fences, the Claude Code 2.1.117 fact, and what it cannot see (a search order phrased outside the four shapes).
 
 ### Step 16: FINAL-REVIEW
 - [ ] Every acceptance box above is checked against its evidence. The measured-run result is quoted, not summarised.
@@ -131,20 +131,20 @@ Unchanged: every `tools:` line, `PROFILE`, `HELD_REMOVALS` and its maximum, ever
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
 - [ ] Self-review all new code
@@ -152,9 +152,9 @@ Unchanged: every `tools:` line, `PROFILE`, `HELD_REMOVALS` and its maximum, ever
 - [ ] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
 - [ ] Validate inputs (no path traversal)
@@ -163,15 +163,15 @@ Unchanged: every `tools:` line, `PROFILE`, `HELD_REMOVALS` and its maximum, ever
 - [ ] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
 - [ ] Verify steps 8-15 completed correctly
@@ -187,3 +187,10 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record
+
+- Step 8 red: check 15 failed naming exactly architecture/pattern-detector, data-ml/data-quality-checker, security/security-scanner, specialized/health-check-validator; check 15.1 and the maxima test green. With an empty debt list the check names those four plus hallucination-detector, llm-security-tester and dependency-analyzer (the seven of the census).
+- Step 9: `claude --version` 2.1.291, native install (`~/.local/bin/claude`). The executor's Bash `grep` is ugrep 7.8.4 and `find` is bfs 4.1.1 (the embedded tools). In a `mktemp -d` folder, `grep -rn -e '<word>' -- '<folder>'`, `grep -rn -E -i -c --include='*.md'`, `grep -rn -P -l`, `find '<folder>' -name '*.md' -type f` and `find -path … -type f` all worked.
+- Step 10: the sentence inserted at the four named places; health-check-validator and data-quality-checker carry it appended to the paragraph that ends with the shared "Grep and Glob tools" sentence, pattern-detector and security-scanner as a new paragraph after the named one. No other text changed.
+- Step 14 measured run, still to do by the session: dispatch architecture/pattern-detector on this repository on the native build; its report must quote the `find` commands its directory analysis ran, or say the fallback was not exercised.
