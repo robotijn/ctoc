@@ -19,6 +19,12 @@
       "kind": "planted",
       "shortfalls": [],
       "status": "ok"
+    },
+    {
+      "fixture": "fetch-built-from-repository-text",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
     }
   ],
   "note": "smoke check, one run per version, low statistical power, not proof",
@@ -184,16 +190,73 @@
         ],
         "standingBlindSpot": null
       }
+    },
+    {
+      "fixture": "fetch-built-from-repository-text",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "issue-robustness",
+          "issue-completeness",
+          "issue-integration",
+          "issue-robustness",
+          "issue-completeness",
+          "issue-completeness",
+          "issue-calibration",
+          "issue-specificity",
+          "issue-specificity",
+          "issue-integration",
+          "issue-boundaries",
+          "issue-research_grounding",
+          "issue-boundaries",
+          "issue-integration"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "issue-robustness",
+          "issue-robustness",
+          "issue-completeness",
+          "issue-specificity",
+          "issue-integration",
+          "issue-completeness",
+          "issue-completeness",
+          "issue-actionability",
+          "issue-boundaries",
+          "issue-calibration",
+          "issue-research_grounding",
+          "issue-integration",
+          "issue-specificity"
+        ],
+        "standingBlindSpot": null
+      }
     }
   ],
   "usage": {
     "original": {
-      "median_tokens": 314651,
-      "median_duration_ms": 294947
+      "median_tokens": 303213,
+      "median_duration_ms": 306502
     },
     "compacted": {
-      "median_tokens": 227562,
-      "median_duration_ms": 297938
+      "median_tokens": 203888,
+      "median_duration_ms": 288542.5
     }
   }
 }

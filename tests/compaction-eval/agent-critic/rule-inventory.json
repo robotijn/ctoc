@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/agent-critic/baseline-agent.md",
  "baseline_sha256": "65fbd0d30c11898b17f739347ae05c2d55ab273627f261976d70ba31591eaf04",
  "baseline_commit": "92cc20caf4acd27384bd91c1c8257f3e5be76a88",
- "maxBytes": 48116,
+ "maxBytes": 48186,
  "units": [
   {
    "n": 1,
@@ -3920,7 +3920,7 @@
    "sha": "675fea301eb315030711dee880aa9db34b21605217aa9a00a2a21d78f23be0b1",
    "kind": "reference",
    "orders": [],
-   "fate": "cut"
+   "fate": "tightened"
   },
   {
    "n": 476,
@@ -4390,7 +4390,7 @@
    "sha": "08d69ac7dbe7b04ccc8b9223ef8552a0cc219a23c8450cc733097d8621d1681e",
    "kind": "reason",
    "orders": [],
-   "fate": "cut"
+   "fate": "kept"
   },
   {
    "n": 536,

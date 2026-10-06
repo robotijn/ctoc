@@ -49,7 +49,7 @@ Prompt injection (**LLM01:2025**, OWASP): separating instruction from data as ab
 
 ## Scoring System (0-10)
 
-Scores are awarded bottom-up: start at 0, add points for demonstrated quality. Deduction rules read bottom-up: a -3 deduction would apply if starting from 10, but in bottom-up scoring this simply does not earn points.
+Scores are awarded bottom-up: start at 0, add points for demonstrated quality. Deduction rules read bottom-up: a deduction would apply if starting from 10, but in bottom-up scoring this simply does not earn points.
 
 | Score | Meaning | Calibration Anchor |
 |-------|---------|-------------------|
@@ -78,7 +78,6 @@ To reach each level, the agent must demonstrate ALL criteria of that level AND a
 
 ### 1. SPECIFICITY (0-10)
 
-
 Does the agent give precise, unambiguous instructions that an LLM can execute identically every time?
 
 **Check:**
@@ -104,7 +103,6 @@ Does the agent give precise, unambiguous instructions that an LLM can execute id
 | 10 | Above plus: handles template literals `` `${expr}` ``, dynamic require(), new Function(), setTimeout with strings, and documents why each is dangerous with CWE reference numbers. |
 
 ### 2. COMPLETENESS (0-10)
-
 
 Does the agent cover its ENTIRE declared scope with no gaps?
 
@@ -135,7 +133,6 @@ Does the agent cover its ENTIRE declared scope with no gaps?
 
 ### 3. BOUNDARIES (0-10)
 
-
 Does the agent have clear, explicit boundaries that prevent overlap and scope creep?
 
 **Check:**
@@ -165,7 +162,6 @@ Does the agent have clear, explicit boundaries that prevent overlap and scope cr
 
 ### 4. ACTIONABILITY (0-10)
 
-
 Can the downstream consumer (agent-writer, human, or another agent) act on every finding without asking clarifying questions?
 
 **Check:**
@@ -194,7 +190,6 @@ Can the downstream consumer (agent-writer, human, or another agent) act on every
 | 10 | (9) plus fixes are idempotent (safe to apply multiple times), no fix conflicts with another |
 
 ### 5. INTEGRATION (0-10)
-
 
 Does the agent's output integrate correctly with the CTOC pipeline?
 
@@ -227,7 +222,6 @@ Does the agent's output integrate correctly with the CTOC pipeline?
 
 ### 6. ROBUSTNESS (0-10)
 
-
 Does the agent handle adversarial, malformed, edge-case, and unexpected inputs gracefully?
 
 **Check:**
@@ -257,7 +251,6 @@ Does the agent handle adversarial, malformed, edge-case, and unexpected inputs g
 
 ### 7. CALIBRATION (0-10)
 
-
 Are the agent's thresholds, scores, and judgments evidence-based and reproducible?
 
 **Check:**
@@ -286,7 +279,6 @@ Are the agent's thresholds, scores, and judgments evidence-based and reproducibl
 | 10 | (9) plus self-consistency test protocol defined, edge cases documented, inter-run variance < 1 point |
 
 ### 8. RESEARCH_GROUNDING (0-10)
-
 
 Is the agent's methodology grounded in established research, standards, or documented best practices?
 
@@ -556,7 +548,6 @@ Test the agent against these adversarial scenarios mentally:
 
 ## Bias Mitigation Protocol
 
-
 ### 1. Anchoring Bias Mitigation
 Score bottom-up (start at 0, add points) instead of top-down (start at 10, deduct). This is enforced by the calibration anchors: you must identify which anchor level the agent matches, then score accordingly.
 
@@ -599,14 +590,13 @@ When critiquing yourself (agent-critic), apply the HARDEST evaluation. The evalu
 
 This critic has documented blind spots. Acknowledge them in every self-evaluation:
 
-1. **Context-dependent quality**: novel agent types may need custom evaluation.
+1. **Context-dependent quality**: agents in specialized niches, and novel agent types, may need custom evaluation.
 2. **Temporal relevance**: this critic does not track temporal changes automatically.
 3. **Interaction effects**: this critic evaluates agents in isolation.
 4. **Verbosity detection limits**: well-written but irrelevant padding may receive undeserved credit under COMPLETENESS.
 5. **Cultural and style bias**: anchors are calibrated on English-language, Western software engineering conventions.
 
 ## Anti-Gaming Protocol
-
 
 ### Gaming Vectors and Defenses
 
@@ -620,7 +610,6 @@ This critic has documented blind spots. Acknowledge them in every self-evaluatio
 | Agent adds many examples of the same type | Evaluate diversity of examples, not count. Five SQL injection examples do not compensate for missing XSS patterns. |
 
 ## Inter-Rater Reliability Protocol
-
 
 ### Self-Consistency Test
 
@@ -649,7 +638,6 @@ If variance exceeds acceptable levels on more than 2 dimensions: the rubric has 
 
 ## Actor-Critic Loop Protocol
 
-
 ### Loop Structure
 
 ```
@@ -671,6 +659,8 @@ Termination:
 ```
 
 ### Gradient Signal Quality
+
+Each issue in the critique is a gradient signal.
 
 | Signal Quality | Example |
 |---------------|---------|
