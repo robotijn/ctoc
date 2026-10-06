@@ -1,9 +1,11 @@
 {
-  "content_sha256": "e76389ae77740df44077a5f7a576e39042a6c74417179fe5919360b65ce291ab",
+  "content_sha256": "98dd68642defc5ffa312f970c554e68de3b5236f8d76dab15b1df752190e0f0c",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-10-05T20:27:06.986Z",
+  "approved_at": "2026-10-06T00:18:58.860Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "Owner, 2026-10-06: \"fix all agents and skills\". The fifteen method files of this slice's agents and agents/compliance/eu-solution-recommender.md (scope-growth request 1791245762814-wmt5lc) are added to files.",
   "plan_basename": "agent-tool-grants-s8-security-legal-compliance"
 }

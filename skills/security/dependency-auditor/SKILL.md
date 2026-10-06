@@ -41,7 +41,7 @@ You audit dependencies for security vulnerabilities, maintenance status, and lic
 | Scope | full transitive graph + reachability | direct deps + lockfile diff |
 | Cadence | nightly / weekly / pre-release | every PR / pre-commit |
 | Depth | OSV + GHSA + NVD + EPSS + KEV correlation | one feed, fast |
-| SBOM | generates + signs | none |
+| SBOM | generates; the release pipeline signs | none |
 | Budget | < 5 min full audit | < 5 s on PR diff |
 
 **Core principle**: every dependency is a potential supply-chain attack vector. The 2024-2026 wave (xz-utils CVE-2024-3094, the recurring npm `colors`/`faker` / `ua-parser-js` / `event-stream` lineage, hundreds of PyPI typosquats per month) makes continuous SCA non-negotiable.
@@ -403,7 +403,7 @@ Generate **both** for high-assurance projects — they describe the same graph f
 # Multi-ecosystem SBOM generation
 syft .  -o cyclonedx-json=sbom.cdx.json -o spdx-json=sbom.spdx.json    # universal
 trivy fs --format cyclonedx --output sbom.cdx.json .                   # universal, vuln-aware
-npx @cyclonedx/cyclonedx-npm --output-file sbom.cdx.json               # Node
+npx --no -- @cyclonedx/cyclonedx-npm --output-file sbom.cdx.json               # Node
 cyclonedx-py requirements requirements.txt --output-format JSON -o sbom.cdx.json  # Python (cyclonedx-py v4+ subcommand CLI; -r flag removed)
 cyclonedx-gomod mod -json -output sbom.cdx.json                        # Go
 cargo cyclonedx --format json                                          # Rust
@@ -470,7 +470,7 @@ For Java/Python/Go, run call-graph reachability (Endor Labs / Snyk / `govulnchec
 Cross-link [[license-scanner]] for full policy mapping; this skill only flags the obvious blockers (AGPL in commercial SaaS, GPL in distributed binaries, unknown).
 
 ### Phase 6: SBOM + Sign + Attest
-Generate CycloneDX (and SPDX where required), sign with cosign keyless, publish attestation.
+Generate CycloneDX (and SPDX where required). Signing and publishing the attestation are steps of the release pipeline (see "Placement in CI" above), which signs with its own identity: you never run them. Report the bill of materials as generated and not signed, and whether the pipeline's configuration signs and attests it.
 
 ## Severity (internal triage vs. refinement-loop output)
 

@@ -646,8 +646,8 @@ Both Semgrep and CodeQL emit **SARIF** so findings aggregate in GitHub code-scan
 semgrep --config=p/security-audit --config=p/owasp-top-ten \
         --baseline-commit=origin/main \
         --sarif --output=semgrep.sarif .
-# For LLM-app scanning, check the Semgrep registry for the current LLM ruleset
-# (pack names change; verify https://semgrep.dev/explore before pinning).
+# For LLM-app scanning, the current LLM ruleset is listed in the Semgrep registry (https://semgrep.dev/explore).
+# Pack names change and you read no web page: never pin a pack name from memory; name it in your report as unconfirmed.
 
 # CodeQL — deep, scheduled
 codeql database create db --language=javascript --source-root=.
@@ -658,7 +658,7 @@ codeql database analyze db --format=sarif-latest --output=codeql.sarif \
 pip install bandit
 bandit -r . -f sarif -o bandit.sarif -ll       # Python (native SARIF)
 gosec -fmt=sarif -out=gosec.sarif ./...        # Go
-npx eslint --plugin security --format=@microsoft/eslint-formatter-sarif --output-file=eslint.sarif
+npx --no -- eslint --plugin security --format=@microsoft/eslint-formatter-sarif --output-file=eslint.sarif
 ./gradlew spotbugsMain                         # Java / Kotlin
 cargo audit --json                             # Rust
 

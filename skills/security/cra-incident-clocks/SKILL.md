@@ -25,7 +25,7 @@ related_skills:
   - compliance/sbom-cra-checker
   - compliance/audit-log-checker
 effort_level: high
-tools: Read, Write, Grep
+tools: Read, Write, Grep, Glob, Edit
 model: opus
 ---
 

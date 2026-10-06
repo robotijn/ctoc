@@ -239,7 +239,7 @@ CREATE USER MAPPING FOR app_user SERVER remote_db OPTIONS (user 'admin', passwor
 | Bitbucket app password | `ATBB[A-Za-z0-9]{32}` |
 | Azure DevOps PAT | high-entropy 52-char base32 |
 
-**Verification.** `curl -sS -I -H "Authorization: Bearer $TOKEN" https://api.github.com/user | grep -i x-oauth-scopes` — the `X-OAuth-Scopes` response header lists the token's granted scopes, which set the blast radius. Drop `-I` and pipe the JSON body to `jq '.login'` to confirm the owning account.
+**Verification (for a human in a throwaway shell; the agent never runs it).** `curl -sS -I -H "Authorization: Bearer $TOKEN" https://api.github.com/user | grep -i x-oauth-scopes` — the `X-OAuth-Scopes` response header lists the token's granted scopes, which set the blast radius. Drop `-I` and pipe the JSON body to `jq '.login'` to confirm the owning account.
 
 **Fine-grained PATs vs. classic.** Fine-grained PATs are repo/org-scoped and expire by default — still a finding when committed, but lower blast radius. Classic PATs default to broad scopes; treat any leaked classic PAT with `repo` or `admin:org` scope as CRITICAL.
 
@@ -385,10 +385,10 @@ trufflehog docker --image myorg/api:latest --json --results=verified
 trufflehog github --org=your-org --json --results=verified --issue-comments
 
 # Gitleaks — directory scan, no git history (skips history); fast pre-PR check
-gitleaks dir --report-format sarif --report-path gitleaks.sarif .
+gitleaks dir --redact --report-format sarif --report-path gitleaks.sarif .
 
 # Gitleaks — full git history with custom config and baseline
-gitleaks git --config .gitleaks.toml --baseline-path .gitleaks-baseline.json \
+gitleaks git --redact --config .gitleaks.toml --baseline-path .gitleaks-baseline.json \
              --report-format sarif --report-path gitleaks.sarif .
 
 # Gitleaks — pre-commit (via the pre-commit framework; this is the hook's own command)
@@ -415,6 +415,8 @@ ggshield secret scan ci
 All scanners that matter in 2026 emit **SARIF**. Make SARIF the default output and aggregate into the GitHub code-scanning Security tab so duplicates collapse and reviewers see one unified list.
 
 ### Verifying that a found secret is live (sandboxed)
+
+These commands are for a human in a throwaway shell. The agent never runs them and never types a found value into a command: the scanner's own check verifies, and a credential it did not verify is reported as unverified.
 
 ```bash
 # AWS — minimal IAM call, no side effects

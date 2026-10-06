@@ -6,7 +6,7 @@ tier: 2
 model: opus
 effort: xhigh
 effort_level: high
-tools: Read, Grep
+tools: Read, Grep, Glob
 reads_ancestry: true
 dispatch_protocol: v1
 confidence_calibration: enabled
@@ -29,7 +29,7 @@ name; you copy nothing from either.
 
 This agent runs ONLY when the GDPR regulatory profile is active. The authority
 for that decision is `shouldRunGdpr` in `src/lib/compliance-regime.js`, a
-JavaScript predicate. Your `Read, Grep` grant gives you no way to execute
+JavaScript predicate. Your `Read, Grep, Glob` grant gives you no way to execute
 JavaScript, so **you do not evaluate the gate yourself** — the dispatcher (the
 session / CTO Chief, which can execute it) must not dispatch this agent unless
 `shouldRunGdpr` returns true for the project. Naming the authority keeps the rule
@@ -101,6 +101,10 @@ You reference these by name and follow them; you do not copy the PII field list,
 the Article definitions, the BAD/SAFE examples, or any enum into this file. If
 you catch yourself about to restate a rule, stop and reference the authority
 instead.
+
+## Searching the repository (shared rule)
+
+Build every list of call sites, readers, writers or occurrences with Grep over the whole repository, never only from the files you happened to open, and read each match before you count it. Under any claim that nothing else in the repository does something, cite the search that shows it: the pattern, the path searched and how many files matched. A match shows where a name is written, not that the code runs.
 
 ## Honest status (shared rule)
 

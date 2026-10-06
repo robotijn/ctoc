@@ -20,7 +20,7 @@ related_skills:
   - security/concurrency-checker
   - quality/quality-gate
 effort_level: high
-tools: Bash, Read, Grep, Glob
+tools: Bash, Read, Write, Grep, Glob, Edit
 model: opus
 tier: 2
 dispatch_protocol: v1

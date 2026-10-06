@@ -14,7 +14,7 @@ related_skills:
   - security/dependency-auditor
   - security/dependency-checker
 effort_level: medium
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1
@@ -116,11 +116,11 @@ The scanner runs the per-ecosystem command, parses output to SPDX, joins against
 ### JavaScript / TypeScript (npm / pnpm / yarn)
 ```bash
 # license-checker — broadest coverage, JSON for piping
-npx license-checker --production --json --excludePrivatePackages > licenses-js.json
+npx --no -- license-checker --production --json --excludePrivatePackages > licenses-js.json
 # Block on disallowed licenses in CI:
-npx license-checker --production --failOn "GPL;AGPL;SSPL;BUSL;Commons-Clause;UNLICENSED;UNKNOWN"
+npx --no -- license-checker --production --failOn "GPL;AGPL;SSPL;BUSL;Commons-Clause;UNLICENSED;UNKNOWN"
 # Generate attribution bundle (CSV) for release artifact:
-npx license-checker --production --csv --customPath license-customformat.json > NOTICE.csv
+npx --no -- license-checker --production --csv --customPath license-customformat.json > NOTICE.csv
 ```
 
 ### Python (pip / Poetry / uv)
@@ -130,7 +130,7 @@ pip-licenses --format=json --with-urls --with-license-file > licenses-py.json
 pip-licenses --allow-only="MIT;BSD;BSD-2-Clause;BSD-3-Clause;Apache-2.0;ISC;Python-2.0;PSF-2.0"
 # Poetry users: poetry export then pip-licenses against the venv
 poetry export -f requirements.txt --output requirements.txt
-pip install -r requirements.txt && pip-licenses --format=json
+pip-licenses --format=json
 ```
 
 ### Java / Kotlin (Maven / Gradle)
@@ -277,7 +277,7 @@ Recommended baseline: per-ecosystem CLI on every PR (diff-mode, fast) + a SaaS o
 ```yaml
 # JS
 - name: Check JS licenses
-  run: npx license-checker --production --failOn "GPL;AGPL;SSPL;BUSL;Commons-Clause;UNLICENSED;UNKNOWN"
+  run: npx --no -- license-checker --production --failOn "GPL;AGPL;SSPL;BUSL;Commons-Clause;UNLICENSED;UNKNOWN"
 
 # Python
 - name: Check Python licenses

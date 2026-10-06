@@ -48,13 +48,13 @@ const MAIN = path.join(__dirname, 'agent-tool-grants.test.js');
  * exceptions excuse; HELD_PER_TOOL binds how many times each tool is held for removal.
  */
 const CEILINGS = Object.freeze({
-  MAX_DEBT: 75,
-  MAX_WRITE_EDIT_DEBT: 7,
+  MAX_DEBT: 46,
+  MAX_WRITE_EDIT_DEBT: 1,
   MAX_RULE6_EXCEPTIONS: 1,
-  MAX_HELD_REMOVALS: 48,
-  MAX_MATCH_IS_DATA_DEBT: 6,
+  MAX_HELD_REMOVALS: 42,
+  MAX_MATCH_IS_DATA_DEBT: 1,
   EXCUSED_TOOLS: 1,
-  HELD_PER_TOOL: Object.freeze({ Bash: 21, Write: 13, Edit: 13, Task: 1 }),
+  HELD_PER_TOOL: Object.freeze({ Bash: 21, Write: 10, Edit: 10, Task: 1 }),
 });
 
 /** Each maximum in the main test, with the list whose size it bounds. */

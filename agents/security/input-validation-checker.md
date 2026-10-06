@@ -1,7 +1,7 @@
 ---
 name: input-validation-checker
 description: Ensures all user inputs are validated and sanitized. Dispatch when the request mentions input validation, validate inputs, sanitize user input, injection prevention, schema validation, or validation check.
-tools: Read, Grep
+tools: Read, Grep, Glob
 model: opus
 effort: xhigh
 tier: 2
@@ -141,6 +141,10 @@ Tag every finding with its OWASP Top 10 2025 code and a CWE id, taken from the s
 2. Add path sanitization middleware
 3. Add file upload validation middleware
 ```
+
+## Searching the repository (shared rule)
+
+Build every list of call sites, readers, writers or occurrences with Grep over the whole repository, never only from the files you happened to open, and read each match before you count it. Under any claim that nothing else in the repository does something, cite the search that shows it: the pattern, the path searched and how many files matched. A match shows where a name is written, not that the code runs.
 
 ## Honest status (shared rule)
 

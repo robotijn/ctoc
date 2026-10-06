@@ -464,10 +464,10 @@ npm sbom --sbom-format cyclonedx > bom.json
 npm sbom --sbom-format spdx > bom.spdx.json
 
 # @cyclonedx/cdxgen — most comprehensive Node/TS generator, also covers many other langs
-npx @cyclonedx/cdxgen -t javascript -o bom.json --spec-version 1.6 .
+npx --no -- @cyclonedx/cdxgen -t javascript -o bom.json --spec-version 1.6 .
 
 # pnpm / yarn berry — use cdxgen, both lockfile formats are supported
-npx @cyclonedx/cdxgen -t pnpm -o bom.json --spec-version 1.6 .
+npx --no -- @cyclonedx/cdxgen -t pnpm -o bom.json --spec-version 1.6 .
 ```
 
 Pitfalls: `npm sbom` reflects what's in `node_modules`, which depends on whether you ran `--production` — make sure to run it after `npm ci --omit=dev` for the shipped graph. Bundlers (Vite, esbuild, Rollup) tree-shake — the SBOM should be the *resolved* dependency graph, not just everything in `package.json`.

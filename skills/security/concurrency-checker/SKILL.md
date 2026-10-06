@@ -67,7 +67,7 @@ You operate in two modes:
 | Suspected livelock or starvation under load | Dynamic — load test + profiler | These manifest only with concurrent pressure. |
 | Critical-section protocol where correctness depends on interleavings (lock-free queue, signal handler, RCU) | Model checker — TLA+ or SPIN | Exhaustive interleaving search; expensive but definitive for small models. |
 
-Invoke a dynamic tool when (a) the static signal is ambiguous OR (b) the code is on the hot path and a wrong call is unrecoverable (financial, auth, persistence). Document the choice in `## Decisions Taken Under Ambiguity`.
+Invoke a dynamic tool when (a) the static signal is ambiguous OR (b) the code is on the hot path and a wrong call is unrecoverable (financial, auth, persistence). Report the choice in your output, for the plan's `## Decisions Taken Under Ambiguity` section.
 
 ## What to Detect (foundational categories — apply across all 7 languages)
 
@@ -537,7 +537,7 @@ For C and C++, data races on raw pointers and UAF-by-race overlap with memory sa
 
 - **Vendor / third-party libs**: don't flag inside `vendor/` `node_modules/` `bin/` `obj/`; DO flag your code's use of an API in a way that violates the library's thread-safety contract (e.g. `HashMap` shared across threads in Java, `dict` mutation on free-threaded Python).
 - **Test code**: tests that rely on `sleep` are themselves a smell; flag them as MEDIUM. Tests for concurrent code should use barriers, latches, or property-based stress harnesses.
-- **Legacy**: a confirmed race on a quiet code path that handles non-sensitive data may be tracked via [[technical-debt-tracker]] with an explicit migration plan, but document the decision in the plan's `## Decisions Taken Under Ambiguity`.
+- **Legacy**: a confirmed race on a quiet code path that handles non-sensitive data may be tracked via [[technical-debt-tracker]] with an explicit migration plan, but report the decision in your output, for the plan's `## Decisions Taken Under Ambiguity` section.
 - **Framework-aware**: ASP.NET Core `IHttpContextAccessor` across `Task.Run`, Spring `@Async` returning `void`, Django ORM in `asyncio` without `sync_to_async`, Node.js `worker_threads` with `SharedArrayBuffer` — each has a documented thread-safety contract; flag violations.
 
 ## Letter schema (refinement-loop output contract)

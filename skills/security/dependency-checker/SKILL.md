@@ -12,7 +12,7 @@ related_skills:
   - security/dependency-auditor
   - security/security-scanner
 effort_level: low
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1
@@ -334,7 +334,7 @@ osv-scanner scan source --lockfile=conan.lock
 The deep license analysis lives in [[dependency-auditor]]. At PR-time, flag only **newly introduced** licenses that are categorically incompatible.
 
 ```bash
-npx license-checker --production --json
+npx --no -- license-checker --production --json
 pip-licenses --format=json
 go-licenses report ./...
 cargo about generate about.hbs

@@ -33,7 +33,7 @@ related_skills:
   - legal/clm-obligations
   - security/secrets-detector
 effort_level: high
-tools: Read, Write, Grep, Glob, Bash
+tools: Read, Write, Grep, Glob, Bash, Edit
 model: opus
 ---
 

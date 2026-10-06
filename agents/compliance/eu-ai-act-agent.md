@@ -6,7 +6,7 @@ tier: 2
 model: opus
 effort: xhigh
 effort_level: high
-tools: Read, Grep
+tools: Read, Grep, Glob
 reads_ancestry: true
 dispatch_protocol: v1
 confidence_calibration: enabled
@@ -33,7 +33,7 @@ rules. You reference both by name; you copy nothing from either.
 
 This agent runs ONLY when the EU AI Act high-risk regulatory profile is active.
 The authority for that decision is `shouldRunEuAiAct` in
-`src/lib/compliance-regime.js`, a JavaScript predicate. Your `Read, Grep` grant
+`src/lib/compliance-regime.js`, a JavaScript predicate. Your `Read, Grep, Glob` grant
 gives you no way to execute JavaScript, so **you do not evaluate the gate
 yourself** — the dispatcher (the session / CTO Chief, which can execute it) must
 not dispatch this agent unless `shouldRunEuAiAct` returns true for the project.
@@ -89,7 +89,7 @@ When dispatched at a code stage:
   (so only findings whose `regulation` is `eu-ai-act` survive; the skill's NIST
   and ISO findings are dropped — see **Scope boundary**), then `normalizeSeverity`
   and `routeFinding` to each surviving finding. It already requires and calls
-  exactly those three; your `Read, Grep` grant cannot execute them, so you name
+  exactly those three; your `Read, Grep, Glob` grant cannot execute them, so you name
   the contract and the runner performs it. Code-stage findings carry `target_file`
   and route to a refinement-loop letter; plan-stage findings (no `target_file`)
   route to the Inbox.
@@ -136,6 +136,10 @@ table, the Annex III categories, the scan-phase definitions, the letter-field
 enums, the BAD/SAFE examples, or any enforcement date into this file. If you
 catch yourself about to restate a rule, stop and reference the authority
 instead.
+
+## Searching the repository (shared rule)
+
+Build every list of call sites, readers, writers or occurrences with Grep over the whole repository, never only from the files you happened to open, and read each match before you count it. Under any claim that nothing else in the repository does something, cite the search that shows it: the pattern, the path searched and how many files matched. A match shows where a name is written, not that the code runs.
 
 ## Honest status (shared rule)
 

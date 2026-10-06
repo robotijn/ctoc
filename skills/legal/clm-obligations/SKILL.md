@@ -31,7 +31,7 @@ related_skills:
   - compliance/gdpr-compliance-checker
   - compliance/audit-log-checker
 effort_level: medium
-tools: Read, Write, Grep, Glob
+tools: Read, Write, Grep, Glob, Edit
 model: opus
 ---
 
@@ -202,7 +202,7 @@ The skill **does not** generate the body of the clause. If the lawyer-reviewed f
 3. **Validate** — every obligation entry must carry either a calendar date or an `n/a:` reason. `null` is not acceptable.
 4. **Reconcile** — cross-check with [[saas/legal-scaffold]] output (which documents were generated) and [[legal/dsar-handler]] output (which sub-processors are notified on DSAR events).
 5. **Emit** — write or update `.ctoc/contracts/obligations.yaml`. Sort `calendar.next_30_days:` and `calendar.next_90_days:` by date ascending.
-6. **Audit** — append a hash-chain entry: SHA-256 of the canonical YAML, signed by the run, written to `.ctoc/audit/dispatches/<date>/clm-extract.yaml`.
+6. **Audit** — give the hash-chain entry in your report for the executor to append to `.ctoc/audit/dispatches/<date>/clm-extract.yaml`: you hold no command tool, so name the command that computes the SHA-256 of the canonical YAML, and never write a hash you did not see computed.
 
 ## Health Insurance Portability and Accountability Act — special handling
 

@@ -14,7 +14,7 @@ related_skills:
   - security/sast-scanner
   - specialized/api-contract-validator
 effort_level: medium
-tools: Read, Grep
+tools: Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1

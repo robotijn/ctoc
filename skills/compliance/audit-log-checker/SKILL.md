@@ -14,7 +14,7 @@ related_skills:
   - specialized/observability-checker
   - security/secrets-detector
 effort_level: high
-tools: Read, Grep
+tools: Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1
