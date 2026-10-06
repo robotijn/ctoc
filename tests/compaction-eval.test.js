@@ -205,6 +205,12 @@ describe('3. matchers', () => {
     assert.equal(score.evaluate({ findings: [{ id: 'a', severity: 'important' }] }, clean).seriousFalse, true);
     assert.equal(score.evaluate({ findings: [{ id: 'a', severity: 'normal' }] }, clean).seriousFalse, false);
   });
+  for (const [key, value] of [['require', [{ id: 'x' }]], ['forbid', ['x']], ['fields', { verdict: 'ACCEPT' }], ['fields_contain', { notes: 'x' }]]) {
+    test(`a clean fixture carrying ${key} is refused, naming the fixture and the key`, () => {
+      const clean = { name: 'c-named', kind: 'clean', [key]: value };
+      assert.throws(() => score.evaluate({ findings: [] }, clean), (err) => err.message === `clean fixture c-named carries ${key}, which the scorer never reads on a clean plan`);
+    });
+  }
 });
 
 // ── 4. The smoke rule ────────────────────────────────────────────────────────────────
@@ -230,12 +236,49 @@ describe('4. the smoke rule', () => {
     const v = score.smokeVerdict([row('clean', ok, { ...ok, seriousFalse: true })]);
     assert.deepEqual(v.rows[0].shortfalls, ['serious-false-finding']);
   });
-  test('a planted defect both versions missed is reported and not counted', () => {
+  test('a planted defect both versions missed tested nothing: planted-missed-by-both, INCOMPLETE', () => {
     const missed = { ...ok, found: false };
-    const v = score.smokeVerdict([row('planted', missed, missed)]);
-    assert.equal(v.verdict, 'PASS');
+    const v = score.smokeVerdict([row('planted', missed, missed), row('clean', ok, ok)]);
+    assert.equal(v.verdict, 'INCOMPLETE');
+    assert.equal(v.rows[0].status, 'planted-missed-by-both');
     assert.deepEqual(v.rows[0].shortfalls, []);
-    assert.ok(v.rows[0].notes.includes('both-missed-planted-defect'));
+    assert.equal('notes' in v.rows[0], false, 'the replaced both-missed note is gone');
+  });
+  test('planted-missed-by-both outranks FAIL and RERUN, and stays when the rerun misses too', () => {
+    const missed = { ...ok, found: false };
+    const confirmed = row('planted', ok, missed, { original: ok, compacted: missed });
+    const v = score.smokeVerdict([row('planted', missed, missed, { original: missed, compacted: missed }), confirmed]);
+    assert.equal(v.verdict, 'INCOMPLETE');
+    assert.equal(v.rows[0].status, 'planted-missed-by-both');
+  });
+  test('a rerun in which either version finds the planted defect clears planted-missed-by-both', () => {
+    const missed = { ...ok, found: false };
+    assert.equal(score.smokeVerdict([row('planted', missed, missed, { original: missed, compacted: ok })]).rows[0].status, 'ok');
+    assert.equal(score.smokeVerdict([row('planted', missed, missed, { original: ok, compacted: missed })]).rows[0].status, 'planted-missed-by-both',
+      'a rerun showing the regression itself (original finds, compacted misses) clears nothing');
+  });
+  test('a clean plan whose original already raises a serious finding tested nothing: baseline-not-clean, INCOMPLETE', () => {
+    const serious = { ...ok, seriousFalse: true };
+    const v = score.smokeVerdict([row('clean', serious, serious), row('planted', ok, ok)]);
+    assert.equal(v.verdict, 'INCOMPLETE');
+    assert.equal(v.rows[0].status, 'baseline-not-clean');
+    assert.equal(score.smokeVerdict([row('clean', serious, ok)]).verdict, 'INCOMPLETE');
+  });
+  test('a rerun whose original is not serious-false clears baseline-not-clean; one that is, does not', () => {
+    const serious = { ...ok, seriousFalse: true };
+    const cleared = score.smokeVerdict([row('clean', serious, ok, { original: ok, compacted: ok })]);
+    assert.equal(cleared.verdict, 'PASS');
+    assert.equal(cleared.rows[0].status, 'ok');
+    const kept = score.smokeVerdict([row('clean', serious, ok, { original: serious, compacted: ok })]);
+    assert.equal(kept.rows[0].status, 'baseline-not-clean');
+    const regressed = score.smokeVerdict([row('clean', serious, ok, { original: ok, compacted: serious })]);
+    assert.equal(regressed.rows[0].status, 'baseline-not-clean', 'a rerun whose compacted raises the serious finding clears nothing');
+    assert.equal(regressed.verdict, 'INCOMPLETE');
+  });
+  test('baseline-invalid keeps precedence over the two new statuses', () => {
+    const bad = { valid: false, found: false, seriousFalse: true };
+    assert.equal(score.smokeVerdict([row('clean', bad, ok)]).rows[0].status, 'baseline-invalid');
+    assert.equal(score.smokeVerdict([row('planted', bad, { ...ok, found: false })]).rows[0].status, 'baseline-invalid');
   });
   test('a rerun that does not repeat the shortfall clears it', () => {
     const v = score.smokeVerdict([row('planted', ok, { ...ok, found: false }, { original: ok, compacted: ok })]);
@@ -733,6 +776,9 @@ describe('9. score.js serves every agent', () => {
     const v = score.smokeVerdict([{ fixture: 'p', kind: 'planted', original: bad, compacted: ok, rerun: { original: ok, compacted: ok } }]);
     assert.equal(v.verdict, 'PASS');
     assert.equal(score.smokeVerdict([{ fixture: 'p', kind: 'planted', original: bad, compacted: ok, rerun: { original: bad, compacted: ok } }]).verdict, 'INCOMPLETE');
+    const regressed = score.smokeVerdict([{ fixture: 'p', kind: 'planted', original: bad, compacted: ok, rerun: { original: ok, compacted: { ...ok, found: false } } }]);
+    assert.equal(regressed.rows[0].status, 'baseline-invalid', 'a rerun that shows the regression clears nothing');
+    assert.equal(regressed.verdict, 'INCOMPLETE');
   });
 
   test('a contract adapter outside the repository is refused', () => {
@@ -802,6 +848,42 @@ describe('9c. score.js command line refusals', () => {
       const r = runScore(repo, ['--expectations', 'missing.json', '--runs', '.ctoc/eval/x/d']);
       assert.equal(r.status, 5);
       assert.match(r.stderr, /harness error/);
+    } finally {
+      fs.rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('9d. score.js refuses a row that tested nothing', () => {
+  const lensRun = (severity) => JSON.stringify({ output: JSON.stringify({ ...validPayload(), findings: severity ? [{ ...validPayload().findings[0], severity }] : [] }), tokens: 1 });
+  const setUp = (repo, fixtures, severity) => {
+    fs.writeFileSync(path.join(repo, 'e.json'), JSON.stringify({ lens: 'premortem', fixtures }));
+    const runs = path.join('.ctoc', 'eval', 'x', 'd');
+    fs.mkdirSync(path.join(repo, runs), { recursive: true });
+    for (const f of fixtures) for (const v of ['original', 'compacted']) fs.writeFileSync(path.join(repo, runs, `${f.name}__${v}.json`), lensRun(severity));
+    return runs;
+  };
+
+  test('a clean fixture the original already flags serious is INCOMPLETE, exit 4, the fixture named on its row', () => {
+    const repo = tmpdir();
+    try {
+      const runs = setUp(repo, [{ name: 'clean-but-not', kind: 'clean', ref: EXPECT.ref }], 'critical');
+      const r = runScore(repo, ['--expectations', 'e.json', '--runs', runs]);
+      assert.equal(r.status, 4, r.stdout + r.stderr);
+      assert.match(r.stdout, /^clean-but-not .*baseline-not-clean/m);
+      assert.match(r.stdout, /VERDICT INCOMPLETE/);
+    } finally {
+      fs.rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  test('a clean fixture carrying a condition is a harness error, exit 5, naming fixture and key', () => {
+    const repo = tmpdir();
+    try {
+      const runs = setUp(repo, [{ name: 'clean-with-require', kind: 'clean', ref: EXPECT.ref, require: [{ id: 'f-1' }] }], null);
+      const r = runScore(repo, ['--expectations', 'e.json', '--runs', runs]);
+      assert.equal(r.status, 5, r.stdout + r.stderr);
+      assert.match(r.stderr, /harness error: clean fixture clean-with-require carries require/);
     } finally {
       fs.rmSync(repo, { recursive: true, force: true });
     }

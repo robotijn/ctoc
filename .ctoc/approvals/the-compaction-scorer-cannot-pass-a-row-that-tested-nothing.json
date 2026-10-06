@@ -1,9 +1,9 @@
 {
-  "content_sha256": "b07f14d9e083d990e91056a9809cd0d19a8e3c38efdd8b86cc5f5f48b55078de",
+  "content_sha256": "a5cd7e10e81b29efd8786660711fa8d41607d33adbfe04e1154e4b7a6eb2ab89",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T19:14:16.411Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T19:26:13.408Z",
   "approved_by": "human",
   "plan_basename": "the-compaction-scorer-cannot-pass-a-row-that-tested-nothing"
 }
