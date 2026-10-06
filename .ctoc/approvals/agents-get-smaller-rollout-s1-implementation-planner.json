@@ -1,9 +1,9 @@
 {
-  "content_sha256": "47e3a25bdbd17070eea907c835d557488461411e1454f6e2fe6d601fc9f21a45",
+  "content_sha256": "4d01f732b17a08dfd97919c4f345b3be83819f74bdf3d0a92315ccf5b8b7b110",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T18:01:53.302Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T19:14:06.201Z",
   "approved_by": "human",
   "plan_basename": "agents-get-smaller-rollout-s1-implementation-planner"
 }

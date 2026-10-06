@@ -121,3 +121,7 @@ dominated by cache reads. The whole measurement was 17 runs, 4,233,967 billed to
 ## Agents never wait in a sleep loop
 
 2026-10-06. Plan `agents-never-wait-in-a-sleep-loop`: the rule sentence now ships in `agents/iron-loop/iron-loop-executor.md`, as lesson 20 in `.ctoc/templates/operating-lessons.md` (every user project on its next `/ctoc:update`) and in this repository's CLAUDE.md (now 14,815 bytes). Before: 412 of 1,045 agent-hours in sleep-and-check loops since 18 August. After: not measured yet — rerun `node .ctoc/audit/speed-and-size/benchmarks/pipeline-time.js` on transcripts from after the release and report polling hours per month; the test only proves the sentence ships. `npm test`: 12,158 tests, 12,158 passed, 0 failed, 0 skipped, coverage 99.9% (floor 99), gate PASS.
+
+## implementation-planner — compaction (rollout)
+
+The agent definition went from 36797 to 27019 bytes with every order kept, checked by its rule-inventory test. Smoke check (one run per version, low statistical power, not proof): PASS. Full numbers, including tokens per run, are in the plan's Execution Record (plans/done/agents-get-smaller-rollout-s1-implementation-planner.md) and in `.ctoc/eval/implementation-planner/2026-10-06/summary.json`.

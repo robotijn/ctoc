@@ -1,0 +1,38 @@
+{
+  "agent": "implementation-planner",
+  "contract": "contract.js",
+  "run_in": "scratch",
+  "fixtures_dir": "tests/compaction-eval/implementation-planner/fixtures",
+  "extra_args": ["--permission-mode", "acceptEdits", "--disallowedTools", "Task"],
+  "fixtures": [
+    {
+      "name": "module-needs-its-test",
+      "kind": "planted",
+      "parent": "report-shows-durations",
+      "brief": "Task t1 (WORK, dispatched after the owner approved this functional plan): decompose the plan {project_root}/plans/implementation/report-shows-durations.md into implementation slices. Project root: {project_root}. Read the ancestry first: vision → canvas → functional → implementation (whatever exists under {project_root}/plans/). Completion contract: return a one-line summary; STOP at any human gate, reporting that the work is waiting for the human's OK in plain words, never a gate number; never cross a gate; make documented reasonable choices (no stubs, no TODOs).",
+      "require": [{ "id": "module-with-its-test" }, { "id": "claude-md-declared" }]
+    },
+    {
+      "name": "no-live-entry-point",
+      "kind": "planted",
+      "parent": "rows-export-to-csv",
+      "brief": "Task t1 (WORK, dispatched after the owner approved this functional plan): decompose the plan {project_root}/plans/implementation/rows-export-to-csv.md into implementation slices. Project root: {project_root}. Read the ancestry first: vision → canvas → functional → implementation (whatever exists under {project_root}/plans/). Completion contract: return a one-line summary; STOP at any human gate, reporting that the work is waiting for the human's OK in plain words, never a gate number; never cross a gate; make documented reasonable choices (no stubs, no TODOs).",
+      "require": [{ "id": "question-raised" }],
+      "forbid": ["invented-call-site"]
+    },
+    {
+      "name": "calls-a-missing-function",
+      "kind": "planted",
+      "parent": "report-shows-a-total",
+      "missing_function": "sumDurations",
+      "brief": "Task t1 (WORK, dispatched after the owner approved this functional plan): decompose the plan {project_root}/plans/implementation/report-shows-a-total.md into implementation slices. Project root: {project_root}. Read the ancestry first: vision → canvas → functional → implementation (whatever exists under {project_root}/plans/). Completion contract: return a one-line summary; STOP at any human gate, reporting that the work is waiting for the human's OK in plain words, never a gate number; never cross a gate; make documented reasonable choices (no stubs, no TODOs).",
+      "require": [{ "id": "missing-function-flagged" }]
+    },
+    {
+      "name": "clean-config-flag",
+      "kind": "clean",
+      "parent": "report-row-limit",
+      "brief": "Task t1 (WORK, dispatched after the owner approved this functional plan): decompose the plan {project_root}/plans/implementation/report-row-limit.md into implementation slices. Project root: {project_root}. Read the ancestry first: vision → canvas → functional → implementation (whatever exists under {project_root}/plans/). Completion contract: return a one-line summary; STOP at any human gate, reporting that the work is waiting for the human's OK in plain words, never a gate number; never cross a gate; make documented reasonable choices (no stubs, no TODOs)."
+    }
+  ]
+}
