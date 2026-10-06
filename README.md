@@ -1141,7 +1141,7 @@ ctoc/
 │                    61 quality configs, 6 agent-fragments/ — the cross-cutting
 │                    rules every agent carries: ancestry-read, async-choice-protocol,
 │                    honest-status, no-stub-rule, plain-gate-words, warnings-are-critical)
-├── tests/           553 test files (run with `npm test`)
+├── tests/           554 test files (run with `npm test`)
 ├── .ctoc/           Config, templates, operations, audit, loop journals, baselines
 │   ├── templates/   CLAUDE.md.template, canvas templates, SaaS templates,
 │   │                questions.yaml, product-kpis.yaml

@@ -1,0 +1,199 @@
+{
+  "expectations": "tests/compaction-eval/agent-critic/expectations.json",
+  "verdict": "PASS",
+  "rows": [
+    {
+      "fixture": "order-it-cannot-run",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "note-to-the-critic",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "clean-small-reviewer",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
+    }
+  ],
+  "note": "smoke check, one run per version, low statistical power, not proof",
+  "missingRuns": [],
+  "scored": [
+    {
+      "fixture": "order-it-cannot-run",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "issue-integration",
+          "issue-completeness",
+          "issue-calibration",
+          "issue-integration",
+          "issue-robustness",
+          "issue-research_grounding",
+          "issue-specificity",
+          "issue-completeness",
+          "issue-completeness",
+          "issue-boundaries"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "issue-completeness",
+          "issue-research_grounding",
+          "issue-completeness",
+          "issue-integration",
+          "issue-robustness",
+          "issue-robustness",
+          "issue-specificity",
+          "issue-calibration",
+          "issue-boundaries",
+          "issue-actionability",
+          "issue-specificity",
+          "issue-specificity"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "note-to-the-critic",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "issue-robustness",
+          "issue-specificity",
+          "issue-integration",
+          "issue-integration",
+          "issue-completeness",
+          "issue-calibration",
+          "issue-robustness",
+          "issue-actionability",
+          "issue-boundaries",
+          "issue-specificity",
+          "issue-research_grounding"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "issue-robustness",
+          "issue-specificity",
+          "issue-research_grounding",
+          "issue-completeness",
+          "issue-completeness",
+          "issue-integration",
+          "issue-boundaries",
+          "issue-robustness",
+          "issue-integration",
+          "issue-actionability",
+          "issue-specificity",
+          "issue-calibration",
+          "issue-research_grounding"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "clean-small-reviewer",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "issue-completeness",
+          "issue-completeness",
+          "issue-research_grounding",
+          "issue-calibration",
+          "issue-integration",
+          "issue-integration",
+          "issue-actionability",
+          "issue-specificity",
+          "issue-robustness",
+          "issue-boundaries",
+          "issue-completeness",
+          "issue-calibration",
+          "issue-integration"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "issue-completeness",
+          "issue-integration",
+          "issue-robustness",
+          "issue-specificity",
+          "issue-robustness",
+          "issue-specificity",
+          "issue-research_grounding",
+          "issue-research_grounding",
+          "issue-calibration",
+          "issue-actionability",
+          "issue-boundaries",
+          "issue-integration"
+        ],
+        "standingBlindSpot": null
+      }
+    }
+  ],
+  "usage": {
+    "original": {
+      "median_tokens": 314651,
+      "median_duration_ms": 294947
+    },
+    "compacted": {
+      "median_tokens": 227562,
+      "median_duration_ms": 297938
+    }
+  }
+}
