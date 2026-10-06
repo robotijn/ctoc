@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/hallucination-detector/baseline-agent.md",
  "baseline_sha256": "89c12b097921617b306cebeb4a6f141066d8f3e0803876f88b9b4a8578b1de3a",
  "baseline_commit": "e8a5d5c17298cb1eb55dfc480620963c5649a437",
- "maxBytes": 57956,
+ "maxBytes": 58392,
  "units": [
   {
    "n": 1,
@@ -691,7 +691,7 @@
    "sha": "403673a4b1a830ffcf699143de57612a70f5f55c4de45c3bf69f76dd867a35f7",
    "kind": "reason",
    "orders": [],
-   "fate": "cut"
+   "fate": "kept"
   },
   {
    "n": 83,
@@ -826,14 +826,14 @@
    "orders": [
     "HD-099"
    ],
-   "fate": "tightened"
+   "fate": "kept"
   },
   {
    "n": 100,
    "sha": "7f84c4f233da35b11018e394f28e66de560632c6a4f998ee6dbd74e195ae3007",
    "kind": "reason",
    "orders": [],
-   "fate": "tightened"
+   "fate": "kept"
   },
   {
    "n": 101,
@@ -2151,14 +2151,14 @@
    "sha": "fb2e0e0a4ef1d49806436d8c2716bdc89eecf9f0fde8e26745d580a9f19baed9",
    "kind": "description",
    "orders": [],
-   "fate": "cut"
+   "fate": "kept"
   },
   {
    "n": 263,
    "sha": "a0775c1df702c42f83da9adb59c7daa39f61f309e2835cdc00abdcb49f417ebf",
    "kind": "description",
    "orders": [],
-   "fate": "cut"
+   "fate": "kept"
   },
   {
    "n": 264,
@@ -3331,7 +3331,7 @@
    "says": "- Python: an import name is not a distribution name.",
    "now_in": "## Detection Methods",
    "anchors": [
-    "Python: an import name is not a distribution name"
+    "- Python: an import name is not a distribution name."
    ],
    "pinned_by": null,
    "wire": false
@@ -3682,7 +3682,7 @@
    "says": "- Status 200, for a name that may be private. When the repository configures a registry other than the public one for that ecosystem, or the name carries the o…",
    "now_in": "## Detection Methods",
    "anchors": [
-    "and the public registry answers 200, the public package may be shadowing the organisation's own"
+    "When the repository configures a registry other than the public one for that ecosystem, or the name carries the organisation's own scope or prefix, and the public registry answers 200, the public package may be shadowing the organisation's own"
    ],
    "pinned_by": null,
    "wire": false
@@ -3753,7 +3753,7 @@
    "says": "- Status 404, for a name that may be private. When the repository configures a registry other than the public one for that ecosystem, or the name carries the o…",
    "now_in": "## Detection Methods",
    "anchors": [
-    "it may be an internal package"
+    "When the repository configures a registry other than the public one for that ecosystem, or the name carries the organisation's own scope or prefix, it may be an internal package"
    ],
    "pinned_by": null,
    "wire": false
@@ -3996,6 +3996,8 @@
    "now_in": "## Detection Methods",
    "anchors": [
     "The recipe reads only whether provenance is present, never whether it is valid, so never report a package's provenance as verified",
+    "package signing, integrity or provenance metadata",
+    "\"Prefer signed packages",
     "this file has no way to verify a signature"
    ],
    "pinned_by": null,

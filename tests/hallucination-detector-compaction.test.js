@@ -101,8 +101,7 @@ function yaml(r) {
         for (const item of v) {
           const [first, ...rest] = Object.entries(item);
           lines.push(`${pad}  - ${first[0]}: ${scalar(first[1])}`);
-          const sub = [];
-          put(Object.fromEntries(rest), `${pad}    `, sub);
+          put(Object.fromEntries(rest), `${pad}    `);
         }
       } else if (v && typeof v === 'object') { lines.push(`${pad}${k}:`); put(v, `${pad}  `); }
       else lines.push(`${pad}${k}: ${scalar(v)}`);

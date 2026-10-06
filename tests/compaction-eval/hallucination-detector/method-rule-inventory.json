@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/hallucination-detector/baseline-method.md",
  "baseline_sha256": "301804095c0bdafe863fa29ef4dc55e229774a7825b0855214d8740a96eaaea4",
  "baseline_commit": "e8a5d5c17298cb1eb55dfc480620963c5649a437",
- "maxBytes": 61982,
+ "maxBytes": 62099,
  "units": [
   {
    "n": 1,
@@ -1946,7 +1946,8 @@
    "says": "- Cargo: never `cargo search`, which \"performs a textual search for crates\" (https://doc.rust-lang.org/cargo/commands/cargo-search.html, read 2026-09-30) rathe…",
    "now_in": "## 2026 Best Practices (AI Quality category)",
    "anchors": [
-    "never `cargo search`"
+    "never `cargo search`",
+    "rather than an exact-name lookup; use the wrapper's crates.io recipe"
    ],
    "pinned_by": null,
    "wire": false
@@ -2279,6 +2280,7 @@
    "says": "The wrapper has no recipe for NuGet, the Go module proxy or Postgres extensions, so names from those are recorded as not checked; the addresses under \"2026 Bes…",
    "now_in": "## Detection Methods",
    "anchors": [
+    "so names from those are recorded as not checked; the addresses",
     "are observed facts about those registries, not recipes to run"
    ],
    "pinned_by": null,
