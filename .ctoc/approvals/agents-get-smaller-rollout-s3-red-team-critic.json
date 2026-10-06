@@ -1,9 +1,9 @@
 {
-  "content_sha256": "721cf7319f65526bf4b281aa07662dc8da39661e219675b7b765ec4549385dc9",
+  "content_sha256": "cd3b5f478d2c0f85dad390f41273913fdb29f986496e5bdbfe8810c0851e0616",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T18:01:53.555Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T19:43:16.087Z",
   "approved_by": "human",
   "plan_basename": "agents-get-smaller-rollout-s3-red-team-critic"
 }
