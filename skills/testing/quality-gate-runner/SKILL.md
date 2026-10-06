@@ -143,11 +143,15 @@ FAILED=0
 
 # Stage 1: security first (fail-fast)
 (cd . && gitleaks detect --no-banner --redact >"$RESULTS_DIR/secrets.log" 2>&1; echo $? >"$RESULTS_DIR/secrets.exit") &
-(cd . && semgrep --config=p/security-audit --error >"$RESULTS_DIR/sast.log" 2>&1; echo $? >"$RESULTS_DIR/sast.exit") &
+(cd . && semgrep --config=p/security-audit --error --json --output "$RESULTS_DIR/sast.json" >"$RESULTS_DIR/sast.log" 2>&1; echo $? >"$RESULTS_DIR/sast.exit") &
 wait
 for s in secrets sast; do
   if [ ! -f "$RESULTS_DIR/$s.exit" ] || [ "$(cat "$RESULTS_DIR/$s.exit")" != 0 ]; then
-    echo "CRITICAL: $s failed or recorded no exit status — aborting"; tail -20 "$RESULTS_DIR/$s.log" 2>/dev/null; exit 1
+    echo "CRITICAL: $s failed or recorded no exit status — aborting"
+    # semgrep quotes source lines: name the log and count the findings, never print them
+    if [ "$s" = sast ]; then echo "log: $RESULTS_DIR/sast.log, findings: $(grep -o '"check_id"' "$RESULTS_DIR/sast.json" 2>/dev/null | wc -l | tr -d ' ')"
+    else tail -20 "$RESULTS_DIR/$s.log" 2>/dev/null; fi
+    exit 1
   fi
 done
 
@@ -162,9 +166,11 @@ wait
 (cd frontend && npm run test >"$RESULTS_DIR/fe-test.log" 2>&1; echo $? >"$RESULTS_DIR/fe-test.exit") &
 (cd backend && pytest >"$RESULTS_DIR/be-test.log" 2>&1; echo $? >"$RESULTS_DIR/be-test.exit") &
 CHECKS="fe-lint fe-types be-lint be-types fe-test be-test"
-if [ -f playwright.config.ts ] || [ -f playwright.config.js ]; then
+PW_DIR=
+for d in . frontend; do for c in "$d"/playwright.config.*; do [ -f "$c" ] && PW_DIR=$d && break 2; done; done
+if [ -n "$PW_DIR" ]; then
   CHECKS="$CHECKS playwright"
-  (npx --no -- playwright test --reporter=list >"$RESULTS_DIR/playwright.log" 2>&1; echo $? >"$RESULTS_DIR/playwright.exit") &
+  (cd "$PW_DIR" && npx --no -- playwright test --reporter=list >"$RESULTS_DIR/playwright.log" 2>&1; echo $? >"$RESULTS_DIR/playwright.exit") &
 fi
 wait
 

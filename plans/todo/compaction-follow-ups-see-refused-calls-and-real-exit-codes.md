@@ -249,6 +249,21 @@ count moves):
   no wget" in the workflow limits (the Role section keeps it), "for changed tests only" after
   `--only-changed`, "above" after "the Go pair", and tightened two sentences; 21121 bytes, every anchor
   and kept unit holds.
+- **Refused-call records use keep-lists (decided by CTO Chief after the security re-check).** The
+  name-based redaction above is replaced: a tool name is a built-in name or `<other tool>`; a command
+  keeps program names, shell operators and plain relative path arguments, every other word `<arg>`; a
+  URL keeps http(s) scheme, host, a plain path and lowercase-word query values (the canary phrase
+  survives), everything else `<url>`, `/<path>` or `REDACTED`; a path field keeps only a plain relative
+  path, else `<outside the copy>`; the built value is then privacy-checked in full and percent-decoded
+  before the cut. Choices the decision left open, made here: a command argument without a `/` is kept
+  only when it reads as a file name with a short extension (`a.md`), so a bare flag value (`--token
+  VALUE`) is `<arg>`; the word after `|`, `||`, `&&`, `;` or `&` is also a program name and operators
+  are kept, so `echo x > plans/a.md` still reads as a write; a URL path segment is kept only when it is
+  at most 32 lowercase characters and a query word at most 20, so a lowercase token is not kept as a
+  "word"; the user-name check no longer treats `_` as a word character, so `backup_<user>_old` refuses.
+- **The skill's semgrep abort prints only the log path and the finding count** (semgrep now also writes
+  `--json --output sast.json`, which is counted); Playwright runs from the first folder, `.` then
+  `frontend`, holding any `playwright.config.*`.
 
 
 ---
@@ -346,3 +361,7 @@ findings from a critic that read this plan._
 - Security pass (red then green): 11 hostile-input tests, one per finding, each seen failing first.
   Finding 9's first form passed on the old block (the write to `/secrets.log` failed before gitleaks
   ran), so the test was sharpened to assert the block stops at `mktemp`, and then failed as it should.
+- Keep-list pass (red then green): 7 tests failed first — the re-check's 25 hostile inputs, refusal of a
+  kept value naming the user (before the cut, raw, decoded, any case), the `<other tool>` rule, the
+  canary-in-query and `plans/`-in-command survivals, the payload test, Playwright under `frontend/`, and
+  the semgrep abort. All green after the change.

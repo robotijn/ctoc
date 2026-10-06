@@ -275,11 +275,17 @@ function runParallelBlock({ fail = [], playwrightConfig = false, mktempFails = f
   const bin = path.join(dir, 'bin');
   const work = path.join(dir, 'work');
   for (const d of [bin, path.join(work, 'frontend'), path.join(work, 'backend')]) fs.mkdirSync(d, { recursive: true });
-  if (playwrightConfig) fs.writeFileSync(path.join(work, 'playwright.config.ts'), '');
+  if (playwrightConfig) fs.writeFileSync(path.join(work, playwrightConfig === true ? 'playwright.config.ts' : playwrightConfig), '');
   const tools = ['gitleaks', 'semgrep', 'npm', 'npx', 'ruff', 'mypy', 'pytest', ...(mktempFails ? ['mktemp'] : [])];
   for (const tool of tools) {
     const code = fail.includes(tool) || tool === 'mktemp' ? 1 : 0;
-    fs.writeFileSync(path.join(bin, tool), `#!/bin/sh\necho "${tool} $*" >> "${dir}/calls.log"\necho "out-of-${tool}"\nexit ${code}\n`, { mode: 0o755 });
+    // Logs its folder and arguments; writes a two-finding JSON report wherever `--output` points.
+    fs.writeFileSync(path.join(bin, tool), [
+      '#!/bin/sh', `echo "${tool} $(pwd) $*" >> "${dir}/calls.log"`,
+      'out=""; prev=""; for a in "$@"; do [ "$prev" = --output ] && out=$a; prev=$a; done',
+      '[ -n "$out" ] && echo \'{"results":[{"check_id":"a"},{"check_id":"b"}]}\' > "$out"',
+      `echo "out-of-${tool}"`, `exit ${code}`, ''
+    ].join('\n'), { mode: 0o755 });
   }
   const r = spawnSync('sh', ['-c', block], { cwd: work, encoding: 'utf8', env: { PATH: `${bin}:/usr/bin:/bin` } });
   const calls = fs.existsSync(path.join(dir, 'calls.log')) ? fs.readFileSync(path.join(dir, 'calls.log'), 'utf8') : '';
@@ -297,6 +303,22 @@ else {
     assert.match(passing.stdout, /✅ playwright PASSED/, passing.stdout);
     assert.equal(passing.status, 0, passing.stdout);
     assert.doesNotMatch(runParallelBlock().stdout, /playwright/, 'Playwright is expected without a config');
+  });
+
+  test('a playwright.config.* under frontend/ is found, and Playwright runs from that folder', () => {
+    const r = runParallelBlock({ fail: ['npx'], playwrightConfig: path.join('frontend', 'playwright.config.mjs') });
+    assert.match(r.stdout, /❌ playwright FAILED/, r.stdout);
+    assert.match(r.calls, /^npx \S*\/work\/frontend --no -- playwright test/m, r.calls);
+    assert.notEqual(r.status, 0);
+  });
+
+  test('a semgrep abort prints the log path and the finding count, never the log\'s source lines', () => {
+    const r = runParallelBlock({ fail: ['semgrep'] });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stdout, /CRITICAL: sast/);
+    assert.match(r.stdout, /sast\.log/);
+    assert.match(r.stdout, /findings: 2\b/, r.stdout);
+    assert.doesNotMatch(r.stdout, /out-of-semgrep/, 'the abort printed what semgrep wrote, which quotes source lines');
   });
 
   test('finding 9: when mktemp fails the block stops before running any check', () => {

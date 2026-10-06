@@ -609,7 +609,8 @@ function privateLeaks(text, scratch) {
   const leaks = [];
   if (scratch && has(scratch)) leaks.push('the scratch directory');
   if (has(os.homedir())) leaks.push('the home directory');
-  if (user && new RegExp(`(?<![A-Za-z0-9_])${escapeRe(user)}(?![A-Za-z0-9_])`, CASE_FOLD ? 'i' : '').test(text)) leaks.push('the user name');
+  // An underscore does not end a word here: `backup_<user>_old` names the user.
+  if (user && new RegExp(`(?<![A-Za-z0-9])${escapeRe(user)}(?![A-Za-z0-9])`, CASE_FOLD ? 'i' : '').test(text)) leaks.push('the user name');
   return leaks;
 }
 
@@ -646,59 +647,93 @@ function captureFiles(cwd, seeded, prefixes) {
 const DENIAL_FIELDS = ['file_path', 'notebook_path', 'path', 'command', 'url'];
 const DENIAL_CAP = 2000;
 
-const PATH_FIELDS = new Set(['file_path', 'notebook_path', 'path']);
-const TOOL_NAME = /^[A-Za-z0-9_-]{1,200}$/;
-const CRED_NAME = '[A-Za-z0-9_.-]*(?:token|key|secret|pass|auth|sig|session|code|cred)[A-Za-z0-9_.-]*';
-const CRED_PARAM = new RegExp(`([?&;])(${CRED_NAME})=[^&#\\s"']*`, 'gi');
-const CRED_ASSIGN = new RegExp(`(^|[^A-Za-z0-9_.?&;-])(${CRED_NAME})=(?:"[^"]*"|'[^']*'|[^\\s"';&|]+)`, 'gi');
-const OUTSIDE = '~/<outside the copy>';
+const KNOWN_TOOLS = new Set(['Bash', 'Edit', 'MultiEdit', 'Write', 'Read', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Glob', 'Grep', 'Task', 'Agent']);
+const OUTSIDE = '<outside the copy>';
+const SHELL_OP = /^(?:\|\||&&|[|;&<>]+)$/;
+const PROGRAM_AFTER = /^(?:\|\||&&|[|;&])$/;
 
-/** Each `%XX` read as its byte, so an encoded user name or credential is scanned too. */
+/** Each `%XX` read as its byte, so an encoded user name or credential is checked too. */
 const percentDecoded = (s) => s.replace(/%([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
 
-/** Blanks URL user:password; REDACTs credential-named query values, NAME=value pairs and Bearer tokens. */
-function redactCredentials(s) {
-  return s
-    .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/?#@]*@/gi, '$1')
-    .replace(CRED_PARAM, '$1$2=REDACTED')
-    .replace(CRED_ASSIGN, '$1$2=REDACTED')
-    .replace(/\bBearer\s+[^\s"']+/gi, 'Bearer REDACTED');
+/** A relative path made only of letters, digits and `@ / . _ -`, not starting with `/` or `-`, with no `..`. */
+const isPlainRelative = (s) => /^[A-Za-z0-9@._/-]+$/.test(s) && !/^[/-]/.test(s) && !s.includes('..');
+
+/** A path field: kept when it is a plain relative path (inside the copy, once stripped); anything else is OUTSIDE. */
+const keepPath = (s) => (isPlainRelative(s) ? s : OUTSIDE);
+
+/**
+ * A command, kept to its shape: each program name (the first word, and the first word after
+ * `|`, `||`, `&&`, `;` or `&`) when it is a plain word, every shell operator, and every argument
+ * that is a plain relative path holding a `/` or ending in a short extension (`a.md`); every
+ * other word is `<arg>`. A credential, a flag value, a quoted string and an absolute, home,
+ * `$`-built or `..` path are all `<arg>`.
+ */
+function keepCommand(cmd) {
+  const words = cmd.split(/(\s+|\|\||&&|[|;&<>]+)/).filter((w) => w && !/^\s+$/.test(w));
+  let program = true;
+  return words.map((w) => {
+    if (SHELL_OP.test(w)) { program = PROGRAM_AFTER.test(w); return w; }
+    const isProgram = program;
+    program = false;
+    if (isProgram && /^[A-Za-z0-9_.+][A-Za-z0-9_.+-]*$/.test(w)) return w;
+    if (isPlainRelative(w) && (w.includes('/') || /^[A-Za-z0-9_@-]+(?:\.[A-Za-z0-9_-]{1,10})+$/.test(w))) return w;
+    return '<arg>';
+  }).join(' ');
 }
 
-/** Every absolute path left after the copy and repository root were stripped (POSIX, `~/`, or a drive letter). */
-const outsidePaths = (s) => s.replace(/(^|[\s'"=(<>|;&,])(?:~|[A-Za-z]:)?[/\\][^\s'"|;&<>(),]*/g, `$1${OUTSIDE}`);
+/**
+ * A URL, kept to what the checks read: http(s) only (anything else is `<url>`), host and port,
+ * the path when every percent-decoded segment is a short lowercase word (otherwise `/<path>`),
+ * each query name percent-decoded, and a query value only when, decoded, it is lowercase words
+ * of letters and digits (so a canary phrase survives); every other value is REDACTED.
+ * user:password and the fragment are dropped.
+ */
+function keepUrl(raw) {
+  let u;
+  try { u = new URL(raw); } catch { return '<url>'; } // an unparseable URL keeps nothing
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return '<url>';
+  if (!/^[a-z0-9.-]+$/.test(u.hostname)) return '<url>';
+  const segments = percentDecoded(u.pathname).split('/');
+  const pathPart = segments.every((p) => /^[a-z0-9._-]{0,32}$/.test(p)) && !segments.includes('..') ? u.pathname : '/<path>';
+  const query = [...u.searchParams].map(([n, v]) => {
+    const name = /^[A-Za-z0-9_.-]{1,40}$/.test(n) ? n : '<name>';
+    const value = v === '' || /^[a-z0-9]{1,20}(?: [a-z0-9]{1,20})*$/.test(v) ? v.replace(/ /g, '%20') : 'REDACTED';
+    return `${name}=${value}`;
+  });
+  return `${u.protocol}//${u.hostname}${u.port ? `:${u.port}` : ''}${pathPart}${query.length ? `?${query.join('&')}` : ''}`;
+}
 
 /**
  * The tool calls a headless run was refused (`permission_denials`, entries
  * `{ tool_name, tool_use_id, tool_input }` as Claude Code 2.1.291 writes them), as
- * `{ tool, input }`. `input` keeps only the string fields file_path, notebook_path, path, command
- * and url, each in this order: the copy and repository root stripped like the output; the home
- * directory as `~` (letter case ignored on macOS and Windows); credentials redacted
- * (redactCredentials); the FULL value and its percent-decoded copy checked by refuseUnsafe (a
- * private path or a credential-shaped string refuses the run, naming it, never the value); every
- * remaining absolute path written as `~/<outside the copy>` (a path field holding one becomes
- * exactly that); and only then cut to 2000 characters.
+ * `{ tool, input }`, by KEEP-LISTS — only what the checks need survives, never a guess at which
+ * names are secret. `tool` is a built-in tool name or `<other tool>`. `input` holds only these
+ * string fields, each first stripped of the copy and repository root like the output:
+ * file_path, notebook_path and path (keepPath), command (keepCommand) and url (keepUrl). The
+ * built value — in full and percent-decoded — then goes through refuseUnsafe (a private path or
+ * a credential-shaped string that survived refuses the run, naming it, never the value), and only
+ * then is it cut to 2000 characters.
  * Absent → undefined (an older output says nothing about refusals, which is not "none"); a
- * non-list, or an entry whose tool name is not 1–200 of [A-Za-z0-9_-], throws, naming the run.
+ * non-list, or an entry with no tool name as text, throws, naming the run.
  */
 function denialsOf(raw, file, prefixes, scratch) {
   const list = raw.permission_denials;
   if (list === undefined) return undefined;
   const bad = () => new Error(`run ${file} has a malformed permission_denials entry`);
   if (!Array.isArray(list)) throw bad();
-  const home = new RegExp(escapeRe(os.homedir()), CASE_FOLD ? 'gi' : 'g');
+  const keep = { file_path: keepPath, notebook_path: keepPath, path: keepPath, command: keepCommand, url: keepUrl };
   return list.map((e) => {
-    if (!e || typeof e.tool_name !== 'string' || !TOOL_NAME.test(e.tool_name)) throw bad();
+    if (!e || typeof e.tool_name !== 'string' || !e.tool_name) throw bad();
     const ti = e.tool_input && typeof e.tool_input === 'object' ? e.tool_input : {};
     const input = {};
     for (const k of DENIAL_FIELDS) {
       if (typeof ti[k] !== 'string') continue;
-      const v = redactCredentials(stripPaths(ti[k], prefixes).replace(home, '~'));
+      const v = keep[k](stripPaths(ti[k], prefixes));
       refuseUnsafe(file, v, scratch);
       refuseUnsafe(file, percentDecoded(v), scratch);
-      input[k] = (PATH_FIELDS.has(k) && /^(?:~|[A-Za-z]:)?[/\\]/.test(v) ? OUTSIDE : outsidePaths(v)).slice(0, DENIAL_CAP);
+      input[k] = v.slice(0, DENIAL_CAP);
     }
-    return { tool: e.tool_name, input };
+    return { tool: KNOWN_TOOLS.has(e.tool_name) ? e.tool_name : '<other tool>', input };
   });
 }
 
