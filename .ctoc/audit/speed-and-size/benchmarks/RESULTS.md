@@ -125,3 +125,7 @@ dominated by cache reads. The whole measurement was 17 runs, 4,233,967 billed to
 ## implementation-planner — compaction (rollout)
 
 The agent definition went from 36797 to 27019 bytes with every order kept, checked by its rule-inventory test. Smoke check (one run per version, low statistical power, not proof): PASS. Full numbers, including tokens per run, are in the plan's Execution Record (plans/done/agents-get-smaller-rollout-s1-implementation-planner.md) and in `.ctoc/eval/implementation-planner/2026-10-06/summary.json`.
+
+## gate-critic — compaction (rollout)
+
+The agent definition went from 168257 to 134683 bytes with every order kept, checked by its rule-inventory test. Smoke check (one run per version, low statistical power, not proof): PASS. Full numbers, including tokens per run, are in the plan's Execution Record (plans/done/agents-get-smaller-rollout-s2-gate-critic.md) and in `.ctoc/eval/gate-critic/2026-10-06/summary.json`.
