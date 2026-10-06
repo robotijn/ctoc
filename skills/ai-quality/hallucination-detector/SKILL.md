@@ -80,7 +80,7 @@ Every finding falls into one of these categories. The category drives the verifi
 
 ## 7-Language Coverage
 
-Hallucination patterns are language-specific. The detection technique is the same — verify against the authoritative registry — but the registries and pattern signatures differ. The command templates in the examples below take a package name or version: substitute only a value that passed the wrapper's character check, and run package-manager clients from outside the repository under review.
+Hallucination patterns are language-specific. The detection technique is the same — verify against the authoritative registry — but the registries and pattern signatures differ. The command templates in the examples below take a package name or version: substitute only a value that passed the wrapper's character check, and run package-manager clients from outside the repository under review. These templates are for a human or a pipeline; the hallucination-detector agent runs only the three recipes in its own file.
 
 ### TypeScript / JavaScript (npm)
 

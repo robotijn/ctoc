@@ -32,8 +32,8 @@ const DIR = path.join(__dirname, 'compaction-eval', 'hallucination-detector');
 const read = (...p) => fs.readFileSync(path.join(...p), 'utf8');
 
 /** The order counts at extraction. Floors: they may rise, never fall. */
-const AGENT_ORDER_FLOOR = 198;
-const METHOD_ORDER_FLOOR = 101;
+const AGENT_ORDER_FLOOR = 199;
+const METHOD_ORDER_FLOOR = 102;
 
 defineInventoryTests({
   test,

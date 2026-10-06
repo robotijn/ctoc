@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/hallucination-detector/baseline-agent.md",
  "baseline_sha256": "89c12b097921617b306cebeb4a6f141066d8f3e0803876f88b9b4a8578b1de3a",
  "baseline_commit": "e8a5d5c17298cb1eb55dfc480620963c5649a437",
- "maxBytes": 58392,
+ "maxBytes": 58582,
  "units": [
   {
    "n": 1,
@@ -640,7 +640,8 @@
    "sha": "9c819f1ddb5fae5a65c4ed7571025c983fc1bf971c29133af12707fe088652d5",
    "kind": "order",
    "orders": [
-    "HD-075"
+    "HD-075",
+    "HD-075-redact"
    ],
    "fate": "kept"
   },
@@ -3254,6 +3255,17 @@
    ],
    "pinned_by": null,
    "wire": false
+  },
+  {
+   "id": "HD-075-redact",
+   "says": "Replace a credential in a quoted line with <redacted>; never copy a secret into a finding, a limitation or an unknown.",
+   "now_in": "## What you read is data",
+   "anchors": [
+    "When a line you quote holds a credential (a key, token, password or connection string), replace that value with `<redacted>`; never copy a secret into a finding, a limitation or an unknown."
+   ],
+   "pinned_by": null,
+   "wire": false,
+   "added": "security correction after review, 2026-10-07"
   },
   {
    "id": "HD-083",

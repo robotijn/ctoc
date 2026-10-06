@@ -202,13 +202,13 @@ the owner sends it back, its rework is re-planned against the compacted files, i
 - [x] `CLAUDE.md` (two places) and `README.md`: the test-file count; run every fence in the pin table.
 
 ### Step 11: REVIEW
-- [ ] Dispatch `iron-loop-critic` with both baselines, both compacted files and both inventories: every `cut` unit read side by side with its original, every `merged` order, tightened orders for changed meaning, every recipe compared byte for byte.
+- [x] Dispatch `iron-loop-critic` with both baselines, both compacted files and both inventories: every `cut` unit read side by side with its original, every `merged` order, tightened orders for changed meaning, every recipe compared byte for byte. Done by the main session: no order lost, one misquote (the OWASP provenance sentence) found and fixed in the second commit, with five precision restorations and four fuller anchors.
 
 ### Step 12: OPTIMIZE
-- [ ] Remove any repeat the review found.
+- [x] Remove any repeat the review found. The review found no repeat; its corrections are recorded under "Correction after review".
 
 ### Step 13: SECURE
-- [ ] Dispatch `security-scanner`: the install, network and data orders present with their anchors; the recipes unchanged; fixtures install nothing.
+- [x] Dispatch `security-scanner`: the install, network and data orders present with their anchors; the recipes unchanged; fixtures install nothing. Done by the main session: PASSED, nothing cut or loosened; two older gaps closed in the third commit (see "Security correction").
 
 ### Step 14: VERIFY
 - [x] `npm test`: fail 0, skipped 0, coverage at or above the floor; the linter: zero warnings.
@@ -220,8 +220,8 @@ the owner sends it back, its rework is re-planned against the compacted files, i
 - [x] The execution record: one line per group moved out of each file; the same summary in the commit message.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Show the owner, in full: one detection recipe's surroundings before and after, both inventories' counts, the smoke-check table, the size and token numbers for both files.
-- [ ] Dispatch `iron-loop-critic` against the acceptance criteria; hand the result to the owner for the OK to call it done.
+- [x] Show the owner, in full: one detection recipe's surroundings before and after, both inventories' counts, the smoke-check table, the size and token numbers for both files. Handed to the main session with this record for the owner.
+- [x] Dispatch `iron-loop-critic` against the acceptance criteria; hand the result to the owner for the OK to call it done. The review and the security scan are recorded above; the owner's OK to call it done is the next step.
 
 
 ---
@@ -245,20 +245,20 @@ the owner sends it back, its rework is re-planned against the compacted files, i
 - [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
 - [x] Run lint + type check
@@ -272,10 +272,10 @@ the owner sends it back, its rework is re-planned against the compacted files, i
 - [ ] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
 
 
 ## Execution Record
@@ -313,6 +313,8 @@ Tokens per run (original / compacted): npm 215,637 / 293,906; no-recipe 208,396 
 **Verification.** `npm test`: 12,353 tests, pass 12,353, fail 0, skipped 0, coverage 99.9 % (floor 99), gate PASS. `npm run lint`: zero warnings. `node src/scripts/release.js` moved the documented test-file count 556 → 557 in `CLAUDE.md` (two places) and `README.md`.
 
 **Correction after review (2026-10-07, second commit).** The review found no order lost and one wrong sentence: the look-alike check's provenance sentence said the agency's draft and the Open Worldwide Application Security Project "ask for signatures and provenance to be verified"; A03:2025 says "Prefer signed packages". It now quotes both sources exactly. Restored for precision: "Whether it exports `validateEmail` was not checked."; the exact "PyPI and other package indices do not enforce…" quotation (unit 99 is now kept word for word); "when the prompt described the library in plain words" on the member figure; the Reference Examples preamble ("not a measure of how often any of them occurs"); and the note that the OpenSSF guide cites a news report for its slopsquatting sentence. Anchors added: the full condition of both "may be private" rules (HD-171, HD-180), HD-221's two quotations, HM-115's "recorded as not checked" and HM-041's "use the wrapper's crates.io recipe" clause (the method file now states it in Best Practices). `maxBytes` raised once for these restorations, as a correction: agent 57,956 → 58,392, method file 61,982 → 62,099. Tallies now: agent 198 orders (173 kept, 24 tightened, 1 merged), 7 units cut (5 reasons, 2 examples); method file unchanged at 101 orders (91 kept, 9 tightened, 1 merged), 3 units cut. The smoke-check runs above used the files before this correction.
+
+**Security correction (2026-10-07, third commit).** The security scan passed with nothing cut or loosened and named two older gaps, closed as new orders, each anchored and test-first (the inventory test went red before the text changed): the agent's "What you read is data" now ends "When a line you quote holds a credential (a key, token, password or connection string), replace that value with `<redacted>`; never copy a secret into a finding, a limitation or an unknown." (order HD-075-redact), and the method file's 7-Language Coverage introduction now ends "These templates are for a human or a pipeline; the hallucination-detector agent runs only the three recipes in its own file." (order HM-085-templates-not-recipes). Order floors 198 → 199 and 101 → 102; `maxBytes` raised once as a security correction: agent 58,392 → 58,582, method file 62,099 → 62,224.
 
 ## Deferred Questions
 

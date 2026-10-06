@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/hallucination-detector/baseline-method.md",
  "baseline_sha256": "301804095c0bdafe863fa29ef4dc55e229774a7825b0855214d8740a96eaaea4",
  "baseline_commit": "e8a5d5c17298cb1eb55dfc480620963c5649a437",
- "maxBytes": 62099,
+ "maxBytes": 62224,
  "units": [
   {
    "n": 1,
@@ -692,7 +692,8 @@
    "sha": "29e3676766e8c287d306c243f798a067cff99ab22aa4791f11a943dc12b9bb0e",
    "kind": "order",
    "orders": [
-    "HM-085"
+    "HM-085",
+    "HM-085-templates-not-recipes"
    ],
    "fate": "kept"
   },
@@ -2234,6 +2235,17 @@
    ],
    "pinned_by": null,
    "wire": false
+  },
+  {
+   "id": "HM-085-templates-not-recipes",
+   "says": "The command templates are for a human or a pipeline; the agent runs only the three recipes in its own file.",
+   "now_in": "## 7-Language Coverage",
+   "anchors": [
+    "These templates are for a human or a pipeline; the hallucination-detector agent runs only the three recipes in its own file."
+   ],
+   "pinned_by": null,
+   "wire": false,
+   "added": "security correction after review, 2026-10-07"
   },
   {
    "id": "HM-107",
