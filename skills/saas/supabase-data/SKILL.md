@@ -28,7 +28,7 @@ related_skills:
   - security/sast-scanner
 effort_level: high
 model: opus
-tools: Read, Write, Edit, Bash
+tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 
 # Supabase Data (saas skill)
@@ -37,7 +37,9 @@ tools: Read, Write, Edit, Bash
 
 ## Role
 
-You set up Supabase as the data layer of a SaaS — Postgres (pooled), migrations, RLS policies that are enabled AND forced, storage buckets with policies matching table RLS, custom JWT claims for org membership, Edge Functions for privileged operations, Realtime channels that honor RLS, and backups. You assume every client-shipped key is hostile and every RLS-off table is a public dump.
+You set up Supabase as the data layer of a SaaS — Postgres (pooled), migrations, RLS policies that are enabled AND forced, storage buckets with policies matching table RLS, custom JWT claims for org membership, Edge Functions for privileged operations, Realtime channels that honor RLS, and backups. You assume every client-shipped key is hostile and every RLS-off table is a public dump. The `supabase-data` agent reads this file to review, not to build: it reports findings, each with the change it suggests, and the executor makes the change at the build step.
+
+The command lines in this file that reach a database or a Supabase project — `supabase db push`, `supabase db diff --linked`, `supabase gen types --linked`, `supabase functions deploy`, `drizzle-kit migrate`, `psql` — act on a live project. The `supabase-data` agent runs none of them: where a finding depends on one, it names the command in its report for the executor or the team, and never writes a "passes" it did not see.
 
 ## 2026 Best Practices
 
@@ -283,9 +285,9 @@ supabase functions deploy <name>
 ### 10. Drizzle migrations (alternative)
 
 ```bash
-npx drizzle-kit generate                       # generate from schema
-npx drizzle-kit migrate                        # apply versioned
-npx drizzle-kit check                          # CI: fail on drift
+npx --no -- drizzle-kit generate                       # generate from schema
+npx --no -- drizzle-kit migrate                        # apply versioned
+npx --no -- drizzle-kit check                          # CI: fail on drift
 ```
 
 ```typescript
@@ -641,7 +643,7 @@ supabase gen types typescript --linked > db/types.ts
 supabase functions deploy stripe-webhook --no-verify-jwt
 
 # Drizzle CI guard — fail on drift
-npx drizzle-kit check
+npx --no -- drizzle-kit check
 
 # pgmustard / EXPLAIN — find missing indexes on RLS columns
 EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM invoices WHERE org_id = '<uuid>';
@@ -704,7 +706,7 @@ The integrator uses `confidence` to weight findings: a `confidence: low` single-
 ```bash
 # Schema drift
 supabase db diff --linked            # non-empty = drift, fail the build
-npx drizzle-kit check                # alternative: Drizzle-managed schemas
+npx --no -- drizzle-kit check                # alternative: Drizzle-managed schemas
 
 # Client-bundle leak grep (run after build)
 rg "service_role|SERVICE_ROLE_KEY|sb_secret_" .next/ dist/ build/ && exit 1 || exit 0

@@ -24,7 +24,7 @@ related_skills:
   - specialized/resilience-checker
 effort_level: medium
 model: sonnet
-tools: Read, Write, Edit, Bash
+tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 
 # Inngest Jobs (saas skill)
@@ -33,7 +33,9 @@ tools: Read, Write, Edit, Bash
 
 ## Role
 
-You set up Inngest (or an equivalent durable-execution engine) as the background-job substrate: typed events, retries with backoff, fan-out across users, scheduled cron, idempotency, concurrency keys per tenant, dead-letter handling. You assume every step can crash, every external call can double-fire on retry, and every queue is at-least-once.
+You set up Inngest (or an equivalent durable-execution engine) as the background-job substrate: typed events, retries with backoff, fan-out across users, scheduled cron, idempotency, concurrency keys per tenant, dead-letter handling. You assume every step can crash, every external call can double-fire on retry, and every queue is at-least-once. The `inngest-jobs` agent reads this file to review, not to build: it reports findings, each with the change it suggests, and the executor makes the change at the build step.
+
+The command lines under "CI / local verification" in this file — the Inngest development server (`npx --no -- inngest-cli dev`) and the `curl` that sends it a test event — start or call a running service. The `inngest-jobs` agent runs none of them: where a finding depends on one, it names the command in its report for the executor or the team, and never writes a "passes" it did not see.
 
 ## 2026 Best Practices
 
@@ -425,7 +427,7 @@ export const dunning = inngest.createFunction(
 
 ```bash
 # Local dev server with signature verification disabled in dev mode.
-npx inngest-cli@latest dev
+npx --no -- inngest-cli dev
 
 # Test event in dev (placeholder data only — no real PII).
 curl -X POST http://localhost:8288/e/test-event \
@@ -442,7 +444,7 @@ curl -X POST http://localhost:8288/e/test-event \
 | **Inngest Cloud Dashboard** | Function runs, step-level traces, replay, event browser | Production visibility |
 | **Inngest CLI** (`inngest dev`) | Local dev server, function discovery, replay UI on localhost:8288 | Every dev session |
 | **Temporal CLI** (`temporal server start-dev` + Temporal UI) | Alternative engine; visual workflow history, signal/query, replay | When choosing Temporal |
-| **Trigger.dev CLI** (`npx trigger.dev@latest dev`) | Alternative engine; dedicated-compute job runner | When choosing Trigger.dev v4 |
+| **Trigger.dev CLI** (`npx --no -- trigger.dev dev`) | Alternative engine; dedicated-compute job runner | When choosing Trigger.dev v4 |
 | **BetterStack** (Logtail / Uptime) | Queue health, failed-job rate alerts, function latency SLOs | Production paging |
 | **Sentry** | Failed-job alerts via `onFailure` handler → `Sentry.captureException` | Production paging |
 | **PostHog** | Funnel analysis on event-driven flows (signup → activation) — see [[posthog-analytics]] | Product loop |

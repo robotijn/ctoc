@@ -3,8 +3,8 @@
 /**
  * The tool-grant ratchet, stated a second time, in a second file.
  *
- * tests/agent-tool-grants.test.js holds five lists that only shrink (DEBT,
- * WRITE_EDIT_DEBT, RULE6_EXCEPTIONS, HELD_REMOVALS, MATCH_IS_DATA_DEBT); each list's size must EQUAL its
+ * tests/agent-tool-grants.test.js holds six lists that only shrink (DEBT,
+ * WRITE_EDIT_DEBT, RULE6_EXCEPTIONS, HELD_REMOVALS, MATCH_IS_DATA_DEBT, METHOD_TOOLS_DEBT); each list's size must EQUAL its
  * maximum there (MAX_DEBT and the rest). This file states each ceiling once more, and
  * adds two counts that could drift unseen: the tools the safety-floor exceptions excuse,
  * and the held removals per tool. It is the HISTORICAL_FLOOR pattern of
@@ -54,6 +54,7 @@ const CEILINGS = Object.freeze({
   MAX_HELD_REMOVALS: 42,
   MAX_MATCH_IS_DATA_DEBT: 0,
   EXCUSED_TOOLS: 0,
+  MAX_METHOD_TOOLS_DEBT: 2,
   HELD_PER_TOOL: Object.freeze({ Bash: 21, Write: 10, Edit: 10, Task: 1 }),
 });
 
@@ -64,6 +65,7 @@ const LISTS = [
   ['MAX_RULE6_EXCEPTIONS', 'RULE6_EXCEPTIONS'],
   ['MAX_HELD_REMOVALS', 'HELD_REMOVALS'],
   ['MAX_MATCH_IS_DATA_DEBT', 'MATCH_IS_DATA_DEBT'],
+  ['MAX_METHOD_TOOLS_DEBT', 'METHOD_TOOLS_DEBT'],
 ];
 
 // describe bodies run, so a value moved there is read after it moves; it bodies never run.
@@ -71,7 +73,7 @@ const NO_TESTS = Object.freeze({ describe(name, fn) { fn(); }, it() {} });
 
 /**
  * Evaluate a main-test source with node:test stubbed out (describe bodies run, no it body
- * runs), within 10 seconds, and read back what it actually binds: the five MAX_* values, the real sizes of its five lists,
+ * runs), within 10 seconds, and read back what it actually binds: the six MAX_* values, the real sizes of its six lists,
  * the tools its safety-floor exceptions excuse and its held removals per tool. A source
  * that throws, or lacks a binding, throws here: it is never read as passing. This runs
  * the repository's own test file, which a test run executes anyway; node:vm is used to
@@ -81,13 +83,14 @@ function evaluateMain(source) {
   const context = vm.createContext({ require: (id) => (id === 'node:test' ? NO_TESTS : require(id)), __dirname, console });
   vm.runInContext(source, context, { filename: MAIN, timeout: 10000 });
   return JSON.parse(vm.runInContext(`JSON.stringify({
-    MAX_DEBT, MAX_WRITE_EDIT_DEBT, MAX_RULE6_EXCEPTIONS, MAX_HELD_REMOVALS, MAX_MATCH_IS_DATA_DEBT,
+    MAX_DEBT, MAX_WRITE_EDIT_DEBT, MAX_RULE6_EXCEPTIONS, MAX_HELD_REMOVALS, MAX_MATCH_IS_DATA_DEBT, MAX_METHOD_TOOLS_DEBT,
     sizes: {
       DEBT: DEBT.size,
       WRITE_EDIT_DEBT: WRITE_EDIT_DEBT.size,
       RULE6_EXCEPTIONS: Object.keys(RULE6_EXCEPTIONS).length,
       HELD_REMOVALS: Object.values(HELD_REMOVALS).reduce((n, tools) => n + tools.length, 0),
       MATCH_IS_DATA_DEBT: MATCH_IS_DATA_DEBT.size,
+      METHOD_TOOLS_DEBT: METHOD_TOOLS_DEBT.size,
     },
     excusedTools: Object.values(RULE6_EXCEPTIONS).reduce((n, e) => n + (e && Array.isArray(e.tools) ? e.tools.length : 0), 0),
     held: Object.values(HELD_REMOVALS).flat().reduce((m, t) => { m[t] = (m[t] || 0) + 1; return m; }, {}),
@@ -124,8 +127,8 @@ describe('the tool-grant maximums only fall', () => {
     assert.deepEqual(failures, [], failures.join('\n'));
   });
 
-  it('2. the ceilings themselves only fall: 118, 22, 6, 50, 12 (MATCH_IS_DATA_DEBT, from slice 3), 6 excused tools, and Bash 21, Write 14, Edit 14, Task 1 on 2026-10-05', () => {
-    const first = { MAX_DEBT: 118, MAX_WRITE_EDIT_DEBT: 22, MAX_RULE6_EXCEPTIONS: 6, MAX_HELD_REMOVALS: 50, MAX_MATCH_IS_DATA_DEBT: 12, EXCUSED_TOOLS: 6 };
+  it('2. the ceilings themselves only fall: 118, 22, 6, 50, 12 (MATCH_IS_DATA_DEBT, from slice 3), 6 excused tools, 2 (MAX_METHOD_TOOLS_DEBT, from slice 12), and Bash 21, Write 14, Edit 14, Task 1 on 2026-10-05', () => {
+    const first = { MAX_DEBT: 118, MAX_WRITE_EDIT_DEBT: 22, MAX_RULE6_EXCEPTIONS: 6, MAX_HELD_REMOVALS: 50, MAX_MATCH_IS_DATA_DEBT: 12, EXCUSED_TOOLS: 6, MAX_METHOD_TOOLS_DEBT: 2 };
     const firstHeld = { Bash: 21, Write: 14, Edit: 14, Task: 1 };
     assert.deepEqual(Object.keys(CEILINGS), [...Object.keys(first), 'HELD_PER_TOOL']);
     assert.deepEqual(Object.keys(CEILINGS.HELD_PER_TOOL), Object.keys(firstHeld));
@@ -144,9 +147,11 @@ describe('the tool-grant maximums only fall', () => {
       'const MAX_HELD_REMOVALS = 3;',
       "const MATCH_IS_DATA_DEBT = new Set(['a']);",
       'const MAX_MATCH_IS_DATA_DEBT = 1;',
+      "const METHOD_TOOLS_DEBT = new Set(['a']);",
+      'const MAX_METHOD_TOOLS_DEBT = 1;',
     ].join('\n');
     const main = (debt) => `'use strict';\n${debt}\n${lists}\n`;
-    const ceilings = { MAX_DEBT: 2, MAX_WRITE_EDIT_DEBT: 1, MAX_RULE6_EXCEPTIONS: 1, MAX_HELD_REMOVALS: 3, MAX_MATCH_IS_DATA_DEBT: 1, EXCUSED_TOOLS: 1, HELD_PER_TOOL: { Bash: 1, Write: 1, Edit: 1, Task: 0 } };
+    const ceilings = { MAX_DEBT: 2, MAX_WRITE_EDIT_DEBT: 1, MAX_RULE6_EXCEPTIONS: 1, MAX_HELD_REMOVALS: 3, MAX_MATCH_IS_DATA_DEBT: 1, EXCUSED_TOOLS: 1, MAX_METHOD_TOOLS_DEBT: 1, HELD_PER_TOOL: { Bash: 1, Write: 1, Edit: 1, Task: 0 } };
     const fails = (source) => checkMain(source, ceilings).join('\n');
     assert.match(fails(main('const MAX_DEBT = 1;')), /^MAX_DEBT is 1 in the main test but 2 here/);
     assert.match(fails(main('const MAX_DEBT = 3;')), /^MAX_DEBT is 3 in the main test but 2 here/);
@@ -159,6 +164,8 @@ describe('the tool-grant maximums only fall', () => {
     // the safety-sentence debt list has its own maximum and ceiling (slice 3 fix pass)
     assert.match(fails(main('const MAX_DEBT = 2;').replace('const MAX_MATCH_IS_DATA_DEBT = 1;', 'const MAX_MATCH_IS_DATA_DEBT = 2;')), /^MAX_MATCH_IS_DATA_DEBT is 2 in the main test but 1 here/);
     assert.match(fails(main('const MAX_DEBT = 2;').replace("const MATCH_IS_DATA_DEBT = new Set(['a']);", "const MATCH_IS_DATA_DEBT = new Set(['a', 'b']);")), /MATCH_IS_DATA_DEBT holds 2 entries in the main test; its ceiling here is 1/);
+    // the method-file debt list has its own maximum and ceiling (slice 12)
+    assert.match(fails(main('const MAX_DEBT = 2;').replace('const MAX_METHOD_TOOLS_DEBT = 1;', 'const MAX_METHOD_TOOLS_DEBT = 2;')), /^MAX_METHOD_TOOLS_DEBT is 2 in the main test but 1 here/);
     // the describe bodies run (it stays stubbed): a list moved there is read after it moves
     assert.match(fails(`${main('const MAX_DEBT = 2;')}const { describe } = require('node:test');\ndescribe('moves', () => { DEBT.add('c'); });\n`), /DEBT holds 3 entries in the main test; its ceiling here is 2/);
   });
@@ -178,11 +185,13 @@ describe('the tool-grant maximums only fall', () => {
       'const MAX_HELD_REMOVALS = 3;',
       "const MATCH_IS_DATA_DEBT = new Set(['a']);",
       'const MAX_MATCH_IS_DATA_DEBT = 1;',
+      "const METHOD_TOOLS_DEBT = new Set(['a']);",
+      'const MAX_METHOD_TOOLS_DEBT = 1;',
       "const { describe, it } = require('node:test');",
       "describe('stubbed', () => { it('never runs', () => { throw new Error('ran'); }); });",
     ].join('\n');
     const main = (debt) => `'use strict';\n${debt}\n${lists}\n`;
-    const ceilings = { MAX_DEBT: 2, MAX_WRITE_EDIT_DEBT: 1, MAX_RULE6_EXCEPTIONS: 1, MAX_HELD_REMOVALS: 3, MAX_MATCH_IS_DATA_DEBT: 1, EXCUSED_TOOLS: 1, HELD_PER_TOOL: { Bash: 1, Write: 1, Edit: 1, Task: 0 } };
+    const ceilings = { MAX_DEBT: 2, MAX_WRITE_EDIT_DEBT: 1, MAX_RULE6_EXCEPTIONS: 1, MAX_HELD_REMOVALS: 3, MAX_MATCH_IS_DATA_DEBT: 1, EXCUSED_TOOLS: 1, MAX_METHOD_TOOLS_DEBT: 1, HELD_PER_TOOL: { Bash: 1, Write: 1, Edit: 1, Task: 0 } };
     const fails = (source) => checkMain(source, ceilings).join('\n');
     // the literal kept in a comment or a template string, the real binding elsewhere
     assert.match(fails(main('/*\nconst MAX_DEBT = 2;\n*/\nconst [MAX_DEBT] = [3];')), /MAX_DEBT is 3 in the main test but 2 here/);

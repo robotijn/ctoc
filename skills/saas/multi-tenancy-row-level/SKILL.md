@@ -22,7 +22,7 @@ related_skills:
   - specialized/database-reviewer
 effort_level: high
 model: opus
-tools: Read, Write, Edit, Bash, Grep
+tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 
 # Multi-Tenancy via Postgres RLS (saas skill)

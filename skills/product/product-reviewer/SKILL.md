@@ -1,6 +1,6 @@
 ---
 name: product-reviewer
-description: Weekly product review. Reads KPI data from PostHog/Stripe, compares against targets, identifies funnel drop-offs, surfaces 2-3 hypotheses for improvement.
+description: Weekly product review. Reads the KPI data exported from PostHog/Stripe, compares against targets, identifies funnel drop-offs, surfaces 2-3 hypotheses for improvement.
 type: skill
 tier: 2
 dispatch_protocol: v1
@@ -25,7 +25,7 @@ related_skills:
   - product/experiment-designer
 effort_level: high
 model: opus
-tools: Read, Write, Bash, WebFetch
+tools: Read, Write, Bash, Grep, Glob, Edit
 ---
 
 # Product Reviewer (product skill)
@@ -77,7 +77,7 @@ These are the patterns this skill is meant to catch in the existing review workf
 
 ```yaml
 kpi_plan: plans/canvas/<slug>-kpis.yaml    # the targets
-posthog_export: .ctoc/product-loop/data/<date>.csv  # OR call PostHog API
+posthog_export: .ctoc/product-loop/data/<date>.csv  # exported by the team; never call the PostHog API
 stripe_export: .ctoc/product-loop/data/stripe-<date>.json
 date_range: { from: <last_review_date>, to: <today> }
 prior_review: .ctoc/product-loop/reviews/<previous-date>.md  # for trends
@@ -346,12 +346,12 @@ response:
 
 ## 7-language coverage — review automation snippets
 
-Product review is a Python / TypeScript / SQL workflow in practice. Other stacks (C/C++/Java/C#) are rarely the front-of-house for KPI plumbing and are intentionally skipped per the skill's scope.
+Product review is a Python / TypeScript / SQL workflow in practice. Other stacks (C/C++/Java/C#) are rarely the front-of-house for KPI plumbing and are intentionally skipped per the skill's scope. These snippets belong to the team's own pipeline, which produces the exports the Input block names and posts the weekly rollup. The `product-reviewer` agent runs none of them: it reviews only the exports handed to it, and never calls the PostHog or Stripe API itself.
 
 ### Python — KPI query against PostHog + Stripe
 
 ```python
-# Pull this week's activation funnel from PostHog and MRR from Stripe.
+# The team's export job, never the reviewer's: pulls this week's activation funnel from PostHog and MRR from Stripe.
 import os, requests, stripe
 from datetime import datetime, timedelta, timezone
 

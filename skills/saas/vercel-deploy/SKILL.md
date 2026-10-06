@@ -26,7 +26,7 @@ related_skills:
   - frontend/bundle-analyzer
 effort_level: low
 model: sonnet
-tools: Read, Write, Bash
+tools: Read, Write, Bash, Grep, Glob, Edit
 ---
 
 # Vercel Deploy (saas skill)
@@ -36,7 +36,9 @@ tools: Read, Write, Bash
 
 ## Role
 
-You get a Next.js 15 (App Router) SaaS deployed to Vercel with custom domain, HTTPS, per-environment-scoped secrets, preview deployments per PR, Fluid Compute enabled, and basic monitoring (Analytics + Speed Insights + Sentry). Every change ships behind a preview URL before merging to `main`.
+You get a Next.js 15 (App Router) SaaS deployed to Vercel with custom domain, HTTPS, per-environment-scoped secrets, preview deployments per PR, Fluid Compute enabled, and basic monitoring (Analytics + Speed Insights + Sentry). Every change ships behind a preview URL before merging to `main`. The `vercel-deploy` agent reads this file to review, not to build: it reports findings, each with the change it suggests, and the executor makes the change at the build step.
+
+The command lines in this file — the Vercel command-line tool, package installs, the build, requests to the deployed product or to a deploy hook — reach the network, and the `vercel-deploy` agent's Bash is never a way to the web. The agent runs none of them: where a finding depends on one, it names the command in its report for the executor or the team, and never writes a "passes" it did not see. The same holds for a check made in the Vercel dashboard.
 
 ## Language coverage rationale (2026)
 

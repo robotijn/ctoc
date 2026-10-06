@@ -25,7 +25,7 @@ related_skills:
   - versioning/feature-flag-auditor
 effort_level: high
 model: opus
-tools: Read, Write
+tools: Read, Write, Grep, Glob, Edit
 ---
 
 # Experiment Designer (product skill)
@@ -155,7 +155,7 @@ For non-proportion metrics (revenue, time-on-task, engagement counts), use a t-t
 n_per_arm = 2 * sigma^2 * (Z_alpha + Z_beta)^2 / delta^2
 ```
 
-Use scipy.stats.norm.ppf or `statsmodels.stats.power` for both.
+Work both out from the formulas above. The `experiment-designer` agent holds no command tool: a run of `scipy.stats.norm.ppf` or `statsmodels.stats.power` is the build step's or the team's to run. Where a finding needs a command run, the agent names the command in its report for the executor, and never writes a "passes" it did not see.
 
 ### Step 5: Estimate duration
 
