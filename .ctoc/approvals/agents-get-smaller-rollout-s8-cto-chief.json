@@ -1,9 +1,9 @@
 {
-  "content_sha256": "499606115cdbff6db92461e86005ba21df2bd41eacd9c8a26c465d479444df52",
+  "content_sha256": "5db022668d697a666c999c2a6eafd8263957d1f3bf72439ec52c3564e6f79942",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T18:01:53.892Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T20:21:46.142Z",
   "approved_by": "human",
   "plan_basename": "agents-get-smaller-rollout-s8-cto-chief"
 }

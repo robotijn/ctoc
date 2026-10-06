@@ -58,7 +58,7 @@ Hook or gate logic changes only with the owner's explicit approval. Plans declar
 ```bash
 npm test                             # THE GATED ENTRY POINT — runs the suite AND the
                                      # coverage floor + zero-skipped gate (test-gate.js)
-node --test tests/*.test.js          # Run all 556 test files — suite ONLY; does NOT
+node --test tests/*.test.js          # Run all 557 test files — suite ONLY; does NOT
                                      # enforce coverage or the zero-skipped gate. Use for
                                      # a fast pass, not as the gate.
 node src/scripts/release.js          # Sync VERSION to all JSON files
@@ -91,7 +91,7 @@ ctoc/
     tabs/  4 dashboard tab files (overview, vision, review, tools)
   agents/  125 agent definitions
   skills/  430 skill files (102 SKILL.md bodies = 99 Tier-2 specialists + 2 ambient skills, the decision format and deepthink, + 1 pointer to the advocate agent; + 328 reference)
-  tests/  556 test files
+  tests/  557 test files
   .ctoc/  Config and templates
   .claude-plugin/  Plugin metadata
   plans/  Plan files by stage (vision/ … done/)

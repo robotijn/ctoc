@@ -141,3 +141,7 @@ The agent definition went from 100675 to 80175 bytes with every order kept, chec
 ## red-team-critic — compaction (rollout)
 
 The agent definition went from 126193 to 96537 bytes with every order kept, checked by its rule-inventory test. Smoke check (one run per version, low statistical power, not proof): PASS. Full numbers, including tokens per run, are in the plan's Execution Record (plans/done/agents-get-smaller-rollout-s3-red-team-critic.md) and in `.ctoc/eval/red-team-critic/2026-10-06/summary.json`.
+
+## cto-chief — compaction (rollout)
+
+The agent definition went from 59787 to 53365 bytes with every order kept, checked by its rule-inventory test. Smoke check (one run per version, low statistical power, not proof): PASS. Full numbers, including tokens per run, are in the plan's Execution Record (plans/done/agents-get-smaller-rollout-s8-cto-chief.md) and in `.ctoc/eval/cto-chief/2026-10-06/summary.json`.

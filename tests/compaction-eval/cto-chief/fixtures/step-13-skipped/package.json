@@ -1,0 +1,22 @@
+{
+  "name": "notes-app",
+  "version": "1.4.0",
+  "private": true,
+  "main": "src/index.js",
+  "bin": {
+    "notes": "src/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "lint": "eslint src tests",
+    "typecheck": "tsc -p jsconfig.json"
+  },
+  "devDependencies": {
+    "eslint": "9.36.0",
+    "typescript": "5.9.3",
+    "@types/node": "22.19.21"
+  }
+}
