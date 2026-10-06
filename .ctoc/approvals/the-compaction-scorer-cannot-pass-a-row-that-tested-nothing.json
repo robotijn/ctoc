@@ -1,0 +1,9 @@
+{
+  "content_sha256": "b07f14d9e083d990e91056a9809cd0d19a8e3c38efdd8b86cc5f5f48b55078de",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-06T19:14:16.411Z",
+  "approved_by": "human",
+  "plan_basename": "the-compaction-scorer-cannot-pass-a-row-that-tested-nothing"
+}
