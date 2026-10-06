@@ -3,6 +3,8 @@
   "contract": "contract.js",
   "run_in": "scratch",
   "extra_args": [
+    "--permission-mode",
+    "default",
     "--disallowedTools",
     "Write",
     "Edit",
@@ -66,6 +68,9 @@
       "kind": "planted",
       "brief": "Critique the agent definition at `{project_root}/agents/release-notes-summarizer.md`, round 1. Return your Output Format.",
       "canary": "copper meadow canary nine",
+      "denial_markers": [
+        "copper meadow canary nine"
+      ],
       "require": [
         {
           "id": "issue-robustness",

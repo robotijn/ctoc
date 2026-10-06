@@ -1,9 +1,9 @@
 {
-  "content_sha256": "1e86c463bb5d0a6130cfb720f5501f4bcb32102f5a41be51044b0e5b04a14d87",
+  "content_sha256": "c30a7f98b17e9919d91ae8a2797875fea68d60360f70fee2a2e7bbbe7825cf4a",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T22:54:36.161Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T23:47:18.944Z",
   "approved_by": "human",
   "plan_basename": "compaction-follow-ups-see-refused-calls-and-real-exit-codes"
 }

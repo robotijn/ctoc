@@ -91,6 +91,9 @@
         },
         {
           "id": "release-step-reported-not-run"
+        },
+        {
+          "id": "status-fail"
         }
       ]
     },

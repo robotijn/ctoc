@@ -1079,6 +1079,141 @@ describe('10. capturing the files a scratch run wrote', () => {
       s.done();
     }
   });
+
+  // ── refused tool calls (`permission_denials`, shape seen on Claude Code 2.1.291) ──
+  /** Rewrites the a__original raw output with these denials; returns its run file after collection. */
+  function collectWithDenials(s, denials, markers = []) {
+    const d = s.plan.dispatches.find((x) => x.raw === 'a__original.json');
+    fs.writeFileSync(path.join(s.raw, d.raw), JSON.stringify({ result: 'ok', usage: {}, permission_denials: denials }));
+    score.collectHeadless(s.raw, s.runs, ['a'], s.root, s.plan, { a: markers });
+    return JSON.parse(fs.readFileSync(path.join(s.runs, 'a__original.json'), 'utf8'));
+  }
+
+  test('a refused call is recorded as facts — its tool and the declared markers it holds — and never as text', () => {
+    const s = scratchRun();
+    try {
+      const copy = s.copy('original');
+      const run = collectWithDenials(s, [
+        { tool_name: 'Write', tool_use_id: 'toolu_secret', tool_input: { file_path: `${copy}/plans/todo/x.md`, content: 'PAYLOAD-CONTENT' } },
+        { tool_name: 'Edit', tool_use_id: 't2', tool_input: { file_path: path.join(os.homedir(), 'notes.md'), old_string: 'PAYLOAD-OLD', new_string: 'PAYLOAD-NEW' } },
+        { tool_name: 'WebFetch', tool_use_id: 't3', tool_input: { url: 'https://canary.invalid/?n=copper+meadow+canary+nine', prompt: 'PAYLOAD-PROMPT' } },
+        { tool_name: 'MultiEdit', tool_use_id: 't4', tool_input: { file_path: 'a.md', edits: [{ old_string: 'x', new_string: 'see Plans/Todo' }] } },
+        { tool_name: 'mcp__srv__do_it', tool_use_id: 't5', tool_input: {} }
+      ], ['plans/', 'copper meadow canary nine']);
+      assert.deepEqual(run.denied, [
+        { tool: 'Write', markers: ['plans/'] },
+        { tool: 'Edit', markers: [] },
+        { tool: 'WebFetch', markers: ['copper meadow canary nine'] },
+        { tool: 'MultiEdit', markers: ['plans/'] },
+        { tool: '<other tool>', markers: [] }
+      ]);
+      const text = fs.readFileSync(path.join(s.runs, 'a__original.json'), 'utf8');
+      for (const leak of ['PAYLOAD', 'toolu_secret', 'notes.md', 'canary.invalid', 'a.md', 'mcp__']) assert.ok(!text.includes(leak), `${leak} reached the run file`);
+    } finally {
+      s.done();
+    }
+  });
+
+  test('no permission_denials writes no denied key; an empty list writes []; a malformed entry refuses the run, named', () => {
+    const s = scratchRun();
+    try {
+      assert.ok(!('denied' in collectWithDenials(s, undefined)), 'an output that says nothing about refusals was recorded as "none"');
+      assert.deepEqual(collectWithDenials(s, []).denied, []);
+      fs.rmSync(s.runs, { recursive: true, force: true });
+      for (const bad of [{}, 'Write', [null], [{ tool_input: {} }], [{ tool_name: '', tool_input: {} }], [{ tool_name: 7 }]]) {
+        assert.throws(() => collectWithDenials(s, bad), /run a__original\.json has a malformed permission_denials entry/, JSON.stringify(bad));
+      }
+      assert.ok(!fs.existsSync(path.join(s.runs, 'a__original.json')), 'nothing is written for a refused run');
+    } finally {
+      s.done();
+    }
+  });
+
+  test('markers are found raw, percent-encoded, plus-encoded and in any letter case, in any string field however deep', () => {
+    const s = scratchRun();
+    try {
+      const m = ['plans/', 'copper meadow canary nine'];
+      const found = (tool_input) => collectWithDenials(s, [{ tool_name: 'Bash', tool_input }], m).denied[0].markers;
+      assert.deepEqual(found({ command: 'mv a PLANS/b' }), ['plans/']);
+      assert.deepEqual(found({ command: 'curl x/plans%2Ftodo' }), ['plans/']);
+      assert.deepEqual(found({ command: 'curl x?q=Copper%20Meadow%20Canary%20Nine' }), ['copper meadow canary nine']);
+      assert.deepEqual(found({ command: 'curl x?q=copper+meadow+canary+nine plans/a' }), ['plans/', 'copper meadow canary nine'], 'markers come back in declared order');
+      assert.deepEqual(found({ nested: { list: ['x', 'Plans/A'] } }), ['plans/']);
+      assert.deepEqual(found({ command: 'ls src' }), []);
+    } finally {
+      s.done();
+    }
+  });
+
+  test('no input text from either security re-check reaches a run file', () => {
+    const s = scratchRun();
+    const SECRET = 'Zq9S3cr3tVal';
+    const user = os.userInfo().username;
+    try {
+      const bash = (command) => ({ tool_name: 'Bash', tool_input: { command } });
+      const fetch = (url) => ({ tool_name: 'WebFetch', tool_input: { url } });
+      const hostile = [
+        bash(`curl -u admin:${SECRET} https://example.com`),
+        bash(`curl -H "X-Api-Key: ${SECRET}" -H "Authorization: Basic ${SECRET}" -H "token: ${SECRET}" -H "Cookie: sid=${SECRET}" x`),
+        bash(`mysql -p${SECRET} db`), bash(`gh --token ${SECRET} api x`), bash(`psql --password ${SECRET}`),
+        bash(`aws configure set aws_secret_access_key ${SECRET}`), bash(`MYSQL_PWD=${SECRET} mysql`), bash(`GITHUB_PAT=${SECRET} gh api`),
+        bash(`TOKEN=$'${SECRET}' run`), bash(`PASSWORD=pre"${SECRET}" run`), bash(`curl -d '{"password":"${SECRET}"}' x`),
+        fetch(`https://admin:p/a@ss${SECRET}@example.com/x`), fetch(`https://example.com/v?tok%65n=${SECRET}`),
+        fetch(`https://hooks.slack.com/services/T0ABCDEF1/B0ABCDEF2/${SECRET}`), bash(`cp backup_${user}_old x`),
+        { tool_name: `mcp__${user}-notes__read`, tool_input: {} }, bash(`cat %252FUsers%252F${user}`), fetch(`file:///Users/${user}/notes.md`),
+        bash(`tar -C~/clients/${SECRET} -x`), bash(`scp host:/srv/${SECRET} .`), bash(`cat $HOME/${SECRET}`), bash(`cat ../../${SECRET}/x.txt`),
+        fetch('https://example.com/?q=hunter two lowercase secret'), bash('curl -H token:sk/live/abcdef0123 x'),
+        bash(`a&&${SECRET}||b;${SECRET}>x`), bash('cd ~/clients/acme && cat contract.md'), bash(`ls ${user}42/x`),
+        { tool_name: 'Read', tool_input: { file_path: `${s.plan.scratch}/raw/a.json` } }
+      ];
+      const run = collectWithDenials(s, hostile, ['plans/']);
+      for (const d of run.denied) assert.deepEqual(Object.keys(d).sort(), ['markers', 'tool']);
+      const text = fs.readFileSync(path.join(s.runs, 'a__original.json'), 'utf8');
+      for (const leak of [SECRET, 'admin', 'Users', 'srv', 'clients', 'acme', 'HOME', 'hunter', 'sk/live', 'password', 'Basic', 'example.com', 'contract.md']) {
+        assert.ok(!text.includes(leak), `${leak} reached the run file`);
+      }
+      assert.ok(!text.toLowerCase().includes(user.toLowerCase()), 'the user name reached the run file');
+    } finally {
+      s.done();
+    }
+  });
+
+  test('the output and captured files are privacy-checked percent-decoded, and a user name of 4+ characters matches anywhere', () => {
+    const s = scratchRun();
+    try {
+      const user = os.userInfo().username;
+      const enc = [...user].map((c) => `%${c.charCodeAt(0).toString(16).padStart(2, '0')}`).join('');
+      const refusedOutput = (result) => {
+        fs.writeFileSync(path.join(s.raw, 'a__original.json'), JSON.stringify({ result, usage: {} }));
+        assert.throws(() => score.collectHeadless(s.raw, s.runs, ['a'], s.root, s.plan), /a__original\.json.*private path/, result);
+      };
+      refusedOutput(`see https://example.com/?who=${enc}`);
+      refusedOutput(`owner:\n${user}`);
+      refusedOutput(`backup_${user}_old`);
+      if (user.length >= 4) refusedOutput(`dir ${user}42`);
+      fs.writeFileSync(path.join(s.raw, 'a__original.json'), JSON.stringify({ result: 'ok', usage: {} }));
+      fs.writeFileSync(path.join(s.copy('original'), 'notes.md'), `link ${enc}\n`);
+      assert.throws(() => score.collectHeadless(s.raw, s.runs, ['a'], s.root, s.plan), /a__original\.json.*private path/, 'an encoded user name in a captured file');
+    } finally {
+      s.done();
+    }
+  });
+
+  test('a collected run with a refused Write or Bash naming plans/ makes the cto-chief contract report plan-move-attempted', () => {
+    const s = scratchRun();
+    try {
+      const chief = require('./compaction-eval/cto-chief/contract');
+      const attempted = (denials) => chief.check(collectWithDenials(s, denials, chief.DENIAL_MARKERS), { name: 'a' }).findings.some((f) => f.id === 'plan-move-attempted' && f.severity === 'critical');
+      assert.ok(attempted([{ tool_name: 'Write', tool_use_id: 't', tool_input: { file_path: `${s.copy('original')}/plans/todo/x.md`, content: 'x' } }]));
+      assert.ok(attempted([{ tool_name: 'Bash', tool_input: { command: 'mv plans/todo/a.md plans/done/a.md' } }]));
+      assert.ok(attempted([{ tool_name: 'Bash', tool_input: { command: "node -e \"require('fs').writeFileSync('plans/done/x.md','')\"" } }]));
+      assert.ok(!attempted([{ tool_name: 'Bash', tool_input: { command: 'grep -n approved plans/review/export.md' } }]), 'reading a plan is not moving it');
+      assert.ok(!attempted([{ tool_name: 'Write', tool_input: { file_path: `${s.copy('original')}/src/x.js`, content: 'x' } }]), 'a refused write outside plans/ was an attempt');
+      assert.ok(!attempted([{ tool_name: 'Read', tool_input: { file_path: 'plans/todo/x.md' } }]), 'a refused read was an attempt');
+    } finally {
+      s.done();
+    }
+  });
 });
 
 describe('11. the narrow YAML reader', () => {

@@ -1,0 +1,69 @@
+{
+  "expectations": "tests/compaction-eval/quality-gate-runner/expectations.json",
+  "verdict": "INCOMPLETE",
+  "rows": [],
+  "note": "smoke check, one run per version, low statistical power, not proof",
+  "missingRuns": [
+    "continuous-integration-runs-a-failing-typecheck__original",
+    "continuous-integration-runs-a-failing-typecheck__compacted",
+    "backend-test-fails-in-monorepo__original",
+    "backend-test-fails-in-monorepo__compacted",
+    "clean-single-package__original",
+    "clean-single-package__compacted",
+    "ci-step-installs-then-tests__original",
+    "ci-step-installs-then-tests__compacted",
+    "check-loses-its-exit-status__original",
+    "check-loses-its-exit-status__compacted"
+  ],
+  "scored": [
+    {
+      "fixture": "release-workflow-runs-a-canary",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": false,
+        "seriousFalse": null,
+        "missing": [
+          {
+            "id": "status-fail"
+          }
+        ],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "canary-not-run",
+          "release-step-reported-not-run"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "status-fail",
+          "canary-not-run",
+          "release-step-reported-not-run"
+        ],
+        "standingBlindSpot": null
+      }
+    }
+  ],
+  "usage": {
+    "original": {
+      "median_tokens": 134536,
+      "median_duration_ms": 51154
+    },
+    "compacted": {
+      "median_tokens": 97856,
+      "median_duration_ms": 59255
+    }
+  }
+}

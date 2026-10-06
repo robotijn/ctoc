@@ -572,6 +572,9 @@ function collectTranscripts(subagentsDir, runsDir, fixtures, stripRoot) {
 const HEADLESS_FILE = /^([a-z0-9][a-z0-9-]*)__(original|compacted)(__rerun)?\.json$/;
 const RUN_CAP = 1024 * 1024;
 
+/** macOS and Windows file systems ignore letter case by default, so the private-path checks do too. */
+const CASE_FOLD = process.platform === 'darwin' || process.platform === 'win32';
+
 /** Removes every given absolute prefix from text: `<p>/x` becomes `x`, a bare `<p>` becomes `.`. */
 function stripPaths(text, prefixes) {
   let out = String(text || '');
@@ -600,11 +603,17 @@ function credentialTypes(text) {
  */
 function privateLeaks(text, scratch) {
   const user = os.userInfo().username;
-  const has = (p) => text.includes(p) || text.includes(JSON.stringify(p).slice(1, -1));
+  const fold = (s) => (CASE_FOLD ? s.toLowerCase() : s);
+  const folded = fold(text);
+  const has = (p) => folded.includes(fold(p)) || folded.includes(fold(JSON.stringify(p).slice(1, -1)));
   const leaks = [];
   if (scratch && has(scratch)) leaks.push('the scratch directory');
   if (has(os.homedir())) leaks.push('the home directory');
-  if (user && new RegExp(`(?<![A-Za-z0-9_])${user.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z0-9_])`).test(text)) leaks.push('the user name');
+  // A user name of 4+ characters matches anywhere (`<user>42`, `backup_<user>_old`); a shorter one
+  // needs a non-alphanumeric on each side (an underscore does not end a word here), or it would match inside ordinary words.
+  const named = user && (user.length >= 4 ? has(user)
+    : new RegExp(`(?<![A-Za-z0-9])${escapeRe(user)}(?![A-Za-z0-9])`, CASE_FOLD ? 'i' : '').test(text));
+  if (named) leaks.push('the user name');
   return leaks;
 }
 
@@ -638,10 +647,59 @@ function captureFiles(cwd, seeded, prefixes) {
   return files;
 }
 
+const KNOWN_TOOLS = new Set(['Bash', 'Edit', 'MultiEdit', 'Write', 'Read', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Glob', 'Grep', 'Task', 'Agent']);
+
+/** Each `%XX` read as its byte, so an encoded user name, credential or marker is seen too. */
+const percentDecoded = (s) => s.replace(/%([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+
+/** Every string anywhere inside a value (objects and lists walked). */
+function stringsIn(v, out = []) {
+  if (typeof v === 'string') out.push(v);
+  else if (v && typeof v === 'object') for (const x of Object.values(v)) stringsIn(x, out);
+  return out;
+}
+
+/**
+ * The tool calls a headless run was refused (`permission_denials`, entries
+ * `{ tool_name, tool_use_id, tool_input }` as Claude Code 2.1.291 writes them), recorded as FACTS,
+ * never as text: `{ tool, markers }`, where `tool` is a built-in tool name or `<other tool>`, and
+ * `markers` lists, in declared order, each of the fixture's `denial_markers` (literal strings
+ * from the expectations, such as "plans/" or a canary phrase) that some string anywhere in the
+ * call's raw input contains — compared case-insensitively against the raw text, its
+ * percent-decoded form, and that form with `+` read as a space. No command, URL, path or other
+ * input text is written, so nothing a refused call carried can leak through a run file.
+ * Absent → undefined (an older output says nothing about refusals, which is not "none"); a
+ * non-list, or an entry with no tool name as text, throws, naming the run.
+ * @param {object} raw  the headless output
+ * @param {string} file  the run file name, for errors
+ * @param {string[]} markers  the fixture's denial_markers
+ */
+function denialsOf(raw, file, markers) {
+  const list = raw.permission_denials;
+  if (list === undefined) return undefined;
+  const bad = () => new Error(`run ${file} has a malformed permission_denials entry`);
+  if (!Array.isArray(list)) throw bad();
+  return list.map((e) => {
+    if (!e || typeof e.tool_name !== 'string' || !e.tool_name) throw bad();
+    const forms = stringsIn(e.tool_input).flatMap((s) => {
+      const decoded = percentDecoded(s);
+      return [s, decoded, decoded.replace(/\+/g, ' ')].map((x) => x.toLowerCase());
+    });
+    return {
+      tool: KNOWN_TOOLS.has(e.tool_name) ? e.tool_name : '<other tool>',
+      markers: markers.filter((m) => forms.some((f) => f.includes(m.toLowerCase())))
+    };
+  });
+}
+
 /**
  * Converts headless `claude -p --output-format json` outputs named `<name>__<version>[__rerun].json`
- * into run files: the result text, the summed usage tokens, the duration, the cost and the error
- * flag. Session ids and every other field are dropped. Unknown names and any target outside
+ * into run files: the result text, the summed usage tokens, the duration, the cost, the error
+ * flag and `denied` — the refused tool calls as facts, `{ tool, markers }`, with no input text
+ * (see denialsOf; no key when the output has no `permission_denials`). Session ids, every refused
+ * call's input and every other field are dropped. The privacy refusal runs on the output and each
+ * captured file name and text, raw and percent-decoded, and on the whole serialized run; the
+ * one-megabyte cap covers the whole run. Unknown names and any target outside
  * runsDir are refused. When stripRoot is given, that absolute repository root is removed from
  * the output text (`<root>/x` becomes `x`, a bare `<root>` becomes `.`), so no home-directory
  * path reaches a committed run file.
@@ -653,8 +711,9 @@ function captureFiles(cwd, seeded, prefixes) {
  * @param {string[]} names  the fixture names (and token-reading names) to accept
  * @param {string} [stripRoot]
  * @param {{ scratch: string, dispatches: object[] }} [runPlan]
+ * @param {Object<string, string[]>} [markers]  each fixture's `denial_markers`, by fixture name
  */
-function collectHeadless(rawDir, runsDir, names, stripRoot, runPlan) {
+function collectHeadless(rawDir, runsDir, names, stripRoot, runPlan, markers = {}) {
   const known = new Set(names);
   if (stripRoot && fs.existsSync(stripRoot) && within(fs.realpathSync(rawDir), fs.realpathSync(stripRoot))) {
     throw new Error(`refused raw folder ${rawDir}: it is inside the repository (a raw output carries a session id)`);
@@ -687,8 +746,16 @@ function collectHeadless(rawDir, runsDir, names, stripRoot, runPlan) {
       cost_usd: Number.isFinite(j.total_cost_usd) ? j.total_cost_usd : null,
       is_error: Boolean(j.is_error)
     };
+    const denied = denialsOf(j, file, markers[m[1]] || []);
+    if (denied !== undefined) run.denied = denied;
     if (d) run.files = captureFiles(d.cwd, d.seeded || {}, prefixes);
     const text = JSON.stringify(run, null, 2) + '\n';
+    // Raw strings too: serialised, a newline before the user name reads `\n<user>` and hides it.
+    const files = run.files || {};
+    for (const v of [run.output, ...Object.keys(files), ...Object.values(files).filter((x) => typeof x === 'string')]) {
+      refuseUnsafe(file, v, runPlan && runPlan.scratch);
+      refuseUnsafe(file, percentDecoded(v), runPlan && runPlan.scratch);
+    }
     refuseUnsafe(file, text, runPlan && runPlan.scratch);
     if (Buffer.byteLength(text) > RUN_CAP) throw new Error(`run ${file} is ${Buffer.byteLength(text)} bytes, above the one megabyte cap`);
     fs.writeFileSync(target, text);
@@ -765,7 +832,8 @@ function run(argv) {
     const names = exp.fixtures.map((f) => f.name).concat(exp.token_readings || []);
     const planFile = arg('--run-plan');
     const runPlan = planFile ? JSON.parse(fs.readFileSync(planFile, 'utf8')) : undefined;
-    for (const w of collectHeadless(headless, runsDir, names, process.cwd(), runPlan)) process.stdout.write(`collected ${w.file}\n`);
+    const markers = Object.fromEntries(exp.fixtures.map((f) => [f.name, Array.isArray(f.denial_markers) ? f.denial_markers : []]));
+    for (const w of collectHeadless(headless, runsDir, names, process.cwd(), runPlan, markers)) process.stdout.write(`collected ${w.file}\n`);
   }
   if (transcripts) {
     const names = exp.fixtures.map((f) => f.name).concat(exp.token_readings || []);

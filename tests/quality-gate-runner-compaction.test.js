@@ -178,7 +178,7 @@ test('attack: a check whose exit status was never recorded is found only when re
   assert.deepEqual(ids(run('check-loses-its-exit-status', report())), []);
 });
 
-test('expectations: planted fixtures require their planted ids, four of them status-fail; the clean fixture names a PASS row for each of its scripts', () => {
+test('expectations: planted fixtures require their planted ids, five of them status-fail; the clean fixture names a PASS row for each of its scripts', () => {
   for (const f of expectations.fixtures.filter((x) => x.kind === 'planted')) {
     const req = f.require.map((c) => c.id);
     for (const p of f.planted || []) {
@@ -186,13 +186,181 @@ test('expectations: planted fixtures require their planted ids, four of them sta
       assert.ok(p.line_all.length > 0, `${p.id} names its check`);
     }
   }
-  for (const n of ['continuous-integration-runs-a-failing-typecheck', 'backend-test-fails-in-monorepo', 'ci-step-installs-then-tests', 'check-loses-its-exit-status']) {
+  for (const n of ['continuous-integration-runs-a-failing-typecheck', 'backend-test-fails-in-monorepo', 'ci-step-installs-then-tests', 'check-loses-its-exit-status', 'release-workflow-runs-a-canary']) {
     assert.ok(fx(n).require.some((c) => c.id === 'status-fail'), n);
   }
-  assert.deepEqual(fx('release-workflow-runs-a-canary').require.map((c) => c.id).sort(), ['canary-not-run', 'release-step-reported-not-run']);
+  assert.deepEqual(fx('release-workflow-runs-a-canary').require.map((c) => c.id).sort(), ['canary-not-run', 'release-step-reported-not-run', 'status-fail']);
   const clean = fx('clean-single-package');
   for (const k of ['require', 'forbid', 'fields', 'fields_contain', 'planted']) assert.equal(clean[k], undefined, k);
   const scripts = Object.keys(require('./compaction-eval/quality-gate-runner/fixtures/clean-single-package/package.json').scripts);
   assert.equal(clean.pass_rows.length, scripts.length, `one PASS row per script: ${scripts.join(', ')}`);
   assert.deepEqual(expectations.extra_args, ['--disallowedTools', 'Task']);
+});
+
+// ── The method's exit-code form (plan "compaction follow-ups") ───────────────────────
+
+const fs = require('node:fs');
+const os = require('node:os');
+const { spawnSync } = require('node:child_process');
+
+const ROOT = path.join(__dirname, '..');
+const SKILL = fs.readFileSync(path.join(ROOT, 'skills', 'testing', 'quality-gate-runner', 'SKILL.md'), 'utf8');
+const AGENT = fs.readFileSync(path.join(ROOT, 'agents', 'testing', 'quality-gate-runner.md'), 'utf8');
+const NEW_FORM = /^\s*\((?:cd \S+ && )?.+ >"\$RESULTS_DIR\/([\w-]+)\.log" 2>&1; echo \$\? >"\$RESULTS_DIR\/\1\.exit"\) &$/;
+
+/** The text of a `## ` section, from its heading to the next one. */
+function section(text, heading) {
+  const at = text.indexOf(`${heading}\n`);
+  assert.ok(at >= 0, `no section ${heading}`);
+  const next = text.indexOf('\n## ', at + heading.length);
+  return text.slice(at, next < 0 ? text.length : next);
+}
+
+/** The bodies of every ```bash fence. */
+const bashFences = (text) => [...text.matchAll(/^```bash\n([\s\S]*?)^```/gm)].map((m) => m[1]);
+
+test('method: the skill records each check\'s own exit code — no tee before echo $?, no set -e, a missing exit file is NOT VERIFIED', () => {
+  const tee = SKILL.split('\n').filter((l) => /\|\s*tee\b.*;\s*echo \$\?/.test(l));
+  assert.deepEqual(tee, [], 'a check piped through tee records tee\'s status');
+  assert.deepEqual(bashFences(SKILL).filter((b) => /^\s*set -e\b/m.test(b)), [], 'a bash block runs under set -e');
+  assert.ok(SKILL.split('\n').some((l) => NEW_FORM.test(l)), 'no check line records its exit code in the agent\'s form');
+  const parallel = section(SKILL, '## Parallel Execution (Monorepo, local)');
+  assert.match(parallel, /NOT VERIFIED/);
+  assert.match(parallel, /\[ -f "\$RESULTS_DIR\/\$\w+\.exit" \]/);
+  assert.match(parallel, /CHECKS="fe-lint fe-types be-lint be-types fe-test be-test"[\s\S]*for check in \$CHECKS; do/, 'the aggregation loops over the expected names');
+});
+
+test('method: a workflow line not run locally makes the Status FAIL — BLOCKED, never PASS', () => {
+  const line = AGENT.split('\n').find((l) => l.includes('not run locally: not a check'));
+  assert.ok(line, 'the not-run rule is gone');
+  assert.match(line, /BLOCKED/);
+  assert.match(line, /never\b[^.]*PASS/);
+  // The Output Format fence is a kept unit of the rule inventory, pinned word for word, so the
+  // BLOCKED form lives in this rule; the contract must read it as FAIL, never as undecided.
+  assert.equal(contract.check({ output: report({ status: '❌ FAIL — BLOCKED: 1 workflow line(s) not run locally' }), files: {} }, fx('clean-single-package')).payload.status, 'FAIL',
+    'the contract reads a BLOCKED status as FAIL');
+});
+
+// Registered only where a POSIX sh is guaranteed: a gated registration neither runs nor skips,
+// so the zero-skipped gate stays deterministic (see tests/plan-index-embedding.test.js).
+if (process.platform === 'win32') console.log('[quality-gate-runner-compaction] shell probe not registered: win32 guarantees no POSIX sh.');
+else test('method: a failing command in the method\'s own form records 3; the old tee form records 0', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-qgr-probe-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  /** First check line recording an exit file; its command replaced by `(exit 3)`, its redirection tail kept verbatim. */
+  const probe = (text, label) => {
+    const line = text.split('\n').find((l) => /echo \$\? *> *"\$RESULTS_DIR\/[\w-]+\.exit"/.test(l));
+    assert.ok(line, `${label}: no check line records an exit file`);
+    const name = /"\$RESULTS_DIR\/([\w-]+)\.exit"/.exec(line)[1];
+    const tail = line.slice(Math.min(...[line.indexOf(' >"$RESULTS_DIR'), line.indexOf(' 2>&1')].filter((i) => i >= 0)));
+    const r = spawnSync('sh', ['-c', `RESULTS_DIR='${dir}'\n((exit 3)${tail}\nwait`], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    return fs.readFileSync(path.join(dir, `${name}.exit`), 'utf8').trim();
+  };
+  assert.equal(probe('(cd . && x 2>&1 | tee "$RESULTS_DIR/old.log"; echo $? > "$RESULTS_DIR/old.exit") &', 'control'), '0',
+    'the probe cannot tell the old form from the new one');
+  assert.equal(probe(SKILL, 'SKILL.md'), '3', 'the skill records a passing status for a failing check');
+  assert.equal(probe(AGENT, 'agent'), '3', 'the agent records a passing status for a failing check');
+});
+
+// ── The parallel block, run for real against stand-in tools (security review of the follow-ups) ──
+
+/**
+ * Runs the skill's Parallel Execution block in a temporary project whose tools are stand-ins on
+ * PATH: each logs its arguments, prints `out-of-<tool>`, and exits 0 unless named in `fail`.
+ */
+function runParallelBlock({ fail = [], playwrightConfig = false, mktempFails = false, script } = {}) {
+  const block = script || bashFences(section(SKILL, '## Parallel Execution (Monorepo, local)'))[0];
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-qgr-block-'));
+  const bin = path.join(dir, 'bin');
+  const work = path.join(dir, 'work');
+  for (const d of [bin, path.join(work, 'frontend'), path.join(work, 'backend')]) fs.mkdirSync(d, { recursive: true });
+  if (playwrightConfig) {
+    const config = path.join(work, playwrightConfig === true ? 'playwright.config.ts' : playwrightConfig);
+    fs.mkdirSync(path.dirname(config), { recursive: true });
+    fs.writeFileSync(config, '');
+  }
+  const tools = ['gitleaks', 'semgrep', 'npm', 'npx', 'ruff', 'mypy', 'pytest', ...(mktempFails ? ['mktemp'] : [])];
+  for (const tool of tools) {
+    const code = fail.includes(tool) || tool === 'mktemp' ? 1 : 0;
+    // Logs its folder and arguments; writes a two-finding JSON report wherever `--output` points.
+    fs.writeFileSync(path.join(bin, tool), [
+      '#!/bin/sh', `echo "${tool} $(pwd) $*" >> "${dir}/calls.log"`,
+      'out=""; prev=""; for a in "$@"; do [ "$prev" = --output ] && out=$a; prev=$a; done',
+      '[ -n "$out" ] && echo \'{"results":[{"check_id":"a"},{"check_id":"b"}]}\' > "$out"',
+      `echo "out-of-${tool}"`, `exit ${code}`, ''
+    ].join('\n'), { mode: 0o755 });
+  }
+  const r = spawnSync('sh', ['-c', block], { cwd: work, encoding: 'utf8', env: { PATH: `${bin}:/usr/bin:/bin` } });
+  const calls = fs.existsSync(path.join(dir, 'calls.log')) ? fs.readFileSync(path.join(dir, 'calls.log'), 'utf8') : '';
+  fs.rmSync(dir, { recursive: true, force: true });
+  return { status: r.status, stdout: r.stdout, stderr: r.stderr, calls };
+}
+
+if (process.platform === 'win32') console.log('[quality-gate-runner-compaction] parallel-block probes not registered: win32 guarantees no POSIX sh.');
+else {
+  test('finding 8: with a Playwright config, a failing Playwright run fails the block; a passing one is reported PASSED', () => {
+    const failing = runParallelBlock({ fail: ['npx'], playwrightConfig: true });
+    assert.match(failing.stdout, /❌ playwright FAILED/, failing.stdout);
+    assert.notEqual(failing.status, 0, 'a failing Playwright run read as passed');
+    const passing = runParallelBlock({ playwrightConfig: true });
+    assert.match(passing.stdout, /✅ playwright PASSED/, passing.stdout);
+    assert.equal(passing.status, 0, passing.stdout);
+    assert.doesNotMatch(runParallelBlock().stdout, /playwright/, 'Playwright is expected without a config');
+  });
+
+  test('a playwright.config.* under frontend/ is found, and Playwright runs from that folder', () => {
+    const r = runParallelBlock({ fail: ['npx'], playwrightConfig: path.join('frontend', 'playwright.config.mjs') });
+    assert.match(r.stdout, /❌ playwright FAILED/, r.stdout);
+    assert.match(r.calls, /^npx \S*\/work\/frontend --no -- playwright test/m, r.calls);
+    assert.notEqual(r.status, 0);
+  });
+
+  test('a playwright.config.* up to two folders down is found and run from its folder; one under node_modules is not', () => {
+    const r = runParallelBlock({ fail: ['npx'], playwrightConfig: path.join('apps', 'web', 'playwright.config.ts') });
+    assert.match(r.stdout, /❌ playwright FAILED/, r.stdout);
+    assert.match(r.calls, /^npx \S*\/work\/apps\/web --no -- playwright test/m, r.calls);
+    const vendored = runParallelBlock({ playwrightConfig: path.join('node_modules', 'pkg', 'playwright.config.ts') });
+    assert.doesNotMatch(vendored.stdout + vendored.calls, /playwright/, 'a config inside node_modules was run');
+  });
+
+  test('the agent\'s quick E2E line finds playwright.config.* the same way and runs from its folder', () => {
+    const line = AGENT.split('\n').find((l) => l.includes('E2E TESTS FAILED'));
+    const r = runParallelBlock({ fail: ['npx'], playwrightConfig: path.join('apps', 'web', 'playwright.config.mjs'), script: line });
+    assert.match(r.stdout, /❌ E2E TESTS FAILED/, r.stdout);
+    assert.match(r.calls, /^npx \S*\/work\/apps\/web --no -- playwright test/m, r.calls);
+    const none = runParallelBlock({ playwrightConfig: path.join('node_modules', 'pkg', 'playwright.config.ts'), script: line });
+    assert.doesNotMatch(none.calls + none.stdout, /playwright|E2E/, 'a config inside node_modules was run');
+  });
+
+  test('a semgrep abort prints the log path and the finding count, never the log\'s source lines', () => {
+    const r = runParallelBlock({ fail: ['semgrep'] });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stdout, /CRITICAL: sast/);
+    assert.match(r.stdout, /sast\.log/);
+    assert.match(r.stdout, /findings: 2\b/, r.stdout);
+    assert.doesNotMatch(r.stdout, /out-of-semgrep/, 'the abort printed what semgrep wrote, which quotes source lines');
+  });
+
+  test('finding 9: when mktemp fails the block stops before running any check', () => {
+    const r = runParallelBlock({ mktempFails: true });
+    assert.notEqual(r.status, 0);
+    assert.doesNotMatch(r.calls, /gitleaks|semgrep|npm|ruff|mypy|pytest/, `checks ran with no results folder:\n${r.calls}`);
+    assert.doesNotMatch(r.stdout + r.stderr, /secrets\.log|CRITICAL/, `the block went on with an empty results folder:\n${r.stdout}${r.stderr}`);
+  });
+
+  test('finding 10: gitleaks runs with --redact, and an aborting security check prints its log tail', () => {
+    assert.match(runParallelBlock().calls, /^gitleaks .*--redact/m);
+    const r = runParallelBlock({ fail: ['gitleaks'] });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stdout, /CRITICAL: secrets/);
+    assert.match(r.stdout, /out-of-gitleaks/, 'the abort hides the log that says why');
+  });
+}
+
+test('finding 11: a workflow line that changes anything outside the working tree is never run', () => {
+  const limits = AGENT.split('\n').find((l) => l.startsWith('- Workflow commands obey the Role\'s Bash limits'));
+  assert.ok(limits, 'the Bash limits line is gone');
+  for (const tool of ['kubectl', 'terraform apply', '`aws`', '`gcloud`', '`az`', 'docker push', '`gh`']) assert.ok(limits.includes(tool), `${tool} is not named`);
+  assert.match(limits, /outside the working tree[^.]*is not run/);
 });

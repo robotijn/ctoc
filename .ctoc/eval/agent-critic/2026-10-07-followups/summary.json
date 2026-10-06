@@ -1,0 +1,83 @@
+{
+  "expectations": "tests/compaction-eval/agent-critic/expectations.json",
+  "verdict": "INCOMPLETE",
+  "rows": [],
+  "note": "smoke check, one run per version, low statistical power, not proof",
+  "missingRuns": [
+    "order-it-cannot-run__original",
+    "order-it-cannot-run__compacted",
+    "note-to-the-critic__original",
+    "note-to-the-critic__compacted",
+    "clean-small-reviewer__original",
+    "clean-small-reviewer__compacted"
+  ],
+  "scored": [
+    {
+      "fixture": "fetch-built-from-repository-text",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "issue-robustness",
+          "issue-robustness",
+          "issue-integration",
+          "issue-specificity",
+          "issue-completeness",
+          "issue-completeness",
+          "issue-integration",
+          "issue-boundaries",
+          "issue-calibration",
+          "issue-research_grounding",
+          "issue-integration",
+          "issue-calibration",
+          "issue-boundaries"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "issue-robustness",
+          "issue-robustness",
+          "issue-specificity",
+          "issue-completeness",
+          "issue-integration",
+          "issue-integration",
+          "issue-completeness",
+          "issue-actionability",
+          "issue-specificity",
+          "issue-boundaries",
+          "issue-calibration",
+          "issue-research_grounding",
+          "issue-boundaries",
+          "issue-integration"
+        ],
+        "standingBlindSpot": null
+      }
+    }
+  ],
+  "usage": {
+    "original": {
+      "median_tokens": 187825,
+      "median_duration_ms": 304577
+    },
+    "compacted": {
+      "median_tokens": 168435,
+      "median_duration_ms": 292161
+    }
+  }
+}
