@@ -1,9 +1,9 @@
 {
-  "content_sha256": "0a8c91189085e7fbec9bc82003427acb932f5ad4909d184c992900823113393d",
+  "content_sha256": "3337045e5636efcfe5de8bed0388a5961d7672686be8f2481a68e450565ceccd",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T09:05:12.533Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T14:34:53.104Z",
   "approved_by": "human",
   "plan_basename": "agent-tool-grants-s12-method-files-of-slices-2-to-4"
 }

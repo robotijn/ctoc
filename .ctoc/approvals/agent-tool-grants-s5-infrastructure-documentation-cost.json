@@ -1,11 +1,9 @@
 {
-  "content_sha256": "1ea4a80668583c24783f1f99ad6132ef88ca528adabf367fb3033ede4c7854e6",
+  "content_sha256": "7e32fa091d737ca2c5cfd55575593e31dc47f2d57914d6b57ebb84151176bf76",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-05T22:37:41.376Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T14:34:52.888Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "Owner approved this slice for build on 2026-10-05 and widened it on 2026-10-06 (\"fix all agents and skills\"). A Step 14 kickback for an unrelated load-sensitive timing test deleted the entry; it is re-recorded unchanged.",
   "plan_basename": "agent-tool-grants-s5-infrastructure-documentation-cost"
 }

@@ -48,8 +48,8 @@ files:
   # the web-only recommender gets the rule that nothing leaves through a query.
   - agents/compliance/eu-solution-recommender.md
 approved_by: human
-approved_at: 2026-10-05T20:27:06.954Z
-gate_crossed: implementation → todo
+approved_at: 2026-10-06T14:34:52.967Z
+gate_crossed: review → done
 ---
 
 # Tool grants for the security, legal and compliance agents

@@ -1,11 +1,9 @@
 {
-  "content_sha256": "9b75a8fa738bed4714f618429a495f7cda1c8eeafd6a7d72799f29ec7cecd0fc",
+  "content_sha256": "0ea9dbcfb417ca4521fb0d8c996863153a7adb7036eafe88a8d7f93c4191591a",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-05T22:58:32.142Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T14:34:52.926Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "Owner, 2026-10-06: \"fix all agents and skills\". The two changelog files are added so a fault shipped in slice 5 (npx --no without the -- separator hands flags to npm) is repaired with this slice.",
   "plan_basename": "agent-tool-grants-s6-testing"
 }

@@ -1,9 +1,9 @@
 {
-  "content_sha256": "fc0f490d92da3a84dc5648f49f7dbd6446d26b2f7f2f8f99dc825b030ce9d889",
+  "content_sha256": "5eac8375705b9f770576cd3a89fc941b21c1aa934320f3561b1be6ca77f0124f",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-05T20:27:06.848Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T14:34:52.847Z",
   "approved_by": "human",
   "plan_basename": "agent-tool-grants-s4-saas"
 }

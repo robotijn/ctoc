@@ -55,8 +55,8 @@ files:
   - skills/devex/api-deprecation-checker/SKILL.md
   - skills/devex/onboarding-validator/SKILL.md
 approved_by: human
-approved_at: 2026-10-05T20:27:06.990Z
-gate_crossed: implementation → todo
+approved_at: 2026-10-06T14:34:53.000Z
+gate_crossed: review → done
 ---
 
 # Tool grants for the quality, architecture, versioning, frontend and developer-experience agents

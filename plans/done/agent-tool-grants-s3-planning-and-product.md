@@ -16,8 +16,8 @@ files:
   - tests/agent-tool-grants.test.js
   - tests/agent-tool-grants-maxima.test.js
 approved_by: human
-approved_at: 2026-10-05T20:27:06.774Z
-gate_crossed: implementation → todo
+approved_at: 2026-10-06T14:34:52.776Z
+gate_crossed: review → done
 ---
 
 # Tool grants for the remaining planning agents and the two product agents

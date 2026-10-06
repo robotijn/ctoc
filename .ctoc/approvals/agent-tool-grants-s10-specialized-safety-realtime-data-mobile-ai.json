@@ -1,11 +1,9 @@
 {
-  "content_sha256": "dddeafee44487219c208166e77a7ef3f0961e7c910ea81e13f6424ea98ff16d0",
+  "content_sha256": "5aa214ecc588f9878df4f10d03d0861cdbc07ee9c287f9f4053588b912228d17",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T01:33:35.040Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T14:34:53.068Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "Owner, 2026-10-06: \"fix all agents and skills\" — the method files of this slice's agents, and six slice 8 agent files (scope-growth request 1791250135059-zkxsbu), are added to files.",
   "plan_basename": "agent-tool-grants-s10-specialized-safety-realtime-data-mobile-ai"
 }

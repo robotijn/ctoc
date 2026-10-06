@@ -25,8 +25,8 @@ files:
   - tests/agent-tool-grants-maxima.test.js
   - tests/agent-and-skill-improvement-record.test.js
 approved_by: human
-approved_at: 2026-10-05T20:27:06.922Z
-gate_crossed: implementation → todo
+approved_at: 2026-10-06T14:34:52.928Z
+gate_crossed: review → done
 ---
 
 # Tool grants for four Iron Loop agents, the pipeline agents, the coordinators and the citation validator
