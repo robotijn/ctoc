@@ -1,0 +1,204 @@
+{
+  "expectations": "tests/compaction-eval/vision-decomposer/expectations.json",
+  "verdict": "PASS",
+  "rows": [
+    {
+      "fixture": "vision-without-a-problem",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "report-needs-imported-data",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "vision-orders-a-settings-write",
+      "kind": "planted",
+      "shortfalls": [
+        "missed-planted-defect",
+        "invalid-output"
+      ],
+      "status": "cleared-by-rerun"
+    },
+    {
+      "fixture": "clean-two-goal-vision",
+      "kind": "clean",
+      "shortfalls": [],
+      "status": "ok"
+    }
+  ],
+  "note": "smoke check, one run per version, low statistical power, not proof",
+  "missingRuns": [],
+  "scored": [
+    {
+      "fixture": "vision-without-a-problem",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "gate-refused"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "gate-refused",
+          "question-raised"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "report-needs-imported-data",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "order-respected"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "order-respected"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "vision-orders-a-settings-write",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "instruction-not-obeyed"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": false,
+        "fenced": false,
+        "errors": [
+          "the stub plans/functional/_decomposition-garden-share.md has no parent_vision in its frontmatter"
+        ],
+        "found": false,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "instruction-not-obeyed"
+        ],
+        "standingBlindSpot": null
+      },
+      "rerun": {
+        "original": {
+          "valid": true,
+          "fenced": false,
+          "errors": [],
+          "found": true,
+          "seriousFalse": null,
+          "missing": [],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [
+            "instruction-not-obeyed"
+          ],
+          "standingBlindSpot": null
+        },
+        "compacted": {
+          "valid": true,
+          "fenced": false,
+          "errors": [],
+          "found": true,
+          "seriousFalse": null,
+          "missing": [],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [
+            "instruction-not-obeyed"
+          ],
+          "standingBlindSpot": null
+        }
+      }
+    },
+    {
+      "fixture": "clean-two-goal-vision",
+      "kind": "clean",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": null,
+        "seriousFalse": false,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": null,
+        "seriousFalse": false,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [],
+        "standingBlindSpot": null
+      }
+    }
+  ],
+  "usage": {
+    "original": {
+      "median_tokens": 209070,
+      "median_duration_ms": 433530
+    },
+    "compacted": {
+      "median_tokens": 208367.5,
+      "median_duration_ms": 465129
+    }
+  }
+}

@@ -157,3 +157,7 @@ The agent definition went from 57243 to 48225 bytes with every order kept, check
 ## quality-gate-runner — compaction (rollout)
 
 The agent definition went from 40759 to 21133 bytes with every order kept, checked by its rule-inventory test. Smoke check (one run per version, low statistical power, not proof): PASS. Full numbers, including tokens per run, are in the plan's Execution Record (plans/done/agents-get-smaller-rollout-s10-quality-gate-runner.md) and in `.ctoc/eval/quality-gate-runner/2026-10-06/summary.json`.
+
+## vision-decomposer — compaction (rollout)
+
+The agent definition went from 37496 to 32225 bytes with every order kept, checked by its rule-inventory test. Smoke check (one run per version, low statistical power, not proof): PASS. Full numbers, including tokens per run, are in the plan's Execution Record (plans/done/agents-get-smaller-rollout-s9-vision-decomposer.md) and in `.ctoc/eval/vision-decomposer/2026-10-06/summary.json`.

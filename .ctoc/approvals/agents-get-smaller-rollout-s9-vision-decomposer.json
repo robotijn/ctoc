@@ -1,9 +1,9 @@
 {
-  "content_sha256": "6818dd33c1b5f689a82250c7c9bd2c25ba278a962ae9043c561a8fdaa99adfd1",
+  "content_sha256": "98f055b55c19bb3350e2802f389b462b54b63cd4618141997fe4ef8eab077a8c",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T18:01:53.954Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T23:03:19.689Z",
   "approved_by": "human",
   "plan_basename": "agents-get-smaller-rollout-s9-vision-decomposer"
 }
