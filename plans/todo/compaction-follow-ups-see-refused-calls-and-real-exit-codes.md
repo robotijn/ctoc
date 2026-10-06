@@ -14,6 +14,9 @@ files:
   - "tests/quality-gate-runner-compaction.test.js"
   - "tests/compaction-eval/agent-critic/expectations.json"
   - "tests/compaction-eval/quality-gate-runner/expectations.json"
+  - "tests/compaction-eval/cto-chief/contract.js"
+  - "tests/compaction-eval/cto-chief/expectations.json"
+  - "tests/cto-chief-compaction.test.js"
 approved_by: human
 approved_at: 2026-10-06T22:54:36.108Z
 gate_crossed: implementation → todo
@@ -261,6 +264,16 @@ count moves):
   are kept, so `echo x > plans/a.md` still reads as a write; a URL path segment is kept only when it is
   at most 32 lowercase characters and a query word at most 20, so a lowercase token is not kept as a
   "word"; the user-name check no longer treats `_` as a word character, so `backup_<user>_old` refuses.
+- **Refused calls are recorded as facts, never as text (CTO Chief decision, supersedes the keep-lists
+  above).** `run.denied` is `[{ tool, markers }]`: a built-in tool name or `<other tool>`, and the
+  fixture's declared `denial_markers` found in any string of the raw input (raw, percent-decoded, and
+  decoded with `+` as a space; case-insensitive). The keep-list code and its tests are deleted. Choices
+  made here: markers are searched in every string anywhere in the input (nested objects and lists too,
+  e.g. a MultiEdit's edits); a user name of 4+ characters now matches anywhere in the output and
+  captured files (a shorter one keeps non-alphanumeric boundaries, so it cannot match inside ordinary
+  words) — note this refuses any output containing the user name as a substring, so on a machine whose
+  user is, say, `runner`, an output mentioning `quality-gate-runner` is refused; "up to two levels deep"
+  is read as `find . -maxdepth 3` (the root, and two folders below it).
 - **The skill's semgrep abort prints only the log path and the finding count** (semgrep now also writes
   `--json --output sast.json`, which is counted); Playwright runs from the first folder, `.` then
   `frontend`, holding any `playwright.config.*`.
@@ -365,3 +378,22 @@ findings from a critic that read this plan._
   kept value naming the user (before the cut, raw, decoded, any case), the `<other tool>` rule, the
   canary-in-query and `plans/`-in-command survivals, the payload test, Playwright under `frontend/`, and
   the semgrep abort. All green after the change.
+- Facts-only pass (2026-10-07): 6 tests failed first (facts not text, markers raw/encoded/mixed case,
+  both re-checks' hostile inputs, percent-decoded output and 4+-character user name, the agent-critic
+  canary via WebFetch and WebSearch, Playwright two folders down); all green after the change except
+  the cto-chief end-to-end test. The cto-chief adapter reads `d.input`, which is no longer written, and
+  its contract, expectations and test (`tests/compaction-eval/cto-chief/contract.js`,
+  `tests/compaction-eval/cto-chief/expectations.json`, `tests/cto-chief-compaction.test.js`) are not in
+  `files:`. Scope-growth requests filed: 1791329890310-atqp3b, 1791329890312-tvt64s,
+  1791329890312-nk5qff. Nothing from this pass is committed until the scope is decided. The agent's
+  quick E2E line was changed before its test was written; the old line (`[ -f "playwright.config.ts" ]`
+  at the root only) cannot find a nested config, so the test's first assertion fails against it
+  (reasoned, not run).
+- Scope widened again by the main session (the three cto-chief files; ledger re-recorded with
+  ledger-backfill, coverage check → approved, verified by the executor). The cto-chief adapter now reads
+  `markers`: a refused Edit/Write/MultiEdit/NotebookEdit with `plans/`, or a refused Bash with `plans/`
+  and one of its exported write markers (`mv `, `cp `, `rm `, `> `, `writefile`, `unlink`, …), is
+  `plan-move-attempted`; a refused read naming `plans/` is not. Its three plan-move fixtures declare
+  `denial_markers` equal to the contract's `DENIAL_MARKERS`, pinned by a test. Known limit: markers are
+  not positional, so a refused Bash that reads `plans/` and writes elsewhere in the same command counts
+  as an attempt (fails toward reporting). Red (3 tests) then green.

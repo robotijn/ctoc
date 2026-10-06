@@ -166,11 +166,11 @@ wait
 (cd frontend && npm run test >"$RESULTS_DIR/fe-test.log" 2>&1; echo $? >"$RESULTS_DIR/fe-test.exit") &
 (cd backend && pytest >"$RESULTS_DIR/be-test.log" 2>&1; echo $? >"$RESULTS_DIR/be-test.exit") &
 CHECKS="fe-lint fe-types be-lint be-types fe-test be-test"
-PW_DIR=
-for d in . frontend; do for c in "$d"/playwright.config.*; do [ -f "$c" ] && PW_DIR=$d && break 2; done; done
-if [ -n "$PW_DIR" ]; then
+# the first playwright.config.* up to two folders down, never inside node_modules; run from its folder
+PW=$(find . -maxdepth 3 -name node_modules -prune -o -name 'playwright.config.*' -print | head -1)
+if [ -n "$PW" ]; then
   CHECKS="$CHECKS playwright"
-  (cd "$PW_DIR" && npx --no -- playwright test --reporter=list >"$RESULTS_DIR/playwright.log" 2>&1; echo $? >"$RESULTS_DIR/playwright.exit") &
+  (cd "${PW%/*}" && npx --no -- playwright test --reporter=list >"$RESULTS_DIR/playwright.log" 2>&1; echo $? >"$RESULTS_DIR/playwright.exit") &
 fi
 wait
 

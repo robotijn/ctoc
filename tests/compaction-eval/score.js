@@ -609,8 +609,11 @@ function privateLeaks(text, scratch) {
   const leaks = [];
   if (scratch && has(scratch)) leaks.push('the scratch directory');
   if (has(os.homedir())) leaks.push('the home directory');
-  // An underscore does not end a word here: `backup_<user>_old` names the user.
-  if (user && new RegExp(`(?<![A-Za-z0-9])${escapeRe(user)}(?![A-Za-z0-9])`, CASE_FOLD ? 'i' : '').test(text)) leaks.push('the user name');
+  // A user name of 4+ characters matches anywhere (`<user>42`, `backup_<user>_old`); a shorter one
+  // needs a non-alphanumeric on each side (an underscore does not end a word here), or it would match inside ordinary words.
+  const named = user && (user.length >= 4 ? has(user)
+    : new RegExp(`(?<![A-Za-z0-9])${escapeRe(user)}(?![A-Za-z0-9])`, CASE_FOLD ? 'i' : '').test(text));
+  if (named) leaks.push('the user name');
   return leaks;
 }
 
@@ -644,108 +647,59 @@ function captureFiles(cwd, seeded, prefixes) {
   return files;
 }
 
-const DENIAL_FIELDS = ['file_path', 'notebook_path', 'path', 'command', 'url'];
-const DENIAL_CAP = 2000;
-
 const KNOWN_TOOLS = new Set(['Bash', 'Edit', 'MultiEdit', 'Write', 'Read', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Glob', 'Grep', 'Task', 'Agent']);
-const OUTSIDE = '<outside the copy>';
-const SHELL_OP = /^(?:\|\||&&|[|;&<>]+)$/;
-const PROGRAM_AFTER = /^(?:\|\||&&|[|;&])$/;
 
-/** Each `%XX` read as its byte, so an encoded user name or credential is checked too. */
+/** Each `%XX` read as its byte, so an encoded user name, credential or marker is seen too. */
 const percentDecoded = (s) => s.replace(/%([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
 
-/** A relative path made only of letters, digits and `@ / . _ -`, not starting with `/` or `-`, with no `..`. */
-const isPlainRelative = (s) => /^[A-Za-z0-9@._/-]+$/.test(s) && !/^[/-]/.test(s) && !s.includes('..');
-
-/** A path field: kept when it is a plain relative path (inside the copy, once stripped); anything else is OUTSIDE. */
-const keepPath = (s) => (isPlainRelative(s) ? s : OUTSIDE);
-
-/**
- * A command, kept to its shape: each program name (the first word, and the first word after
- * `|`, `||`, `&&`, `;` or `&`) when it is a plain word, every shell operator, and every argument
- * that is a plain relative path holding a `/` or ending in a short extension (`a.md`); every
- * other word is `<arg>`. A credential, a flag value, a quoted string and an absolute, home,
- * `$`-built or `..` path are all `<arg>`.
- */
-function keepCommand(cmd) {
-  const words = cmd.split(/(\s+|\|\||&&|[|;&<>]+)/).filter((w) => w && !/^\s+$/.test(w));
-  let program = true;
-  return words.map((w) => {
-    if (SHELL_OP.test(w)) { program = PROGRAM_AFTER.test(w); return w; }
-    const isProgram = program;
-    program = false;
-    if (isProgram && /^[A-Za-z0-9_.+][A-Za-z0-9_.+-]*$/.test(w)) return w;
-    if (isPlainRelative(w) && (w.includes('/') || /^[A-Za-z0-9_@-]+(?:\.[A-Za-z0-9_-]{1,10})+$/.test(w))) return w;
-    return '<arg>';
-  }).join(' ');
-}
-
-/**
- * A URL, kept to what the checks read: http(s) only (anything else is `<url>`), host and port,
- * the path when every percent-decoded segment is a short lowercase word (otherwise `/<path>`),
- * each query name percent-decoded, and a query value only when, decoded, it is lowercase words
- * of letters and digits (so a canary phrase survives); every other value is REDACTED.
- * user:password and the fragment are dropped.
- */
-function keepUrl(raw) {
-  let u;
-  try { u = new URL(raw); } catch { return '<url>'; } // an unparseable URL keeps nothing
-  if (u.protocol !== 'http:' && u.protocol !== 'https:') return '<url>';
-  if (!/^[a-z0-9.-]+$/.test(u.hostname)) return '<url>';
-  const segments = percentDecoded(u.pathname).split('/');
-  const pathPart = segments.every((p) => /^[a-z0-9._-]{0,32}$/.test(p)) && !segments.includes('..') ? u.pathname : '/<path>';
-  const query = [...u.searchParams].map(([n, v]) => {
-    const name = /^[A-Za-z0-9_.-]{1,40}$/.test(n) ? n : '<name>';
-    const value = v === '' || /^[a-z0-9]{1,20}(?: [a-z0-9]{1,20})*$/.test(v) ? v.replace(/ /g, '%20') : 'REDACTED';
-    return `${name}=${value}`;
-  });
-  return `${u.protocol}//${u.hostname}${u.port ? `:${u.port}` : ''}${pathPart}${query.length ? `?${query.join('&')}` : ''}`;
+/** Every string anywhere inside a value (objects and lists walked). */
+function stringsIn(v, out = []) {
+  if (typeof v === 'string') out.push(v);
+  else if (v && typeof v === 'object') for (const x of Object.values(v)) stringsIn(x, out);
+  return out;
 }
 
 /**
  * The tool calls a headless run was refused (`permission_denials`, entries
- * `{ tool_name, tool_use_id, tool_input }` as Claude Code 2.1.291 writes them), as
- * `{ tool, input }`, by KEEP-LISTS — only what the checks need survives, never a guess at which
- * names are secret. `tool` is a built-in tool name or `<other tool>`. `input` holds only these
- * string fields, each first stripped of the copy and repository root like the output:
- * file_path, notebook_path and path (keepPath), command (keepCommand) and url (keepUrl). The
- * built value — in full and percent-decoded — then goes through refuseUnsafe (a private path or
- * a credential-shaped string that survived refuses the run, naming it, never the value), and only
- * then is it cut to 2000 characters.
+ * `{ tool_name, tool_use_id, tool_input }` as Claude Code 2.1.291 writes them), recorded as FACTS,
+ * never as text: `{ tool, markers }`, where `tool` is a built-in tool name or `<other tool>`, and
+ * `markers` lists, in declared order, each of the fixture's `denial_markers` (literal strings
+ * from the expectations, such as "plans/" or a canary phrase) that some string anywhere in the
+ * call's raw input contains — compared case-insensitively against the raw text, its
+ * percent-decoded form, and that form with `+` read as a space. No command, URL, path or other
+ * input text is written, so nothing a refused call carried can leak through a run file.
  * Absent → undefined (an older output says nothing about refusals, which is not "none"); a
  * non-list, or an entry with no tool name as text, throws, naming the run.
+ * @param {object} raw  the headless output
+ * @param {string} file  the run file name, for errors
+ * @param {string[]} markers  the fixture's denial_markers
  */
-function denialsOf(raw, file, prefixes, scratch) {
+function denialsOf(raw, file, markers) {
   const list = raw.permission_denials;
   if (list === undefined) return undefined;
   const bad = () => new Error(`run ${file} has a malformed permission_denials entry`);
   if (!Array.isArray(list)) throw bad();
-  const keep = { file_path: keepPath, notebook_path: keepPath, path: keepPath, command: keepCommand, url: keepUrl };
   return list.map((e) => {
     if (!e || typeof e.tool_name !== 'string' || !e.tool_name) throw bad();
-    const ti = e.tool_input && typeof e.tool_input === 'object' ? e.tool_input : {};
-    const input = {};
-    for (const k of DENIAL_FIELDS) {
-      if (typeof ti[k] !== 'string') continue;
-      const v = keep[k](stripPaths(ti[k], prefixes));
-      refuseUnsafe(file, v, scratch);
-      refuseUnsafe(file, percentDecoded(v), scratch);
-      input[k] = v.slice(0, DENIAL_CAP);
-    }
-    return { tool: KNOWN_TOOLS.has(e.tool_name) ? e.tool_name : '<other tool>', input };
+    const forms = stringsIn(e.tool_input).flatMap((s) => {
+      const decoded = percentDecoded(s);
+      return [s, decoded, decoded.replace(/\+/g, ' ')].map((x) => x.toLowerCase());
+    });
+    return {
+      tool: KNOWN_TOOLS.has(e.tool_name) ? e.tool_name : '<other tool>',
+      markers: markers.filter((m) => forms.some((f) => f.includes(m.toLowerCase())))
+    };
   });
 }
 
 /**
  * Converts headless `claude -p --output-format json` outputs named `<name>__<version>[__rerun].json`
  * into run files: the result text, the summed usage tokens, the duration, the cost, the error
- * flag and `denied` — the refused tool calls as redacted `{ tool, input }` summaries (see
- * denialsOf, which checks each full value before it is cut; no key when the output has no
- * `permission_denials`). Session ids, tool payloads (content, old_string, new_string, prompt,
- * description, tool_use_id) and every other field are dropped. The privacy refusal runs on the
- * output, each captured file name and text as raw strings, and on the whole serialized run; the
- * one-megabyte cap covers the whole run, `denied` included. Unknown names and any target outside
+ * flag and `denied` — the refused tool calls as facts, `{ tool, markers }`, with no input text
+ * (see denialsOf; no key when the output has no `permission_denials`). Session ids, every refused
+ * call's input and every other field are dropped. The privacy refusal runs on the output and each
+ * captured file name and text, raw and percent-decoded, and on the whole serialized run; the
+ * one-megabyte cap covers the whole run. Unknown names and any target outside
  * runsDir are refused. When stripRoot is given, that absolute repository root is removed from
  * the output text (`<root>/x` becomes `x`, a bare `<root>` becomes `.`), so no home-directory
  * path reaches a committed run file.
@@ -757,8 +711,9 @@ function denialsOf(raw, file, prefixes, scratch) {
  * @param {string[]} names  the fixture names (and token-reading names) to accept
  * @param {string} [stripRoot]
  * @param {{ scratch: string, dispatches: object[] }} [runPlan]
+ * @param {Object<string, string[]>} [markers]  each fixture's `denial_markers`, by fixture name
  */
-function collectHeadless(rawDir, runsDir, names, stripRoot, runPlan) {
+function collectHeadless(rawDir, runsDir, names, stripRoot, runPlan, markers = {}) {
   const known = new Set(names);
   if (stripRoot && fs.existsSync(stripRoot) && within(fs.realpathSync(rawDir), fs.realpathSync(stripRoot))) {
     throw new Error(`refused raw folder ${rawDir}: it is inside the repository (a raw output carries a session id)`);
@@ -791,13 +746,16 @@ function collectHeadless(rawDir, runsDir, names, stripRoot, runPlan) {
       cost_usd: Number.isFinite(j.total_cost_usd) ? j.total_cost_usd : null,
       is_error: Boolean(j.is_error)
     };
-    const denied = denialsOf(j, file, prefixes, runPlan && runPlan.scratch);
+    const denied = denialsOf(j, file, markers[m[1]] || []);
     if (denied !== undefined) run.denied = denied;
     if (d) run.files = captureFiles(d.cwd, d.seeded || {}, prefixes);
     const text = JSON.stringify(run, null, 2) + '\n';
     // Raw strings too: serialised, a newline before the user name reads `\n<user>` and hides it.
     const files = run.files || {};
-    for (const v of [run.output, ...Object.keys(files), ...Object.values(files).filter((x) => typeof x === 'string')]) refuseUnsafe(file, v, runPlan && runPlan.scratch);
+    for (const v of [run.output, ...Object.keys(files), ...Object.values(files).filter((x) => typeof x === 'string')]) {
+      refuseUnsafe(file, v, runPlan && runPlan.scratch);
+      refuseUnsafe(file, percentDecoded(v), runPlan && runPlan.scratch);
+    }
     refuseUnsafe(file, text, runPlan && runPlan.scratch);
     if (Buffer.byteLength(text) > RUN_CAP) throw new Error(`run ${file} is ${Buffer.byteLength(text)} bytes, above the one megabyte cap`);
     fs.writeFileSync(target, text);
@@ -874,7 +832,8 @@ function run(argv) {
     const names = exp.fixtures.map((f) => f.name).concat(exp.token_readings || []);
     const planFile = arg('--run-plan');
     const runPlan = planFile ? JSON.parse(fs.readFileSync(planFile, 'utf8')) : undefined;
-    for (const w of collectHeadless(headless, runsDir, names, process.cwd(), runPlan)) process.stdout.write(`collected ${w.file}\n`);
+    const markers = Object.fromEntries(exp.fixtures.map((f) => [f.name, Array.isArray(f.denial_markers) ? f.denial_markers : []]));
+    for (const w of collectHeadless(headless, runsDir, names, process.cwd(), runPlan, markers)) process.stdout.write(`collected ${w.file}\n`);
   }
   if (transcripts) {
     const names = exp.fixtures.map((f) => f.name).concat(exp.token_readings || []);

@@ -269,13 +269,17 @@ else test('method: a failing command in the method\'s own form records 3; the ol
  * Runs the skill's Parallel Execution block in a temporary project whose tools are stand-ins on
  * PATH: each logs its arguments, prints `out-of-<tool>`, and exits 0 unless named in `fail`.
  */
-function runParallelBlock({ fail = [], playwrightConfig = false, mktempFails = false } = {}) {
-  const block = bashFences(section(SKILL, '## Parallel Execution (Monorepo, local)'))[0];
+function runParallelBlock({ fail = [], playwrightConfig = false, mktempFails = false, script } = {}) {
+  const block = script || bashFences(section(SKILL, '## Parallel Execution (Monorepo, local)'))[0];
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-qgr-block-'));
   const bin = path.join(dir, 'bin');
   const work = path.join(dir, 'work');
   for (const d of [bin, path.join(work, 'frontend'), path.join(work, 'backend')]) fs.mkdirSync(d, { recursive: true });
-  if (playwrightConfig) fs.writeFileSync(path.join(work, playwrightConfig === true ? 'playwright.config.ts' : playwrightConfig), '');
+  if (playwrightConfig) {
+    const config = path.join(work, playwrightConfig === true ? 'playwright.config.ts' : playwrightConfig);
+    fs.mkdirSync(path.dirname(config), { recursive: true });
+    fs.writeFileSync(config, '');
+  }
   const tools = ['gitleaks', 'semgrep', 'npm', 'npx', 'ruff', 'mypy', 'pytest', ...(mktempFails ? ['mktemp'] : [])];
   for (const tool of tools) {
     const code = fail.includes(tool) || tool === 'mktemp' ? 1 : 0;
@@ -310,6 +314,23 @@ else {
     assert.match(r.stdout, /❌ playwright FAILED/, r.stdout);
     assert.match(r.calls, /^npx \S*\/work\/frontend --no -- playwright test/m, r.calls);
     assert.notEqual(r.status, 0);
+  });
+
+  test('a playwright.config.* up to two folders down is found and run from its folder; one under node_modules is not', () => {
+    const r = runParallelBlock({ fail: ['npx'], playwrightConfig: path.join('apps', 'web', 'playwright.config.ts') });
+    assert.match(r.stdout, /❌ playwright FAILED/, r.stdout);
+    assert.match(r.calls, /^npx \S*\/work\/apps\/web --no -- playwright test/m, r.calls);
+    const vendored = runParallelBlock({ playwrightConfig: path.join('node_modules', 'pkg', 'playwright.config.ts') });
+    assert.doesNotMatch(vendored.stdout + vendored.calls, /playwright/, 'a config inside node_modules was run');
+  });
+
+  test('the agent\'s quick E2E line finds playwright.config.* the same way and runs from its folder', () => {
+    const line = AGENT.split('\n').find((l) => l.includes('E2E TESTS FAILED'));
+    const r = runParallelBlock({ fail: ['npx'], playwrightConfig: path.join('apps', 'web', 'playwright.config.mjs'), script: line });
+    assert.match(r.stdout, /❌ E2E TESTS FAILED/, r.stdout);
+    assert.match(r.calls, /^npx \S*\/work\/apps\/web --no -- playwright test/m, r.calls);
+    const none = runParallelBlock({ playwrightConfig: path.join('node_modules', 'pkg', 'playwright.config.ts'), script: line });
+    assert.doesNotMatch(none.calls + none.stdout, /playwright|E2E/, 'a config inside node_modules was run');
   });
 
   test('a semgrep abort prints the log path and the finding count, never the log\'s source lines', () => {

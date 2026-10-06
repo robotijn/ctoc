@@ -43,7 +43,7 @@ npm run test      || echo "❌ FRONTEND TESTS FAILED"
 # BACKEND (must ALL pass)
 (cd backend && { ruff check . || echo "❌ BACKEND LINT FAILED"; mypy . || echo "❌ BACKEND TYPES FAILED"; pytest || echo "❌ BACKEND TESTS FAILED"; })
 # E2E (if playwright exists)
-if [ -f "playwright.config.ts" ]; then npx --no -- playwright test || echo "❌ E2E TESTS FAILED"; fi
+PW=$(find . -maxdepth 3 -name node_modules -prune -o -name 'playwright.config.*' -print | head -1); [ -z "$PW" ] || (cd "${PW%/*}" && npx --no -- playwright test || echo "❌ E2E TESTS FAILED")
 # SECURITY AUDIT: npm audit / pip-audit
 npm audit || echo "❌ SECURITY AUDIT FAILED"   # Python: pip-audit
 
@@ -169,7 +169,7 @@ First, detect what's available in the project: `package.json` → Node (list its
 
 ### Phase 2: Run ALL Checks in Parallel
 
-**CRITICAL: Use parallel execution for speed.** Run tests, lint, types and security together, then aggregate the results into one PASS / FAIL.
+**CRITICAL: Use parallel execution for speed.** Run every check together, then aggregate into one PASS / FAIL.
 
 ## Language-Specific Parallel Commands
 
@@ -186,7 +186,7 @@ Each check keeps its output and exit code and is aggregated as in the monorepo b
 
 ## Using Task Tool for True Parallelism
 
-For maximum parallelism, spawn subagents: SPAWN IN PARALLEL (single message with multiple Task calls), one per check — unit tests, linting, type check, security audit.
+For maximum parallelism, spawn subagents: SPAWN IN PARALLEL (single message with multiple Task calls), one per check.
 
 **Prefer the bash `&` / `wait` blocks above for check execution** — a subagent
 runs in an isolated context and cannot tee into this run's shared `$RESULTS_DIR`,
