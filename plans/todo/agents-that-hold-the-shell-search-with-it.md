@@ -95,13 +95,13 @@ Unchanged: every `tools:` line, `PROFILE`, `HELD_REMOVALS` and its maximum, ever
 - [x] Insert the sentence in the four agent files at the named places. That is one sentence per file; nothing else changes.
 
 ### Step 11: REVIEW
-- [ ] The critic reads each insertion against the sentence before it. The fallback must not widen any network rule ("never a way to the web" stands), any never-type-text-from-a-file rule, or the security-scanner's never-type-a-path-from-SARIF rule.
+- [x] The critic reads each insertion against the sentence before it. The fallback must not widen any network rule ("never a way to the web" stands), any never-type-text-from-a-file rule, or the security-scanner's never-type-a-path-from-SARIF rule.
 
 ### Step 12: OPTIMIZE
 - [x] Confirm check 15 reads each agent once, reusing the census the file already builds.
 
 ### Step 13: SECURE
-- [ ] The security scanner attacks the option allow-list and the path rule. It checks that no permitted `grep`/`find` form can run a program, write a file or delete one (`ugrep --filter`, `find -exec`/`-delete`/`-fprint` are all excluded), and that no permitted form takes a path or pattern from material under review.
+- [x] The security scanner attacks the option allow-list and the path rule. It checks that no permitted `grep`/`find` form can run a program, write a file or delete one (`ugrep --filter`, `find -exec`/`-delete`/`-fprint` are all excluded), and that no permitted form takes a path or pattern from material under review.
 
 ### Step 14: VERIFY
 - [x] `npm test` passes: lint, all tests, coverage at or above the floor in `.ctoc/coverage-baseline.json`, 0 skipped.
@@ -111,7 +111,7 @@ Unchanged: every `tools:` line, `PROFILE`, `HELD_REMOVALS` and its maximum, ever
 - [x] Extend the header comment of `tests/agent-tool-grants.test.js` with check 15 and its debt list: what it fences, the Claude Code 2.1.117 fact, and what it cannot see (a search order phrased outside the four shapes).
 
 ### Step 16: FINAL-REVIEW
-- [ ] Every acceptance box above is checked against its evidence. The measured-run result is quoted, not summarised.
+- [x] Every acceptance box above is checked against its evidence. The measured-run result is quoted, not summarised.
 
 ## Decisions Taken Under Ambiguity
 
@@ -147,9 +147,9 @@ Unchanged: every `tools:` line, `PROFILE`, `HELD_REMOVALS` and its maximum, ever
 - [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
 - [x] Remove redundant operations
@@ -157,10 +157,10 @@ Unchanged: every `tools:` line, `PROFILE`, `HELD_REMOVALS` and its maximum, ever
 - [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
 - [x] Run lint + type check
@@ -174,10 +174,10 @@ Unchanged: every `tools:` line, `PROFILE`, `HELD_REMOVALS` and its maximum, ever
 - [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
 
 
 ## Deferred Questions
@@ -196,3 +196,10 @@ findings from a critic that read this plan._
 - Step 14 measured run, still to do by the session: dispatch architecture/pattern-detector on this repository on the native build; its report must quote the `find` commands its directory analysis ran, or say the fallback was not exercised.
 - Measured run (coordinator, 2026-10-06): pattern-detector on the native build ran 42 `find` and 30 `grep` through Bash, all from `.`.
 - Security-scan fix (warn, 1 high): the sentence now searches only from `.` (never a named path, which closes command substitution through a crafted directory name and reading through a named symlink), drops `-P` (ugrep reports no match when PCRE2 hits its limit), single-quotes every operand with `.` in place of a quote character, and admits a repository file name or glob into `--include`/`-name`/`-path` only when made of letters, digits and `@ / . _ -`. Test-first: check 15 went red on exactly the four agents with the new constant, then green once the four carried it.
+- The sentence quoted under "The change, purely additive" in the technical approach is the APPROVED first version, superseded by the security fix in a5bc7c93. It stays as approved because that section is inside the approval hash (editing it measures `hash-mismatch`, which reverts the plan). What shipped, verbatim from `SEARCH_WITHOUT_THE_TOOLS` in tests/agent-tool-grants.test.js:
+
+  > Where this file has you search with Grep or Glob and you do not have that tool (Claude Code's native builds for macOS, Linux and WSL leave both out of an agent that holds Bash), run the same search through Bash, and that search is a use of your Bash beyond any this file names elsewhere: only `grep -rn` (adding only `-E`, `-i`, `-l`, `-c` or `--include`) or `find` (with only `-name`, `-path` and `-type`), always from `.`, the repository you were dispatched in, and never from any other path, narrowing the search with `--include`, `-name` or `-path` instead. Every operand goes in single quotes — the pattern you wrote yourself after `-e`, each `--include=` value, each `-name` and `-path` value — with `.` in place of any quote character you need to match, and a file name or glob you read in the repository goes into `--include`, `-name` or `-path` only when it is made of letters, digits and `@ / . _ -`.
+
+- The measured run used the PRE-FIX sentence, so the shipped sentence is unmeasured; its allowed forms are a strict subset of the measured ones. Commands from that run, as the coordinator's report quotes them: `find . -type d -name 'controllers'` and `find . -type f -path './agents/*' -name '*.md'`. No grep line from that run reached this executor, so none is quoted here.
+- Step 11 and Step 16: the final review passed for code, tests and agents (coordinator, 2026-10-07).
+- Step 13: the security scan ran (warn, 1 high); its fixes are in a5bc7c93.
