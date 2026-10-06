@@ -1,0 +1,8 @@
+{
+  "output": "I created no stubs: the vision `plans/vision/loyalty-boost.md` fails the readiness check on two blocking items, so it goes back to the Vision Advisor and waits for you to fill them in. It never names the problem it solves (a lower-than-wanted repeat-order rate is only implied by the 30 percent growth target), and it never says who it serves (all shop customers, registered accounts only, or guests too). There is no canvas under `plans/canvas/`, and `src/lib/vision-decomposer.js` is not in this project root, so I checked the gate against its documented rules rather than running it.",
+  "tokens": 69569,
+  "duration_ms": 18878,
+  "cost_usd": 0.0626014,
+  "is_error": false,
+  "files": {}
+}
