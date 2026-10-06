@@ -1104,7 +1104,7 @@ describe('10. capturing the files a scratch run wrote', () => {
       ]);
       assert.deepEqual(run.denied.slice(0, 6), [
         { tool: 'Write', input: { file_path: 'plans/todo/x.md' } },
-        { tool: 'Edit', input: { file_path: '~/notes.md' } },
+        { tool: 'Edit', input: { file_path: '~/<outside the copy>' } },
         { tool: 'WebFetch', input: { url: 'https://example.com/x' } },
         { tool: 'Bash', input: { command: 'mv plans/a.md plans/b.md' } },
         { tool: 'NotebookEdit', input: { notebook_path: 'n.ipynb' } },
@@ -1145,6 +1145,106 @@ describe('10. capturing the files a scratch run wrote', () => {
         assert.throws(() => collectWithDenials(s, bad), /run a__original\.json has a malformed permission_denials entry/, JSON.stringify(bad));
       }
       assert.ok(!fs.existsSync(path.join(s.runs, 'a__original.json')), 'nothing is written for a refused run');
+    } finally {
+      s.done();
+    }
+  });
+
+  // ── hostile refused calls (security review of the follow-ups) ──
+  test('finding 1: URL user:password is blanked, credential-named query values, NAME=value and Bearer tokens are REDACTED; the canary param survives', () => {
+    const s = scratchRun();
+    try {
+      const run = collectWithDenials(s, [
+        { tool_name: 'WebFetch', tool_input: { url: 'https://alice:hunter2xyz@example.com/v?token=t0k3nvalue&notes=copper%20meadow&api_key=k3yvalue&Session=s3ss' } },
+        { tool_name: 'Bash', tool_input: { command: 'API_TOKEN=abc123def DB_PASSWORD="p4ss w0rd" curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9" https://example.com' } }
+      ]);
+      assert.equal(run.denied[0].input.url, 'https://example.com/v?token=REDACTED&notes=copper%20meadow&api_key=REDACTED&Session=REDACTED');
+      assert.equal(run.denied[1].input.command, 'API_TOKEN=REDACTED DB_PASSWORD=REDACTED curl -H "Authorization: Bearer REDACTED" https://example.com');
+      const text = fs.readFileSync(path.join(s.runs, 'a__original.json'), 'utf8');
+      for (const v of ['alice', 'hunter2xyz', 't0k3nvalue', 'k3yvalue', 's3ss', 'abc123def', 'p4ss', 'eyJhbGci']) assert.ok(!text.includes(v), `${v} reached the run file`);
+    } finally {
+      s.done();
+    }
+  });
+
+  test('finding 2: a credential or the user name beyond the 2000-character cap still refuses the run (checked before the cut)', () => {
+    const s = scratchRun();
+    try {
+      const pad = 'x'.repeat(1995) + ' ';
+      assert.throws(() => collectWithDenials(s, [{ tool_name: 'Bash', tool_input: { command: pad + 'AKIA' + 'ABCDEFGHIJKLMNOP' } }]), /a__original\.json.*credential/);
+      assert.throws(() => collectWithDenials(s, [{ tool_name: 'Bash', tool_input: { command: `${pad}ls /Volumes/${os.userInfo().username}/x` } }]), /a__original\.json.*private path/);
+    } finally {
+      s.done();
+    }
+  });
+
+  test('finding 3: a percent-encoded credential or user name refuses the run', () => {
+    const s = scratchRun();
+    try {
+      const user = os.userInfo().username;
+      const enc = (t) => [...t].map((c) => `%${c.charCodeAt(0).toString(16).padStart(2, '0')}`).join('');
+      assert.throws(() => collectWithDenials(s, [{ tool_name: 'WebFetch', tool_input: { url: `https://example.com/?x=${enc('AKIA' + 'ABCDEFGHIJKLMNOP')}` } }]), /a__original\.json.*credential/);
+      assert.throws(() => collectWithDenials(s, [{ tool_name: 'WebFetch', tool_input: { url: `https://example.com/?who=${enc(user)}` } }]), /a__original\.json.*private path/);
+    } finally {
+      s.done();
+    }
+  });
+
+  test('finding 4: the user name right after a newline (which JSON serialises as \\n) refuses the run', () => {
+    const s = scratchRun();
+    try {
+      assert.throws(() => collectWithDenials(s, [{ tool_name: 'Bash', tool_input: { command: `echo hi\n${os.userInfo().username}` } }]), /a__original\.json.*private path/);
+      fs.writeFileSync(path.join(s.raw, 'a__original.json'), JSON.stringify({ result: `owner:\n${os.userInfo().username}`, usage: {} }));
+      assert.throws(() => score.collectHeadless(s.raw, s.runs, ['a'], s.root, s.plan), /a__original\.json.*private path/);
+    } finally {
+      s.done();
+    }
+  });
+
+  test('finding 5: on macOS and Windows the user name and home checks ignore letter case', () => {
+    const s = scratchRun();
+    try {
+      const user = os.userInfo().username;
+      const flipped = user === user.toUpperCase() ? user.toLowerCase() : user.toUpperCase();
+      const insensitive = process.platform === 'darwin' || process.platform === 'win32';
+      if (insensitive && flipped !== user) {
+        assert.throws(() => collectWithDenials(s, [{ tool_name: 'Bash', tool_input: { command: `ls /Volumes/${flipped}/x` } }]), /a__original\.json.*private path/);
+        const home = os.homedir();
+        const run = collectWithDenials(s, [{ tool_name: 'Bash', tool_input: { command: `ls ${path.join(home.toUpperCase(), 'x')}` } }]);
+        assert.equal(run.denied[0].input.command, 'ls ~/<outside the copy>', 'a home path in another case was kept');
+      } else {
+        assert.equal(collectWithDenials(s, [{ tool_name: 'Bash', tool_input: { command: 'ls src' } }]).denied[0].input.command, 'ls src');
+      }
+    } finally {
+      s.done();
+    }
+  });
+
+  test('finding 6: any path outside the copy is written as ~/<outside the copy>, in path fields and in commands', () => {
+    const s = scratchRun();
+    try {
+      const run = collectWithDenials(s, [
+        { tool_name: 'Read', tool_input: { file_path: '/etc/hosts' } },
+        { tool_name: 'Glob', tool_input: { path: 'C:\\Windows\\System32' } },
+        { tool_name: 'Bash', tool_input: { command: `cat /etc/hosts ${path.join(os.homedir(), '.ssh', 'config')} 2>/dev/null; mv ${s.copy('original')}/plans/a.md plans/b.md; curl https://example.com/x` } }
+      ]);
+      assert.deepEqual(run.denied.map((d) => d.input), [
+        { file_path: '~/<outside the copy>' },
+        { path: '~/<outside the copy>' },
+        { command: 'cat ~/<outside the copy> ~/<outside the copy> 2>~/<outside the copy>; mv plans/a.md plans/b.md; curl https://example.com/x' }
+      ]);
+    } finally {
+      s.done();
+    }
+  });
+
+  test('finding 7: a tool name outside [A-Za-z0-9_-]{1,200} is a malformed entry', () => {
+    const s = scratchRun();
+    try {
+      for (const bad of ['Bash; rm -rf', 'x'.repeat(201), 'Write\n', 'mcp__a b']) {
+        assert.throws(() => collectWithDenials(s, [{ tool_name: bad, tool_input: {} }]), /malformed permission_denials entry/, JSON.stringify(bad));
+      }
+      assert.equal(collectWithDenials(s, [{ tool_name: 'mcp__srv-1__do_it', tool_input: {} }]).denied[0].tool, 'mcp__srv-1__do_it');
     } finally {
       s.done();
     }

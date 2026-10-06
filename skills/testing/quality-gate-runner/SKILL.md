@@ -138,16 +138,16 @@ Rule: ANY failure → FIX IT → re-run ALL → push only when ALL pass. **NO EX
 
 ```bash
 #!/bin/bash
-RESULTS_DIR=$(mktemp -d)
+RESULTS_DIR=$(mktemp -d) || exit 1
 FAILED=0
 
 # Stage 1: security first (fail-fast)
-(cd . && gitleaks detect --no-banner >"$RESULTS_DIR/secrets.log" 2>&1; echo $? >"$RESULTS_DIR/secrets.exit") &
+(cd . && gitleaks detect --no-banner --redact >"$RESULTS_DIR/secrets.log" 2>&1; echo $? >"$RESULTS_DIR/secrets.exit") &
 (cd . && semgrep --config=p/security-audit --error >"$RESULTS_DIR/sast.log" 2>&1; echo $? >"$RESULTS_DIR/sast.exit") &
 wait
 for s in secrets sast; do
   if [ ! -f "$RESULTS_DIR/$s.exit" ] || [ "$(cat "$RESULTS_DIR/$s.exit")" != 0 ]; then
-    echo "CRITICAL: $s failed or recorded no exit status — aborting"; exit 1
+    echo "CRITICAL: $s failed or recorded no exit status — aborting"; tail -20 "$RESULTS_DIR/$s.log" 2>/dev/null; exit 1
   fi
 done
 
@@ -161,9 +161,14 @@ wait
 # Stage 3: tests (parallel)
 (cd frontend && npm run test >"$RESULTS_DIR/fe-test.log" 2>&1; echo $? >"$RESULTS_DIR/fe-test.exit") &
 (cd backend && pytest >"$RESULTS_DIR/be-test.log" 2>&1; echo $? >"$RESULTS_DIR/be-test.exit") &
+CHECKS="fe-lint fe-types be-lint be-types fe-test be-test"
+if [ -f playwright.config.ts ] || [ -f playwright.config.js ]; then
+  CHECKS="$CHECKS playwright"
+  (npx --no -- playwright test --reporter=list >"$RESULTS_DIR/playwright.log" 2>&1; echo $? >"$RESULTS_DIR/playwright.exit") &
+fi
 wait
 
-for check in fe-lint fe-types be-lint be-types fe-test be-test; do
+for check in $CHECKS; do
   if [ -f "$RESULTS_DIR/$check.exit" ] && [ "$(cat "$RESULTS_DIR/$check.exit")" = 0 ]; then echo "✅ $check PASSED"; continue; fi
   if [ -f "$RESULTS_DIR/$check.exit" ]; then echo "❌ $check FAILED"; tail -20 "$RESULTS_DIR/$check.log"
   else echo "❌ $check NOT VERIFIED (no exit status recorded)"; fi

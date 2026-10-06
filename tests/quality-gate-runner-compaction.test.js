@@ -227,7 +227,7 @@ test('method: the skill records each check\'s own exit code — no tee before ec
   const parallel = section(SKILL, '## Parallel Execution (Monorepo, local)');
   assert.match(parallel, /NOT VERIFIED/);
   assert.match(parallel, /\[ -f "\$RESULTS_DIR\/\$\w+\.exit" \]/);
-  assert.match(parallel, /for check in fe-lint fe-types be-lint be-types fe-test be-test; do/, 'the aggregation loops over the expected names');
+  assert.match(parallel, /CHECKS="fe-lint fe-types be-lint be-types fe-test be-test"[\s\S]*for check in \$CHECKS; do/, 'the aggregation loops over the expected names');
 });
 
 test('method: a workflow line not run locally makes the Status FAIL — BLOCKED, never PASS', () => {
@@ -261,4 +261,63 @@ else test('method: a failing command in the method\'s own form records 3; the ol
     'the probe cannot tell the old form from the new one');
   assert.equal(probe(SKILL, 'SKILL.md'), '3', 'the skill records a passing status for a failing check');
   assert.equal(probe(AGENT, 'agent'), '3', 'the agent records a passing status for a failing check');
+});
+
+// ── The parallel block, run for real against stand-in tools (security review of the follow-ups) ──
+
+/**
+ * Runs the skill's Parallel Execution block in a temporary project whose tools are stand-ins on
+ * PATH: each logs its arguments, prints `out-of-<tool>`, and exits 0 unless named in `fail`.
+ */
+function runParallelBlock({ fail = [], playwrightConfig = false, mktempFails = false } = {}) {
+  const block = bashFences(section(SKILL, '## Parallel Execution (Monorepo, local)'))[0];
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-qgr-block-'));
+  const bin = path.join(dir, 'bin');
+  const work = path.join(dir, 'work');
+  for (const d of [bin, path.join(work, 'frontend'), path.join(work, 'backend')]) fs.mkdirSync(d, { recursive: true });
+  if (playwrightConfig) fs.writeFileSync(path.join(work, 'playwright.config.ts'), '');
+  const tools = ['gitleaks', 'semgrep', 'npm', 'npx', 'ruff', 'mypy', 'pytest', ...(mktempFails ? ['mktemp'] : [])];
+  for (const tool of tools) {
+    const code = fail.includes(tool) || tool === 'mktemp' ? 1 : 0;
+    fs.writeFileSync(path.join(bin, tool), `#!/bin/sh\necho "${tool} $*" >> "${dir}/calls.log"\necho "out-of-${tool}"\nexit ${code}\n`, { mode: 0o755 });
+  }
+  const r = spawnSync('sh', ['-c', block], { cwd: work, encoding: 'utf8', env: { PATH: `${bin}:/usr/bin:/bin` } });
+  const calls = fs.existsSync(path.join(dir, 'calls.log')) ? fs.readFileSync(path.join(dir, 'calls.log'), 'utf8') : '';
+  fs.rmSync(dir, { recursive: true, force: true });
+  return { status: r.status, stdout: r.stdout, stderr: r.stderr, calls };
+}
+
+if (process.platform === 'win32') console.log('[quality-gate-runner-compaction] parallel-block probes not registered: win32 guarantees no POSIX sh.');
+else {
+  test('finding 8: with a Playwright config, a failing Playwright run fails the block; a passing one is reported PASSED', () => {
+    const failing = runParallelBlock({ fail: ['npx'], playwrightConfig: true });
+    assert.match(failing.stdout, /❌ playwright FAILED/, failing.stdout);
+    assert.notEqual(failing.status, 0, 'a failing Playwright run read as passed');
+    const passing = runParallelBlock({ playwrightConfig: true });
+    assert.match(passing.stdout, /✅ playwright PASSED/, passing.stdout);
+    assert.equal(passing.status, 0, passing.stdout);
+    assert.doesNotMatch(runParallelBlock().stdout, /playwright/, 'Playwright is expected without a config');
+  });
+
+  test('finding 9: when mktemp fails the block stops before running any check', () => {
+    const r = runParallelBlock({ mktempFails: true });
+    assert.notEqual(r.status, 0);
+    assert.doesNotMatch(r.calls, /gitleaks|semgrep|npm|ruff|mypy|pytest/, `checks ran with no results folder:\n${r.calls}`);
+    assert.doesNotMatch(r.stdout + r.stderr, /secrets\.log|CRITICAL/, `the block went on with an empty results folder:\n${r.stdout}${r.stderr}`);
+  });
+
+  test('finding 10: gitleaks runs with --redact, and an aborting security check prints its log tail', () => {
+    assert.match(runParallelBlock().calls, /^gitleaks .*--redact/m);
+    const r = runParallelBlock({ fail: ['gitleaks'] });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stdout, /CRITICAL: secrets/);
+    assert.match(r.stdout, /out-of-gitleaks/, 'the abort hides the log that says why');
+  });
+}
+
+test('finding 11: a workflow line that changes anything outside the working tree is never run', () => {
+  const limits = AGENT.split('\n').find((l) => l.startsWith('- Workflow commands obey the Role\'s Bash limits'));
+  assert.ok(limits, 'the Bash limits line is gone');
+  for (const tool of ['kubectl', 'terraform apply', '`aws`', '`gcloud`', '`az`', 'docker push', '`gh`']) assert.ok(limits.includes(tool), `${tool} is not named`);
+  assert.match(limits, /outside the working tree[^.]*is not run/);
 });

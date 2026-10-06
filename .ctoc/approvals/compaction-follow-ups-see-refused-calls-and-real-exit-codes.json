@@ -1,9 +1,11 @@
 {
-  "content_sha256": "1e86c463bb5d0a6130cfb720f5501f4bcb32102f5a41be51044b0e5b04a14d87",
+  "content_sha256": "3c3a2e5c94d13ffa350634922ccbaa7b420480c54c4d1757e8ffda536ba73c48",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-10-06T22:54:36.161Z",
+  "approved_at": "2026-10-06T23:10:39.696Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "Scope widened by the main session (CTO Chief) under the owner's standing instruction of 2026-10-06 to decide approvals on evidence: the two expectations files the review's blocker requires.",
   "plan_basename": "compaction-follow-ups-see-refused-calls-and-real-exit-codes"
 }
