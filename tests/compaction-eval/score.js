@@ -638,10 +638,40 @@ function captureFiles(cwd, seeded, prefixes) {
   return files;
 }
 
+const DENIAL_FIELDS = ['file_path', 'notebook_path', 'path', 'command', 'url'];
+const DENIAL_CAP = 2000;
+
+/**
+ * The tool calls a headless run was refused (`permission_denials`, entries
+ * `{ tool_name, tool_use_id, tool_input }` as Claude Code 2.1.291 writes them), as
+ * `{ tool, input }`: `input` keeps only the string fields file_path, notebook_path, path, command
+ * and url, each stripped like the output, the home directory as `~`, at most 2000 characters.
+ * Absent → undefined (an older output says nothing about refusals, which is not "none"); a
+ * malformed list or entry throws, naming the run.
+ */
+function denialsOf(raw, file, prefixes) {
+  const list = raw.permission_denials;
+  if (list === undefined) return undefined;
+  const bad = () => new Error(`run ${file} has a malformed permission_denials entry`);
+  if (!Array.isArray(list)) throw bad();
+  return list.map((e) => {
+    if (!e || typeof e.tool_name !== 'string' || !e.tool_name) throw bad();
+    const ti = e.tool_input && typeof e.tool_input === 'object' ? e.tool_input : {};
+    const input = {};
+    for (const k of DENIAL_FIELDS) {
+      if (typeof ti[k] === 'string') input[k] = stripPaths(ti[k], prefixes).split(os.homedir()).join('~').slice(0, DENIAL_CAP);
+    }
+    return { tool: e.tool_name, input };
+  });
+}
+
 /**
  * Converts headless `claude -p --output-format json` outputs named `<name>__<version>[__rerun].json`
- * into run files: the result text, the summed usage tokens, the duration, the cost and the error
- * flag. Session ids and every other field are dropped. Unknown names and any target outside
+ * into run files: the result text, the summed usage tokens, the duration, the cost, the error
+ * flag and `denied` — the refused tool calls as redacted `{ tool, input }` summaries (see
+ * denialsOf; no key when the output has no `permission_denials`). Session ids, tool payloads
+ * (content, old_string, new_string, prompt, description, tool_use_id) and every other field are
+ * dropped; the privacy refusal and the size cap below cover `denied` like the rest of the run. Unknown names and any target outside
  * runsDir are refused. When stripRoot is given, that absolute repository root is removed from
  * the output text (`<root>/x` becomes `x`, a bare `<root>` becomes `.`), so no home-directory
  * path reaches a committed run file.
@@ -687,6 +717,8 @@ function collectHeadless(rawDir, runsDir, names, stripRoot, runPlan) {
       cost_usd: Number.isFinite(j.total_cost_usd) ? j.total_cost_usd : null,
       is_error: Boolean(j.is_error)
     };
+    const denied = denialsOf(j, file, prefixes);
+    if (denied !== undefined) run.denied = denied;
     if (d) run.files = captureFiles(d.cwd, d.seeded || {}, prefixes);
     const text = JSON.stringify(run, null, 2) + '\n';
     refuseUnsafe(file, text, runPlan && runPlan.scratch);

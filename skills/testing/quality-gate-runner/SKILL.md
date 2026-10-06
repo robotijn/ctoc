@@ -138,36 +138,42 @@ Rule: ANY failure → FIX IT → re-run ALL → push only when ALL pass. **NO EX
 
 ```bash
 #!/bin/bash
-set -e
 RESULTS_DIR=$(mktemp -d)
 FAILED=0
 
 # Stage 1: security first (fail-fast)
-(cd . && gitleaks detect --no-banner 2>&1 | tee "$RESULTS_DIR/secrets.log"; echo $? > "$RESULTS_DIR/secrets.exit") &
-(cd . && semgrep --config=p/security-audit --error 2>&1 | tee "$RESULTS_DIR/sast.log"; echo $? > "$RESULTS_DIR/sast.exit") &
+(cd . && gitleaks detect --no-banner >"$RESULTS_DIR/secrets.log" 2>&1; echo $? >"$RESULTS_DIR/secrets.exit") &
+(cd . && semgrep --config=p/security-audit --error >"$RESULTS_DIR/sast.log" 2>&1; echo $? >"$RESULTS_DIR/sast.exit") &
 wait
 for s in secrets sast; do
-  [ "$(cat $RESULTS_DIR/$s.exit)" != "0" ] && { echo "CRITICAL: $s failed — aborting"; exit 1; }
+  if [ ! -f "$RESULTS_DIR/$s.exit" ] || [ "$(cat "$RESULTS_DIR/$s.exit")" != 0 ]; then
+    echo "CRITICAL: $s failed or recorded no exit status — aborting"; exit 1
+  fi
 done
 
 # Stage 2: quality (parallel)
-(cd frontend && npm run lint 2>&1 | tee "$RESULTS_DIR/fe-lint.log"; echo $? > "$RESULTS_DIR/fe-lint.exit") &
-(cd frontend && npm run typecheck 2>&1 | tee "$RESULTS_DIR/fe-types.log"; echo $? > "$RESULTS_DIR/fe-types.exit") &
-(cd backend && ruff check . 2>&1 | tee "$RESULTS_DIR/be-lint.log"; echo $? > "$RESULTS_DIR/be-lint.exit") &
-(cd backend && mypy . 2>&1 | tee "$RESULTS_DIR/be-types.log"; echo $? > "$RESULTS_DIR/be-types.exit") &
+(cd frontend && npm run lint >"$RESULTS_DIR/fe-lint.log" 2>&1; echo $? >"$RESULTS_DIR/fe-lint.exit") &
+(cd frontend && npm run typecheck >"$RESULTS_DIR/fe-types.log" 2>&1; echo $? >"$RESULTS_DIR/fe-types.exit") &
+(cd backend && ruff check . >"$RESULTS_DIR/be-lint.log" 2>&1; echo $? >"$RESULTS_DIR/be-lint.exit") &
+(cd backend && mypy . >"$RESULTS_DIR/be-types.log" 2>&1; echo $? >"$RESULTS_DIR/be-types.exit") &
 wait
 
 # Stage 3: tests (parallel)
-(cd frontend && npm run test 2>&1 | tee "$RESULTS_DIR/fe-test.log"; echo $? > "$RESULTS_DIR/fe-test.exit") &
-(cd backend && pytest 2>&1 | tee "$RESULTS_DIR/be-test.log"; echo $? > "$RESULTS_DIR/be-test.exit") &
+(cd frontend && npm run test >"$RESULTS_DIR/fe-test.log" 2>&1; echo $? >"$RESULTS_DIR/fe-test.exit") &
+(cd backend && pytest >"$RESULTS_DIR/be-test.log" 2>&1; echo $? >"$RESULTS_DIR/be-test.exit") &
 wait
 
 for check in fe-lint fe-types be-lint be-types fe-test be-test; do
-  [ "$(cat $RESULTS_DIR/$check.exit)" != "0" ] && FAILED=$((FAILED+1))
+  if [ -f "$RESULTS_DIR/$check.exit" ] && [ "$(cat "$RESULTS_DIR/$check.exit")" = 0 ]; then echo "✅ $check PASSED"; continue; fi
+  if [ -f "$RESULTS_DIR/$check.exit" ]; then echo "❌ $check FAILED"; tail -20 "$RESULTS_DIR/$check.log"
+  else echo "❌ $check NOT VERIFIED (no exit status recorded)"; fi
+  FAILED=$((FAILED + 1))
 done
 
-[ $FAILED -gt 0 ] && exit 1 || echo "All checks passed"
+[ "$FAILED" -eq 0 ] && echo "All checks passed" || exit 1
 ```
+
+Never run this block under `set -e`, and never pipe a check through `tee` before `echo $?`: `$?` is then `tee`'s status, so a failing check is recorded as passing.
 
 ## Orchestrator Workflows — 7-Language Coverage (2026)
 
@@ -434,7 +440,7 @@ If the runner sees `${{ secrets.AWS_ACCESS_KEY_ID }}` or equivalents in workflow
 
 ```bash
 if [ -f "playwright.config.ts" ] || [ -f "playwright.config.js" ]; then
-  (npx --no -- playwright test --reporter=list 2>&1 | tee "$RESULTS_DIR/playwright.log"; echo $? > "$RESULTS_DIR/playwright.exit") &
+  (npx --no -- playwright test --reporter=list >"$RESULTS_DIR/playwright.log" 2>&1; echo $? >"$RESULTS_DIR/playwright.exit") &
 fi
 ```
 

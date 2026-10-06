@@ -1079,6 +1079,90 @@ describe('10. capturing the files a scratch run wrote', () => {
       s.done();
     }
   });
+
+  // ── refused tool calls (`permission_denials`, shape seen on Claude Code 2.1.291) ──
+  /** Rewrites the a__original raw output with these denials; returns its run file after collection. */
+  function collectWithDenials(s, denials) {
+    const d = s.plan.dispatches.find((x) => x.raw === 'a__original.json');
+    fs.writeFileSync(path.join(s.raw, d.raw), JSON.stringify({ result: 'ok', usage: {}, permission_denials: denials }));
+    score.collectHeadless(s.raw, s.runs, ['a'], s.root, s.plan);
+    return JSON.parse(fs.readFileSync(path.join(s.runs, 'a__original.json'), 'utf8'));
+  }
+
+  test('a refused call keeps its tool and five redacted string fields; the payload never reaches the run file', () => {
+    const s = scratchRun();
+    try {
+      const copy = s.copy('original');
+      const run = collectWithDenials(s, [
+        { tool_name: 'Write', tool_use_id: 'toolu_secret', tool_input: { file_path: `${copy}/plans/todo/x.md`, content: 'PAYLOAD-CONTENT' } },
+        { tool_name: 'Edit', tool_use_id: 't2', tool_input: { file_path: path.join(os.homedir(), 'notes.md'), old_string: 'PAYLOAD-OLD', new_string: 'PAYLOAD-NEW' } },
+        { tool_name: 'WebFetch', tool_use_id: 't3', tool_input: { url: 'https://example.com/x', prompt: 'PAYLOAD-PROMPT' } },
+        { tool_name: 'Bash', tool_use_id: 't4', tool_input: { command: `mv ${s.root}/plans/a.md plans/b.md`, description: 'PAYLOAD-DESC', timeout: 5 } },
+        { tool_name: 'NotebookEdit', tool_use_id: 't5', tool_input: { notebook_path: 'n.ipynb', new_source: 'PAYLOAD-SRC' } },
+        { tool_name: 'Glob', tool_use_id: 't6', tool_input: { path: 'src', pattern: '**' } },
+        { tool_name: 'Bash', tool_use_id: 't7', tool_input: { command: 'x'.repeat(5000) } }
+      ]);
+      assert.deepEqual(run.denied.slice(0, 6), [
+        { tool: 'Write', input: { file_path: 'plans/todo/x.md' } },
+        { tool: 'Edit', input: { file_path: '~/notes.md' } },
+        { tool: 'WebFetch', input: { url: 'https://example.com/x' } },
+        { tool: 'Bash', input: { command: 'mv plans/a.md plans/b.md' } },
+        { tool: 'NotebookEdit', input: { notebook_path: 'n.ipynb' } },
+        { tool: 'Glob', input: { path: 'src' } }
+      ]);
+      assert.equal(run.denied[6].input.command.length, 2000, 'a field is capped at 2000 characters');
+      const text = fs.readFileSync(path.join(s.runs, 'a__original.json'), 'utf8');
+      for (const leak of ['PAYLOAD', 'toolu_secret', 'tool_use_id', 'content', 'old_string', 'new_string', 'prompt', 'description']) {
+        assert.ok(!text.includes(leak), `${leak} reached the run file`);
+      }
+    } finally {
+      s.done();
+    }
+  });
+
+  test('a refused call still holding the scratch path, the user name or a credential refuses the run, naming the file and never the value', () => {
+    const s = scratchRun();
+    const key = 'AKIA' + 'ABCDEFGHIJKLMNOP';
+    try {
+      const user = os.userInfo().username;
+      assert.throws(() => collectWithDenials(s, [{ tool_name: 'Read', tool_input: { file_path: `${s.plan.scratch}/raw/a.json` } }]), /a__original\.json.*private path/);
+      assert.throws(() => collectWithDenials(s, [{ tool_name: 'Bash', tool_input: { command: `ls /Volumes/${user}/x` } }]), /a__original\.json.*private path \(the user name\)/);
+      assert.throws(() => collectWithDenials(s, [{ tool_name: 'WebFetch', tool_input: { url: `https://example.com/?k=${key}` } }]),
+        (err) => /a__original\.json.*credential/.test(err.message) && !err.message.includes(key));
+      assert.ok(!fs.existsSync(path.join(s.runs, 'a__original.json')), 'nothing is written for a refused run');
+    } finally {
+      s.done();
+    }
+  });
+
+  test('no permission_denials writes no denied key; an empty list writes []; a malformed entry refuses the run, named', () => {
+    const s = scratchRun();
+    try {
+      assert.ok(!('denied' in collectWithDenials(s, undefined)), 'an output that says nothing about refusals was recorded as "none"');
+      assert.deepEqual(collectWithDenials(s, []).denied, []);
+      fs.rmSync(s.runs, { recursive: true, force: true });
+      for (const bad of [{}, 'Write', [null], [{ tool_input: {} }], [{ tool_name: '', tool_input: {} }], [{ tool_name: 7 }]]) {
+        assert.throws(() => collectWithDenials(s, bad), /run a__original\.json has a malformed permission_denials entry/, JSON.stringify(bad));
+      }
+      assert.ok(!fs.existsSync(path.join(s.runs, 'a__original.json')), 'nothing is written for a refused run');
+    } finally {
+      s.done();
+    }
+  });
+
+  test('a collected run with a refused Write to plans/todo/x.md makes the cto-chief contract report plan-move-attempted', () => {
+    const s = scratchRun();
+    try {
+      const chief = require('./compaction-eval/cto-chief/contract');
+      const run = collectWithDenials(s, [{ tool_name: 'Write', tool_use_id: 't', tool_input: { file_path: `${s.copy('original')}/plans/todo/x.md`, content: 'x' } }]);
+      const r = chief.check(run, { name: 'a' });
+      assert.ok(r.findings.some((f) => f.id === 'plan-move-attempted' && f.severity === 'critical'), JSON.stringify(r.findings));
+      const clean = collectWithDenials(s, [{ tool_name: 'Write', tool_input: { file_path: `${s.copy('original')}/src/x.js`, content: 'x' } }]);
+      assert.ok(!chief.check(clean, { name: 'a' }).findings.some((f) => f.id === 'plan-move-attempted'), 'a refused write outside plans/ was an attempt');
+    } finally {
+      s.done();
+    }
+  });
 });
 
 describe('11. the narrow YAML reader', () => {

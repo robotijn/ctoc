@@ -196,3 +196,69 @@ test('expectations: planted fixtures require their planted ids, four of them sta
   assert.equal(clean.pass_rows.length, scripts.length, `one PASS row per script: ${scripts.join(', ')}`);
   assert.deepEqual(expectations.extra_args, ['--disallowedTools', 'Task']);
 });
+
+// ── The method's exit-code form (plan "compaction follow-ups") ───────────────────────
+
+const fs = require('node:fs');
+const os = require('node:os');
+const { spawnSync } = require('node:child_process');
+
+const ROOT = path.join(__dirname, '..');
+const SKILL = fs.readFileSync(path.join(ROOT, 'skills', 'testing', 'quality-gate-runner', 'SKILL.md'), 'utf8');
+const AGENT = fs.readFileSync(path.join(ROOT, 'agents', 'testing', 'quality-gate-runner.md'), 'utf8');
+const NEW_FORM = /^\s*\((?:cd \S+ && )?.+ >"\$RESULTS_DIR\/([\w-]+)\.log" 2>&1; echo \$\? >"\$RESULTS_DIR\/\1\.exit"\) &$/;
+
+/** The text of a `## ` section, from its heading to the next one. */
+function section(text, heading) {
+  const at = text.indexOf(`${heading}\n`);
+  assert.ok(at >= 0, `no section ${heading}`);
+  const next = text.indexOf('\n## ', at + heading.length);
+  return text.slice(at, next < 0 ? text.length : next);
+}
+
+/** The bodies of every ```bash fence. */
+const bashFences = (text) => [...text.matchAll(/^```bash\n([\s\S]*?)^```/gm)].map((m) => m[1]);
+
+test('method: the skill records each check\'s own exit code — no tee before echo $?, no set -e, a missing exit file is NOT VERIFIED', () => {
+  const tee = SKILL.split('\n').filter((l) => /\|\s*tee\b.*;\s*echo \$\?/.test(l));
+  assert.deepEqual(tee, [], 'a check piped through tee records tee\'s status');
+  assert.deepEqual(bashFences(SKILL).filter((b) => /^\s*set -e\b/m.test(b)), [], 'a bash block runs under set -e');
+  assert.ok(SKILL.split('\n').some((l) => NEW_FORM.test(l)), 'no check line records its exit code in the agent\'s form');
+  const parallel = section(SKILL, '## Parallel Execution (Monorepo, local)');
+  assert.match(parallel, /NOT VERIFIED/);
+  assert.match(parallel, /\[ -f "\$RESULTS_DIR\/\$\w+\.exit" \]/);
+  assert.match(parallel, /for check in fe-lint fe-types be-lint be-types fe-test be-test; do/, 'the aggregation loops over the expected names');
+});
+
+test('method: a workflow line not run locally makes the Status FAIL — BLOCKED, never PASS', () => {
+  const line = AGENT.split('\n').find((l) => l.includes('not run locally: not a check'));
+  assert.ok(line, 'the not-run rule is gone');
+  assert.match(line, /BLOCKED/);
+  assert.match(line, /never\b[^.]*PASS/);
+  // The Output Format fence is a kept unit of the rule inventory, pinned word for word, so the
+  // BLOCKED form lives in this rule; the contract must read it as FAIL, never as undecided.
+  assert.equal(contract.check({ output: report({ status: '❌ FAIL — BLOCKED: 1 workflow line(s) not run locally' }), files: {} }, fx('clean-single-package')).payload.status, 'FAIL',
+    'the contract reads a BLOCKED status as FAIL');
+});
+
+// Registered only where a POSIX sh is guaranteed: a gated registration neither runs nor skips,
+// so the zero-skipped gate stays deterministic (see tests/plan-index-embedding.test.js).
+if (process.platform === 'win32') console.log('[quality-gate-runner-compaction] shell probe not registered: win32 guarantees no POSIX sh.');
+else test('method: a failing command in the method\'s own form records 3; the old tee form records 0', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-qgr-probe-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  /** First check line recording an exit file; its command replaced by `(exit 3)`, its redirection tail kept verbatim. */
+  const probe = (text, label) => {
+    const line = text.split('\n').find((l) => /echo \$\? *> *"\$RESULTS_DIR\/[\w-]+\.exit"/.test(l));
+    assert.ok(line, `${label}: no check line records an exit file`);
+    const name = /"\$RESULTS_DIR\/([\w-]+)\.exit"/.exec(line)[1];
+    const tail = line.slice(Math.min(...[line.indexOf(' >"$RESULTS_DIR'), line.indexOf(' 2>&1')].filter((i) => i >= 0)));
+    const r = spawnSync('sh', ['-c', `RESULTS_DIR='${dir}'\n((exit 3)${tail}\nwait`], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    return fs.readFileSync(path.join(dir, `${name}.exit`), 'utf8').trim();
+  };
+  assert.equal(probe('(cd . && x 2>&1 | tee "$RESULTS_DIR/old.log"; echo $? > "$RESULTS_DIR/old.exit") &', 'control'), '0',
+    'the probe cannot tell the old form from the new one');
+  assert.equal(probe(SKILL, 'SKILL.md'), '3', 'the skill records a passing status for a failing check');
+  assert.equal(probe(AGENT, 'agent'), '3', 'the agent records a passing status for a failing check');
+});
