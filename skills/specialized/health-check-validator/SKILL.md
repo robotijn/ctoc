@@ -393,7 +393,7 @@ spec:
 - For each probe path, check if it's behind an auth middleware (`@PreAuthorize`, `[Authorize]`, `app.use(authMiddleware)`, ingress auth). If yes → `kind: probe-requires-auth`.
 
 ### Phase 5: Body leakage check
-- Curl each probe under failure conditions (mock dependency down). Inspect body for stack traces, hostnames, connection strings.
+- Read each probe handler's failure path for what its body would hold: stack traces, hostnames, connection strings. Requesting each probe with a dependency mocked down is a live check for the team to run; name it in your report.
 
 ## Tool Integration (2026)
 

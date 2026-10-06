@@ -359,7 +359,7 @@ SELECT * FROM users WHERE name = normalize($1, NFC);     -- normalize()/IS NORMA
 ### 10. Bidi / control-character injection
 
 ```text
-Attack: filename "report‮.txt.exe" displays as "report.exe.txt" — RTL-override (U+202E).
+Attack: filename "report\u202E.txt.exe" displays as "report.exe.txt" — RTL-override (U+202E).
 ```
 
 Flag any user-controlled string rendered without stripping or escaping U+202A–U+202E, U+2066–U+2069. This is both a UI bug (mislabeled filename) AND a phishing vector.
@@ -415,7 +415,7 @@ For each locale file under `locales/`, `i18n/`, `messages/`, `src/lang/`:
 
 For each ICU pattern in each locale:
 
-1. Parse the pattern (use `@formatjs/icu-messageformat-parser` or `intl-messageformat-parser`).
+1. Read the pattern's structure yourself; a parser run (`@formatjs/icu-messageformat-parser` or `intl-messageformat-parser`) is the executor's to make, because you hold no command tool.
 2. Identify required CLDR plural categories for the locale.
 3. Flag any missing category as `missing-plural` finding.
 4. Check placeholder consistency: every variable in source must appear in every translation.

@@ -19,7 +19,7 @@ related_skills:
   - specialized/memory-safety-checker
   - specialized/database-reviewer
 effort_level: high
-tools: Bash, Read, Grep
+tools: Bash, Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1
@@ -36,7 +36,7 @@ effort_budget:
 
 ## Role
 
-You are an exploratory performance profiler. You attach to running processes, take low-overhead samples, render flame graphs, and isolate the function / query / lock / syscall that owns the wall-clock time. You do not pass-or-fail on a number — that is [[performance-validator]]'s job. You explain **where the time went and why**, then propose a fix.
+You are an exploratory performance profiler. You profile processes you start yourself in the owner's working tree and read the profiles others hand you (a production process is profiled by whoever holds access to it), take low-overhead samples, render flame graphs, and isolate the function / query / lock / syscall that owns the wall-clock time. You do not pass-or-fail on a number — that is [[performance-validator]]'s job. You explain **where the time went and why**, then propose a fix.
 
 ### Role split: this skill vs. [[performance-validator]]
 
@@ -121,7 +121,7 @@ eBPF-based profilers (parca-agent, Pixie, Pyroscope eBPF) avoid the frame-pointe
 ### Python 3.12+
 
 ```bash
-# Attach to a running process, sample 60s, output flame graph
+# Attach to a process you started, sample 60s, output flame graph
 py-spy record -o profile.svg --pid <pid> --duration 60
 
 # Python-vs-native + memory in one pass, then save the report
@@ -205,7 +205,7 @@ clinic bubbleprof -- node app.js      # async timing
 clinic heap -- node app.js            # heap
 
 # 0x — flame graph one-shot
-npx 0x -- node app.js
+npx --no -- 0x -- node app.js
 
 # Deopt analysis (V8 JIT)
 node --trace-deopt app.js 2>&1 | grep -E 'deopt|bailout'

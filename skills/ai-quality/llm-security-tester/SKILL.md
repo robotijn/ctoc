@@ -30,7 +30,7 @@ related_skills:
   - security/threat-modeler
   - security/incident-responder
 effort_level: high
-tools: Bash, Read, Grep, Glob, WebSearch
+tools: Bash, Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1

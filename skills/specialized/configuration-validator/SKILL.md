@@ -14,7 +14,7 @@ related_skills:
   - specialized/health-check-validator
   - infrastructure/terraform-validator
 effort_level: low
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1
@@ -39,10 +39,10 @@ You validate that configuration is correct, consistent, and secure across all en
 - **Validate at boot, not at first use.** Parse-then-validate the entire config object on startup; never lazily validate on the request path. A bad config value discovered three hours into production traffic is an outage; the same value discovered at boot is a rollback.
 - **Type-safe binding from env → typed struct.** Treat env vars as untrusted input. Bind through a schema-aware layer (pydantic-settings, envalid/zod-env, .NET `IOptions<T>` + DataAnnotations, Spring `@ConfigurationProperties` + JSR-380, viper + struct tags) so `"true"` → `bool true`, `"30"` → `int 30`, `"https://..."` → parsed `URL`. Reject on coercion failure — never silently fall through to a zero value.
 - **Schema-pinned env vars.** Maintain an explicit schema (JSON Schema, pydantic model, zod schema, Spring `@Validated`) that lists every env var the app reads, with type, default, description, required-ness, and which environments use it. Undeclared env vars are a code smell; declared-but-unused env vars are dead documentation. CI enforces both directions.
-- **Separate secrets from config.** Config (non-sensitive: timeouts, log levels, feature flags) goes in version-controlled files or env vars. Secrets (DB passwords, API keys, signing keys) go in a secrets manager (Vault, AWS Secrets Manager, Doppler, dotenv-vault, sealed-secrets, SOPS). The validator MUST flag any secret-shaped value in plain config and MUST verify referenced secret URIs resolve.
+- **Separate secrets from config.** Config (non-sensitive: timeouts, log levels, feature flags) goes in version-controlled files or env vars. Secrets (DB passwords, API keys, signing keys) go in a secrets manager (Vault, AWS Secrets Manager, Doppler, dotenv-vault, sealed-secrets, SOPS). The validator MUST flag any secret-shaped value in plain config and MUST check that every referenced secret URI is well-formed. The agent reaches no secrets manager: whether a reference resolves comes from a listing handed to it in its brief, and is otherwise reported as not verified.
 - **Parse-then-validate (Alexis King's principle).** Convert raw strings into the strictest possible type (a parsed `Url`, a validated `PortNumber`, a confirmed-non-empty `ApiKey`) before passing them anywhere. Downstream code receives proofs, not strings; impossible states become unrepresentable.
 - **Manual review for env-specific differences.** Tooling flags drift; humans approve intentional divergence. A parity matrix surfaces every key that differs across dev/staging/prod with a `documented?` column.
-- **Resilience: declared = runtime.** Compare runtime config (what the running process actually sees via `/debug/config` or audit logs) to declared config (what the YAML/env said). Override hooks, late-loaded plugins, and operator hot-patches all create runtime drift invisible to schema validation.
+- **Resilience: declared = runtime.** Compare runtime config (what the running process actually sees via `/debug/config` or audit logs, from an export or a log handed to you in your brief) to declared config (what the YAML/env said). Override hooks, late-loaded plugins, and operator hot-patches all create runtime drift invisible to schema validation.
 
 ## What to Check
 
@@ -56,7 +56,7 @@ You validate that configuration is correct, consistent, and secure across all en
 - No secrets in plain config files (see [[secrets-detector]])
 - Secure defaults: `debug: false`, `tls.min_version: 1.2+`, `cookie.secure: true`
 - Debug mode off in production; verbose tracing off in production
-- Secret references resolve (Vault path exists, AWS Secrets Manager ARN reachable)
+- Secret references resolve (Vault path exists, AWS Secrets Manager ARN reachable) — from a listing handed to you in your brief; you reach no secrets manager yourself
 
 ### Environment Parity
 - Same structure across envs

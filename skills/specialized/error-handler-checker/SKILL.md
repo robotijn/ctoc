@@ -14,7 +14,7 @@ related_skills:
   - specialized/observability-checker
   - quality/code-reviewer
 effort_level: medium
-tools: Read, Grep
+tools: Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1

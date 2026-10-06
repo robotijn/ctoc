@@ -20,7 +20,7 @@ related_skills:
   - security/dependency-auditor
   - security/sast-scanner
 effort_level: high
-tools: Read, Grep, Bash
+tools: Read, Grep, Bash, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1

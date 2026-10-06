@@ -14,7 +14,7 @@ related_skills:
   - data-ml/ml-model-validator
   - specialized/database-reviewer
 effort_level: high
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1
@@ -183,7 +183,7 @@ owner_human: alice.chen@example.com
 oncall_schedule: pd_growth_ml
 ```
 
-Cross-check `owner` against the org directory (LDAP / Workday / SCIM). Flag any owner that doesn't resolve.
+Cross-check `owner` against an export of the org directory (LDAP / Workday / SCIM) that is in the repository or handed to you in your brief; you query no directory yourself. Flag any owner that doesn't resolve, and report an owner you could not check as not verified.
 
 ### 5. No Version Pinning at Inference
 
@@ -326,6 +326,7 @@ Databricks acquired Tecton's assets in 2025 (announced August 2025), folding its
 | **BigQuery / Snowflake** (offline) | Time-travel + as-of joins; ANSI SQL; cheap storage | Latency unsuitable for online serving | Offline store + training set generation |
 
 ```bash
+# The platform team's own commands, for reference. The agent runs none of them: apply, materialize and push change a registry or a store.
 # Feast — validate registry, check lineage, materialize, run consistency probes
 feast apply                                          # validates definitions, fails on schema/owner gaps
 feast registry-dump                                  # inspect registered feature views

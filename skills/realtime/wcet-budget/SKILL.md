@@ -98,6 +98,8 @@ If any input is missing, this skill emits `finding: missing_input` with a precis
 
 ## Outputs (what this skill writes)
 
+The wrapper agent holds neither Write nor Edit: it judges this artifact and says in its report what a missing or stale one must hold; the team or the executor writes it.
+
 A single machine-readable artifact at `.ctoc/realtime/wcet/<plan-id>.yaml`. Schema:
 
 ```yaml

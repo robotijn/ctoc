@@ -1,7 +1,7 @@
 ---
 name: resilience-checker
 description: Verifies circuit breakers, retries, timeouts, idempotency keys, DLQs, and graceful degradation across the dependency graph. Dispatch when the request mentions resilience, circuit breaker, retry logic, timeout check, graceful degradation, fallback, graceful shutdown, idempotency, dead-letter queue, bulkhead, or chaos engineering.
-tools: Read, Grep
+tools: Read, Grep, Glob
 model: opus
 effort: xhigh
 tier: 2
@@ -130,11 +130,11 @@ process.on('SIGTERM', async () => {
 | Cleanup on exit | ⚠️ Partial |
 
 **Missing:**
-```javascript
+~~~javascript
 // Add to server startup
 process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
-```
+~~~
 
 ### Chaos Readiness
 | Experiment | Coverage |
@@ -151,6 +151,10 @@ process.on('SIGINT', gracefulShutdown);
 5. Add idempotency key + dead-letter queue + replay tool for webhooks.in
 6. Stand up a staging chaos experiment (latency injection, pod kill) before next release
 ```
+
+## Searching the repository (shared rule)
+
+Build every list of call sites, readers, writers or occurrences with Grep over the whole repository, never only from the files you happened to open, and read each match before you count it. Under any claim that nothing else in the repository does something, cite the search that shows it: the pattern, the path searched and how many files matched. A match shows where a name is written, not that the code runs.
 
 ## Honest status (shared rule)
 

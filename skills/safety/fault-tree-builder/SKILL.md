@@ -73,6 +73,8 @@ If the FMEDA does not exist and the plan declares hardware components, the skill
 
 ## Outputs (what this skill writes)
 
+The wrapper agent holds neither Write nor Edit: it judges this artifact and says in its report what a missing or stale one must hold; the team or the executor writes it.
+
 A single artifact per top event at `.ctoc/safety/fault-trees/<plan-id>__<top-event-slug>.yaml`. Schema:
 
 ```yaml

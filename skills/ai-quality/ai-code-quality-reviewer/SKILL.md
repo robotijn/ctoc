@@ -30,7 +30,7 @@ related_skills:
   - ai-quality/llm-security-tester
   - compliance/sbom-cra-checker
 effort_level: high
-tools: Read, Grep
+tools: Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1

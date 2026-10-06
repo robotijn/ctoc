@@ -23,7 +23,7 @@ related_skills:
   - security/input-validation-checker
   - security/secrets-detector
 effort_level: medium
-tools: Read, Grep
+tools: Read, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1

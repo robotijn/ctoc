@@ -592,10 +592,11 @@ go tool pprof http://localhost:6060/debug/pprof/heap
 
 # .NET — dotnet-counters / dotnet-gcdump / Visual Studio diagnostic tools
 dotnet-counters monitor --process-id <pid> System.Runtime
-dotnet-gcdump collect -p <pid>
+# "$dir": the folder made with mktemp -d in the same Bash call that started the program
+dotnet-gcdump collect -p <pid> -o "$dir/app.gcdump"
 
 # Java — jcmd / JFR / heap dump
-jcmd <pid> GC.heap_dump heap.hprof
+jcmd <pid> GC.heap_dump "$dir/heap.hprof"
 jcmd <pid> JFR.start name=mem settings=profile duration=60s filename=mem.jfr
 ```
 

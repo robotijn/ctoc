@@ -13,7 +13,7 @@ related_skills:
   - frontend/visual-regression-checker
   - quality/code-reviewer
 effort_level: medium
-tools: Bash, Read
+tools: Bash, Read, Grep, Glob
 model: sonnet
 tier: 2
 dispatch_protocol: v1
@@ -273,23 +273,23 @@ Automated coverage requires multiple layers — engine + runner + IDE/CI surface
 
 ```bash
 # axe-core via Playwright — gate every PR
-npx playwright test tests/a11y.spec.ts
+npx --no -- playwright test tests/a11y.spec.ts
 
 # CLI sweep (axe-core CLI)
-npx @axe-core/cli https://staging.example.com \
+npx --no -- @axe-core/cli https://staging.example.com \
   --tags wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa \
   --exit
 
 # Pa11y crawl
-npx pa11y-ci --sitemap https://staging.example.com/sitemap.xml \
+npx --no -- pa11y-ci --sitemap https://staging.example.com/sitemap.xml \
   --sitemap-exclude "(/admin|/internal)"
 
 # Lighthouse a11y category only
-npx lighthouse https://staging.example.com \
+npx --no -- lighthouse https://staging.example.com \
   --only-categories=accessibility --output=json --output-path=./lh-a11y.json
 
 # IBM Equal Access (Node) — pass the path (file, directory, or a .txt list of paths/URLs) as an argument
-npx achecker ./out/index.html
+npx --no -- achecker ./out/index.html
 # or set the rule policies (e.g. 'WCAG_2_1' / 'WCAG_2_2') in an achecker config file
 ```
 

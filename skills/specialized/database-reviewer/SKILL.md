@@ -20,7 +20,7 @@ related_skills:
   - quality/architecture-checker
   - security/sast-scanner
 effort_level: high
-tools: Read, Grep, Bash
+tools: Read, Grep, Bash, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1
@@ -339,8 +339,8 @@ await db.execute(sql`DELETE FROM sessions WHERE user_id = ${userId}`);
 await db.delete(sessions).where(eq(sessions.userId, userId));
 
 // SAFE: Prisma migrations + shadow DB for drift detection
-//   npx prisma migrate dev --create-only       # author migration
-//   npx prisma migrate deploy                  # apply to prod
+//   npx --no -- prisma migrate dev --create-only       # author migration
+//   npx --no -- prisma migrate deploy                  # apply to prod
 ```
 
 ### C / C++ (libpq — minimal)

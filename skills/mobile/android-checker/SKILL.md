@@ -314,8 +314,8 @@ Android is **Kotlin-primary, Java-supported**. Cross-platform pointers for the s
 ### Build
 ```bash
 ./gradlew assembleDebug
-./gradlew assembleRelease        # Verifies R8 + signing config in CI
-./gradlew bundleRelease          # AAB for Play Store
+./gradlew assembleRelease        # Release pipeline only: it signs with the release identity. The agent never runs it; it reads the R8 and signing settings
+./gradlew bundleRelease          # Release pipeline only (the Play Store bundle). The agent never runs it
 ```
 
 ### Tests
@@ -323,15 +323,15 @@ Android is **Kotlin-primary, Java-supported**. Cross-platform pointers for the s
 ./gradlew testDebugUnitTest                     # JVM unit tests
 ./gradlew connectedDebugAndroidTest             # Instrumented tests on emulator/device
 ./gradlew :macrobenchmark:connectedCheck        # Startup / scrolling perf
-./gradlew :app:generateBaselineProfile          # Refresh Baseline Profile
+./gradlew :app:generateBaselineProfile          # Rewrites the Baseline Profile file: the agent names it for the executor and never runs it
 ```
 
 ### Security audits
 ```bash
 ./gradlew dependencyUpdates                     # Dependency drift
-./gradlew :app:dependencyInsight --dependency <pkg>
+./gradlew :app:dependencyInsight --dependency <pkg>   # the agent runs this only with a name its brief gives; a name read from a build file goes in the report for the executor
 # MobSF: full APK static+dynamic analysis runs via its REST API — upload the built APK to a
-#   running MobSF server (see the MobSF REST API docs). mobsfscan is the source-level CI/CD linter:
+#   running MobSF server (see the MobSF REST API docs) — a step of the team's own pipeline; the agent uploads no build. mobsfscan is the source-level CI/CD linter:
 mobsfscan .                                     # MobSF source security scan (CI/CD-friendly)
 # OWASP Dependency-Check
 ./gradlew dependencyCheckAnalyze
@@ -346,7 +346,7 @@ mobsfscan .                                     # MobSF source security scan (CI
 | Variant | Status | Time | R8 enabled |
 |---------|--------|------|------------|
 | debug | Pass | 1m 23s | n/a |
-| release | Pass | 2m 45s | yes |
+| release | not run: the release pipeline builds and signs it | - | yes (read from `app/build.gradle.kts`) |
 
 ### Lint (ktlint + detekt + AGP lint)
 | Tool | Errors | Warnings |

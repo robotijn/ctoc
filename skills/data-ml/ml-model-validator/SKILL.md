@@ -16,7 +16,7 @@ related_skills:
   - data-ml/feature-store-validator
   - ai-quality/ai-code-quality-reviewer
 effort_level: high
-tools: Bash, Read
+tools: Read, Grep, Glob
 model: opus
 tier: 2
 dispatch_protocol: v1
@@ -496,6 +496,7 @@ The 2026 MLOps surface splits into three layers; pick one per layer.
 | **Fiddler AI** | Drift + explainability + LLM observability in one platform, audit trails for regulated industries | Enterprise pricing | Regulated (finance, healthcare) deployments |
 
 ```bash
+# For the team's own pipeline. The wrapper agent holds no command tool and runs none of this.
 # Evidently — install + run a one-shot report (current API, 0.7+)
 pip install "evidently>=0.7"
 python -c "

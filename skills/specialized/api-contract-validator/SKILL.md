@@ -175,7 +175,7 @@ Rows marked `safe` are **non-findings** — they do not emit a refinement-loop l
 
 ```bash
 # OpenAPI: lint + breaking-change gate + conformance
-npx @stoplight/spectral-cli lint openapi.yaml
+npx --no -- @stoplight/spectral-cli lint openapi.yaml
 oasdiff breaking --fail-on WARN openapi-base.yaml openapi-head.yaml
 schemathesis run http://localhost:3000/openapi.json    # runs all checks by default
 
@@ -184,10 +184,10 @@ buf lint
 buf breaking --against '.git#branch=main'
 
 # GraphQL: diff
-npx @graphql-inspector/cli diff schema-base.graphql schema-head.graphql
+npx --no -- @graphql-inspector/cli diff schema-base.graphql schema-head.graphql
 
 # AsyncAPI
-npx @asyncapi/cli validate asyncapi.yaml
+npx --no -- @asyncapi/cli validate asyncapi.yaml
 
 # Consumer-driven
 pact-broker can-i-deploy --pacticipant my-service --version $GIT_SHA --to-environment production
