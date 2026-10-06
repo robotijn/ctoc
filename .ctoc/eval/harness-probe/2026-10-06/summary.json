@@ -1,0 +1,59 @@
+{
+  "expectations": ".ctoc/eval/harness-probe/2026-10-06/expectations.json",
+  "verdict": "PASS",
+  "rows": [
+    {
+      "fixture": "clean-measurable-criteria",
+      "kind": "planted",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    }
+  ],
+  "note": "smoke check, one run per version, low statistical power, not proof",
+  "missingRuns": [],
+  "scored": [
+    {
+      "fixture": "clean-measurable-criteria",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "wrote/probe.txt"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "wrote/probe.txt"
+        ],
+        "standingBlindSpot": null
+      }
+    }
+  ],
+  "usage": {
+    "original": {
+      "median_tokens": 12232,
+      "median_duration_ms": 5343
+    },
+    "compacted": {
+      "median_tokens": 12178,
+      "median_duration_ms": 5169
+    }
+  }
+}

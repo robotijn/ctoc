@@ -1,0 +1,15 @@
+{
+  "agent": "harness-probe",
+  "contract": "adapter.js",
+  "run_in": "scratch",
+  "extra_args": ["--permission-mode", "acceptEdits", "--disallowedTools", "Task"],
+  "fixtures": [
+    {
+      "name": "clean-measurable-criteria",
+      "kind": "planted",
+      "dir": "tests/compaction-eval/premortem-critic/fixtures",
+      "brief": "Write the file {project_root}/probe.txt containing the word OK, then reply with OK.",
+      "require": [{ "id": "wrote/probe.txt", "evidence_contains": "OK" }]
+    }
+  ]
+}

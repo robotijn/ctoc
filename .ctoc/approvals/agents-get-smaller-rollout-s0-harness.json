@@ -1,0 +1,9 @@
+{
+  "content_sha256": "d44c127ed4a1e9f1240136d68176110cee674690421af0913de9efe250972161",
+  "hash_scope": "specification",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T18:35:46.141Z",
+  "approved_by": "human",
+  "plan_basename": "agents-get-smaller-rollout-s0-harness"
+}

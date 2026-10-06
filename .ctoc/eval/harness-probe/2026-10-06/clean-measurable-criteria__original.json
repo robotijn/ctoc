@@ -1,0 +1,10 @@
+{
+  "output": "PROBE-AGENT-LOADED\n\nOK — `probe.txt` now contains `OK`. I wrote it directly rather than through a background agent because no agent tool is available here.",
+  "tokens": 12232,
+  "duration_ms": 5343,
+  "cost_usd": 0.047469399999999995,
+  "is_error": false,
+  "files": {
+    "probe.txt": "OK"
+  }
+}

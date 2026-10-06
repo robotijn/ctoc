@@ -1,0 +1,10 @@
+{
+  "output": "PROBE-AGENT-LOADED\n\nOK\n\nI wrote the file directly instead of handing it to a background agent, because this session has no tool for starting subagents.",
+  "tokens": 12178,
+  "duration_ms": 5169,
+  "cost_usd": 0.0466258,
+  "is_error": false,
+  "files": {
+    "probe.txt": "OK"
+  }
+}
