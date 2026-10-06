@@ -17,7 +17,7 @@ const assert = require('node:assert/strict');
 const { defineInventoryTests } = require('./compaction-eval/inventory-checks');
 const contract = require('./compaction-eval/implementation-planner/contract');
 
-const ORDER_FLOOR = 176;
+const ORDER_FLOOR = 184;
 
 defineInventoryTests({
   test,
@@ -144,10 +144,42 @@ test('adapter 9: a question through the Needs-Input status or the questions stor
   const status = check({ [`${P}report-shows-durations.md.status`]: JSON.stringify({ agent: 'implementation-planner', status: 'needs-input', message: 'Where is it called?' }) });
   assert.equal(status.valid, true, status.errors.join('\n'));
   assert.deepEqual(ids(status), ['question-raised']);
-  const store = check({ '.ctoc/streaming/questions/implementation__report-shows-durations.json': '{"questions":[]}' });
+  const STORE = '.ctoc/streaming/questions/implementation__report-shows-durations.json';
+  const real = { id: 'q1', prompt: 'Where is it called from?', options: [{ key: 'a', label: 'report', recommended: true }] };
+  const store = check({ [STORE]: JSON.stringify({ questions: [real] }) });
+  assert.equal(store.valid, true, store.errors.join('\n'));
   assert.deepEqual(ids(store), ['question-raised']);
   const working = check({ [`${P}report-shows-durations.md.status`]: JSON.stringify({ status: 'working' }) });
   assert.equal(working.valid, false, 'a status still reading working raised nothing');
+});
+
+test('adapter 9b: an empty question list, a status without a message, or a status that is not JSON raises nothing', () => {
+  const cases = {
+    'an empty questions array': { '.ctoc/streaming/questions/implementation__report-shows-durations.json': '{"questions":[]}' },
+    'a store file that is not JSON': { '.ctoc/streaming/questions/implementation__report-shows-durations.json': 'needs-input' },
+    'needs-input with an empty message': { [`${P}report-shows-durations.md.status`]: JSON.stringify({ status: 'needs-input', message: '  ' }) },
+    'needs-input with no message': { [`${P}report-shows-durations.md.status`]: JSON.stringify({ status: 'needs-input' }) },
+    'a status that only mentions needs-input as text': { [`${P}report-shows-durations.md.status`]: 'status: needs-input — where is it called?' }
+  };
+  for (const [name, files] of Object.entries(cases)) {
+    const r = check(files);
+    assert.deepEqual(ids(r), [], name);
+    assert.equal(r.valid, false, `${name}: no slice and no question is invalid`);
+  }
+});
+
+test('adapter 11: a function the plan assumes but the project lacks is flagged only when the run says it does not exist', () => {
+  const fx = { name: 'calls-a-missing-function', parent: 'report-shows-a-total', missing_function: 'sumDurations' };
+  const slicePath = `${P}report-shows-a-total-s1-total.md`;
+  const flagged = check({ [slicePath]: slice({ parent: fx.parent, files: ['src/commands/report.js'] }) + '\n`sumDurations` does not exist in `src/lib/settings.js`; this slice creates it.\n' }, fx);
+  assert.ok(flagged.findings.some((f) => f.id === 'missing-function-flagged'), 'a slice line naming it as missing');
+  const asked = check({ [`${P}report-shows-a-total.md.status`]: JSON.stringify({ status: 'needs-input', message: 'The plan relies on sumDurations, which is not defined anywhere. Create it or drop it?' }) }, fx);
+  assert.ok(asked.findings.some((f) => f.id === 'missing-function-flagged'), 'a question naming it');
+  const refused = contract.check({ output: 'Stopped: sumDurations is missing from the project, so the blueprint cannot call it.', files: {} }, fx, EXP);
+  assert.ok(refused.findings.some((f) => f.id === 'missing-function-flagged'), 'a refusal in the final message');
+  const silent = check({ [slicePath]: slice({ parent: fx.parent, files: ['src/commands/report.js'] }) + '\n`main` calls `sumDurations(rows)` from `src/lib/settings.js`.\n' }, fx);
+  assert.ok(!silent.findings.some((f) => f.id === 'missing-function-flagged'), 'a slice that just calls it flags nothing');
+  assert.ok(!check({ [slicePath]: slice({ parent: fx.parent, files: ['src/lib/a.js'] }) + '\nsumDurations does not exist.\n' }).findings.some((f) => f.id === 'missing-function-flagged'), 'only a fixture that names a missing function can produce the finding');
 });
 
 test('adapter 10: a truncated capture is invalid, never read as a slice', () => {

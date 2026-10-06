@@ -176,7 +176,7 @@ This slice builds before
 ### Step 8: TEST
 - [x] Confirm the pilot and slice 0 are done and the agent file has no uncommitted change; copy the baseline; record sha256 and commit.
 - [x] Write `tests/implementation-planner-compaction.test.js` (`defineInventoryTests` with the floor, and the adapter's cases on hand-made captured files), the three fixtures, `expectations.json` with its matchers, and the brief.
-- [ ] Verify the clean fixture: its tests pass; dispatch `iron-loop-critic` to read it for any defect of important or higher; fix and record.
+- [x] Verify the clean fixture: its tests pass; dispatch `iron-loop-critic` to read it for any defect of important or higher; fix and record.
 - [x] Run the test; expect RED (inventory and adapter missing); record the failing lines.
 
 ### Step 9: PREPARE
@@ -286,8 +286,8 @@ left to the main session (critic and security-scanner dispatches).
 **Step 8 RED.** `node --test tests/implementation-planner-compaction.test.js` failed at load:
 `Cannot find module './compaction-eval/implementation-planner/contract'` (adapter and inventory
 missing). The clean fixture's own tests pass (`npm test` in the fixture: 4 pass, 0 fail). The
-`iron-loop-critic` read of the clean fixture was NOT dispatched: this executor holds no
-agent-dispatch tool, so the main session should dispatch it (that Step 8 box stays open).
+`iron-loop-critic` read of the clean fixture was not done before the runs. It ran later, in the
+review fix pass, headless and read-only, and found nothing of important or higher (see Step 14).
 
 **Step 9.** Pins re-read: `tests/subplan-decomposition.test.js` (parent_plan, depends_on, "more
 implementation plans than … functional", "never split a module from its test", `-s<N>-`),
@@ -301,51 +301,88 @@ model-floor and honest-status fences. The adapter reads frontmatter with `state.
 (it merges leading blocks and reads the `files:` list) and step labels with
 `plan-validator.validateStepLabels`.
 
-**Step 10 — inventory.** 327 units: 233 kept, 7 tightened, 32 merged, 55 cut. 176 orders (order
-floor 176 in the test); every anchor is original text, unique in the compacted file and found in
-its own section. `tests/implementation-planner-compaction.test.js`: 20 pass (10 inventory checks,
-10 adapter cases). Every pinned test and fence passes unchanged (342 tests across the files in the
+**Step 10 — inventory** (after the review fix pass below). 327 units: 235 kept, 10 tightened, 31
+merged, 51 cut. 184 orders (order floor 184 in the test); every anchor is original text, unique in
+the compacted file and found in its own section. `tests/implementation-planner-compaction.test.js`:
+22 pass (10 inventory checks, 12 adapter cases). The first pass had 176 orders and 20 tests. Every pinned test and fence passes unchanged (342 tests across the files in the
 pin table plus reachability and the harness; `gate-words`, `false-green-fence`,
 `golden-corpus-fence`: 55 pass). eslint on the new files: 0 problems.
 
 **What left (word for word in the baseline):**
-- Examples (12 units): the Phase 2.1 Grep and Glob example blocks (folded into one line each), the
-  Phase 2.3 module, agent-definition and test patterns, the 4.1 to 4.3 example tables (each order
-  now names its output section and columns instead), the naming example, and `## Example: Adding a
-  New Lib Module`. Examples that remain: the Phase 1 change types (a table without its example
+- Examples (9 units cut, 3 tightened): the Phase 2.1 Grep and Glob example blocks (folded into one
+  line each), the Phase 2.3 module, agent-definition and test patterns (section 2.3 now orders the
+  planner to read two or three existing files of the kind it will create and mirror them), the
+  naming example, and `## Example: Adding a New Lib Module`. The 4.1 to 4.3 example tables are
+  tightened, not cut: their example rows leave and each order keeps its output shape, anchored on
+  the original `## Implementation Order`, `Criterion | Implemented In | Test Case` and
+  `Risk | Mitigation | Where`. Examples that remain: the Phase 1 change types (a table without its example
   column), the `coverage-map` / `wire-verify` naming hint and the caching question in Needs-Input.
   The output templates stay.
 - References (7 units): `## References`.
-- Descriptions (31 units): the manifest's contents, the expert-architect sentence, `## Trigger`,
-  the plan contents under Input, Process Overview, the SIP1 label, the second vision-decomposer
-  mirror, `## Batched Gates` (what `approveSubplans` and the executor do, not an order to the
-  planner), `## Integration with Iron Loop`, and the v7 lead sentence.
+- Descriptions (30 units): the manifest's contents, the expert-architect sentence, `## Trigger`,
+  the plan contents under Input, Process Overview, the SIP1 label, `## Batched Gates` (what
+  `approveSubplans` and the executor do, not an order to the planner),
+  `## Integration with Iron Loop`, and the v7 lead sentence.
 - Reasons (5 units): why small slices (a crash loses only one), why the graph prevents cycles, the
   test-first aside in 4.1, "more plans does not mean more gate prompts", "not stylistic
   suggestions".
-- Merged repeats (10 order units): the Role's slice-structure and INDEX restatements, the 3.4
-  cross-platform row (held in the 3.1 template), the 4.1 dependency-order sentence, the
-  anti-patterns that restated the Role, wiring, sizing, 3.3 and 3.4 orders, and the example's
-  "verify real names" (held by "Copy-paste assumptions").
+- Merged repeats (10 order units): the Role's slice-structure and INDEX restatements, the second
+  vision-decomposer mirror (held by the Role, R-030), the 4.1 dependency-order sentence, the
+  anti-patterns that restated the Role, wiring, sizing and 3.4 orders, and the example's "verify
+  real names" (held by the Undiscovered dependency anti-pattern, R-253).
 
-**Size.** 36,797 → 26,558 bytes (72.2 percent; `maxBytes` 26,558). This misses the expected
-24,400 (66.4 percent) by 2,158 bytes. Reason: about 9 KB of this agent is output templates and the
+**Correction to the first pass.** The first record said the 3.4 cross-platform row was merged
+into the 3.1 template. That was wrong: the row was never removed from the file, only mislabelled.
+It is now labelled kept with its own order (R-131). The first pass also dropped the anti-pattern
+"**Undiscovered dependency**: Blueprint references a function that does not exist yet and is not
+in the creation plan" as a repeat of 3.3. 3.3 covers `require()` of files, not functions, so an
+order was lost. It is restored under `### In Dependency Analysis` as R-253. The new fixture
+`calls-a-missing-function` tests exactly this kind of loss.
+
+**Size.** 36,797 → 26,944 bytes (73.2 percent; `maxBytes` 26,944; the first pass was 26,558
+before R-253 and the section 2.3 order were added back). This misses the expected 24,400 (66.4
+percent) by 2,544 bytes. Reason: about 9 KB of this agent is output templates and the
 Phase 4b skeleton, which the plan keeps whole as orders; no order was dropped to reach a number.
 
-**Step 14 — smoke check** (scratch mode, one headless run per version, 6 runs; verdict PASS on
-the first round, no rerun, no matcher correction; low statistical power, not proof):
+**Step 14 — smoke check** (scratch mode, one headless run per version, 8 runs; verdict PASS, no
+rerun, no matcher correction; low statistical power, not proof). The first three fixtures ran
+against the first-pass compacted text (26,558 bytes). `calls-a-missing-function` was added in the
+review fix pass and ran against the fixed text (26,944 bytes).
 
 | Fixture | Original | Compacted | Tokens original | Tokens compacted | Duration original | Duration compacted |
 |---|---|---|---|---|---|---|
 | module-needs-its-test (planted) | found (module-with-its-test, claude-md-declared) | found (same) | 196,847 | 211,093 | 139.0 s | 161.4 s |
 | no-live-entry-point (planted) | found (question-raised, no invented-call-site, no slice written) | found (same) | 132,801 | 137,672 | 79.9 s | 68.3 s |
+| calls-a-missing-function (planted) | found (missing-function-flagged: "the helper it relies on doesn't exist") | found (missing-function-flagged: "The plan's helper doesn't exist") | 266,862 | 237,834 | 150.6 s | 174.4 s |
 | clean-config-flag (clean) | 2 slices, no important finding | 2 slices, no important finding | 276,376 | 248,243 | 163.6 s | 171.0 s |
 
-Median tokens per run: original 196,847, compacted 211,093. Median duration: original 139.0 s,
-compacted 161.4 s. With one run per version this spread is run-to-run noise (the agent body is
-about 2,600 tokens smaller per turn, **derived** from 10,239 bytes at about 4 bytes a token; the
-runs differ by tens of thousands of tokens in how many files the planner chose to read), so these
-numbers show no speed change either way. Scored runs: `.ctoc/eval/implementation-planner/2026-10-06/`.
+Median tokens per run over the four fixtures: original 231,855, compacted 224,464. Median
+duration: original 144.8 s, compacted 166.2 s. **No token or time saving was measured.** At one
+run per fixture, the gap between runs is run-to-run noise: the runs differ by tens of thousands of
+tokens depending on how many files the planner chose to read. The agent body is about 2,500 tokens
+smaller per turn. That figure is **derived** (9,853 bytes at about 4 bytes a token), not measured.
+Scored runs: `.ctoc/eval/implementation-planner/2026-10-06/`.
+
+**Scoring hardened in the review fix pass, then the first six captures re-scored (no rerun):**
+- A questions-store file now counts only when it parses as JSON with a non-empty `questions` array.
+- A `.status` file now counts only when it parses as JSON with status `needs-input` and a non-empty
+  message. The text fallback is removed.
+
+The verdict did not change. Both `no-live-entry-point` runs wrote a real needs-input message
+asking where the nightly sync job is.
+
+**Clean fixture check (acceptance criterion 6), run AFTER the smoke-check runs, not before.**
+CTOC's `iron-loop-critic` ran headless and read-only (`claude -p --agent
+ctoc:iron-loop:iron-loop-critic`, Write, Edit, NotebookEdit, Bash and Task disallowed) on a
+scratch copy of `fixtures/clean-config-flag`. Verdict: no finding of important or higher. It made
+four normal notes:
+1. Adding `maxRows` to `DEFAULTS` breaks the exact-equality assertion at `tests/settings.test.js:12`,
+   and the plan does not name that test update.
+2. A stale JSDoc `@returns`.
+3. The plan says `main` "prints"; the code returns the lines.
+4. The command line passes no settings.
+
+No fixture fix was needed, so no fixture was rerun.
 The `RESULTS.md` section was not written here (parallel slices would conflict); the main session
 appends it at merge, so that Step 14 box stays open.
 
@@ -356,7 +393,15 @@ appends it at merge, so that Step 14 box stays open.
 2. A run that wrote no slice but raised a question through a named channel is VALID: the
    Needs-Input protocol tells the planner to wait for the answer, so halting with the question is a
    correct answer (both runs of `no-live-entry-point` did exactly that).
-3. The question channels are the two the baseline names: the plan's `.status` file reading
-   `needs-input` (seeded `working` in every fixture) and `.ctoc/streaming/questions/`.
+3. The question channels are the two the baseline names: the plan's `.status` file (seeded
+   `working` in every fixture) parsed as JSON with status `needs-input` and a non-empty message,
+   and a `.ctoc/streaming/questions/` file with a non-empty `questions` array.
+5. `missing-function-flagged` fires on a line of the final message, a question or a written file
+   that names the fixture's `missing_function` together with a phrase saying it is absent ("does
+   not exist", "not defined", "missing" and the like). A slice that just calls the function flags
+   nothing.
+6. The order floor is 184, not the 177 the review named. Besides R-253, the review's inventory
+   fixes made seven more units orders (131, the three 4.1–4.3 output shapes, 22, 192 and 196), and
+   the floor is the count at labelling.
 4. `---` horizontal rules and bare list numbers are labelled as markup (`heading`), not content;
    removed rules are `merged`.

@@ -17,6 +17,13 @@
       "status": "ok"
     },
     {
+      "fixture": "calls-a-missing-function",
+      "kind": "planted",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    },
+    {
       "fixture": "clean-config-flag",
       "kind": "clean",
       "shortfalls": [],
@@ -94,6 +101,38 @@
       }
     },
     {
+      "fixture": "calls-a-missing-function",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "missing-function-flagged"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "missing-function-flagged"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
       "fixture": "clean-config-flag",
       "kind": "clean",
       "original": {
@@ -124,12 +163,12 @@
   ],
   "usage": {
     "original": {
-      "median_tokens": 196847,
-      "median_duration_ms": 138971
+      "median_tokens": 231854.5,
+      "median_duration_ms": 144765.5
     },
     "compacted": {
-      "median_tokens": 211093,
-      "median_duration_ms": 161388
+      "median_tokens": 224463.5,
+      "median_duration_ms": 166186
     }
   }
 }

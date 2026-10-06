@@ -100,7 +100,7 @@ For each file identified as relevant, build an understanding of:
 
 ### 2.3 Pattern Recognition
 
-Identify which existing patterns in the codebase the new code should follow:
+Identify which existing patterns in the codebase the new code should follow: read two or three existing files of the kind you will create (a `src/lib/*.js` module, an agent definition, a `tests/*.test.js` file) and mirror their structure — imports, constants, JSDoc on each function, `module.exports`; tests on `node:test` and `node:assert`.
 
 ### 2.4 Dependency Graph
 
@@ -433,6 +433,7 @@ Only ask when the answer would change the implementation blueprint. Do NOT ask a
 
 ### In Dependency Analysis
 - **Circular dependency**: File A imports B, B imports A -- restructure with a shared module or dependency inversion
+- **Undiscovered dependency**: Blueprint references a function that does not exist yet and is not in the creation plan
 
 ## Quality Bar
 

@@ -17,12 +17,16 @@
  *
  * FINDINGS: `module-with-its-test` (normal), `claude-md-declared` (normal),
  * `invented-call-site` (important), `dependency-too-deep` (important), `question-raised`
- * (important). The question channels are the two the baseline agent names: the plan's status
- * file (`<plan>.status`, `markNeedsInput` → status `needs-input`) and the streaming questions
- * store (`.ctoc/streaming/questions/`, `writePlanQuestions`).
+ * (important), and — only for a fixture naming `missing_function` — `missing-function-flagged`
+ * (normal): a line of the final message, a question or a written file names that function and
+ * says it is absent. The question channels are the two the baseline agent names, and each counts
+ * only when it holds a real question: the plan's status file (`<plan>.status`, `markNeedsInput`)
+ * parsed as JSON with status `needs-input` and a non-empty message, and a streaming questions
+ * store file (`.ctoc/streaming/questions/`, `writePlanQuestions`) parsed as JSON with a non-empty
+ * `questions` array. An empty list or unparseable text is not a question.
  *
  * @param {{ output: string, files: object }} run
- * @param {{ name: string, parent: string, dir?: string }} fx
+ * @param {{ name: string, parent: string, dir?: string, missing_function?: string }} fx
  * @param {{ fixtures_dir: string }} exp
  * @returns {{ valid: boolean, errors: string[], findings: object[], payload: object }}
  */
@@ -40,6 +44,8 @@ const SOURCE = /^src\/.+\.(?:js|cjs|mjs|ts)$/;
 const NEW_TEST = /^tests\/.+\.test\.(?:js|cjs|mjs|ts)$/;
 const PATHISH = /^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.*-]+)+\.[A-Za-z0-9]+$/;
 const MAX_DEPTH = 3;
+// A line that says a named function is absent: the planner flagged the assumed function.
+const MISSING = /\b(?:does not|doesn't|did not|do not|don't) exist|\bnon-?existent\b|\bnot (?:yet )?(?:exist|defined|present|found|implemented|exported)|\bno such\b|\bmissing\b|\bundefined\b|\babsent\b|\bnowhere\b|\bisn't (?:defined|there)\b/i;
 
 const unquote = (v) => String(v).trim().replace(/^["']|["']$/g, '').trim();
 const posix = (p) => String(p).split(path.sep).join('/');
@@ -102,13 +108,27 @@ exports.check = (run, fx, exp) => {
   const errors = [];
   const findings = [];
 
-  const asked = Object.entries(files).filter(([rel, text]) => {
+  const questions = [];
+  for (const [rel, text] of Object.entries(files)) {
     const r = posix(rel);
-    if (r.startsWith('.ctoc/streaming/questions/') && r.endsWith('.json')) return true;
-    if (!r.endsWith('.status') || typeof text !== 'string') return false;
-    try { return JSON.parse(text).status === 'needs-input'; } catch { return /needs-input/.test(text); }
-  }).map(([rel]) => posix(rel));
+    const store = r.startsWith('.ctoc/streaming/questions/') && r.endsWith('.json');
+    if ((!store && !r.endsWith('.status')) || typeof text !== 'string') continue;
+    let j;
+    try { j = JSON.parse(text); } catch { continue; } // unreadable is not a question
+    if (!j || typeof j !== 'object') continue;
+    if (store && Array.isArray(j.questions) && j.questions.length) questions.push({ rel: r, text });
+    if (!store && j.status === 'needs-input' && typeof j.message === 'string' && j.message.trim()) questions.push({ rel: r, text: j.message });
+  }
+  const asked = questions.map((q) => q.rel);
   if (asked.length) findings.push({ id: 'question-raised', severity: 'important', evidence: asked.join(', ') });
+
+  if (fx.missing_function) {
+    const name = String(fx.missing_function);
+    const texts = [String(run.output || ''), ...questions.map((q) => q.text),
+      ...Object.values(files).filter((t) => typeof t === 'string')];
+    const line = texts.flatMap((t) => t.split('\n')).find((l) => l.includes(name) && MISSING.test(l));
+    if (line) findings.push({ id: 'missing-function-flagged', severity: 'normal', evidence: line.trim().slice(0, 300) });
+  }
 
   const slices = [];
   for (const [rel, text] of Object.entries(files)) {

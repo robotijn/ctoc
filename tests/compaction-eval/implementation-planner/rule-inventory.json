@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/implementation-planner/baseline-agent.md",
  "baseline_sha256": "44c9baf3a44ca711129a21df2620c03f22266b499308bda98064a0d61ed46520",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 26558,
+ "maxBytes": 26944,
  "units": [
   {
    "n": 1,
@@ -183,8 +183,10 @@
   {
    "n": 22,
    "sha": "ccf7ac1c1abb9ad58c43da134f27252dd637659f1793b1a58a929094f7de68d4",
-   "kind": "description",
-   "orders": [],
+   "kind": "order",
+   "orders": [
+    "R-022"
+   ],
    "fate": "kept"
   },
   {
@@ -1094,10 +1096,9 @@
    "sha": "60180e9afe2e24255be7d7f7cc368ea3ad653366bc8cbb57e9a7385527437d20",
    "kind": "order",
    "orders": [
-    "R-111"
+    "R-131"
    ],
-   "fate": "merged",
-   "note": "the cross-platform rule is held once, in the 3.1 template Cross-Platform Notes"
+   "fate": "kept"
   },
   {
    "n": 132,
@@ -1212,9 +1213,12 @@
   {
    "n": 145,
    "sha": "08a9f1a4f8120a0b5f4696b0e86b4d8970f69c3336b789ba4eac71405390329b",
-   "kind": "example",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "R-145"
+   ],
+   "fate": "tightened",
+   "note": "the example rows leave; the 4.1 order names the output section and its line shape"
   },
   {
    "n": 146,
@@ -1252,9 +1256,12 @@
   {
    "n": 150,
    "sha": "615c2856035e7067fb824818e14dfc454212ef7af0c9c3e253a5bb0fe11ec519",
-   "kind": "example",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "R-150"
+   ],
+   "fate": "tightened",
+   "note": "the example rows leave; the 4.2 order names the output section and its columns"
   },
   {
    "n": 151,
@@ -1284,9 +1291,12 @@
   {
    "n": 154,
    "sha": "81640e20787f61ce528d9b46a06e539d51bac58f4d54e891da02673d4b4a491e",
-   "kind": "example",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "R-154"
+   ],
+   "fate": "tightened",
+   "note": "the example rows leave; the 4.3 order names the output section and its columns"
   },
   {
    "n": 155,
@@ -1331,9 +1341,12 @@
   {
    "n": 160,
    "sha": "0cfdd542a618ba9499b46915c2780c38e3cf75e44f31505201aa82a375070607",
-   "kind": "description",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "R-030"
+   ],
+   "fate": "merged",
+   "note": "restates the Role: you are a decomposer, mirroring the vision-decomposer"
   },
   {
    "n": 161,
@@ -1603,8 +1616,10 @@
   {
    "n": 192,
    "sha": "26065660a0ad6df0405b722293dcdc62c5b98ef1541f1de97439a051bd59d896",
-   "kind": "reason",
-   "orders": [],
+   "kind": "order",
+   "orders": [
+    "R-192"
+   ],
    "fate": "kept"
   },
   {
@@ -1632,8 +1647,10 @@
   {
    "n": 196,
    "sha": "f799d3c36efd01212fabbd73cd0461067fa6f684c91178b09eac36d591f0e9e4",
-   "kind": "description",
-   "orders": [],
+   "kind": "order",
+   "orders": [
+    "R-196"
+   ],
    "fate": "kept"
   },
   {
@@ -2111,10 +2128,9 @@
    "sha": "46ad84fcaaf29a4c752776f8b2d71487caa21af0c04fd5a19dca37dbcbbe3a83",
    "kind": "order",
    "orders": [
-    "R-118"
+    "R-253"
    ],
-   "fate": "merged",
-   "note": "restates 3.3: every require() references a file that exists or will be created"
+   "fate": "kept"
   },
   {
    "n": 254,
@@ -2358,10 +2374,10 @@
    "sha": "e8b1b70d01a724609c7ccecd03e59054fb1fad8fb39b3664bed7d98ef3ee72f9",
    "kind": "order",
    "orders": [
-    "R-249"
+    "R-253"
    ],
    "fate": "merged",
-   "note": "restates the Copy-paste assumptions anti-pattern: verify against the codebase"
+   "note": "held by the Undiscovered dependency anti-pattern: a referenced function must exist or be in the creation plan"
   },
   {
    "n": 285,
@@ -2828,6 +2844,16 @@
    "now_in": "## Step 0: Template selection",
    "anchors": [
     "Reference the `skills/saas/posthog-analytics` skill for instrumentation patterns."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "R-022",
+   "says": "The CTO Chief implements the wiring; the key-performance-indicator selection is outside scope.",
+   "now_in": "## Step 0: Template selection",
+   "anchors": [
+    "The CTO Chief implements the wiring; the key-performance-indicator selection is outside scope."
    ],
    "pinned_by": null,
    "wire": false
@@ -3473,6 +3499,16 @@
    "wire": false
   },
   {
+   "id": "R-131",
+   "says": "| Cross-platform | All file operations use `path.join()`, no hardcoded separators | Grep for `/` in path construction |",
+   "now_in": "## Phase 3: Generate Implementation Blueprint",
+   "anchors": [
+    "| Cross-platform | All file operations use `path.join()`, no hardcoded separators | Grep for `/` in path construction |"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
    "id": "R-133",
    "says": "For every file in the blueprint:",
    "now_in": "## Phase 3: Generate Implementation Blueprint",
@@ -3563,11 +3599,31 @@
    "wire": false
   },
   {
+   "id": "R-145",
+   "says": "```markdown ## Implementation Order 1. `src/lib/new-module.js` (CREATE) -- no dependencies on other new files 2. `tests/new-module.test.js` (CREATE) -- tests...",
+   "now_in": "## Phase 4: Assemble and Validate",
+   "anchors": [
+    "## Implementation Order"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
    "id": "R-149",
    "says": "Map every acceptance criterion from the plan to at least one implementation action:",
    "now_in": "## Phase 4: Assemble and Validate",
    "anchors": [
     "Map every acceptance criterion from the plan to at least one implementation action:"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "R-150",
+   "says": "```markdown ## Acceptance Criteria Mapping | Criterion | Implemented In | Test Case | |-----------|---------------|-----------| | \"Agent spawns when plan mov...",
+   "now_in": "## Phase 4: Assemble and Validate",
+   "anchors": [
+    "Criterion | Implemented In | Test Case"
    ],
    "pinned_by": null,
    "wire": false
@@ -3588,6 +3644,16 @@
    "now_in": "## Phase 4: Assemble and Validate",
    "anchors": [
     "For each risk identified in the plan, specify a concrete mitigation in the blueprint:"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "R-154",
+   "says": "```markdown ## Risk Mitigations | Risk | Mitigation | Where | |------|-----------|-------| | \"File parsing fails on malformed YAML\" | Add try-catch around pa...",
+   "now_in": "## Phase 4: Assemble and Validate",
+   "anchors": [
+    "Risk | Mitigation | Where"
    ],
    "pinned_by": null,
    "wire": false
@@ -3851,6 +3917,26 @@
    ],
    "pinned_by": null,
    "wire": true
+  },
+  {
+   "id": "R-192",
+   "says": "CTOC is a collaboration: build enough context by ASKING BEFORE building, so that no guessing is required.",
+   "now_in": "## Phase 4b: Decompose into cohesive slices",
+   "anchors": [
+    "CTOC is a collaboration: build enough context by ASKING BEFORE building, so that no guessing is required."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "R-196",
+   "says": "Instead of appending one blueprint to the parent plan:",
+   "now_in": "## Phase 5: Write Output",
+   "anchors": [
+    "Instead of appending one blueprint to the parent plan:"
+   ],
+   "pinned_by": null,
+   "wire": false
   },
   {
    "id": "R-198",
@@ -4148,6 +4234,16 @@
    "now_in": "## Anti-Patterns to Avoid",
    "anchors": [
     "Circular dependency: File A imports B, B imports A -- restructure with a shared module or dependency inversion"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "R-253",
+   "says": "Undiscovered dependency: Blueprint references a function that does not exist yet and is not in the creation plan",
+   "now_in": "## Anti-Patterns to Avoid",
+   "anchors": [
+    "Undiscovered dependency: Blueprint references a function that does not exist yet and is not in the creation plan"
    ],
    "pinned_by": null,
    "wire": false
