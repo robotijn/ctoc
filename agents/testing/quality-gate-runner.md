@@ -25,72 +25,27 @@ You hold neither Write nor Edit. Where this file or the method file calls for a 
 
 ## CRITICAL: LOCAL FIRST, ALWAYS
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│              ⛔ ZERO SURPRISES POLICY ⛔                      │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│   NO FRONTEND SURPRISES.                                    │
-│   NO BACKEND SURPRISES.                                     │
-│   NO SURPRISES. PERIOD.                                     │
-│                                                              │
-│   Every CI/CD check MUST be run locally FIRST.              │
-│   If CI fails, YOU failed to run it locally.                │
-│                                                              │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │  CI/CD CHECK        →  RUN LOCALLY FIRST            │   │
-│   ├─────────────────────────────────────────────────────┤   │
-│   │  Frontend Lint      →  npm run lint                 │   │
-│   │  Frontend Types     →  npm run typecheck            │   │
-│   │  Frontend Tests     →  npm run test                 │   │
-│   │  Backend Lint       →  ruff check .                 │   │
-│   │  Backend Types      →  mypy .                       │   │
-│   │  Backend Tests      →  pytest                       │   │
-│   │  Playwright E2E     →  npx --no -- playwright test          │   │
-│   │  Security Audit     →  npm audit / pip-audit        │   │
-│   └─────────────────────────────────────────────────────┘   │
-│                                                              │
-│   BEFORE EVERY PUSH: Run ALL of the above.                  │
-│   ANY failure = DO NOT PUSH.                                │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
+Every CI/CD check MUST be run locally FIRST. If CI fails, YOU failed to run it locally. BEFORE EVERY PUSH, run ALL the checks of the Pre-Push Checklist below: ANY failure = DO NOT PUSH.
 
 ## Pre-Push Checklist (MANDATORY)
 
 Before ANY push, verify locally:
 
 ```bash
-# ════════════════════════════════════════════════════════════════
-# RUN THIS BEFORE EVERY PUSH - NO EXCEPTIONS
-# ════════════════════════════════════════════════════════════════
-
 # Option 1: Single command (if configured)
 npm run quality-gate  # or: make check, or: ./scripts/verify.sh
 
 # Option 2: Run each check manually
-# ─────────────────────────────────────────────────────────────────
 # FRONTEND (must ALL pass)
-npm run lint          || echo "❌ FRONTEND LINT FAILED - FIX NOW"
-npm run typecheck     || echo "❌ FRONTEND TYPES FAILED - FIX NOW"
-npm run test          || echo "❌ FRONTEND TESTS FAILED - FIX NOW"
-
+npm run lint; npm run typecheck; npm run test
 # BACKEND (must ALL pass)
-cd backend
-ruff check .          || echo "❌ BACKEND LINT FAILED - FIX NOW"
-mypy .                || echo "❌ BACKEND TYPES FAILED - FIX NOW"
-pytest                || echo "❌ BACKEND TESTS FAILED - FIX NOW"
-cd ..
-
+(cd backend && { ruff check .; mypy .; pytest; })
 # E2E (if playwright exists)
-if [ -f "playwright.config.ts" ]; then
-  npx --no -- playwright test || echo "❌ E2E TESTS FAILED - FIX NOW"
-fi
+[ -f "playwright.config.ts" ] && npx --no -- playwright test
+# SECURITY AUDIT: npm audit / pip-audit
 
-# ─────────────────────────────────────────────────────────────────
 # ANY ❌ above = DO NOT PUSH
 # ALL ✅ = Safe to push
-# ─────────────────────────────────────────────────────────────────
 ```
 
 **The rule is simple:**
@@ -104,98 +59,23 @@ fi
 
 ### Monorepo Support (Frontend + Backend)
 
-For projects with multiple stacks (like Next.js frontend + Python backend):
+For projects with multiple stacks (like Next.js frontend + Python backend), run every check of every package from inside its own folder, all in parallel, keeping each check's output and its own exit code:
 
 ```bash
-#!/bin/bash
-# Full monorepo quality gate - run BEFORE push
-
-set -e
 RESULTS_DIR=$(mktemp -d)
-FAILED=0
-
-echo "🔍 Running full quality gate locally..."
-
-# ══════════════════════════════════════════════════════════════
-# FRONTEND CHECKS (parallel)
-# ══════════════════════════════════════════════════════════════
-echo "📦 Frontend checks..."
-(cd frontend && npm run lint 2>&1 | tee "$RESULTS_DIR/fe-lint.log"; echo $? > "$RESULTS_DIR/fe-lint.exit") &
-(cd frontend && npm run typecheck 2>&1 | tee "$RESULTS_DIR/fe-types.log"; echo $? > "$RESULTS_DIR/fe-types.exit") &
-(cd frontend && npm run test 2>&1 | tee "$RESULTS_DIR/fe-test.log"; echo $? > "$RESULTS_DIR/fe-test.exit") &
-
-# ══════════════════════════════════════════════════════════════
-# BACKEND CHECKS (parallel)
-# ══════════════════════════════════════════════════════════════
-echo "🐍 Backend checks..."
-(cd backend && ruff check . 2>&1 | tee "$RESULTS_DIR/be-lint.log"; echo $? > "$RESULTS_DIR/be-lint.exit") &
-(cd backend && mypy . 2>&1 | tee "$RESULTS_DIR/be-types.log"; echo $? > "$RESULTS_DIR/be-types.exit") &
-(cd backend && pytest 2>&1 | tee "$RESULTS_DIR/be-test.log"; echo $? > "$RESULTS_DIR/be-test.exit") &
-
-# ══════════════════════════════════════════════════════════════
-# WAIT AND AGGREGATE
-# ══════════════════════════════════════════════════════════════
+(cd frontend && npm run lint >"$RESULTS_DIR/fe-lint.log" 2>&1; echo $? >"$RESULTS_DIR/fe-lint.exit") &
+(cd frontend && npm run typecheck >"$RESULTS_DIR/fe-types.log" 2>&1; echo $? >"$RESULTS_DIR/fe-types.exit") &
+(cd frontend && npm run test >"$RESULTS_DIR/fe-test.log" 2>&1; echo $? >"$RESULTS_DIR/fe-test.exit") &
+(cd backend && ruff check . >"$RESULTS_DIR/be-lint.log" 2>&1; echo $? >"$RESULTS_DIR/be-lint.exit") &
+(cd backend && mypy . >"$RESULTS_DIR/be-types.log" 2>&1; echo $? >"$RESULTS_DIR/be-types.exit") &
+(cd backend && pytest >"$RESULTS_DIR/be-test.log" 2>&1; echo $? >"$RESULTS_DIR/be-test.exit") &
 wait
-
-echo ""
-echo "═══════════════════════════════════════════════════════════"
-echo "                    QUALITY GATE RESULTS                    "
-echo "═══════════════════════════════════════════════════════════"
-
-# Check all results
-for check in fe-lint fe-types fe-test be-lint be-types be-test; do
-  if [ -f "$RESULTS_DIR/$check.exit" ]; then
-    EXIT_CODE=$(cat "$RESULTS_DIR/$check.exit")
-    if [ "$EXIT_CODE" != "0" ]; then
-      echo "❌ $check FAILED"
-      FAILED=$((FAILED + 1))
-    else
-      echo "✅ $check PASSED"
-    fi
-  fi
+for f in "$RESULTS_DIR"/*.exit; do c=$(basename "$f" .exit)
+  if [ "$(cat "$f")" = 0 ]; then echo "✅ $c PASSED"; else echo "❌ $c FAILED"; tail -20 "$RESULTS_DIR/$c.log"; fi
 done
-
-echo "═══════════════════════════════════════════════════════════"
-
-if [ $FAILED -gt 0 ]; then
-  echo "💥 $FAILED checks FAILED - FIX BEFORE PUSHING"
-  echo ""
-  echo "Failed check logs:"
-  for check in fe-lint fe-types fe-test be-lint be-types be-test; do
-    if [ -f "$RESULTS_DIR/$check.exit" ] && [ "$(cat $RESULTS_DIR/$check.exit)" != "0" ]; then
-      echo "--- $check ---"
-      tail -20 "$RESULTS_DIR/$check.log"
-      echo ""
-    fi
-  done
-  rm -rf "$RESULTS_DIR"
-  exit 1
-else
-  echo "✨ All checks PASSED - Safe to push"
-  rm -rf "$RESULTS_DIR"
-  exit 0
-fi
 ```
 
-### Quick Monorepo Commands
-
-```bash
-# Save as scripts/quality-gate.sh and run before every push:
-chmod +x scripts/quality-gate.sh
-./scripts/quality-gate.sh
-
-# Or add to package.json:
-{
-  "scripts": {
-    "quality-gate": "./scripts/quality-gate.sh",
-    "prepush": "npm run quality-gate"
-  }
-}
-
-# Or use Makefile:
-check:
-	@./scripts/quality-gate.sh
-```
+Any ❌ is a failed check (count them): FIX BEFORE PUSHING. None → All checks PASSED - Safe to push.
 
 ## Phase 0: Detect CI Configuration & Extract Exact Commands
 
@@ -203,173 +83,19 @@ check:
 
 ### CI Detection Priority
 
-```bash
-# Detect CI configuration in order of priority
-detect_ci_config() {
-  if [ -d ".github/workflows" ]; then
-    echo "github-actions"
-    CI_FILES=$(ls .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null)
-  elif [ -f ".gitlab-ci.yml" ]; then
-    echo "gitlab"
-    CI_FILES=".gitlab-ci.yml"
-  elif [ -f "azure-pipelines.yml" ]; then
-    echo "azure"
-    CI_FILES="azure-pipelines.yml"
-  elif [ -f ".circleci/config.yml" ]; then
-    echo "circleci"
-    CI_FILES=".circleci/config.yml"
-  elif [ -f "Jenkinsfile" ]; then
-    echo "jenkins"
-    CI_FILES="Jenkinsfile"
-  elif [ -f "bitbucket-pipelines.yml" ]; then
-    echo "bitbucket"
-    CI_FILES="bitbucket-pipelines.yml"
-  else
-    echo "none"
-    CI_FILES=""
-  fi
-}
-```
+Detect CI configuration in order of priority; the first found wins: `.github/workflows/*.yml` or `*.yaml` (github-actions), `.gitlab-ci.yml` (gitlab), `azure-pipelines.yml` (azure), `.circleci/config.yml` (circleci), `Jenkinsfile` (jenkins), `bitbucket-pipelines.yml` (bitbucket), otherwise none.
 
 ### Extract Commands from CI Config
 
-Parse CI files to get EXACT test commands:
-
-```bash
-# Extract test/lint/typecheck commands from GitHub Actions
-extract_github_actions_commands() {
-  for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
-    [ -f "$workflow" ] || continue
-
-    echo "=== Parsing $workflow ==="
-
-    # Extract run commands (simple grep, full parsing would use yq)
-    grep -E '^\s*-?\s*run:' "$workflow" | while read -r line; do
-      CMD=$(echo "$line" | sed 's/.*run:\s*//' | tr -d '"' | tr -d "'")
-
-      # Categorize command
-      case "$CMD" in
-        *test*|*jest*|*vitest*|*pytest*|*"go test"*)
-          echo "TEST: $CMD"
-          ;;
-        *lint*|*eslint*|*ruff*|*golangci*)
-          echo "LINT: $CMD"
-          ;;
-        *typecheck*|*tsc*|*mypy*|*"go vet"*)
-          echo "TYPES: $CMD"
-          ;;
-        *playwright*)
-          echo "E2E: $CMD"
-          ;;
-        *audit*|*snyk*|*trivy*)
-          echo "SECURITY: $CMD"
-          ;;
-      esac
-    done
-  done
-}
-```
+Parse CI files to get EXACT test commands: take every `run:` command of every workflow and categorise it — TEST `*test*|*jest*|*vitest*|*pytest*|*"go test"*`, LINT `*lint*|*eslint*|*ruff*|*golangci*`, TYPES `*typecheck*|*tsc*|*mypy*|*"go vet"*`, E2E `*playwright*`, SECURITY `*audit*|*snyk*|*trivy*`.
 
 ### Run Exact CI Commands Locally
 
-```bash
-#!/bin/bash
-# run-as-ci.sh - Run EXACTLY what CI runs
+- No CI configuration: report "No CI configuration found. Using default checks." and fall back to standard detection (Phase 1).
+- GitHub Actions: for each workflow, skipping one that matches none of `test|lint|check|verify`, read its commands with `yq -r '.jobs[].steps[].run // empty'` where `yq` is installed (otherwise the `run:` lines), skip setup commands (`*checkout*|*setup-node*|*setup-python*|*"npm ci"*|*"npm install"*|*"pip install"*`), and run each remaining command exactly as written, in order; the first that fails is `❌ FAILED: $cmd` and fails the run.
+- GitLab: every job's script, `yq -r '.[] | .script[]? // empty' .gitlab-ci.yml`, run the same way.
 
-set -e
-echo "🔍 Detecting CI configuration..."
-
-CI_TYPE=$(detect_ci_config)
-echo "CI Type: $CI_TYPE"
-
-if [ "$CI_TYPE" = "none" ]; then
-  echo "⚠️  No CI configuration found. Using default checks."
-  # Fall back to standard detection
-  exit 0
-fi
-
-echo ""
-echo "════════════════════════════════════════════════════════════"
-echo "  RUNNING TESTS EXACTLY AS CI DOES"
-echo "════════════════════════════════════════════════════════════"
-echo ""
-
-# Parse CI config and run commands
-case $CI_TYPE in
-  github-actions)
-    # For each workflow that has test jobs
-    for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
-      [ -f "$workflow" ] || continue
-
-      # Skip non-test workflows
-      if ! grep -qE 'test|lint|check|verify' "$workflow"; then
-        continue
-      fi
-
-      echo "📋 Running commands from: $workflow"
-      echo ""
-
-      # Extract and run each command
-      # Using yq for proper YAML parsing (install: pip install yq)
-      if command -v yq &> /dev/null; then
-        yq -r '.jobs[].steps[].run // empty' "$workflow" | while read -r cmd; do
-          [ -z "$cmd" ] && continue
-
-          # Skip setup commands
-          case "$cmd" in
-            *checkout*|*setup-node*|*setup-python*|*"npm ci"*|*"npm install"*|*"pip install"*)
-              echo "⏭️  Skipping setup: ${cmd:0:50}..."
-              continue
-              ;;
-          esac
-
-          echo "▶️  Running: $cmd"
-          eval "$cmd" || {
-            echo "❌ FAILED: $cmd"
-            exit 1
-          }
-          echo "✅ Passed"
-          echo ""
-        done
-      else
-        # Fallback: simple grep parsing
-        grep -E '^\s*-?\s*run:' "$workflow" | sed 's/.*run:\s*//' | tr -d '"' | while read -r cmd; do
-          [ -z "$cmd" ] && continue
-
-          # Skip setup commands
-          case "$cmd" in
-            *checkout*|*setup-node*|*"npm ci"*|*"npm install"*)
-              continue
-              ;;
-          esac
-
-          echo "▶️  Running: $cmd"
-          eval "$cmd" || {
-            echo "❌ FAILED: $cmd"
-            exit 1
-          }
-          echo "✅ Passed"
-        done
-      fi
-    done
-    ;;
-
-  gitlab)
-    echo "📋 Running commands from: .gitlab-ci.yml"
-    # Similar parsing for GitLab CI
-    yq -r '.[] | .script[]? // empty' .gitlab-ci.yml | while read -r cmd; do
-      # ... same execution logic
-      echo "▶️  Running: $cmd"
-      eval "$cmd" || exit 1
-    done
-    ;;
-esac
-
-echo ""
-echo "════════════════════════════════════════════════════════════"
-echo "  ✅ ALL CI CHECKS PASSED LOCALLY"
-echo "════════════════════════════════════════════════════════════"
-```
+All passed: `✅ ALL CI CHECKS PASSED LOCALLY`.
 
 ### Verification Check (Reviewer's Responsibility)
 
@@ -393,24 +119,6 @@ Before approving any code for push:
 2. Run the missing commands
 3. Re-verify all pass
 4. Only then allow push
-```
-
-### Quick Command: Check CI Parity
-
-```bash
-# Add to package.json or Makefile
-{
-  "scripts": {
-    "ci-local": "./scripts/run-as-ci.sh",
-    "prepush": "npm run ci-local"
-  }
-}
-
-# Or Makefile
-ci-local:
-	@./scripts/run-as-ci.sh
-
-prepush: ci-local
 ```
 
 ### Gate Topology: What CI Actually Requires
@@ -439,207 +147,33 @@ topology before mirroring it locally.
   locally.
 
 The rule stands: every check CI can block on must have been run locally first.
-The topology is how you learn which checks those are.
 
 ---
 
 ## Phase 1: Detect Stack & Available Checks
 
-First, detect what's available in the project:
-
-```bash
-# Detect package manager and available scripts
-if [ -f "package.json" ]; then
-  echo "Node project detected"
-  cat package.json | grep -E '"(test|lint|typecheck|format|check)"'
-fi
-
-if [ -f "pyproject.toml" ] || [ -f "setup.py" ]; then
-  echo "Python project detected"
-fi
-
-if [ -f "go.mod" ]; then
-  echo "Go project detected"
-fi
-
-if [ -f "Cargo.toml" ]; then
-  echo "Rust project detected"
-fi
-```
+First, detect what's available in the project: `package.json` → Node (list its `"(test|lint|typecheck|format|check)"` scripts); `pyproject.toml` or `setup.py` → Python; `go.mod` → Go; `Cargo.toml` → Rust.
 
 ### Phase 2: Run ALL Checks in Parallel
 
-**CRITICAL: Use parallel execution for speed.**
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    PARALLEL QUALITY GATE                     │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│   │  TESTS   │  │   LINT   │  │  TYPES   │  │ SECURITY │   │
-│   └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
-│        │             │             │             │          │
-│        ▼             ▼             ▼             ▼          │
-│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│   │  Unit    │  │  ESLint  │  │   tsc    │  │  Audit   │   │
-│   │  Integ   │  │  Ruff    │  │  mypy    │  │  Snyk    │   │
-│   │  E2E     │  │  golint  │  │  go vet  │  │  trivy   │   │
-│   └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
-│        │             │             │             │          │
-│        └─────────────┴──────┬──────┴─────────────┘          │
-│                             │                               │
-│                      ┌──────▼──────┐                        │
-│                      │  AGGREGATE  │                        │
-│                      │   RESULTS   │                        │
-│                      └──────┬──────┘                        │
-│                             │                               │
-│                      ┌──────▼──────┐                        │
-│                      │ PASS / FAIL │                        │
-│                      └─────────────┘                        │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
+**CRITICAL: Use parallel execution for speed.** Run tests, lint, types and security together, then aggregate the results into one PASS / FAIL.
 
 ## Language-Specific Parallel Commands
 
-### TypeScript/JavaScript
-
 Run these in parallel using `&` and `wait`:
 
-```bash
-#!/bin/bash
-set -e
+| Stack | Checks, all in parallel |
+|---|---|
+| TypeScript/JavaScript | `npm run test`, `npm run lint`, `npm run typecheck`, `npm audit --audit-level=high`, `npm run format:check` |
+| Python | `pytest -v --cov=src`, `ruff check .`, `mypy .`, `ruff format --check .`, `pip-audit`, `bandit -r src` |
+| Go | `go test -v -cover ./...`, `golangci-lint run`, `go vet ./...`, `staticcheck ./...`, `govulncheck ./...`, `gofmt -l .` |
+| Rust | `cargo test`, `cargo clippy -- -D warnings`, `cargo fmt --check`, `cargo audit` |
 
-echo "Starting parallel quality checks..."
-
-# Create temp files for results
-RESULTS_DIR=$(mktemp -d)
-
-# Run all checks in parallel
-(npm run test 2>&1 | tee "$RESULTS_DIR/tests.log"; echo $? > "$RESULTS_DIR/tests.exit") &
-(npm run lint 2>&1 | tee "$RESULTS_DIR/lint.log"; echo $? > "$RESULTS_DIR/lint.exit") &
-(npm run typecheck 2>&1 | tee "$RESULTS_DIR/types.log"; echo $? > "$RESULTS_DIR/types.exit") &
-(npm audit --audit-level=high 2>&1 | tee "$RESULTS_DIR/audit.log"; echo $? > "$RESULTS_DIR/audit.exit") &
-(npm run format:check 2>&1 | tee "$RESULTS_DIR/format.log"; echo $? > "$RESULTS_DIR/format.exit") &
-
-# Wait for all to complete
-wait
-
-# Check results
-FAILED=0
-for check in tests lint types audit format; do
-  if [ -f "$RESULTS_DIR/$check.exit" ]; then
-    EXIT_CODE=$(cat "$RESULTS_DIR/$check.exit")
-    if [ "$EXIT_CODE" != "0" ]; then
-      echo "❌ $check FAILED (exit code: $EXIT_CODE)"
-      FAILED=$((FAILED + 1))
-    else
-      echo "✅ $check PASSED"
-    fi
-  fi
-done
-
-# Cleanup
-rm -rf "$RESULTS_DIR"
-
-if [ $FAILED -gt 0 ]; then
-  echo "💥 $FAILED checks failed"
-  exit 1
-else
-  echo "✨ All checks passed"
-  exit 0
-fi
-```
-
-### Python
-
-```bash
-#!/bin/bash
-set -e
-
-RESULTS_DIR=$(mktemp -d)
-
-# Parallel checks
-(pytest -v --cov=src 2>&1 | tee "$RESULTS_DIR/tests.log"; echo $? > "$RESULTS_DIR/tests.exit") &
-(ruff check . 2>&1 | tee "$RESULTS_DIR/lint.log"; echo $? > "$RESULTS_DIR/lint.exit") &
-(mypy . 2>&1 | tee "$RESULTS_DIR/types.log"; echo $? > "$RESULTS_DIR/types.exit") &
-(ruff format --check . 2>&1 | tee "$RESULTS_DIR/format.log"; echo $? > "$RESULTS_DIR/format.exit") &
-(pip-audit 2>&1 | tee "$RESULTS_DIR/audit.log"; echo $? > "$RESULTS_DIR/audit.exit") &
-(bandit -r src 2>&1 | tee "$RESULTS_DIR/security.log"; echo $? > "$RESULTS_DIR/security.exit") &
-
-wait
-
-# Aggregate results (same as above)
-```
-
-### Go
-
-```bash
-#!/bin/bash
-set -e
-
-RESULTS_DIR=$(mktemp -d)
-
-# Parallel checks
-(go test -v -cover ./... 2>&1 | tee "$RESULTS_DIR/tests.log"; echo $? > "$RESULTS_DIR/tests.exit") &
-(golangci-lint run 2>&1 | tee "$RESULTS_DIR/lint.log"; echo $? > "$RESULTS_DIR/lint.exit") &
-(go vet ./... 2>&1 | tee "$RESULTS_DIR/vet.log"; echo $? > "$RESULTS_DIR/vet.exit") &
-(staticcheck ./... 2>&1 | tee "$RESULTS_DIR/static.log"; echo $? > "$RESULTS_DIR/static.exit") &
-(govulncheck ./... 2>&1 | tee "$RESULTS_DIR/vuln.log"; echo $? > "$RESULTS_DIR/vuln.exit") &
-(gofmt -l . 2>&1 | tee "$RESULTS_DIR/format.log"; echo $? > "$RESULTS_DIR/format.exit") &
-
-wait
-```
-
-### Rust
-
-```bash
-#!/bin/bash
-set -e
-
-RESULTS_DIR=$(mktemp -d)
-
-# Parallel checks
-(cargo test 2>&1 | tee "$RESULTS_DIR/tests.log"; echo $? > "$RESULTS_DIR/tests.exit") &
-(cargo clippy -- -D warnings 2>&1 | tee "$RESULTS_DIR/lint.log"; echo $? > "$RESULTS_DIR/lint.exit") &
-(cargo fmt --check 2>&1 | tee "$RESULTS_DIR/format.log"; echo $? > "$RESULTS_DIR/format.exit") &
-(cargo audit 2>&1 | tee "$RESULTS_DIR/audit.log"; echo $? > "$RESULTS_DIR/audit.exit") &
-
-wait
-```
+Each check keeps its output and exit code as in the monorepo block, and is aggregated the same way: a non-zero exit is `❌ FAILED (exit code: N)`; any failed → the gate fails.
 
 ## Using Task Tool for True Parallelism
 
-For maximum parallelism, spawn subagents:
-
-```
-SPAWN IN PARALLEL (single message with multiple Task calls):
-
-Task 1: {
-  "prompt": "Run unit tests: npm test OR pytest OR go test",
-  "subagent_type": "general-purpose",
-  "description": "unit tests"
-}
-
-Task 2: {
-  "prompt": "Run linting: npm run lint OR ruff check OR golangci-lint",
-  "subagent_type": "general-purpose",
-  "description": "linting"
-}
-
-Task 3: {
-  "prompt": "Run type checking: tsc --noEmit OR mypy OR go vet",
-  "subagent_type": "general-purpose",
-  "description": "type check"
-}
-
-Task 4: {
-  "prompt": "Run security audit: npm audit OR pip-audit OR cargo audit",
-  "subagent_type": "general-purpose",
-  "description": "security audit"
-}
-```
+For maximum parallelism, spawn subagents: SPAWN IN PARALLEL (single message with multiple Task calls), one per check — unit tests, linting, type check, security audit.
 
 **Prefer the bash `&` / `wait` blocks above for check execution** — a subagent
 runs in an isolated context and cannot tee into this run's shared `$RESULTS_DIR`,
@@ -669,82 +203,11 @@ falls back to the runners directly only when this agent is unavailable).
 
 ### Detection
 
-Check if Playwright is available:
-
-```bash
-# Check for Playwright config
-if [ -f "playwright.config.ts" ] || [ -f "playwright.config.js" ]; then
-  echo "Playwright detected"
-  PLAYWRIGHT_AVAILABLE=true
-fi
-
-# Check package.json for playwright
-if grep -q '"@playwright/test"' package.json 2>/dev/null; then
-  echo "Playwright in dependencies"
-  PLAYWRIGHT_AVAILABLE=true
-fi
-
-# Check for playwright test directory
-if [ -d "tests/e2e" ] || [ -d "e2e" ] || [ -d "tests/playwright" ]; then
-  echo "Playwright test directory found"
-fi
-```
+Check if Playwright is available: `playwright.config.ts` or `playwright.config.js` exists, or `package.json` lists `"@playwright/test"`; a Playwright test directory is `tests/e2e`, `e2e` or `tests/playwright`.
 
 ### Running Playwright Tests
 
-```bash
-# Standard Playwright execution
-npx --no -- playwright test
-
-# With specific browser (parallel by default)
-npx --no -- playwright test --project=chromium --project=firefox --project=webkit
-
-# CI mode (no UI, all browsers)
-npx --no -- playwright test --reporter=html --reporter=github
-
-# Only changed tests (faster CI)
-npx --no -- playwright test --only-changed
-
-# With sharding for parallel CI
-npx --no -- playwright test --shard=1/4  # Run on 4 CI nodes
-```
-
-### Playwright in Parallel Script
-
-Add to the parallel execution:
-
-```bash
-#!/bin/bash
-set -e
-
-RESULTS_DIR=$(mktemp -d)
-
-# Core checks (always run)
-(npm run test 2>&1 | tee "$RESULTS_DIR/tests.log"; echo $? > "$RESULTS_DIR/tests.exit") &
-(npm run lint 2>&1 | tee "$RESULTS_DIR/lint.log"; echo $? > "$RESULTS_DIR/lint.exit") &
-(npm run typecheck 2>&1 | tee "$RESULTS_DIR/types.log"; echo $? > "$RESULTS_DIR/types.exit") &
-(npm audit --audit-level=high 2>&1 | tee "$RESULTS_DIR/audit.log"; echo $? > "$RESULTS_DIR/audit.exit") &
-
-# Playwright E2E (if available)
-if [ -f "playwright.config.ts" ] || [ -f "playwright.config.js" ]; then
-  echo "Running Playwright tests..."
-  (npx --no -- playwright test --reporter=list 2>&1 | tee "$RESULTS_DIR/playwright.log"; echo $? > "$RESULTS_DIR/playwright.exit") &
-fi
-
-# Wait for all
-wait
-
-# Check Playwright results
-if [ -f "$RESULTS_DIR/playwright.exit" ]; then
-  PLAYWRIGHT_EXIT=$(cat "$RESULTS_DIR/playwright.exit")
-  if [ "$PLAYWRIGHT_EXIT" != "0" ]; then
-    echo "❌ Playwright E2E tests FAILED"
-    FAILED=$((FAILED + 1))
-  else
-    echo "✅ Playwright E2E tests PASSED"
-  fi
-fi
-```
+Run `npx --no -- playwright test`; browsers (parallel by default) with `--project=chromium --project=firefox --project=webkit`, CI mode `--reporter=html --reporter=github`, `--only-changed` for changed tests only, `--shard=1/4` to shard across CI nodes. When a config exists, run it in the parallel run beside the core checks (`--reporter=list`); a non-zero exit is `❌ Playwright E2E tests FAILED`.
 
 ### Playwright-Specific Reporting
 
@@ -768,31 +231,6 @@ fi
 
 #### Flaky Tests (retried)
 - None detected
-```
-
-### Playwright CI Configuration
-
-For GitHub Actions parallel execution:
-
-```yaml
-# .github/workflows/playwright.yml
-jobs:
-  playwright:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        shard: [1, 2, 3, 4]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-      - run: npm ci
-      - run: npx --no -- playwright install --with-deps
-      - run: npx --no -- playwright test --shard=${{ matrix.shard }}/4
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report-${{ matrix.shard }}
-          path: playwright-report/
 ```
 
 ## Output Format
@@ -902,19 +340,7 @@ QUALITY_GATE_RESULT:
 
 ## Pre-Commit Hook Integration
 
-Generate a pre-commit compatible script:
-
-```bash
-#!/bin/bash
-# .git/hooks/pre-commit or .husky/pre-commit
-
-# Run quality gate in parallel
-npm run quality-gate || {
-  echo "❌ Quality gate failed. Commit blocked."
-  echo "Run 'npm run quality-gate' to see details."
-  exit 1
-}
-```
+Generate a pre-commit compatible script (`.git/hooks/pre-commit` or `.husky/pre-commit`) that runs `npm run quality-gate` and, when it fails, prints "❌ Quality gate failed. Commit blocked." and exits 1.
 
 ## Code Coverage Enforcement (CI/CD Criteria)
 
@@ -928,88 +354,15 @@ npm run quality-gate || {
 
 ### Detection & Execution
 
-```bash
-# Detect coverage tool and run with enforcement
-detect_and_run_coverage() {
-  local MODE=${CTOC_MODE:-strict}
+Detect coverage tool and run with enforcement. The mode is `${CTOC_MODE:-strict}`; its line and branch thresholds come from the table above (functions take the line threshold).
 
-  # Set thresholds based on mode
-  case $MODE in
-    strictest) LINE_THRESH=90; BRANCH_THRESH=85 ;;
-    legacy)    LINE_THRESH=50; BRANCH_THRESH=40 ;;
-    *)         LINE_THRESH=80; BRANCH_THRESH=75 ;;  # strict default
-  esac
+- `"vitest"` in package.json: `npx --no -- vitest run --coverage --coverage.thresholds.lines=$LINE_THRESH --coverage.thresholds.branches=$BRANCH_THRESH --coverage.thresholds.functions=$LINE_THRESH`
+- otherwise `"jest"` in package.json: `npx --no -- jest --coverage --coverageThreshold='{"global":{"lines":'$LINE_THRESH',"branches":'$BRANCH_THRESH'}}'`
+- Python: `pytest --cov=src --cov-fail-under=$LINE_THRESH --cov-report=term-missing`
+- Go: `go test -coverprofile=coverage.out ./...`, then the total of `go tool cover -func=coverage.out`; below the line threshold is `❌ Coverage $COVERAGE% below threshold $LINE_THRESH%`
+- Rust: `cargo tarpaulin --fail-under $LINE_THRESH`
 
-  # TypeScript/JavaScript (Jest/Vitest)
-  if [ -f "package.json" ]; then
-    if grep -q '"vitest"' package.json; then
-      npx --no -- vitest run --coverage --coverage.thresholds.lines=$LINE_THRESH \
-        --coverage.thresholds.branches=$BRANCH_THRESH \
-        --coverage.thresholds.functions=$LINE_THRESH
-    elif grep -q '"jest"' package.json; then
-      npx --no -- jest --coverage --coverageThreshold='{"global":{"lines":'$LINE_THRESH',"branches":'$BRANCH_THRESH'}}'
-    fi
-  fi
-
-  # Python (pytest-cov)
-  if [ -f "pyproject.toml" ] || [ -f "setup.py" ]; then
-    pytest --cov=src --cov-fail-under=$LINE_THRESH --cov-report=term-missing
-  fi
-
-  # Go
-  if [ -f "go.mod" ]; then
-    go test -coverprofile=coverage.out ./...
-    COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
-    if (( $(echo "$COVERAGE < $LINE_THRESH" | bc -l) )); then
-      echo "❌ Coverage $COVERAGE% below threshold $LINE_THRESH%"
-      exit 1
-    fi
-  fi
-
-  # Rust (cargo-tarpaulin)
-  if [ -f "Cargo.toml" ]; then
-    cargo tarpaulin --fail-under $LINE_THRESH
-  fi
-}
-```
-
-### Coverage in Parallel Script
-
-```bash
-#!/bin/bash
-RESULTS_DIR=$(mktemp -d)
-MODE=${CTOC_MODE:-strict}
-
-# Set thresholds
-case $MODE in
-  strictest) LINE=90; BRANCH=85 ;;
-  legacy)    LINE=50; BRANCH=40 ;;
-  *)         LINE=80; BRANCH=75 ;;
-esac
-
-# Run coverage as part of tests (captures both)
-if [ -f "package.json" ]; then
-  (npm run test -- --coverage --coverageThreshold='{"global":{"lines":'$LINE',"branches":'$BRANCH'}}' 2>&1 \
-    | tee "$RESULTS_DIR/coverage.log"; echo $? > "$RESULTS_DIR/coverage.exit") &
-elif [ -f "pyproject.toml" ]; then
-  (pytest --cov=src --cov-fail-under=$LINE --cov-branch 2>&1 \
-    | tee "$RESULTS_DIR/coverage.log"; echo $? > "$RESULTS_DIR/coverage.exit") &
-elif [ -f "go.mod" ]; then
-  (go test -coverprofile=coverage.out ./... && \
-    go tool cover -func=coverage.out | grep total 2>&1 \
-    | tee "$RESULTS_DIR/coverage.log"; echo $? > "$RESULTS_DIR/coverage.exit") &
-fi
-
-wait
-
-# Check coverage passed
-if [ -f "$RESULTS_DIR/coverage.exit" ]; then
-  if [ "$(cat $RESULTS_DIR/coverage.exit)" != "0" ]; then
-    echo "❌ Coverage below threshold ($LINE% lines, $BRANCH% branches)"
-    exit 1
-  fi
-fi
-```
+In the parallel run, coverage runs as part of the tests (`npm run test -- --coverage`, `pytest --cov=src --cov-fail-under=$LINE --cov-branch`, the Go pair above); a non-zero exit is `❌ Coverage below threshold ($LINE% lines, $BRANCH% branches)`.
 
 ### Coverage Report Format
 
@@ -1042,71 +395,6 @@ fi
 ```
 Last 5 runs: 82% → 84% → 85% → 86% → 87% ↑
 ```
-```
-
-### CI/CD Integration Examples
-
-#### GitHub Actions (with coverage gate)
-
-```yaml
-- name: Run tests with coverage
-  run: npm run test -- --coverage
-
-- name: Check coverage thresholds
-  run: |
-    COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
-    if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-      echo "::error::Coverage $COVERAGE% is below 80% threshold"
-      exit 1
-    fi
-
-- name: Upload coverage to Codecov
-  uses: codecov/codecov-action@v4
-  with:
-    fail_ci_if_error: true
-
-- name: Coverage comment on PR
-  uses: MishaKav/jest-coverage-comment@main
-  with:
-    coverage-summary-path: coverage/coverage-summary.json
-```
-
-#### GitLab CI
-
-```yaml
-test:
-  script:
-    - npm run test -- --coverage
-  coverage: '/Lines\s*:\s*(\d+\.?\d*)%/'
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-  artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage/cobertura-coverage.xml
-```
-
-### Codecov/Coveralls Integration
-
-```yaml
-# codecov.yml
-coverage:
-  status:
-    project:
-      default:
-        target: 80%
-        threshold: 2%  # Allow 2% drop
-    patch:
-      default:
-        target: 85%  # New code must be 85%+
-
-  # Fail PR if coverage drops
-  range: "70...100"
-
-comment:
-  layout: "reach, diff, flags, files"
-  behavior: default
 ```
 
 ## Red Lines (Never Pass With)

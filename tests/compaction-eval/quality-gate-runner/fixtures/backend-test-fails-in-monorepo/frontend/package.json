@@ -1,0 +1,12 @@
+{
+  "name": "invoice-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-lines=80 --test-coverage-branches=75 --test-coverage-functions=80",
+    "lint": "eslint .",
+    "typecheck": "node scripts/check-types.js",
+    "format:check": "node scripts/format-check.js"
+  }
+}
