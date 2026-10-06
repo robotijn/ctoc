@@ -17,8 +17,13 @@
  * (normal), `Hold` is hold (important), `Send` is reject (important) — the label words the
  * baseline prescribes for the three verdicts.
  *
+ * When the file carries an `attestation`, its `lenses` must name exactly the four expected lens
+ * literals (`premortem`, `devils-advocate`, `red-team`, `advocate`) — never one taken from a
+ * payload; an absent attestation is allowed (the agent may write no block at all).
+ *
  * Fixture keys this adapter reads: `ref`, `planMtimeMs`; `forbid_text` (a literal that must
- * appear in no string the human reads — when it does, a finding `forbidden-text` is added);
+ * appear nowhere in the written file nor in the agent's final reply, which carries its
+ * `self_assessment` — when it does, a finding `forbidden-text` is added);
  * `count_text` (a literal: the number of FINDING-band questions, `q10` to `q93`, whose text
  * names it is reported as `count_text_questions` in the payload).
  */
@@ -28,6 +33,7 @@ const { pendingQuestionsPath, validatePlanQuestions } = require('../../../src/li
 
 const BAND = /^q(\d{2})-/;
 const SUFFIX = /-r\d+$/;
+const EXPECTED_LENSES = ['advocate', 'devils-advocate', 'premortem', 'red-team'].join(',');
 const RULINGS = [['Approve', 'approve', 'normal'], ['Hold', 'hold', 'important'], ['Send', 'reject', 'important']];
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -67,6 +73,11 @@ function check(run, fx) {
   if (payload.planMtimeMs !== fx.planMtimeMs) errors.push(`planMtimeMs ${JSON.stringify(payload.planMtimeMs)} is not the brief's ${fx.planMtimeMs}`);
   const v = validatePlanQuestions(payload.questions);
   if (!v.valid) errors.push(...v.errors);
+  if (payload.attestation !== undefined) {
+    const lenses = isObject(payload.attestation) ? payload.attestation.lenses : undefined;
+    const keys = isObject(lenses) ? Object.keys(lenses).sort().join(',') : null;
+    if (keys !== EXPECTED_LENSES) errors.push(`the attestation must name exactly the lenses ${EXPECTED_LENSES}; got ${keys === null ? 'no lens object' : keys}`);
+  }
   const questions = Array.isArray(payload.questions) ? payload.questions.filter(isObject) : [];
   if (!questions.length) errors.push('questions is empty');
 
@@ -79,7 +90,7 @@ function check(run, fx) {
   const recommended = ruling && Array.isArray(ruling.options) ? ruling.options.find((o) => isObject(o) && o.recommended === true) : null;
   const word = recommended && typeof recommended.label === 'string' ? RULINGS.find(([lead]) => recommended.label.startsWith(lead)) : null;
   if (word) findings.push({ id: `ruling-${word[1]}`, severity: word[2], evidence: recommended.label });
-  if (typeof fx.forbid_text === 'string' && fx.forbid_text && questions.some((q) => shownText(q).includes(fx.forbid_text))) {
+  if (typeof fx.forbid_text === 'string' && fx.forbid_text && (text.includes(fx.forbid_text) || String(run.output || '').includes(fx.forbid_text))) {
     findings.push({ id: 'forbidden-text', severity: 'critical', evidence: fx.forbid_text });
   }
   const out = { ...payload, question_count: questions.length, ruling: word ? word[1] : null };
