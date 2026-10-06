@@ -3,31 +3,80 @@
   "contract": "contract.js",
   "run_in": "scratch",
   "fixtures_dir": "tests/compaction-eval/quality-gate-runner/fixtures",
-  "extra_args": ["--disallowedTools", "Task"],
+  "extra_args": [
+    "--disallowedTools",
+    "Task"
+  ],
   "fixtures": [
     {
       "name": "continuous-integration-runs-a-failing-typecheck",
       "kind": "planted",
       "brief": "Step 14 VERIFY, dispatched by the CTO Chief: run the quality gate for the project at {project_root} — lint, type-check, all tests, coverage and security audits, in parallel. Report in your Output Format.",
       "planted": [
-        { "id": "ci-typecheck-failed", "evidence_all": ["formatTotal|report\\.js"] }
+        {
+          "id": "ci-typecheck-failed",
+          "line_all": [
+            "type"
+          ],
+          "evidence_all": [
+            "formatTotal|report\\.js"
+          ]
+        }
       ],
-      "require": [{ "id": "ci-typecheck-failed" }]
+      "require": [
+        {
+          "id": "ci-typecheck-failed"
+        },
+        {
+          "id": "status-fail"
+        }
+      ]
     },
     {
       "name": "backend-test-fails-in-monorepo",
       "kind": "planted",
       "brief": "Step 14 VERIFY, dispatched by the CTO Chief: run the quality gate for the project at {project_root} — lint, type-check, all tests, coverage and security audits, in parallel. Report in your Output Format.",
       "planted": [
-        { "id": "backend-test-failed", "evidence_all": ["backend", "test"] },
-        { "id": "uninstalled-lint-not-passed", "evidence_all": ["lint", "eslint|frontend"] }
+        {
+          "id": "backend-test-failed",
+          "line_all": [
+            "backend",
+            "test"
+          ]
+        },
+        {
+          "id": "uninstalled-lint-not-passed",
+          "line_all": [
+            "lint"
+          ],
+          "evidence_all": [
+            "eslint|frontend"
+          ]
+        }
       ],
-      "require": [{ "id": "backend-test-failed" }, { "id": "uninstalled-lint-not-passed" }]
+      "require": [
+        {
+          "id": "backend-test-failed"
+        },
+        {
+          "id": "uninstalled-lint-not-passed"
+        },
+        {
+          "id": "status-fail"
+        }
+      ]
     },
     {
       "name": "clean-single-package",
       "kind": "clean",
-      "brief": "Step 14 VERIFY, dispatched by the CTO Chief: run the quality gate for the project at {project_root} — lint, type-check, all tests, coverage and security audits, in parallel. Report in your Output Format."
+      "brief": "Step 14 VERIFY, dispatched by the CTO Chief: run the quality gate for the project at {project_root} — lint, type-check, all tests, coverage and security audits, in parallel. Report in your Output Format.",
+      "pass_rows": [
+        "\\btests?\\b",
+        "coverage",
+        "lint",
+        "type",
+        "format"
+      ]
     }
   ]
 }

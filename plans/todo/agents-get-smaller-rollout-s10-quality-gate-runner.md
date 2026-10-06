@@ -170,12 +170,22 @@ folder; runs happen in a scratch copy outside the repository.
    `typecheck` script in `package.json`), so Phase 1 detection alone cannot find it. Its matcher needs
    the error's own words (`formatTotal` or `report.js`), not the check's name: a run that never ran it
    cannot know them. This tightens the plan's "evidence contains typecheck or Type".
-8. **The monorepo block records each check's own exit code.** The original wrote
-   `cmd 2>&1 | tee log; echo $?`, which records tee's exit code (always 0). The compacted block
-   writes `cmd >log 2>&1; echo $?`. This is the one place where the compaction changed what a command
-   does. The review should confirm it or send it back.
+8. **Each check's own exit code is recorded (kept after review).** Seven original scripts recorded
+   `cmd 2>&1 | tee log; echo $?`, which is tee's exit code (always 0): the monorepo script, the
+   TypeScript, Python, Go and Rust scripts, the Playwright parallel script and the parallel coverage
+   script. The compacted monorepo block writes `cmd >log 2>&1; echo $?` (plain POSIX), and the language,
+   Playwright and coverage orders point at that pattern. The block also exits non-zero when any check
+   failed.
 9. **"install: pip install yq" was dropped.** It conflicts with the kept pinned rule "no package
    downloaded to run". The order now reads "where `yq` is installed".
+10. **Three Phase 0 behaviour changes (recorded at review).** (a) The original's grep fallback skipped
+   a shorter setup list (`checkout`, `setup-node`, `npm ci`, `npm install`); the compacted order
+   applies the `yq` path's longer list (adding `setup-python` and `pip install`) to both paths.
+   (b) The fallback's quote stripping (`tr -d '"'`) is dropped: commands run as written.
+   (c) The original detected GitHub Actions by the `.github/workflows` directory; the compacted order
+   names the workflow files in it (`*.yml` or `*.yaml`).
+11. **An unknown `CTOC_MODE` takes the strict default** (the original's `*)` case), now said
+   explicitly.
 
 ## Execution Plan
 
@@ -369,6 +379,43 @@ count in `CLAUDE.md` (two places) and `README.md` from 555 to 556.
 **Not done in this run:** Steps 11 (critic review of every cut, merged and tightened unit), 13 (security
 scanner) and 16. The `RESULTS.md` section was not written: the brief puts the numbers here, and the
 main session writes that section at merge.
+
+### Review fix pass (2026-10-06, second commit)
+
+The review found two orders that lost meaning inside tightened units. Both are restored, each
+test-first: the new anchors went into the inventory first, and checks 4 and 10 failed until the agent
+held them.
+- **Parallel coverage threshold (blocker).** The parallel coverage command is restored whole with its
+  `--coverageThreshold='{"global":{"lines":'$LINE_THRESH',"branches":'$BRANCH_THRESH'}}'`. Without it,
+  Jest exits 0 at any coverage. The undefined `$LINE`/`$BRANCH` are now `$LINE_THRESH`/`$BRANCH_THRESH`
+  throughout. The whole command is the Q-138 anchor. It is the inventory's one anchor that is not
+  verbatim from the original, because the review ordered the rename. Q-138 also keeps `--cov-branch`
+  and `Coverage below threshold ($LINE`.
+- **Per-check failure markers (blocker).** The Pre-Push Checklist again marks each check:
+  `|| echo "❌ FRONTEND LINT FAILED"` and its siblings for typecheck and tests, the backend three, the E2E
+  check and `npm audit || echo "❌ SECURITY AUDIT FAILED"`. Seven of these strings are anchored in Q-020b,
+  Q-020c and Q-020d.
+- **Monorepo block:** counts failures (`FAILED=$((FAILED + 1))`, anchored in Q-035d) and runs
+  `[ "$FAILED" -eq 0 ] || exit 1`.
+- **Coverage mode:** "any other value takes the strict default" (`strict default` anchored in Q-136a).
+- **maxBytes, corrected:** 19,254 → 19,865 (the restored text). It is still 48.7% of the original.
+  Order count unchanged at 112. Units unchanged: 64 kept, 23 tightened, 3 merged, 21 cut.
+- **Adapter tightened, with no loosening.** A failed check now needs an explicit verdict word (❌,
+  FAIL, NOT VERIFIED, UNVERIFIED, BLOCKED) in its heading line or its row's status cell. These never
+  count on their own: skipped, not run, n/a, warn, an exit code, ERROR, COULD NOT, or a "Blocking issue"
+  heading without a verdict word. A planted finding matches only when the heading line or the row names
+  the check (`line_all`). Both planted fixtures now also require `status-fail`. The clean fixture
+  requires a PASS row for each of its five scripts (`pass_rows`); a missing one makes the run invalid.
+  The test now has 23 cases, with one for each shape the review named, and each was seen failing first.
+- **Re-score of the six stored runs** with the tightened adapter: the backend fixture and the clean
+  fixture are unchanged, both versions valid. The type-check fixture changed for the original: its
+  failure sat under "## Blocking issue: type check" with no verdict word, and its row carried no error
+  text, so it is no longer credited. Only that fixture was rerun, once per version, against the
+  corrected agent:
+  both versions were valid and found the failure (original 106,996 tokens and 56.8 s; compacted
+  74,805 tokens and 51.3 s). Verdict after the rerun: **PASS**. The first-run medians above are
+  unchanged. After the fix: `npm test` passes 12,329 tests with 0 failed and 0 skipped, coverage 99.9%; the
+  linter reports zero warnings.
 
 ## Deferred Questions
 

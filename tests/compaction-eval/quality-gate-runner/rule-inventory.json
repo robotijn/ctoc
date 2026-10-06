@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/quality-gate-runner/baseline-agent.md",
  "baseline_sha256": "1e27c64d5464bfd920f3eea0205d980a2e33421eaee0601146bfa3fd109aa3f4",
  "baseline_commit": "a20b0b743834a3ca2a42892c579f3ae19459ffe8",
- "maxBytes": 19254,
+ "maxBytes": 19865,
  "units": [
   {
    "n": 1,
@@ -1592,7 +1592,10 @@
    "now_in": "## Pre-Push Checklist (MANDATORY)",
    "anchors": [
     "Option 2: Run each check manually",
-    "FRONTEND (must ALL pass)"
+    "FRONTEND (must ALL pass)",
+    "npm run lint || echo \"❌ FRONTEND LINT FAILED",
+    "npm run typecheck || echo \"❌ FRONTEND TYPES FAILED",
+    "npm run test || echo \"❌ FRONTEND TESTS FAILED"
    ],
    "pinned_by": null,
    "wire": false
@@ -1602,7 +1605,10 @@
    "says": "Backend ruff, mypy and pytest in backend/ must all pass.",
    "now_in": "## Pre-Push Checklist (MANDATORY)",
    "anchors": [
-    "BACKEND (must ALL pass)"
+    "BACKEND (must ALL pass)",
+    "ruff check . || echo \"❌ BACKEND LINT FAILED",
+    "mypy . || echo \"❌ BACKEND TYPES FAILED",
+    "pytest || echo \"❌ BACKEND TESTS FAILED"
    ],
    "pinned_by": null,
    "wire": false
@@ -1612,7 +1618,8 @@
    "says": "Run Playwright when its config exists.",
    "now_in": "## Pre-Push Checklist (MANDATORY)",
    "anchors": [
-    "E2E (if playwright exists)"
+    "E2E (if playwright exists)",
+    "npx --no -- playwright test || echo \"❌ E2E TESTS FAILED"
    ],
    "pinned_by": null,
    "wire": false
@@ -1728,7 +1735,8 @@
    "now_in": "## Parallel Execution Strategy",
    "anchors": [
     "FIX BEFORE PUSHING",
-    "All checks PASSED - Safe to push"
+    "All checks PASSED - Safe to push",
+    "FAILED=$((FAILED + 1))"
    ],
    "pinned_by": null,
    "wire": false
@@ -2399,7 +2407,8 @@
    "now_in": "## Code Coverage Enforcement (CI/CD Criteria)",
    "anchors": [
     "Detect coverage tool and run with enforcement",
-    "${CTOC_MODE:-strict}"
+    "${CTOC_MODE:-strict}",
+    "strict default"
    ],
    "pinned_by": null,
    "wire": false
@@ -2460,9 +2469,9 @@
    "says": "In the parallel run, coverage runs with the tests; a non-zero exit is below threshold.",
    "now_in": "## Code Coverage Enforcement (CI/CD Criteria)",
    "anchors": [
-    "npm run test -- --coverage",
+    "npm run test -- --coverage --coverageThreshold='{\"global\":{\"lines\":'$LINE_THRESH',\"branches\":'$BRANCH_THRESH'}}'",
     "--cov-branch",
-    "Coverage below threshold ($LINE% lines, $BRANCH% branches)"
+    "Coverage below threshold ($LINE"
    ],
    "pinned_by": null,
    "wire": false

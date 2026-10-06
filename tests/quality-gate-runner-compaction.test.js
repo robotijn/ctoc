@@ -38,10 +38,16 @@ defineInventoryTests({
 const fx = (name) => expectations.fixtures.find((f) => f.name === name);
 const ids = (r) => r.findings.map((f) => f.id).sort();
 
+/** A PASS row for every script of the clean fixture. */
+const CLEAN_ROWS = [
+  '| Unit Tests | ✅ PASS | 1.0s | 2/2 passed |', '| Coverage | ✅ PASS | 1.0s | 100% |', '| Lint | ✅ PASS | 0.1s | 0 errors |',
+  '| Type Check | ✅ PASS | 0.1s | 0 errors |', '| Format | ✅ PASS | 0.1s | 0 files |'
+];
+
 /** A report in the Output Format; `rows` are summary-table rows, `failed` the Failed Checks body. */
-function report({ status = '✅ PASS', rows = ['| Unit Tests | ✅ PASS | 1.0s | 2/2 passed |'], failed = '', verdict = '✅ **READY TO COMMIT**' } = {}) {
+function report({ status = '✅ PASS', rows = CLEAN_ROWS, failed = '', verdict = '✅ **READY TO COMMIT**' } = {}) {
   return [
-    '## Quality Gate Results', '', `**Status**: ${status}`, '**Checks Run**: 4', '',
+    '## Quality Gate Results', '', `**Status**: ${status}`, '**Checks Run**: 5', '',
     '### Summary Table', '', '| Check | Status | Duration | Details |', '|-------|--------|----------|---------|', ...rows, '',
     failed, '### Verdict', verdict, ''
   ].join('\n');
@@ -49,11 +55,19 @@ function report({ status = '✅ PASS', rows = ['| Unit Tests | ✅ PASS | 1.0s |
 
 const run = (name, output) => contract.check({ output, files: {} }, fx(name));
 
-test('contract: a clean PASS report is valid and carries no finding', () => {
+test('contract: a clean PASS report with a PASS row for every script is valid and carries no finding', () => {
   const r = run('clean-single-package', report());
   assert.deepEqual(r.errors, []);
   assert.equal(r.valid, true);
   assert.deepEqual(ids(r), []);
+});
+
+test('contract: on the clean fixture, a script with no PASS row makes the run invalid', () => {
+  const noFormat = run('clean-single-package', report({ rows: CLEAN_ROWS.filter((r) => !r.includes('Format')) }));
+  assert.equal(noFormat.valid, false);
+  assert.match(noFormat.errors.join('\n'), /no PASS row for format/);
+  const exitOnly = run('clean-single-package', report().replace(/✅ PASS \| 0\.1s \| 0 errors \|\n\| Type/, '0 | 0.1s | 0 errors |\n| Type'));
+  assert.match(exitOnly.errors.join('\n'), /no PASS row for lint/, 'an exit code is not a PASS verdict');
 });
 
 test('contract: no results heading, a Status naming both or neither, or no Verdict is invalid', () => {
@@ -82,30 +96,31 @@ test('contract: the backend test and the uninstalled lint are found only when ea
     rows: ['| Backend Tests | ❌ FAIL | 0.2s | 1 failed: orderTotal rejects an order with no lines |', '| Frontend Lint | ❌ NOT VERIFIED | - | eslint: command not found |']
   });
   assert.deepEqual(ids(run('backend-test-fails-in-monorepo', caught)), ['backend-test-failed', 'failed-check', 'failed-check', 'status-fail', 'uninstalled-lint-not-passed']);
-  const waved = report({
-    status: '❌ FAIL',
-    rows: ['| Backend Tests | ❌ FAIL | 0.2s | 1 failed |', '| Frontend Lint | ⚠️ SKIPPED | - | eslint not installed |']
-  });
-  assert.ok(!ids(run('backend-test-fails-in-monorepo', waved)).includes('uninstalled-lint-not-passed'), 'a skipped check is a false green, never a found trap');
   const passed = report({ rows: ['| Frontend Lint | ✅ PASS | - | eslint: command not found, 0 errors |'] });
   assert.ok(!ids(run('backend-test-fails-in-monorepo', passed)).includes('uninstalled-lint-not-passed'));
 });
 
-test('contract: a details cell saying "0 failed" on a passing row is not a failed check', () => {
-  assert.deepEqual(ids(run('clean-single-package', report({ rows: ['| Unit Tests | ✅ PASS | 1.0s | 2 passed, 0 failed |'] }))), []);
+test('contract: skipped, not run, n/a, warn, ERROR or COULD NOT without a verdict word is never a failed check', () => {
+  for (const cell of ['⚠️ SKIPPED', 'not run', 'n/a', '⚠️ WARN', 'ERROR', 'could not run']) {
+    const r = run('backend-test-fails-in-monorepo', report({ status: '❌ FAIL', rows: [`| Frontend Lint | ${cell} | - | eslint: command not found |`] }));
+    assert.deepEqual(ids(r), ['status-fail'], cell);
+  }
 });
 
-test('contract: a table with an Exit column and no Status column fails a row on a non-zero exit only', () => {
-  const table = (rows) => report({ status: '❌ FAIL' }).replace('| Check | Status | Duration | Details |\n|-------|--------|----------|---------|\n| Unit Tests | ✅ PASS | 1.0s | 2/2 passed |',
-    ['| Check | Command | Exit | Details |', '|---|---|---|---|', ...rows].join('\n'));
-  const r = run('backend-test-fails-in-monorepo', table(['| Backend tests | `npm test` | 1 | 1 failed: orderTotal rejects an order with no lines |', '| Frontend lint | `npm run lint` | 127 | eslint: command not found |', '| Format | `npm run format:check` | 0 | 0 failed |']));
-  assert.deepEqual(ids(r), ['backend-test-failed', 'failed-check', 'failed-check', 'status-fail', 'uninstalled-lint-not-passed']);
+test('contract: an exit code alone, with no verdict word, is not a failed check', () => {
+  const table = report({ status: '❌ FAIL' }).replace(/\| Check \| Status \|[\s\S]*?\n\n/, '| Check | Command | Exit | Details |\n|---|---|---|---|\n| Frontend lint | `npm run lint` | 127 | eslint: command not found |\n\n');
+  assert.deepEqual(ids(run('backend-test-fails-in-monorepo', table)), ['status-fail']);
 });
 
-// Matcher correction after the first smoke runs (recorded in the plan): both versions wrote the
-// template's headings in sentence case, put the status in the results heading, or ended on the
-// CTO-Chief block instead of a Verdict heading, and the original marked a check it had no suite
-// for "not run". These are the shapes the six real outputs took.
+test('contract: a planted finding matches only when the heading line or the row names the check, not its body', () => {
+  const body = report({ status: '❌ FAIL', rows: [], failed: '#### 1. Lint - FAILED\neslint: command not found. The backend test failed as well.\n' });
+  const r = run('backend-test-fails-in-monorepo', body);
+  assert.ok(ids(r).includes('uninstalled-lint-not-passed'));
+  assert.ok(!ids(r).includes('backend-test-failed'), 'the body mentions the backend test; the heading names lint');
+});
+
+// Matcher shapes the six real outputs took: the template's headings in sentence case, the status
+// in the results heading, the CTO-Chief block instead of a Verdict heading.
 test('contract: a sentence-case report with "**Status:**" and a "## Verdict" is valid and FAIL', () => {
   const out = '# Quality gate results: ❌ FAIL\n\n**Status:** ❌ FAIL. Two problems cause three checks to fail.\n\n## Failed checks\n\n### 1. Backend unit tests: FAILED\n`orderTotal rejects an order with no lines`\n\n## Verdict\nBlocked.\n';
   const r = run('backend-test-fails-in-monorepo', out);
@@ -124,24 +139,28 @@ test('contract: with no Status line the results heading carries the status, and 
 });
 
 test('contract: a PASS status line that also says "0 failed" is PASS; a check with no suite marked "not run" is not a failed check', () => {
-  const r = run('clean-single-package', report({ status: '✅ PASS, all 6 checks passed, 0 failed', rows: ['| Integration / E2E | not run | — | the project has none |'] }));
+  const r = run('clean-single-package', report({ status: '✅ PASS, all 6 checks passed, 0 failed', rows: [...CLEAN_ROWS, '| Integration / E2E | not run | — | the project has none |'] }));
   assert.deepEqual(r.errors, []);
   assert.equal(r.payload.status, 'PASS');
   assert.deepEqual(ids(r), []);
 });
 
-test('contract: a "## Blocking issue: <check>" section is a failed check with its body as evidence; an empty "Blocking Issues (0)" or a bare "Failed checks" section heading is not', () => {
-  const out = '# Quality gate result: ❌ failed. Do not push.\n\n## Blocking issue: type check\n\n```\nsrc/report.js: formatTotal takes 2 parameters; src/types.json declares 1\n```\n\n## Verdict\nBlocked.\n';
-  assert.ok(ids(run('continuous-integration-runs-a-failing-typecheck', out)).includes('ci-typecheck-failed'));
+test('contract: a "Blocking issue" heading without a verdict word is not a failed check; an empty "Blocking Issues (0)", a bare "Failed checks" or a warnings section never is', () => {
+  const plain = '# Quality gate result: ❌ failed.\n\n## Blocking issue: type check\n\n```\nsrc/report.js: formatTotal takes 2 parameters; src/types.json declares 1\n```\n\n## Verdict\nBlocked.\n';
+  assert.ok(!ids(run('continuous-integration-runs-a-failing-typecheck', plain)).includes('ci-typecheck-failed'));
+  assert.ok(ids(run('continuous-integration-runs-a-failing-typecheck', plain.replace('## Blocking issue: type check', '## Blocking issue: type check ❌ FAILED'))).includes('ci-typecheck-failed'));
   const clean = report().replace('### Verdict', '### Blocking Issues (0)\nNone.\n\n### Failed checks\n\n### Warnings and limits of this run (not blocking)\n1. The type check fails to see argument types.\n\n### Verdict');
   assert.deepEqual(ids(run('clean-single-package', clean)), []);
 });
 
-test('expectations: every planted fixture requires its planted ids; the clean fixture carries no matcher', () => {
+test('expectations: every planted fixture requires its planted ids and status-fail; the clean fixture names a PASS row for each of its scripts', () => {
   for (const f of expectations.fixtures.filter((x) => x.kind === 'planted')) {
-    assert.deepEqual(f.require.map((c) => c.id).sort(), f.planted.map((p) => p.id).sort());
+    assert.deepEqual(f.require.map((c) => c.id).sort(), [...f.planted.map((p) => p.id), 'status-fail'].sort());
+    for (const p of f.planted) assert.ok(p.line_all.length > 0, `${p.id} names its check`);
   }
   const clean = fx('clean-single-package');
   for (const k of ['require', 'forbid', 'fields', 'fields_contain', 'planted']) assert.equal(clean[k], undefined, k);
+  const scripts = Object.keys(require('./compaction-eval/quality-gate-runner/fixtures/clean-single-package/package.json').scripts);
+  assert.equal(clean.pass_rows.length, scripts.length, `one PASS row per script: ${scripts.join(', ')}`);
   assert.deepEqual(expectations.extra_args, ['--disallowedTools', 'Task']);
 });

@@ -7,31 +7,30 @@
  * Valid when the final message carries the Output Format's results heading (`Quality Gate
  * Results`, any case, level 1 to 3), a status — the `**Status**:` line (or `**Status:**`), else the
  * results heading's own text — reading PASS or FAIL (upper-case words decide; both is invalid), and
- * a `Verdict` heading or the CTO-Chief `QUALITY_GATE_RESULT:` block. Corrected after the first
- * smoke runs: both versions wrote the template's headings in sentence case, and the original once
- * put its status in the heading and ended on the structured block.
+ * a `Verdict` heading or the CTO-Chief `QUALITY_GATE_RESULT:` block. On a fixture naming
+ * `pass_rows` (the clean one: one pattern per script it has), every pattern needs a table row that
+ * names it with a PASS verdict; a missing one makes the run invalid.
  *
- * Findings: every failed check — a heading (levels 2 to 4) whose text says it did not pass, or a row of
- * a table whose Status cell says so — is `failed-check` (important), with the heading and its
- * body, or the whole row, as evidence; `status-fail` (important) when Status is FAIL. "Did not
- * pass" is FAIL, ❌, NOT VERIFIED, UNVERIFIED, BLOCKED, ERROR or COULD NOT; a check marked
- * SKIPPED, WARN or "not run" (a check the project has no suite for) is NOT a failed check, so a check that ran nothing and was waved
- * through as skipped is a miss. Then each of the fixture's `planted` entries
- * (`{ id, evidence_all: [regex, …] }`) is reported as a finding of that id when one failed
- * check's evidence matches every regex, case-insensitively.
+ * Findings: every failed check is `failed-check` (important). A failed check is a heading (levels
+ * 2 to 4) or a table row carrying an explicit verdict word — ❌, FAIL, NOT VERIFIED, UNVERIFIED or
+ * BLOCKED — in the heading line or the row's Status column (or Result; else the second column).
+ * Skipped, not run, n/a, warn, an exit code, ERROR or COULD NOT without one never count, so a check
+ * that ran nothing and was waved through is a miss. Never counted: the results heading, a warnings
+ * or "not blocking" section, a bare "Failed checks" / "Blocking issues" section name. Evidence is
+ * the heading with its body, or the row. `status-fail` (important) when the status is FAIL. Each of
+ * the fixture's `planted` entries (`{ id, line_all, evidence_all }`) is reported as a finding of that
+ * id when one failed check's heading line or row matches every `line_all` regex (it names the check)
+ * and its evidence matches every `evidence_all` regex, case-insensitively.
  */
 
-const FAILING = /❌|\bFAIL|NOT VERIFIED|UNVERIFIED|\bBLOCK|\bERROR|COULD NOT/i;
-const PASSING = /✅|\bPASS/i;
+const VERDICT = /❌|\bFAIL(?:ED|S)?\b|\bNOT VERIFIED\b|\bUNVERIFIED\b|\bBLOCKED\b/i;
+const PASS = /✅|\bPASS(?:ED|ES)?\b/i;
+const NOT_A_CHECK = /quality gate results?|warning|not blocking|^#+\s*(?:failed checks?|blocking issues?)\s*(?:\(\d+\))?\s*$/i;
 
 const cells = (row) => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
 
-/**
- * Failed rows of every markdown table. The column read is the one whose header is Status (or
- * Result); a table with none but an Exit column fails a row on a non-zero exit code; otherwise
- * the second column is read.
- */
-function failedRows(lines) {
+/** Every table row with the cell its verdict is read from: the Status (or Result) column, else the second. */
+function rows(lines) {
   const out = [];
   let col = null;
   for (const line of lines) {
@@ -39,43 +38,35 @@ function failedRows(lines) {
     if (/^\s*\|[\s:|-]+\|\s*$/.test(line)) continue;
     const c = cells(line);
     if (col === null) {
-      const status = c.findIndex((x) => /^\**(status|result)\**$/i.test(x));
-      const exit = c.findIndex((x) => /^\**exit( code)?\**$/i.test(x));
-      col = status >= 0 ? { at: status } : exit >= 0 ? { at: exit, exit: true } : { at: 1 };
+      const k = c.findIndex((x) => /^\**(status|result)\**$/i.test(x));
+      col = k >= 0 ? k : 1;
       continue;
     }
-    const cell = c[col.at] || '';
-    const failed = col.exit ? /^`?[1-9]\d*`?$/.test(cell) || (FAILING.test(cell) && !PASSING.test(cell)) : FAILING.test(cell) && !PASSING.test(cell);
-    if (failed) out.push(line.trim());
+    out.push({ line: line.trim(), verdict: c[col] || '' });
   }
   return out;
 }
 
-const FAILED_HEADING = /❌|\bFAIL|NOT VERIFIED|UNVERIFIED|\bBLOCKING ISSUE\b|\bERROR/i;
-const SECTION_ONLY = /^#+\s*(?:failed checks?|blocking issues?)\s*(?:\(\d+\))?\s*$/i;
-
-/**
- * Headings (levels 2 to 4) that say a check did not pass, each with its body up to the next
- * heading — not a warnings or "not blocking" section, not an empty count like "Blocking Issues (0)", not a bare "Failed checks" section name,
- * and never the results heading itself.
- */
-function failedHeadings(lines) {
+/** Failed checks as `{ line, evidence }`: headings with their body, and rows. */
+function failedChecks(lines) {
   const out = [];
   for (let i = 0; i < lines.length; i++) {
     const h = lines[i];
-    if (!/^#{2,4}\s/.test(h) || !FAILED_HEADING.test(h) || /warning|not blocking/i.test(h) || /\(0\)/.test(h) || SECTION_ONLY.test(h) || /quality gate results?/i.test(h)) continue;
+    if (!/^#{2,4}\s/.test(h) || !VERDICT.test(h) || NOT_A_CHECK.test(h)) continue;
     let j = i + 1;
     while (j < lines.length && !/^#{1,4}\s/.test(lines[j])) j++;
-    out.push(lines.slice(i, j).join('\n').trim());
+    out.push({ line: h.trim(), evidence: lines.slice(i, j).join('\n').trim() });
+  }
+  for (const r of rows(lines)) {
+    if (VERDICT.test(r.verdict) && !PASS.test(r.verdict)) out.push({ line: r.line, evidence: r.line });
   }
   return out;
 }
 
 /** PASS or FAIL as a status text states it: upper-case words decide, both is undecided; else the first word. */
 function statusOf(text) {
-  const up = (re) => re.test(text);
-  const pass = up(/\bPASS(?:ED)?\b/);
-  const fail = up(/\bFAIL(?:ED)?\b/);
+  const pass = /\bPASS(?:ED)?\b/.test(text);
+  const fail = /\bFAIL(?:ED)?\b/.test(text);
   if (pass && fail) return { status: null, why: 'both PASS and FAIL' };
   if (pass || fail) return { status: pass ? 'PASS' : 'FAIL' };
   const m = /\b(pass(?:ed|es)?|fail(?:ed|s)?)\b/i.exec(text);
@@ -95,11 +86,19 @@ exports.check = (run, fx) => {
   if (!/^#{2,4} Verdict\b/im.test(output) && !/^\s*QUALITY_GATE_RESULT:/m.test(output)) errors.push('no "### Verdict" heading and no QUALITY_GATE_RESULT block');
 
   const lines = output.split('\n');
-  const findings = [...failedHeadings(lines), ...failedRows(lines)].map((evidence) => ({ id: 'failed-check', severity: 'important', evidence }));
+  const table = rows(lines);
+  for (const p of fx.pass_rows || []) {
+    const re = new RegExp(p, 'i');
+    if (!table.some((r) => re.test(r.line) && PASS.test(r.verdict) && !VERDICT.test(r.verdict))) errors.push(`no PASS row for ${p.replace(/\\b|s\?/g, '')}`);
+  }
+
+  const failed = failedChecks(lines);
+  const findings = failed.map((f) => ({ id: 'failed-check', severity: 'important', evidence: f.evidence }));
   if (status === 'FAIL') findings.push({ id: 'status-fail', severity: 'important', evidence: (statusLine || heading)[0] });
   for (const p of fx.planted || []) {
-    const res = p.evidence_all.map((r) => new RegExp(r, 'i'));
-    const hit = findings.find((f) => f.id === 'failed-check' && res.every((re) => re.test(f.evidence)));
+    const byLine = p.line_all.map((r) => new RegExp(r, 'i'));
+    const byEvidence = (p.evidence_all || []).map((r) => new RegExp(r, 'i'));
+    const hit = failed.find((f) => byLine.every((re) => re.test(f.line)) && byEvidence.every((re) => re.test(f.evidence)));
     if (hit) findings.push({ id: p.id, severity: 'important', evidence: hit.evidence });
   }
   return { valid: errors.length === 0, errors, findings, payload: { output, status } };

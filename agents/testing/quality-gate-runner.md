@@ -37,12 +37,15 @@ npm run quality-gate  # or: make check, or: ./scripts/verify.sh
 
 # Option 2: Run each check manually
 # FRONTEND (must ALL pass)
-npm run lint; npm run typecheck; npm run test
+npm run lint      || echo "❌ FRONTEND LINT FAILED"
+npm run typecheck || echo "❌ FRONTEND TYPES FAILED"
+npm run test      || echo "❌ FRONTEND TESTS FAILED"
 # BACKEND (must ALL pass)
-(cd backend && { ruff check .; mypy .; pytest; })
+(cd backend && { ruff check . || echo "❌ BACKEND LINT FAILED"; mypy . || echo "❌ BACKEND TYPES FAILED"; pytest || echo "❌ BACKEND TESTS FAILED"; })
 # E2E (if playwright exists)
-[ -f "playwright.config.ts" ] && npx --no -- playwright test
+if [ -f "playwright.config.ts" ]; then npx --no -- playwright test || echo "❌ E2E TESTS FAILED"; fi
 # SECURITY AUDIT: npm audit / pip-audit
+npm audit || echo "❌ SECURITY AUDIT FAILED"   # Python: pip-audit
 
 # ANY ❌ above = DO NOT PUSH
 # ALL ✅ = Safe to push
@@ -70,12 +73,14 @@ RESULTS_DIR=$(mktemp -d)
 (cd backend && mypy . >"$RESULTS_DIR/be-types.log" 2>&1; echo $? >"$RESULTS_DIR/be-types.exit") &
 (cd backend && pytest >"$RESULTS_DIR/be-test.log" 2>&1; echo $? >"$RESULTS_DIR/be-test.exit") &
 wait
+FAILED=0
 for f in "$RESULTS_DIR"/*.exit; do c=$(basename "$f" .exit)
-  if [ "$(cat "$f")" = 0 ]; then echo "✅ $c PASSED"; else echo "❌ $c FAILED"; tail -20 "$RESULTS_DIR/$c.log"; fi
+  if [ "$(cat "$f")" = 0 ]; then echo "✅ $c PASSED"; else echo "❌ $c FAILED"; tail -20 "$RESULTS_DIR/$c.log"; FAILED=$((FAILED + 1)); fi
 done
+[ "$FAILED" -eq 0 ] || exit 1
 ```
 
-Any ❌ is a failed check (count them): FIX BEFORE PUSHING. None → All checks PASSED - Safe to push.
+Any ❌ is a failed check and the block exits non-zero: FIX BEFORE PUSHING. None → All checks PASSED - Safe to push.
 
 ## Phase 0: Detect CI Configuration & Extract Exact Commands
 
@@ -354,7 +359,7 @@ Generate a pre-commit compatible script (`.git/hooks/pre-commit` or `.husky/pre-
 
 ### Detection & Execution
 
-Detect coverage tool and run with enforcement. The mode is `${CTOC_MODE:-strict}`; its line and branch thresholds come from the table above (functions take the line threshold).
+Detect coverage tool and run with enforcement. The mode is `${CTOC_MODE:-strict}`: `strictest` and `legacy` take their rows of the table above, any other value takes the strict default; functions take the line threshold.
 
 - `"vitest"` in package.json: `npx --no -- vitest run --coverage --coverage.thresholds.lines=$LINE_THRESH --coverage.thresholds.branches=$BRANCH_THRESH --coverage.thresholds.functions=$LINE_THRESH`
 - otherwise `"jest"` in package.json: `npx --no -- jest --coverage --coverageThreshold='{"global":{"lines":'$LINE_THRESH',"branches":'$BRANCH_THRESH'}}'`
@@ -362,7 +367,7 @@ Detect coverage tool and run with enforcement. The mode is `${CTOC_MODE:-strict}
 - Go: `go test -coverprofile=coverage.out ./...`, then the total of `go tool cover -func=coverage.out`; below the line threshold is `❌ Coverage $COVERAGE% below threshold $LINE_THRESH%`
 - Rust: `cargo tarpaulin --fail-under $LINE_THRESH`
 
-In the parallel run, coverage runs as part of the tests (`npm run test -- --coverage`, `pytest --cov=src --cov-fail-under=$LINE --cov-branch`, the Go pair above); a non-zero exit is `❌ Coverage below threshold ($LINE% lines, $BRANCH% branches)`.
+In the parallel run, coverage runs as part of the tests: with `package.json`, `npm run test -- --coverage --coverageThreshold='{"global":{"lines":'$LINE_THRESH',"branches":'$BRANCH_THRESH'}}'`; else with `pyproject.toml`, `pytest --cov=src --cov-fail-under=$LINE_THRESH --cov-branch`; else the Go pair above. A non-zero exit is `❌ Coverage below threshold ($LINE_THRESH% lines, $BRANCH_THRESH% branches)`.
 
 ### Coverage Report Format
 

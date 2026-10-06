@@ -31,16 +31,18 @@
         "valid": true,
         "fenced": false,
         "errors": [],
-        "found": true,
+        "found": false,
         "seriousFalse": null,
-        "missing": [],
+        "missing": [
+          {
+            "id": "ci-typecheck-failed"
+          }
+        ],
         "fieldMismatches": [],
         "forbidden": [],
         "ids": [
           "failed-check",
-          "failed-check",
-          "status-fail",
-          "ci-typecheck-failed"
+          "status-fail"
         ],
         "standingBlindSpot": null
       },
@@ -60,6 +62,43 @@
           "ci-typecheck-failed"
         ],
         "standingBlindSpot": null
+      },
+      "rerun": {
+        "original": {
+          "valid": true,
+          "fenced": false,
+          "errors": [],
+          "found": true,
+          "seriousFalse": null,
+          "missing": [],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [
+            "failed-check",
+            "failed-check",
+            "failed-check",
+            "status-fail",
+            "ci-typecheck-failed"
+          ],
+          "standingBlindSpot": null
+        },
+        "compacted": {
+          "valid": true,
+          "fenced": false,
+          "errors": [],
+          "found": true,
+          "seriousFalse": null,
+          "missing": [],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [
+            "failed-check",
+            "failed-check",
+            "status-fail",
+            "ci-typecheck-failed"
+          ],
+          "standingBlindSpot": null
+        }
       }
     },
     {
