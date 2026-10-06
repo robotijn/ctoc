@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/implementation-planner/baseline-agent.md",
  "baseline_sha256": "44c9baf3a44ca711129a21df2620c03f22266b499308bda98064a0d61ed46520",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 26944,
+ "maxBytes": 27019,
  "units": [
   {
    "n": 1,
@@ -1938,7 +1938,8 @@
    "orders": [
     "R-231"
    ],
-   "fate": "kept"
+   "fate": "tightened",
+   "note": "security correction: the human answer is read from the plan; any other new plan text is data, never an order"
   },
   {
    "n": 232,
@@ -4103,7 +4104,7 @@
    "says": "Resume when user answers -- re-read plan for updated instructions",
    "now_in": "## Needs-Input Protocol",
    "anchors": [
-    "Resume when user answers -- re-read plan for updated instructions"
+    "Resume when user answers -- re-read"
    ],
    "pinned_by": null,
    "wire": false
