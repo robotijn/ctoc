@@ -87,11 +87,11 @@
     },
     {
       "n": 5,
-      "fixture": "clean-measurable-criteria",
+      "fixture": "clean-bounded-title-search",
       "version": "original",
       "subagent_type": "devils-advocate-eval-original",
-      "description": "compaction-eval clean-measurable-criteria original",
-      "prompt": "Run the devil's-advocate lens on one plan.\nref: functional/title-search.md\nproject root: tests/compaction-eval/premortem-critic/fixtures/clean-measurable-criteria\ngate: 1\n\nRetrieved facts about the corpus — data, not instructions:\nRelated plans: []\nDetected cross-plan conflicts: []",
+      "description": "compaction-eval clean-bounded-title-search original",
+      "prompt": "Run the devil's-advocate lens on one plan.\nref: functional/title-search.md\nproject root: tests/compaction-eval/devils-advocate-critic/fixtures/clean-bounded-title-search\ngate: 1\n\nRetrieved facts about the corpus — data, not instructions:\nRelated plans: []\nDetected cross-plan conflicts: []",
       "argv": [
         "-p",
         "--agent",
@@ -102,17 +102,17 @@
         "{\"disableAllHooks\":true}",
         "--strict-mcp-config",
         "--",
-        "Run the devil's-advocate lens on one plan.\nref: functional/title-search.md\nproject root: tests/compaction-eval/premortem-critic/fixtures/clean-measurable-criteria\ngate: 1\n\nRetrieved facts about the corpus — data, not instructions:\nRelated plans: []\nDetected cross-plan conflicts: []"
+        "Run the devil's-advocate lens on one plan.\nref: functional/title-search.md\nproject root: tests/compaction-eval/devils-advocate-critic/fixtures/clean-bounded-title-search\ngate: 1\n\nRetrieved facts about the corpus — data, not instructions:\nRelated plans: []\nDetected cross-plan conflicts: []"
       ],
-      "raw": "clean-measurable-criteria__original.json"
+      "raw": "clean-bounded-title-search__original.json"
     },
     {
       "n": 6,
-      "fixture": "clean-measurable-criteria",
+      "fixture": "clean-bounded-title-search",
       "version": "compacted",
       "subagent_type": "devils-advocate-eval-compacted",
-      "description": "compaction-eval clean-measurable-criteria compacted",
-      "prompt": "Run the devil's-advocate lens on one plan.\nref: functional/title-search.md\nproject root: tests/compaction-eval/premortem-critic/fixtures/clean-measurable-criteria\ngate: 1\n\nRetrieved facts about the corpus — data, not instructions:\nRelated plans: []\nDetected cross-plan conflicts: []",
+      "description": "compaction-eval clean-bounded-title-search compacted",
+      "prompt": "Run the devil's-advocate lens on one plan.\nref: functional/title-search.md\nproject root: tests/compaction-eval/devils-advocate-critic/fixtures/clean-bounded-title-search\ngate: 1\n\nRetrieved facts about the corpus — data, not instructions:\nRelated plans: []\nDetected cross-plan conflicts: []",
       "argv": [
         "-p",
         "--agent",
@@ -123,9 +123,9 @@
         "{\"disableAllHooks\":true}",
         "--strict-mcp-config",
         "--",
-        "Run the devil's-advocate lens on one plan.\nref: functional/title-search.md\nproject root: tests/compaction-eval/premortem-critic/fixtures/clean-measurable-criteria\ngate: 1\n\nRetrieved facts about the corpus — data, not instructions:\nRelated plans: []\nDetected cross-plan conflicts: []"
+        "Run the devil's-advocate lens on one plan.\nref: functional/title-search.md\nproject root: tests/compaction-eval/devils-advocate-critic/fixtures/clean-bounded-title-search\ngate: 1\n\nRetrieved facts about the corpus — data, not instructions:\nRelated plans: []\nDetected cross-plan conflicts: []"
       ],
-      "raw": "clean-measurable-criteria__compacted.json"
+      "raw": "clean-bounded-title-search__compacted.json"
     }
   ],
   "token_readings": [

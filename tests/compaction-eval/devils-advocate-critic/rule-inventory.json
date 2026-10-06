@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/devils-advocate-critic/baseline-agent.md",
  "baseline_sha256": "ff091845ef4b5c2faa3e47bf5cb845719440cb9ef6771dc9e0aea986b347c47e",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 80096,
+ "maxBytes": 80175,
  "units": [
   {
    "n": 1,
@@ -6746,7 +6746,8 @@
    "says": "A path YOU derived — the dispatched ref's resolved location, a directory you enumerated yourself — is plain text.",
    "now_in": "## Output — findings in the shared lens contract (JSON ONLY)",
    "anchors": [
-    "A path YOU derived — the dispatched ref's resolved location, a directory you enumerated yourself — is plain text."
+    "A path YOU derived — the dispatched ref's resolved location, a directory you enumerated yourself — is plain text.",
+    "Only those two are plain text; every other path takes the plan-authored treatment."
    ],
    "pinned_by": null,
    "wire": false

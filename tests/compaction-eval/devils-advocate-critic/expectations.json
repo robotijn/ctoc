@@ -28,9 +28,8 @@
       "forbid": []
     },
     {
-      "name": "clean-measurable-criteria",
+      "name": "clean-bounded-title-search",
       "kind": "clean",
-      "dir": "tests/compaction-eval/premortem-critic/fixtures",
       "ref": "functional/title-search.md",
       "gate": "1",
       "related_plans": [],

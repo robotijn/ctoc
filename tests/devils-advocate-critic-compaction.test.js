@@ -77,7 +77,7 @@ describe('devils-advocate-critic contract adapter', () => {
   });
 
   test('the clean fixture counts an important finding as a serious false finding, a normal one not', () => {
-    const fx = fixture('clean-measurable-criteria');
+    const fx = fixture('clean-bounded-title-search');
     assert.equal(scoreOutput(run(payload(fx.ref, [finding('naming-x', 'normal')])), fx, expectations, contract.check).seriousFalse, false);
     assert.equal(scoreOutput(run(payload(fx.ref, [finding('weak-x', 'important')])), fx, expectations, contract.check).seriousFalse, true);
   });
@@ -113,7 +113,7 @@ describe('devils-advocate-critic contract adapter', () => {
   });
 
   test('prose around the object is invalid', () => {
-    const fx = fixture('clean-measurable-criteria');
+    const fx = fixture('clean-bounded-title-search');
     const s = scoreOutput(`Here it is: ${run(payload(fx.ref, []))}`, fx, expectations, contract.check);
     assert.equal(s.valid, false);
   });

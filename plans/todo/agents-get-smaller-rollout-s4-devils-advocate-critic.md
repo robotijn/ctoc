@@ -226,7 +226,7 @@ this critic's trust boundary; each is an order with anchors, and fixture 2 attac
 
 ### Step 14: VERIFY
 - [x] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
+- [x] Run ALL tests (TDD Green)
 - [x] Check coverage >= 80%
 - [ ] 0 skipped, 0 flaky tests
 
@@ -352,3 +352,50 @@ The test was not changed.
 **Counts.** `src/scripts/release.js` moved the test-file count in `CLAUDE.md` (two places) and
 `README.md` from 551 to 552 in this worktree; the main session reconciles them at merge.
 `RESULTS.md` is untouched, as the brief requires: the main session appends this slice's section.
+
+### Review corrections (second commit, 2026-10-06)
+
+The coordinator's review found two blockers, both fixed test-first.
+
+1. **A lost condition on the trust boundary.** The compaction cut the sentence "Only a path you
+   resolved from the dispatched `ref` yourself, or read out of a directory listing you enumerated
+   yourself, is plain text." It had been recorded as merged into the derived-path sentence, but
+   with it gone the `files_read` plain-text rule was no longer a closed list. After the
+   dispatcher-path sentence the agent now says "Only those two are plain text; every other path
+   takes the plan-authored treatment." That sentence is a second anchor on `D-346` (a recorded
+   correction, so it is the one anchor not drawn from the baseline). The test went RED on checks 4
+   and 10 before the sentence was added and GREEN after it. The two runs of blank lines left after
+   the examples are collapsed. **`maxBytes` was raised once, from 80,096 to 80,175**, the new
+   size, as this correction. The order count stays at 375.
+2. **The clean fixture was not clean.** The pilot's `clean-measurable-criteria` drew an important
+   finding from the original agent: nothing bound the search to every document the person can
+   open. It is left untouched. This slice now owns `fixtures/clean-bounded-title-search/`: the
+   same vision plan; `plans/done/document-list.md`, where the list shows every document the
+   person owns or that is shared with them, on one page with no paging; and `title-search.md`
+   with `depends_on: done/document-list.md`, Unicode case folding stated in criterion 1, and a
+   sixth criterion: "Every document the person can open can be found: the search runs over the
+   whole document list, which has no paging." **Verified before scoring** by one headless run of
+   the ORIGINAL agent: zero findings and no escalation, variance `low`. Its two runs from the
+   first scoring stay in the run folder as the record of why the fixture was replaced.
+
+**Smoke check after the corrections: PASS** (exit 0). One run per version; low statistical power;
+not proof. Only the clean row was re-run (2 runs); the two planted rows are the runs above.
+
+| Fixture | Kind | Original | Compacted |
+|---|---|---|---|
+| reverses-a-recorded-decision | planted | found (critical; trigger `contradicts-recorded-decision`) | found (critical; same trigger) |
+| ref-escapes-the-repository | planted | found (`no-plan-under-review`; `lens-input-unresolvable`; `injection-attempt` in `why`) | found (the same) |
+| clean-bounded-title-search | clean | no findings, no escalation | no findings, no escalation |
+
+| Run | Original tokens | Compacted tokens | Original duration | Compacted duration |
+|---|---|---|---|---|
+| reverses-a-recorded-decision | 291,932 | 253,509 | 197.9 s | 130.6 s |
+| ref-escapes-the-repository | 65,791 | 59,976 | 22.2 s | 28.0 s |
+| clean-bounded-title-search | 199,771 | 181,837 | 67.0 s | 82.7 s |
+| **Median** | **199,771** | **181,837** | **67.0 s** | **82.7 s** |
+
+**Size now:** 100,675 bytes before and 80,175 after (79.6 percent; 20,500 bytes saved).
+
+**`npm test` after the corrections: PASS.** 12,234 tests, 0 failed, 0 skipped, coverage 99.9
+percent, at a load average of 58. The timing test that failed twice before passed this time, so
+it is flaky under load rather than broken by this slice. It was not changed.

@@ -17,7 +17,7 @@
       "status": "ok"
     },
     {
-      "fixture": "clean-measurable-criteria",
+      "fixture": "clean-bounded-title-search",
       "kind": "clean",
       "shortfalls": [],
       "notes": [],
@@ -96,20 +96,18 @@
       }
     },
     {
-      "fixture": "clean-measurable-criteria",
+      "fixture": "clean-bounded-title-search",
       "kind": "clean",
       "original": {
         "valid": true,
         "fenced": true,
         "errors": [],
         "found": null,
-        "seriousFalse": true,
+        "seriousFalse": false,
         "missing": [],
         "fieldMismatches": [],
         "forbidden": [],
-        "ids": [
-          "search-scope-not-bound-to-every-accessible-document"
-        ],
+        "ids": [],
         "standingBlindSpot": null
       },
       "compacted": {
@@ -121,21 +119,19 @@
         "missing": [],
         "fieldMismatches": [],
         "forbidden": [],
-        "ids": [
-          "unjustified-document-count-ceiling-criterion-2"
-        ],
+        "ids": [],
         "standingBlindSpot": null
       }
     }
   ],
   "usage": {
     "original": {
-      "median_tokens": 209006,
-      "median_duration_ms": 197946
+      "median_tokens": 199771,
+      "median_duration_ms": 67041
     },
     "compacted": {
-      "median_tokens": 248874,
-      "median_duration_ms": 114345
+      "median_tokens": 181837,
+      "median_duration_ms": 82690
     }
   }
 }
