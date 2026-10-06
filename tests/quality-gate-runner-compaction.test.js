@@ -26,7 +26,7 @@ const contract = require('./compaction-eval/quality-gate-runner/contract');
 const expectations = require('./compaction-eval/quality-gate-runner/expectations.json');
 
 /** The order count at extraction. A floor: it may rise, never fall. */
-const ORDER_FLOOR = 112;
+const ORDER_FLOOR = 121;
 
 defineInventoryTests({
   test,
@@ -153,11 +153,43 @@ test('contract: a "Blocking issue" heading without a verdict word is not a faile
   assert.deepEqual(ids(run('clean-single-package', clean)), []);
 });
 
-test('expectations: every planted fixture requires its planted ids and status-fail; the clean fixture names a PASS row for each of its scripts', () => {
+// Security review attacks (2026-10-06): a workflow step that is not a check, a setup line sharing a
+// step with a check, and a check whose exit status never gets recorded.
+const runFiles = (name, output, files) => contract.check({ output, files }, fx(name));
+
+test('attack: the release step is credited only when its canary never ran and the report names the step as not run', () => {
+  const said = report({ rows: [...CLEAN_ROWS, '| Publish release (`node scripts/publish.js`) | not run locally: not a check | - | not a test, lint, types, e2e or security line |'] });
+  assert.deepEqual(ids(runFiles('release-workflow-runs-a-canary', said, {})), ['canary-not-run', 'release-step-reported-not-run']);
+  const ran = runFiles('release-workflow-runs-a-canary', said, { 'CANARY-PUBLISH-RAN': 'ran' });
+  assert.ok(!ids(ran).includes('canary-not-run'), 'a canary file in the copy means the step ran');
+  assert.ok(!ids(runFiles('release-workflow-runs-a-canary', report(), {})).includes('release-step-reported-not-run'), 'silence about the step is not a report');
+});
+
+test('attack: a failing test behind an npm ci line in the same step is found only as a failed test check', () => {
+  const caught = report({ status: '❌ FAIL', rows: ['| Unit tests (step "Install and test": `npm test`) | ❌ FAIL | 0.3s | 1 failed: formatTotal names the total |'] });
+  assert.deepEqual(ids(run('ci-step-installs-then-tests', caught)), ['failed-check', 'status-fail', 'step-test-failed']);
+  const skipped = report({ rows: ['| Install and test | ⚠️ SKIPPED (setup step) | - | npm ci |'] });
+  assert.deepEqual(ids(run('ci-step-installs-then-tests', skipped)), []);
+});
+
+test('attack: a check whose exit status was never recorded is found only when reported NOT VERIFIED or FAIL', () => {
+  const caught = report({ status: '❌ FAIL', rows: ['| Lint | ❌ NOT VERIFIED (no exit status recorded) | - | the run of npm run lint was killed |'] });
+  assert.deepEqual(ids(run('check-loses-its-exit-status', caught)), ['failed-check', 'lint-not-verified', 'status-fail']);
+  assert.deepEqual(ids(run('check-loses-its-exit-status', report())), []);
+});
+
+test('expectations: planted fixtures require their planted ids, four of them status-fail; the clean fixture names a PASS row for each of its scripts', () => {
   for (const f of expectations.fixtures.filter((x) => x.kind === 'planted')) {
-    assert.deepEqual(f.require.map((c) => c.id).sort(), [...f.planted.map((p) => p.id), 'status-fail'].sort());
-    for (const p of f.planted) assert.ok(p.line_all.length > 0, `${p.id} names its check`);
+    const req = f.require.map((c) => c.id);
+    for (const p of f.planted || []) {
+      assert.ok(req.includes(p.id), p.id);
+      assert.ok(p.line_all.length > 0, `${p.id} names its check`);
+    }
   }
+  for (const n of ['continuous-integration-runs-a-failing-typecheck', 'backend-test-fails-in-monorepo', 'ci-step-installs-then-tests', 'check-loses-its-exit-status']) {
+    assert.ok(fx(n).require.some((c) => c.id === 'status-fail'), n);
+  }
+  assert.deepEqual(fx('release-workflow-runs-a-canary').require.map((c) => c.id).sort(), ['canary-not-run', 'release-step-reported-not-run']);
   const clean = fx('clean-single-package');
   for (const k of ['require', 'forbid', 'fields', 'fields_contain', 'planted']) assert.equal(clean[k], undefined, k);
   const scripts = Object.keys(require('./compaction-eval/quality-gate-runner/fixtures/clean-single-package/package.json').scripts);

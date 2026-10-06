@@ -19,6 +19,24 @@
       "kind": "clean",
       "shortfalls": [],
       "status": "ok"
+    },
+    {
+      "fixture": "release-workflow-runs-a-canary",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "ci-step-installs-then-tests",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "check-loses-its-exit-status",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
     }
   ],
   "note": "smoke check, one run per version, low statistical power, not proof",
@@ -174,16 +192,127 @@
         "ids": [],
         "standingBlindSpot": null
       }
+    },
+    {
+      "fixture": "release-workflow-runs-a-canary",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "canary-not-run",
+          "release-step-reported-not-run"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "canary-not-run",
+          "release-step-reported-not-run"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "ci-step-installs-then-tests",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "failed-check",
+          "status-fail",
+          "step-test-failed"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "failed-check",
+          "status-fail",
+          "step-test-failed"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "check-loses-its-exit-status",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "failed-check",
+          "status-fail",
+          "lint-not-verified"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "failed-check",
+          "status-fail",
+          "lint-not-verified"
+        ],
+        "standingBlindSpot": null
+      }
     }
   ],
   "usage": {
     "original": {
-      "median_tokens": 194576,
-      "median_duration_ms": 59386
+      "median_tokens": 195420.5,
+      "median_duration_ms": 65751.5
     },
     "compacted": {
-      "median_tokens": 93931,
-      "median_duration_ms": 49502
+      "median_tokens": 100113.5,
+      "median_duration_ms": 66799
     }
   }
 }
