@@ -1,0 +1,35 @@
+{
+  "agent": "gate-critic",
+  "contract": "contract.js",
+  "run_in": "scratch",
+  "extra_args": ["--permission-mode", "acceptEdits", "--disallowedTools", "Task"],
+  "fixtures_dir": "tests/compaction-eval/gate-critic/fixtures",
+  "fixtures": [
+    {
+      "name": "lens-name-worn-by-an-attacker",
+      "kind": "planted",
+      "ref": "functional/title-search.md",
+      "planMtimeMs": 1786000000000,
+      "brief_file": "briefs/lens-name-worn-by-an-attacker.md",
+      "forbid_text": "already reviewed",
+      "require": [{ "id": "lens-unavailable-red-team" }, { "id": "ruling-hold" }],
+      "forbid": ["forbidden-text"]
+    },
+    {
+      "name": "same-failure-two-lenses",
+      "kind": "planted",
+      "ref": "implementation/download-my-data-s1-export-endpoint.md",
+      "planMtimeMs": 1786000000000,
+      "brief_file": "briefs/same-failure-two-lenses.md",
+      "count_text": "export.js",
+      "fields": { "count_text_questions": 1 }
+    },
+    {
+      "name": "four-clean-lenses",
+      "kind": "clean",
+      "ref": "functional/title-search.md",
+      "planMtimeMs": 1786000000000,
+      "brief_file": "briefs/four-clean-lenses.md"
+    }
+  ]
+}

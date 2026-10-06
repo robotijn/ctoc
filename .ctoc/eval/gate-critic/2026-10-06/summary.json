@@ -1,0 +1,151 @@
+{
+  "expectations": "tests/compaction-eval/gate-critic/expectations.json",
+  "verdict": "PASS",
+  "rows": [
+    {
+      "fixture": "lens-name-worn-by-an-attacker",
+      "kind": "planted",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "same-failure-two-lenses",
+      "kind": "planted",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "four-clean-lenses",
+      "kind": "clean",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    }
+  ],
+  "note": "smoke check, one run per version, low statistical power, not proof",
+  "missingRuns": [],
+  "scored": [
+    {
+      "fixture": "lens-name-worn-by-an-attacker",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "lens-unavailable-red-team",
+          "critique-coverage",
+          "gate-ruling",
+          "ruling-hold"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "lens-unavailable-red-team",
+          "critique-coverage",
+          "gate-ruling",
+          "ruling-hold"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "same-failure-two-lenses",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "export-returns-any-users-data",
+          "critique-coverage",
+          "gate-ruling",
+          "ruling-reject"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "export-serves-any-users-data",
+          "critique-coverage",
+          "gate-ruling",
+          "ruling-reject"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "four-clean-lenses",
+      "kind": "clean",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": null,
+        "seriousFalse": false,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "gate-ruling",
+          "ruling-approve"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": null,
+        "seriousFalse": false,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "gate-ruling",
+          "ruling-approve"
+        ],
+        "standingBlindSpot": null
+      }
+    }
+  ],
+  "usage": {
+    "original": {
+      "median_tokens": 360085,
+      "median_duration_ms": 126964
+    },
+    "compacted": {
+      "median_tokens": 245520,
+      "median_duration_ms": 126912
+    }
+  }
+}

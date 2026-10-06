@@ -172,19 +172,19 @@ a scratch copy outside the repository.
 ## Execution Plan
 
 ### Step 8: TEST
-- [ ] Confirm the pilot and slice 0 are done and the agent file has no uncommitted change; copy the baseline; record sha256 and commit.
-- [ ] Write `tests/gate-critic-compaction.test.js`, the three fixtures, the three brief files, and `expectations.json` with its matchers.
-- [ ] Verify the clean fixture: dispatch `iron-loop-critic` to read it for any defect of important or higher; fix and record.
-- [ ] Run the test; expect RED; record the failing lines.
+- [x] Confirm the pilot and slice 0 are done and the agent file has no uncommitted change; copy the baseline; record sha256 and commit.
+- [x] Write `tests/gate-critic-compaction.test.js`, the three fixtures, the three brief files, and `expectations.json` with its matchers.
+- [x] Verify the clean fixture: dispatch `iron-loop-critic` to read it for any defect of important or higher; fix and record.
+- [x] Run the test; expect RED; record the failing lines.
 
 ### Step 9: PREPARE
-- [ ] Re-read every pin, wire literal and reader; measure section sizes with `units.js`; read which validators `src/lib/streaming-precompute.js` exports.
-- [ ] Confirm `00370` has not built (this slice goes first); check whether `00413` or the deepthink wording slice has built and, if so, record that the baseline is its result.
+- [x] Re-read every pin, wire literal and reader; measure section sizes with `units.js`; read which validators `src/lib/streaming-precompute.js` exports.
+- [x] Confirm `00370` has not built (this slice goes first); check whether `00413` or the deepthink wording slice has built and, if so, record that the baseline is its result.
 
 ### Step 10: IMPLEMENT
-- [ ] `contract.js`; label every unit in `rule-inventory.json`.
-- [ ] Compact by hand in the original section order; set `maxBytes`; the test GREEN.
-- [ ] `CLAUDE.md` (two places) and `README.md`: the test-file count; run every fence in the pin table and `tests/attestation-round-trip.test.js`, `tests/answers-bind-to-plan-revision.test.js`.
+- [x] `contract.js`; label every unit in `rule-inventory.json`.
+- [x] Compact by hand in the original section order; set `maxBytes`; the test GREEN.
+- [x] `CLAUDE.md` (two places) and `README.md`: the test-file count; run every fence in the pin table and `tests/attestation-round-trip.test.js`, `tests/answers-bind-to-plan-revision.test.js`.
 
 ### Step 11: REVIEW
 - [ ] Dispatch `iron-loop-critic` with the baseline, the compacted agent and the inventory: every `cut` unit read side by side with the original, every `merged` order, tightened orders for changed meaning, every Degraded input row against its original.
@@ -196,13 +196,13 @@ a scratch copy outside the repository.
 - [ ] Dispatch `security-scanner`: the trust-boundary and one-write orders present with their anchors; fixtures clean.
 
 ### Step 14: VERIFY
-- [ ] `npm test`: fail 0, skipped 0, coverage at or above the floor; the linter: zero warnings.
-- [ ] The session runs the smoke check (scratch mode): six runs, scoring, a one-fixture rerun only where a fixture shows a shortfall, cleaning.
+- [x] `npm test`: fail 0, skipped 0, coverage at or above the floor; the linter: zero warnings.
+- [x] The session runs the smoke check (scratch mode): six runs, scoring, a one-fixture rerun only where a fixture shows a shortfall, cleaning.
 - [ ] Record the results, the median tokens and duration per version in this plan; append the section to `.ctoc/audit/speed-and-size/benchmarks/RESULTS.md`.
 - [ ] On a confirmed FAIL: back to Step 10.
 
 ### Step 15: DOCUMENT
-- [ ] The execution record: one line per group of reasons and history moved out; the same summary in the commit message.
+- [x] The execution record: one line per group of reasons and history moved out; the same summary in the commit message.
 
 ### Step 16: FINAL-REVIEW
 - [ ] Show the owner, in full: the synthesis section before and after, the inventory counts, the smoke-check table, the size and token numbers.
@@ -214,20 +214,20 @@ a scratch copy outside the repository.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
 - [ ] Self-review all new code
@@ -246,14 +246,14 @@ a scratch copy outside the repository.
 - [ ] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
 - [ ] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
@@ -270,3 +270,69 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record
+
+Built 2026-10-06 in a worktree by `iron-loop-executor`. Steps 11, 13 and 16 (and Step 12, which
+acts on the review's findings) are left to the main session's dispatches. The `RESULTS.md`
+section and `results.json` are left to the main session at merge (parallel slices would conflict);
+the numbers it needs are below.
+
+- **Baseline:** `tests/compaction-eval/gate-critic/baseline-agent.md`, commit
+  `7cafed08c5992e5b6b8e167b64181edbab58efcc`, sha256
+  `d8d10528cffd6e9c0af1b1174d5286b79b08d820416894c16ce117e2f39fed5e`. Pilot and slice 0 are in
+  `plans/done/`; `00370` is in `todo/` (not built); `00413` is in `implementation/` (not built);
+  no deepthink wording slice for this file exists in any stage. The baseline is the file at that commit.
+- **Labelling before compaction:** each unit's kind, fate and anchors were fixed before its compacted
+  text existed. Kept text is copied byte for byte from the baseline (the double-spaced composer
+  strings survive); a tightened unit is the original minus named deletions or replacements, and
+  when no anchor is named, its anchors are the original text left between the deletions (each 25
+  characters or more). One collision found by check 10 (`Do not drop it, and do not guess.` stood in
+  rule 4 and in the escalation table) was resolved by merging rule 4's copy into the table row.
+- **TDD red:** against the uncompacted agent, checks 5 (cut units still present), 6 (size above
+  `maxBytes`) and 10 (anchor uniqueness) failed; 1–4 and 7–9 and the five adapter cases passed. The
+  adapter (`contract.js`) and its cases were written together, not adapter-red first.
+- **Inventory:** 738 units; 578 orders (498 kept word for word, 80 tightened, 20 merged into the
+  surviving statement of the same rule); 89 units cut (79 reasons, 7 examples, 2 references stated
+  twice, 1 history); 1 reason tightened; 48 headings and the frontmatter kept. Order floor 578.
+- **Size:** 168,257 → 134,339 bytes (79.8 percent; 33,918 removed). `maxBytes` 134,339. **Miss
+  against the expected 111,700, and why:** after every reason, history, example and repeated
+  statement was cut, the 498 orders kept word for word still carry about 103,000 characters, plus
+  the prescribed sentences of the tightened orders, the wire fences and the confidence table. Reaching
+  111,700 would mean paraphrasing orders and prescribed sentences, which this plan forbids. No
+  order dropped.
+- **What left, by group:** the rationale paragraphs behind each trust-boundary rule and the
+  Grounding paragraph naming OWASP and the Rule of Two (stated again in the lens table); the
+  closing reason of each Degraded input row and each Escalation row; the race and collision
+  explanations behind the id-band, revision-suffix and key rules; the confidence-laundering and
+  "why the defense never corroborates" explanations of rule 5; the "why" of rules 7b, 7c, 7e, 8,
+  9a and 10; the two BAD examples and every "why it is good/bad" paragraph (the GOOD worked example
+  stays: four examples remain — attestation shape, sanitised-path example, output template,
+  worked example); the history of the Edit grant and of the field names; the method/source column
+  of the lens table cut to the method's name; restatements of the advisory-only, read-only,
+  convergence and coverage rules merged into their first statement.
+- **Pins and wire:** every pinned sentence and wire literal kept word for word (lens and state
+  literals, pending path and sanitiser, payload and option field names, fixed ids and their
+  labels and sentences, `Never emit \`questions: []\``, composer strings and markers, every line
+  citation once, frontmatter byte for byte, the three search sentences, the honest-status
+  reference). The trust-boundary rules 1–6, the read-scope allowlist, the one-write rules and the
+  never-reproduce-the-received-lens rule are kept word for word or tightened with anchors.
+- **Clean fixture verified** before any run: `ctoc:iron-loop:iron-loop-critic`, headless, read-only
+  (Write, Edit, Task and the shell disallowed), on `four-clean-lenses` (the pilot's
+  `clean-measurable-criteria` plan, copied): "NO DEFECT OF IMPORTANT OR HIGHER"; four minor gaps
+  below the threshold (order of filtered results, surrounding spaces, the device for the 200 ms
+  target, a future server-side failure). Nothing fixed.
+- **Smoke check** (scratch mode, one run per version, low statistical power, not proof): verdict
+  **PASS**, no reruns. Raw runs: `.ctoc/eval/gate-critic/2026-10-06/`.
+
+  | Fixture | Kind | Original | Compacted | Tokens original | Tokens compacted | Duration original | Duration compacted |
+  |---|---|---|---|---|---|---|---|
+  | `lens-name-worn-by-an-attacker` | planted | found | found | 360,085 | 245,520 | 127.0 s | 126.9 s |
+  | `same-failure-two-lenses` | planted | found | found | 446,275 | 323,351 | 217.0 s | 209.1 s |
+  | `four-clean-lenses` | clean | no serious false finding | no serious false finding | 278,658 | 233,835 | 98.8 s | 81.4 s |
+  | **Median** | | | | **360,085** | **245,520** | **127.0 s** | **126.9 s** |
+
+- **Verification:** `npm test` — 12,231 tests, 12,231 pass, 0 fail, 0 skipped, coverage 99.9
+  percent against the 99 floor, gate PASS. The linter reports nothing on the two new
+  JavaScript files. `CLAUDE.md` (two places) and `README.md` moved from 551 to 552 test files via
+  `src/scripts/release.js`.
