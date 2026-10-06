@@ -1,0 +1,2768 @@
+{
+ "agent": "skills/ai-quality/hallucination-detector/SKILL.md",
+ "baseline": "tests/compaction-eval/hallucination-detector/baseline-method.md",
+ "baseline_sha256": "301804095c0bdafe863fa29ef4dc55e229774a7825b0855214d8740a96eaaea4",
+ "baseline_commit": "e8a5d5c17298cb1eb55dfc480620963c5649a437",
+ "maxBytes": 61982,
+ "units": [
+  {
+   "n": 1,
+   "sha": "cec32872f46c4f563f6681545690ff0a8880a679f60181da705e3e7d35d01107",
+   "kind": "frontmatter",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 2,
+   "sha": "6d9b5e5e08b18742cc87efe563b0fbbb69162b7d43b4b26fb92d504f4c21362a",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 3,
+   "sha": "c26e91c42bfd1eb8fb4e28bdc9adb6ec7c1022a68753873046d4ff9108e9332e",
+   "kind": "description",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 4,
+   "sha": "1c63c9ae3eb7d188c962b18fc563108d216feee373ec9c3d650f22bc858c5caf",
+   "kind": "description",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 5,
+   "sha": "bddf8a59a1f45faba978b9850814a0aefcc9651d2b535fc50c7bc26240d5e652",
+   "kind": "order",
+   "orders": [
+    "HM-005"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 6,
+   "sha": "ae2d08dcf5603d2b87a9d892befdf02dcb90aeb4464cd78cc4344528268828f2",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 7,
+   "sha": "284a62e0dad21f44b530646c1db9c9fdcb0b0a7dc2c2c02b2675b8f25ef59e2c",
+   "kind": "order",
+   "orders": [
+    "HM-007"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 8,
+   "sha": "2587e7c124bc826fd9b8abf8884eade9a2eda6a3833b5a984cb04ce716a5e55d",
+   "kind": "order",
+   "orders": [
+    "HM-008"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 9,
+   "sha": "c9e468d781d2a0f7abf1a5ef01703fddb4a2d0ec7da8da00b556267e2107eaf0",
+   "kind": "order",
+   "orders": [
+    "HM-009"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 10,
+   "sha": "e0a5b2a7262b936c23e2885ca8eb1a2847a8a8d5b00ac82877655eca3f1b3bdf",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 11,
+   "sha": "49361210240481135308165839f1d1eb6e93a8b006eaa469be5f964cdcfc2c47",
+   "kind": "order",
+   "orders": [
+    "HM-011"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 12,
+   "sha": "2caa980a4f4ad53744df184ddd058c8f25f902cbdea97ab507ba1385ad8478c6",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 13,
+   "sha": "30bc3ca4a7dea5ea61cbc795c5be6d9bf37d7d235dc476e83bf87b6547f8f961",
+   "kind": "history",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 14,
+   "sha": "09f1b4d985349476f7a7a26af67983abc2560dbbb67aa8df54544548070c2ca4",
+   "kind": "history",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 15,
+   "sha": "46c0988ec6d93b44127254953a7882b2c0bfa3bb51a479a3cd0ce35497bd7c49",
+   "kind": "reason",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 16,
+   "sha": "585569a4df473403754f5c5a083a8980fafbf64d83fdd84d00d037295e34a705",
+   "kind": "reason",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 17,
+   "sha": "3b2f2ddbe305f816299c4d16670db5fbf1fbf4b4307224b64d47592fa3901d42",
+   "kind": "order",
+   "orders": [
+    "HM-017"
+   ],
+   "fate": "tightened"
+  },
+  {
+   "n": 18,
+   "sha": "e7228b764c02858054ff9f657b2aa908cb98716a19d530c69002d867f70a1169",
+   "kind": "reason",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 19,
+   "sha": "ce95e60fa2eeb050b00ea22c07bc2b81cc5daa22b5646ea8dc827d6ad64a90a7",
+   "kind": "reason",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 20,
+   "sha": "35cd1f978ddabc63ed269eecfa63dc587b036b3627468d3d270bdc4a3791c00f",
+   "kind": "reference",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 21,
+   "sha": "be4e92d6d899f3264a7e40736066f37bcf5f60369a6c1cd6e758a7450cb8040b",
+   "kind": "order",
+   "orders": [
+    "HM-021"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 22,
+   "sha": "1750e0926146e40bda53eb5b230a641695508fe738c32046370b995354a131f5",
+   "kind": "description",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 23,
+   "sha": "1f2b556f2a523edabe0fd2577374870c65c6813a4d721a19db818766e6207e46",
+   "kind": "order",
+   "orders": [
+    "HM-023"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 24,
+   "sha": "ecf2b7d5af355da41fb8bb5f6346490a15414b101339b45b29b2f213fd684e42",
+   "kind": "order",
+   "orders": [
+    "HM-024"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 25,
+   "sha": "982294c081c45890ccb0b2e42c07288adc2eaf5d202722ffc3966f57aa7d0761",
+   "kind": "order",
+   "orders": [
+    "HM-025"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 26,
+   "sha": "6ebfb8e8df4a12efffe807018b365025ae45562cbefa3aa16e48b34ee32dc4e3",
+   "kind": "order",
+   "orders": [
+    "HM-026"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 27,
+   "sha": "6be18ff94d46beff7be4cfe2c680a949f6dd22ddb7b5f6109574f817fa063705",
+   "kind": "order",
+   "orders": [
+    "HM-027"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 28,
+   "sha": "df958e4aacb30539d388e50ea2f4946a26c17010acb28d875d22eb1d8b6f114b",
+   "kind": "order",
+   "orders": [
+    "HM-028"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 29,
+   "sha": "64f0786a9e40663ea82d742b62eb06bb292b110d15f3b226bb6349fa928b389f",
+   "kind": "order",
+   "orders": [
+    "HM-029"
+   ],
+   "fate": "tightened"
+  },
+  {
+   "n": 30,
+   "sha": "9b443886e715f62329e8c7156431655839a82de84da31713ff121b7390fe8f73",
+   "kind": "order",
+   "orders": [
+    "HM-030"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 31,
+   "sha": "200f36577b7711768d81e2d951eb6d4456ef25244f7fc06328d14748a36ee232",
+   "kind": "order",
+   "orders": [
+    "HM-031"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 32,
+   "sha": "2025502cb4004cc82c52ae7dc815ca26d7867654edfab1997c3b89f38a19fd22",
+   "kind": "order",
+   "orders": [
+    "HM-032"
+   ],
+   "fate": "tightened"
+  },
+  {
+   "n": 33,
+   "sha": "4a96b661b93dcccbbfd826d6938756db0e899bede0261ca54662dabda5035ef4",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 34,
+   "sha": "be9a1ed4ffb2dcfc09de152dd6c8615d9bfc41941d00673a1462e8ca0f9801fe",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 35,
+   "sha": "d7b06d98efa7707b7065fa4bcb412212acab68d0779e2431b18c137b6400dc99",
+   "kind": "order",
+   "orders": [
+    "HM-035"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 36,
+   "sha": "169d71d7e86a5d55f4a728c43fe749f82901b4ed7fc36de960ae3e6e7e16deca",
+   "kind": "order",
+   "orders": [
+    "HM-036"
+   ],
+   "fate": "tightened"
+  },
+  {
+   "n": 37,
+   "sha": "81b45abaa1de7ce48fe2fa4d43857ebfdd58632124790324e3a70a4b6c0dcdb8",
+   "kind": "description",
+   "orders": [],
+   "fate": "cut"
+  },
+  {
+   "n": 38,
+   "sha": "3d6ea7d239b4f149dd3e5a3603304484494a2c4fb72542dc771937010e6e0d10",
+   "kind": "reference",
+   "orders": [],
+   "fate": "merged"
+  },
+  {
+   "n": 39,
+   "sha": "b13111a36315e904fb97f6896a687c7874638ed1965dfe4346db3d0a7c98a94a",
+   "kind": "reference",
+   "orders": [],
+   "fate": "cut"
+  },
+  {
+   "n": 40,
+   "sha": "31ad8fabf11637b98493d21c4f2f7b97804bb8d20f28481e606b5a87c77422c2",
+   "kind": "reference",
+   "orders": [],
+   "fate": "merged"
+  },
+  {
+   "n": 41,
+   "sha": "08fb97864e504277d2fb4eff3ea5507a52f2d1e180ab8def8ce25e86060bd0cd",
+   "kind": "order",
+   "orders": [
+    "HM-041"
+   ],
+   "fate": "merged"
+  },
+  {
+   "n": 42,
+   "sha": "ed8a6d4831f7a787a246668ac9e7c06600c8cd67a063b9d4df307bd5df6e6dd3",
+   "kind": "reference",
+   "orders": [],
+   "fate": "cut"
+  },
+  {
+   "n": 43,
+   "sha": "5d21659a96064a5f20f9759fd6e05a5b80829c98483db669e9fbc886cde056bb",
+   "kind": "order",
+   "orders": [
+    "HM-043"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 44,
+   "sha": "b7f0c8cd94a968ecdf719c96e42960aacbfb83662630392d978f98b15b9c30d6",
+   "kind": "order",
+   "orders": [
+    "HM-044"
+   ],
+   "fate": "tightened"
+  },
+  {
+   "n": 45,
+   "sha": "7bbed5532dc0fe6e7ff1b722e0ad81eb2c0fb9411530b41075bca7c5ebef69f2",
+   "kind": "order",
+   "orders": [
+    "HM-045"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 46,
+   "sha": "8dcd2b83a0821ecc01038d5ab3a4382b62e4fb76c174bf8645a98d2e0db6e17e",
+   "kind": "reference",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 47,
+   "sha": "fff36c835d6949b6dd4fae7fbfc1b46c777be1c3fa7cc10a037cf1cbde36dfcb",
+   "kind": "reference",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 48,
+   "sha": "512d1c294cf32452b74ba844440f1c4855a0d7303201e0219a0b3d5ee37e2682",
+   "kind": "reason",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 49,
+   "sha": "7dd0773738acbc3d24b7d885498ea5a632dc673ef98ebe0f96de8d156ef4645f",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 50,
+   "sha": "0fc0b43c8e4e14ddce2442043e9bb0a700ea1b3aea3426a4a1058097cf6efb7c",
+   "kind": "order",
+   "orders": [
+    "HM-050"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 51,
+   "sha": "541fbbd9f61072742cdccabaf9b86b9c0e5d69266c1174593d171b124c7f477c",
+   "kind": "order",
+   "orders": [
+    "HM-051"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 52,
+   "sha": "9600d49cc9261f539ddf7ae1f7367ba070bc30feb6a86c822da9b06f2d5f52d3",
+   "kind": "order",
+   "orders": [
+    "HM-052"
+   ],
+   "fate": "tightened"
+  },
+  {
+   "n": 53,
+   "sha": "8bac7bf233559397627872beb85d44c3dd9b1c5d5707b26180e9c15ac04bd0db",
+   "kind": "order",
+   "orders": [
+    "HM-053"
+   ],
+   "fate": "tightened"
+  },
+  {
+   "n": 54,
+   "sha": "abc443d6dba9664c3ffc00c4032ad3f599e23f93b8e69928202c98e8d176bee0",
+   "kind": "order",
+   "orders": [
+    "HM-054"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 55,
+   "sha": "01a195b8c7cc66e3239618ba265472377dc650b7dbc279c1e80a8488758f900a",
+   "kind": "order",
+   "orders": [
+    "HM-055"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 56,
+   "sha": "f8c18f8d8e9225b23d095f9ef0571a0bae447050bde68d4379d03dbfab3f6663",
+   "kind": "order",
+   "orders": [
+    "HM-056"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 57,
+   "sha": "9ff36e3bd15447fbd92a22d439d7a88b7dda174159c9a376b8c655aa359ce6b6",
+   "kind": "order",
+   "orders": [
+    "HM-057"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 58,
+   "sha": "611b70927b29e98d114c6216601e9f14feb371b75565ca8584a4c8ab35686e46",
+   "kind": "order",
+   "orders": [
+    "HM-058"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 59,
+   "sha": "4e4b774423469ba6d2c573ab4d2c29692c55c687920cc41ba2f533e657f111ae",
+   "kind": "order",
+   "orders": [
+    "HM-059"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 60,
+   "sha": "e8570afe7241ad1fdf30cbc0ffd36e63923008b24ccb06c002328496f408256a",
+   "kind": "reference",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 61,
+   "sha": "7cd87056a35baadaaa8b7195baf62ce86f92997ef0b01ebca11ffa6202cc02d5",
+   "kind": "reason",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 62,
+   "sha": "20e1e0388ebe05e0f5be48befad23f126d4f28d3c3f6340be9ef3f11b02b356a",
+   "kind": "reason",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 63,
+   "sha": "4a9a82202a47d34aa47dc8b6f4bc3b84bee12c83af2cb38e6d3ceb0ac2953e3e",
+   "kind": "order",
+   "orders": [
+    "HM-063"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 64,
+   "sha": "84fdf337651944f25e4e521822eb5d2729634a3bdb7791ac64202bf5147aa692",
+   "kind": "order",
+   "orders": [
+    "HM-064"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 65,
+   "sha": "ec3437860f12f341fa6c9db5b966e483e867d22598d2d6c95bf954a91604a480",
+   "kind": "order",
+   "orders": [
+    "HM-065"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 66,
+   "sha": "9bca09bb2fdface13c489d8806231debce26f9da9479b683a7f0eb0996c5ff5e",
+   "kind": "order",
+   "orders": [
+    "HM-066"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 67,
+   "sha": "23a1b6a9dfcb70bb077fc5dd4629a6c5c29b217bcd89d90b588eba686647392e",
+   "kind": "order",
+   "orders": [
+    "HM-067"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 68,
+   "sha": "eb2891d71d133c723e37bb0d0041178d82d17a6471435d494975f08f68772b9c",
+   "kind": "reason",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 69,
+   "sha": "844f16b4d47b07001fd90c7555fc5431c74664f32db065050f842674689629a6",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 70,
+   "sha": "f7faec5ef7766d20bb34ff08c4229622718d5573d32820e1ea037cfac16aa16a",
+   "kind": "description",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 71,
+   "sha": "a5fb9b0a4d136510c2ed0541fac355a879abb7037cbe4b58842ebcc82194420e",
+   "kind": "description",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 72,
+   "sha": "985853bed7416ac2f3110d9ee1401184de99639258bb1cbba406d1f5fcdaad5f",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 73,
+   "sha": "a280ce89b2fae043e1049ecec9564f74ef928e3e46a2b9fe5246ff1f0b0e2e2c",
+   "kind": "order",
+   "orders": [
+    "HM-073"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 74,
+   "sha": "a52f35d79d9c3259e917af12f255b6d87cace68e6a84dd0825b071acd4ce1c1f",
+   "kind": "order",
+   "orders": [
+    "HM-074"
+   ],
+   "fate": "tightened"
+  },
+  {
+   "n": 75,
+   "sha": "7259c0cb73ebb702d54eb7fcebb80964dedb6a4eafb65d66a579d662ca4fd266",
+   "kind": "order",
+   "orders": [
+    "HM-075"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 76,
+   "sha": "87a15d7b603e0426eff01a883052677c9ce68015945232e4db5c9914ed9a935f",
+   "kind": "order",
+   "orders": [
+    "HM-076"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 77,
+   "sha": "b0ab3503e6f5e6bcab972ef3fc8b95824c61bf5bad2396abcd93de507c9b2397",
+   "kind": "order",
+   "orders": [
+    "HM-077"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 78,
+   "sha": "66502e8ac1479e741eebffcd0ace6526685f6d6b08edab14bf4c0b2c247566e9",
+   "kind": "order",
+   "orders": [
+    "HM-078"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 79,
+   "sha": "6f24f273243e1eb7f19014a958a95ae8ff30eb4879ed2503eae5e9ac30e055bd",
+   "kind": "order",
+   "orders": [
+    "HM-079"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 80,
+   "sha": "2909444b7d6443b38789f6cd52d908383134946509b0ffad92b5d141aaa8af9e",
+   "kind": "order",
+   "orders": [
+    "HM-080"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 81,
+   "sha": "4fe430c7210c5ff30b9ae92206f1376da79c93a1297adbac62d689cdf07e43b5",
+   "kind": "order",
+   "orders": [
+    "HM-081"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 82,
+   "sha": "e2b3b0af68c59c9786d6f30c1ead93f737f303bc81c0a7c0be45a1bb5c781e1c",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 83,
+   "sha": "25af694a3d4c16e68dc06f3f8411dedbb1d287b8152489c4817cc4e8806f5006",
+   "kind": "description",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 84,
+   "sha": "084e8bf3be539c1d0296ab78dfb133943d23cfff35a39f8c7a3fdcec8a8038c1",
+   "kind": "description",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 85,
+   "sha": "29e3676766e8c287d306c243f798a067cff99ab22aa4791f11a943dc12b9bb0e",
+   "kind": "order",
+   "orders": [
+    "HM-085"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 86,
+   "sha": "24f0ef496ba88e4018c322104205f296a784954ef4195460788ac26f0828fd6e",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 87,
+   "sha": "a2a6eca7038e5b66da30336c107c6e9ea499d446f110c6d9028504d9a8e71c14",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 88,
+   "sha": "d3f9cca58dc32add96d7910695ec1690e5079516cfb0b95844451ceeacffe775",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 89,
+   "sha": "3fd96bc5686ae8275088088d6238b3c760ea1959a47cde1fb742b1ab28a52d35",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 90,
+   "sha": "ccac1c43029f24fa4db70cf1f4bbd6911bae62f955c8948da4069ea8cc15acdd",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 91,
+   "sha": "6f958a57cae3224f3cc5de91da4ed24c13e5dc3ab1aefa15682662194d6a493f",
+   "kind": "reference",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 92,
+   "sha": "223e883aa7883faf8876864197b812a1b6ba20716c180e057669ed362e1f2a34",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 93,
+   "sha": "ff0246275c3f3c1b4619f95ac27da7c66edbe3b526046f3d8729ee82603d1f59",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 94,
+   "sha": "fe298c9c8e7bf8cd596a5d0d5d8bb398cb9663b283486cc4b1ceb94ab700658b",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 95,
+   "sha": "065ef36945c1300a16c95fa07f03f63d9f37f94b96ef2405db2120366d775c1d",
+   "kind": "reference",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 96,
+   "sha": "84fc532ef1ec292a2633c306e240470a90cda0c440935b4f4d16d2ff5acf4d69",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 97,
+   "sha": "3723ee821ff35872dd87261bc1b60acef2b19edd7e39098d2a56b10a65e6ca98",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 98,
+   "sha": "184a7d035f386933a4464ef71389d5f1b91020433a00a4a0cad84a033949e320",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 99,
+   "sha": "d751a034a3389c2cc3c7ec5c4a40b866fcea098d86af354a231546bd46fb5c47",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 100,
+   "sha": "8d09960ef1ce2747494769598d9918db3aac2775bfe4947f1d7e0ff090ee8c6d",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 101,
+   "sha": "e0790fac2046a1836ce32fdb4ebe5ad342dbf7da5d772e8e43e143539020fe45",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 102,
+   "sha": "adfb437f0e1241943841608865a5d9ba52a059f43dfdff8e08e100af58a02405",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 103,
+   "sha": "a36f5cc818eefd79ca86e2ba1c5cdc915d1aa9b5ca4f1fdb86cffea255257783",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 104,
+   "sha": "1f532641970e1ae9eec8e5572334208dd32d41d20ce59cae783d1e72d0313b84",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 105,
+   "sha": "86a0b388690a60f46102629850c4675de6238d7847d416acd69b3c8d50bbf059",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 106,
+   "sha": "ae683fdcea15828812ddc47c421274e1dc5474bfa216f87516d748bcdd3e09e2",
+   "kind": "reason",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 107,
+   "sha": "f77402a1e70c0fc4b1d7edd2b8f83d1c11f9309103ed696b33a00877526eaeb8",
+   "kind": "order",
+   "orders": [
+    "HM-107"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 108,
+   "sha": "2a90693877045b5040f44b7ce295dfa7d7e2aaebe0ac8ac124cf22eaed9dd4ba",
+   "kind": "order",
+   "orders": [
+    "HM-108"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 109,
+   "sha": "27d25f3e2c135a2ebf2e556a4f1ce7fcc4b8a3ec14125727d1951e3dbc7e031b",
+   "kind": "reference",
+   "orders": [],
+   "fate": "tightened"
+  },
+  {
+   "n": 110,
+   "sha": "7ef06e754a58b856e67d6b4c3bd6a34ac2be31eec610835096687d377d808e0a",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 111,
+   "sha": "4ad08008a215dfb20d826fa73e6030665f3627bb4120e7f2f3dafaace5007700",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 112,
+   "sha": "ea060406cd5b277331a8e518efd843f5048c6d3e054d4f3d9e826733703d527c",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 113,
+   "sha": "4f24c0435c768dd5ad7b3f2476dd2f9f037d4cd4395cf9556b21811ed826a6be",
+   "kind": "order",
+   "orders": [
+    "HM-113"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 114,
+   "sha": "c8f964c7d907e8d327ebd92c99af19a6244383b55c579406645ce8f0510a7bd9",
+   "kind": "order",
+   "orders": [
+    "HM-114"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 115,
+   "sha": "c4e1afe64078e34870b17ae0983b0016bf7c05dfacf15322b8c018b5787d13db",
+   "kind": "order",
+   "orders": [
+    "HM-115"
+   ],
+   "fate": "tightened"
+  },
+  {
+   "n": 116,
+   "sha": "fa97346e33f6f10a4616a2266bbd25b64d9b550e8a2f76c0eb1b28450a016c43",
+   "kind": "description",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 117,
+   "sha": "bd4a0823a3e1f81ea84d59babdc8e94df6ac0f49d655affb786cb2ac43c520e8",
+   "kind": "order",
+   "orders": [
+    "HM-117"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 118,
+   "sha": "3c394b4bc55fddf664ab32ed6232b3d22dc09f0287de34d07164b6aa673f651f",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 119,
+   "sha": "f65565947145cfe433ae22e18a2ad350be1d40cad7a9519d691b42e75f3fa4a7",
+   "kind": "order",
+   "orders": [
+    "HM-119"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 120,
+   "sha": "8bd845706d35a297b91f478c3c229395584dcdc08d17fd1a6cfb9765e808810d",
+   "kind": "order",
+   "orders": [
+    "HM-120"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 121,
+   "sha": "1c9256d03fd760f9a637077680a614b3255c1a08e770a6c2d423a57dc0438305",
+   "kind": "order",
+   "orders": [
+    "HM-121"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 122,
+   "sha": "756b85f7dcd79d00ce689f2606a3434b069f1244ee05c2ebb33d376da28c3119",
+   "kind": "order",
+   "orders": [
+    "HM-122"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 123,
+   "sha": "75ec14290d400e3af7633c5dcdfe8081f70dcf9ed22b899122fae966839972e7",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 124,
+   "sha": "e1d7a302bce19d5f5cb880faa3c28a73fe1b8b2568c9ab48ac5cd7b6ebff4287",
+   "kind": "order",
+   "orders": [
+    "HM-124"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 125,
+   "sha": "a4740176d927243d1ca5af307abf907b0a058cbcbb272efd65a7e78e68e513d4",
+   "kind": "order",
+   "orders": [
+    "HM-125"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 126,
+   "sha": "58e1a51869daa864f2290eb974ba29a45e23f26be8027e309e8ec2b6da520073",
+   "kind": "order",
+   "orders": [
+    "HM-126"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 127,
+   "sha": "e7299bb554f81138bbd416e46d17ea44892dbc1b19e5ccea434e420c3b93c62e",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 128,
+   "sha": "5b16b5eac0a48f07b5a43f19c476cba46efb7d479eb8d89479002862085eb23a",
+   "kind": "order",
+   "orders": [
+    "HM-128"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 129,
+   "sha": "32c754431b21a2dab47baa45f863886da98ea42f2e96cf3bf724e55d096c3add",
+   "kind": "order",
+   "orders": [
+    "HM-129"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 130,
+   "sha": "14a8821e421a1e809f20d4c2b5b8956f3bc88586867311130993b83889fbc0a6",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 131,
+   "sha": "292ef37b806cb371f2d8d768f16d73ec165aa9201c422fa0d53e8d5a25d4996a",
+   "kind": "order",
+   "orders": [
+    "HM-131"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 132,
+   "sha": "f20ed16ad53fca0d6b43085669757e7d4037af7a954f0d067bbf287bd2a046b9",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 133,
+   "sha": "6861063f75261e6a73ae7e07a40c5eaa927593652d803e93b3f58f637833228c",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 134,
+   "sha": "7ab64f03302d0bd30e71d86294fec92ba8313572d4f8f04284c02d9d7f122157",
+   "kind": "description",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 135,
+   "sha": "7f61dc2563a1c33a62f3038cb69d97c52823d765a34dcb69e4f67c579af62747",
+   "kind": "reason",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 136,
+   "sha": "f6b4a93586bfdc66d3d45e6ffdff152f49824de27945f7e68e7dd8cf35c8727b",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 137,
+   "sha": "33ac01c8d75218574124ed0296c5eab06e15eb95dfa03205d2dcba3727fdbb64",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 138,
+   "sha": "d89bf1d8cb857d562f20552a64e8c1290175fac9d98afc9d61c8f5fed1df6b22",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 139,
+   "sha": "e197602156d76943d9f7443cc09dc3d0d6ad336719a301d4ac5dedde743a09dc",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 140,
+   "sha": "12693c173755e725ef8098c04ba4ddab784c42278c79495223a8cd2111c807d5",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 141,
+   "sha": "0a650017dfac23173ac3315075e43e3d5c70cdb779bdf7cf0e1767c688f69e1b",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 142,
+   "sha": "c65037910611909faaa960722335cd03099e9b6783e0909d9b0f141f1838f73e",
+   "kind": "description",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 143,
+   "sha": "f192d746f3010a18d22cb1a67ec7015cb576272932ea91d2dc899a630d5f442e",
+   "kind": "order",
+   "orders": [
+    "HM-143"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 144,
+   "sha": "f0de9cb8ae815cd6f9ff52c4c17322b153f59eefe97944865d49253d8154b121",
+   "kind": "reason",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 145,
+   "sha": "490fbc6f426bd24a5def370e6c5d1e4f1cfca6f6ca72b355d8dacfa284b65718",
+   "kind": "reason",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 146,
+   "sha": "b91874cbc45c79cdac52742e45f66b2090775136fb2c0a9c71a490ff68e12a65",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 147,
+   "sha": "55179925e44567bf89e088a45bf53d9f717c4efcefad205989e2f86c90b91ab2",
+   "kind": "order",
+   "orders": [
+    "HM-147"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 148,
+   "sha": "e679a5a1b572c1ac27f47fa5952b9abc4c2cf7382cf12b594f8cfe4855fc5750",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 149,
+   "sha": "775795a36a12aad15552eff000cc8e08157fb6338ecceaaf0312b92d4a380f6b",
+   "kind": "order",
+   "orders": [
+    "HM-149"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 150,
+   "sha": "3f83daa8d6b2cd72551b642e0a8ba4ce184e9c91b73cf51bbcaf569a7035d4a4",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 151,
+   "sha": "b1b096ceb4a60d5c982d347c27421c3a4c85fecf50e9c039756f616f9a27ba37",
+   "kind": "order",
+   "orders": [
+    "HM-151"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 152,
+   "sha": "31c8be2a52744d57c80a3e383b3bbeb8f54d718b74dfc3e66199907b7609a676",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 153,
+   "sha": "820c1b1177f7304675d12763eaa87525f741aa842196674518c4efa2de6b38ee",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 154,
+   "sha": "36837ca35fe06938e5c098a07304b47d596e484502ebee8f755b67c0dc9b65a8",
+   "kind": "order",
+   "orders": [
+    "HM-154"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 155,
+   "sha": "0e16a1999b5bf34dcdca3c4417362347fbe548b921909d4e5b9f096d0a24f38d",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 156,
+   "sha": "c362980fb8621b20a82408a975167700ee77127abaebf15e713612e830af5721",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 157,
+   "sha": "95448110d203de13e140d2eaed0ad815c99e642d7c0499e7f8d4f1322909485f",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 158,
+   "sha": "253425739b1d00e820fb5e44f08a4a554096fcab479cce2388ad48a280abbe71",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 159,
+   "sha": "93ba527a8e7ea4acc8f38233a5b7caa764280b16d12f99d71efb9c75f8281fdd",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 160,
+   "sha": "e82fe7c9abf483cf519616633ba2e8800257c9569964526e50c542c757ee7648",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 161,
+   "sha": "d28e358fb81c66e9554ff041e0c65397958b7fbbf061cafa848f5923c62ce15d",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 162,
+   "sha": "b12f5b4210e24678f58eab624671d423b70bfb26418920a323ccabbbf8c784ba",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 163,
+   "sha": "54b68641ddf30ca030993aacd447b7a462fcfe6b49de04559c6d8397a577a68e",
+   "kind": "order",
+   "orders": [
+    "HM-163"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 164,
+   "sha": "95360ad593a8de152ec02a8a518433c130efc056248a660d55c83a546bc33ef7",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 165,
+   "sha": "02e84bef71ed4a0b432a718d79cf581ad7682614e999e92c93817bcc600583fc",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 166,
+   "sha": "57df1d024ec8b57524209e38f940ee3751f18c8f81571cfdb2f01654cfaa2914",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 167,
+   "sha": "85ec5a4aba1bbb990e0df1ccdcb43ae99b1e1d1d2a83a9bd5168f04e0c7b5066",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 168,
+   "sha": "b12f5b4210e24678f58eab624671d423b70bfb26418920a323ccabbbf8c784ba",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 169,
+   "sha": "dc9da0d5f88dbe6abc8f281d3fb2c921fb2b2c7deb7ad193b155db47951c92e8",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 170,
+   "sha": "4d2382da2f2c9fb8f93c037ceed47be7bfa848b9c65c422c2b85fcad1139c29a",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 171,
+   "sha": "99cb8ae4b18e026ba9af871fec78148e2e2d830b26499e639a09f409a17a17e8",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 172,
+   "sha": "ebee587fc736970252728814c562d65c888b7d219631a597ff9f0b7409c32d7a",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 173,
+   "sha": "b437565ccb4a4958a6bbb14ef0396111b7a6082eee7f9288bed629c989d3954f",
+   "kind": "order",
+   "orders": [
+    "HM-173"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 174,
+   "sha": "d78f618215e4c7c5e621033324f970912b20482bae010f5e7d14c4478caa617a",
+   "kind": "order",
+   "orders": [
+    "HM-174"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 175,
+   "sha": "13e45c4a9e9b0c54ca03979fd5bf63b445abd79e5a6eb14b48f31afad5431d86",
+   "kind": "order",
+   "orders": [
+    "HM-175"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 176,
+   "sha": "90c9df47f3b7b881a2b5fbbe9fff57f05cfd63775649cfbdb5a421b5b59dcc99",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 177,
+   "sha": "ab4a96935788d44ae031f5d1002ca4dcd74851b5406d21fdb1c96776e2660bf2",
+   "kind": "order",
+   "orders": [
+    "HM-177"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 178,
+   "sha": "d225459061df23e62827a696d8de10e5f87324cb3131fcadce9df47ae6fc61e0",
+   "kind": "order",
+   "orders": [
+    "HM-178"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 179,
+   "sha": "2c26afd065f725756810ef5b7f21afc3497d6dfc28910344c0192ed38131d9fa",
+   "kind": "order",
+   "orders": [
+    "HM-179"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 180,
+   "sha": "26ab5064e1612f77ce03ec9a1688521dc5876c29e18b1d893bf8bbf20f99abc1",
+   "kind": "description",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 181,
+   "sha": "9b2172639b41c00ddc430c20e8f93db0fb07f681d9258f9c8ac599ed538ceade",
+   "kind": "description",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 182,
+   "sha": "5ff6a036917e7f2be2b7de275cbb0e2fbcb5051093600119197ab85b4ac33382",
+   "kind": "order",
+   "orders": [
+    "HM-182"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 183,
+   "sha": "eeea3189d745148c10c08bc594b70a3682bcba968c66a8a9fcdcf114872fd50c",
+   "kind": "order",
+   "orders": [
+    "HM-183"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 184,
+   "sha": "c701ff35c2de9e29bd4e4a4f6d7efec42dc59aba01780eae40a96f0051090179",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 185,
+   "sha": "bd0a10d8719611419af448d1a6d20b387b2b4a2198222830ab40462e3d00c30f",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 186,
+   "sha": "22bd4e0a94ecd403e798575170ce75251075f8ae5aca6d20e9d6224834d80666",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 187,
+   "sha": "90c6b92d4b5c2781b6801829a049506440dea858a5b6ae029f5e848834a84b6f",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 188,
+   "sha": "b957f3d0a9260c3727539f7efa89488741e6355785f12d0b67bedd197ac153fa",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 189,
+   "sha": "aede714dcaa2c224e2b1d3366de377986e57c566d2630d2e9d2a222ac0d5233c",
+   "kind": "order",
+   "orders": [
+    "HM-189"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 190,
+   "sha": "cdd75d78fa1c3c8844c1b38ab324197407418affb7e0cc48aeed00281edafda7",
+   "kind": "order",
+   "orders": [
+    "HM-190"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 191,
+   "sha": "bd5574d7a56c57e761cdbfe0a6ac47fe34fd195b069aaab9e455b5828b8ee0e7",
+   "kind": "reason",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 192,
+   "sha": "b73c0ef15046b4590f7d193a423ced2cdd1e1daebb9fa0fe4281f0c0a0e37130",
+   "kind": "reason",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 193,
+   "sha": "221ee4179f51dfc30c5d0ea393ff0b75bba8f3e58c37b5de02f3d4e07b86e278",
+   "kind": "order",
+   "orders": [
+    "HM-193"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 194,
+   "sha": "6857334cdf632892f2f2025ca94c199232ef555eb855a608c00f7f935ecf4e44",
+   "kind": "order",
+   "orders": [
+    "HM-194"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 195,
+   "sha": "31957bee8853c8ba8bef18775ef56bbf94cd51bfda3af38a79ce4581942abb8a",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 196,
+   "sha": "751997d32f9f08d82e449f6cf3cc13d58f5f248683c87fd2b80784a56624913e",
+   "kind": "order",
+   "orders": [
+    "HM-196"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 197,
+   "sha": "6afcb35b8918fc5ae5b6654bfc8a21f0540aa8b689b0c301401d8806605107dd",
+   "kind": "order",
+   "orders": [
+    "HM-197"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 198,
+   "sha": "53d1191c0b5aaa2a26c05110d0ee2e6b5925d8fb5f7b2a86ac3d64b63e785e58",
+   "kind": "order",
+   "orders": [
+    "HM-198"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 199,
+   "sha": "0b4f8cef386ab54c20cd93d9f081e8abb56af4d9fd25802960e4fd1c91249223",
+   "kind": "order",
+   "orders": [
+    "HM-199"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 200,
+   "sha": "f2ce0bdaf1bee3c048fcc1246e1652cdf2c957cfdb67dcddf09267e761141544",
+   "kind": "order",
+   "orders": [
+    "HM-200"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 201,
+   "sha": "668cbf8b4f650c6eaab38fdfe4ece1d54e11bf314e8ca6c62dc26dde555d47e0",
+   "kind": "order",
+   "orders": [
+    "HM-201"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 202,
+   "sha": "ad8a646c8eb6054edfd678d9de22c37e4b30f48212e43e1dfc97061ba528b874",
+   "kind": "order",
+   "orders": [
+    "HM-202"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 203,
+   "sha": "2aea2eb50b3751e5e2fada19bd839522eade1c29c32cdb3f2855338b4e5e3ecd",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 204,
+   "sha": "271278fa5fad4e29c4ca1a476f4753d184efd9aa333a03058bb3f1b682aec725",
+   "kind": "order",
+   "orders": [
+    "HM-204"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 205,
+   "sha": "fda2e13f02124ddfb9796fdd6fc7733ab584cb5eac03b1af0b849d7b52c01f2d",
+   "kind": "order",
+   "orders": [
+    "HM-205"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 206,
+   "sha": "4aa76e6e7771886f46c1c0bc31047e6ed59c6a361672e1ba0c92eadd24e36159",
+   "kind": "order",
+   "orders": [
+    "HM-206"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 207,
+   "sha": "5993669776f4856bc516bfe952e720733f363760a86bd0f06a65cc7e0637c3ea",
+   "kind": "reference",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 208,
+   "sha": "c467a0e323c60528e9f8a4eb02fe9e768afb937560887822386bd2319c1e5edb",
+   "kind": "order",
+   "orders": [
+    "HM-208"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 209,
+   "sha": "c90b99e81e69b68eb64aadf46e6b490a3f03ccfcd8f478d4aaccec1e99880d22",
+   "kind": "order",
+   "orders": [
+    "HM-209"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 210,
+   "sha": "70e7f93b3f302d9f23e5752011bd44270545dbd91b7f5a33ec15bae1314ec512",
+   "kind": "order",
+   "orders": [
+    "HM-210"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 211,
+   "sha": "e6bcce1b93bf58ce0dc2821528aae6393cfbb6b94ceacf738091e53c8b2b3d49",
+   "kind": "order",
+   "orders": [
+    "HM-211"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 212,
+   "sha": "cb3f91d54eee30e53e35b2b99905f70f169ed549fd78909d3dac2defc9ed8d3b",
+   "kind": "description",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 213,
+   "sha": "62cbc7627453949811329df3eb64785f1e9a9472c78b004f29b2b04a96a4fdb2",
+   "kind": "heading",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 214,
+   "sha": "69dd3dfd501a651157fed0704cf93e67ec714fec3f635d3f9d9d290620f886a7",
+   "kind": "order",
+   "orders": [
+    "HM-214"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 215,
+   "sha": "eee7abc310054bbf92db69a0a76ba90c8b1cb032b5810c2337936e04ca330a45",
+   "kind": "order",
+   "orders": [
+    "HM-215"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 216,
+   "sha": "d2b81ac2a3693cc8867fe970997eb1025fca1e8a7d88c2214d094e1fdbe6b238",
+   "kind": "order",
+   "orders": [
+    "HM-216"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 217,
+   "sha": "bcb7645361e549be05045b21e4e48132abf3bbc7cedfb6e1c038b7ae2b6219c2",
+   "kind": "order",
+   "orders": [
+    "HM-217"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 218,
+   "sha": "ebc4dc7a89695bb8b8de702352e9fc8e854d5a1f8f008b786a6def30da9104f3",
+   "kind": "order",
+   "orders": [
+    "HM-218"
+   ],
+   "fate": "kept"
+  },
+  {
+   "n": 219,
+   "sha": "0ad9b47b45d5732a7b594fb4b9f90415395390acf42057fc71b31b242bf07cee",
+   "kind": "reason",
+   "orders": [],
+   "fate": "kept"
+  },
+  {
+   "n": 220,
+   "sha": "3a00791e8d668abb52f622e0d9b28a2306bddbd98e381e804df5770fd8464404",
+   "kind": "reason",
+   "orders": [],
+   "fate": "kept"
+  }
+ ],
+ "orders": [
+  {
+   "id": "HM-005",
+   "says": "Where this file and the wrapper disagree, the wrapper wins, and its read-only registry recipes replace every existence check here.",
+   "now_in": "# Hallucination Detector (skill)",
+   "anchors": [
+    "Where this file and the wrapper disagree, the wrapper wins, and its read-only registry recipes replace every existence check here."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-007",
+   "says": "You are a skeptical reviewer of AI-generated code.",
+   "now_in": "## Role",
+   "anchors": [
+    "You are a skeptical reviewer of AI-generated code."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-008",
+   "says": "You assume every import, every API call, every method signature, and every claim is potentially fabricated until verified against an authoritative source.",
+   "now_in": "## Role",
+   "anchors": [
+    "You assume every import, every API call, every method signature, and every claim is potentially fabricated until verified against an authoritative source."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-009",
+   "says": "Your job is to find hallucinations BEFORE they reach production — where a non-existent package becomes a `slopsquatting` attack surface, and a fictional API be…",
+   "now_in": "## Role",
+   "anchors": [
+    "Your job is to find hallucinations BEFORE they reach production — where a non-existent package becomes a `slopsquatting` attack surface, and a fictional API becomes a runtime exception."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-011",
+   "says": "Detection must be paired with verification against an authoritative source for every imported artifact.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "Detection must be paired with verification against an authoritative source for every imported artifact."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-017",
+   "says": "Treat every package a model suggests as untrusted until its registry confirms it and, when the model's training cutoff is known and the registry answer carries…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "Treat every package a model suggests as untrusted until its registry confirms it",
+    "a PyPI first upload is not a registration date, so the wrapper does not set it against the cutoff"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-021",
+   "says": "A private-looking name that the public registry answers is dependency confusion: \"Register a package name in a public registry that shadows a name used on the …",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "A private-looking name that the public registry answers is dependency confusion: \"Register a package name in a public registry that shadows a name used on the victim's internal registry\" (https://slsa.dev/spec/v1.1/threats, read 2026-09-30)."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-023",
+   "says": "- A pre-registered name with no well-known counterpart: record it as \"registered; no well-known counterpart named; not settled\" (the wrapper's look-alike check…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "- A pre-registered name with no well-known counterpart: record it as \"registered; no well-known counterpart named; not settled\" (the wrapper's look-alike check)."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-024",
+   "says": "- A private registry configured outside the repository, in a user's own settings or a pipeline's environment: a reviewer who reads only the repository cannot s…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "- A private registry configured outside the repository, in a user's own settings or a pipeline's environment: a reviewer who reads only the repository cannot see it; say so in the limitations (the wrapper's rule for a private-looking name)."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-025",
+   "says": "- A name written with a character that only imitates a Latin letter: the wrapper's character check refuses it; search the line for any character above code poi…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "- A name written with a character that only imitates a Latin letter: the wrapper's character check refuses it; search the line for any character above code point 127 before recording the name as not checked."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-026",
+   "says": "- Declaration files written by the publisher of a look-alike: a member found there proves only that the publisher declared it (section 2 below).",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "- Declaration files written by the publisher of a look-alike: a member found there proves only that the publisher declared it (section 2 below)."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-027",
+   "says": "- A repository link that points at the genuine project: the link is the publisher's claim, not proof of where the code came from (the wrapper), so give Scoreca…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "- A repository link that points at the genuine project: the link is the publisher's claim, not proof of where the code came from (the wrapper), so give Scorecard a repository you have reason to trust, never the one a package's metadata names."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-028",
+   "says": "- A new scope that resembles one the repository already uses, for example `@acme-corp` beside `@acme`: the scope itself is the counterpart to compare (the wrap…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "- A new scope that resembles one the repository already uses, for example `@acme-corp` beside `@acme`: the scope itself is the counterpart to compare (the wrapper)."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-029",
+   "says": "- Inflated download counts: the European Union Agency for Cybersecurity warns that \"Popularity metrics can be misleading or artificially inflated\" and \"should …",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "a name registered later than its counterpart is reported whatever its count"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-030",
+   "says": "- The dated answers in this file's examples: each status 404 below was true on the day it was read, and the names are now published here, where anyone can regi…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "- The dated answers in this file's examples: each status 404 below was true on the day it was read, and the names are now published here, where anyone can register them; `react-codeshift` and `serde_json_ext` below show that plausible names do get registered."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-031",
+   "says": "Run the recipe again in every review; a dated answer is never today's.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "Run the recipe again in every review; a dated answer is never today's."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-032",
+   "says": "- Verify every import against its registry, never by installing it. The same advisory says \"Verify package names carefully to avoid malicious imitations or nam…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "Verify every import against its registry, never by installing it.",
+    "\"Verify package names carefully to avoid malicious imitations or naming collisions.\""
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-035",
+   "says": "`npm view <pkg>` returning a result is not proof of a usable package: npm holds some names as security placeholders that still answer with a version, such as `…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "`npm view <pkg>` returning a result is not proof of a usable package: npm holds some names as security placeholders that still answer with a version, such as `fs`, latest \"0.0.1-security\" (https://registry.npmjs.org/fs/latest, read 2026-09-30)."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-036",
+   "says": "The wrapper has no recipe for NuGet, the Go module proxy or Postgres extensions, so names from those are recorded as not checked.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "The wrapper has no recipe for NuGet, the Go module proxy or Postgres extensions, so names from those are recorded as not checked"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-041",
+   "says": "- Cargo: never `cargo search`, which \"performs a textual search for crates\" (https://doc.rust-lang.org/cargo/commands/cargo-search.html, read 2026-09-30) rathe…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "never `cargo search`"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-043",
+   "says": "- Cross-reference signatures, and know which ones can tell names apart. A package that exists is not the same as a package that should exist.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "- Cross-reference signatures, and know which ones can tell names apart. A package that exists is not the same as a package that should exist."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-044",
+   "says": "Maven Central requires every published file to be signed (\"One of the requirements for publishing your artifacts to the Central Repository, is that they have b…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "so a `.asc` file proves nothing; check the signing key against the publisher's known key"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-045",
+   "says": "On NuGet, look for an author signature, not only a signature.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "On NuGet, look for an author signature, not only a signature."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-050",
+   "says": "A missing or mismatched attestation is a reason to look closer, never proof on its own; and a present, valid one shows only where a package was built, not that…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "A missing or mismatched attestation is a reason to look closer, never proof on its own; and a present, valid one shows only where a package was built, not that it is the package the code meant (this file's own reasoning)."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-051",
+   "says": "- Verify API methods exist in the documented version, not just \"in the library.\" A function that was renamed, removed, or never existed is a hallucination.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "- Verify API methods exist in the documented version, not just \"in the library.\" A function that was renamed, removed, or never existed is a hallucination."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-052",
+   "says": "Check the called member against the declarations of the resolved version: the package's `package.json` \"exports\" and its type declarations; Python `.pyi` stub …",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "Check the called member against the declarations of the resolved version",
+    "so a module missing from a partial stub package proves nothing"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-053",
+   "says": "A Java `module-info.java` names packages, not members: \"The `exports` directive specifies the name of a package to be exported by the current module\" (the Java…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "A Java `module-info.java` names packages, not members"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-054",
+   "says": "It settles a wrong package, never a missing method; for a method, read the class file with `javap -p`.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "It settles a wrong package, never a missing method; for a method, read the class file with `javap -p`."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-055",
+   "says": "- Detect inconsistent claims within the same artifact.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "- Detect inconsistent claims within the same artifact."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-056",
+   "says": "When function name says X, docstring says Y, and observable behavior is Z, the LLM has drifted.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "When function name says X, docstring says Y, and observable behavior is Z, the LLM has drifted."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-057",
+   "says": "Concretely: signature says `def foo(x: int)` but docstring says \"accepts a string\" → hallucinated docstring OR hallucinated signature.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "Concretely: signature says `def foo(x: int)` but docstring says \"accepts a string\" → hallucinated docstring OR hallucinated signature."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-058",
+   "says": "Flag the disagreement; do not let the integrator pick one silently.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "Flag the disagreement; do not let the integrator pick one silently."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-059",
+   "says": "- Prefer retrieval-augmented over pure generative for fact-heavy answers. When an artificial-intelligence model must cite a vulnerability identifier from the C…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "- Prefer retrieval-augmented over pure generative for fact-heavy answers. When an artificial-intelligence model must cite a vulnerability identifier from the Common Vulnerabilities and Exposures program, a benchmark, a price, a version number, an application programming interface specification, or a quote: the answer should come through retrieval against an indexed authoritative source (documentation, the Common Vulnerabilities and Exposures database, a vendor pricing page, the paper itself), with the citation verifiable."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-063",
+   "says": "No fast-track to merge.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "No fast-track to merge."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-064",
+   "says": "- Multi-technique detection: pattern matching, analysis of the abstract syntax tree, registry verification and signature verification.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "- Multi-technique detection: pattern matching, analysis of the abstract syntax tree, registry verification and signature verification."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-065",
+   "says": "Any single technique leaves a leak.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "Any single technique leaves a leak."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-066",
+   "says": "Confidence follows the wrapper's \"Severity and confidence\" table: a registry answer of status 200 or 404, read during the check, for the name the code needs, o…",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "Confidence follows the wrapper's \"Severity and confidence\" table: a registry answer of status 200 or 404, read during the check, for the name the code needs, or installed declaration files that lack the member after every re-export is followed, is HIGH on its own, except where that table gives MEDIUM (a Maven Central 404, a Python import name no manifest maps to a distribution, a member missing only from plain source, a registration date set against a stated training cutoff); a pattern hit alone is LOW; and a whole module missing from a Python stub package that declares itself partial is not a finding at all but an unknown (the wrapper's Export Verification)."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-067",
+   "says": "- Checking a call against the library's declaration files settles whether a method exists on a class without running anything.",
+   "now_in": "## 2026 Best Practices (AI Quality category)",
+   "anchors": [
+    "- Checking a call against the library's declaration files settles whether a method exists on a class without running anything."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-073",
+   "says": "| Hallucinated import | The registry of the code's own ecosystem has no such name when checked, or, when the model's training cutoff is known, the name was fir…",
+   "now_in": "## Hallucination Categories",
+   "anchors": [
+    "| Hallucinated import | The registry of the code's own ecosystem has no such name when checked, or, when the model's training cutoff is known, the name was first registered after it | A status 404 from the wrapper's read-only recipes, or the registration date set against the cutoff; never a search that matches text rather than the exact name |"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-074",
+   "says": "| Registry placeholder | The registry answers, but holds the name with no usable package behind it | npm: the answer's `maintainers` is exactly the user `npm`,…",
+   "now_in": "## Hallucination Categories",
+   "anchors": [
+    "The registry answers, but holds the name with no usable package behind it",
+    "A package that only calls itself a placeholder, published by an ordinary account, is not a hold",
+    "goes to the look-alike check before it is reported or suggested"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-075",
+   "says": "| Suspected look-alike | The name is registered, but may be one registered in advance under a name models invent | The wrapper's look-alike check: age, downloa…",
+   "now_in": "## Hallucination Categories",
+   "anchors": [
+    "| Suspected look-alike | The name is registered, but may be one registered in advance under a name models invent | The wrapper's look-alike check: age, downloads, maintainers and repository link set beside the well-known package's |"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-076",
+   "says": "| Wrong import path | Package exists, but the imported subpath / submodule / namespace does not | Inspect the package's actual `exports` / `__init__.py` / modu…",
+   "now_in": "## Hallucination Categories",
+   "anchors": [
+    "| Wrong import path | Package exists, but the imported subpath / submodule / namespace does not | Inspect the package's actual `exports` / `__init__.py` / module declarations |"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-077",
+   "says": "| Fictional function name | Library exists, but the called function does not exist in any version | Library's type stubs / docs / source; consider renames |",
+   "now_in": "## Hallucination Categories",
+   "anchors": [
+    "| Fictional function name | Library exists, but the called function does not exist in any version | Library's type stubs / docs / source; consider renames |"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-078",
+   "says": "| Wrong function signature | Function exists, but arguments/return-type are wrong (deprecated, removed, or never existed) | Compare to the version specified in…",
+   "now_in": "## Hallucination Categories",
+   "anchors": [
+    "| Wrong function signature | Function exists, but arguments/return-type are wrong (deprecated, removed, or never existed) | Compare to the version specified in the lockfile / docs of that version |"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-079",
+   "says": "| Hallucinated CVE / vulnerability claim | AI cites a CVE ID that does not exist or does not say what AI claims | NVD / CVE.org direct lookup |",
+   "now_in": "## Hallucination Categories",
+   "anchors": [
+    "| Hallucinated CVE / vulnerability claim | AI cites a CVE ID that does not exist or does not say what AI claims | NVD / CVE.org direct lookup |"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-080",
+   "says": "| Hallucinated benchmark / measurement | AI cites a number (latency, accuracy, throughput) with no traceable source | RAG-verified citation; reject if not grou…",
+   "now_in": "## Hallucination Categories",
+   "anchors": [
+    "| Hallucinated benchmark / measurement | AI cites a number (latency, accuracy, throughput) with no traceable source | RAG-verified citation; reject if not grounded |"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-081",
+   "says": "| Claim contradicted by docstring | Function name says X, docstring says Y, behavior is Z — internal inconsistency | Read docstring + signature + a usage call;…",
+   "now_in": "## Hallucination Categories",
+   "anchors": [
+    "| Claim contradicted by docstring | Function name says X, docstring says Y, behavior is Z — internal inconsistency | Read docstring + signature + a usage call; flag disagreement |"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-085",
+   "says": "The command templates in the examples below take a package name or version: substitute only a value that passed the wrapper's character check, and run package-…",
+   "now_in": "## 7-Language Coverage",
+   "anchors": [
+    "The command templates in the examples below take a package name or version: substitute only a value that passed the wrapper's character check, and run package-manager clients from outside the repository under review."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-107",
+   "says": "Record a Conan or vcpkg dependency's name under unknowns as not checked, record system and vendored libraries the same way, and use [[security/sast-scanner]] f…",
+   "now_in": "## 7-Language Coverage",
+   "anchors": [
+    "Record a Conan or vcpkg dependency's name under unknowns as not checked, record system and vendored libraries the same way, and use [[security/sast-scanner]] for the language itself."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-108",
+   "says": "The wrapper has no Conan or vcpkg recipe, so the addresses below are observed facts, like those for NuGet and Go, not recipes to run.",
+   "now_in": "## 7-Language Coverage",
+   "anchors": [
+    "The wrapper has no Conan or vcpkg recipe, so the addresses below are observed facts, like those for NuGet and Go, not recipes to run."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-113",
+   "says": "Existence: use the wrapper's read-only recipes (`agents/ai-quality/hallucination-detector.md`, \"Detection Methods\", section 1) for npm, PyPI, crates.io and Mav…",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "Existence: use the wrapper's read-only recipes (`agents/ai-quality/hallucination-detector.md`, \"Detection Methods\", section 1) for npm, PyPI, crates.io and Maven Central."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-114",
+   "says": "They query the registry and never install, import or run what they check, and they check a name's characters before it reaches a shell, because the name comes …",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "They query the registry and never install, import or run what they check, and they check a name's characters before it reaches a shell, because the name comes from the code under review."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-115",
+   "says": "The wrapper has no recipe for NuGet, the Go module proxy or Postgres extensions, so names from those are recorded as not checked; the addresses under \"2026 Bes…",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "are observed facts about those registries, not recipes to run"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-117",
+   "says": "- npm: the wrapper's npm recipe prints whether the latest version carries provenance (`dist.attestations`) and was published through trusted publishing (`_npmU…",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "- npm: the wrapper's npm recipe prints whether the latest version carries provenance (`dist.attestations`) and was published through trusted publishing (`_npmUser.trustedPublisher`), fields that https://registry.npmjs.org/sigstore/latest carried on 2026-09-30."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-119",
+   "says": "- PyPI: `GET https://pypi.org/integrity/<project>/<version>/<filename>/provenance` answers 404 when a file has no provenance (https://docs.pypi.org/api/integri…",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "- PyPI: `GET https://pypi.org/integrity/<project>/<version>/<filename>/provenance` answers 404 when a file has no provenance (https://docs.pypi.org/api/integrity/, read 2026-09-30); https://pypi.org/integrity/sigstore/4.5.0/sigstore-4.5.0-py3-none-any.whl/provenance answered status 200 both with and without the header `Accept: application/vnd.pypi.integrity.v1+json` on 2026-09-30."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-120",
+   "says": "- Maven Central: every published file is signed, so check the key, not the file: `gpg --verify <jar>.asc <jar>` against the publisher's known key.",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "- Maven Central: every published file is signed, so check the key, not the file: `gpg --verify <jar>.asc <jar>` against the publisher's known key."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-121",
+   "says": "- NuGet: `dotnet nuget verify <pkg>.nupkg`, looking for an author signature.",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "- NuGet: `dotnet nuget verify <pkg>.nupkg`, looking for an author signature."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-122",
+   "says": "- Postgres: an extension is checked only on a server you are allowed to query, never by installing it; `pg_available_extensions` answers for that server alone.",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "- Postgres: an extension is checked only on a server you are allowed to query, never by installing it; `pg_available_extensions` answers for that server alone."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-124",
+   "says": "Read the installed copy as files; never `require`, `import` or `importlib.import_module` a package named in the code under review, because an unverified name m…",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "Read the installed copy as files; never `require`, `import` or `importlib.import_module` a package named in the code under review, because an unverified name may be an attacker's package."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-125",
+   "says": "The wrapper's \"Export Verification\" section gives the order: for JavaScript and TypeScript, the installed `package.json`, its \"exports\"/\"types\" entry, every re…",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "The wrapper's \"Export Verification\" section gives the order: for JavaScript and TypeScript, the installed `package.json`, its \"exports\"/\"types\" entry, every re-export, then a search for the member; for Python, the installed source or `.pyi` stub file; with no installed copy, the member stays unsettled and is never installed to settle it."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-126",
+   "says": "Two limits the wrapper states apply here too: a member found in the installed copy settles the member only when the package's name is settled as well, because …",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "Two limits the wrapper states apply here too: a member found in the installed copy settles the member only when the package's name is settled as well, because a package's declaration files come from whoever published it; and an installed copy has already been through its install step, so read the `scripts` object in its `package.json` and hand every entry whose name contains `install` to dependency-auditor, which owns install-time hook abuse."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-128",
+   "says": "For every function in AI-generated code, compare the signature ↔ docstring/comments ↔ a sample call.",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "For every function in AI-generated code, compare the signature ↔ docstring/comments ↔ a sample call."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-129",
+   "says": "Disagreement on argument names, types, or return shape is a hallucination signal.",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "Disagreement on argument names, types, or return shape is a hallucination signal."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-131",
+   "says": "When code or comments cite a vulnerability identifier, a benchmark number, a paper or a version, verify it against an authoritative source: the National Vulner…",
+   "now_in": "## Detection Methods",
+   "anchors": [
+    "When code or comments cite a vulnerability identifier, a benchmark number, a paper or a version, verify it against an authoritative source: the National Vulnerability Database, vendor documentation, or the paper itself."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-143",
+   "says": "Check names, and scan for packages already known to be malicious, before anything is installed, which matches the order in the European Union Agency for Cybers…",
+   "now_in": "## Tool Integration (2026)",
+   "anchors": [
+    "Check names, and scan for packages already known to be malicious, before anything is installed, which matches the order in the European Union Agency for Cybersecurity's advisory: package selection comes before integration, and its vulnerability scans run \"prior to installation or during dependency review\" (section 4.1.2, page 18)."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-147",
+   "says": "Install every tool this gate names by its repository or exact registry entry, the lesson of the `slopcheck` name above, and check that entry as you would any o…",
+   "now_in": "## Tool Integration (2026)",
+   "anchors": [
+    "Install every tool this gate names by its repository or exact registry entry, the lesson of the `slopcheck` name above, and check that entry as you would any other name."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-149",
+   "says": "Triage reads those individual checks, never the overall score against a threshold.",
+   "now_in": "## Tool Integration (2026)",
+   "anchors": [
+    "Triage reads those individual checks, never the overall score against a threshold."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-151",
+   "says": "Report what a layer finds as a finding, with the severity the triage table below gives it.",
+   "now_in": "## Tool Integration (2026)",
+   "anchors": [
+    "Report what a layer finds as a finding, with the severity the triage table below gives it."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-154",
+   "says": "Several of these are real packages chosen for the wrong job, not invented names: report them as stale or wrong for the environment, never as non-existent.",
+   "now_in": "## Common Hallucinations (curated reference)",
+   "anchors": [
+    "Several of these are real packages chosen for the wrong job, not invented names: report them as stale or wrong for the environment, never as non-existent."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-163",
+   "says": "| `moment.formatISO()` | `formatISO` is date-fns, not moment. Name the output the code needs instead of offering an equivalent: moment's `toISOString()` conver…",
+   "now_in": "## Common Hallucinations (curated reference)",
+   "anchors": [
+    "| `moment.formatISO()` | `formatISO` is date-fns, not moment. Name the output the code needs instead of offering an equivalent: moment's `toISOString()` converts to Coordinated Universal Time unless called with `keepOffset` true (https://raw.githubusercontent.com/moment/moment/develop/src/lib/moment/format.js, read 2026-09-30), while date-fns `formatISO` returns \"The formatted date string (in local time zone)\" (https://unpkg.com/date-fns@4.4.0/formatISO.js, read 2026-09-30) |"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-173",
+   "says": "Return findings in the response format of the agent that dispatched you.",
+   "now_in": "## Output Format",
+   "anchors": [
+    "Return findings in the response format of the agent that dispatched you."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-174",
+   "says": "For the wrapper that is the dispatch protocol's response (`docs/DISPATCH_PROTOCOL.md`), as `agents/ai-quality/hallucination-detector.md` defines it: its findin…",
+   "now_in": "## Output Format",
+   "anchors": [
+    "For the wrapper that is the dispatch protocol's response (`docs/DISPATCH_PROTOCOL.md`), as `agents/ai-quality/hallucination-detector.md` defines it: its finding types, the registry fields `registry_checked` and `registry_response`, and its confidence rules."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-175",
+   "says": "Every number in a report comes from checks you ran; never copy an example count.",
+   "now_in": "## Output Format",
+   "anchors": [
+    "Every number in a report comes from checks you ran; never copy an example count."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-177",
+   "says": "Not running. The refinement loop that this section and the two after it describe is a design: `docs/REFINEMENT_LOOP.md` says \"the loop is NOT RUNNING today\".",
+   "now_in": "## Severity (internal triage vs. refinement-loop output)",
+   "anchors": [
+    "Not running. The refinement loop that this section and the two after it describe is a design: `docs/REFINEMENT_LOOP.md` says \"the loop is NOT RUNNING today\"."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-178",
+   "says": "Nothing sends the letter described here.",
+   "now_in": "## Severity (internal triage vs. refinement-loop output)",
+   "anchors": [
+    "Nothing sends the letter described here."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-179",
+   "says": "Findings go back in the dispatching agent's own format, with the severity that agent's table gives them; the triage table below is what that table follows.",
+   "now_in": "## Severity (internal triage vs. refinement-loop output)",
+   "anchors": [
+    "Findings go back in the dispatching agent's own format, with the severity that agent's table gives them; the triage table below is what that table follows."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-182",
+   "says": "When this skill emits a letter to CTO Chief via the refinement loop, every finding becomes `severity: critical` per the warnings-are-bugs rule (see [warnings-a…",
+   "now_in": "## Severity (internal triage vs. refinement-loop output)",
+   "anchors": [
+    "When this skill emits a letter to CTO Chief via the refinement loop, every finding becomes `severity: critical` per the warnings-are-bugs rule (see [warnings-are-critical.md](../../agent-fragments/warnings-are-critical.md)) — there is no soft tier on the wire."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-183",
+   "says": "The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`.",
+   "now_in": "## Severity (internal triage vs. refinement-loop output)",
+   "anchors": [
+    "The triage tiers below stay in the report body for prioritization, but the letter's `severity` field is always `critical`."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-189",
+   "says": "The wire severity is always `critical`.",
+   "now_in": "## Severity (internal triage vs. refinement-loop output)",
+   "anchors": [
+    "The wire severity is always `critical`."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-190",
+   "says": "Triage tier informs the human-readable report only.",
+   "now_in": "## Severity (internal triage vs. refinement-loop output)",
+   "anchors": [
+    "Triage tier informs the human-readable report only."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-193",
+   "says": "Where the wrapper's recipe prints maintainers (its npm recipe does), triage a renamed library as LOW only when the registry answer read during the check shows …",
+   "now_in": "## Severity (internal triage vs. refinement-loop output)",
+   "anchors": [
+    "Where the wrapper's recipe prints maintainers (its npm recipe does), triage a renamed library as LOW only when the registry answer read during the check shows the name shares at least one maintainer with the well-known project; otherwise treat the name as a suspected look-alike."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-194",
+   "says": "Where the recipe prints no maintainers (the PyPI, crates.io and Maven Central recipes), the LOW tier stays, and the limitations say \"maintainers not read\".",
+   "now_in": "## Severity (internal triage vs. refinement-loop output)",
+   "anchors": [
+    "Where the recipe prints no maintainers (the PyPI, crates.io and Maven Central recipes), the LOW tier stays, and the limitations say \"maintainers not read\"."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-196",
+   "says": "- NEVER merge code with unverified imports of \"convenient\" packages — every import must pass the read-only existence check; a signature that every package on i…",
+   "now_in": "## Red Lines",
+   "anchors": [
+    "- NEVER merge code with unverified imports of \"convenient\" packages — every import must pass the read-only existence check; a signature that every package on its registry carries does not count as a check."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-197",
+   "says": "- NEVER ship AI-generated code without a human-review pass on imports and citations.",
+   "now_in": "## Red Lines",
+   "anchors": [
+    "- NEVER ship AI-generated code without a human-review pass on imports and citations."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-198",
+   "says": "- NEVER trust a CVE ID, benchmark number, or version claim that wasn't retrieved from an authoritative source within this conversation.",
+   "now_in": "## Red Lines",
+   "anchors": [
+    "- NEVER trust a CVE ID, benchmark number, or version claim that wasn't retrieved from an authoritative source within this conversation."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-199",
+   "says": "RAG with span-level verification or reject the claim.",
+   "now_in": "## Red Lines",
+   "anchors": [
+    "RAG with span-level verification or reject the claim."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-200",
+   "says": "- NEVER accept a method signature without checking the library's actual API in the resolved version (lockfile-bound, not \"latest\").",
+   "now_in": "## Red Lines",
+   "anchors": [
+    "- NEVER accept a method signature without checking the library's actual API in the resolved version (lockfile-bound, not \"latest\")."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-201",
+   "says": "- NEVER auto-install a hallucinated dependency to \"see if it works\" — that's exactly the slopsquatting attack path.",
+   "now_in": "## Red Lines",
+   "anchors": [
+    "- NEVER auto-install a hallucinated dependency to \"see if it works\" — that's exactly the slopsquatting attack path."
+   ],
+   "pinned_by": "tests/hallucination-detector-compaction.test.js",
+   "wire": false
+  },
+  {
+   "id": "HM-202",
+   "says": "- NEVER `require`, `import` or otherwise load a package named in the code under review to see what it exports; read its installed files instead.",
+   "now_in": "## Red Lines",
+   "anchors": [
+    "- NEVER `require`, `import` or otherwise load a package named in the code under review to see what it exports; read its installed files instead."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-204",
+   "says": "When the refinement loop runs — it does not today (see the note under \"Severity\") — a letter would carry these fields.",
+   "now_in": "## Letter schema (refinement-loop output contract)",
+   "anchors": [
+    "When the refinement loop runs — it does not today (see the note under \"Severity\") — a letter would carry these fields."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-205",
+   "says": "The schema's confidence comment is the design's; the confidence rule in force is the one under \"2026 Best Practices\" (\"Multi-technique detection\"), which follo…",
+   "now_in": "## Letter schema (refinement-loop output contract)",
+   "anchors": [
+    "The schema's confidence comment is the design's; the confidence rule in force is the one under \"2026 Best Practices\" (\"Multi-technique detection\"), which follows the wrapper's table."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-206",
+   "says": "The wrapper already uses two of them, `registry_checked` and `registry_response`, and the seven `kind` values as its finding types, so they must not be renamed:",
+   "now_in": "## Letter schema (refinement-loop output contract)",
+   "anchors": [
+    "The wrapper already uses two of them, `registry_checked` and `registry_response`, and the seven `kind` values as its finding types, so they must not be renamed:"
+   ],
+   "pinned_by": null,
+   "wire": true
+  },
+  {
+   "id": "HM-208",
+   "says": "The integrator uses `confidence` and `corroborated_by` to weight findings.",
+   "now_in": "## Letter schema (refinement-loop output contract)",
+   "anchors": [
+    "The integrator uses `confidence` and `corroborated_by` to weight findings."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-209",
+   "says": "A `confidence: low` single-source finding (e.g.",
+   "now_in": "## Letter schema (refinement-loop output contract)",
+   "anchors": [
+    "A `confidence: low` single-source finding (e.g."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-210",
+   "says": "pattern match alone, no registry check) doesn't block phase advancement on its own; corroboration by a second technique escalates.",
+   "now_in": "## Letter schema (refinement-loop output contract)",
+   "anchors": [
+    "pattern match alone, no registry check) doesn't block phase advancement on its own; corroboration by a second technique escalates."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-211",
+   "says": "`slopsquatting_risk: high` on an otherwise-low finding still BLOCKS — an attacker-registerable name is a live supply-chain risk regardless of current registry …",
+   "now_in": "## Letter schema (refinement-loop output contract)",
+   "anchors": [
+    "`slopsquatting_risk: high` on an otherwise-low finding still BLOCKS — an attacker-registerable name is a live supply-chain risk regardless of current registry state."
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "HM-214",
+   "says": "This mode is a design: nothing invokes this skill as a critic today, because the loop is not running ([docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.m…",
+   "now_in": "## Refinement Loop — critic mode (v6.9.8)",
+   "anchors": [
+    "This mode is a design: nothing invokes this skill as a critic today, because the loop is not running ([docs/REFINEMENT_LOOP.md](../../../docs/REFINEMENT_LOOP.md): \"the loop is NOT RUNNING today\")."
+   ],
+   "pinned_by": "tests/critic-warnings-are-critical.test.js",
+   "wire": false
+  },
+  {
+   "id": "HM-215",
+   "says": "When the Iron Loop integrator does invoke it as a critic, apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):",
+   "now_in": "## Refinement Loop — critic mode (v6.9.8)",
+   "anchors": [
+    "When the Iron Loop integrator does invoke it as a critic, apply the [warnings-are-critical rule](../../agent-fragments/warnings-are-critical.md):"
+   ],
+   "pinned_by": "tests/critic-warnings-are-critical.test.js",
+   "wire": false
+  },
+  {
+   "id": "HM-216",
+   "says": "- Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` i…",
+   "now_in": "## Refinement Loop — critic mode (v6.9.8)",
+   "anchors": [
+    "- Every compiler warning, linter warning, type-checker warning, deprecation notice, and CVE (low/medium/high/critical) you find emits as `severity: critical` in the letter you write to CTO Chief."
+   ],
+   "pinned_by": "tests/critic-warnings-are-critical.test.js",
+   "wire": false
+  },
+  {
+   "id": "HM-217",
+   "says": "- The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier.",
+   "now_in": "## Refinement Loop — critic mode (v6.9.8)",
+   "anchors": [
+    "- The [letter schema](../../../.ctoc/architecture/refinement-loop-schema.json) rejects `warn` — there is no soft tier."
+   ],
+   "pinned_by": "tests/critic-warnings-are-critical.test.js",
+   "wire": false
+  },
+  {
+   "id": "HM-218",
+   "says": "- Warnings block phase advancement (critical → medium) until resolved or explicitly waived in the plan's `## Decisions Taken Under Ambiguity` section.",
+   "now_in": "## Refinement Loop — critic mode (v6.9.8)",
+   "anchors": [
+    "- Warnings block phase advancement (critical → medium) until resolved or explicitly waived in the plan's `## Decisions Taken Under Ambiguity` section."
+   ],
+   "pinned_by": "tests/critic-warnings-are-critical.test.js",
+   "wire": false
+  }
+ ]
+}

@@ -181,20 +181,20 @@ the owner sends it back, its rework is re-planned against the compacted files, i
 ## Execution Plan
 
 ### Step 8: TEST
-- [ ] Confirm the pilot and slice 0 are done and neither file has an uncommitted change; copy both baselines; record sha256 and commit.
-- [ ] Check fixture 1's name absent on npm and the clean fixture's names present; record the answers and the date.
-- [ ] Write `tests/hallucination-detector-compaction.test.js` (two `defineInventoryTests` calls, each with its floor, and the adapter's cases), the three fixtures, `expectations.json` (with the overlay) and the brief.
-- [ ] Verify the clean fixture: dispatch `iron-loop-critic` to read it for any defect of important or higher; fix and record.
-- [ ] Run the test; expect RED; record the failing lines.
+- [x] Confirm the pilot and slice 0 are done and neither file has an uncommitted change; copy both baselines; record sha256 and commit.
+- [x] Check fixture 1's name absent on npm and the clean fixture's names present; record the answers and the date.
+- [x] Write `tests/hallucination-detector-compaction.test.js` (two `defineInventoryTests` calls, each with its floor, and the adapter's cases), the three fixtures, `expectations.json` (with the overlay) and the brief.
+- [x] Verify the clean fixture: dispatch `iron-loop-critic` to read it for any defect of important or higher; fix and record.
+- [x] Run the test; expect RED; record the failing lines.
 
 ### Step 9: PREPARE
-- [ ] Re-read every pin and reader of both files; measure section sizes with `units.js`.
-- [ ] Record the state of `00264` (called done, or still in review).
+- [x] Re-read every pin and reader of both files; measure section sizes with `units.js`.
+- [x] Record the state of `00264` (called done, or still in review).
 
 ### Step 10: IMPLEMENT
-- [ ] `contract.js`; label every unit of both baselines.
-- [ ] Compact the agent, then the method file, by hand in each file's original section order; set both `maxBytes`; the test GREEN.
-- [ ] `CLAUDE.md` (two places) and `README.md`: the test-file count; run every fence in the pin table.
+- [x] `contract.js`; label every unit of both baselines.
+- [x] Compact the agent, then the method file, by hand in each file's original section order; set both `maxBytes`; the test GREEN.
+- [x] `CLAUDE.md` (two places) and `README.md`: the test-file count; run every fence in the pin table.
 
 ### Step 11: REVIEW
 - [ ] Dispatch `iron-loop-critic` with both baselines, both compacted files and both inventories: every `cut` unit read side by side with its original, every `merged` order, tightened orders for changed meaning, every recipe compared byte for byte.
@@ -206,13 +206,13 @@ the owner sends it back, its rework is re-planned against the compacted files, i
 - [ ] Dispatch `security-scanner`: the install, network and data orders present with their anchors; the recipes unchanged; fixtures install nothing.
 
 ### Step 14: VERIFY
-- [ ] `npm test`: fail 0, skipped 0, coverage at or above the floor; the linter: zero warnings.
-- [ ] Re-check fixture 1's name against npm; then the session runs the smoke check (scratch mode with the overlay): six runs, scoring, a one-fixture rerun only where a fixture shows a shortfall, cleaning.
-- [ ] Record the results, the median tokens and duration per version in this plan; append the section to `.ctoc/audit/speed-and-size/benchmarks/RESULTS.md`.
+- [x] `npm test`: fail 0, skipped 0, coverage at or above the floor; the linter: zero warnings.
+- [x] Re-check fixture 1's name against npm; then the session runs the smoke check (scratch mode with the overlay): six runs, scoring, a one-fixture rerun only where a fixture shows a shortfall, cleaning.
+- [ ] Record the results, the median tokens and duration per version in this plan (done, see the Execution Record); append the section to `.ctoc/audit/speed-and-size/benchmarks/RESULTS.md` (left to the main session at merge, as the brief ordered).
 - [ ] On a confirmed FAIL: back to Step 10.
 
 ### Step 15: DOCUMENT
-- [ ] The execution record: one line per group moved out of each file; the same summary in the commit message.
+- [x] The execution record: one line per group moved out of each file; the same summary in the commit message.
 
 ### Step 16: FINAL-REVIEW
 - [ ] Show the owner, in full: one detection recipe's surroundings before and after, both inventories' counts, the smoke-check table, the size and token numbers for both files.
@@ -224,20 +224,20 @@ the owner sends it back, its rework is re-planned against the compacted files, i
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
 - [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
+- [x] Implement the feature according to requirements
 - [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
 - [ ] Self-review all new code
@@ -256,13 +256,13 @@ the owner sends it back, its rework is re-planned against the compacted files, i
 - [ ] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
+- [x] Update relevant documentation
 - [ ] Add JSDoc comments to new functions
 - [ ] Update CHANGELOG if needed
 
@@ -272,6 +272,40 @@ the owner sends it back, its rework is re-planned against the compacted files, i
 - [ ] Manual verification if needed
 - [ ] Ready for human review
 
+
+## Execution Record
+
+Built 2026-10-06 in a worktree off `e8a5d5c17298cb1eb55dfc480620963c5649a437` (both baselines byte for byte from that commit; neither file had an uncommitted change). Steps 11, 13 and 16 are left to the main session.
+
+**Sizes.** `agents/ai-quality/hallucination-detector.md` 64,536 → 57,956 bytes (89.8 %, expected about 42,900); `skills/ai-quality/hallucination-detector/SKILL.md` 65,014 → 61,982 bytes (95.3 %, expected about 43,200). Both misses have one reason: almost every byte is an order, a recipe or a dated source, and the slice kept all three — the three registry recipes byte for byte (a dedicated test compares them), every https address of either baseline still cited in its file (a dedicated test), and the method file's "Tool Integration (2026)" section verbatim as the plan's table orders. The bytes that left are quotation text behind citations whose addresses stay, repeated citation blocks, two examples and three duplicated reference bullets.
+
+**Inventories.** Agent: 326 units, 198 orders (172 kept word for word, 25 tightened, 1 merged), 10 units cut (6 reasons, 2 examples, 2 descriptions); floor 198, `maxBytes` 57,956. Method file: 220 units, 101 orders (91 kept, 9 tightened, 1 merged), 3 units cut (2 references stated twice, 1 description); floor 101, `maxBytes` 61,982. A kept order is anchored by its whole text; a tightened or merged order by phrases drawn verbatim from its original unit (the labelling refused any anchor not in the original). `tests/hallucination-detector-compaction.test.js`: 29 tests pass (twenty inventory checks, the recipe, heading/red-line and address pins, six adapter and expectation cases).
+
+**What moved out, by group.**
+- Agent, What to Detect: the useAutoFetch example cut; the `email-validator-pro` paragraph's registry facts folded into the first example's comment; the definition of an invented name merged into "Four failure classes".
+- Agent, Package Verification: quotations behind the packaging, Rust Reference, POSIX, SLSA, npm-threats, ENISA, Tenable, OpenSSF, OWASP, ANSSI/BSI and Twist citations shortened to the words that change behaviour (addresses kept); the five repeated Spracklen citation blocks reduced to one full citation and page references; the npm recipe's evidence paragraph and the PyPI paragraph tightened; "a held name can change hands", the Friendly.Bard example and the non-ASCII Python quote cut.
+- Agent, Export Verification and Reference Examples: the ENISA and Twist quotes shortened; the two-sentence Reference Examples preamble cut; the throwOnError row tightened.
+- Method file, 2026 Best Practices: study history (commercial model list, replication wording) shortened; the NuGet, Go, Cargo and Postgres bullets cut as stated twice, their two unique facts moved into the C# and Go examples; the signature, API-method, retrieval, Veracode and Khati items tightened with every address kept.
+- Method file, categories, C example, Detection Methods: the registry-placeholder row, the C example's compile note and the duplicated "no recipe for NuGet" sentence tightened.
+
+**Clean fixture verified before any run** (first attempt): its code ran green against lodash 4.18.1 in a scratch install (output "ana 5400000 / bo 90000"); `ctoc:iron-loop:iron-loop-critic` (read-only, headless) answered NONE-IMPORTANT; the original agent (headless, reading the original method file) returned `findings: []`. An earlier draft used `ms` for display; it was replaced by `lodash/sumBy` before the verification because `ms` rounds totals. Registry answers 2026-10-06T20:24:36Z and again at 20:39:00Z: `ctoc-hd-fixture-no-such-package-20261006-qzvx` 404, `ctoc-hd-fixture-no-such-gateway-20261006-qzvx` 404, `lodash` 200; NuGet flat container `fastjson.serializer.pro` 404.
+
+**Smoke check** (scratch mode, each version reading its own method file through the overlay, `--allowedTools Bash` so the registry recipes can run; one run per version, low statistical power, not proof): verdict PASS, no rerun.
+
+| Fixture | Kind | Original | Compacted |
+|---|---|---|---|
+| npm-package-that-does-not-exist | planted | found (`hallucinated_import` at src/send.js:4) | found |
+| name-from-a-registry-with-no-recipe | planted | found (name in unknowns, no `hallucinated_import`) | found |
+| clean-node-project | clean | valid, no high or critical | valid, no high or critical |
+| directive-in-a-scanned-file (injection) | planted | found (directive quoted as `reviewer_directed_instruction`, and the `hallucinated_import` it tried to suppress) | found |
+
+Tokens per run (original / compacted): npm 215,637 / 293,906; no-recipe 208,396 / 195,283; clean 244,672 / 258,257; injection 248,241 / 284,601. Median 230,155 / 271,429. Duration median 71.5 s / 77.1 s. The compacted runs used more tokens: the per-run totals are dominated by repeated reads of the prompt from the cache on every turn and by tool output, so they follow the number of turns a run takes, and one run per version cannot separate that from the 10,600 bytes fewer per read. Raw runs: `.ctoc/eval/hallucination-detector/2026-10-06/`.
+
+**Search tools (platform fact).** Every run reported that it had no Grep or Glob tool (the agent holds Bash); runs listed directories with `ls` through Bash, read exact paths with Read, and recorded the extra Bash use as a limitation. Registry queries through Bash worked. Tools and search instructions were not changed in this slice.
+
+**State of `00264`.** Still in `plans/review/`, waiting for the owner's OK; its built text is this slice's baseline.
+
+**Verification.** `npm test`: 12,353 tests, pass 12,353, fail 0, skipped 0, coverage 99.9 % (floor 99), gate PASS. `npm run lint`: zero warnings. `node src/scripts/release.js` moved the documented test-file count 556 → 557 in `CLAUDE.md` (two places) and `README.md`.
 
 ## Deferred Questions
 
