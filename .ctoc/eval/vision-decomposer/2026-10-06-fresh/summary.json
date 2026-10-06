@@ -24,7 +24,7 @@
       "fixture": "clean-two-goal-vision",
       "kind": "clean",
       "shortfalls": [],
-      "status": "baseline-invalid"
+      "status": "ok"
     }
   ],
   "note": "smoke check, one run per version, low statistical power, not proof",
@@ -97,6 +97,41 @@
           "order-respected"
         ],
         "standingBlindSpot": null
+      },
+      "rerun": {
+        "original": {
+          "valid": false,
+          "fenced": false,
+          "errors": [
+            "the run wrote files outside the stubs: .ctoc/decomposition/bookshop-sales-insights.md",
+            "no decomposition was produced and no gate refusal was given"
+          ],
+          "found": false,
+          "seriousFalse": null,
+          "missing": [
+            {
+              "id": "order-respected"
+            }
+          ],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [],
+          "standingBlindSpot": null
+        },
+        "compacted": {
+          "valid": true,
+          "fenced": false,
+          "errors": [],
+          "found": true,
+          "seriousFalse": null,
+          "missing": [],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [
+            "order-respected"
+          ],
+          "standingBlindSpot": null
+        }
       }
     },
     {
@@ -166,6 +201,32 @@
         "forbidden": [],
         "ids": [],
         "standingBlindSpot": null
+      },
+      "rerun": {
+        "original": {
+          "valid": true,
+          "fenced": false,
+          "errors": [],
+          "found": null,
+          "seriousFalse": false,
+          "missing": [],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [],
+          "standingBlindSpot": null
+        },
+        "compacted": {
+          "valid": true,
+          "fenced": false,
+          "errors": [],
+          "found": null,
+          "seriousFalse": false,
+          "missing": [],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [],
+          "standingBlindSpot": null
+        }
       }
     }
   ],
