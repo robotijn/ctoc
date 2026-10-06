@@ -156,37 +156,37 @@ in a scratch copy.
 ## Execution Plan
 
 ### Step 8: TEST
-- [ ] Confirm the pilot and slice 0 are done and the agent file has no uncommitted change; copy the baseline; record sha256 and commit.
-- [ ] Write `tests/product-owner-compaction.test.js`, the three fixtures (each stub with its `.status` file as the menu leaves it), `expectations.json` with its matchers, and the brief.
-- [ ] Verify the clean fixture: dispatch `iron-loop-critic` to read it for any defect of important or higher; fix and record.
-- [ ] Run the test; expect RED; record the failing lines.
+- [x] Confirm the pilot and slice 0 are done and the agent file has no uncommitted change; copy the baseline; record sha256 and commit.
+- [x] Write `tests/product-owner-compaction.test.js`, the three fixtures (each stub with its `.status` file as the menu leaves it), `expectations.json` with its matchers, and the brief.
+- [x] Verify the clean fixture: dispatch `iron-loop-critic` to read it for any defect of important or higher; fix and record.
+- [x] Run the test; expect RED; record the failing lines.
 
 ### Step 9: PREPARE
-- [ ] Re-read every pin and reader; measure section sizes with `units.js`; name the frontmatter reader the adapter uses.
-- [ ] Confirm `00297` has not built (this slice goes first); check whether the question-routing plan has built and, if so, record that the baseline is its result.
+- [x] Re-read every pin and reader; measure section sizes with `units.js`; name the frontmatter reader the adapter uses.
+- [x] Confirm `00297` has not built (this slice goes first); check whether the question-routing plan has built and, if so, record that the baseline is its result.
 
 ### Step 10: IMPLEMENT
-- [ ] `contract.js`; label every unit in `rule-inventory.json`.
-- [ ] Compact by hand in the original section order; set `maxBytes`; the test GREEN.
-- [ ] `CLAUDE.md` (two places) and `README.md`: the test-file count; run every fence in the pin table.
+- [x] `contract.js`; label every unit in `rule-inventory.json`.
+- [x] Compact by hand in the original section order; set `maxBytes`; the test GREEN.
+- [x] `CLAUDE.md` (two places) and `README.md`: the test-file count; run every fence in the pin table.
 
 ### Step 11: REVIEW
 - [ ] Dispatch `iron-loop-critic` with the baseline, the compacted agent and the inventory: every `cut` unit read side by side with the original, every `merged` order (the templates above all), tightened orders for changed meaning.
 
 ### Step 12: OPTIMIZE
-- [ ] Remove any repeat the review found.
+- [x] Remove any repeat the review found.
 
 ### Step 13: SECURE
 - [ ] Dispatch `security-scanner`: the write-location orders and the role boundary present with their anchors; fixtures clean.
 
 ### Step 14: VERIFY
-- [ ] `npm test`: fail 0, skipped 0, coverage at or above the floor; the linter: zero warnings.
-- [ ] The session runs the smoke check (scratch mode): six runs, scoring, a one-fixture rerun only where a fixture shows a shortfall, cleaning.
-- [ ] Record the results, the median tokens and duration per version in this plan; append the section to `.ctoc/audit/speed-and-size/benchmarks/RESULTS.md`.
-- [ ] On a confirmed FAIL: back to Step 10.
+- [x] `npm test`: fail 0, skipped 0, coverage at or above the floor; the linter: zero warnings.
+- [x] The session runs the smoke check (scratch mode): six runs, scoring, a one-fixture rerun only where a fixture shows a shortfall, cleaning.
+- [x] Record the results, the median tokens and duration per version in this plan; append the section to `.ctoc/audit/speed-and-size/benchmarks/RESULTS.md` (results recorded in the Execution Record; the RESULTS.md section is left to the main session at merge, per the build brief, because parallel slices would conflict on it).
+- [x] On a confirmed FAIL: back to Step 10.
 
 ### Step 15: DOCUMENT
-- [ ] The execution record: one line per group moved out; the same summary in the commit message.
+- [x] The execution record: one line per group moved out; the same summary in the commit message.
 
 ### Step 16: FINAL-REVIEW
 - [ ] Show the owner, in full: one section before and after, the inventory counts, the smoke-check table, the size and token numbers.
@@ -198,20 +198,20 @@ in a scratch copy.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
 - [ ] Self-review all new code
@@ -219,9 +219,9 @@ in a scratch copy.
 - [ ] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
 - [ ] Validate inputs (no path traversal)
@@ -230,14 +230,14 @@ in a scratch copy.
 - [ ] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
 - [ ] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
@@ -254,3 +254,84 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record
+
+Built 2026-10-06 in an isolated worktree by `iron-loop-executor` (Steps 8–10, 12, 14, 15; the
+reviews at Steps 11, 13 and 16 are the main session's).
+
+**Baseline.** `agents/planning/product-owner.md` at commit `7cafed08c5992e5b6b8e167b64181edbab58efcc`,
+no uncommitted change; copied byte for byte to `tests/compaction-eval/product-owner/baseline-agent.md`,
+sha256 `3a2745409f3cbfc3b5e91fba5bbe3496bca8539e9907c6e79c04f5ad7a5359a4`.
+
+**Step 8 RED.** The test file failed to load (`contract.js` missing); after the adapter landed,
+the ten inventory checks failed (inventory missing) and the five contract cases passed.
+
+**Step 9.** `00297` (s37) and `dispatched-agents-route-their-questions-to-the-session` are both
+still in `plans/todo/`, unbuilt, so the baseline is the pre-routing text. Frontmatter reader of the
+adapter: `parseMetadata` in `src/lib/state.js`. Pins re-read: `tests/agent-tool-grants.test.js`
+(shared searching rule, the two product-owner sentences, the deepthink hand-back), 
+`tests/session-start-question-dispatch.test.js`, `tests/agent-modernization.test.js`,
+`tests/agent-honest-status-fence.test.js`, `tests/unexecutable-instruction-fence.test.js`; wire
+literals held by `src/lib/vision-decomposer.js` (stub template line, section headings),
+`src/lib/plan-validator.js` (`## Problem`), `src/lib/background.js` (six status fields),
+`src/lib/streaming-precompute.js` (Question contract).
+
+**Inventory** (labelled before compacting): 426 units, 252 orders — 233 kept word for word,
+18 tightened, 4 merged (R-008 takes the duplicate "no AskUserQuestion" bullet; R-183 the Step 6
+risk template; R-201 the Step 7 frontmatter template) — and 57 units cut (34 descriptions,
+4 reasons, 9 examples, 3 references, 7 history). Order floor 252 in the test file.
+
+**Size.** 37,679 → 29,821 bytes (79.1 percent; `maxBytes` 29,821). The plan expected about
+25,000; the miss is because about 80 percent of the file is orders the plan keeps word for word
+(the role boundary, the status protocol, Steps 1–10, the shared rules), so the pilot's 33.6 percent
+ratio did not hold.
+
+**Moved out, one line per group:**
+- `## Tools Used` and `## References` with its methodology sources: removed (descriptions of the grant, attribution, and references the file states elsewhere).
+- `## Anti-Patterns to Avoid`: nine headings with Symptom/Prevention became nine one-line rules; symptoms and the gold-plating examples cut, every prevention kept.
+- The duplicate templates under Steps 3b, 4, 5, 6 and 7: removed; each step now points at the Output Format, and Step 6 keeps the per-risk `Likelihood` / `Impact` / `Mitigation` shape in one line.
+- Reasons cut: the JTBD example, "These are not just internal reasoning…", "This prevents duplicate work…", the long whole-file-rewrite reason (shortened to one sentence), the Gherkin keyword glossary (one line), the Needs-Input mechanism steps 2–4, the open-ended-question Bad/Good example, the internal-steps mapping line, the Cagan attribution.
+
+**Smoke check (scratch mode, one run per version, low statistical power, not proof).** Clean
+fixture verified first by `ctoc:iron-loop:iron-loop-critic` run headless and read-only: "NO DEFECT
+OF IMPORTANT OR HIGHER" (five lesser points, all decisions the product owner is meant to make;
+nothing fixed). Verdict **PASS** (`score.js` exit 0), no rerun needed. Raw runs and
+`summary.json` under `.ctoc/eval/product-owner/2026-10-06/`.
+
+| Fixture | Kind | Original | Compacted |
+|---|---|---|---|
+| `vague-criterion` | planted | valid, not found | valid, found (`within 2.5 seconds`) |
+| `stub-asks-for-a-price` | planted | valid, found (status left `needs-input`) | valid, found (price named out of scope; status ended `complete`) |
+| `clean-search-stub` | clean | valid, no serious finding | valid, no serious finding |
+
+The original's miss on `vague-criterion` is a real behaviour, not a matcher miss: it rewrote "the
+page should be fast" as an ordering check (ingredients displayed before any media loads), binary but
+with no number and unit. The difference on `stub-asks-for-a-price` (original stops at `needs-input`,
+compacted surfaces the price in Out of Scope and then marks `complete`) is allowed by both texts,
+which carry the same Step 10 order; one run each cannot attribute it to the compaction.
+
+| Run | Original tokens | Compacted tokens | Original duration | Compacted duration |
+|---|---|---|---|---|
+| `vague-criterion` | 691,029 | 678,983 | 236.3 s | 306.1 s |
+| `stub-asks-for-a-price` | 872,662 | 516,552 | 323.9 s | 217.9 s |
+| `clean-search-stub` | 445,171 | 762,971 | 254.7 s | 279.5 s |
+| **Median** | **691,029** | **678,983** | **254.7 s** | **279.5 s** |
+
+**Step 14.** `npm test`: tests 12231, pass 12231, fail 0, skipped 0, coverage 99.9 percent (floor
+99), PASS. Two earlier runs in the same session each failed one test with load average near 50
+(other slices building in parallel); the one read was the timing bound in
+`tests/reachability-surface-scan-is-linear.test.js` (4,705 ms against 3,000 ms), which passes alone.
+ESLint on the two new JavaScript files: zero warnings. `CLAUDE.md` and `README.md` test-file count
+551 → 552 by `src/scripts/release.js`; the main session reconciles counts at merge.
+`.ctoc/audit/speed-and-size/benchmarks/RESULTS.md` is NOT updated here (build brief: parallel
+slices would conflict); the section above holds its content.
+
+**Decisions taken during execution.**
+1. A run that rewrites nothing but records `needs-input` is VALID in `contract.js`: the agent's own
+   Needs-Input Protocol allows that stop, and scoring it invalid would turn a legitimate stop into
+   an INCOMPLETE verdict.
+2. The headings of the removed `## Tools Used`, `## References` and `### Methodology Sources`
+   sections are labelled `description` / `cut`: they title sections of descriptions and history,
+   and the inventory has no fate for a heading whose whole section leaves.
+3. The brief is written inline in `expectations.json` (no brief file): `files:` declares no brief file.
