@@ -174,19 +174,19 @@ This slice builds before
 ## Execution Plan
 
 ### Step 8: TEST
-- [ ] Confirm the pilot and slice 0 are done and the agent file has no uncommitted change; copy the baseline; record sha256 and commit.
-- [ ] Write `tests/implementation-planner-compaction.test.js` (`defineInventoryTests` with the floor, and the adapter's cases on hand-made captured files), the three fixtures, `expectations.json` with its matchers, and the brief.
+- [x] Confirm the pilot and slice 0 are done and the agent file has no uncommitted change; copy the baseline; record sha256 and commit.
+- [x] Write `tests/implementation-planner-compaction.test.js` (`defineInventoryTests` with the floor, and the adapter's cases on hand-made captured files), the three fixtures, `expectations.json` with its matchers, and the brief.
 - [ ] Verify the clean fixture: its tests pass; dispatch `iron-loop-critic` to read it for any defect of important or higher; fix and record.
-- [ ] Run the test; expect RED (inventory and adapter missing); record the failing lines.
+- [x] Run the test; expect RED (inventory and adapter missing); record the failing lines.
 
 ### Step 9: PREPARE
-- [ ] Re-read every pin and reader of the agent file; measure the section sizes with `units.js`; name the repository's frontmatter reader the adapter uses.
-- [ ] Confirm `00295` has not built (this slice goes first); if it has, record that the baseline is its result.
+- [x] Re-read every pin and reader of the agent file; measure the section sizes with `units.js`; name the repository's frontmatter reader the adapter uses.
+- [x] Confirm `00295` has not built (this slice goes first); if it has, record that the baseline is its result.
 
 ### Step 10: IMPLEMENT
-- [ ] `contract.js`; label every unit of the baseline in `rule-inventory.json`; run the test (checks 5 and 6 red until compacted).
-- [ ] Compact the agent by hand in the original section order; set `maxBytes`; the test GREEN.
-- [ ] `CLAUDE.md` (two places) and `README.md`: the test-file count; run every fence in the pin table.
+- [x] `contract.js`; label every unit of the baseline in `rule-inventory.json`; run the test (checks 5 and 6 red until compacted).
+- [x] Compact the agent by hand in the original section order; set `maxBytes`; the test GREEN.
+- [x] `CLAUDE.md` (two places) and `README.md`: the test-file count; run every fence in the pin table.
 
 ### Step 11: REVIEW
 - [ ] Dispatch `iron-loop-critic` with the baseline, the compacted agent and the inventory: every `cut` unit read side by side with the original, every `merged` order's surviving statement, tightened orders for changed meaning.
@@ -198,13 +198,13 @@ This slice builds before
 - [ ] Dispatch `security-scanner`: the security checklist orders present with their anchors; fixtures free of credential-shaped strings and outside paths.
 
 ### Step 14: VERIFY
-- [ ] `npm test`: fail 0, skipped 0, coverage at or above the floor; the linter: zero warnings.
-- [ ] The session runs the smoke check by the protocol in `prepare.js` (scratch mode): six runs, scoring, a one-fixture rerun only where a fixture shows a shortfall, cleaning.
+- [x] `npm test`: fail 0, skipped 0, coverage at or above the floor; the linter: zero warnings.
+- [x] The session runs the smoke check by the protocol in `prepare.js` (scratch mode): six runs, scoring, a one-fixture rerun only where a fixture shows a shortfall, cleaning.
 - [ ] Record the per-fixture results, any rerun or matcher correction, the verdict, the sizes and the median tokens and duration per version in this plan; append the section to `.ctoc/audit/speed-and-size/benchmarks/RESULTS.md`.
 - [ ] On a confirmed FAIL: back to Step 10 with the failing fixture's outputs.
 
 ### Step 15: DOCUMENT
-- [ ] This plan's execution record: one line per group of reasons, history and examples moved out (they stay word for word in the baseline); the commit message carries the same summary.
+- [x] This plan's execution record: one line per group of reasons, history and examples moved out (they stay word for word in the baseline); the commit message carries the same summary.
 
 ### Step 16: FINAL-REVIEW
 - [ ] Show the owner, in full: one section before and after, the inventory counts, the smoke-check table, the size and token numbers.
@@ -216,20 +216,20 @@ This slice builds before
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
 - [ ] Self-review all new code
@@ -248,14 +248,14 @@ This slice builds before
 - [ ] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
 - [ ] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
@@ -272,3 +272,91 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record
+
+Built in an isolated worktree by the iron-loop executor, 2026-10-06. Steps 11, 13 and 16 are
+left to the main session (critic and security-scanner dispatches).
+
+**Baseline.** `tests/compaction-eval/implementation-planner/baseline-agent.md`, copied from commit
+`7cafed08c5992e5b6b8e167b64181edbab58efcc`, sha256
+`44c9baf3a44ca711129a21df2620c03f22266b499308bda98064a0d61ed46520`. The pilot and slice 0 are in
+`plans/done/`; `00295` is still in `plans/todo/` (not built), so this slice goes first.
+
+**Step 8 RED.** `node --test tests/implementation-planner-compaction.test.js` failed at load:
+`Cannot find module './compaction-eval/implementation-planner/contract'` (adapter and inventory
+missing). The clean fixture's own tests pass (`npm test` in the fixture: 4 pass, 0 fail). The
+`iron-loop-critic` read of the clean fixture was NOT dispatched: this executor holds no
+agent-dispatch tool, so the main session should dispatch it (that Step 8 box stays open).
+
+**Step 9.** Pins re-read: `tests/subplan-decomposition.test.js` (parent_plan, depends_on, "more
+implementation plans than … functional", "never split a module from its test", `-s<N>-`),
+`tests/tier1-no-peer-dispatch.test.js` (the Step 0 heading; the stack-chooser item names CTO
+Chief; no "Dispatch <name>" line), `tests/session-start-question-dispatch.test.js` (the
+dispatch-brief sentence, `writePlanQuestions`, `streaming-precompute`, no "SessionStart injects" —
+a pin missing from the plan's table, added to the inventory), `tests/agent-modernization.test.js`
+(frontmatter fields, a shared-snippet reference), `tests/architecture-invariants.test.js` (tier 1,
+reports_to), `tests/unexecutable-instruction-fence.test.js` test 10, and the tool-grant,
+model-floor and honest-status fences. The adapter reads frontmatter with `state.parseMetadata`
+(it merges leading blocks and reads the `files:` list) and step labels with
+`plan-validator.validateStepLabels`.
+
+**Step 10 — inventory.** 327 units: 233 kept, 7 tightened, 32 merged, 55 cut. 176 orders (order
+floor 176 in the test); every anchor is original text, unique in the compacted file and found in
+its own section. `tests/implementation-planner-compaction.test.js`: 20 pass (10 inventory checks,
+10 adapter cases). Every pinned test and fence passes unchanged (342 tests across the files in the
+pin table plus reachability and the harness; `gate-words`, `false-green-fence`,
+`golden-corpus-fence`: 55 pass). eslint on the new files: 0 problems.
+
+**What left (word for word in the baseline):**
+- Examples (12 units): the Phase 2.1 Grep and Glob example blocks (folded into one line each), the
+  Phase 2.3 module, agent-definition and test patterns, the 4.1 to 4.3 example tables (each order
+  now names its output section and columns instead), the naming example, and `## Example: Adding a
+  New Lib Module`. Examples that remain: the Phase 1 change types (a table without its example
+  column), the `coverage-map` / `wire-verify` naming hint and the caching question in Needs-Input.
+  The output templates stay.
+- References (7 units): `## References`.
+- Descriptions (31 units): the manifest's contents, the expert-architect sentence, `## Trigger`,
+  the plan contents under Input, Process Overview, the SIP1 label, the second vision-decomposer
+  mirror, `## Batched Gates` (what `approveSubplans` and the executor do, not an order to the
+  planner), `## Integration with Iron Loop`, and the v7 lead sentence.
+- Reasons (5 units): why small slices (a crash loses only one), why the graph prevents cycles, the
+  test-first aside in 4.1, "more plans does not mean more gate prompts", "not stylistic
+  suggestions".
+- Merged repeats (10 order units): the Role's slice-structure and INDEX restatements, the 3.4
+  cross-platform row (held in the 3.1 template), the 4.1 dependency-order sentence, the
+  anti-patterns that restated the Role, wiring, sizing, 3.3 and 3.4 orders, and the example's
+  "verify real names" (held by "Copy-paste assumptions").
+
+**Size.** 36,797 → 26,558 bytes (72.2 percent; `maxBytes` 26,558). This misses the expected
+24,400 (66.4 percent) by 2,158 bytes. Reason: about 9 KB of this agent is output templates and the
+Phase 4b skeleton, which the plan keeps whole as orders; no order was dropped to reach a number.
+
+**Step 14 — smoke check** (scratch mode, one headless run per version, 6 runs; verdict PASS on
+the first round, no rerun, no matcher correction; low statistical power, not proof):
+
+| Fixture | Original | Compacted | Tokens original | Tokens compacted | Duration original | Duration compacted |
+|---|---|---|---|---|---|---|
+| module-needs-its-test (planted) | found (module-with-its-test, claude-md-declared) | found (same) | 196,847 | 211,093 | 139.0 s | 161.4 s |
+| no-live-entry-point (planted) | found (question-raised, no invented-call-site, no slice written) | found (same) | 132,801 | 137,672 | 79.9 s | 68.3 s |
+| clean-config-flag (clean) | 2 slices, no important finding | 2 slices, no important finding | 276,376 | 248,243 | 163.6 s | 171.0 s |
+
+Median tokens per run: original 196,847, compacted 211,093. Median duration: original 139.0 s,
+compacted 161.4 s. With one run per version this spread is run-to-run noise (the agent body is
+about 2,600 tokens smaller per turn, **derived** from 10,239 bytes at about 4 bytes a token; the
+runs differ by tens of thousands of tokens in how many files the planner chose to read), so these
+numbers show no speed change either way. Scored runs: `.ctoc/eval/implementation-planner/2026-10-06/`.
+The `RESULTS.md` section was not written here (parallel slices would conflict); the main session
+appends it at merge, so that Step 14 box stays open.
+
+**Decisions taken while building** (recorded here, outside the approved text):
+1. The brief is composed from the self-contained-brief contract in `src/commands/start.md` (task
+   id, plan path, ancestry to read, completion contract), because `start.md` holds no literal
+   planner brief to copy word for word.
+2. A run that wrote no slice but raised a question through a named channel is VALID: the
+   Needs-Input protocol tells the planner to wait for the answer, so halting with the question is a
+   correct answer (both runs of `no-live-entry-point` did exactly that).
+3. The question channels are the two the baseline names: the plan's `.status` file reading
+   `needs-input` (seeded `working` in every fixture) and `.ctoc/streaming/questions/`.
+4. `---` horizontal rules and bare list numbers are labelled as markup (`heading`), not content;
+   removed rules are `merged`.

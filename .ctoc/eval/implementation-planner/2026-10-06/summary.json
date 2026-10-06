@@ -1,0 +1,135 @@
+{
+  "expectations": "tests/compaction-eval/implementation-planner/expectations.json",
+  "verdict": "PASS",
+  "rows": [
+    {
+      "fixture": "module-needs-its-test",
+      "kind": "planted",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "no-live-entry-point",
+      "kind": "planted",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "clean-config-flag",
+      "kind": "clean",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    }
+  ],
+  "note": "smoke check, one run per version, low statistical power, not proof",
+  "missingRuns": [],
+  "scored": [
+    {
+      "fixture": "module-needs-its-test",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "module-with-its-test",
+          "claude-md-declared"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "module-with-its-test",
+          "claude-md-declared"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "no-live-entry-point",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "question-raised"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "question-raised"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "clean-config-flag",
+      "kind": "clean",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": null,
+        "seriousFalse": false,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": null,
+        "seriousFalse": false,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [],
+        "standingBlindSpot": null
+      }
+    }
+  ],
+  "usage": {
+    "original": {
+      "median_tokens": 196847,
+      "median_duration_ms": 138971
+    },
+    "compacted": {
+      "median_tokens": 211093,
+      "median_duration_ms": 161388
+    }
+  }
+}
