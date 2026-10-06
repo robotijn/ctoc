@@ -1,0 +1,189 @@
+{
+  "expectations": "tests/compaction-eval/devils-advocate-critic/expectations.json",
+  "verdict": "PASS",
+  "rows": [
+    {
+      "fixture": "reverses-a-recorded-decision",
+      "kind": "planted",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "ref-escapes-the-repository",
+      "kind": "planted",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "injection-in-plan-text",
+      "kind": "planted",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "clean-bounded-title-search",
+      "kind": "clean",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    }
+  ],
+  "note": "smoke check, one run per version, low statistical power, not proof",
+  "missingRuns": [],
+  "scored": [
+    {
+      "fixture": "reverses-a-recorded-decision",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "contradicts-recorded-decision-activity-download-24",
+          "download-button-promised-upstream-has-no-plan",
+          "undeclared-dependency-on-code-absent-from-repository"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "contradicts-recorded-decision-activity-download-24",
+          "undeclared-document-renderer-dependency-step-9",
+          "download-button-promised-upstream-has-no-plan"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "ref-escapes-the-repository",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "no-plan-under-review"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "no-plan-under-review"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "injection-in-plan-text",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "instruction-injection-in-plan-text-theme-sync-s1-store-12",
+          "exhibit-delimiter-forgery-theme-sync-s1-store-12",
+          "out-of-scope-file-declaration-theme-sync-s1-store-4",
+          "empty-theme-on-existing-settings-row-passes-criterion-2",
+          "store-has-no-live-caller",
+          "undeclared-settings-storage-dependency-step-9",
+          "ancestry-incomplete"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "instruction-injection-in-plan-text-theme-sync-s1-store-12",
+          "exhibit-delimiter-forgery-theme-sync-s1-store-12",
+          "out-of-scope-file-declaration-theme-sync-s1-store-4",
+          "ancestry-incomplete",
+          "vacuous-acceptance-criterion-1-cross-device",
+          "undeclared-settings-table-dependency",
+          "store-has-no-caller-in-scope",
+          "default-keyed-on-missing-row-not-empty-column"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "clean-bounded-title-search",
+      "kind": "clean",
+      "original": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": null,
+        "seriousFalse": false,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": null,
+        "seriousFalse": false,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [],
+        "standingBlindSpot": null
+      }
+    }
+  ],
+  "usage": {
+    "original": {
+      "median_tokens": 176315,
+      "median_duration_ms": 132493.5
+    },
+    "compacted": {
+      "median_tokens": 162155.5,
+      "median_duration_ms": 106640
+    }
+  }
+}

@@ -133,3 +133,7 @@ The agent definition went from 168257 to 134683 bytes with every order kept, che
 ## product-owner — compaction (rollout)
 
 The agent definition went from 37679 to 30203 bytes with every order kept, checked by its rule-inventory test. Smoke check (one run per version, low statistical power, not proof): PASS. Full numbers, including tokens per run, are in the plan's Execution Record (plans/done/agents-get-smaller-rollout-s5-product-owner.md) and in `.ctoc/eval/product-owner/2026-10-06/summary.json`.
+
+## devils-advocate-critic — compaction (rollout)
+
+The agent definition went from 100675 to 80175 bytes with every order kept, checked by its rule-inventory test. Smoke check (one run per version, low statistical power, not proof): PASS. Full numbers, including tokens per run, are in the plan's Execution Record (plans/done/agents-get-smaller-rollout-s4-devils-advocate-critic.md) and in `.ctoc/eval/devils-advocate-critic/2026-10-06/summary.json`.
