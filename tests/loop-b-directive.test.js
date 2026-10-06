@@ -240,8 +240,8 @@ test('a large review backlog is BOUNDED and labelled "waiting for your OK", neve
     const out = driver.loopBDirective(dir);
     // labelled as waiting for the human's OK, NOT as questions being worked out
     assert.ok(/waiting for your ok/i.test(out), `expected a "waiting for your OK" line, got: ${JSON.stringify(out)}`);
-    assert.ok(!/still working out what to ask you about/i.test(out),
-      `review-backlog plans must NOT be under "still working out what to ask you about": ${JSON.stringify(out)}`);
+    assert.ok(!/wait for their questions/i.test(out),
+      `review-backlog plans must NOT be under "wait for their questions": ${JSON.stringify(out)}`);
     // BOUNDED: at most 5 titles named, then "and K more" — never all 32.
     assert.ok(/and \d+ more/.test(out), `expected an "and K more" summary, got: ${JSON.stringify(out)}`);
     const namedCount = (out.match(/Waiting item \d+/g) || []).length;
@@ -264,8 +264,8 @@ test('a review→done plan carrying an OPEN FORK is "working out", not "waiting 
         blockingQuestionIds: ['q1'], unansweredQuestionIds: ['q1'] },
     ]);
     const out = driver.loopBDirective(dir);
-    assert.ok(/still working out what to ask you about: Forky decision/i.test(out),
-      `a review→done plan with an open fork must be "working out", got: ${JSON.stringify(out)}`);
+    assert.ok(/1 plan\(s\) wait for their questions[^\n]*: Forky decision\./.test(out),
+      `a review→done plan with an open fork must wait for its questions, got: ${JSON.stringify(out)}`);
     assert.ok(!/waiting for your ok[^]*Forky decision/i.test(out),
       `a plan with an open fork must NOT be "waiting for your OK": ${JSON.stringify(out)}`);
     assertPlainLanguage(out);
@@ -282,7 +282,7 @@ test('a mixed backlog renders BOTH bounded lines, cleanly separated', () => {
     makePlan(dir, 'implementation', '90001-inline-help', { title: 'Inline help panel' }); // working out (pre-build)
     makePlan(dir, 'implementation', '90002-usage-graph', { title: 'Usage graph' });       // working out (pre-build)
     const out = driver.loopBDirective(dir);
-    assert.ok(/still working out what to ask you about:/i.test(out), `expected the working-out line: ${JSON.stringify(out)}`);
+    assert.ok(/2 plan\(s\) wait for their questions/.test(out), `expected the wait-for-questions line: ${JSON.stringify(out)}`);
     assert.ok(/waiting for your ok/i.test(out), `expected the waiting-for-OK line: ${JSON.stringify(out)}`);
     assert.ok(out.includes('Inline help panel'));
     assert.ok(/and \d+ more/.test(out), `the waiting line must still be bounded: ${JSON.stringify(out)}`);
@@ -326,4 +326,68 @@ test('a sufficiency auto-cross (plan leaves its pre-build stage) is named in pla
     streamingGate.pendingGateDecisions = orig;
     cleanup(dir);
   }
+});
+
+// ── the questions line names the human's way to ask, and orders nothing ─────────
+// Plan "CTOC does no unasked work at session start or stop": nothing generates
+// questions in the background any more, so the old "Still working out what to ask you
+// about" wording would be false. The line now gives the COUNT and the one way to ask —
+// choose "Generate its questions" on a plan's decision in /ctoc:start — and the names,
+// capped at five.
+
+test('plans without questions: the line gives the count and "Generate its questions", names capped at five, no order', () => {
+  const dir = mkProject();
+  try {
+    for (let i = 0; i < 7; i++) {
+      makePlan(dir, 'implementation', `9100${i}-needs-qs-${i}`, { title: `Needs questions ${i}` });
+    }
+    const out = driver.loopBDirective(dir);
+    assert.match(out, /7 plan\(s\) wait for their questions — choose "Generate its questions" on a plan's decision in \/ctoc:start: /);
+    assert.equal((out.match(/Needs questions \d/g) || []).length, 5, `names capped at five: ${JSON.stringify(out)}`);
+    assert.match(out, /and 2 more\./);
+    assert.doesNotMatch(out, /still working out/i, 'the false "working out" wording is gone');
+    assert.doesNotMatch(out, /\bsubagents?\b|dispatch/i, 'the line orders nothing');
+    assertPlainLanguage(out);
+  } finally { cleanup(dir); }
+});
+
+// ── the count line counts what it offers: built and empty plans are not counted ──
+// A built plan without questions is listed under "Waiting for your OK", never counted
+// as waiting for its questions; an empty plan gets the broken-plan screen (no "Generate
+// its questions"), so it is not counted either.
+
+test('a built plan without questions is listed as waiting for your OK; an empty plan is not counted', () => {
+  const dir = mkProject();
+  try {
+    makePlan(dir, 'review', '00095-built-noqs', { title: 'Built without questions' });
+    fs.writeFileSync(path.join(dir, 'plans', 'functional', '00096-empty.md'), '');
+    makePlan(dir, 'implementation', '00097-unbuilt', { title: 'Unbuilt plan' });
+    const out = driver.loopBDirective(dir);
+    assert.match(out, /1 plan\(s\) wait for their questions[^\n]*: Unbuilt plan\./,
+      `only the unbuilt, non-empty plan is counted: ${JSON.stringify(out)}`);
+    assert.match(out, /Waiting for your OK[^\n]*Built without questions/);
+    assert.doesNotMatch(out, /empty/i, `the empty plan is not named: ${JSON.stringify(out)}`);
+  } finally { cleanup(dir); }
+});
+
+test('each plan name in a line is capped at 80 characters with an ellipsis', () => {
+  const dir = mkProject();
+  try {
+    const long = 'L'.repeat(6000);
+    makePlan(dir, 'implementation', '00098-long-title', { title: long });
+    const out = driver.loopBDirective(dir);
+    assert.ok(!out.includes('L'.repeat(81)), `a name longer than 80 characters reached the line (${out.length} characters)`);
+    assert.ok(out.includes('L'.repeat(79) + '…'), 'the capped name ends in an ellipsis');
+    assert.ok(out.length < 400, `the line stays short: ${out.length} characters`);
+  } finally { cleanup(dir); }
+});
+
+test('the "Next up to build" name is capped at 80 characters too', () => {
+  const dir = mkProject();
+  try {
+    makePlan(dir, 'todo', '00099-long-next', { title: 'N'.repeat(6000), approve: true });
+    const out = driver.loopBDirective(dir);
+    assert.ok(!out.includes('N'.repeat(81)), `a name longer than 80 characters reached the line (${out.length} characters)`);
+    assert.ok(out.includes('N'.repeat(79) + '…'), 'the capped name ends in an ellipsis');
+  } finally { cleanup(dir); }
 });

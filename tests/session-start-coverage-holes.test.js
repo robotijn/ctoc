@@ -2,50 +2,50 @@
  * Every optional session-start subsystem degrades to SILENCE, provably.
  * ---------------------------------------------------------------------------
  * `src/hooks/SessionStart.js` runs on every session open. Nine of its ranges were
- * dark on the 2026-08-31 measurement (96.68 % line coverage), and every one of them
- * is the same shape: the catch arm that keeps a broken OPTIONAL subsystem from
+ * dark on the 2026-08-31 measurement (96.68 % line coverage); one of them, the
+ * question-dispatch directive, has since been deleted with the directive itself (plan
+ * "CTOC does no unasked work at session start or stop"). Every remaining one is the
+ * same shape: the catch arm that keeps a broken OPTIONAL subsystem from
  * breaking the human's session start.
  *
- * The property each case pins is not "it did not crash". Line 202 composes the
+ * The property each case pins is not "it did not crash". `main()` composes the
  * injected context as
- *   console.log(context + (directive||'') + (resume||'') + (loopB||'') + (away||''))
+ *   console.log(context + (resume||'') + (loopB||'') + (away||''))
  * so a broken optional subsystem must contribute EXACTLY NOTHING — not `undefined`,
  * not a partial, not an error string — to the text the model reads. The one
  * deliberate exception is the Iron Loop self-check, which contributes a visible
  * "Self-check skipped: <reason>" line: the human is told, and the session still
  * starts.
  *
- * RANGE MAP (line numbers from the 2026-08-31 gate report; they drift with edits,
- * the gate's own table is the source of truth):
+ * RANGE MAP (the catch-arm lines of `src/hooks/SessionStart.js` as of 2026-10-06; they
+ * drift with edits, and the gate's own table is the source of truth):
  *
  * | lines   | subsystem broken                        | route      | asserted here |
  * |---------|-----------------------------------------|------------|---------------|
- * | 138-139 | plan-index backfill kick                | in-process | stderr line + session still starts |
- * | 166-168 | Iron Loop self-check                    | in-process | "Self-check skipped: <reason>" in the banner |
- * | 189-190 | build-loop tick (loop-b-driver)         | in-process | byte-for-byte identical to an ABSENT tick |
- * | 200-201 | while-you-were-away increment feed      | in-process | byte-for-byte identical to an ABSENT feed |
- * | 237-238 | question-dispatch directive             | in-process | '' — no directive |
- * | 318-319 | durable-watchdog resume injection       | in-process | '' — never wrongly resumes |
- * | 345-346 | CTOC-repo identity detector             | in-process | false — the fail-SAFE direction (do NOT inject) |
- * | 371-372 | operating-lessons block injection       | in-process | stderr line + no CLAUDE.md manufactured |
- * | 568-569 | main().catch, hook run as main module   | spawned    | exit 1 + "[CTOC] Session start error:" |
+ * | 138     | plan-index backfill kick                | in-process | stderr line + session still starts |
+ * | 166-167 | Iron Loop self-check                    | in-process | "Self-check skipped: <reason>" in the banner |
+ * | 189     | build-loop tick (loop-b-driver)         | in-process | byte-for-byte identical to an ABSENT tick |
+ * | 200     | while-you-were-away increment feed      | in-process | byte-for-byte identical to an ABSENT feed |
+ * | 257     | durable-watchdog resume injection       | in-process | '' — never wrongly resumes |
+ * | 284     | CTOC-repo identity detector             | in-process | false — the fail-SAFE direction (do NOT inject) |
+ * | 310     | operating-lessons block injection       | in-process | stderr line + no CLAUDE.md manufactured |
+ * | 507-508 | main().catch, hook run as main module   | spawned    | exit 1 + "[CTOC] Session start error:" |
  *
- * ROUTES. Eight cases run IN-PROCESS: `SessionStart.js` exports `main`,
- * `questionDispatchDirective`, `resumeInjection`, `shouldInjectLessons` and
- * `maybeInjectLessons`, so the real code runs with `process.cwd()` pointed at a temp
- * fixture. The ninth (568-569) sits inside `if (require.main === module)`, so it is
- * reachable ONLY when the hook is the main module: that case spawns the hook as a
- * child with a `--require` preload (written into the temp fixture, never into this
- * repository) that poisons the stack detector so `main()` rejects.
+ * ROUTES. Seven cases run IN-PROCESS: `SessionStart.js` exports `main`,
+ * `resumeInjection`, `shouldInjectLessons` and `maybeInjectLessons`, so the real code
+ * runs with `process.cwd()` pointed at a temp fixture. The eighth (507-508) sits
+ * inside `if (require.main === module)`, so it is reachable ONLY when the hook is the
+ * main module: that case spawns the hook as a child with a `--require` preload
+ * (written into the temp fixture, never into this repository) that poisons the stack
+ * detector so `main()` rejects.
  *
  * NOTHING IS LEFT UNCOVERED by this file, and nothing here is permission-gated or
- * terminal-only: all nine ranges are reachable and all nine are exercised. No range
+ * terminal-only: all eight ranges are reachable and all eight are exercised. No range
  * of this file was found dead.
  *
  * FAULT INJECTION IS AT THE TRUE BOUNDARY ONLY — the exported reader of the module
  * each arm requires (`bootstrap.isBackfillNeeded`, `iron-loop-enforcer.checkAllInvariants`,
- * `loop-b-driver.loopBDirective`, `increment-feed.whileYouWereAway`,
- * `streaming-precompute.plansNeedingQuestions`, `continuation.status`,
+ * `loop-b-driver.loopBDirective`, `increment-feed.whileYouWereAway`, `continuation.status`,
  * `ctoc-project-detector.isCtocProject`, `claude-md-lessons.ensureLessonsBlock`).
  * The function under test is never mocked. Every stub is restored in a `finally`,
  * and the last case asserts every boundary is back to its original function object.
@@ -68,12 +68,11 @@ const crypto = require('../src/lib/crypto');
 const HOOK_PATH = path.resolve(__dirname, '..', 'src', 'hooks', 'SessionStart.js');
 const STACK_DETECTOR_PATH = path.resolve(__dirname, '..', 'src', 'lib', 'stack-detector.js');
 
-// The eight true boundaries, captured at load so the final case can prove restoration.
+// The seven true boundaries, captured at load so the final case can prove restoration.
 const bootstrap = require('../src/lib/plan-index/bootstrap');
 const enforcer = require('../src/lib/iron-loop-enforcer');
 const loopBDriver = require('../src/lib/loop-b-driver');
 const incrementFeed = require('../src/lib/increment-feed');
-const streamingPrecompute = require('../src/lib/streaming-precompute');
 const continuation = require('../src/lib/continuation');
 const ctocDetector = require('../src/lib/ctoc-project-detector');
 const claudeMdLessons = require('../src/lib/claude-md-lessons');
@@ -83,7 +82,6 @@ const BOUNDARIES = [
   [enforcer, 'checkAllInvariants'],
   [loopBDriver, 'loopBDirective'],
   [incrementFeed, 'whileYouWereAway'],
-  [streamingPrecompute, 'plansNeedingQuestions'],
   [continuation, 'status'],
   [ctocDetector, 'isCtocProject'],
   [claudeMdLessons, 'ensureLessonsBlock']
@@ -227,20 +225,6 @@ describe('a broken optional subsystem contributes nothing to session start', () 
     assert.ok(!broken.stdout.includes('undefined'), 'no undefined in the injected context');
   });
 
-  it('a broken question-dispatch precompute yields no directive at all', async () => {
-    // Arrange
-    const dir = makeFixture('ss-holes-directive-');
-
-    // Act
-    const directive = await withStub(
-      streamingPrecompute, 'plansNeedingQuestions', thrower('SIMULATED precompute failure'),
-      async () => hook.questionDispatchDirective(dir)
-    );
-
-    // Assert — '' exactly: a broken precompute must not half-instruct the session model.
-    assert.equal(directive, '');
-  });
-
   it('a broken continuation state never resumes — the injection is empty, not a guess', async () => {
     // Arrange — the kill-switch must be off, otherwise the early return, not the
     // catch arm, would produce the empty string.
@@ -296,7 +280,7 @@ describe('a broken optional subsystem contributes nothing to session start', () 
   });
 
   it('a rejecting main, run as the hook, exits 1 and names the failure on stderr', async () => {
-    // Arrange — 568-569 lives inside `if (require.main === module)`, so the hook must
+    // Arrange — 507-508 lives inside `if (require.main === module)`, so the hook must
     // be the MAIN module. The preload (written into the temp fixture, never into this
     // repository) poisons the stack detector's cached export BEFORE SessionStart is
     // loaded, so main()'s unguarded `detectStack(projectPath)` rejects the promise.

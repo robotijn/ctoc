@@ -167,20 +167,20 @@ async function main() {
     selfCheckSummary = `Self-check skipped: ${err.message}`;
   }
 
-  // 8. Output context for Claude (to stdout for hook consumption). When plans are
-  //    sitting at a gate without their decision questions, append the session-driven
-  //    dispatch directive so the SESSION MODEL itself dispatches the producers — the
-  //    plugin never spawns a second Claude (fail-open: any error → no directive).
+  // 8. Output context for Claude (to stdout for hook consumption). Session start
+  //    injects NO order to act: it reports state and leaves every action to the
+  //    human. Plans whose questions are missing are COUNTED by the build-loop line
+  //    below, which names the human's way to ask ("Generate its questions" on a
+  //    plan's decision in /ctoc:start); nothing is generated until the human chooses it.
   const context = generateContext(stack, state, version, updateInfo, selfCheckSummary, rootInfo);
-  const directive = questionDispatchDirective(projectPath);
   // The durable-watchdog resume (plan 00231): when the human opens a new session and
   // an unfinished, fork-free batch has gone idle past the stall threshold, inject the
   // "drive the next unit" directive so the run picks up exactly where it stalled. Empty
   // (quiet start) for no batch / complete / forked / fresh / the kill-switch.
   const resume = resumeInjection(projectPath);
   // The Loop-B tick (plan 00226): one plain-language line describing the build loop's
-  // state — what just auto-crossed on sufficiency, which plans still need questions, and
-  // the next plan to build. Purely ADDITIVE and fail-open ('' when there is nothing to
+  // state — what just auto-crossed on sufficiency, how many plans wait for their
+  // questions, and the next plan to build. Purely ADDITIVE and fail-open ('' when there is nothing to
   // report), so the injected context is byte-for-byte unchanged for an idle project.
   let loopB = '';
   try {
@@ -199,68 +199,7 @@ async function main() {
   } catch {
     away = ''; // the increment feed must never break session start
   }
-  console.log(context + (directive || '') + (resume || '') + (loopB || '') + (away || ''));
-}
-
-/**
- * The SESSION-DRIVEN question-dispatch directive (X7).
- *
- * The ruling: "there is no model calling, it is a plugin in the Claude command-line
- * interface, not using online API calls" and "session driven — when starting CTOC,
- * CTOC starts at least one subagent immediately to find open issues and generate
- * questions, preferably up to 5." Plain code cannot dispatch a CTOC subagent; only the
- * MODEL can. So SessionStart INJECTS an instruction and the session model acts on it —
- * it never spawns a second Claude (the deleted detached-spawn producer did exactly that).
- *
- * Requiring `streaming-precompute` here also keeps that module reachable from a hook
- * root: `plansNeedingQuestions` is the list of plans at a gate whose decision
- * questions are missing or stale. When it is EMPTY the directive is '' — no
- * session-start noise. When it is NON-EMPTY the directive names the concurrency cap
- * (up to 5), the stage producers, the adversarial critics, the real write path
- * (`streaming-precompute.writePlanQuestions`) with its schema, and every plan ref that
- * needs questions.
- *
- * FAIL-OPEN: any error (a bad root, a broken require) yields '' — the directive can
- * never break session start.
- *
- * @param {string} projectPath - absolute path to the project root
- * @returns {string} the directive to append to the injected context, or '' when
- *   nothing is pending.
- */
-function questionDispatchDirective(projectPath) {
-  if (typeof projectPath !== 'string' || projectPath.length === 0) return '';
-  let needing = [];
-  try {
-    const { plansNeedingQuestions } = require('../lib/streaming-precompute');
-    needing = plansNeedingQuestions(projectPath);
-  } catch {
-    return '';
-  }
-  if (!Array.isArray(needing) || needing.length === 0) return '';
-  const refs = needing
-    .map((d) => d && d.ref)
-    .filter((r) => typeof r === 'string' && r.length > 0);
-  if (refs.length === 0) return '';
-
-  const n = refs.length;
-  return `
-## Streaming questions — open forks awaiting the human (${n} plan${n === 1 ? '' : '(s)'})
-
-Before other work, dispatch UP TO 5 CTOC subagents IN THE BACKGROUND to find open
-issues and generate their questions — at least one, at most 5 at a time, refilling
-as they complete:
-  • producers, per plan stage — product-owner (functional), vision-advisor (vision),
-    implementation-planner (implementation) — generate a plan's decision forks;
-  • the adversarial critics — premortem-critic, devils-advocate-critic, red-team-critic
-    — surface forks nobody has asked yet.
-Each subagent writes its questions to the streaming store via
-src/lib/streaming-precompute.js → writePlanQuestions(root, ref, questions, planMtimeMs),
-questions = [{ id, prompt, critical?, important?, options:[{key,label,pros?,cons?}] }].
-The human answers them in /ctoc:start; a plan with every fork answered that passes
-validation crosses its pre-build gate by itself.
-
-Plans needing questions: ${refs.join(', ')}
-`;
+  console.log(context + (resume || '') + (loopB || '') + (away || ''));
 }
 
 /**
@@ -493,11 +432,11 @@ function generateContext(stack, state, version, updateInfo, selfCheckSummary, ro
   const selfCheckLine = selfCheckSummary ? `\n${selfCheckSummary}` : '';
   const databasesLine = formatDatabasesLine(stack);
   const frameworksLine = formatFrameworksLine(stack);
-  // The approved-queue depth the continuation gate will act on (slice 1 of the
-  // "when CTOC starts it must not stop" mechanism). Lazy require matches this file's
-  // style and keeps continuation-queue.js reachable from a live hook root. Fail-open:
-  // the helper returns '' for a null/invalid root, so legacy 5-arg callers (no
-  // rootInfo) and projects with no approved work render an unchanged banner.
+  // How many approved plans wait to be built — a REPORT only. Nothing acts on this
+  // count: the Stop hook never blocks for an approved queue (only a batch a human
+  // explicitly started does). Lazy require matches this file's style. Fail-open: the
+  // helper returns '' for a null/invalid root, so legacy 5-arg callers (no rootInfo)
+  // and projects with no approved work render an unchanged banner.
   const approvedQueueLine = require('../lib/continuation-queue')
     .approvedQueueBannerLine(rootInfo && typeof rootInfo.root === 'string' ? rootInfo.root : null);
 
@@ -570,4 +509,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, generateContext, questionDispatchDirective, resumeInjection, formatDatabasesLine, formatFrameworksLine, shouldInjectLessons, maybeInjectLessons };
+module.exports = { main, generateContext, resumeInjection, formatDatabasesLine, formatFrameworksLine, shouldInjectLessons, maybeInjectLessons };

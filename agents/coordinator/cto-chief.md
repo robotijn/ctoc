@@ -60,14 +60,8 @@ so you may surface the decision; `continuation.resolveFork(root)` resumes it onc
 answers. On genuine completion, `continuation.complete(root)` ends the batch. While the batch
 has remaining, fork-free work, the Stop hook BLOCKS a premature stop — so building continues.
 
-**Derived approved-queue regime (`src/lib/continuation-queue.js`).** When there is NO
-explicit batch, the approved, fork-free queue in `plans/todo/` (and a recoverable
-`plans/in-progress/` plan) IS the batch: the same Stop hook blocks a premature idle stop
-while approved plans wait. You do not start this regime — it is derived from the ledger.
-On a genuine fork while continuing on the derived queue, pause it with
-`continuationQueue.registerQueueFork(root, reason)` and surface the decision; once the human
-answers, resume it by calling `continuationQueue.resolveQueueFork(root)`. The bound
-self-heals as the queue drains, so an undrainable queue always eventually allows the stop.
+An approved build queue alone never blocks a stop: with no batch started, the Stop hook
+allows every stop, however many approved plans wait.
 
 ## Top-Level Authority — Sole Technical Coordinator (v8.x)
 

@@ -1,0 +1,3500 @@
+{
+ "generatedAt": "2026-10-06T15:15:46.879Z",
+ "from": "2026-06",
+ "months": [
+  "2026-06",
+  "2026-07",
+  "2026-08",
+  "2026-09",
+  "2026-10"
+ ],
+ "selfCheck": {
+  "subagentFilesFound": 1525,
+  "subagentFilesParsed": 1524,
+  "unparsed": [
+   "no user or assistant lines"
+  ],
+  "mainSessionFiles": 367,
+  "firstSubagentRun": "2026-08-18T17:30:09.750Z",
+  "lastSubagentRun": "2026-10-06T15:08:23.492Z",
+  "otherCtocProjects": 8
+ },
+ "humanWaitPerTurn": {
+  "2026-06": "no data",
+  "2026-07": "no data",
+  "2026-08": {
+   "turns": 33,
+   "medianMinutes": 1.7,
+   "p90Minutes": 16.1,
+   "over10Minutes": 6,
+   "over1Hour": 1,
+   "totalHours": 3.7
+  },
+  "2026-09": {
+   "turns": 1390,
+   "medianMinutes": 0.7,
+   "p90Minutes": 17,
+   "over10Minutes": 171,
+   "over1Hour": 75,
+   "totalHours": 812.7
+  },
+  "2026-10": {
+   "turns": 288,
+   "medianMinutes": 0.8,
+   "p90Minutes": 22.9,
+   "over10Minutes": 46,
+   "over1Hour": 11,
+   "totalHours": 71.3
+  }
+ },
+ "turnDurationAsRecordedByClaudeCode": {
+  "2026-06": "no data",
+  "2026-07": "no data",
+  "2026-08": {
+   "turns": 49,
+   "medianMinutes": 1.3,
+   "p90Minutes": 16.4,
+   "over10Minutes": 7,
+   "over1Hour": 1,
+   "totalHours": 4.3
+  },
+  "2026-09": {
+   "turns": 2798,
+   "medianMinutes": 0.5,
+   "p90Minutes": 2.6,
+   "over10Minutes": 154,
+   "over1Hour": 80,
+   "totalHours": 548.1
+  },
+  "2026-10": {
+   "turns": 591,
+   "medianMinutes": 0.5,
+   "p90Minutes": 3.8,
+   "over10Minutes": 47,
+   "over1Hour": 16,
+   "totalHours": 106.7
+  }
+ },
+ "usageLimitHits": {
+  "2026-06": "no data",
+  "2026-07": "no data",
+  "2026-08": {
+   "hits": 0,
+   "hoursOfSilenceAfter": 0
+  },
+  "2026-09": {
+   "hits": 212,
+   "hoursOfSilenceAfter": 334.8
+  },
+  "2026-10": {
+   "hits": 25,
+   "hoursOfSilenceAfter": 67.1
+  }
+ },
+ "monthTotals": {
+  "2026-06": "no data",
+  "2026-07": "no data",
+  "2026-08": {
+   "ctocRuns": 6,
+   "ctocHours": 1.1,
+   "nonCtocRuns": 12,
+   "nonCtocHours": 0.9,
+   "ctocWallHours": {
+    "model": 1,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "ctocTopToolHours": [
+    {
+     "tool": "npm test",
+     "hours": 0
+    },
+    {
+     "tool": "node <script>",
+     "hours": 0
+    },
+    {
+     "tool": "Read",
+     "hours": 0
+    },
+    {
+     "tool": "a project's own program",
+     "hours": 0
+    },
+    {
+     "tool": "Grep",
+     "hours": 0
+    },
+    {
+     "tool": "Write",
+     "hours": 0
+    }
+   ],
+   "ctocAgentHoursByCause": [
+    {
+     "cause": "model thinking and writing",
+     "hours": 0.9
+    },
+    {
+     "cause": "test runs",
+     "hours": 0
+    },
+    {
+     "cause": "other tools",
+     "hours": 0
+    }
+   ],
+   "ctocAgentHoursByCauseInThisRepository": [
+    {
+     "cause": "model thinking and writing",
+     "hours": 0.7
+    },
+    {
+     "cause": "test runs",
+     "hours": 0
+    },
+    {
+     "cause": "other tools",
+     "hours": 0
+    }
+   ],
+   "ctocRunsInThisRepository": 3,
+   "ctocSilenceOver30MinutesBy": []
+  },
+  "2026-09": {
+   "ctocRuns": 924,
+   "ctocHours": 973.9,
+   "nonCtocRuns": 310,
+   "nonCtocHours": 100.9,
+   "ctocWallHours": {
+    "model": 215.3,
+    "tools": 355.2,
+    "silenceOver30Minutes": 271.1,
+    "afterUsageLimit": 131.9
+   },
+   "ctocTopToolHours": [
+    {
+     "tool": "wait loop (sleep and re-check)",
+     "hours": 151.1
+    },
+    {
+     "tool": "<other>",
+     "hours": 60.3
+    },
+    {
+     "tool": "until",
+     "hours": 32.6
+    },
+    {
+     "tool": "npm run",
+     "hours": 12.8
+    },
+    {
+     "tool": "python3",
+     "hours": 11.8
+    },
+    {
+     "tool": "export",
+     "hours": 10.1
+    }
+   ],
+   "ctocAgentHoursByCause": [
+    {
+     "cause": "polling: sleep-and-re-check loops",
+     "hours": 406.4
+    },
+    {
+     "cause": "model thinking and writing",
+     "hours": 215.7
+    },
+    {
+     "cause": "other tools",
+     "hours": 162.1
+    },
+    {
+     "cause": "stopped by a usage limit",
+     "hours": 131.8
+    },
+    {
+     "cause": "silence over 30 minutes with nothing outstanding",
+     "hours": 37.1
+    },
+    {
+     "cause": "silence over 30 minutes during another tool",
+     "hours": 13.2
+    },
+    {
+     "cause": "test runs",
+     "hours": 7.4
+    }
+   ],
+   "ctocAgentHoursByCauseInThisRepository": [
+    {
+     "cause": "model thinking and writing",
+     "hours": 24.3
+    },
+    {
+     "cause": "test runs",
+     "hours": 5.9
+    },
+    {
+     "cause": "silence over 30 minutes with nothing outstanding",
+     "hours": 2.3
+    },
+    {
+     "cause": "stopped by a usage limit",
+     "hours": 1.8
+    },
+    {
+     "cause": "other tools",
+     "hours": 1.2
+    },
+    {
+     "cause": "polling: sleep-and-re-check loops",
+     "hours": 0.3
+    }
+   ],
+   "ctocRunsInThisRepository": 115,
+   "ctocSilenceOver30MinutesBy": [
+    {
+     "during": "while waiting on wait loop (sleep and re-check)",
+     "hours": 184.1
+    },
+    {
+     "during": "nothing outstanding",
+     "hours": 37.1
+    },
+    {
+     "during": "while waiting on wait loop (sleep and re-check) + zsh",
+     "hours": 13.1
+    },
+    {
+     "during": "while waiting on set",
+     "hours": 9.7
+    },
+    {
+     "during": "while waiting on export + until + wait loop (sleep and re-check)",
+     "hours": 8.2
+    },
+    {
+     "during": "while waiting on cargo test + wait loop (sleep and re-check)",
+     "hours": 6.8
+    }
+   ]
+  },
+  "2026-10": {
+   "ctocRuns": 172,
+   "ctocHours": 71.6,
+   "nonCtocRuns": 100,
+   "nonCtocHours": 191.5,
+   "ctocWallHours": {
+    "model": 31.3,
+    "tools": 9.4,
+    "silenceOver30Minutes": 30.7,
+    "afterUsageLimit": 0
+   },
+   "ctocTopToolHours": [
+    {
+     "tool": "Write",
+     "hours": 3
+    },
+    {
+     "tool": "npm test",
+     "hours": 1.8
+    },
+    {
+     "tool": "wait loop (sleep and re-check)",
+     "hours": 1.4
+    },
+    {
+     "tool": "node <script>",
+     "hours": 0.5
+    },
+    {
+     "tool": "WebFetch",
+     "hours": 0.5
+    },
+    {
+     "tool": "python3",
+     "hours": 0.4
+    }
+   ],
+   "ctocAgentHoursByCause": [
+    {
+     "cause": "model thinking and writing",
+     "hours": 31.2
+    },
+    {
+     "cause": "silence over 30 minutes during another tool",
+     "hours": 20.6
+    },
+    {
+     "cause": "polling: sleep-and-re-check loops",
+     "hours": 6.6
+    },
+    {
+     "cause": "other tools",
+     "hours": 5.7
+    },
+    {
+     "cause": "silence over 30 minutes with nothing outstanding",
+     "hours": 5.2
+    },
+    {
+     "cause": "test runs",
+     "hours": 2.2
+    }
+   ],
+   "ctocAgentHoursByCauseInThisRepository": [
+    {
+     "cause": "model thinking and writing",
+     "hours": 31.1
+    },
+    {
+     "cause": "silence over 30 minutes during another tool",
+     "hours": 20.6
+    },
+    {
+     "cause": "polling: sleep-and-re-check loops",
+     "hours": 6.6
+    },
+    {
+     "cause": "other tools",
+     "hours": 5.7
+    },
+    {
+     "cause": "silence over 30 minutes with nothing outstanding",
+     "hours": 5.2
+    },
+    {
+     "cause": "test runs",
+     "hours": 2.2
+    }
+   ],
+   "ctocRunsInThisRepository": 171,
+   "ctocSilenceOver30MinutesBy": [
+    {
+     "during": "while waiting on Write",
+     "hours": 16.3
+    },
+    {
+     "during": "nothing outstanding",
+     "hours": 5.2
+    },
+    {
+     "during": "while waiting on npm test + wait loop (sleep and re-check)",
+     "hours": 4.9
+    },
+    {
+     "during": "while waiting on export",
+     "hours": 4.3
+    }
+   ]
+  }
+ },
+ "testSuiteInsideAgents": {
+  "2026-06": "no data",
+  "2026-07": "no data",
+  "2026-08": {
+   "node --test": {
+    "runs": 5,
+    "medianMinutes": 0,
+    "p90Minutes": 0,
+    "totalHours": 0
+   }
+  },
+  "2026-09": {
+   "npm test": {
+    "runs": 86,
+    "medianMinutes": 0.8,
+    "p90Minutes": 3.6,
+    "totalHours": 2.7
+   },
+   "node --test": {
+    "runs": 591,
+    "medianMinutes": 0,
+    "p90Minutes": 0.3,
+    "totalHours": 1.5
+   }
+  },
+  "2026-10": {
+   "node --test": {
+    "runs": 316,
+    "medianMinutes": 0.1,
+    "p90Minutes": 0.2,
+    "totalHours": 0.6
+   },
+   "npm test": {
+    "runs": 59,
+    "medianMinutes": 0.8,
+    "p90Minutes": 1.3,
+    "totalHours": 0.9
+   }
+  }
+ },
+ "pollingLoopsInCtocAgents": {
+  "hoursByState": [
+   {
+    "key": "job end not observable (shell background)",
+    "pollingHours": 117.4
+   },
+   {
+    "key": "job had already finished (wasted wait)",
+    "pollingHours": 90.6
+   },
+   {
+    "key": "job end not observable (shell background), linked by timing (inferred)",
+    "pollingHours": 83.2
+   },
+   {
+    "key": "job still running (needed wait)",
+    "pollingHours": 54.9
+   },
+   {
+    "key": "job never reported finishing",
+    "pollingHours": 28.2
+   },
+   {
+    "key": "no launch found",
+    "pollingHours": 17.2
+   },
+   {
+    "key": "job still running (needed wait), linked by timing (inferred)",
+    "pollingHours": 16.2
+   },
+   {
+    "key": "job never reported finishing, linked by timing (inferred)",
+    "pollingHours": 4.9
+   },
+   {
+    "key": "job had already finished (wasted wait), linked by timing (inferred)",
+    "pollingHours": 0.3
+   }
+  ],
+  "hoursByAwaitedJob": [
+   {
+    "key": "a shell script",
+    "pollingHours": 168.1,
+    "neededHours": 16.7,
+    "wastedHours": 14,
+    "otherHours": 137.4
+   },
+   {
+    "key": "npm run",
+    "pollingHours": 52.9,
+    "otherHours": 7.3,
+    "neededHours": 7.4,
+    "wastedHours": 38.2
+   },
+   {
+    "key": "cargo build",
+    "pollingHours": 36,
+    "otherHours": 35.7,
+    "neededHours": 0.3,
+    "wastedHours": 0
+   },
+   {
+    "key": "<script>",
+    "pollingHours": 21.9,
+    "wastedHours": 17,
+    "otherHours": 0,
+    "neededHours": 4.8
+   },
+   {
+    "key": "cargo test",
+    "pollingHours": 20.9,
+    "otherHours": 10.1,
+    "neededHours": 4.2,
+    "wastedHours": 6.6
+   },
+   {
+    "key": "find",
+    "pollingHours": 20.4,
+    "otherHours": 20.4
+   },
+   {
+    "key": "a file or marker (no launch found)",
+    "pollingHours": 16.7,
+    "otherHours": 16.7
+   },
+   {
+    "key": "a project's own program",
+    "pollingHours": 15.2,
+    "otherHours": 4.5,
+    "neededHours": 10.7,
+    "wastedHours": 0.1
+   },
+   {
+    "key": "cargo clean",
+    "pollingHours": 14.7,
+    "neededHours": 0.7,
+    "wastedHours": 14
+   },
+   {
+    "key": "python3",
+    "pollingHours": 10,
+    "neededHours": 7.7,
+    "otherHours": 2.2,
+    "wastedHours": 0
+   },
+   {
+    "key": "lsappinfo",
+    "pollingHours": 9.1,
+    "neededHours": 4.2,
+    "otherHours": 4.6,
+    "wastedHours": 0.3
+   },
+   {
+    "key": "until",
+    "pollingHours": 6.7,
+    "neededHours": 1.7,
+    "wastedHours": 0,
+    "otherHours": 5
+   },
+   {
+    "key": "npx wdio",
+    "pollingHours": 5.3,
+    "neededHours": 5.3
+   },
+   {
+    "key": "cargo check",
+    "pollingHours": 3.9,
+    "otherHours": 3.9
+   },
+   {
+    "key": "for",
+    "pollingHours": 1.6,
+    "neededHours": 1.3,
+    "wastedHours": 0.3,
+    "otherHours": 0
+   },
+   {
+    "key": "node <script>",
+    "pollingHours": 1.4,
+    "neededHours": 1.3,
+    "wastedHours": 0.1,
+    "otherHours": 0
+   },
+   {
+    "key": "sed",
+    "pollingHours": 1.4,
+    "neededHours": 0.6,
+    "wastedHours": 0,
+    "otherHours": 0.8
+   },
+   {
+    "key": "cargo fmt",
+    "pollingHours": 1.1,
+    "otherHours": 0.5,
+    "neededHours": 0.5
+   },
+   {
+    "key": "mktemp",
+    "pollingHours": 1.1,
+    "neededHours": 1,
+    "wastedHours": 0,
+    "otherHours": 0.1
+   },
+   {
+    "key": "while",
+    "pollingHours": 0.9,
+    "neededHours": 0.9
+   },
+   {
+    "key": "cargo clippy",
+    "pollingHours": 0.8,
+    "otherHours": 0.7,
+    "neededHours": 0.1
+   },
+   {
+    "key": "another task's output file (launched elsewhere)",
+    "pollingHours": 0.5,
+    "otherHours": 0.5
+   },
+   {
+    "key": "sleep",
+    "pollingHours": 0.5,
+    "neededHours": 0.5
+   },
+   {
+    "key": "npm test",
+    "pollingHours": 0.4,
+    "neededHours": 0.1,
+    "otherHours": 0.2
+   },
+   {
+    "key": "node --test",
+    "pollingHours": 0.3,
+    "otherHours": 0,
+    "neededHours": 0.1,
+    "wastedHours": 0.3
+   },
+   {
+    "key": "awk",
+    "pollingHours": 0.2,
+    "neededHours": 0.1,
+    "otherHours": 0
+   },
+   {
+    "key": "mv",
+    "pollingHours": 0.2,
+    "neededHours": 0.2,
+    "wastedHours": 0
+   },
+   {
+    "key": "time",
+    "pollingHours": 0.2,
+    "neededHours": 0.2
+   },
+   {
+    "key": "uv run",
+    "pollingHours": 0.1,
+    "neededHours": 0.1
+   },
+   {
+    "key": "npx playwright",
+    "pollingHours": 0.1,
+    "neededHours": 0.1
+   },
+   {
+    "key": "git status",
+    "pollingHours": 0,
+    "otherHours": 0
+   },
+   {
+    "key": "cp",
+    "pollingHours": 0.1,
+    "neededHours": 0.1
+   },
+   {
+    "key": "stat",
+    "pollingHours": 0,
+    "otherHours": 0
+   },
+   {
+    "key": "node -e",
+    "pollingHours": 0.1,
+    "neededHours": 0.1
+   },
+   {
+    "key": "git checkout",
+    "pollingHours": 0.1,
+    "otherHours": 0.1
+   },
+   {
+    "key": "cargo deny",
+    "pollingHours": 0,
+    "neededHours": 0,
+    "otherHours": 0
+   },
+   {
+    "key": "npx tsc",
+    "pollingHours": 0,
+    "neededHours": 0
+   },
+   {
+    "key": "railway",
+    "pollingHours": 0,
+    "neededHours": 0
+   },
+   {
+    "key": "npx bddgen",
+    "pollingHours": 0.1,
+    "neededHours": 0.1
+   },
+   {
+    "key": "docker compose",
+    "pollingHours": 0,
+    "otherHours": 0
+   },
+   {
+    "key": "uptime",
+    "pollingHours": 0,
+    "neededHours": 0
+   },
+   {
+    "key": "npx jest",
+    "pollingHours": 0,
+    "neededHours": 0
+   }
+  ],
+  "hoursByLaunchMethod": [
+   {
+    "key": "run_in_background",
+    "pollingHours": 173.9,
+    "neededHours": 50.7,
+    "wastedHours": 90.5,
+    "otherHours": 32.6
+   },
+   {
+    "key": "nohup",
+    "pollingHours": 136.1,
+    "otherHours": 136.1
+   },
+   {
+    "key": "a trailing '&' in the shell",
+    "pollingHours": 64.3,
+    "otherHours": 64.3
+   },
+   {
+    "key": "no launch found",
+    "pollingHours": 17.2,
+    "otherHours": 17.2
+   },
+   {
+    "key": "run_in_background, after the same command had run past its timeout earlier",
+    "pollingHours": 11.9,
+    "neededHours": 11.7,
+    "wastedHours": 0.1
+   },
+   {
+    "key": "ran past its own longer timeout and was moved to the background",
+    "pollingHours": 9.1,
+    "neededHours": 8.2,
+    "wastedHours": 0.3,
+    "otherHours": 0.6
+   },
+   {
+    "key": "ran past its default 2-minute timeout and was moved to the background",
+    "pollingHours": 0.4,
+    "neededHours": 0.4,
+    "wastedHours": 0
+   },
+   {
+    "key": "nohup, in the same command as the poll",
+    "pollingHours": 0.1,
+    "otherHours": 0.1
+   },
+   {
+    "key": "a trailing '&' in the shell, in the same command as the poll",
+    "pollingHours": 0.1,
+    "otherHours": 0.1
+   }
+  ],
+  "hoursByMonth": [
+   {
+    "key": "2026-09",
+    "pollingHours": 406.4,
+    "otherHours": 244.8,
+    "neededHours": 70.6,
+    "wastedHours": 91
+   },
+   {
+    "key": "2026-10",
+    "pollingHours": 6.6,
+    "otherHours": 6.1,
+    "neededHours": 0.5,
+    "wastedHours": 0
+   }
+  ],
+  "pollCountsByOutcome": [
+   {
+    "key": "job end not observable (shell background), linked by timing (inferred)",
+    "polls": 952,
+    "pollNeverReturned": 29,
+    "pollRanPastItsOwnTimeout": 202
+   },
+   {
+    "key": "job finished while being polled",
+    "polls": 580,
+    "pollNeverReturned": 29,
+    "pollRanPastItsOwnTimeout": 160
+   },
+   {
+    "key": "job end not observable (shell background)",
+    "polls": 517,
+    "pollNeverReturned": 14,
+    "pollRanPastItsOwnTimeout": 88
+   },
+   {
+    "key": "no launch found in this run",
+    "polls": 355,
+    "pollNeverReturned": 3,
+    "pollRanPastItsOwnTimeout": 35
+   },
+   {
+    "key": "job finished while being polled, linked by timing (inferred)",
+    "polls": 117,
+    "pollNeverReturned": 8,
+    "pollRanPastItsOwnTimeout": 66
+   },
+   {
+    "key": "poll gave up before the job finished, linked by timing (inferred)",
+    "polls": 60,
+    "pollNeverReturned": 0,
+    "pollRanPastItsOwnTimeout": 1
+   },
+   {
+    "key": "poll gave up before the job finished",
+    "polls": 36,
+    "pollNeverReturned": 0,
+    "pollRanPastItsOwnTimeout": 1
+   },
+   {
+    "key": "job never reported finishing",
+    "polls": 29,
+    "pollNeverReturned": 14,
+    "pollRanPastItsOwnTimeout": 19
+   },
+   {
+    "key": "job never reported finishing, linked by timing (inferred)",
+    "polls": 11,
+    "pollNeverReturned": 10,
+    "pollRanPastItsOwnTimeout": 5
+   }
+  ],
+  "jobs": [
+   {
+    "awaitedJob": "a shell script",
+    "jobs": 98,
+    "endedJobs": 34,
+    "jobRunHours": 18.5
+   },
+   {
+    "awaitedJob": "a project's own program",
+    "jobs": 29,
+    "endedJobs": 15,
+    "jobRunHours": 11.4
+   },
+   {
+    "awaitedJob": "npm run",
+    "jobs": 151,
+    "endedJobs": 63,
+    "jobRunHours": 10.8
+   },
+   {
+    "awaitedJob": "python3",
+    "jobs": 63,
+    "endedJobs": 43,
+    "jobRunHours": 10
+   },
+   {
+    "awaitedJob": "<script>",
+    "jobs": 24,
+    "endedJobs": 21,
+    "jobRunHours": 6.7
+   },
+   {
+    "awaitedJob": "cargo test",
+    "jobs": 120,
+    "endedJobs": 42,
+    "jobRunHours": 6
+   },
+   {
+    "awaitedJob": "npx wdio",
+    "jobs": 21,
+    "endedJobs": 21,
+    "jobRunHours": 5.7
+   },
+   {
+    "awaitedJob": "lsappinfo",
+    "jobs": 38,
+    "endedJobs": 9,
+    "jobRunHours": 4.2
+   },
+   {
+    "awaitedJob": "while",
+    "jobs": 2,
+    "endedJobs": 2,
+    "jobRunHours": 2.6
+   },
+   {
+    "awaitedJob": "until",
+    "jobs": 8,
+    "endedJobs": 7,
+    "jobRunHours": 1.9
+   },
+   {
+    "awaitedJob": "for",
+    "jobs": 17,
+    "endedJobs": 14,
+    "jobRunHours": 1.9
+   },
+   {
+    "awaitedJob": "node <script>",
+    "jobs": 9,
+    "endedJobs": 7,
+    "jobRunHours": 1.8
+   },
+   {
+    "awaitedJob": "mktemp",
+    "jobs": 8,
+    "endedJobs": 4,
+    "jobRunHours": 1
+   },
+   {
+    "awaitedJob": "cargo clean",
+    "jobs": 1,
+    "endedJobs": 1,
+    "jobRunHours": 0.7
+   },
+   {
+    "awaitedJob": "cargo fmt",
+    "jobs": 24,
+    "endedJobs": 8,
+    "jobRunHours": 0.6
+   },
+   {
+    "awaitedJob": "sed",
+    "jobs": 4,
+    "endedJobs": 2,
+    "jobRunHours": 0.6
+   },
+   {
+    "awaitedJob": "sleep",
+    "jobs": 5,
+    "endedJobs": 5,
+    "jobRunHours": 0.5
+   },
+   {
+    "awaitedJob": "cargo build",
+    "jobs": 14,
+    "endedJobs": 5,
+    "jobRunHours": 0.4
+   },
+   {
+    "awaitedJob": "railway",
+    "jobs": 3,
+    "endedJobs": 3,
+    "jobRunHours": 0.3
+   },
+   {
+    "awaitedJob": "npm test",
+    "jobs": 14,
+    "endedJobs": 5,
+    "jobRunHours": 0.2
+   },
+   {
+    "awaitedJob": "uv run",
+    "jobs": 2,
+    "endedJobs": 2,
+    "jobRunHours": 0.1
+   },
+   {
+    "awaitedJob": "npx playwright",
+    "jobs": 5,
+    "endedJobs": 5,
+    "jobRunHours": 0.1
+   },
+   {
+    "awaitedJob": "cargo clippy",
+    "jobs": 15,
+    "endedJobs": 3,
+    "jobRunHours": 0.1
+   },
+   {
+    "awaitedJob": "find",
+    "jobs": 2,
+    "endedJobs": 0,
+    "jobRunHours": 0
+   },
+   {
+    "awaitedJob": "cp",
+    "jobs": 3,
+    "endedJobs": 3,
+    "jobRunHours": 0.1
+   },
+   {
+    "awaitedJob": "git status",
+    "jobs": 3,
+    "endedJobs": 0,
+    "jobRunHours": 0
+   },
+   {
+    "awaitedJob": "npx bddgen",
+    "jobs": 1,
+    "endedJobs": 1,
+    "jobRunHours": 0.3
+   },
+   {
+    "awaitedJob": "mv",
+    "jobs": 1,
+    "endedJobs": 1,
+    "jobRunHours": 0.2
+   },
+   {
+    "awaitedJob": "awk",
+    "jobs": 2,
+    "endedJobs": 1,
+    "jobRunHours": 0.1
+   },
+   {
+    "awaitedJob": "node --test",
+    "jobs": 9,
+    "endedJobs": 6,
+    "jobRunHours": 0.1
+   },
+   {
+    "awaitedJob": "cargo check",
+    "jobs": 2,
+    "endedJobs": 0,
+    "jobRunHours": 0
+   },
+   {
+    "awaitedJob": "stat",
+    "jobs": 1,
+    "endedJobs": 0,
+    "jobRunHours": 0
+   },
+   {
+    "awaitedJob": "time",
+    "jobs": 3,
+    "endedJobs": 3,
+    "jobRunHours": 0.2
+   },
+   {
+    "awaitedJob": "node -e",
+    "jobs": 1,
+    "endedJobs": 1,
+    "jobRunHours": 0.1
+   },
+   {
+    "awaitedJob": "git checkout",
+    "jobs": 1,
+    "endedJobs": 0,
+    "jobRunHours": 0
+   },
+   {
+    "awaitedJob": "cargo deny",
+    "jobs": 2,
+    "endedJobs": 1,
+    "jobRunHours": 0
+   },
+   {
+    "awaitedJob": "npx tsc",
+    "jobs": 1,
+    "endedJobs": 1,
+    "jobRunHours": 0
+   },
+   {
+    "awaitedJob": "git diff",
+    "jobs": 1,
+    "endedJobs": 0,
+    "jobRunHours": 0
+   },
+   {
+    "awaitedJob": "docker compose",
+    "jobs": 2,
+    "endedJobs": 0,
+    "jobRunHours": 0
+   },
+   {
+    "awaitedJob": "uptime",
+    "jobs": 3,
+    "endedJobs": 3,
+    "jobRunHours": 0
+   },
+   {
+    "awaitedJob": "npx jest",
+    "jobs": 2,
+    "endedJobs": 2,
+    "jobRunHours": 0
+   }
+  ]
+ },
+ "byAgentAndMonth": [
+  {
+   "agent": "ctoc:iron-loop:devils-advocate-critic",
+   "month": "2026-08",
+   "runs": 1,
+   "runsInThisRepository": 0,
+   "medianMinutes": 4.2,
+   "p90Minutes": 4.2,
+   "totalHours": 0.1,
+   "medianFirstTurnInputTokens": 60884,
+   "medianOutputTokens": 9438,
+   "medianTurns": 10,
+   "medianToolCalls": 19,
+   "toolShareOfWall": 1.1,
+   "wallHours": {
+    "model": 0.1,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:iron-loop-executor",
+   "month": "2026-08",
+   "runs": 1,
+   "runsInThisRepository": 1,
+   "medianMinutes": 4.4,
+   "p90Minutes": 4.4,
+   "totalHours": 0.1,
+   "medianFirstTurnInputTokens": 62600,
+   "medianOutputTokens": 1380,
+   "medianTurns": 23,
+   "medianToolCalls": 28,
+   "toolShareOfWall": 62.3,
+   "wallHours": {
+    "model": 0,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 62600,
+   "topToolsByMinutes": [
+    {
+     "tool": "npm test",
+     "minutes": 2.1
+    },
+    {
+     "tool": "node <script>",
+     "minutes": 0.4
+    },
+    {
+     "tool": "a project's own program",
+     "minutes": 0.2
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:premortem-critic",
+   "month": "2026-08",
+   "runs": 1,
+   "runsInThisRepository": 0,
+   "medianMinutes": 4.4,
+   "p90Minutes": 4.4,
+   "totalHours": 0.1,
+   "medianFirstTurnInputTokens": 67248,
+   "medianOutputTokens": 18754,
+   "medianTurns": 9,
+   "medianToolCalls": 15,
+   "toolShareOfWall": 1,
+   "wallHours": {
+    "model": 0.1,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:red-team-critic",
+   "month": "2026-08",
+   "runs": 1,
+   "runsInThisRepository": 0,
+   "medianMinutes": 3.3,
+   "p90Minutes": 3.3,
+   "totalHours": 0.1,
+   "medianFirstTurnInputTokens": 69839,
+   "medianOutputTokens": 14081,
+   "medianTurns": 8,
+   "medianToolCalls": 12,
+   "toolShareOfWall": 1.2,
+   "wallHours": {
+    "model": 0.1,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:planning:implementation-planner",
+   "month": "2026-08",
+   "runs": 2,
+   "runsInThisRepository": 2,
+   "medianMinutes": 35.2,
+   "p90Minutes": 35.2,
+   "totalHours": 0.7,
+   "medianFirstTurnInputTokens": 73196,
+   "medianOutputTokens": 32337,
+   "medianTurns": 68,
+   "medianToolCalls": 89,
+   "toolShareOfWall": 0.9,
+   "wallHours": {
+    "model": 0.7,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 73196,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0.1
+    },
+    {
+     "tool": "Write",
+     "minutes": 0.1
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0.1
+    }
+   ]
+  },
+  {
+   "agent": "non-CTOC agents",
+   "month": "2026-08",
+   "runs": 12,
+   "runsInThisRepository": 0,
+   "medianMinutes": 4.4,
+   "p90Minutes": 5.5,
+   "totalHours": 0.9,
+   "medianFirstTurnInputTokens": 25094,
+   "medianOutputTokens": 16903,
+   "medianTurns": 19,
+   "medianToolCalls": 39,
+   "toolShareOfWall": 12.9,
+   "wallHours": {
+    "model": 0.7,
+    "tools": 0.1,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "WebSearch",
+     "minutes": 2.1
+    },
+    {
+     "tool": "for",
+     "minutes": 1.6
+    },
+    {
+     "tool": "echo",
+     "minutes": 0.7
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:ai-quality:ai-code-quality-reviewer",
+   "month": "2026-09",
+   "runs": 1,
+   "runsInThisRepository": 1,
+   "medianMinutes": 1.2,
+   "p90Minutes": 1.2,
+   "totalHours": 0,
+   "medianFirstTurnInputTokens": 58825,
+   "medianOutputTokens": 6946,
+   "medianTurns": 4,
+   "medianToolCalls": 4,
+   "toolShareOfWall": 0.3,
+   "wallHours": {
+    "model": 0,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 58825,
+   "topToolsByMinutes": [
+    {
+     "tool": "Grep",
+     "minutes": 0
+    },
+    {
+     "tool": "Read",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:ai-quality:citation-validator",
+   "month": "2026-09",
+   "runs": 36,
+   "runsInThisRepository": 34,
+   "medianMinutes": 10.2,
+   "p90Minutes": 14.1,
+   "totalHours": 6,
+   "medianFirstTurnInputTokens": 72767,
+   "medianOutputTokens": 54902,
+   "medianTurns": 28,
+   "medianToolCalls": 48,
+   "toolShareOfWall": 13.1,
+   "wallHours": {
+    "model": 5.2,
+    "tools": 0.8,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 11,
+   "hoursSittingFinishedBeforeResume": 4.7,
+   "medianFirstTurnInputTokensInThisRepository": 72782,
+   "topToolsByMinutes": [
+    {
+     "tool": "WebFetch",
+     "minutes": 36.3
+    },
+    {
+     "tool": "WebSearch",
+     "minutes": 8.7
+    },
+    {
+     "tool": "Read",
+     "minutes": 1.4
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:ai-quality:llm-security-tester",
+   "month": "2026-09",
+   "runs": 2,
+   "runsInThisRepository": 0,
+   "medianMinutes": 15.5,
+   "p90Minutes": 15.5,
+   "totalHours": 0.5,
+   "medianFirstTurnInputTokens": 26317,
+   "medianOutputTokens": 23939,
+   "medianTurns": 37,
+   "medianToolCalls": 55,
+   "toolShareOfWall": 19.6,
+   "wallHours": {
+    "model": 0.4,
+    "tools": 0.1,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "WebSearch",
+     "minutes": 4
+    },
+    {
+     "tool": "echo",
+     "minutes": 0.6
+    },
+    {
+     "tool": "find",
+     "minutes": 0.5
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:compliance:gdpr-agent",
+   "month": "2026-09",
+   "runs": 2,
+   "runsInThisRepository": 1,
+   "medianMinutes": 7.9,
+   "p90Minutes": 7.9,
+   "totalHours": 0.1,
+   "medianFirstTurnInputTokens": 58056,
+   "medianOutputTokens": 45019,
+   "medianTurns": 20,
+   "medianToolCalls": 53,
+   "toolShareOfWall": 1.2,
+   "wallHours": {
+    "model": 0.1,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 58056,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0.1
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:coordinator:cto-chief",
+   "month": "2026-09",
+   "runs": 4,
+   "runsInThisRepository": 0,
+   "medianMinutes": 1483.4,
+   "p90Minutes": 3741.8,
+   "totalHours": 90.3,
+   "medianFirstTurnInputTokens": 45805,
+   "medianOutputTokens": 162842,
+   "medianTurns": 155,
+   "medianToolCalls": 134,
+   "toolShareOfWall": 27.3,
+   "wallHours": {
+    "model": 1.7,
+    "tools": 24.7,
+    "silenceOver30Minutes": 0.5,
+    "afterUsageLimit": 63.4
+   },
+   "resumedByAMessageAfterFinishing": 1,
+   "hoursSittingFinishedBeforeResume": 0.3,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "<other>",
+     "minutes": 1070.1
+    },
+    {
+     "tool": "wait loop (sleep and re-check)",
+     "minutes": 273.4
+    },
+    {
+     "tool": "date",
+     "minutes": 57.2
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:coordinator:synthesizer",
+   "month": "2026-09",
+   "runs": 3,
+   "runsInThisRepository": 0,
+   "medianMinutes": 24.9,
+   "p90Minutes": 26.3,
+   "totalHours": 1.1,
+   "medianFirstTurnInputTokens": 24887,
+   "medianOutputTokens": 154028,
+   "medianTurns": 37,
+   "medianToolCalls": 83,
+   "toolShareOfWall": 0.4,
+   "wallHours": {
+    "model": 1.1,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0.2
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0.1
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:documentation:documentation-updater",
+   "month": "2026-09",
+   "runs": 13,
+   "runsInThisRepository": 0,
+   "medianMinutes": 0.2,
+   "p90Minutes": 4.8,
+   "totalHours": 0.2,
+   "medianFirstTurnInputTokens": 16684,
+   "medianOutputTokens": 1086,
+   "medianTurns": 3,
+   "medianToolCalls": 3,
+   "toolShareOfWall": 2,
+   "wallHours": {
+    "model": 0.2,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Edit",
+     "minutes": 0.2
+    },
+    {
+     "tool": "Read",
+     "minutes": 0.1
+    },
+    {
+     "tool": "Write",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:infrastructure:ci-pipeline-checker",
+   "month": "2026-09",
+   "runs": 1,
+   "runsInThisRepository": 0,
+   "medianMinutes": 86.5,
+   "p90Minutes": 86.5,
+   "totalHours": 1.4,
+   "medianFirstTurnInputTokens": 24953,
+   "medianOutputTokens": 57267,
+   "medianTurns": 45,
+   "medianToolCalls": 45,
+   "toolShareOfWall": 20.8,
+   "wallHours": {
+    "model": 0.4,
+    "tools": 0.3,
+    "silenceOver30Minutes": 0.7,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "gh",
+     "minutes": 7.6
+    },
+    {
+     "tool": "wait loop (sleep and re-check)",
+     "minutes": 4.3
+    },
+    {
+     "tool": "sleep",
+     "minutes": 3.4
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:infrastructure:deployment-setup",
+   "month": "2026-09",
+   "runs": 2,
+   "runsInThisRepository": 0,
+   "medianMinutes": 8.3,
+   "p90Minutes": 8.3,
+   "totalHours": 0.2,
+   "medianFirstTurnInputTokens": 36106,
+   "medianOutputTokens": 19016,
+   "medianTurns": 49,
+   "medianToolCalls": 48,
+   "toolShareOfWall": 49.4,
+   "wallHours": {
+    "model": 0.1,
+    "tools": 0.1,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "railway",
+     "minutes": 3.1
+    },
+    {
+     "tool": "wait loop (sleep and re-check)",
+     "minutes": 1.4
+    },
+    {
+     "tool": "<other>",
+     "minutes": 0.5
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:advocate-critic",
+   "month": "2026-09",
+   "runs": 18,
+   "runsInThisRepository": 0,
+   "medianMinutes": 8.6,
+   "p90Minutes": 10.2,
+   "totalHours": 1.9,
+   "medianFirstTurnInputTokens": 58793,
+   "medianOutputTokens": 8428,
+   "medianTurns": 12,
+   "medianToolCalls": 25,
+   "toolShareOfWall": 0.8,
+   "wallHours": {
+    "model": 1.8,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0.6
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0.3
+    },
+    {
+     "tool": "Glob",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:devils-advocate-critic",
+   "month": "2026-09",
+   "runs": 34,
+   "runsInThisRepository": 0,
+   "medianMinutes": 12.3,
+   "p90Minutes": 15,
+   "totalHours": 6.9,
+   "medianFirstTurnInputTokens": 57024,
+   "medianOutputTokens": 66300,
+   "medianTurns": 17,
+   "medianToolCalls": 33,
+   "toolShareOfWall": 0.4,
+   "wallHours": {
+    "model": 6.9,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 1
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0.6
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:gate-critic",
+   "month": "2026-09",
+   "runs": 29,
+   "runsInThisRepository": 0,
+   "medianMinutes": 12.6,
+   "p90Minutes": 17,
+   "totalHours": 6.6,
+   "medianFirstTurnInputTokens": 79873,
+   "medianOutputTokens": 74627,
+   "medianTurns": 18,
+   "medianToolCalls": 37,
+   "toolShareOfWall": 0.4,
+   "wallHours": {
+    "model": 6.5,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 1.1
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0.3
+    },
+    {
+     "tool": "Write",
+     "minutes": 0.1
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:iron-loop-critic",
+   "month": "2026-09",
+   "runs": 9,
+   "runsInThisRepository": 3,
+   "medianMinutes": 9,
+   "p90Minutes": 12.3,
+   "totalHours": 1.5,
+   "medianFirstTurnInputTokens": 24419,
+   "medianOutputTokens": 58020,
+   "medianTurns": 38,
+   "medianToolCalls": 55,
+   "toolShareOfWall": 0.8,
+   "wallHours": {
+    "model": 1.5,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 1,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 60514,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0.3
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0.3
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:iron-loop-executor",
+   "month": "2026-09",
+   "runs": 274,
+   "runsInThisRepository": 34,
+   "medianMinutes": 60.3,
+   "p90Minutes": 232.3,
+   "totalHours": 696.1,
+   "medianFirstTurnInputTokens": 33252,
+   "medianOutputTokens": 37445,
+   "medianTurns": 102,
+   "medianToolCalls": 106,
+   "toolShareOfWall": 45.5,
+   "wallHours": {
+    "model": 71.4,
+    "tools": 316.8,
+    "silenceOver30Minutes": 243.7,
+    "afterUsageLimit": 64.3
+   },
+   "resumedByAMessageAfterFinishing": 58,
+   "hoursSittingFinishedBeforeResume": 30.8,
+   "medianFirstTurnInputTokensInThisRepository": 62885,
+   "topToolsByMinutes": [
+    {
+     "tool": "wait loop (sleep and re-check)",
+     "minutes": 8584.7
+    },
+    {
+     "tool": "<other>",
+     "minutes": 2544.5
+    },
+    {
+     "tool": "until",
+     "minutes": 1903.7
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:iron-loop-integrator",
+   "month": "2026-09",
+   "runs": 17,
+   "runsInThisRepository": 0,
+   "medianMinutes": 5.9,
+   "p90Minutes": 11.3,
+   "totalHours": 1.9,
+   "medianFirstTurnInputTokens": 25349,
+   "medianOutputTokens": 32788,
+   "medianTurns": 14,
+   "medianToolCalls": 38,
+   "toolShareOfWall": 2.2,
+   "wallHours": {
+    "model": 1.8,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Edit",
+     "minutes": 1.9
+    },
+    {
+     "tool": "Read",
+     "minutes": 0.7
+    },
+    {
+     "tool": "Write",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:premortem-critic",
+   "month": "2026-09",
+   "runs": 33,
+   "runsInThisRepository": 0,
+   "medianMinutes": 10.6,
+   "p90Minutes": 12.2,
+   "totalHours": 5.6,
+   "medianFirstTurnInputTokens": 63220,
+   "medianOutputTokens": 53055,
+   "medianTurns": 17,
+   "medianToolCalls": 33,
+   "toolShareOfWall": 0.5,
+   "wallHours": {
+    "model": 5.6,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Grep",
+     "minutes": 0.8
+    },
+    {
+     "tool": "Read",
+     "minutes": 0.8
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:red-team-critic",
+   "month": "2026-09",
+   "runs": 37,
+   "runsInThisRepository": 0,
+   "medianMinutes": 12.1,
+   "p90Minutes": 14.7,
+   "totalHours": 7.1,
+   "medianFirstTurnInputTokens": 65758,
+   "medianOutputTokens": 52778,
+   "medianTurns": 7,
+   "medianToolCalls": 14,
+   "toolShareOfWall": 0.4,
+   "wallHours": {
+    "model": 7,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Grep",
+     "minutes": 0.8
+    },
+    {
+     "tool": "Read",
+     "minutes": 0.7
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:pipeline:agent-critic",
+   "month": "2026-09",
+   "runs": 5,
+   "runsInThisRepository": 5,
+   "medianMinutes": 18,
+   "p90Minutes": 142.1,
+   "totalHours": 4.6,
+   "medianFirstTurnInputTokens": 75903,
+   "medianOutputTokens": 124545,
+   "medianTurns": 31,
+   "medianToolCalls": 45,
+   "toolShareOfWall": 0.2,
+   "wallHours": {
+    "model": 3.4,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 1.2
+   },
+   "resumedByAMessageAfterFinishing": 16,
+   "hoursSittingFinishedBeforeResume": 5.6,
+   "medianFirstTurnInputTokensInThisRepository": 75903,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0.3
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0.1
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:planning:implementation-planner",
+   "month": "2026-09",
+   "runs": 220,
+   "runsInThisRepository": 15,
+   "medianMinutes": 16.5,
+   "p90Minutes": 27.9,
+   "totalHours": 75.8,
+   "medianFirstTurnInputTokens": 41351,
+   "medianOutputTokens": 40482,
+   "medianTurns": 20,
+   "medianToolCalls": 66,
+   "toolShareOfWall": 2.4,
+   "wallHours": {
+    "model": 65.2,
+    "tools": 1.8,
+    "silenceOver30Minutes": 7.3,
+    "afterUsageLimit": 1.5
+   },
+   "resumedByAMessageAfterFinishing": 2,
+   "hoursSittingFinishedBeforeResume": 1.6,
+   "medianFirstTurnInputTokensInThisRepository": 71186,
+   "topToolsByMinutes": [
+    {
+     "tool": "Glob",
+     "minutes": 60.3
+    },
+    {
+     "tool": "Read",
+     "minutes": 31.7
+    },
+    {
+     "tool": "Grep",
+     "minutes": 16.5
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:planning:kpi-planner",
+   "month": "2026-09",
+   "runs": 1,
+   "runsInThisRepository": 0,
+   "medianMinutes": 1.7,
+   "p90Minutes": 1.7,
+   "totalHours": 0,
+   "medianFirstTurnInputTokens": 19967,
+   "medianOutputTokens": 225,
+   "medianTurns": 3,
+   "medianToolCalls": 3,
+   "toolShareOfWall": 0.4,
+   "wallHours": {
+    "model": 0,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0
+    },
+    {
+     "tool": "Write",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:planning:product-owner",
+   "month": "2026-09",
+   "runs": 68,
+   "runsInThisRepository": 16,
+   "medianMinutes": 9.1,
+   "p90Minutes": 23.7,
+   "totalHours": 14.8,
+   "medianFirstTurnInputTokens": 36056,
+   "medianOutputTokens": 52618,
+   "medianTurns": 12,
+   "medianToolCalls": 25,
+   "toolShareOfWall": 1.2,
+   "wallHours": {
+    "model": 13.8,
+    "tools": 0.2,
+    "silenceOver30Minutes": 0.8,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 2,
+   "hoursSittingFinishedBeforeResume": 1.4,
+   "medianFirstTurnInputTokensInThisRepository": 69873,
+   "topToolsByMinutes": [
+    {
+     "tool": "WebSearch",
+     "minutes": 6.2
+    },
+    {
+     "tool": "Read",
+     "minutes": 2.7
+    },
+    {
+     "tool": "Glob",
+     "minutes": 1.9
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:planning:vision-advisor",
+   "month": "2026-09",
+   "runs": 8,
+   "runsInThisRepository": 0,
+   "medianMinutes": 18,
+   "p90Minutes": 74.9,
+   "totalHours": 3.3,
+   "medianFirstTurnInputTokens": 31896,
+   "medianOutputTokens": 52500,
+   "medianTurns": 13,
+   "medianToolCalls": 17,
+   "toolShareOfWall": 0.1,
+   "wallHours": {
+    "model": 2,
+    "tools": 0,
+    "silenceOver30Minutes": 1.3,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 4,
+   "hoursSittingFinishedBeforeResume": 28.4,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0.2
+    },
+    {
+     "tool": "Write",
+     "minutes": 0.1
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:planning:vision-decomposer",
+   "month": "2026-09",
+   "runs": 3,
+   "runsInThisRepository": 0,
+   "medianMinutes": 11.8,
+   "p90Minutes": 12.7,
+   "totalHours": 0.6,
+   "medianFirstTurnInputTokens": 32348,
+   "medianOutputTokens": 7460,
+   "medianTurns": 20,
+   "medianToolCalls": 23,
+   "toolShareOfWall": 0.5,
+   "wallHours": {
+    "model": 0.6,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0.1
+    },
+    {
+     "tool": "Write",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:quality:code-reviewer",
+   "month": "2026-09",
+   "runs": 21,
+   "runsInThisRepository": 0,
+   "medianMinutes": 8.5,
+   "p90Minutes": 12.1,
+   "totalHours": 3.2,
+   "medianFirstTurnInputTokens": 30497,
+   "medianOutputTokens": 33520,
+   "medianTurns": 26,
+   "medianToolCalls": 88,
+   "toolShareOfWall": 1.8,
+   "wallHours": {
+    "model": 3.1,
+    "tools": 0.1,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 2
+    },
+    {
+     "tool": "Grep",
+     "minutes": 1
+    },
+    {
+     "tool": "Glob",
+     "minutes": 0.4
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:quality:dead-code-detector",
+   "month": "2026-09",
+   "runs": 2,
+   "runsInThisRepository": 1,
+   "medianMinutes": 6.6,
+   "p90Minutes": 6.6,
+   "totalHours": 0.1,
+   "medianFirstTurnInputTokens": 57735,
+   "medianOutputTokens": 39933,
+   "medianTurns": 27,
+   "medianToolCalls": 30,
+   "toolShareOfWall": 6.7,
+   "wallHours": {
+    "model": 0.1,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 57735,
+   "topToolsByMinutes": [
+    {
+     "tool": "mkdir",
+     "minutes": 0.3
+    },
+    {
+     "tool": "node -e",
+     "minutes": 0
+    },
+    {
+     "tool": "cat",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:saas:clerk-auth",
+   "month": "2026-09",
+   "runs": 1,
+   "runsInThisRepository": 1,
+   "medianMinutes": 0.2,
+   "p90Minutes": 0.2,
+   "totalHours": 0,
+   "medianFirstTurnInputTokens": 61542,
+   "medianOutputTokens": 830,
+   "medianTurns": 2,
+   "medianToolCalls": 1,
+   "toolShareOfWall": 3,
+   "wallHours": {
+    "model": 0,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 61542,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:security:dependency-checker",
+   "month": "2026-09",
+   "runs": 2,
+   "runsInThisRepository": 0,
+   "medianMinutes": 9.3,
+   "p90Minutes": 9.3,
+   "totalHours": 0.2,
+   "medianFirstTurnInputTokens": 22604,
+   "medianOutputTokens": 52483,
+   "medianTurns": 21,
+   "medianToolCalls": 37,
+   "toolShareOfWall": 11.2,
+   "wallHours": {
+    "model": 0.2,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "rm",
+     "minutes": 0.4
+    },
+    {
+     "tool": "cat",
+     "minutes": 0.3
+    },
+    {
+     "tool": "for",
+     "minutes": 0.3
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:security:input-validation-checker",
+   "month": "2026-09",
+   "runs": 1,
+   "runsInThisRepository": 1,
+   "medianMinutes": 1.5,
+   "p90Minutes": 1.5,
+   "totalHours": 0,
+   "medianFirstTurnInputTokens": 58135,
+   "medianOutputTokens": 9117,
+   "medianTurns": 5,
+   "medianToolCalls": 6,
+   "toolShareOfWall": 0.7,
+   "wallHours": {
+    "model": 0,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 58135,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:security:sast-scanner",
+   "month": "2026-09",
+   "runs": 1,
+   "runsInThisRepository": 0,
+   "medianMinutes": 7.7,
+   "p90Minutes": 7.7,
+   "totalHours": 0.1,
+   "medianFirstTurnInputTokens": 30092,
+   "medianOutputTokens": 31894,
+   "medianTurns": 38,
+   "medianToolCalls": 41,
+   "toolShareOfWall": 1.4,
+   "wallHours": {
+    "model": 0.1,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "cat",
+     "minutes": 0
+    },
+    {
+     "tool": "rg",
+     "minutes": 0
+    },
+    {
+     "tool": "for",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:security:security-scanner",
+   "month": "2026-09",
+   "runs": 11,
+   "runsInThisRepository": 2,
+   "medianMinutes": 17.4,
+   "p90Minutes": 29.1,
+   "totalHours": 3.4,
+   "medianFirstTurnInputTokens": 24257,
+   "medianOutputTokens": 83682,
+   "medianTurns": 53,
+   "medianToolCalls": 64,
+   "toolShareOfWall": 53.1,
+   "wallHours": {
+    "model": 1.6,
+    "tools": 1.8,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 60032,
+   "topToolsByMinutes": [
+    {
+     "tool": "source",
+     "minutes": 19.8
+    },
+    {
+     "tool": "<script>",
+     "minutes": 14.5
+    },
+    {
+     "tool": "node <script>",
+     "minutes": 12.9
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:security:threat-modeler",
+   "month": "2026-09",
+   "runs": 2,
+   "runsInThisRepository": 0,
+   "medianMinutes": 18.5,
+   "p90Minutes": 18.5,
+   "totalHours": 0.6,
+   "medianFirstTurnInputTokens": 25560,
+   "medianOutputTokens": 75450,
+   "medianTurns": 31,
+   "medianToolCalls": 43,
+   "toolShareOfWall": 8.9,
+   "wallHours": {
+    "model": 0.5,
+    "tools": 0.1,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "for",
+     "minutes": 1
+    },
+    {
+     "tool": "ls",
+     "minutes": 1
+    },
+    {
+     "tool": "cat",
+     "minutes": 0.5
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:specialized:accessibility-checker",
+   "month": "2026-09",
+   "runs": 2,
+   "runsInThisRepository": 0,
+   "medianMinutes": 65.8,
+   "p90Minutes": 65.8,
+   "totalHours": 1.5,
+   "medianFirstTurnInputTokens": 20713,
+   "medianOutputTokens": 36456,
+   "medianTurns": 41,
+   "medianToolCalls": 48,
+   "toolShareOfWall": 11,
+   "wallHours": {
+    "model": 0.7,
+    "tools": 0.2,
+    "silenceOver30Minutes": 0.6,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "cat",
+     "minutes": 5
+    },
+    {
+     "tool": "sed",
+     "minutes": 2.6
+    },
+    {
+     "tool": "mkdir",
+     "minutes": 1.5
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:specialized:database-reviewer",
+   "month": "2026-09",
+   "runs": 13,
+   "runsInThisRepository": 0,
+   "medianMinutes": 10.8,
+   "p90Minutes": 25.3,
+   "totalHours": 11.9,
+   "medianFirstTurnInputTokens": 23936,
+   "medianOutputTokens": 61945,
+   "medianTurns": 29,
+   "medianToolCalls": 33,
+   "toolShareOfWall": 2.3,
+   "wallHours": {
+    "model": 1.9,
+    "tools": 0.3,
+    "silenceOver30Minutes": 9.7,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "cat",
+     "minutes": 3.3
+    },
+    {
+     "tool": "sed",
+     "minutes": 3.2
+    },
+    {
+     "tool": "docker run",
+     "minutes": 2.6
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:specialized:error-handler-checker",
+   "month": "2026-09",
+   "runs": 1,
+   "runsInThisRepository": 1,
+   "medianMinutes": 2.5,
+   "p90Minutes": 2.5,
+   "totalHours": 0,
+   "medianFirstTurnInputTokens": 58261,
+   "medianOutputTokens": 15593,
+   "medianTurns": 6,
+   "medianToolCalls": 12,
+   "toolShareOfWall": 0.9,
+   "wallHours": {
+    "model": 0,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 58261,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:specialized:performance-profiler",
+   "month": "2026-09",
+   "runs": 1,
+   "runsInThisRepository": 0,
+   "medianMinutes": 11.4,
+   "p90Minutes": 11.4,
+   "totalHours": 0.2,
+   "medianFirstTurnInputTokens": 23581,
+   "medianOutputTokens": 46010,
+   "medianTurns": 51,
+   "medianToolCalls": 51,
+   "toolShareOfWall": 33,
+   "wallHours": {
+    "model": 0.1,
+    "tools": 0.1,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "source",
+     "minutes": 2.2
+    },
+    {
+     "tool": "uptime",
+     "minutes": 0.8
+    },
+    {
+     "tool": "railway",
+     "minutes": 0.2
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:testing:coverage-mapper",
+   "month": "2026-09",
+   "runs": 1,
+   "runsInThisRepository": 0,
+   "medianMinutes": 13.4,
+   "p90Minutes": 13.4,
+   "totalHours": 0.2,
+   "medianFirstTurnInputTokens": 28792,
+   "medianOutputTokens": 25045,
+   "medianTurns": 55,
+   "medianToolCalls": 59,
+   "toolShareOfWall": 2.2,
+   "wallHours": {
+    "model": 0.2,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "ls",
+     "minutes": 0.1
+    },
+    {
+     "tool": "echo",
+     "minutes": 0
+    },
+    {
+     "tool": "for",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:testing:playwright-qa",
+   "month": "2026-09",
+   "runs": 3,
+   "runsInThisRepository": 0,
+   "medianMinutes": 41.2,
+   "p90Minutes": 44.2,
+   "totalHours": 1.8,
+   "medianFirstTurnInputTokens": 31696,
+   "medianOutputTokens": 158587,
+   "medianTurns": 102,
+   "medianToolCalls": 112,
+   "toolShareOfWall": 62.2,
+   "wallHours": {
+    "model": 0.7,
+    "tools": 1.1,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "cat",
+     "minutes": 20.1
+    },
+    {
+     "tool": "Read",
+     "minutes": 18.9
+    },
+    {
+     "tool": "export",
+     "minutes": 12.5
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:testing:quality-gate-runner",
+   "month": "2026-09",
+   "runs": 3,
+   "runsInThisRepository": 0,
+   "medianMinutes": 10.8,
+   "p90Minutes": 44.8,
+   "totalHours": 1,
+   "medianFirstTurnInputTokens": 37952,
+   "medianOutputTokens": 53656,
+   "medianTurns": 48,
+   "medianToolCalls": 60,
+   "toolShareOfWall": 37.7,
+   "wallHours": {
+    "model": 0.6,
+    "tools": 0.4,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "python3",
+     "minutes": 6.1
+    },
+    {
+     "tool": "cat",
+     "minutes": 5.1
+    },
+    {
+     "tool": "wait loop (sleep and re-check)",
+     "minutes": 3.1
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:testing:runners:e2e-test-runner",
+   "month": "2026-09",
+   "runs": 4,
+   "runsInThisRepository": 0,
+   "medianMinutes": 28.8,
+   "p90Minutes": 293.9,
+   "totalHours": 6.1,
+   "medianFirstTurnInputTokens": 29606,
+   "medianOutputTokens": 72068,
+   "medianTurns": 76,
+   "medianToolCalls": 80,
+   "toolShareOfWall": 66,
+   "wallHours": {
+    "model": 0.6,
+    "tools": 4,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 1.5
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "wait loop (sleep and re-check)",
+     "minutes": 149.4
+    },
+    {
+     "tool": "<script>",
+     "minutes": 67.3
+    },
+    {
+     "tool": "export",
+     "minutes": 12.5
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:testing:runners:smoke-test-runner",
+   "month": "2026-09",
+   "runs": 3,
+   "runsInThisRepository": 0,
+   "medianMinutes": 4.4,
+   "p90Minutes": 21.9,
+   "totalHours": 0.5,
+   "medianFirstTurnInputTokens": 27146,
+   "medianOutputTokens": 9298,
+   "medianTurns": 23,
+   "medianToolCalls": 21,
+   "toolShareOfWall": 95.4,
+   "wallHours": {
+    "model": 0,
+    "tools": 0.5,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "wait loop (sleep and re-check)",
+     "minutes": 23.2
+    },
+    {
+     "tool": "sleep",
+     "minutes": 2.1
+    },
+    {
+     "tool": "<other>",
+     "minutes": 0.7
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:testing:runners:unit-test-runner",
+   "month": "2026-09",
+   "runs": 3,
+   "runsInThisRepository": 0,
+   "medianMinutes": 4.5,
+   "p90Minutes": 7.9,
+   "totalHours": 0.3,
+   "medianFirstTurnInputTokens": 27816,
+   "medianOutputTokens": 21776,
+   "medianTurns": 29,
+   "medianToolCalls": 27,
+   "toolShareOfWall": 45.9,
+   "wallHours": {
+    "model": 0.1,
+    "tools": 0.1,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "<script>",
+     "minutes": 4.2
+    },
+    {
+     "tool": "source",
+     "minutes": 1.5
+    },
+    {
+     "tool": "mkdir",
+     "minutes": 0.6
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:testing:writers:e2e-test-writer",
+   "month": "2026-09",
+   "runs": 16,
+   "runsInThisRepository": 0,
+   "medianMinutes": 22.2,
+   "p90Minutes": 83.5,
+   "totalHours": 8.7,
+   "medianFirstTurnInputTokens": 24139,
+   "medianOutputTokens": 69555,
+   "medianTurns": 60,
+   "medianToolCalls": 68,
+   "toolShareOfWall": 14.4,
+   "wallHours": {
+    "model": 4.6,
+    "tools": 1.3,
+    "silenceOver30Minutes": 2.9,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 1,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "wait loop (sleep and re-check)",
+     "minutes": 14.4
+    },
+    {
+     "tool": "pgrep",
+     "minutes": 10.5
+    },
+    {
+     "tool": "until",
+     "minutes": 8.5
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:testing:writers:integration-test-writer",
+   "month": "2026-09",
+   "runs": 1,
+   "runsInThisRepository": 0,
+   "medianMinutes": 0.7,
+   "p90Minutes": 0.7,
+   "totalHours": 0,
+   "medianFirstTurnInputTokens": 25176,
+   "medianOutputTokens": 695,
+   "medianTurns": 6,
+   "medianToolCalls": 6,
+   "toolShareOfWall": 4.9,
+   "wallHours": {
+    "model": 0,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "uv run",
+     "minutes": 0
+    },
+    {
+     "tool": "Read",
+     "minutes": 0
+    },
+    {
+     "tool": "cat",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:testing:writers:unit-test-writer",
+   "month": "2026-09",
+   "runs": 12,
+   "runsInThisRepository": 0,
+   "medianMinutes": 13.2,
+   "p90Minutes": 81.1,
+   "totalHours": 7.6,
+   "medianFirstTurnInputTokens": 24917,
+   "medianOutputTokens": 81744,
+   "medianTurns": 49,
+   "medianToolCalls": 53,
+   "toolShareOfWall": 5.9,
+   "wallHours": {
+    "model": 3.5,
+    "tools": 0.4,
+    "silenceOver30Minutes": 3.6,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "<script>",
+     "minutes": 7.9
+    },
+    {
+     "tool": "source",
+     "minutes": 4.6
+    },
+    {
+     "tool": "uptime",
+     "minutes": 3.7
+    }
+   ]
+  },
+  {
+   "agent": "non-CTOC agents",
+   "month": "2026-09",
+   "runs": 310,
+   "runsInThisRepository": 0,
+   "medianMinutes": 9,
+   "p90Minutes": 31.3,
+   "totalHours": 100.9,
+   "medianFirstTurnInputTokens": 60869,
+   "medianOutputTokens": 10735,
+   "medianTurns": 22,
+   "medianToolCalls": 44,
+   "toolShareOfWall": 25.1,
+   "wallHours": {
+    "model": 44.7,
+    "tools": 25.3,
+    "silenceOver30Minutes": 17.4,
+    "afterUsageLimit": 13.6
+   },
+   "resumedByAMessageAfterFinishing": 27,
+   "hoursSittingFinishedBeforeResume": 27,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "wait loop (sleep and re-check)",
+     "minutes": 615
+    },
+    {
+     "tool": "python3",
+     "minutes": 118
+    },
+    {
+     "tool": "WebFetch",
+     "minutes": 116.2
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:ai-quality:citation-validator",
+   "month": "2026-10",
+   "runs": 49,
+   "runsInThisRepository": 49,
+   "medianMinutes": 9.2,
+   "p90Minutes": 12.8,
+   "totalHours": 9.1,
+   "medianFirstTurnInputTokens": 72142,
+   "medianOutputTokens": 52289,
+   "medianTurns": 20,
+   "medianToolCalls": 37,
+   "toolShareOfWall": 6.9,
+   "wallHours": {
+    "model": 6.9,
+    "tools": 0.6,
+    "silenceOver30Minutes": 1.6,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 72142,
+   "topToolsByMinutes": [
+    {
+     "tool": "WebFetch",
+     "minutes": 29.3
+    },
+    {
+     "tool": "WebSearch",
+     "minutes": 6.2
+    },
+    {
+     "tool": "Read",
+     "minutes": 1.4
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:ai-quality:llm-security-tester",
+   "month": "2026-10",
+   "runs": 1,
+   "runsInThisRepository": 1,
+   "medianMinutes": 18.9,
+   "p90Minutes": 18.9,
+   "totalHours": 0.3,
+   "medianFirstTurnInputTokens": 62637,
+   "medianOutputTokens": 96718,
+   "medianTurns": 30,
+   "medianToolCalls": 43,
+   "toolShareOfWall": 2.3,
+   "wallHours": {
+    "model": 0.3,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 62637,
+   "topToolsByMinutes": [
+    {
+     "tool": "rm",
+     "minutes": 0.2
+    },
+    {
+     "tool": "node --test",
+     "minutes": 0.1
+    },
+    {
+     "tool": "Read",
+     "minutes": 0.1
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:gate-critic",
+   "month": "2026-10",
+   "runs": 2,
+   "runsInThisRepository": 2,
+   "medianMinutes": 0,
+   "p90Minutes": 0,
+   "totalHours": 0,
+   "medianFirstTurnInputTokens": 111895,
+   "medianOutputTokens": 4,
+   "medianTurns": 1,
+   "medianToolCalls": 0,
+   "toolShareOfWall": 0,
+   "wallHours": {
+    "model": 0,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 111895,
+   "topToolsByMinutes": []
+  },
+  {
+   "agent": "ctoc:iron-loop:iron-loop-critic",
+   "month": "2026-10",
+   "runs": 34,
+   "runsInThisRepository": 34,
+   "medianMinutes": 7.9,
+   "p90Minutes": 11.6,
+   "totalHours": 4.7,
+   "medianFirstTurnInputTokens": 59288,
+   "medianOutputTokens": 45787,
+   "medianTurns": 26,
+   "medianToolCalls": 38,
+   "toolShareOfWall": 0.8,
+   "wallHours": {
+    "model": 4.7,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 59288,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 1.4
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0.8
+    },
+    {
+     "tool": "Glob",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:iron-loop-executor",
+   "month": "2026-10",
+   "runs": 22,
+   "runsInThisRepository": 22,
+   "medianMinutes": 26,
+   "p90Minutes": 249.4,
+   "totalHours": 36.7,
+   "medianFirstTurnInputTokens": 62013,
+   "medianOutputTokens": 79464,
+   "medianTurns": 79,
+   "medianToolCalls": 92,
+   "toolShareOfWall": 19.8,
+   "wallHours": {
+    "model": 5.3,
+    "tools": 7.3,
+    "silenceOver30Minutes": 24.1,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 56,
+   "hoursSittingFinishedBeforeResume": 95.5,
+   "medianFirstTurnInputTokensInThisRepository": 62013,
+   "topToolsByMinutes": [
+    {
+     "tool": "Write",
+     "minutes": 159.8
+    },
+    {
+     "tool": "npm test",
+     "minutes": 108
+    },
+    {
+     "tool": "wait loop (sleep and re-check)",
+     "minutes": 83.7
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:iron-loop:iron-loop-integrator",
+   "month": "2026-10",
+   "runs": 4,
+   "runsInThisRepository": 4,
+   "medianMinutes": 14.9,
+   "p90Minutes": 20.2,
+   "totalHours": 0.7,
+   "medianFirstTurnInputTokens": 58653,
+   "medianOutputTokens": 56378,
+   "medianTurns": 24,
+   "medianToolCalls": 133,
+   "toolShareOfWall": 1.1,
+   "wallHours": {
+    "model": 0.7,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 1,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 58653,
+   "topToolsByMinutes": [
+    {
+     "tool": "Edit",
+     "minutes": 0.3
+    },
+    {
+     "tool": "Read",
+     "minutes": 0.2
+    },
+    {
+     "tool": "Write",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:pipeline:agent-critic",
+   "month": "2026-10",
+   "runs": 12,
+   "runsInThisRepository": 12,
+   "medianMinutes": 16.9,
+   "p90Minutes": 22.1,
+   "totalHours": 3.4,
+   "medianFirstTurnInputTokens": 76237,
+   "medianOutputTokens": 117732,
+   "medianTurns": 23,
+   "medianToolCalls": 31,
+   "toolShareOfWall": 0.3,
+   "wallHours": {
+    "model": 3.4,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 76237,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0.4
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0.2
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:planning:implementation-planner",
+   "month": "2026-10",
+   "runs": 12,
+   "runsInThisRepository": 12,
+   "medianMinutes": 28,
+   "p90Minutes": 31.4,
+   "totalHours": 5,
+   "medianFirstTurnInputTokens": 69898,
+   "medianOutputTokens": 177897,
+   "medianTurns": 90,
+   "medianToolCalls": 110,
+   "toolShareOfWall": 0.6,
+   "wallHours": {
+    "model": 4.9,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 6,
+   "hoursSittingFinishedBeforeResume": 0.1,
+   "medianFirstTurnInputTokensInThisRepository": 69898,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0.8
+    },
+    {
+     "tool": "Grep",
+     "minutes": 0.7
+    },
+    {
+     "tool": "Glob",
+     "minutes": 0.1
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:planning:product-owner",
+   "month": "2026-10",
+   "runs": 3,
+   "runsInThisRepository": 3,
+   "medianMinutes": 18.6,
+   "p90Minutes": 49.3,
+   "totalHours": 1.3,
+   "medianFirstTurnInputTokens": 70796,
+   "medianOutputTokens": 71998,
+   "medianTurns": 18,
+   "medianToolCalls": 58,
+   "toolShareOfWall": 0.8,
+   "wallHours": {
+    "model": 0.6,
+    "tools": 0,
+    "silenceOver30Minutes": 0.7,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 70796,
+   "topToolsByMinutes": [
+    {
+     "tool": "WebSearch",
+     "minutes": 0.4
+    },
+    {
+     "tool": "Read",
+     "minutes": 0.2
+    },
+    {
+     "tool": "Glob",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:planning:vision-decomposer",
+   "month": "2026-10",
+   "runs": 1,
+   "runsInThisRepository": 0,
+   "medianMinutes": 9,
+   "p90Minutes": 9,
+   "totalHours": 0.2,
+   "medianFirstTurnInputTokens": 39023,
+   "medianOutputTokens": 56456,
+   "medianTurns": 7,
+   "medianToolCalls": 19,
+   "toolShareOfWall": 0.2,
+   "wallHours": {
+    "model": 0.2,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": null,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0
+    },
+    {
+     "tool": "Write",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:product:experiment-designer",
+   "month": "2026-10",
+   "runs": 1,
+   "runsInThisRepository": 1,
+   "medianMinutes": 0.1,
+   "p90Minutes": 0.1,
+   "totalHours": 0,
+   "medianFirstTurnInputTokens": 59146,
+   "medianOutputTokens": 404,
+   "medianTurns": 2,
+   "medianToolCalls": 1,
+   "toolShareOfWall": 5.9,
+   "wallHours": {
+    "model": 0,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 59146,
+   "topToolsByMinutes": [
+    {
+     "tool": "Read",
+     "minutes": 0
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:quality:consistency-checker",
+   "month": "2026-10",
+   "runs": 3,
+   "runsInThisRepository": 3,
+   "medianMinutes": 0,
+   "p90Minutes": 0.1,
+   "totalHours": 0,
+   "medianFirstTurnInputTokens": 56234,
+   "medianOutputTokens": 4,
+   "medianTurns": 1,
+   "medianToolCalls": 0,
+   "toolShareOfWall": 0,
+   "wallHours": {
+    "model": 0,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 56234,
+   "topToolsByMinutes": []
+  },
+  {
+   "agent": "ctoc:quality:duplicate-code-detector",
+   "month": "2026-10",
+   "runs": 1,
+   "runsInThisRepository": 1,
+   "medianMinutes": 16.5,
+   "p90Minutes": 16.5,
+   "totalHours": 0.3,
+   "medianFirstTurnInputTokens": 56873,
+   "medianOutputTokens": 101205,
+   "medianTurns": 57,
+   "medianToolCalls": 57,
+   "toolShareOfWall": 6,
+   "wallHours": {
+    "model": 0.3,
+    "tools": 0,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 56873,
+   "topToolsByMinutes": [
+    {
+     "tool": "cat",
+     "minutes": 0.6
+    },
+    {
+     "tool": "python3",
+     "minutes": 0.1
+    },
+    {
+     "tool": "sed",
+     "minutes": 0.1
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:quality:performance-validator",
+   "month": "2026-10",
+   "runs": 1,
+   "runsInThisRepository": 1,
+   "medianMinutes": 33.4,
+   "p90Minutes": 33.4,
+   "totalHours": 0.6,
+   "medianFirstTurnInputTokens": 59548,
+   "medianOutputTokens": 128661,
+   "medianTurns": 262,
+   "medianToolCalls": 268,
+   "toolShareOfWall": 73.5,
+   "wallHours": {
+    "model": 0.1,
+    "tools": 0.4,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 59548,
+   "topToolsByMinutes": [
+    {
+     "tool": "rm",
+     "minutes": 11.3
+    },
+    {
+     "tool": "<script>",
+     "minutes": 7
+    },
+    {
+     "tool": "uptime",
+     "minutes": 3.2
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:security:security-scanner",
+   "month": "2026-10",
+   "runs": 25,
+   "runsInThisRepository": 25,
+   "medianMinutes": 11.4,
+   "p90Minutes": 19.4,
+   "totalHours": 8.9,
+   "medianFirstTurnInputTokens": 58061,
+   "medianOutputTokens": 51540,
+   "medianTurns": 39,
+   "medianToolCalls": 40,
+   "toolShareOfWall": 11.2,
+   "wallHours": {
+    "model": 3.6,
+    "tools": 1,
+    "silenceOver30Minutes": 4.3,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 1,
+   "hoursSittingFinishedBeforeResume": 0.1,
+   "medianFirstTurnInputTokensInThisRepository": 58061,
+   "topToolsByMinutes": [
+    {
+     "tool": "node <script>",
+     "minutes": 23.3
+    },
+    {
+     "tool": "Write",
+     "minutes": 18.3
+    },
+    {
+     "tool": "node --test",
+     "minutes": 4.6
+    }
+   ]
+  },
+  {
+   "agent": "ctoc:specialized:performance-profiler",
+   "month": "2026-10",
+   "runs": 1,
+   "runsInThisRepository": 1,
+   "medianMinutes": 21.9,
+   "p90Minutes": 21.9,
+   "totalHours": 0.4,
+   "medianFirstTurnInputTokens": 57367,
+   "medianOutputTokens": 95927,
+   "medianTurns": 95,
+   "medianToolCalls": 96,
+   "toolShareOfWall": 29.6,
+   "wallHours": {
+    "model": 0.3,
+    "tools": 0.1,
+    "silenceOver30Minutes": 0,
+    "afterUsageLimit": 0
+   },
+   "resumedByAMessageAfterFinishing": 0,
+   "hoursSittingFinishedBeforeResume": 0,
+   "medianFirstTurnInputTokensInThisRepository": 57367,
+   "topToolsByMinutes": [
+    {
+     "tool": "for",
+     "minutes": 2.1
+    },
+    {
+     "tool": "uptime",
+     "minutes": 1.4
+    },
+    {
+     "tool": "export",
+     "minutes": 1.2
+    }
+   ]
+  },
+  {
+   "agent": "non-CTOC agents",
+   "month": "2026-10",
+   "runs": 100,
+   "runsInThisRepository": 4,
+   "medianMinutes": 11.6,
+   "p90Minutes": 118,
+   "totalHours": 191.5,
+   "medianFirstTurnInputTokens": 61809,
+   "medianOutputTokens": 23884,
+   "medianTurns": 25,
+   "medianToolCalls": 36,
+   "toolShareOfWall": 8.4,
+   "wallHours": {
+    "model": 19.9,
+    "tools": 16.1,
+    "silenceOver30Minutes": 109.9,
+    "afterUsageLimit": 45.7
+   },
+   "resumedByAMessageAfterFinishing": 5,
+   "hoursSittingFinishedBeforeResume": 15.2,
+   "medianFirstTurnInputTokensInThisRepository": 80472,
+   "topToolsByMinutes": [
+    {
+     "tool": "wait loop (sleep and re-check)",
+     "minutes": 680.3
+    },
+    {
+     "tool": "sleep",
+     "minutes": 44.5
+    },
+    {
+     "tool": "until",
+     "minutes": 38.4
+    }
+   ]
+  }
+ ]
+}

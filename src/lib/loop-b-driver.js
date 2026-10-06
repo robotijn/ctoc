@@ -14,8 +14,11 @@
  *       just moved, detected as the difference between the pre-build stages before and
  *       after the call. Its return value lists what STAYED pending, so it cannot tell us
  *       what crossed — the before/after diff is the honest, reuse-only way to see it.
- *   (b) `streaming-precompute.plansNeedingQuestions(root)` — the plans whose precomputed
- *       decision questions are missing/stale (Loop-B must dispatch subagents for these).
+ *   (b) `streaming-precompute.plansNeedingQuestions(root)` — the plans whose questions
+ *       have not been generated (missing or stale). The line gives their count and the
+ *       human's one way to ask — "Generate its questions" on a plan's decision in
+ *       /ctoc:start — and orders nothing: no questions are generated until the human
+ *       chooses it (plan "CTOC does no unasked work at session start or stop").
  *   (c) `continuation-queue.nextBuildable(root)` — the head of `.buildable` is the next
  *       plan to build.
  *
@@ -66,17 +69,29 @@ function buildDeps() {
   };
 }
 
+/** The longest a single plan name may run in a line before it ends in an ellipsis. */
+const NAME_MAX_CHARS = 80;
+
+/** One plan name, cut to NAME_MAX_CHARS characters with a trailing ellipsis. */
+function capName(name) {
+  const s = String(name);
+  return s.length <= NAME_MAX_CHARS ? s : `${s.slice(0, NAME_MAX_CHARS - 1)}…`;
+}
+
 /**
- * Cap a list of human names to at most `cap`, then "and K more". The one place the
- * wall becomes a summary — every group line routes through it.
+ * Cap a list of human names to at most `cap`, then "and K more", and each name to
+ * NAME_MAX_CHARS characters. The one place the wall becomes a summary — every group
+ * line routes through it, so a plan title of any length cannot grow the session-start
+ * text.
  * @param {string[]} names
  * @param {number} [cap]
  * @returns {string}
  */
 function summarize(names, cap = NAME_CAP) {
   const n = cap > 0 ? cap : NAME_CAP;
-  if (names.length <= n) return names.join(', ');
-  return `${names.slice(0, n).join(', ')}, and ${names.length - n} more`;
+  const shown = names.slice(0, n).map(capName);
+  if (names.length <= n) return shown.join(', ');
+  return `${shown.join(', ')}, and ${names.length - n} more`;
 }
 
 /** A decision descriptor still carries an unresolved fork the human must answer. */
@@ -86,11 +101,10 @@ function hasOpenForks(d) {
 }
 
 /**
- * A plan is BUILT AND WAITING FOR THE HUMAN'S OK — not one CTOC is still working out
- * questions for — when its next move is the final human sign-off and it has no open
- * fork. `toStage === 'done'` is that final edge (only `review → done`); everything else
- * in `plansNeedingQuestions` is a pre-build plan whose sufficiency is not yet computed,
- * i.e. genuinely still being worked out.
+ * A plan is BUILT AND WAITING FOR THE HUMAN'S OK — not one waiting for its questions —
+ * when its next move is the final human sign-off and it has no open fork.
+ * `toStage === 'done'` is that final edge (only `review → done`); everything else in
+ * `plansNeedingQuestions` is a pre-build plan whose questions have not been generated.
  */
 function isWaitingForOk(d) {
   return !!d && d.toStage === 'done' && !hasOpenForks(d);
@@ -170,8 +184,9 @@ function crossedLines(root, deps) {
 
 /**
  * (b) the pending set, SPLIT by what each plan actually needs and each list CAPPED:
- *   - WORKING OUT: plans with an open fork, or pre-build plans whose sufficiency is not
- *     yet computed — a real question CTOC is still generating.
+ *   - WAITING FOR THEIR QUESTIONS: plans with an open fork, or pre-build plans whose
+ *     questions have not been generated — counted, with the human's way to ask. An
+ *     EMPTY plan is left out: its screen is the broken-plan screen, with no option to ask.
  *   - WAITING FOR YOUR OK: built plans at the final sign-off with no open fork.
  * The descriptor already carries `title`/`slug`, so names come from it directly — no
  * per-plan file read (the old wall re-read ~134 files here). Moment phrasing via
@@ -187,11 +202,17 @@ function needQuestionLines(root, deps) {
       if (!d) continue;
       const name = deps.humanPlanName(d.title, d.slug);
       if (!name) continue;
-      (isWaitingForOk(d) ? waiting : working).push({ name, fromStage: d.fromStage });
+      if (isWaitingForOk(d)) {
+        waiting.push({ name, fromStage: d.fromStage });
+      } else if (!d.broken) {
+        // An EMPTY plan gets the broken-plan screen, which offers no "Generate its
+        // questions", so it is not counted as waiting for them.
+        working.push({ name, fromStage: d.fromStage });
+      }
     }
     const lines = [];
     if (working.length) {
-      lines.push(`Still working out what to ask you about: ${summarize(working.map((w) => w.name))}.`);
+      lines.push(`${working.length} plan(s) wait for their questions — choose "Generate its questions" on a plan's decision in /ctoc:start: ${summarize(working.map((w) => w.name))}.`);
     }
     if (waiting.length) {
       const moment = deps.moment(waiting[0].fromStage) || 'nothing is finished until you say so';
@@ -209,7 +230,7 @@ function nextBuildLines(root, deps) {
     const order = deps.nextBuildable(root);
     const head = order && Array.isArray(order.buildable) ? order.buildable[0] : null;
     if (!head) return [];
-    const name = nameForRef(root, head, deps);
+    const name = capName(nameForRef(root, head, deps));
     return name ? [`Next up to build: ${name}.`] : [];
   } catch {
     return [];

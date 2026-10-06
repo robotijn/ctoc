@@ -327,35 +327,6 @@ test('drives REAL captured plan-frontmatter samples through nextBuildable (not s
   } finally { cleanup(dir); }
 });
 
-// ── live wiring: shouldContinueQueue surfaces the build order (reachability) ──
-
-test('shouldContinueQueue attaches buildOrder additively; existing fields unchanged', () => {
-  const dir = mkProject();
-  try {
-    makePlan(dir, 'todo', 'B-first', { priority: 'high' });
-    makePlan(dir, 'todo', 'A-second', { dependsOn: 'B-first', priority: 'critical' });
-
-    const d = q.shouldContinueQueue(dir);
-    // existing contract preserved
-    assert.equal(d.continue, true);
-    assert.equal(d.depth, 2);
-    assert.match(d.reason, /2 approved plan\(s\)/);
-    // additive build order: B is buildable, A is blocked behind it (an inversion).
-    assert.deepEqual(d.buildOrder.buildable, ['todo/B-first.md']);
-    assert.deepEqual(d.buildOrder.blocked, [{ ref: 'todo/A-second.md', blockedBy: ['B-first'] }]);
-    assert.equal(d.buildOrder.inversions.length, 1);
-  } finally { cleanup(dir); }
-});
-
-test('shouldContinueQueue with an empty queue carries NO buildOrder (continue:false branch)', () => {
-  const dir = mkProject();
-  try {
-    const d = q.shouldContinueQueue(dir);
-    assert.equal(d.continue, false);
-    assert.equal(d.buildOrder, undefined);
-  } finally { cleanup(dir); }
-});
-
 // ── existing queue shape is untouched (regression guard) ─────────────────────
 
 test('approvedFreeQueue still returns the {refs, depth} shape nextBuildable is built on', () => {

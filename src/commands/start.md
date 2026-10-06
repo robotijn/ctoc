@@ -46,6 +46,7 @@ The command outputs JSON: `{ text, ask, actions }`.
 | `claude:view-edit {ref}` | Display the plan file, then help the user edit it (View and Edit are one action) |
 | `claude:discuss` | **WORK (interactive-async). The FIRST and MOST IMPORTANT plan action.** Dispatch a background `discuss` agent (never foreground) to deliver a MAXIMALLY HARSH, no-holds-barred **adversarial critique** — nothing held back. It attacks the plan without mercy: surface EVERY weak assumption, failure mode, unstated dependency, weak or missing justification, and missing edge case. NO praise, NO hedging, NO "this is good but" — only what is wrong and what could break. It makes documented reasonable choices; open questions surface as inbox "decisions awaiting review" — the `${CLAUDE_PLUGIN_ROOT}/.ctoc/ask-me-questions.md` Unicode-box decision-matrix (Option / Pros / Cons / Recommendation) is the FRAMING for those decisions, not a synchronous prompt. Strictly **advisory**: it NEVER edits the plan and NEVER crosses a gate. See the Two-Plane Protocol (WORK dispatch). |
 | `claude:discuss-all {stage}` | **WORK (bulk critique). The bulk form of `claude:discuss`.** A WORD shortcut on the stage plan list (`browse functional` / `browse implementation`) — never a number; numbers open a single plan. Dispatch the brutal, nothing-held-back **adversarial critique across EVERY plan in `{stage}`** — one critique per plan, or one per parent-plan group — and surface each result. Same maximally-harsh contract as `claude:discuss`: attack every plan without mercy (weak assumptions, failure modes, unstated dependencies, weak/missing justification, missing edge cases), no praise, no hedging. Strictly **advisory**: it NEVER edits a plan and NEVER crosses a gate. See the Two-Plane Protocol (WORK dispatch). |
+| `claude:generate-questions {ref}` | **WORK.** Run the gate-critique precompute for that one plan in the background: `menu task add precompute '{ref}' --touches '.ctoc/streaming/questions/{ref}'` (both quoted; the menu only ever emits a plain-character `{ref}`), dispatch only on `run`, render the menu at once. Never generate for any other plan. |
 | `claude:advance-all-implementation` | **The human deliberately crossing Gate 2 (implementation → todo) for EVERY implementation plan at once — the person selecting this option IS the approval.** A WORD shortcut (`todo-all`) on the implementation stage plan list only — never a number. Batch-approve each parent's slices via `approveSubplans(parentSlug, 'implementation')` (each stamped `approved_by: human`), moving all implementation plans to todo, then start the iron loop to build them by calling `startAgent()` and dispatching the next todo plan as a background `implement` task (per `claude:start-agent`) — file-disjoint slices run concurrently, same-file slices serialize. After enqueuing the wave's implement tasks, call `enqueueWaveSync(root, { blockedBy: <their task ids> })` so the integrated suite + baseline reconcile + commit run as a scheduled `sync` barrier once the wave finishes. It NEVER crosses the gate unless the human chooses it. |
 | `claude:done-all-<parent>` | **The human deliberately crossing Gate 3 (review → done) for EVERY reviewed slice of `<parent>` at once — the human typing the word `done-all` on a parent's review list IS the approval.** A WORD shortcut (`done-all`) on the review stage plan list only — never a number; numbers open a single plan. Call `approveSubplans(parentSlug, 'review')` (`src/lib/actions.js`) — it topo-orders the parent's review siblings, per-sibling runs `validateReviewToDone`, and crosses each via the gate-safe `approvePlan` (each stamped `approved_by: human`, `gate_crossed: review → done`); a sibling that fails validation is REPORTED in `skipped[]` and left in review, never silently dropped, and the batch continues. Surface `{approved, skipped}` to the human. It NEVER crosses the gate unless the human types the word. Gate 3 reads the VERIFY evidence the COMPLETION produced (see the completion recipe) — a slice whose recorded verify run FAILED is refused here, and that refusal is the system working. |
 | `claude:approve {ref}` | Run `approvePlan()`, show result, return to stage list. **`approvePlan` now VALIDATES the transition (R5-B).** On a clean plan it crosses and stamps `approved_by: human`. On an INVALID transition it REFUSES by default — returns `{ ok:false, refused:true, reason, failures }` and does NOT move the plan, stamp a marker, or write a ledger entry; surface the `failures` and route to `plan {ref}` to fix. The buried **"Approve anyway"** option (only shown on a failed `validate`) emits `claude:approve <ref> --override` — that `--override` token is the human's explicit override: prompt for a reason and call `approvePlan(path, root, { override: { reason } })` with it. An override crosses AND records `override: true` + the reason in BOTH the ledger entry and the plan marker (a forced crossing is auditable, never a silent one). **A refusal never auto-retries with an override** — an override is always the human's deliberate act. |
@@ -95,7 +96,8 @@ Resolve the user's reply to an action string `A`, then classify:
    a functional plan (Gate 1) with an autonomous follow-on runs the foreground approve,
    then dispatches `implementation-planner` as **WORK**.
 3. `A` is a **WORK-claude** action (`start-agent` → `implement`, `decompose`,
-   `discuss`, `approve-stubs` → `plan`, a `create-plan` discussion → `discuss`) →
+   `discuss`, `approve-stubs` → `plan`, a `create-plan` discussion → `discuss`,
+   `generate-questions` → `precompute`) →
    the **WORK dispatch** recipe below. WORK is **never** run in the foreground.
    Note: `approve-stubs` crosses **Gate 0** (vision → functional) in the foreground
    and hands the stubs off to `product-owner` as that WORK follow-on — the Gate-0
@@ -107,7 +109,7 @@ Resolve the user's reply to an action string `A`, then classify:
 | Class | Actions | Handling |
 |-------|---------|----------|
 | NAV | render, view, browse, section, plan, stubs, validate, inbox, tasks, task, approve, reject, delete, edit, sync, gate clicks | Synchronous; render immediately; no task; minimal reasoning |
-| WORK | implement, plan, review, quality, security, decompose, discuss | Background task via the WORK recipe; **never foreground** |
+| WORK | implement, plan, review, quality, security, decompose, discuss, precompute | Background task via the WORK recipe; **never foreground** |
 
 ### WORK dispatch (turn recipe)
 
@@ -208,34 +210,28 @@ any `--next` route is navigation-only — never a gate transition. Crossing the 
 is a foreground NAV action the user takes deliberately. No completion, promotion, or
 `--next` may ever perform a gate transition.
 
-### Streaming gate questions — background precompute (never-wait)
+### Streaming gate questions — generated only when the human asks
 
-**The human must NEVER wait for a critique to run.** Question generation is decoupled
-from answering: the adversarial gate-critique fleet writes each plan's decision
-questions to a file *ahead of demand*, and the foreground streaming screen reads only
-the already-computed files. A plan whose questions are not ready yet is simply not
-asked with rich questions — the screen falls back to the plain Approve/Open/Skip for
-that plan (from `richQuestionScreen` returning null) and the human moves on. Nobody
-watches a spinner.
+**Nothing is generated when the menu opens, and the human never waits for a critique.**
+A plan's decision questions are written when the human ASKS for them: the adversarial
+gate-critique fleet writes that one plan's questions to a file, and the foreground
+streaming screen reads only the already-computed files. A plan whose questions are not
+ready is not asked with rich questions — the screen falls back to the plain
+Approve/Open/Skip for that plan (from `richQuestionScreen` returning null) and, while
+its questions are missing or stale, also offers **"Generate its questions"**, which
+emits `claude:generate-questions {ref}`. Nobody watches a spinner.
 
-**Fire on open (background, bounded, critical-first).** When you render the `(no args)`
-streaming screen, read the plans whose questions are absent or stale:
-`node -e "console.log(JSON.stringify(require('${CLAUDE_PLUGIN_ROOT}/src/lib/streaming-precompute').plansNeedingQuestions(process.cwd()).map(d=>d.ref)))"`.
-If the list is non-empty, run the **gate-critique precompute** across those refs as
-**BACKGROUND WORK** — never foreground, never `await`ed, never blocking the render. It is
-a render-time background behavior (like the on-open reconcile), not a user-pickable
-action. **Fan out in parallel, up to 5 concurrent subagents** — CTOC's standing
-concurrency cap, the same number `claude:start-agent` uses for concurrent implement
-tasks. Each plan's precompute is independent of every other plan's, so do NOT drain one
-plan before starting the next: take refs in list order (already critical-first,
-furthest-along) and keep the slots FULL. The moment a subagent returns, promote the next
-pending ref into the free slot. Both the per-plan lens fan-out and the per-plan synthesis
-draw from that one 5-slot budget. The precompute stays ahead of the human, so the answer
-queue is always ready.
+**On request only (background, one plan).** Opening the menu generates no questions. When the
+human picks `claude:generate-questions {ref}`, run the **gate-critique precompute**
+below for that one `{ref}` as **BACKGROUND WORK** — never foreground, never `await`ed,
+never blocking the render — and never for any other plan. The per-plan lens fan-out and
+the per-plan synthesis draw from CTOC's standing 5-slot budget of concurrent background
+subagents, the same number `claude:start-agent` uses for concurrent implement tasks.
 
-**The gate-critique precompute — the fleet dispatch (background WORK).** Record a task per
-ref (`menu task add`, kind `precompute`, `--touches .ctoc/streaming/questions/<ref>`) —
-they touch disjoint files, so they run concurrently — and on each scheduler `run`:
+**The gate-critique precompute — the fleet dispatch (background WORK).** Record one task
+for the ref (`menu task add precompute '{ref}' --touches '.ctoc/streaming/questions/{ref}'`)
+— precompute tasks touch disjoint files, so two the human asked for run concurrently —
+and on the scheduler's `run`:
 1. **Gather the semantic corpus context for `{ref}` FIRST — the dispatcher runs these,
    not the critics.** The plan-index (`src/lib/plan-index`) is CTOC's hybrid
    retrieval-augmented index over the plan corpus: lexical BM25 fused with vector
@@ -317,9 +313,8 @@ they touch disjoint files, so they run concurrently — and on each scheduler `r
    A malformed, superseded, or hostile payload is discarded and logged to
    `.ctoc/logs/streaming-sweeper.jsonl`; nothing is written and the human sees the plain
    Approve screen. The critic can propose questions; it can never author the file the
-   human reads. No plan is moved, no gate crossed — this is pure precompute. Every
-   subagent return frees a slot: refill it immediately with the next pending ref, so 5
-   stay in flight while work remains.
+   human reads. No plan is moved, no gate crossed — this is pure precompute. The next
+   time the human opens that decision, its questions are asked.
 
 Any failure falls back silently to the plain gate question — the human is never blocked
 or shown a crash. This is the async-overnight / precompute-never-wait principle applied

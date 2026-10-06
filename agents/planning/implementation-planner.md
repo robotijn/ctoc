@@ -690,9 +690,9 @@ These are not stylistic suggestions; they are pre-conditions for correct operati
 
 ## Writing questions to the streaming store
 
-When SessionStart injects the session-driven dispatch directive, you are one of the
-subagents it dispatches — for a implementation plan you generate the load-bearing DECISION
-FORKS a human must answer before the plan can be built without guessing. You do NOT
+When a dispatch brief asks you to generate the decision questions of an implementation plan,
+you generate the load-bearing DECISION FORKS a human must answer before the plan can
+be built without guessing. You do NOT
 edit the plan, move it, or stamp any approval; your only write is the questions file.
 
 Write your questions through the real store-writer, never by hand:

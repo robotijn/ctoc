@@ -227,6 +227,10 @@ as each unit completes. While the batch has remaining, fork-free work, the Stop 
 CANNOT randomly halt mid-batch. The gate ALLOWS the stop (exit 0) only on: batch complete
 (`remaining === 0`), a registered FORK (`continuation.registerFork(root, reason)` — a
 decision that is the human's), the bounded block-budget exhausted, or no active batch.
+An approved build queue alone never blocks a stop. Only a batch started with `startBatch`
+does, and its message names that batch and its remaining count, never a list of plans.
+The derived approved-queue regime (v6.13.18) and the question order the gate repeated
+(v6.14.36) are removed.
 It is OPT-IN (inert with no batch — safe to ship enabled), FORK-AWARE, BOUNDED (`maxBlocks`),
 FAIL-OPEN (any error → allow), and ESCAPABLE (`CTOC_SKIP_CONTINUATION=1`). The two
 legitimate stops are the ONLY stops: work complete, or a real fork surfaced as a question.
@@ -249,9 +253,9 @@ the moment the human returns. It does NOT — and by the runtime's physics canno
 closed or idle session on its own. Same guardrails as the Stop gate: OPT-IN, FORK-AWARE,
 ESCAPABLE (`CTOC_SKIP_CONTINUATION=1`). Enforced by `tests/resume-watchdog.test.js`.
 
-## Streaming questions — the SESSION dispatches subagents on start (never a second Claude)
+## Streaming questions — generated only when the human asks (never a second Claude)
 
-CTOC is a plugin inside the Claude command-line interface: plain code cannot dispatch a CTOC subagent, and it must never spawn a second Claude (no `claude -p`, no online API calls). Generation is SESSION-DRIVEN. On start, `src/hooks/SessionStart.js` computes `streaming-precompute.plansNeedingQuestions(root)` and, when it is non-empty, appends a directive to the injected context telling the SESSION MODEL to dispatch up to 5 subagents (the stage producers `product-owner`/`vision-advisor`/`implementation-planner` plus the adversarial critics) to find open issues and generate questions, each writing through `streaming-precompute.writePlanQuestions(root, ref, questions, planMtimeMs)`. When nothing is pending the directive is empty — no session-start noise. `/ctoc:start` only READS that store (instant, fail-soft); the human never waits for a critique.
+CTOC is a plugin inside the Claude command-line interface: plain code cannot dispatch a CTOC subagent, and it must never spawn a second Claude (no `claude -p`, no online API calls). A plan's decision questions are generated only when the human asks: while a decision's questions are missing or stale, its screen in `/ctoc:start` offers "Generate its questions" (`claude:generate-questions {ref}`), and choosing it runs the existing critique fleet for that one plan as background work, writing through `streaming-precompute.writePlanQuestions(root, ref, questions, planMtimeMs)`. Nothing is generated when the menu opens. Session start gives no order: it shows one line with the count of plans waiting for their questions and how to ask (`src/lib/loop-b-driver.js`). The Stop hook never orders question generation. `/ctoc:start` otherwise only READS the store (instant, fail-soft); the human never waits for a critique.
 
 **The critique fleet RECORDS that it ran — an audit attestation, never a licence to cross.** The adversarial `gate-critic` may add an `attestation` block to its quarantined pending object: per expected lens (`premortem`, `devils-advocate`, `red-team`, `advocate`), the `state` it classified (`clean-pass` | `partial` | `failed` | `absent`), a `coverage` DERIVED from that state (`full`/`partial`/`none` — the critic's input is `{ ref, lens, findings }` and it does NOT receive a lens's own coverage, so it never copies one), and the post-dedup `findings` count. `streaming-questions-sweeper.promotePendingFile` threads that block through `writePlanQuestions`'s optional fifth parameter into the live store, where the sufficiency auditor and the Doctor screen read it via `planQuestionsStatus.attested` / `.attestation`. This is a RECORD for audit, NOT a crossing-enabler: it changes no gate behaviour, the empty→ready/enough contract is unchanged, and `gate-critic` still NEVER emits `questions: []`. Honesty is preserved at both ends — the sweeper validates and fabricates nothing (an absent block passes straight through), and the reader (`validateAttestation`) fails toward NOT-ATTESTED on an absent or malformed block, so a missing or broken attestation is always safe and only a fabricated clean one would lie. Round-tripped by `tests/attestation-round-trip.test.js`.
 

@@ -27,6 +27,11 @@
  * closed instead is the human's decision; this file only makes the current contract
  * a stated one.
  *
+ * The stop-continuation-gate case that lived here (a fault in the question directive
+ * the hook appended must not change its verdict) is removed with the directive itself:
+ * the hook no longer appends any question order (plan "CTOC does no unasked work at
+ * session start or stop"). The hook's own arms are covered by the continuation tests.
+ *
  * RESOLVED PATHS (the plan's table left three entries without a directory; each was
  * located by listing the directory, not by guessing):
  *   - ctoc-routing-reminder.js  → src/lib/ctoc-routing-reminder.js  (no src/hooks/ twin)
@@ -49,7 +54,6 @@
  *   (a) src/lib/ctoc-routing-reminder.js 85-86   plan-count fault → all-zero state
  *   (a) src/lib/ctoc-routing-reminder.js 227-228 memo write fault → false
  *   (a) src/lib/ctoc-routing-reminder.js 279-280 any internal fault → reason 'error', no throw
- *   (a) src/hooks/stop-continuation-gate.js 62-63 question-directive fault does not change the verdict
  *   (a) src/hooks/stop-test-gate.js  182-183  a spawn fault ALLOWS the stop
  *   (a) src/lib/settings.js          309-310  an unreadable setting never opens the push ship gate
  *   (a) src/lib/v8-dispatcher.js     276      a non-serialisable dispatch value still writes the audit record
@@ -100,7 +104,6 @@ const cache = require('../src/lib/cache');
 
 const INIT_PROJECT_FILE = require.resolve('../src/lib/init-project');
 const PUSH_CMD = path.join(REPO, 'src', 'commands', 'push.js');
-const CONTINUATION_HOOK = path.join(REPO, 'src', 'hooks', 'stop-continuation-gate.js');
 const TEST_GATE_HOOK = path.join(REPO, 'src', 'hooks', 'stop-test-gate.js');
 
 // ── fixture bookkeeping ──────────────────────────────────────────────────────
@@ -508,47 +511,6 @@ describe('push.js entry point — a rejection is reported, never a silent succes
       `a failed push command must exit non-zero, got ${res.status}\n${res.stderr}`);
     assert.match(res.stderr, /push error:/,
       'the failure must be printed, not swallowed into a clean-looking exit');
-  });
-});
-
-describe('stop-continuation-gate — a fault in the question directive', () => {
-  function approvedQueueProject() {
-    const ledger = require('../src/lib/approval-ledger');
-    const dir = mkTmp('ctoc-s18-cont-');
-    fs.mkdirSync(path.join(dir, '.ctoc'), { recursive: true });
-    for (const s of ['todo', 'in-progress']) {
-      fs.mkdirSync(path.join(dir, 'plans', s), { recursive: true });
-    }
-    const content = `---
-title: "alpha"
-type: implementation
-files:
-  - "src/lib/alpha.js"
----
-
-# alpha
-
-The specification the human ruled on.
-`;
-    const p = path.join(dir, 'plans', 'todo', 'alpha.md');
-    fs.writeFileSync(p, content);
-    ledger.writeEntry(ledger.slugFromPlanPath(p),
-      { content, stage_from: 'implementation', stage_to: 'todo', approved_by: 'human' }, dir);
-    return dir;
-  }
-
-  it('does not change the verdict — the gate still blocks and still says why', () => {
-    const dir = approvedQueueProject();
-    const preload = writeThrowingPreload(dir, 'session-start',
-      require.resolve('../src/hooks/SessionStart'));
-
-    const res = spawnSync(process.execPath, ['--require', preload, CONTINUATION_HOOK],
-      { cwd: dir, encoding: 'utf8', env: { ...process.env } });
-
-    assert.equal(res.status, 2,
-      `approved fork-free work must still block the stop, got ${res.status}\n${res.stderr}`);
-    assert.match(res.stderr, /1 approved plan\(s\) are waiting to be built/,
-      'the keep-going message must survive a fault in the optional directive appended to it');
   });
 });
 

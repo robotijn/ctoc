@@ -19,48 +19,20 @@
  * ship enabled for every marketplace user (unlike the opt-in stop-test-gate, which
  * runs the suite).
  *
- * DERIVED APPROVED-QUEUE CONTINUATION (slice 2 of the "when CTOC starts it must not
- * stop" mechanism). When the shipped explicit-batch gate declines to continue
- * *because there is NO explicit batch at all* (`continuation.status(root) === null`),
- * the hook consults the derived decision `continuation-queue.shouldContinueQueue`:
- * if approved, fork-free plans are waiting in `plans/todo/` (or a recoverable
- * `plans/in-progress/` plan), it blocks the premature idle stop (exit 2) with an
- * HONEST message naming how many wait. The `status === null` guard is the SAFETY
- * BOUNDARY: the derived regime NEVER overrides an explicit fork / complete /
- * exhausted decision — the two regimes never stack. This derived path is bounded by
- * the same MAX_QUEUE_BLOCKS budget (self-resetting on drain), fork-aware
- * (`registerQueueFork`), fail-open, and escapable — so an undrainable queue always
- * eventually stops. Reverting THIS file's diff fully disables the derived path and
- * returns the hook to its shipped explicit-batch-only behavior.
+ * AN APPROVED QUEUE ALONE NEVER BLOCKS A STOP. Only a batch a human explicitly
+ * started with `continuation.startBatch` does, and its message names that batch and
+ * its remaining count — never a plan, never an order to dispatch subagents. The
+ * derived approved-queue regime (v6.13.18), which blocked the stop whenever approved
+ * plans waited with no batch at all, and the question order this hook repeated on
+ * every block (v6.14.36) are removed: both made every user pay for work nobody asked
+ * for (plan "CTOC does no unasked work at session start or stop").
  */
 
 const { findProjectRoot } = require('../lib/project-root');
 const continuation = require('../lib/continuation');
-const continuationQueue = require('../lib/continuation-queue');
 
 function writeStderr(msg) {
   try { process.stderr.write(msg); } catch { /* swallow */ }
-}
-
-/**
- * The question-dispatch directive to APPEND to a continue-path (block) injection —
- * the SAME text SessionStart injects once at session open, reused verbatim so a
- * mid-session gate crossing does not leave its child slices with no question
- * generation until the next open (the "one-shot-at-open" gap). Returns '' when no
- * plan needs questions.
- *
- * FAIL-OPEN: any error yields '' so the keep-going injection and the exit code are
- * never affected by a failure here. Required lazily to match this module's
- * convention and to keep SessionStart's heavier require off the no-batch hot path.
- */
-function questionDirectiveSuffix(projectRoot) {
-  try {
-    const { questionDispatchDirective } = require('./SessionStart');
-    const d = questionDispatchDirective(projectRoot);
-    return typeof d === 'string' ? d : '';
-  } catch {
-    return '';
-  }
 }
 
 function main() {
@@ -75,43 +47,9 @@ function main() {
   // 3. Ask the explicit-batch continuation state whether building should continue.
   let decision;
   try { decision = continuation.shouldContinue(projectRoot); } catch { process.exit(0); }
-  if (!decision || !decision.continue) {
-    // The explicit-batch gate declined. DERIVE from the approved queue ONLY when
-    // there is NO explicit continuation state at all — never override an explicit
-    // fork / complete / exhausted decision (those are the human's explicit batch
-    // talking). This is the safety boundary that keeps the two regimes from stacking.
-    let hasExplicit;
-    try { hasExplicit = continuation.status(projectRoot) !== null; } catch { process.exit(0); }
-    if (hasExplicit) process.exit(0); // an explicit batch decided; honor it
-
-    let qDecision;
-    try { qDecision = continuationQueue.shouldContinueQueue(projectRoot); } catch { process.exit(0); }
-    if (!qDecision || !qDecision.continue) process.exit(0); // empty queue / fork / exhausted
-
-    // Approved, fork-free work waits. Record a block (bounds the loop). WEDGE-1: if it
-    // cannot be persisted, the bound cannot advance -> FAIL OPEN and allow the stop.
-    let qPersisted;
-    try { qPersisted = continuationQueue.recordQueueBlock(projectRoot, qDecision.depth); } catch { process.exit(0); }
-    if (!qPersisted) process.exit(0);
-
-    // NAME the correct dependency-and-criticality-ordered next BUILDABLE plan so the
-    // auto-build directive targets THAT plan (never a blocked one). `nextName` is
-    // already computed by shouldContinueQueue; render it only when present (a queue with
-    // work but nothing currently buildable has no next name — keep the message generic).
-    const nextLine = typeof qDecision.nextName === 'string' && qDecision.nextName
-      ? ` Build next: ${qDecision.nextName}.`
-      : '';
-    writeStderr(
-      `\n[CTOC] continuation-gate BLOCKED stop: ${qDecision.depth} approved plan(s) ` +
-      `are waiting to be built.${nextLine} CTOC is autonomous building — do NOT stop while approved, ` +
-      `fork-free work waits. Drive the next approved plan to completion, checkpointing at ` +
-      `each boundary. Stop ONLY when the approved queue is empty or a genuine fork needs ` +
-      `the human (register it with continuationQueue.registerQueueFork). ` +
-      `Escape: CTOC_SKIP_CONTINUATION=1.\n` +
-      questionDirectiveSuffix(projectRoot)
-    );
-    process.exit(2);
-  }
+  // No batch, a complete batch, a pending fork or an exhausted budget: allow the stop.
+  // An approved build queue with no batch is NOT a reason to block.
+  if (!decision || !decision.continue) process.exit(0);
 
   // 4. There is authorized, unfinished, fork-free work — record a block, then BLOCK the
   //    stop. WEDGE-1: if the block could NOT be persisted (unwritable state file / full
@@ -125,8 +63,7 @@ function main() {
     `CTOC is autonomous building — do NOT stop mid-batch. Drive the next unit to ` +
     `completion, checkpointing at each boundary. Stop ONLY when the batch is complete ` +
     `or a genuine fork needs the human's decision (register it with ` +
-    `continuation.registerFork). Escape: CTOC_SKIP_CONTINUATION=1.\n` +
-    questionDirectiveSuffix(projectRoot)
+    `continuation.registerFork). Escape: CTOC_SKIP_CONTINUATION=1.\n`
   );
   process.exit(2);
 }

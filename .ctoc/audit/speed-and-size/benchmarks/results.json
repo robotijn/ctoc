@@ -1,0 +1,155 @@
+[
+  {
+    "label": "CTOC does no unasked work at session start or stop",
+    "date": "2026-10-06T15:02:56.360Z",
+    "plans": 300,
+    "node": "v24.14.1",
+    "cpu": "Apple M5 Max",
+    "cores": 18,
+    "fixture": {
+      "plans": 300,
+      "functional": 15,
+      "implementation": 21,
+      "todo": 60,
+      "review": 69,
+      "done": 135,
+      "waiting": 19,
+      "approved": 216
+    },
+    "before": {
+      "ref": "9b4bdfe4ea9fbfa9577f43bc09112bafe3a52d9d",
+      "version": "6.14.92",
+      "hooksLoaded": false,
+      "behaviour": {
+        "sessionStartChars": 4267,
+        "sessionStartWaitingShown": 19,
+        "sessionStartPlansOrderedToDispatch": 19,
+        "stopQueuedNoBatch": {
+          "exit": 2,
+          "chars": 2134,
+          "ordersWork": true,
+          "plansNamed": 20,
+          "dispatchOrder": true,
+          "namesOnlyBatch": false
+        },
+        "stopInBatch": {
+          "exit": 2,
+          "chars": 2056,
+          "ordersWork": true,
+          "plansNamed": 19,
+          "dispatchOrder": true,
+          "namesOnlyBatch": false
+        },
+        "gateCheckPlanReads": 216
+      },
+      "agents": {
+        "agents": 125,
+        "totalBytes": 2329017,
+        "estimatedTokens": 582254,
+        "largest": [
+          {
+            "agent": "agents/iron-loop/gate-critic.md",
+            "bytes": 168257
+          },
+          {
+            "agent": "agents/iron-loop/red-team-critic.md",
+            "bytes": 126193
+          },
+          {
+            "agent": "agents/iron-loop/premortem-critic.md",
+            "bytes": 119364
+          },
+          {
+            "agent": "agents/iron-loop/devils-advocate-critic.md",
+            "bytes": 100675
+          },
+          {
+            "agent": "agents/architecture/dependency-analyzer.md",
+            "bytes": 90933
+          }
+        ]
+      },
+      "quality": {
+        "exit": 1,
+        "tests": 12102,
+        "passed": 12101,
+        "failed": 1,
+        "skipped": 0,
+        "coverage": 99.89,
+        "verdict": "FAIL",
+        "failing": "README — explicit numeric claims match reality; Lesson 2 capture: the version line equals the VERSION file",
+        "deadExports": 65,
+        "unreachableFiles": 17,
+        "falseGreen": 207
+      }
+    },
+    "after": {
+      "ref": "9b4bdfe4ea9fbfa9577f43bc09112bafe3a52d9d with uncommitted fix",
+      "version": "6.14.92",
+      "hooksLoaded": false,
+      "behaviour": {
+        "sessionStartChars": 2641,
+        "sessionStartWaitingShown": 19,
+        "sessionStartPlansOrderedToDispatch": 0,
+        "stopQueuedNoBatch": {
+          "exit": 0,
+          "chars": 0,
+          "ordersWork": false,
+          "plansNamed": 0,
+          "dispatchOrder": false,
+          "namesOnlyBatch": false
+        },
+        "stopInBatch": {
+          "exit": 2,
+          "chars": 365,
+          "ordersWork": true,
+          "plansNamed": 0,
+          "dispatchOrder": false,
+          "namesOnlyBatch": true
+        },
+        "gateCheckPlanReads": 216
+      },
+      "agents": {
+        "agents": 125,
+        "totalBytes": 2330084,
+        "estimatedTokens": 582521,
+        "largest": [
+          {
+            "agent": "agents/iron-loop/gate-critic.md",
+            "bytes": 168257
+          },
+          {
+            "agent": "agents/iron-loop/red-team-critic.md",
+            "bytes": 126193
+          },
+          {
+            "agent": "agents/iron-loop/premortem-critic.md",
+            "bytes": 119229
+          },
+          {
+            "agent": "agents/iron-loop/devils-advocate-critic.md",
+            "bytes": 100675
+          },
+          {
+            "agent": "agents/architecture/dependency-analyzer.md",
+            "bytes": 92818
+          }
+        ]
+      },
+      "quality": {
+        "exit": 1,
+        "tests": 12087,
+        "passed": 12083,
+        "failed": 4,
+        "skipped": 0,
+        "coverage": 99.9,
+        "verdict": "FAIL",
+        "failing": "iron-loop-enforcer — live repo state; iron-loop-enforcer — the verdict envelope; Lint enforcement; CTOC repo passes the fast self-check with 0 critical and 0 block; CTOC repo passes the thorough self-check with 0 critical and 0 block; (7) the summary counts are unchanged — plan-counts still reports exactly one info; ESLint reports zero errors across the codebase",
+        "deadExports": 65,
+        "unreachableFiles": 17,
+        "falseGreen": 207
+      }
+    },
+    "note": "Neither failure set is caused by the fix. Before: the committed README still says version 6.14.81 while the VERSION file says 6.14.92 (the working tree has since corrected it). After: `.ctoc/audit/speed-and-size/benchmarks/pipeline-time.js`, written beside this benchmark, fails lint (a shebang and an empty block), and `plans/implementation/the-gate-check-does-not-reread-every-plan-on-every-tool-call.md` has no approval entry, which the repository self-check blocks. The fifteen fewer tests match the plan deleting the tests of the removed queue regime. `npm test` rewrites the README version lines in the tree it runs in, so each run uses a fresh clone."
+  }
+]

@@ -80,11 +80,20 @@ const GATE_META = Object.freeze({
 });
 
 /**
- * A plan reference's file part must be a bare filename inside a stage folder.
- * Anything with a path separator, a ".." segment, a NUL byte, or an absolute path
- * is a traversal attempt and is refused before the path is ever joined.
- * (Same rule as menu-screens.isUnsafePlanFile — duplicated locally to keep this
- * module's guard self-contained.)
+ * The ONLY plan file names this module passes on. A plan's reference reaches a command
+ * line — the session runs `menu task add precompute <ref> …` for "Generate its
+ * questions", and the Approve, Skip and comment actions carry the same reference — so a
+ * name is restricted to plain characters before any descriptor or action is built from
+ * it. A file named `x$(curl … | sh).md` is refused here, not escaped downstream.
+ */
+const SAFE_PLAN_FILE = /^[A-Za-z0-9_][A-Za-z0-9._-]*\.md$/;
+
+/**
+ * A plan reference's file part must be a bare, plain-character filename inside a stage
+ * folder. Anything with a path separator, a ".." segment, a NUL byte, or an absolute
+ * path is a traversal attempt, and anything outside SAFE_PLAN_FILE is a name CTOC will
+ * not pass to a command; both are refused before the path is ever joined. (Stricter
+ * than menu-screens.isUnsafePlanFile, which keeps only the traversal rule.)
  */
 function isUnsafePlanFile(file) {
   return typeof file !== 'string'
@@ -94,7 +103,33 @@ function isUnsafePlanFile(file) {
     || file.includes('\0')
     || file.split(/[\\/]/).includes('..')
     || file.includes('..')
-    || path.isAbsolute(file);
+    || path.isAbsolute(file)
+    || !SAFE_PLAN_FILE.test(file);
+}
+
+/**
+ * How many plan files at a decision stage have a name `isUnsafePlanFile` refuses — the
+ * plans `pendingGateDecisions` leaves out. Counted so the screen can say so: a plan
+ * that silently vanished from the decisions would be hidden from the human. Fail-soft:
+ * an unreadable stage directory counts zero (the decisions list skips it the same way).
+ * @param {string} projectRoot
+ * @returns {number}
+ */
+function countUnsafePlanFiles(projectRoot) {
+  let n = 0;
+  const plansDir = getPlansDir(projectRoot);
+  for (const stage of GATE_SOURCE_ORDER) {
+    let names = [];
+    try {
+      names = safeFs.readdirSync(path.join(plansDir, stage));
+    } catch {
+      names = []; // an unreadable stage is skipped by the decisions list too
+    }
+    for (const name of names) {
+      if (typeof name === 'string' && name.endsWith('.md') && isUnsafePlanFile(name)) n += 1;
+    }
+  }
+  return n;
 }
 
 /** Parse a `stage/file.md` ref into { stage, file } or null when malformed/unsafe. */
@@ -670,6 +705,10 @@ function pendingGateDecisions(projectRoot) {
       plans = []; // a stage read failure must never brick the whole list
     }
     for (const plan of plans) {
+      // A name CTOC will not pass to a command gets NO descriptor, so no action can
+      // carry it, and it is never validated; `countUnsafePlanFiles` tells the human
+      // how many were left out.
+      if (isUnsafePlanFile(`${plan.name}.md`)) continue;
       let passesValidation = false;
       try {
         const v = validateTransition(plan.path, stage, meta.toStage, projectRoot);
@@ -1311,6 +1350,17 @@ function sufficiencyLine(d) {
   return `  Enough information: NO — ${why}.\n`;
 }
 
+/** The option label that asks for one plan's questions to be generated. */
+const GENERATE_LABEL = 'Generate its questions';
+
+/**
+ * The sufficiency reasons that ARE a question-store status other than 'ready'
+ * (`streaming-precompute.hasEnoughInformation` returns the store status as its reason
+ * when the store is not ready). 'unavailable' — the check could not run — is NOT here:
+ * a store nobody could read is not evidence that questions are missing.
+ */
+const QUESTIONS_NOT_READY = new Set(['not-computed', 'stale', 'invalid', 'unknown-plan']);
+
 /**
  * Build the option list; the RECOMMENDED option is placed FIRST (menu convention).
  *
@@ -1319,8 +1369,17 @@ function sufficiencyLine(d) {
  * description) — Open leads, then Skip. On a clean plan Approve leads. The
  * `stream approve` ACTION is still built by the caller regardless; this governs only
  * what the human is OFFERED.
+ *
+ * `canGenerate` (the plan's questions are missing or stale) appends "Generate its
+ * questions" LAST and never as the recommendation: question generation runs only when
+ * the human chooses it, for that one plan. At most four options, the limit of the
+ * asking tool.
+ *
+ * @param {object} d - the pending-decision descriptor
+ * @param {boolean} [canGenerate] - offer "Generate its questions"
+ * @returns {Array<{label: string, description: string}>}
  */
-function buildOptions(d) {
+function buildOptions(d, canGenerate) {
   const open = {
     label: 'Open the plan',
     description: d.passesValidation
@@ -1328,12 +1387,16 @@ function buildOptions(d) {
       : 'Recommended — this plan fails validation; open it to see what to fix.',
   };
   const skip = { label: 'Skip for now', description: 'Move to the next pending decision (nothing is changed).' };
-  if (!d.passesValidation) return [open, skip];
+  const generate = canGenerate ? [{
+    label: GENERATE_LABEL,
+    description: 'Run the question critique for this plan in the background. Its questions appear the next time this decision is shown; nothing else changes.',
+  }] : [];
+  if (!d.passesValidation) return [open, skip, ...generate];
   const approve = {
     label: d.approveLabel,
     description: 'Recommended — everything checks out. Your answer is recorded as yours.',
   };
-  return [approve, open, skip];
+  return [approve, open, skip, ...generate];
 }
 
 /**
@@ -1404,6 +1467,17 @@ function gateScreenAt(decisions, index, statusLine, root) {
     if (rich) return rich;
   }
 
+  // The plan's questions are missing or stale. Read off the verdict
+  // `pendingGateDecisions` already computed for this descriptor: a sufficiency reason in
+  // QUESTIONS_NOT_READY is exactly a question-store status other than 'ready', which is
+  // `!isFresh` — the predicate `plansNeedingQuestions` uses — so the option appears on
+  // exactly the decisions `plansNeedingQuestions` lists, except an empty plan (it got
+  // the broken-plan screen above). The session-start line counts the unbuilt ones and
+  // lists the built ones under "Waiting for your OK"; a built plan keeps the option. No
+  // second read and no require here: a store that cannot even load yields
+  // 'unavailable', which offers nothing, and the screen still renders.
+  const canGenerate = isNonEmptyStr(root) && QUESTIONS_NOT_READY.has(d.sufficiencyReason);
+
   let text = '';
   if (statusLine) text += `${stripCtl(statusLine)}\n\n`;
   text += `Topic: ${humanPlanName(d.title, d.slug)}  ·  ${d.moment}  ·  decision ${index + 1} of ${total}\n`;
@@ -1419,6 +1493,7 @@ function gateScreenAt(decisions, index, statusLine, root) {
     // AskUserQuestion's built-in "Other" free-text path records a comment.
     'Other': `stream comment ${d.ref}`,
   };
+  if (canGenerate) actions[GENERATE_LABEL] = `claude:generate-questions ${d.ref}`;
 
   return {
     text,
@@ -1426,7 +1501,7 @@ function gateScreenAt(decisions, index, statusLine, root) {
       questions: [{
         question: gateWords.question(d.fromStage, humanPlanName(d.title, d.slug)),
         header: d.chip,
-        options: buildOptions(d),
+        options: buildOptions(d, canGenerate),
       }],
     },
     actions,
@@ -1439,12 +1514,12 @@ function gateScreenAt(decisions, index, statusLine, root) {
  *
  * Question GENERATION is NOT kicked here, and this module spawns no subprocess. The
  * CTOC runtime is a plugin inside the Claude command-line interface — plain code
- * cannot dispatch a CTOC subagent, and it must never spawn a second Claude. The old
- * detached-spawn producer is deleted. Generation is now SESSION-DRIVEN:
- * `src/hooks/SessionStart.js` injects a directive that makes the session model itself
- * dispatch up to 5 subagents, each writing its questions through
- * `streaming-precompute.writePlanQuestions`. This screen only READS that store
- * (instant, fail-soft) — the human never waits for a critique.
+ * cannot dispatch a CTOC subagent, and it must never spawn a second Claude. Generation
+ * runs ONLY when the human asks: a decision whose questions are missing offers
+ * "Generate its questions" (`claude:generate-questions <ref>`), and `start.md` runs the
+ * gate-critique precompute for that one plan as background work, which writes through
+ * `streaming-precompute.writePlanQuestions`. Nothing is generated when the menu opens
+ * or a session starts. This screen only READS that store (instant, fail-soft).
  * @param {string} projectRoot
  * @param {string} [statusLine]
  * @param {{banner?: boolean}} [opts] - `banner:false` suppresses the on-open engine
@@ -1460,7 +1535,14 @@ function streamingGateScreen(projectRoot, statusLine, opts) {
   const withBanner = !opts || opts.banner !== false;
   const banner = withBanner ? engineStatusBanner(projectRoot) : '';
   const decisions = pendingGateDecisions(projectRoot);
-  const screen = gateScreenAt(decisions, 0, statusLine, projectRoot);
+  // Plans left out of the decisions because of their file name are COUNTED on the
+  // status line, never hidden.
+  const unsafe = countUnsafePlanFiles(projectRoot);
+  const notice = unsafe > 0
+    ? `${unsafe} plan file(s) have a name CTOC will not pass to a command — rename them.`
+    : '';
+  const status = [statusLine, notice].filter((x) => isNonEmptyStr(x)).join('  ');
+  const screen = gateScreenAt(decisions, 0, status || statusLine, projectRoot);
   if (banner && screen && typeof screen.text === 'string') {
     screen.text = banner + screen.text;
   }

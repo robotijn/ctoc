@@ -1320,7 +1320,7 @@ describe('streamingGateScreen — the engine status banner on the default screen
     const text = streamingGate.streamingGateScreen(root).text;
     assert.doesNotMatch(text, BUILT, 'no built-increment line when nothing was built');
     assert.doesNotMatch(text, WAITING, 'no waiting line when nothing is waiting');
-    assert.doesNotMatch(text, /Moved forward on their own|Next up to build|Still working out/,
+    assert.doesNotMatch(text, /Moved forward on their own|Next up to build|Still working out|wait for their questions/,
       'no other engine line either');
     assert.match(text, /^No gate decisions pending/, 'text begins with the bare screen — no banner prepended');
   });
@@ -1350,5 +1350,137 @@ describe('streamingGateScreen — the engine status banner on the default screen
       incMod.whileYouWereAway = origAway;
       loopMod.loopBDirective = origLoop;
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Questions are generated ONLY when the human asks (plan "CTOC does no unasked work
+// at session start or stop", 2026-10-06). A decision whose questions are missing
+// offers "Generate its questions", mapped to `claude:generate-questions <ref>`; a
+// decision whose questions are fresh does not. Nothing runs until the human chooses
+// it, and `start.md` no longer fires the critique fleet when the menu opens.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('"Generate its questions" — generation runs only on the human\'s choice', () => {
+  it('a decision whose questions are missing offers it, mapped to claude:generate-questions <ref>', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'noqs', validFunctionalBody('noqs'));
+
+    const screen = streamingGate.streamingGateScreen(root, undefined, { banner: false });
+    const labels = screen.ask.questions[0].options.map((o) => o.label);
+
+    assert.ok(labels.includes('Generate its questions'), `offered: ${JSON.stringify(labels)}`);
+    assert.ok(labels.length <= 4, 'at most four options, the limit of the asking tool');
+    assert.equal(screen.actions['Generate its questions'], 'claude:generate-questions functional/noqs.md');
+    const gen = screen.ask.questions[0].options.find((o) => o.label === 'Generate its questions');
+    assert.doesNotMatch(gen.description, /Recommended/i, 'the generate option is never pushed as the recommendation');
+  });
+
+  it('a failing plan whose questions are missing offers it too, after Open and Skip', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'dirtyqs', invalidFunctionalBody('dirtyqs'));
+
+    const screen = streamingGate.streamingGateScreen(root, undefined, { banner: false });
+    const labels = screen.ask.questions[0].options.map((o) => o.label);
+
+    assert.deepEqual(labels, ['Open the plan', 'Skip for now', 'Generate its questions']);
+    assert.equal(screen.actions['Generate its questions'], 'claude:generate-questions functional/dirtyqs.md');
+  });
+
+  it('a decision whose questions are fresh and fully answered does NOT offer it', () => {
+    const root = makeSandbox();
+    // review→done is never crossed on sufficiency, so a fresh, fully answered (empty)
+    // question list leaves the plan on the plain screen with its questions READY.
+    writePlan(root, 'review', 'freshqs', `# freshqs title\n\nBody.\n`);
+    precompute.writePlanQuestions(root, 'review/freshqs.md', [], planMtimeMs(root, 'review', 'freshqs'));
+    assert.equal(precompute.isFresh(root, 'review/freshqs.md'), true, 'precondition: the questions are fresh');
+
+    const screen = streamingGate.streamingGateScreen(root, undefined, { banner: false });
+    const labels = screen.ask.questions[0].options.map((o) => o.label);
+
+    assert.ok(!labels.includes('Generate its questions'), `offered: ${JSON.stringify(labels)}`);
+    assert.equal(screen.actions['Generate its questions'], undefined);
+  });
+
+  it('start.md documents claude:generate-questions as WORK and no longer fires the fleet on open', () => {
+    const startMd = fs.readFileSync(path.join(__dirname, '..', 'src', 'commands', 'start.md'), 'utf8');
+    const row = startMd.split('\n').find((l) => l.startsWith('| `claude:generate-questions {ref}`'));
+    assert.ok(row, 'the Claude Actions table has a claude:generate-questions row');
+    assert.match(row, /\*\*WORK\.\*\*/, 'the row is classified as WORK');
+    assert.match(row, /Never generate for any other plan/, 'the row confines the work to that one plan');
+    // Exact absence check: the on-open recipe that fired the fleet over every plan is gone.
+    assert.ok(!startMd.includes('plansNeedingQuestions(process.cwd())'), 'the fire-on-open recipe is deleted');
+  });
+});
+
+describe('"Generate its questions" is offered on every decision plansNeedingQuestions lists, except an empty plan', () => {
+  it('for every pending decision, the option is offered iff plansNeedingQuestions lists it (a built plan included)', () => {
+    const root = makeSandbox();
+    // missing questions
+    writePlan(root, 'functional', 'missing', validFunctionalBody('missing'));
+    // stale questions: written, then the plan changes after them
+    const stale = writePlan(root, 'functional', 'stale', validFunctionalBody('stale'));
+    precompute.writePlanQuestions(root, 'functional/stale.md', precomputedQuestions(), planMtimeMs(root, 'functional', 'stale') - 60000);
+    fs.utimesSync(stale, new Date(), new Date());
+    // fresh, unanswered questions (the rich screen)
+    writePlan(root, 'functional', 'fresh', validFunctionalBody('fresh'));
+    precompute.writePlanQuestions(root, 'functional/fresh.md', precomputedQuestions(), planMtimeMs(root, 'functional', 'fresh'));
+    // fresh, fully answered questions on a decision never crossed on sufficiency
+    writePlan(root, 'review', 'answered', `# answered title\n\nBody.\n`);
+    precompute.writePlanQuestions(root, 'review/answered.md', [], planMtimeMs(root, 'review', 'answered'));
+    // a BUILT plan with no questions: offered here, and listed under "Waiting for your
+    // OK" (not in the count) by the session-start line — see tests/loop-b-directive.test.js
+    writePlan(root, 'review', 'built-noqs', `# built-noqs title\n\nBody.\n`);
+
+    const needing = new Set(precompute.plansNeedingQuestions(root).map((d) => d.ref));
+    assert.deepEqual([...needing].sort(), ['functional/missing.md', 'functional/stale.md', 'review/built-noqs.md'],
+      'precondition: the fixture covers both sides of the predicate');
+
+    // Walk every pending decision the way the human does: open the menu, then Skip.
+    const refs = streamingGate.pendingGateDecisions(root).map((d) => d.ref);
+    assert.equal(refs.length, 5);
+    let screen = streamingGate.streamingGateScreen(root, undefined, { banner: false });
+    for (const ref of refs) {
+      assert.equal(screen.actions['Open the plan'], `plan ${ref}`, 'the walk is on the expected decision');
+      const offered = screen.ask.questions[0].options.some((o) => o.label === 'Generate its questions');
+      assert.equal(offered, needing.has(ref), `${ref}: offered=${offered}, counted=${needing.has(ref)}`);
+      assert.equal(screen.actions['Generate its questions'] !== undefined, offered,
+        `${ref}: the action exists exactly when the option is offered`);
+      screen = route(screen.actions['Skip for now'].split(' '), root);
+    }
+  });
+
+  it('an EMPTY plan is listed by plansNeedingQuestions but gets the broken-plan screen, with no option', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'empty-plan', '');
+    assert.deepEqual(precompute.plansNeedingQuestions(root).map((d) => d.ref), ['functional/empty-plan.md'],
+      'precondition: the empty plan is listed');
+    const screen = streamingGate.streamingGateScreen(root, undefined, { banner: false });
+    const labels = screen.ask.questions[0].options.map((o) => o.label);
+    assert.ok(!labels.includes('Generate its questions'), `offered: ${JSON.stringify(labels)}`);
+    assert.equal(screen.actions['Generate its questions'], undefined);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A plan file's name reaches a command line (the "Generate its questions" action is run
+// by the session as `menu task add precompute <ref> …`). A name outside the plain
+// character set — `x$(id).md` — must produce no descriptor and therefore no action, and
+// the screen says how many such files it left out, so nothing is hidden.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('a plan file whose name CTOC will not pass to a command', () => {
+  it('produces no action carrying its reference, and the screen counts it', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'x$(id)', validFunctionalBody('x$(id)'));
+    writePlan(root, 'functional', 'plain-name', validFunctionalBody('plain-name'));
+
+    const refs = streamingGate.pendingGateDecisions(root).map((d) => d.ref);
+    assert.deepEqual(refs, ['functional/plain-name.md'], 'no descriptor for the unsafe name');
+
+    const screen = streamingGate.streamingGateScreen(root, undefined, { banner: false });
+    for (const [label, action] of Object.entries(screen.actions)) {
+      assert.ok(!String(action).includes('$('), `the action for "${label}" carries the unsafe name: ${action}`);
+    }
+    assert.match(screen.text, /1 plan file\(s\) have a name CTOC will not pass to a command — rename them/);
+    assert.equal(precompute.plansNeedingQuestions(root).some((d) => d.ref.includes('$(')), false);
   });
 });

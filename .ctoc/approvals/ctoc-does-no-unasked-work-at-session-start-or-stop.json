@@ -1,0 +1,9 @@
+{
+  "content_sha256": "b1976dc8c6f79e92975751e0f81f61b0670e57e20db20eb7cc8dd8dd94a7f2ee",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-06T13:38:43.361Z",
+  "approved_by": "human",
+  "plan_basename": "ctoc-does-no-unasked-work-at-session-start-or-stop"
+}
