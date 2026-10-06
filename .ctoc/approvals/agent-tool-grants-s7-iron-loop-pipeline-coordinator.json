@@ -3,7 +3,9 @@
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-10-05T20:27:06.952Z",
+  "approved_at": "2026-10-05T23:48:14.201Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "Correction by the session (CTO Chief), 2026-10-06: the owner approved this slice for build on 2026-10-05 and that approval stands. The session re-recorded it on 2026-10-06 with a wrong reason (\"method files added\"): none of the thirteen agents has a method file and the file list did not change. This entry replaces that wrong reason; nothing in the plan's specification changed.",
   "plan_basename": "agent-tool-grants-s7-iron-loop-pipeline-coordinator"
 }

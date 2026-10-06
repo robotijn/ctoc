@@ -42,7 +42,7 @@ const REAL_EXPECTED = Object.freeze({ agents: 124, agent_categories: 24, skills:
 
 const LIST_FILES = new Set(['inventory.json', 'late-corrections.json', 'for-the-human.json']);
 const EXCLUDED_GUIDES = ['skills/languages/', 'skills/frameworks/', 'skills/quality-configs/', 'skills/agent-fragments/'];
-const CRITIC_TOOLS = 'Read, Grep, WebSearch, WebFetch';
+const CRITIC_TOOLS = 'Read, Grep, WebSearch, WebFetch, Glob';
 const FORBIDDEN_TOOLS = ['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash', 'Task'];
 const FP_RX = /^sha256:[0-9a-f]{64}$/;
 const DATE_RX = /^\d{4}-\d{2}-\d{2}$/;
@@ -283,12 +283,13 @@ function checkRecordDir({ root, expected }) {
       continue;
     }
     // The validator's grant is its recorded start line with ONLY the Skill tool
-    // removed (human ruling, 2026-09-30: the plugin manifest registers no
-    // specialist skill, so the Skill tool resolves nothing a watcher borrows). Still
-    // an exact comparison: keeping Skill, gaining a tool, or losing any other tool fails.
+    // removed (human ruling, 2026-09-30) and Glob appended (owner's answer to the
+    // tool-grant audit, plans/implementation/agent-tool-grants.md, question 5). Still
+    // an exact comparison: keeping Skill, gaining another tool, or losing any fails.
+    const validatorBase = isObj(inv.tools_at_start) ? withoutTool(inv.tools_at_start[VALIDATOR], 'Skill') : undefined;
     const want = p === CRITIC
       ? `tools: ${CRITIC_TOOLS}`
-      : isObj(inv.tools_at_start) ? withoutTool(inv.tools_at_start[VALIDATOR], 'Skill') : undefined;
+      : validatorBase === undefined ? undefined : `${validatorBase}, Glob`;
     if (line !== want) fail('tools', `${p} tools line is ${JSON.stringify(line)}, expected ${JSON.stringify(want)}`);
     const named = (line || '').replace(/^tools:/, '').split(',').map((t) => t.trim());
     const bad = named.filter((t) => FORBIDDEN_TOOLS.includes(t));
@@ -514,8 +515,8 @@ const FOO = 'skills/ai-quality/foo/SKILL.md';
 function goodModel() {
   const files = {
     [FOO]: '---\nname: foo\n---\n\n# foo\n',
-    [VALIDATOR]: '---\nname: citation-validator\ntools: Read, Grep, WebSearch, WebFetch\n---\n\n# validator\n',
-    [CRITIC]: '---\nname: agent-critic\ntools: Read, Grep, WebSearch, WebFetch\n---\n\n# critic\n',
+    [VALIDATOR]: '---\nname: citation-validator\ntools: Read, Grep, WebSearch, WebFetch, Glob\n---\n\n# validator\n',
+    [CRITIC]: '---\nname: agent-critic\ntools: Read, Grep, WebSearch, WebFetch, Glob\n---\n\n# critic\n',
   };
   const entry = (p, kind, slice) => ({
     path: p,
@@ -717,18 +718,19 @@ describe('the record check rejects each named defect', () => {
 
   it('rejects a critic tools line that names Write', () => {
     assertRejected(fixtureErrors((m) => {
-      m.files[CRITIC] = m.files[CRITIC].replace('tools: Read, Grep, WebSearch, WebFetch', 'tools: Read, Grep, WebSearch, WebFetch, Write');
+      m.files[CRITIC] = m.files[CRITIC].replace('tools: Read, Grep, WebSearch, WebFetch, Glob', 'tools: Read, Grep, WebSearch, WebFetch, Glob, Write');
     }), 'tools');
   });
 
-  it('rejects a validator tools line that keeps Skill, gains a tool, or loses one other than Skill', () => {
+  it('rejects a validator tools line that keeps Skill, gains a tool, or loses one', () => {
     for (const wrong of [
-      'tools: Read, Grep, Skill, WebSearch, WebFetch',
-      'tools: Read, Grep, Glob, WebSearch, WebFetch',
-      'tools: Read, Grep, WebSearch',
+      'tools: Read, Grep, Skill, WebSearch, WebFetch, Glob',
+      'tools: Read, Grep, WebSearch, WebFetch, Glob, Bash',
+      'tools: Read, Grep, WebSearch, WebFetch',
+      'tools: Read, Grep, WebSearch, Glob',
     ]) {
       assertRejected(fixtureErrors((m) => {
-        m.files[VALIDATOR] = m.files[VALIDATOR].replace('tools: Read, Grep, WebSearch, WebFetch', wrong);
+        m.files[VALIDATOR] = m.files[VALIDATOR].replace('tools: Read, Grep, WebSearch, WebFetch, Glob', wrong);
       }), 'tools');
     }
   });
