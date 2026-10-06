@@ -187,10 +187,10 @@ a scratch copy outside the repository.
 - [x] `CLAUDE.md` (two places) and `README.md`: the test-file count; run every fence in the pin table and `tests/attestation-round-trip.test.js`, `tests/answers-bind-to-plan-revision.test.js`.
 
 ### Step 11: REVIEW
-- [ ] Dispatch `iron-loop-critic` with the baseline, the compacted agent and the inventory: every `cut` unit read side by side with the original, every `merged` order, tightened orders for changed meaning, every Degraded input row against its original.
+- [x] Dispatch `iron-loop-critic` with the baseline, the compacted agent and the inventory: every `cut` unit read side by side with the original, every `merged` order, tightened orders for changed meaning, every Degraded input row against its original. — Review PASSED, no blockers; two wording repairs applied (second commit).
 
 ### Step 12: OPTIMIZE
-- [ ] Remove any repeat the review found.
+- [x] Remove any repeat the review found. — No-op: the review found no repeats.
 
 ### Step 13: SECURE
 - [ ] Dispatch `security-scanner`: the trust-boundary and one-write orders present with their anchors; fixtures clean.
@@ -206,7 +206,7 @@ a scratch copy outside the repository.
 
 ### Step 16: FINAL-REVIEW
 - [ ] Show the owner, in full: the synthesis section before and after, the inventory counts, the smoke-check table, the size and token numbers.
-- [ ] Dispatch `iron-loop-critic` against the acceptance criteria; hand the result to the owner for the OK to call it done.
+- [x] Dispatch `iron-loop-critic` against the acceptance criteria; hand the result to the owner for the OK to call it done. — Review passed against the criteria; the result goes to the owner for the OK to call it done.
 
 
 ---
@@ -336,3 +336,10 @@ the numbers it needs are below.
   percent against the 99 floor, gate PASS. The linter reports nothing on the two new
   JavaScript files. `CLAUDE.md` (two places) and `README.md` moved from 551 to 552 test files via
   `src/scripts/release.js`.
+
+- **Review repairs (second commit):** the contradicting-lenses row now reads `option text; "the
+  position" means …` so the NEVER no longer governs the definition; rule 7a reads "When the
+  advocate lens reported". The advocate row's six-sources clause was NOT restored: the shortest
+  faithful clause is about 190 bytes and does not fit under `maxBytes`. To offset the 12 bytes of
+  the two repairs, "(Prompt Injection)" was dropped from the red-team row's method cell (my own
+  replacement text, not an anchor). Size 134,332 bytes; `maxBytes` lowered to 134,332.
