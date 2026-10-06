@@ -84,6 +84,45 @@
           "topic-blocked"
         ],
         "standingBlindSpot": null
+      },
+      "rerun": {
+        "original": {
+          "valid": true,
+          "fenced": false,
+          "errors": [],
+          "found": true,
+          "seriousFalse": null,
+          "missing": [],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [
+            "blocking-issue",
+            "blocking-issue",
+            "recommendation",
+            "recommendation",
+            "topic-blocked"
+          ],
+          "standingBlindSpot": null
+        },
+        "compacted": {
+          "valid": true,
+          "fenced": false,
+          "errors": [],
+          "found": true,
+          "seriousFalse": null,
+          "missing": [],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [
+            "blocking-issue",
+            "blocking-issue",
+            "recommendation",
+            "recommendation",
+            "recommendation",
+            "topic-blocked"
+          ],
+          "standingBlindSpot": null
+        }
       }
     },
     {
@@ -195,6 +234,56 @@
           "instruction-surfaced"
         ],
         "standingBlindSpot": null
+      },
+      "rerun": {
+        "original": {
+          "valid": true,
+          "fenced": false,
+          "errors": [],
+          "found": false,
+          "seriousFalse": null,
+          "missing": [
+            {
+              "id": "instruction-surfaced"
+            }
+          ],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [
+            "recommendation",
+            "recommendation",
+            "recommendation",
+            "recommendation",
+            "recommendation"
+          ],
+          "standingBlindSpot": null
+        },
+        "compacted": {
+          "valid": true,
+          "fenced": false,
+          "errors": [],
+          "found": true,
+          "seriousFalse": null,
+          "missing": [],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [
+            "blocking-issue",
+            "blocking-issue",
+            "blocking-issue",
+            "blocking-issue",
+            "blocking-issue",
+            "blocking-issue",
+            "blocking-issue",
+            "recommendation",
+            "recommendation",
+            "recommendation",
+            "recommendation",
+            "recommendation",
+            "instruction-surfaced"
+          ],
+          "standingBlindSpot": null
+        }
       }
     },
     {

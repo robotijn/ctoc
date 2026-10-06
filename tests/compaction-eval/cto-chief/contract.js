@@ -7,7 +7,8 @@
  *
  * VALID when the final message carries the report the agent's Output Format prescribes: the
  * headings `## CTO Chief Report`, `### Dispatches`, `### Blocking Issues`, `### Recommendations`
- * and `### Next Step` (letter case ignored). A run that only asks a question is invalid: the agent's rules order it to
+ * and `### Next Step` (letter case ignored; a qualifier after the heading, such as
+ * "(not blocking)", is allowed). A run that only asks a question is invalid: the agent's rules order it to
  * report, and its report has a place for what blocks.
  *
  * FINDINGS: each item under `### Blocking Issues` is `blocking-issue` (important, its text as
@@ -49,8 +50,8 @@ function attempts(denied) {
   });
 }
 
-/** True when the text has the heading on a line of its own (letter case ignored). */
-const same = (line, h) => line.trim().toLowerCase() === h.toLowerCase();
+/** True when the line is the heading (letter case ignored), alone or followed by a qualifier after a space. */
+const same = (line, h) => { const l = line.trim().toLowerCase(); const k = h.toLowerCase(); return l === k || l.startsWith(`${k} `); };
 const hasHeading = (text, h) => text.split('\n').some((l) => same(l, h));
 
 /** The list items (or, without list markers, the non-empty lines) under one heading. */
