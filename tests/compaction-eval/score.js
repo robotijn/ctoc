@@ -13,7 +13,9 @@
  * `check({ output, files }, fx, exp)` → `{ valid, errors, findings, payload }`. Adapters may use
  * parseFinalMessage, parseYamlSubset and checkLensFindings from this module. Matchers: per
  * finding `id`, `id_prefix`, `min_severity`, `evidence_contains`, `evidence_cites`; per fixture
- * `require`, `forbid`, `fields` (equality at a dotted payload path), `fields_contain`.
+ * `require`, `forbid`, `fields` (equality at a dotted payload path), `fields_contain`. A clean
+ * fixture carrying any of those four is refused (a harness error): the scorer never reads them
+ * on a clean plan, so writing one would be a condition that is silently never checked.
  *
  * --transcripts first collects each run from Claude Code's subagent transcripts: a transcript
  * whose meta `description` is `compaction-eval <fixture> <original|compacted>[ rerun]` becomes
@@ -21,6 +23,12 @@
  * Then every run is scored, one row per plan is printed with the verdict, and `summary.json`
  * is written beside the runs. Exit code: 0 PASS, 1 FAIL, 2 usage, 3 a rerun is needed before
  * deciding, 4 INCOMPLETE, 5 a harness error.
+ *
+ * A row is INCOMPLETE when it tested nothing, unless its single rerun clears it:
+ * `baseline-invalid` (the original's output broke the contract; takes precedence),
+ * `baseline-not-clean` (a clean plan on which the original already raises an important-or-higher
+ * finding, so a false alarm cannot be told apart), and `planted-missed-by-both` (neither version
+ * found the planted defect, so a miss cannot be told apart).
  *
  * The smoke check has low statistical power: one run per version cannot tell a small real drop
  * from run-to-run noise, and a PASS is not evidence that adherence held.
@@ -393,6 +401,9 @@ function evaluate(payload, fx, findingsIn) {
   const list = findingsIn !== undefined ? findingsIn : payload && payload.findings;
   const findings = Array.isArray(list) ? list.filter(isObject) : [];
   if (fx.kind === 'clean') {
+    for (const key of ['require', 'forbid', 'fields', 'fields_contain']) {
+      if (fx[key] !== undefined) throw new Error(`clean fixture ${fx.name} carries ${key}, which the scorer never reads on a clean plan`);
+    }
     return { found: null, seriousFalse: findings.some((f) => (SEVERITY_RANK[f.severity] || 0) >= 2), missing: [], fieldMismatches: [], forbidden: [] };
   }
   const missing = (fx.require || []).filter((c) => !findings.some((f) => matchCondition(f, c)));
@@ -468,25 +479,32 @@ function shortfalls(kind, original, compacted) {
   return out;
 }
 
+/** The row statuses that mean the plan tested nothing, so the verdict is INCOMPLETE. */
+const TESTED_NOTHING = ['baseline-invalid', 'baseline-not-clean', 'planted-missed-by-both'];
+
 /**
  * The pass rule. A shortfall on a plan stands only when that plan's single rerun repeats it.
+ * A row that tested nothing — an invalid original, a clean plan the original already flags
+ * important or worse, a planted defect neither version found — makes the verdict INCOMPLETE
+ * unless its rerun clears it; `baseline-invalid` takes precedence over the other two.
  * @param {{ fixture: string, kind: string, original: object, compacted: object, rerun?: { original: object, compacted: object } }[]} rows
- * @returns {{ verdict: 'PASS'|'FAIL'|'RERUN', rows: object[], note: string }}
+ * @returns {{ verdict: 'PASS'|'FAIL'|'RERUN'|'INCOMPLETE', rows: object[], note: string }}
  */
 function smokeVerdict(rows) {
   const out = rows.map((r) => {
     const s = shortfalls(r.kind, r.original, r.compacted);
-    const notes = [];
-    if (r.kind === 'planted' && !r.original.found && !r.compacted.found) notes.push('both-missed-planted-defect');
     let status = s.length ? 'needs-rerun' : 'ok';
     if (s.length && r.rerun) {
       const again = shortfalls(r.kind, r.rerun.original, r.rerun.compacted);
       status = s.some((x) => again.includes(x)) ? 'confirmed' : 'cleared-by-rerun';
     }
+    if (r.kind === 'clean' && r.original.seriousFalse && !(r.rerun && !r.rerun.original.seriousFalse)) status = 'baseline-not-clean';
+    if (r.kind === 'planted' && !r.original.found && !r.compacted.found
+      && !(r.rerun && (r.rerun.original.found || r.rerun.compacted.found))) status = 'planted-missed-by-both';
     if (!r.original.valid && !(r.rerun && r.rerun.original.valid)) status = 'baseline-invalid';
-    return { fixture: r.fixture, kind: r.kind, shortfalls: s, notes, status };
+    return { fixture: r.fixture, kind: r.kind, shortfalls: s, status };
   });
-  const verdict = out.some((r) => r.status === 'baseline-invalid') ? 'INCOMPLETE'
+  const verdict = out.some((r) => TESTED_NOTHING.includes(r.status)) ? 'INCOMPLETE'
     : out.some((r) => r.status === 'confirmed') ? 'FAIL'
     : out.some((r) => r.status === 'needs-rerun') ? 'RERUN' : 'PASS';
   return { verdict, rows: out, note: NOTE };
@@ -752,7 +770,7 @@ function run(argv) {
   const result = scoreRuns(exp, runsDir, loadContract(exp, expPath));
   for (const r of result.scored) {
     const row = result.rows.find((x) => x.fixture === r.fixture) || {};
-    process.stdout.write(`${r.fixture}  original[${cell(r.original, r.kind)}]  compacted[${cell(r.compacted, r.kind)}]  ${row.status || ''} ${(row.shortfalls || []).join(',')} ${(row.notes || []).join(',')}\n`);
+    process.stdout.write(`${r.fixture}  original[${cell(r.original, r.kind)}]  compacted[${cell(r.compacted, r.kind)}]  ${row.status || ''} ${(row.shortfalls || []).join(',')}\n`);
   }
   if (result.missingRuns.length) process.stdout.write(`missing runs: ${result.missingRuns.join(', ')}\n`);
   process.stdout.write(`VERDICT ${result.verdict} — ${NOTE}\n`);

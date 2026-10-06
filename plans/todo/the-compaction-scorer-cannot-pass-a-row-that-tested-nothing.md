@@ -53,14 +53,14 @@ All changes are in `tests/compaction-eval/score.js`; the live call site is uncha
 
 ## Execution Plan
 
-- [ ] **Step 8: TEST** — In `tests/compaction-eval.test.js` section "4. the smoke rule": add `baseline-not-clean` (with and without a clearing rerun), add `planted-missed-by-both`, rewrite the both-missed test to expect INCOMPLETE; in the `evaluate` section add one refusal test per key; add one end-to-end run through `score.js` exiting 4 on a non-clean clean fixture. Run them and see each fail.
-- [ ] **Step 9: PREPARE** — Confirm the current suite is green with `node --test tests/compaction-eval.test.js` before editing.
-- [ ] **Step 10: IMPLEMENT** — `score.js`: the two new statuses and their INCOMPLETE ordering in `smokeVerdict()`; the clean-fixture refusal in `evaluate()`; remove the replaced note; update the header comment's status and exit-code wording.
+- [x] **Step 8: TEST** — In `tests/compaction-eval.test.js` section "4. the smoke rule": add `baseline-not-clean` (with and without a clearing rerun), add `planted-missed-by-both`, rewrite the both-missed test to expect INCOMPLETE; in the `evaluate` section add one refusal test per key; add one end-to-end run through `score.js` exiting 4 on a non-clean clean fixture. Run them and see each fail.
+- [x] **Step 9: PREPARE** — Confirm the current suite is green with `node --test tests/compaction-eval.test.js` before editing.
+- [x] **Step 10: IMPLEMENT** — `score.js`: the two new statuses and their INCOMPLETE ordering in `smokeVerdict()`; the clean-fixture refusal in `evaluate()`; remove the replaced note; update the header comment's status and exit-code wording.
 - [ ] **Step 11: REVIEW** — Check status precedence (`baseline-invalid` first), that the rerun clearing mirrors the existing `baseline-invalid` rule, and that no PASS path remains for either new row kind.
-- [ ] **Step 12: OPTIMIZE** — No new helper unless the two rerun-clearing checks share it; no new file.
+- [x] **Step 12: OPTIMIZE** — No new helper unless the two rerun-clearing checks share it; no new file.
 - [ ] **Step 13: SECURE** — The refusal message names fixture and key only, never payload text.
-- [ ] **Step 14: VERIFY** — `npm test`: all tests, coverage at or above the floor in `.ctoc/coverage-baseline.json`, zero skipped.
-- [ ] **Step 15: DOCUMENT** — The header comment of `score.js` lists the two new statuses and the clean-fixture refusal.
+- [x] **Step 14: VERIFY** — `npm test`: all tests, coverage at or above the floor in `.ctoc/coverage-baseline.json`, zero skipped.
+- [x] **Step 15: DOCUMENT** — The header comment of `score.js` lists the two new statuses and the clean-fixture refusal.
 - [ ] **Step 16: FINAL-REVIEW** — Every acceptance criterion maps to a passing test; the committed summaries are untouched.
 
 
@@ -69,20 +69,20 @@ All changes are in `tests/compaction-eval/score.js`; the live call site is uncha
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
 - [ ] Self-review all new code
@@ -90,9 +90,9 @@ All changes are in `tests/compaction-eval/score.js`; the live call site is uncha
 - [ ] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
 - [ ] Validate inputs (no path traversal)
@@ -101,15 +101,15 @@ All changes are in `tests/compaction-eval/score.js`; the live call site is uncha
 - [ ] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
 - [ ] Verify steps 8-15 completed correctly
@@ -125,3 +125,9 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record
+
+- Step 8: twelve tests added or rewritten in `tests/compaction-eval.test.js`; ten seen red before the change (the two rerun-clearing and precedence guards already held and stay as regression guards).
+- Step 10: `notes` was only ever filled by the replaced `both-missed-planted-defect` note, so the field is removed from each row and from the printed row line rather than left always empty.
+- Step 14: `npm run lint` clean; `npm test` PASS — coverage 99.9% (floor 99%), 0 skipped, 0 failed.
