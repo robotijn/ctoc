@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/red-team-critic/baseline-agent.md",
  "baseline_sha256": "f7c96106c5a260c920d23845101e33fb1e653dfbd5fd1d26882ffbd1fc4dbafa",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 95488,
+ "maxBytes": 96257,
  "units": [
   {
    "n": 1,
@@ -1967,9 +1967,11 @@
   {
    "n": 230,
    "sha": "5f6eefddcbf5d8fbec101133429babbe82b31af95a29de3578b55f4bda345a51",
-   "kind": "reason",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "RT-231"
+   ],
+   "fate": "merged"
   },
   {
    "n": 231,
@@ -2552,9 +2554,11 @@
   {
    "n": 299,
    "sha": "b8357a84be2078f2ecf61a5214afebd2491c5610b6814d1686fdb52f5701024b",
-   "kind": "reason",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "RT-343"
+   ],
+   "fate": "merged"
   },
   {
    "n": 300,
@@ -2818,9 +2822,11 @@
   {
    "n": 329,
    "sha": "690398ca92a3377809a2a05315227fe1cc2a6f0be80af3a4d559bdb3f1c58bc1",
-   "kind": "reason",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "RT-329"
+   ],
+   "fate": "kept"
   },
   {
    "n": 330,
@@ -4747,9 +4753,11 @@
   {
    "n": 554,
    "sha": "fa38b9fb7541e46b8ab935da1a00a3a985b7bac3f793b717117f20d07f9df52a",
-   "kind": "example",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "RT-511"
+   ],
+   "fate": "merged"
   },
   {
    "n": 555,
@@ -4768,9 +4776,11 @@
   {
    "n": 557,
    "sha": "6946790cba974ebbd19dda722046f6358fc50b77bcfb7176861283b962e23d22",
-   "kind": "example",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "RT-463"
+   ],
+   "fate": "merged"
   },
   {
    "n": 558,
@@ -4824,9 +4834,11 @@
   {
    "n": 565,
    "sha": "9a0cca1b28e8cb265da15401a7d8bcf34b3c9b0402cbcf24a11d13b4b6fd2623",
-   "kind": "example",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "RT-461"
+   ],
+   "fate": "merged"
   },
   {
    "n": 566,
@@ -4838,9 +4850,11 @@
   {
    "n": 567,
    "sha": "e2b767b356729ae7a348485d99b0f6349d7ebb2c2aa541f03afa4153fb87761a",
-   "kind": "example",
-   "orders": [],
-   "fate": "cut"
+   "kind": "order",
+   "orders": [
+    "RT-269"
+   ],
+   "fate": "merged"
   },
   {
    "n": 568,
@@ -6323,7 +6337,8 @@
     "If it contains no assertion call anywhere, that is the zero-assertion finding at `critical`",
     "Grep is case-sensitive",
     "is Go's FAILURE REPORT",
-    "A dropped `t.Errorf` hit is a JUDGED hit and counts FOR G, never against it."
+    "A dropped `t.Errorf` hit is a JUDGED hit and counts FOR G, never against it.",
+    "a `t.Fatal` reachable unconditionally, or a test body whose only `t.Errorf` is unreachable"
    ],
    "pinned_by": null,
    "wire": false
@@ -7959,6 +7974,16 @@
    "anchors": [
     "This clause exists solely to confirm the false-green pattern matches this project's assertion style",
     "it is the ONLY read in this document that reaches a path the plan did not declare"
+   ],
+   "pinned_by": null,
+   "wire": false
+  },
+  {
+   "id": "RT-329",
+   "says": "If this probe returns NOTHING, that is not evidence the project has no tests — it is evidence this alternation does not cover the project's assertion style, ...",
+   "now_in": "## Read scope (hard)",
+   "anchors": [
+    "If this probe returns NOTHING, that is not evidence the project has no tests"
    ],
    "pinned_by": null,
    "wire": false

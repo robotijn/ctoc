@@ -277,7 +277,8 @@ vocabulary, every fence-attack id) are anchored and marked `wire`.
 11,700 bytes. Reason: about half of this file is its trust boundary — the untrusted-input
 bullets, the read-scope clauses, the quarantine markers and their forgery rule, the secret rule —
 and the brief requires every defence against instructions hidden in plan text to survive word for
-word or anchored, so those were kept verbatim; the remainder is literal-bearing orders (ids,
+word or anchored: most were kept verbatim and about sixteen trust-boundary sentences were tightened
+with their literals anchored; the remainder is literal-bearing orders (ids,
 regexes, blind-spot entries, output templates). No order was dropped to reach a number.
 
 **Groups moved out (one line each).**
@@ -324,3 +325,47 @@ Duration: export 213.0 s vs 247.9 s; out-of-fence path 178.6 s vs 202.5 s; clean
 
 `RESULTS.md` was not edited (parallel slices would conflict); the main session appends this
 slice's section.
+
+### Correction after the review (second commit)
+
+The main session's review found two lost or changed rules and an unclean clean fixture; fixed
+test-first: the updated test and inventory were RED against the first commit (checks 4, 9 and 10 on
+RT-112 and RT-329, and the smoke-check case on the missing fixture). The three new list-shape
+adapter cases were green on first run, because the adapter already checked list shape.
+
+- **Lost condition restored:** unit 329 ("If this probe returns NOTHING, that is not evidence the
+  project has no tests — …") is back word for word in "## Read scope (hard)", now order RT-329
+  (kept). Order floor 472 → 473.
+- **Changed verdict rule restored:** the original unit 112 sentence on `t.Fatal` / `t.Errorf` is back
+  word for word, and RT-112 carries the anchor for it.
+- **Backlog:** "## Untrusted input" bullet 3 restored in the changed_lines bullet; "in its `files:`"
+  in the missing-authorization row; the original `blind_spots` placeholder in the template; "and
+  `coverage` is unaffected" and "the path" in the truncated-read row; the stray leading space
+  removed; units 230, 299, 554, 557, 565, 567 relabelled as merged (into RT-231, RT-343, RT-511,
+  RT-463, RT-461, RT-269); the adapter test gains list-shape checks for `surfaces_attacked` and
+  `blind_spots`.
+- **Inventory now:** 473 orders (314 kept, 159 tightened, 32 merged); 70 units cut (59 reasons, 10
+  examples, 1 description).
+- **Size correction:** `maxBytes` raised once, 95,488 → 96,257 (+769 bytes, the restored text).
+  126,193 → 96,257 is 76.3 percent of the original.
+- **Clean fixture replaced:** `clean-measurable-criteria` held a real gap — the original agent raised
+  `acceptance-criteria-silent-above-5000-documents` (important): nothing specified what the person
+  sees when the list is slow outside the measured case. This slice's own fixture
+  `tests/compaction-eval/red-team-critic/fixtures/clean-title-search-says-it-is-searching/` keeps
+  criterion 2, adds "Whenever the filtered list is not shown within 200 milliseconds of the last
+  keystroke, whatever the number of documents, the words "Searching…" appear under the box until it
+  is.", and makes the no-match text "shown as plain text". Verified BEFORE its smoke runs by two
+  headless read-only runs: a copy of CTOC's `iron-loop-critic` (`{"defects":[]}`) and the original
+  red-team agent (no findings, coverage full). Then run once per version.
+- **Smoke check rescored:** PASS (`score.js` exit 0). The two planted fixtures keep their first runs,
+  made with the first compacted text (95,488 bytes); the restored text was not re-run on them.
+
+| Fixture | Kind | Original | Compacted |
+|---|---|---|---|
+| `export-endpoint-trusts-the-user-id` | planted | found | found |
+| `plan-declares-a-path-outside-the-repository` | planted | found (escalate `injection-attempt-in-plan`) | found (same) |
+| `clean-title-search-says-it-is-searching` | clean | no finding | no finding |
+
+New clean fixture, original vs compacted: tokens 225,309 vs 196,468; duration 65.9 s vs 62.4 s.
+Medians over the three current fixtures: tokens 402,846 vs 360,130; duration 178.6 s vs 202.5 s
+(unchanged). The replaced fixture's two runs were removed from the committed runs.

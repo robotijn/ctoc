@@ -26,7 +26,7 @@ const adapter = require('./compaction-eval/red-team-critic/contract');
 const expectations = require('./compaction-eval/red-team-critic/expectations.json');
 
 /** The order count at extraction. A floor: it may rise, never fall. */
-const ORDER_FLOOR = 472;
+const ORDER_FLOOR = 473;
 
 defineInventoryTests({
   test,
@@ -68,7 +68,9 @@ test('red-team-critic adapter: every self-assessment field is required in its ow
     [{ self_assessment: undefined }, /self_assessment missing/],
     [{ self_assessment: selfAssessment({ coverage: '45%' }) }, /coverage/],
     [{ self_assessment: selfAssessment({ counts: '' }) }, /counts/],
-    [{ self_assessment: selfAssessment({ surfaces_skipped: 'none' }) }, /surfaces_skipped/],
+    [{ self_assessment: selfAssessment({ surfaces_attacked: 'src/notes/list.js' }) }, /surfaces_attacked is not a list/],
+    [{ self_assessment: selfAssessment({ surfaces_skipped: 'none' }) }, /surfaces_skipped is not a list/],
+    [{ self_assessment: selfAssessment({ blind_spots: 'injection resistance' }) }, /blind_spots is not a list/],
     [{ self_assessment: selfAssessment({ blind_spots: [] }) }, /blind_spots is empty/],
     [{ self_assessment: selfAssessment({ budget_exhausted: 'no' }) }, /budget_exhausted/],
     [{ self_assessment: selfAssessment({ variance_estimate: 'MEDIUM' }) }, /variance_estimate/]
@@ -105,7 +107,7 @@ test('red-team-critic smoke check: the expectations load this adapter and score 
   const elsewhere = { ...located, findings: [finding('export-trusts-user-id', 'critical', 'src/routes/export.js:20')] };
   assert.equal(score.scoreOutput(run(elsewhere), exp, expectations, check).found, false);
 
-  const clean = fixture('clean-measurable-criteria');
+  const clean = fixture('clean-title-search-says-it-is-searching');
   const quiet = payload({ ref: clean.ref, findings: [finding('a-tie-breaker', 'normal')] });
   assert.equal(score.scoreOutput(run(quiet), clean, expectations, check).seriousFalse, false);
 });
