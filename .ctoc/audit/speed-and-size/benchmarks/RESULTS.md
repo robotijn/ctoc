@@ -145,3 +145,7 @@ The agent definition went from 126193 to 96537 bytes with every order kept, chec
 ## cto-chief — compaction (rollout)
 
 The agent definition went from 59787 to 53365 bytes with every order kept, checked by its rule-inventory test. Smoke check (one run per version, low statistical power, not proof): PASS. Full numbers, including tokens per run, are in the plan's Execution Record (plans/done/agents-get-smaller-rollout-s8-cto-chief.md) and in `.ctoc/eval/cto-chief/2026-10-06/summary.json`.
+
+## llm-security-tester — compaction (rollout)
+
+The agent definition went from 73377 to 64972 bytes with every order kept, checked by its rule-inventory test. Smoke check (one run per version, low statistical power, not proof): PASS. Full numbers, including tokens per run, are in the plan's Execution Record (plans/done/agents-get-smaller-rollout-s7-llm-security-tester.md) and in `.ctoc/eval/llm-security-tester/2026-10-06/summary.json`.
