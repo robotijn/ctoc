@@ -613,8 +613,8 @@ describe('the opt-out ladder is ONE ladder, and the declaration sits above all o
     }
   });
 
-  it('ladder 7: the entry-point block documented in CLAUDE.md is still valid', () => {
-    const claudeMd = path.join(__dirname, '..', 'CLAUDE.md');
+  it('ladder 7: the entry-point block documented in docs/ENFORCEMENT.md is still valid', () => {
+    const claudeMd = path.join(__dirname, '..', 'docs', 'ENFORCEMENT.md');
     const doc = fs.readFileSync(claudeMd, 'utf8');
 
     // Find the fenced JSON block that declares an entry point. If it cannot be

@@ -1,11 +1,9 @@
 {
-  "content_sha256": "3d7407a75efd77267ca83efe7bc0afd8d0bc8378ce6c3b9c1c573552ee998995",
+  "content_sha256": "b782ae5104fe83d9b1b8ec3f3a260e8bfd62ccf8107fb5ed2c0e8b38c75391e4",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T15:19:58.877Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T17:50:36.454Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "Re-recorded after redacting private folder paths from the duplicates list (approved by the owner on 2026-10-06: compact CLAUDE.md); no other content changed.",
   "plan_basename": "claude-md-gets-small-and-keeps-every-rule"
 }

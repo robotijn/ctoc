@@ -1,0 +1,18 @@
+{
+  "agent": "advocate-critic",
+  "dispatches": [],
+  "token_readings": [
+    {
+      "version": "original",
+      "subagent_type": "advocate-eval-original",
+      "description": "compaction-eval advocate-trivial original",
+      "prompt": "Reply with OK."
+    },
+    {
+      "version": "compacted",
+      "subagent_type": "advocate-eval-compacted",
+      "description": "compaction-eval advocate-trivial compacted",
+      "prompt": "Reply with OK."
+    }
+  ]
+}

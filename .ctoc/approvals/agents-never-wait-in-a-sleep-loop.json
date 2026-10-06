@@ -1,9 +1,9 @@
 {
-  "content_sha256": "f8aea7d04d784ba0722e0a1120834a8699e2c07eb4fcb1b38deb1ec1c441c2b1",
+  "content_sha256": "e29c86667ec823d5fdec58f54752ac3d71a8a68aae09c4ca258f68225c133296",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T14:54:43.559Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T17:51:25.669Z",
   "approved_by": "human",
   "plan_basename": "agents-never-wait-in-a-sleep-loop"
 }

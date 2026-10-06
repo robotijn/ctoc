@@ -63,7 +63,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
-const { updateInstalledPlugins, refreshLocalManual } = require('../src/commands/update');
+const { updateInstalledPlugins, refreshLocalManual, refreshLocalLessons } = require('../src/commands/update');
 const { BEGIN_MARKER } = require('../src/lib/operating-manual');
 
 // A defined, distinctive installedAt sentinel — never "now", so a fallback to
@@ -101,6 +101,81 @@ function ctocEntry(overrides = {}) {
     ...overrides
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CTOC's own repository: /ctoc:update must leave its hand-kept CLAUDE.md alone
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ctocOwnRepoCopy(claudeMdText) {
+  const proj = mkTmp('ctoc-own-repo-');
+  fs.mkdirSync(path.join(proj, '.ctoc'), { recursive: true });
+  fs.writeFileSync(path.join(proj, 'package.json'), JSON.stringify({ name: 'ctoc' }));
+  fs.writeFileSync(path.join(proj, 'CLAUDE.md'), claudeMdText);
+  return proj;
+}
+
+function runIn(dir, fn) {
+  const origCwd = process.cwd();
+  try {
+    process.chdir(dir);
+    fn();
+    return fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8');
+  } finally {
+    process.chdir(origCwd);
+    cleanup();
+  }
+}
+
+test('refreshLocalManual_leaves_ctocs_own_claude_md_alone', () => {
+  const before = '# CTOC Project Instructions\n\nHand-kept text.\n';
+  const proj = ctocOwnRepoCopy(before);
+  const after = runIn(proj, () => refreshLocalManual(REPO_ROOT));
+  assert.equal(after, before,
+    'in a folder whose package.json names ctoc, /ctoc:update must not re-add the craft-manual block');
+});
+
+// A plugin root whose lessons template carries FEWER lessons than this repository's
+// CLAUDE.md: the lib is copied in so ensureLessonsBlock resolves the short template
+// from its own directory, exactly as an older or newer install would.
+function shortLessonsPluginRoot() {
+  const root = mkTmp('ctoc-short-lessons-');
+  const lib = path.join(root, 'src', 'lib');
+  fs.mkdirSync(lib, { recursive: true });
+  for (const name of ['claude-md-lessons.js', 'safe-fs.js']) {
+    fs.copyFileSync(path.join(REPO_ROOT, 'src', 'lib', name), path.join(lib, name));
+  }
+  const tplDir = path.join(root, '.ctoc', 'templates');
+  fs.mkdirSync(tplDir, { recursive: true });
+  fs.writeFileSync(path.join(tplDir, 'operating-lessons.md'),
+    '<!-- CTOC:LESSONS v1 START -->\n## CTOC Operating Lessons\n\n1. **Only one lesson.**\n<!-- CTOC:LESSONS v1 END -->\n');
+  return root;
+}
+
+test('refreshLocalLessons_run_in_this_repository_deletes_no_lesson', () => {
+  // The real CLAUDE.md of this repository, in a ctoc-named copy. Without the guard in
+  // refreshLocalLessons, the short template below would replace its lessons block.
+  const before = fs.readFileSync(path.join(REPO_ROOT, 'CLAUDE.md'), 'utf8');
+  const lessonCount = (text) => {
+    const start = text.indexOf('<!-- CTOC:LESSONS v1 START -->');
+    const end = text.indexOf('<!-- CTOC:LESSONS v1 END -->');
+    assert.ok(start !== -1 && end > start, 'CLAUDE.md must carry a well-formed lessons block');
+    return [...text.slice(start, end).matchAll(/^\d+\. \*\*/gm)].length;
+  };
+  assert.ok(lessonCount(before) >= 20, `CLAUDE.md carries ${lessonCount(before)} lessons, expected at least 20`);
+  const pluginRoot = shortLessonsPluginRoot();
+  const proj = ctocOwnRepoCopy(before);
+  const after = runIn(proj, () => refreshLocalLessons(pluginRoot));
+  assert.equal(after, before, 'the update leaves this repository\'s CLAUDE.md byte-identical');
+});
+
+test('refreshLocalManual_still_writes_the_block_for_a_user_project', () => {
+  const proj = mkTmp('ctoc-my-app-');
+  fs.writeFileSync(path.join(proj, 'package.json'), JSON.stringify({ name: 'my-app' }));
+  fs.writeFileSync(path.join(proj, 'CLAUDE.md'), '# My app\n');
+  const after = runIn(proj, () => refreshLocalManual(REPO_ROOT));
+  assert.ok(after.includes(BEGIN_MARKER), 'a project named my-app still receives the operating-manual block');
+  assert.ok(after.includes('# My app'), 'its own text is kept');
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cluster A — refreshLocalManual's looksLikeProject gate

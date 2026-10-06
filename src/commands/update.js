@@ -33,10 +33,15 @@ const INSTALLED_FILE = path.join(PLUGINS_DIR, 'installed_plugins.json');
  * install (`__dirname`/../..) — correct only on the up-to-date path, where the
  * running dir is not deleted.
  *
+ * Never runs in CTOC's own repository (`package.json` names `ctoc`): there the block
+ * and its template change together in one reviewed edit, and an installed plugin's
+ * template may carry fewer lessons — writing it would delete lessons.
+ *
  * @param {string} [ctocRoot] - Absolute path to the surviving CTOC install root.
  */
 function refreshLocalLessons(ctocRoot = path.resolve(__dirname, '..', '..')) {
   try {
+    if (isCtocOwnRepo(process.cwd())) return; // CTOC's own lessons block is edited with its template
     // ctocRoot is a CTOC-controlled install path (a default from __dirname or the
     // freshly-installed cache version dir), never user input — the require must be
     // resolved FROM the surviving install so a self-deleted old dir cannot ENOENT it.
@@ -50,9 +55,28 @@ function refreshLocalLessons(ctocRoot = path.resolve(__dirname, '..', '..')) {
 }
 
 /**
+ * True when `dir/package.json` names `ctoc` — the same test the project detector's
+ * `isCtocRepo` applies. Inline rather than required: this file is copied alone into
+ * update sandboxes, and the manual refresh must not depend on a sibling module there.
+ * A missing or malformed package.json is not CTOC's repository.
+ *
+ * @param {string} dir
+ * @returns {boolean}
+ */
+function isCtocOwnRepo(dir) {
+  try {
+    return JSON.parse(safeFs.readFileSync(path.join(dir, 'package.json'), 'utf8')).name === 'ctoc';
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
  * Refresh the local project's CTOC-managed operating-manual block (generic craft
  * layer). Only runs when cwd looks like a project (has package.json OR .ctoc/) so
  * `/ctoc:update` never writes a stray CLAUDE.md into a non-project directory.
+ * Never runs in CTOC's own repository (`package.json` names `ctoc`): its CLAUDE.md is
+ * hand-maintained and kept under 15,000 bytes, so the block must not come back there.
  * Fail-open: a merge failure is logged to stderr and NEVER aborts the update.
  *
  * See {@link refreshLocalLessons} for why `ctocRoot` must be the surviving,
@@ -67,6 +91,7 @@ function refreshLocalManual(ctocRoot = path.resolve(__dirname, '..', '..')) {
       safeFs.existsSync(path.join(cwd, 'package.json')) ||
       safeFs.existsSync(path.join(cwd, '.ctoc'));
     if (!looksLikeProject) return;
+    if (isCtocOwnRepo(cwd)) return; // CTOC's own CLAUDE.md is hand-maintained
     // ctocRoot is a CTOC-controlled install path (see refreshLocalLessons), never
     // user input; resolved FROM the surviving install for self-delete safety.
     // eslint-disable-next-line security/detect-non-literal-require

@@ -181,11 +181,14 @@ describe('no instruction surface says session start or the Stop hook orders ques
     assert.ok(text.includes('and never for any other plan.'));
   });
 
-  it('CLAUDE.md says session start gives no order and the queue alone never blocks a stop', () => {
-    const text = fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8');
+  it('docs/ENFORCEMENT.md says the queue alone never blocks a stop; neither it nor CLAUDE.md carries the old dispatch order', () => {
+    const text = fs.readFileSync(path.join(ROOT, 'docs', 'ENFORCEMENT.md'), 'utf8');
     assert.ok(text.includes('An approved build queue alone never blocks a stop.'));
-    assert.ok(!text.includes('appends a directive to the injected context telling the SESSION MODEL to dispatch'),
-      'the old session-start dispatch description is gone');
+    for (const rel of ['CLAUDE.md', path.join('docs', 'ENFORCEMENT.md')]) {
+      assert.ok(!fs.readFileSync(path.join(ROOT, rel), 'utf8')
+        .includes('appends a directive to the injected context telling the SESSION MODEL to dispatch'),
+      `the old session-start dispatch description is gone from ${rel}`);
+    }
   });
 });
 

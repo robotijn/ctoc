@@ -199,8 +199,8 @@ describe('Ground truth — project counts (sanity checks)', () => {
     assert.ok(countTestFiles() >= 65, `expected >=65 test files, got ${countTestFiles()}`);
   });
 
-  it('docs/: 16 docs files (LH1 added SECURITY_LINT.md)', () => {
-    assert.equal(countDocsFiles(), 16);
+  it('docs/: 20 docs files (LH1 added SECURITY_LINT.md; ENFORCEMENT, FENCES, PROJECT_REFERENCE, OPERATING_LESSONS moved out of CLAUDE.md)', () => {
+    assert.equal(countDocsFiles(), 20);
   });
 
   // DELETED by plan F3b: 'scouts (Tier 3): 5 Haiku scout agents', which asserted

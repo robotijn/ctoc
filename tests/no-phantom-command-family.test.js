@@ -53,11 +53,13 @@ const CLEANED = ['src/commands/push.md'];
 
 // Files this slice does NOT clean. Their phantom references are documented DEBT: the
 // fence reports every one and holds a shrink-only ceiling so the count can never grow.
-const DEBT = ['CLAUDE.md', 'README.md', 'src/commands/start.md', 'src/commands/update.md'];
+const DEBT = ['CLAUDE.md', 'docs/PROJECT_REFERENCE.md', 'README.md', 'src/commands/start.md', 'src/commands/update.md'];
 
-// The phantom-debt ceiling, MEASURED on disk on 2026-07-31: CLAUDE.md carries 2
+// The phantom-debt ceiling, MEASURED on disk on 2026-07-31: CLAUDE.md carried 2
 // (`ctoc validate`, `ctoc process-issues`) and README.md carries 4 (`ctoc doctor` x2,
 // `ctoc process-issues`, `ctoc validate`); start.md and update.md carry 0. Total 6.
+// On 2026-10-06 CLAUDE.md's self-improvement section, carrying both of its phantoms,
+// moved word for word into docs/PROJECT_REFERENCE.md, which joined the debt list.
 // SHRINK-ONLY: lower this as a follow-up cleans a debt file; NEVER raise it. Raising it
 // is how a new phantom command gets waved through — the exact defect this fence exists
 // to stop.

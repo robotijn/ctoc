@@ -1,9 +1,9 @@
 {
-  "content_sha256": "1da519dd1e9cdc6b5ab86e987446c2ef276c4a19f73d0c4297890d66c94d87ef",
+  "content_sha256": "2cd73d97cd2cac2fc78015212d85c58b8184935c20c5e6d5e99bd9a0c05b1cdb",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T14:38:22.952Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T17:49:47.688Z",
   "approved_by": "human",
   "plan_basename": "agents-get-smaller-without-losing-findings-pilot"
 }

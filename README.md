@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.14.94-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.14.95-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-125-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-430-blue">
@@ -135,7 +135,7 @@ Answer them once; both choices are remembered. "Keep defaults, stop asking" and 
 **Worked example.** The classic pipeline overview (`Open the dashboard` on the first screen) of a busy project — this is a real capture of the CTO Chief repository itself:
 
 ```
-CTOC v6.14.94
+CTOC v6.14.95
 ────────────────────────────────────────────────────────────
 
 ▼ Business (2)
@@ -987,7 +987,7 @@ Agents spawn conditionally based on your project and current Iron Loop step. No 
 
 There are two kinds of skills:
 
-1. **Tier-2 specialist skill bodies (102)** — the actual expert agents that run during Iron Loop and refinement-loop steps: 99 Tier-2 specialists, the two ambient skills at the top of `skills/` — the `ask-me-questions` decision format and the `deepthink` background research skill — and the preloaded gate-lens skill. Each lives at `skills/<category>/<name>/SKILL.md` with a structured findings contract.
+1. **Tier-2 specialist skill bodies (102)** — 101 of them are the actual expert agents that run during Iron Loop and refinement-loop steps: 99 Tier-2 specialists and the two ambient skills at the top of `skills/` — the `ask-me-questions` decision format and the `deepthink` background research skill. Each lives at `skills/<category>/<name>/SKILL.md` with a structured findings contract. The 102nd, `iron-loop/advocate-lens`, is not a specialist: it holds no rules and only points to the advocate agent.
 2. **Knowledge skills (328)** — a web-verified reference library: 50 language guides, 211 framework guides (85 web, 44 AI/ML, 52 data, 15 DevOps, 15 mobile), 61 per-language quality-config references, and 6 shared agent fragments (the honest-status rule, plain gate words, warnings-are-critical, and their siblings). Each guide was brought current against 2026 authoritative sources — no invented statistics. Guides declare their checkable version and link claims in a machine-readable block; `node src/scripts/verify-claims.js` checks the declared ones against the live registries, and a census reports how many guides still declare nothing, so partial coverage is never mistaken for coverage.
 
 **The quality bar.** Every specialist body went through an explicit improvement loop — `websearch → update → critique → update` (a second critique round for brand-new skills). Every `SKILL.md` ships YAML frontmatter with `when_to_load` triggers and an effort level, a `## 2026 Best Practices` section with sourced citations, 7-language coverage (C#, Java, Python, C, C++, JS/TS, SQL) of BAD/SAFE pattern pairs where it applies, a tool-integration matrix with current commands, a severity block (every finding is `critical` on the wire — warnings are bugs), and a machine-readable letter schema for the refinement loop.
@@ -1107,7 +1107,7 @@ node --test tests/*.test.js   # fast pass only — does NOT enforce the floor
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.14.94'
+getVersion()       // → '6.14.95'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -1118,11 +1118,12 @@ Files synced by `release()`: `VERSION` (source of truth), `.claude-plugin/market
 **Project structure:**
 ```
 ctoc/
-├── docs/            16 docs: IRON_LOOP.md, AGENT_ARCHITECTURE.md, REFINEMENT_LOOP.md,
+├── docs/            20 docs: IRON_LOOP.md, AGENT_ARCHITECTURE.md, REFINEMENT_LOOP.md,
 │                    PRODUCT_LOOP.md, DISPATCH_PROTOCOL.md, EVALUATION_HARNESS.md,
 │                    INDEPENDENCE.md, REGULATORY_OPS.md, REALTIME.md, PROCESS_FMEA.md,
 │                    CRITICAL_CONTROL_POINTS.md, CONTINUOUS_IMPROVEMENT.md,
-│                    CONFIG_SOURCES.md, SECURITY_LINT.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
+│                    CONFIG_SOURCES.md, SECURITY_LINT.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md,
+│                    ENFORCEMENT.md, FENCES.md, PROJECT_REFERENCE.md, OPERATING_LESSONS.md
 ├── src/
 │   ├── commands/    3 slash commands — start, push, update (.md spec + .js impl)
 │   ├── hooks/       17 Claude Code hooks (session start, user-prompt-submit routing
@@ -1140,7 +1141,7 @@ ctoc/
 │                    61 quality configs, 6 agent-fragments/ — the cross-cutting
 │                    rules every agent carries: ancestry-read, async-choice-protocol,
 │                    honest-status, no-stub-rule, plain-gate-words, warnings-are-critical)
-├── tests/           547 test files (run with `npm test`)
+├── tests/           551 test files (run with `npm test`)
 ├── .ctoc/           Config, templates, operations, audit, loop journals, baselines
 │   ├── templates/   CLAUDE.md.template, canvas templates, SaaS templates,
 │   │                questions.yaml, product-kpis.yaml
@@ -1176,6 +1177,6 @@ Use CTO Chief freely for any project. You may not offer CTO Chief itself or a de
 
 ---
 
-**6.14.94** · Built by [@robotijn](https://github.com/robotijn)
+**6.14.95** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

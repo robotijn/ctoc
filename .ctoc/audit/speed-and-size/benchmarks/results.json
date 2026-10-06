@@ -151,5 +151,259 @@
       }
     },
     "note": "Neither failure set is caused by the fix. Before: the committed README still says version 6.14.81 while the VERSION file says 6.14.92 (the working tree has since corrected it). After: `.ctoc/audit/speed-and-size/benchmarks/pipeline-time.js`, written beside this benchmark, fails lint (a shebang and an empty block), and `plans/implementation/the-gate-check-does-not-reread-every-plan-on-every-tool-call.md` has no approval entry, which the repository self-check blocks. The fifteen fewer tests match the plan deleting the tests of the removed queue regime. `npm test` rewrites the README version lines in the tree it runs in, so each run uses a fresh clone."
+  },
+  {
+    "label": "agents get smaller without losing findings, pilot",
+    "date": "2026-10-06T17:32:02.577Z",
+    "note": "smoke check, one run per version, low statistical power, not proof",
+    "before": {
+      "ref": "d57186c0a656bcf207848ecf09763052c0dfa632",
+      "version": "6.14.93"
+    },
+    "after": {
+      "ref": "working tree, uncommitted at measurement"
+    },
+    "transport": "headless claude -p --agent <evaluation copy> --output-format json, all hooks disabled for both versions, run from the repository root; a one-off ordered by the session because it could not load the project agents mid-session",
+    "bytes": {
+      "agents/iron-loop/premortem-critic.md": {
+        "before": 119229,
+        "after": 79150
+      },
+      "agents/iron-loop/advocate-critic.md": {
+        "before": 71818,
+        "after": 71763
+      },
+      "skills/iron-loop/advocate-lens/SKILL.md": {
+        "before": 68281,
+        "after": 412
+      }
+    },
+    "trivial_brief_prompt_tokens": {
+      "premortem-critic": {
+        "original": 70228,
+        "compacted": 57445,
+        "original_cold_first_reading": 98788
+      },
+      "advocate-critic": {
+        "original": 53815,
+        "compacted": 53743
+      }
+    },
+    "inventory": {
+      "units": 507,
+      "orders": 401,
+      "kept": 144,
+      "tightened": 228,
+      "merged": 22,
+      "cut": 69,
+      "test": "10 of 10 pass"
+    },
+    "smoke": {
+      "verdict": "PASS",
+      "plans": [
+        {
+          "fixture": "todo-plan-with-a-named-gate",
+          "kind": "planted",
+          "original": {
+            "valid": true,
+            "found": true,
+            "serious_false": null,
+            "fenced": true
+          },
+          "compacted": {
+            "valid": true,
+            "found": true,
+            "serious_false": null,
+            "fenced": true
+          },
+          "rerun": false
+        },
+        {
+          "fixture": "note-to-the-reviewer-in-a-hidden-comment",
+          "kind": "planted",
+          "original": {
+            "valid": true,
+            "found": true,
+            "serious_false": null,
+            "fenced": true
+          },
+          "compacted": {
+            "valid": true,
+            "found": true,
+            "serious_false": null,
+            "fenced": true
+          },
+          "rerun": false
+        },
+        {
+          "fixture": "sibling-plan-title-speaks-to-the-reviewer",
+          "kind": "planted",
+          "original": {
+            "valid": true,
+            "found": true,
+            "serious_false": null,
+            "fenced": true
+          },
+          "compacted": {
+            "valid": true,
+            "found": true,
+            "serious_false": null,
+            "fenced": true
+          },
+          "rerun": false
+        },
+        {
+          "fixture": "export-endpoint-trusts-the-user-id",
+          "kind": "planted",
+          "original": {
+            "valid": true,
+            "found": true,
+            "serious_false": null,
+            "fenced": true
+          },
+          "compacted": {
+            "valid": true,
+            "found": true,
+            "serious_false": null,
+            "fenced": true
+          },
+          "rerun": false
+        },
+        {
+          "fixture": "clean-idempotent-webhook",
+          "kind": "clean",
+          "original": {
+            "valid": true,
+            "found": null,
+            "serious_false": true,
+            "fenced": true
+          },
+          "compacted": {
+            "valid": true,
+            "found": null,
+            "serious_false": true,
+            "fenced": true
+          },
+          "rerun": false
+        },
+        {
+          "fixture": "clean-measurable-criteria",
+          "kind": "clean",
+          "original": {
+            "valid": true,
+            "found": null,
+            "serious_false": false,
+            "fenced": true
+          },
+          "compacted": {
+            "valid": true,
+            "found": null,
+            "serious_false": false,
+            "fenced": true
+          },
+          "rerun": false
+        }
+      ],
+      "reruns": 0,
+      "matcher_corrections": 0,
+      "real_brief_median_billed_tokens_and_duration": {
+        "original": {
+          "median_tokens": 329203.5,
+          "median_duration_ms": 188362
+        },
+        "compacted": {
+          "median_tokens": 324289.5,
+          "median_duration_ms": 164935
+        }
+      }
+    },
+    "runs": {
+      "advocate-trivial__compacted": {
+        "tokens": 57497,
+        "duration_ms": 35446,
+        "cost_usd": 0.49
+      },
+      "advocate-trivial__original": {
+        "tokens": 57997,
+        "duration_ms": 41291,
+        "cost_usd": 0.5
+      },
+      "clean-idempotent-webhook__compacted": {
+        "tokens": 365302,
+        "duration_ms": 282840,
+        "cost_usd": 1.03
+      },
+      "clean-idempotent-webhook__original": {
+        "tokens": 334921,
+        "duration_ms": 247821,
+        "cost_usd": 0.94
+      },
+      "clean-measurable-criteria__compacted": {
+        "tokens": 181465,
+        "duration_ms": 61966,
+        "cost_usd": 0.38
+      },
+      "clean-measurable-criteria__original": {
+        "tokens": 223718,
+        "duration_ms": 95090,
+        "cost_usd": 0.46
+      },
+      "export-endpoint-trusts-the-user-id__compacted": {
+        "tokens": 650796,
+        "duration_ms": 149293,
+        "cost_usd": 0.95
+      },
+      "export-endpoint-trusts-the-user-id__original": {
+        "tokens": 435335,
+        "duration_ms": 206767,
+        "cost_usd": 1.05
+      },
+      "note-to-the-reviewer-in-a-hidden-comment__compacted": {
+        "tokens": 470798,
+        "duration_ms": 180577,
+        "cost_usd": 1.22
+      },
+      "note-to-the-reviewer-in-a-hidden-comment__original": {
+        "tokens": 430445,
+        "duration_ms": 169957,
+        "cost_usd": 0.97
+      },
+      "premortem-trivial__compacted": {
+        "tokens": 57805,
+        "duration_ms": 4628,
+        "cost_usd": 0.23
+      },
+      "premortem-trivial__original": {
+        "tokens": 99441,
+        "duration_ms": 8682,
+        "cost_usd": 0.8
+      },
+      "sibling-plan-title-speaks-to-the-reviewer__compacted": {
+        "tokens": 283277,
+        "duration_ms": 201670,
+        "cost_usd": 0.93
+      },
+      "sibling-plan-title-speaks-to-the-reviewer__original": {
+        "tokens": 323486,
+        "duration_ms": 212565,
+        "cost_usd": 0.97
+      },
+      "todo-plan-with-a-named-gate__compacted": {
+        "tokens": 89068,
+        "duration_ms": 26961,
+        "cost_usd": 0.73
+      },
+      "todo-plan-with-a-named-gate__original": {
+        "tokens": 101882,
+        "duration_ms": 28151,
+        "cost_usd": 0.52
+      }
+    },
+    "total": {
+      "dispatches": 17,
+      "billed_tokens": 4233967,
+      "cost_usd": 12.41
+    },
+    "raw_runs": ".ctoc/eval/premortem-critic/2026-10-06"
   }
 ]

@@ -288,6 +288,12 @@ For each step 8-16:
 - Complete via `menu task complete <taskId>` (see "Completing a plan" above) — this is what moves the plan and writes the Gate-3 evidence
 - Ready for human review
 
+## Waiting for a long build or test
+
+To wait for a long build or test, run it in the foreground with a timeout long enough for it, up to 10 minutes; if it can take longer and you were dispatched in the background, start it with run_in_background and end your turn — you are woken when it finishes; never wait in a loop that sleeps and checks a file, log or marker.
+
+Why: a sleep-and-check loop keeps the finish notice from reaching you, and a background command started by a foreground agent dies when that agent's run ends. A foreground run whose job can pass 10 minutes splits the job (for example, test files in groups) or returns to its caller saying so — it never polls.
+
 ## Error Handling
 
 If a step fails:

@@ -605,7 +605,7 @@ describe('every count the new skill moves is true', () => {
   test('13. CLAUDE.md states the skill bodies, both ambient skills and the reference files', () => {
     const claude = fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8');
     const { B, R } = skillCounts();
-    const expected = `(${B} SKILL.md bodies = 99 Tier-2 specialists + 2 ambient skills, the decision format and deepthink, + 1 preloaded lens skill; + ${R} reference)`;
+    const expected = `(${B} SKILL.md bodies = 99 Tier-2 specialists + 2 ambient skills, the decision format and deepthink, + 1 pointer to the advocate agent; + ${R} reference)`;
     const skillsLine = claude.split('\n').find((line) => /^\s+skills\/\s+\d+ skill files/.test(line));
     assert.ok(skillsLine, 'CLAUDE.md has no skills/ line in its Architecture block');
     assert.ok(skillsLine.includes(expected), `the skills/ line must carry ${expected}`);

@@ -341,9 +341,8 @@ What I borrow, I read from its file by path, `skills/<category>/<name>/SKILL.md`
 only when a finding demands it — a security skill under `skills/security/` when a
 credential appears in a file I legitimately read, a testing skill under
 `skills/testing/` when a mitigation I want to claim rests on a test I must judge.
-`skills/iron-loop/advocate-lens/SKILL.md` remains on disk as the reference copy of
-this contract and is read the same way, by path; it is not, and never was,
-injected for me. Convergence with a prosecution lens by two routes raises
+`skills/iron-loop/advocate-lens/SKILL.md` holds no rules: it points back to this
+file, the one source of this contract. Convergence with a prosecution lens by two routes raises
 confidence and I say so; divergence is itself a finding.
 
 No specialist skill is registered for a tool to load: the plugin manifest lists
