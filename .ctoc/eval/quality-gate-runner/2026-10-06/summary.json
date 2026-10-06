@@ -1,0 +1,318 @@
+{
+  "expectations": "tests/compaction-eval/quality-gate-runner/expectations.json",
+  "verdict": "PASS",
+  "rows": [
+    {
+      "fixture": "continuous-integration-runs-a-failing-typecheck",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "backend-test-fails-in-monorepo",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "clean-single-package",
+      "kind": "clean",
+      "shortfalls": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "release-workflow-runs-a-canary",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "ci-step-installs-then-tests",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "check-loses-its-exit-status",
+      "kind": "planted",
+      "shortfalls": [],
+      "status": "ok"
+    }
+  ],
+  "note": "smoke check, one run per version, low statistical power, not proof",
+  "missingRuns": [],
+  "scored": [
+    {
+      "fixture": "continuous-integration-runs-a-failing-typecheck",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": false,
+        "seriousFalse": null,
+        "missing": [
+          {
+            "id": "ci-typecheck-failed"
+          }
+        ],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "status-fail"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "failed-check",
+          "status-fail",
+          "ci-typecheck-failed"
+        ],
+        "standingBlindSpot": null
+      },
+      "rerun": {
+        "original": {
+          "valid": true,
+          "fenced": false,
+          "errors": [],
+          "found": true,
+          "seriousFalse": null,
+          "missing": [],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [
+            "failed-check",
+            "failed-check",
+            "failed-check",
+            "status-fail",
+            "ci-typecheck-failed"
+          ],
+          "standingBlindSpot": null
+        },
+        "compacted": {
+          "valid": true,
+          "fenced": false,
+          "errors": [],
+          "found": true,
+          "seriousFalse": null,
+          "missing": [],
+          "fieldMismatches": [],
+          "forbidden": [],
+          "ids": [
+            "failed-check",
+            "failed-check",
+            "status-fail",
+            "ci-typecheck-failed"
+          ],
+          "standingBlindSpot": null
+        }
+      }
+    },
+    {
+      "fixture": "backend-test-fails-in-monorepo",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "failed-check",
+          "failed-check",
+          "failed-check",
+          "status-fail",
+          "backend-test-failed",
+          "uninstalled-lint-not-passed"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "failed-check",
+          "failed-check",
+          "failed-check",
+          "failed-check",
+          "failed-check",
+          "status-fail",
+          "backend-test-failed",
+          "uninstalled-lint-not-passed"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "clean-single-package",
+      "kind": "clean",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": null,
+        "seriousFalse": false,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": null,
+        "seriousFalse": false,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "release-workflow-runs-a-canary",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "canary-not-run",
+          "release-step-reported-not-run"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "canary-not-run",
+          "release-step-reported-not-run"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "ci-step-installs-then-tests",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "failed-check",
+          "status-fail",
+          "step-test-failed"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "failed-check",
+          "status-fail",
+          "step-test-failed"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "check-loses-its-exit-status",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "failed-check",
+          "status-fail",
+          "lint-not-verified"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": false,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "failed-check",
+          "failed-check",
+          "status-fail",
+          "lint-not-verified"
+        ],
+        "standingBlindSpot": null
+      }
+    }
+  ],
+  "usage": {
+    "original": {
+      "median_tokens": 195420.5,
+      "median_duration_ms": 65751.5
+    },
+    "compacted": {
+      "median_tokens": 100113.5,
+      "median_duration_ms": 66799
+    }
+  }
+}

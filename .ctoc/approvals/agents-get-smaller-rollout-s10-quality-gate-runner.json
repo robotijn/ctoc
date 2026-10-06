@@ -1,9 +1,9 @@
 {
-  "content_sha256": "61c93b0a179b8a746517c472b124387b4e901708ef269efb74488b059dac0df0",
+  "content_sha256": "76a464f5203b16bd289a61a0bbc3a4f409382e0bc490f72e82cf33cf7058c231",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-06T18:01:53.369Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-06T20:42:40.421Z",
   "approved_by": "human",
   "plan_basename": "agents-get-smaller-rollout-s10-quality-gate-runner"
 }
