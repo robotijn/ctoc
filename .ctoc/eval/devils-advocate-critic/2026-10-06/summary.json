@@ -1,0 +1,141 @@
+{
+  "expectations": "tests/compaction-eval/devils-advocate-critic/expectations.json",
+  "verdict": "PASS",
+  "rows": [
+    {
+      "fixture": "reverses-a-recorded-decision",
+      "kind": "planted",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "ref-escapes-the-repository",
+      "kind": "planted",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    },
+    {
+      "fixture": "clean-measurable-criteria",
+      "kind": "clean",
+      "shortfalls": [],
+      "notes": [],
+      "status": "ok"
+    }
+  ],
+  "note": "smoke check, one run per version, low statistical power, not proof",
+  "missingRuns": [],
+  "scored": [
+    {
+      "fixture": "reverses-a-recorded-decision",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "contradicts-recorded-decision-activity-download-24",
+          "download-button-promised-upstream-has-no-plan",
+          "undeclared-dependency-on-code-absent-from-repository"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "contradicts-recorded-decision-activity-download-24",
+          "undeclared-document-renderer-dependency-step-9",
+          "download-button-promised-upstream-has-no-plan"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "ref-escapes-the-repository",
+      "kind": "planted",
+      "original": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "no-plan-under-review"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": true,
+        "seriousFalse": null,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "no-plan-under-review"
+        ],
+        "standingBlindSpot": null
+      }
+    },
+    {
+      "fixture": "clean-measurable-criteria",
+      "kind": "clean",
+      "original": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": null,
+        "seriousFalse": true,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "search-scope-not-bound-to-every-accessible-document"
+        ],
+        "standingBlindSpot": null
+      },
+      "compacted": {
+        "valid": true,
+        "fenced": true,
+        "errors": [],
+        "found": null,
+        "seriousFalse": false,
+        "missing": [],
+        "fieldMismatches": [],
+        "forbidden": [],
+        "ids": [
+          "unjustified-document-count-ceiling-criterion-2"
+        ],
+        "standingBlindSpot": null
+      }
+    }
+  ],
+  "usage": {
+    "original": {
+      "median_tokens": 209006,
+      "median_duration_ms": 197946
+    },
+    "compacted": {
+      "median_tokens": 248874,
+      "median_duration_ms": 114345
+    }
+  }
+}
