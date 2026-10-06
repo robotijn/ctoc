@@ -41,7 +41,7 @@
         "seriousFalse": null,
         "missing": [
           {
-            "id": "blocking-issue"
+            "id": "topic-blocked"
           }
         ],
         "fieldMismatches": [],
@@ -80,7 +80,8 @@
           "blocking-issue",
           "recommendation",
           "recommendation",
-          "recommendation"
+          "recommendation",
+          "topic-blocked"
         ],
         "standingBlindSpot": null
       }

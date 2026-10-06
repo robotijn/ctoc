@@ -6,6 +6,7 @@ files:
   - src/search.js
   - tests/search.test.js
   - src/cli.js
+  - src/index.js
   - tests/cli.test.js
   - README.md
   - CHANGELOG.md

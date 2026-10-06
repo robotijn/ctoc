@@ -6,6 +6,7 @@ files:
   - src/export.js
   - tests/export.test.js
   - src/cli.js
+  - src/index.js
   - tests/cli.test.js
   - README.md
   - CHANGELOG.md
