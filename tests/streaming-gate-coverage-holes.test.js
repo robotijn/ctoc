@@ -141,6 +141,13 @@ function forkQuestion(id) {
   };
 }
 
+/** The digest a screen's answer action carries (slice 1's format, derived here independently). */
+function digestOf(q) {
+  const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
+  const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs])).digest('hex');
+}
+
 /**
  * Run `fn` with the streaming-precompute module made UNLOADABLE at the loader
  * boundary. Restored in `finally`, always.
@@ -263,20 +270,25 @@ describe('streaming-gate — a check that could not run never crosses a plan', (
       'no ledger entry may survive a failed crossing');
   });
 
-  it('1297-1298: enough information at the LAST moment is shown to the human, never crossed automatically', () => {
+  it('1297-1298: an empty question list alone never finishes a plan', () => {
     const root = makeSandbox();
     const p = writePlan(root, 'review', 'done-ready', `---\ntitle: done-ready title\n---\n\n# done-ready title\n\nBody.\n`);
     // Ready and empty: the gate critic ran and found nothing to ask.
     precompute.writePlanQuestions(root, 'review/done-ready.md', [], mtimeOf(p), undefined, CLASSIFIED);
 
-    const decisions = streamingGate.pendingGateDecisions(root);
+    // The crossing pass the continuation runs — the only one that may finish a built plan.
+    const crossed = [];
+    const decisions = streamingGate.pendingGateDecisions(root, { crossed });
     const d = decisions.find((x) => x.slug === 'done-ready');
-    assert.ok(d, 'the last moment is never crossed by sufficiency, so the plan stays pending');
-    assert.equal(d.enough, true);
+    assert.ok(d, 'the plan stays pending');
+    assert.equal(d.enough, true, 'nothing is left to ask …');
+    assert.equal(d.passesValidation, false, '… but the built work has no passing check record');
+    assert.deepEqual(crossed, []);
+    const why = require('../src/lib/plan-validator.js').validateReviewToDone(p, root);
+    assert.ok(why.errors.some((e) => /no VERIFY evidence recorded/.test(e)), why.errors.join('; '));
 
     const screen = streamingGate.streamingGateScreen(root);
     assert.match(screen.text, /Enough information: YES — every decision this plan needs has been answered\./);
-    // Shown, not acted on: the plan is still where it was, with no ledger entry.
     assert.equal(fs.existsSync(p), true);
     assert.equal(fs.existsSync(path.join(root, 'plans', 'done', 'done-ready.md')), false);
     assert.equal(fs.existsSync(path.join(root, '.ctoc', 'approvals')), false);
@@ -343,28 +355,21 @@ describe('streaming-gate — recording an answer is honest about what it could a
     assert.equal(fs.existsSync(path.join(root, 'plans', 'implementation', 'ctl.md')), false);
   });
 
-  it('1632-1633: an answer that cannot be tied to a revision is KEPT unstamped and the human is told why', () => {
+  it('1632-1633: an answer that cannot be checked is refused, and the human is told why', () => {
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'nostamp', validFunctionalBody('nostamp'));
     precompute.writePlanQuestions(root, 'functional/nostamp.md', [forkQuestion('q10-db')], mtimeOf(p));
 
     const screen = withBrokenPrecompute(
-      () => streamingGate.streamAnswer('functional/nostamp.md', 'q10-db', '1', root),
+      () => streamingGate.streamAnswer('functional/nostamp.md', 'q10-db', '1', root, digestOf(forkQuestion('q10-db'))),
     );
 
-    // The answer is NOT lost.
-    const logPath = path.join(root, '.ctoc', 'streaming', 'answers.jsonl');
-    assert.equal(fs.existsSync(logPath), true);
-    const record = JSON.parse(fs.readFileSync(logPath, 'utf8').trim());
-    assert.equal(record.questionId, 'q10-db');
-    assert.equal(record.optionKey, '1');
-    assert.equal('planMtimeMs' in record, false,
-      'a revision that could not be established must never be fabricated into the record');
-
-    // And the human is told, with the reason, that it may be asked again.
-    assert.match(screen.text, /could not be tied to a plan revision/);
+    // Its question could not be read, so its options are unknown: nothing is recorded.
+    assert.equal(fs.existsSync(path.join(root, '.ctoc', 'streaming', 'answers.jsonl')), false);
+    // And the human is told, with the reason, that it will be asked again.
+    assert.match(screen.text, /Nothing was recorded for nostamp\.md: its questions could not be read/);
     assert.match(screen.text, /SIMULATED streaming-precompute load failure/);
-    assert.match(screen.text, /may be asked again/);
+    assert.match(screen.text, /The question will be asked again\./);
   });
 
   it('1658-1659: an answer that could not be written says so, and is not reported as recorded', (t) => {
@@ -379,7 +384,7 @@ describe('streaming-gate — recording an answer is honest about what it could a
       return realAppend(target, data, opts);
     });
 
-    const screen = streamingGate.streamAnswer('functional/nowrite.md', 'q10-db', '1', root);
+    const screen = streamingGate.streamAnswer('functional/nowrite.md', 'q10-db', '1', root, digestOf(forkQuestion('q10-db')));
 
     assert.match(screen.text, /Could not record the answer for nowrite\.md: injected append failure/);
     assert.doesNotMatch(screen.text, /Recorded your answer/);

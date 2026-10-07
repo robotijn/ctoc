@@ -35,6 +35,7 @@ const path = require('node:path');
 const precompute = require('../src/lib/streaming-precompute.js');
 const streamingGate = require('../src/lib/streaming-gate.js');
 const ledger = require('../src/lib/approval-ledger.js');
+const { route } = require('../src/lib/menu-screens.js');
 
 const STAGES = ['vision', 'canvas', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
 const sandboxes = [];
@@ -79,21 +80,18 @@ function ledgerFile(root, slug) {
 }
 
 /**
- * Records an answer the way slice 2's writer will (third security scan of 2026-10-07): stamped
- * with the question set's revision and carrying the digest of the question shown — sha256 of
- * JSON [prompt, [[key, label], ...] by key], each text NFKC-folded, accents removed, control
- * characters stripped, trimmed, lower-cased. Today's `streamAnswer` records no digest, so an
- * answer it records is asked again.
+ * The human answers the question the plan's screen asks now, by choosing the option labelled
+ * `label`: the screen's own action runs through the real router exactly as the session runs it
+ * (single quotes delimit one word), so the answer carries the digest of the question shown.
+ * Returns the id of the question that was answered.
  */
-function recordAnswer(root, ref, questionId, optionKey) {
-  const st = precompute.planQuestionsStatus(root, ref);
-  const q = st.questions.find((x) => x.id === questionId);
-  const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
-  const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  const questionDigest = require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs])).digest('hex');
-  const dir = path.join(root, '.ctoc', 'streaming');
-  fs.mkdirSync(dir, { recursive: true });
-  fs.appendFileSync(path.join(dir, 'answers.jsonl'), JSON.stringify({ ts: new Date().toISOString(), ref, questionId, optionKey, planMtimeMs: st.questionsRevisionMs, questionDigest }) + '\n');
+function answerOnScreen(root, ref, label) {
+  const screen = route(['plan', ref], root);
+  const action = screen.actions[label];
+  assert.match(String(action), /^stream answer \S+ '[^']+' '[1-3]' '[0-9a-f]{64}'$/, `the screen offers ${label} as an answer`);
+  const words = [...action.matchAll(/'([^']*)'|(\S+)/g)].map((m) => (m[1] !== undefined ? m[1] : m[2]));
+  route(words, root);
+  return words[3];
 }
 
 /** The gate critic's classification block: only a file it classified can move a plan (the owner, 2026-10-07). */
@@ -120,16 +118,14 @@ describe('streaming human loop — end to end, sandboxed, real code', () => {
     assert.deepEqual(precompute.loadPlanQuestions(root, ref).map((q) => q.id),
       ['q10-store', 'q11-expiry', 'q12-transport', 'q13-copy'], 'all four questions were persisted');
 
-    // 2. The human ANSWERS every question via the REAL answer writer.
-    for (const [qid, key] of [['q10-store', '1'], ['q11-expiry', '1'], ['q12-transport', '1'], ['q13-copy', '1']]) {
-      streamingGate.streamAnswer(ref, qid, key, root);
-    }
-    //    Until slice 2 that writer records no question digest, so every answer is asked
-    //    again and nothing crosses (third security scan of 2026-10-07) ...
-    streamingGate.pendingGateDecisions(root);
-    assert.ok(fs.existsSync(planPath), 'answers with no question digest do not move the plan');
-    //    ... recorded as slice 2's writer records them, they count.
-    for (const qid of ['q10-store', 'q11-expiry', 'q12-transport', 'q13-copy']) recordAnswer(root, ref, qid, '1');
+    // 2. The human ANSWERS every question the screen asks, through the screen's own actions.
+    //    The weighty ones come first; the last weighty answer moves the plan on by itself.
+    const answered = [];
+    answered.push(answerOnScreen(root, ref, 'Postgres'));
+    answered.push(answerOnScreen(root, ref, '15 minutes'));
+    assert.ok(fs.existsSync(planPath), 'a weighty question is still open, so the plan stays');
+    answered.push(answerOnScreen(root, ref, 'Resend'));
+    assert.deepEqual(answered, ['q10-store', 'q11-expiry', 'q12-transport'], 'weighty questions are asked first');
 
     // 3. Drive the REAL sufficiency-cross path. (streamAnswer already re-renders
     //    through this same path; calling it explicitly asserts the END STATE, not
@@ -168,9 +164,10 @@ describe('streaming human loop — end to end, sandboxed, real code', () => {
       root, ref, magicLinkQuestions(), fs.statSync(planPath).mtimeMs, undefined, CLASSIFIED);
     assert.equal(produced.ok, true);
 
-    // Answer every question EXCEPT the critical `q12-transport` fork — a real fork left open —
-    // recorded as slice 2's writer records them (with the question digest).
-    for (const qid of ['q10-store', 'q11-expiry', 'q13-copy']) recordAnswer(root, ref, qid, '1');
+    // The human answers the questions the screen asks, through its own actions, and stops
+    // before the critical `q12-transport` fork — a real fork left open.
+    assert.equal(answerOnScreen(root, ref, 'Postgres'), 'q10-store');
+    assert.equal(answerOnScreen(root, ref, '15 minutes'), 'q11-expiry');
 
     const decisions = streamingGate.pendingGateDecisions(root);
     const d = decisions.find((x) => x.ref === ref);

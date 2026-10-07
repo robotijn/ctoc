@@ -153,14 +153,14 @@ function detail(id) {
 
 /**
  * The question id the streaming gate screen is currently OFFERING for `ref`, read
- * off the screen's own actions (`stream answer <ref> <questionId> <optionKey>`).
+ * off the screen's own answer actions (`stream answer <ref> '<questionId>' '<optionKey>' '<digest>'`).
  * This is the gate-side caller of the shared function, driven end to end.
  */
 function offeredQuestionId(root) {
   const screen = streamingGate.streamingGateScreen(root);
   const values = Object.values((screen && screen.actions) || {});
   for (const v of values) {
-    const m = /^stream answer \S+ (\S+) \S+$/.exec(String(v));
+    const m = /^stream answer \S+ '([^']+)' '[^']+' '[0-9a-f]{64}'$/.exec(String(v));
     if (m) return m[1];
   }
   return null;
@@ -469,7 +469,7 @@ describe('the gate-side caller runs the SAME binding matrix', () => {
     const root = makeSandbox();
     const s = seedAt(root, 'functional', 'c19', [fork('q10-a'), fork('q11-b')], T0);
 
-    route(['stream', 'answer', s.ref, 'q10-a', '1'], root);
+    route(['stream', 'answer', s.ref, 'q10-a', '1', digestOf(fork('q10-a'))], root);
 
     const lines = readAnswerLines(root);
     assert.equal(lines.length, 1);
@@ -479,21 +479,19 @@ describe('the gate-side caller runs the SAME binding matrix', () => {
       "the answer records which question set it was given for");
   });
 
-  it('case 20 — an unstampable answer is still RECORDED, and the human is told it may be asked again', () => {
+  it('case 20 — an answer that cannot be checked is refused, and the human is told', () => {
     const root = makeSandbox();
     const planPath = path.join(root, 'plans', 'functional', 'c20.md');
     fs.writeFileSync(planPath, validFunctionalBody('c20')); // NO questions file → no revision
 
-    const screen = route(['stream', 'answer', 'functional/c20.md', 'q10-a', '1'], root);
+    const screen = route(['stream', 'answer', 'functional/c20.md', 'q10-a', '1', digestOf(fork('q10-a'))], root);
 
-    const lines = readAnswerLines(root);
-    assert.equal(lines.length, 1, 'refusing the answer would lose the human\'s input');
-    assert.equal(Object.prototype.hasOwnProperty.call(lines[0], 'planMtimeMs'), false,
-      'an unstampable answer is recorded UNSTAMPED, never with a fabricated stamp');
+    assert.equal(readAnswerLines(root).length, 0,
+      'an answer whose question cannot be read cannot be checked, so nothing is recorded');
     const text = String((screen && screen.text) || '');
-    assert.match(text, /could not be tied to a plan revision/,
-      'recording it silently would let the human discover later that it did not count');
-    assert.match(text, /may be asked again/);
+    assert.match(text, /Nothing was recorded for c20\.md: its questions could not be read \(/,
+      'the human is told that nothing was recorded, and why');
+    assert.match(text, /The question will be asked again\./);
   });
 
   it('case 21 — the fail-closed branches and non-fork behaviour are unchanged', () => {

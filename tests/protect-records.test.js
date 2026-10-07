@@ -319,3 +319,68 @@ describe('security scan findings (Step 13)', () => {
     assertAllowed(run(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 5 } })), 'case 72c');
   });
 });
+
+describe('a background agent may not answer, approve or move a plan through the menu (owner, 2026-10-07)', () => {
+  const MENU = 'node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js"';
+  const REFUSAL_SUBAGENT = 'CTOC refused this call because a background agent may not answer CTOC\'s '
+    + 'questions, approve a plan or move one on through the menu; report your result and let the '
+    + 'main session do it.';
+  const agentBash = (command, agentId = 'a1b2c3') => ({
+    ...bash(command), agent_id: agentId, agent_type: 'iron-loop-executor',
+  });
+  const refusedAgent = (command) => assertRefused(run(agentBash(command)), command, REFUSAL_SUBAGENT);
+  const allowedAgent = (command) => assertAllowed(run(agentBash(command)), command);
+
+  test("74 · a background agent's `stream answer` is refused", () => {
+    refusedAgent(`${MENU} stream answer review/x.md 'q10-db' '1'`);
+  });
+  test('75 · the same call from the main session, or with an empty agent id, is allowed', () => {
+    allowedBash(`${MENU} stream answer review/x.md 'q10-db' '1'`);
+    assertAllowed(run(agentBash(`${MENU} stream answer review/x.md 'q10-db' '1'`, '')), 'empty agent id');
+  });
+  test("76 · the build agent's own completion is allowed", () => {
+    allowedAgent(`${MENU} menu task complete t7 --summary "built"`);
+  });
+  test('77 · every other route that answers, approves or crosses is refused', () => {
+    for (const route of ['', '--live-agent-ids a,b', 'stream approve review/x.md', 'stream skip review/x.md',
+      'stream comment review/x.md looks fine', 'stream', 'plan', 'menu task complete t7 --continue --summary "x"',
+      '"stream answer review/x.md q10-db 1"', 'frobnicate']) {
+      refusedAgent(`${MENU} ${route}`.trim());
+    }
+  });
+  test('78 · the routes that answer nothing stay allowed', () => {
+    for (const route of ['menu task fail t7 --summary x', 'menu task add implement p --touches a.js', 'menu task list',
+      'menu commands', 'dashboard', 'tasks', 'task t7', 'browse review', 'section execution', 'stubs s',
+      'validate review/x.md', 'inbox gates', 'plan review/x.md']) {
+      allowedAgent(`${MENU} ${route}`);
+    }
+  });
+  test('79 · the menu reached outside a pure call is refused to a background agent, allowed as today to the main session', () => {
+    const compound = 'node src/commands/start.js stream approve review/x.md; true';
+    const inline = `node -e "require('./src/lib/menu-screens').route(['stream','answer','review/x.md','q10-db','1'],process.cwd())"`;
+    refusedAgent(compound);
+    refusedAgent(inline);
+    allowedBash(compound);
+    allowedBash(inline);
+  });
+  test("80 · a background agent's ordinary work is allowed", () => {
+    allowedAgent('npm test');
+    allowedAgent('node --test tests/streaming-gate.test.js');
+    allowedAgent('grep -n route src/commands/start.js');
+  });
+  test('81 · a crash on a background agent\'s menu call refuses; on the main session\'s it allows', () => {
+    const plugin = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pr-plug-')));
+    try {
+      fs.mkdirSync(path.join(plugin, 'src', 'hooks'), { recursive: true });
+      fs.mkdirSync(path.join(plugin, 'src', 'lib'), { recursive: true });
+      const brokenEntry = path.join(plugin, 'src', 'hooks', 'protect-records.js');
+      fs.copyFileSync(ENTRY, brokenEntry);
+      fs.copyFileSync(path.join(REPO, 'src', 'lib', 'hook-deny-signal.js'), path.join(plugin, 'src', 'lib', 'hook-deny-signal.js'));
+      const call = `${MENU} stream answer review/x.md 'q10-db' '1'`;
+      assertRefused(run(agentBash(call), { entry: brokenEntry }), 'crash, background agent', REFUSAL_UNCHECKED);
+      assertAllowed(run(bash(call), { entry: brokenEntry }), 'crash, main session');
+    } finally {
+      fs.rmSync(plugin, { recursive: true, force: true });
+    }
+  });
+});

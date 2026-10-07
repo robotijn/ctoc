@@ -91,23 +91,13 @@ function answersLog(root) {
   return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
 }
 
-/**
- * Records an answer the way slice 2's writer will (third security scan of 2026-10-07): stamped
- * with the question set's revision and carrying the digest of the question shown — sha256 of
- * JSON [prompt, [[key, label], ...] by key], each text NFKC-folded, accents removed, control
- * characters stripped, trimmed, lower-cased. Today's `streamAnswer` records no digest, so an
- * answer it records is asked again.
- */
-function recordAnswer(root, ref, questionId, optionKey) {
-  const st = precompute.planQuestionsStatus(root, ref);
-  const q = st.questions.find((x) => x.id === questionId);
+/** The digest the screen's answer action carries for question `q` (slice 1's format). */
+function digestOf(q) {
   const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
   const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  const questionDigest = require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs])).digest('hex');
-  const dir = path.join(root, '.ctoc', 'streaming');
-  fs.mkdirSync(dir, { recursive: true });
-  fs.appendFileSync(path.join(dir, 'answers.jsonl'), JSON.stringify({ ts: new Date().toISOString(), ref, questionId, optionKey, planMtimeMs: st.questionsRevisionMs, questionDigest }) + '\n');
+  return require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs])).digest('hex');
 }
+const D_DB = digestOf(forkQuestion('q10-db'));
 
 /** The gate critic's classification block: only a file it classified can move a plan (the owner, 2026-10-07). */
 const CLASSIFIED = Object.freeze({ by: 'gate-critic', at: 1786000000000 });
@@ -125,9 +115,9 @@ describe('slice 3 — streamAnswer records the answer AND carries the Loop-B dir
     const p = writePlan(root, 'functional', 'reg', validFunctionalBody('reg'));
     const ref = 'functional/reg.md';
     // TWO forks; answer ONE — a fork stays open, so nothing crosses and nothing is buildable.
-    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db'), forkQuestion('q11-cache')], fs.statSync(p).mtimeMs);
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db'), forkQuestion('q11-cache')], fs.statSync(p).mtimeMs, undefined, CLASSIFIED);
 
-    const out = streamingGate.streamAnswer(ref, 'q10-db', '1', root);
+    const out = streamingGate.streamAnswer(ref, 'q10-db', '1', root, D_DB);
 
     // Existing behaviour: the answer landed in the append-only log.
     assert.match(answersLog(root), /"questionId":"q10-db"/, 'the answer is recorded, as before');
@@ -137,7 +127,7 @@ describe('slice 3 — streamAnswer records the answer AND carries the Loop-B dir
     assert.match(out.text, /Recorded your answer/, 'still carries the recorded-answer status in .text');
     // Nothing crossed / nothing buildable / questions present -> the directive is empty,
     // so the return is deep-equal to the pure screen.
-    assert.deepEqual(out, streamingGate.streamingGateScreen(root, 'Recorded your answer for reg.md.'),
+    assert.deepEqual(out, streamingGate.streamingGateScreen(root, 'Recorded your answer for reg.md.', { banner: false }),
       'with an empty directive the return is exactly the pure screen — existing consumers unchanged');
   });
 
@@ -151,7 +141,7 @@ describe('slice 3 — streamAnswer records the answer AND carries the Loop-B dir
     precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db'), forkQuestion('q11-cache')], fs.statSync(p).mtimeMs);
     approveTodo(root, '00042-weekly-summary', 'Send the weekly summary');
 
-    const out = streamingGate.streamAnswer(ref, 'q10-db', '1', root);
+    const out = streamingGate.streamAnswer(ref, 'q10-db', '1', root, D_DB);
 
     assert.match(answersLog(root), /"questionId":"q10-db"/, 'the answer is still recorded');
     assert.ok(out.text.includes('Send the weekly summary'),
@@ -169,14 +159,9 @@ describe('slice 3 — streamAnswer records the answer AND carries the Loop-B dir
     // A single fork in the gate critic's file: answering it makes the plan sufficient, so it auto-crosses.
     precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs, undefined, CLASSIFIED);
 
-    // Until slice 2 the writer records no question digest, so its answer is asked again and
-    // nothing crosses (third security scan of 2026-10-07).
-    const before = streamingGate.streamAnswer(ref, 'q10-db', '1', root);
-    assert.ok(fs.existsSync(p), 'an answer with no question digest does not move the plan');
-    assert.ok(!before.text.includes('Moved forward on their own'), 'and nothing is reported as moved');
-    // The answer as slice 2's writer records it; the same call's return then surfaces the cross.
-    recordAnswer(root, ref, 'q10-db', '1');
-    const out = streamingGate.streamAnswer(ref, 'q10-db', '1', root);
+    // The real writer's answer, carrying the digest of the question shown, counts at the gate;
+    // the same call's return surfaces the cross it caused.
+    const out = streamingGate.streamAnswer(ref, 'q10-db', '1', root, D_DB);
 
     // The plan crossed on its own (existing sufficiency side effect) ...
     assert.ok(!fs.existsSync(p), 'the answered plan left functional/ on its own');
@@ -197,7 +182,7 @@ describe('slice 3 — streamAnswer records the answer AND carries the Loop-B dir
     loopBDriver.loopBDirective = () => { throw new Error('boom'); };
     try {
       let out;
-      assert.doesNotThrow(() => { out = streamingGate.streamAnswer(ref, 'q10-db', '1', root); });
+      assert.doesNotThrow(() => { out = streamingGate.streamAnswer(ref, 'q10-db', '1', root, D_DB); });
       assert.match(answersLog(root), /"questionId":"q10-db"/, 'the answer is recorded despite the throw');
       assert.equal(typeof out, 'object', 'a screen object is still returned');
       assert.match(out.text, /Recorded your answer/, 'the screen is intact; the directive is simply omitted');
