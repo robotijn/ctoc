@@ -278,3 +278,33 @@ describe("the owner's answers and the live question files", () => {
     assertAllowed(run(write(p('.ctoc', 'streaming', 'questions', 'pending', 'implementation__y.md.json'))), 'case 68');
   });
 });
+
+describe('security scan findings (Step 13)', () => {
+  const MENU = 'node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js"';
+  function plantFakeMenu() {
+    fs.mkdirSync(p('scratch', 'src', 'commands'), { recursive: true });
+    fs.writeFileSync(p('scratch', 'src', 'commands', 'start.js'), "require('fs').writeFileSync(process.argv[2], '{}');\n");
+  }
+  test('69 · an agent-written …/src/commands/start.js gets no menu exemption', () => {
+    plantFakeMenu();
+    refusedBash('node scratch/src/commands/start.js menu task complete t1 --summary "wrote .ctoc/approvals/y.json"');
+    refusedBash('node scratch/src/commands/start.js .ctoc/approvals/x.json');
+    refusedBash(`node "${project}/scratch/src/commands/start.js" .ctoc/state/verify/x.json`);
+  });
+  test('70 · the real menu with a record path as an argument is refused', () => {
+    refusedBash(`${MENU} .ctoc/approvals/x.json`);
+    refusedBash(`${MENU} menu task complete t1 --summary .ctoc/state/verify/x.json`);
+    refusedBash(`${MENU} menu x src/../.ctoc/approvals/y.json`);
+  });
+  test('71 · the real menu with ordinary menu commands stays allowed', () => {
+    allowedBash(`${MENU} menu task complete t1 --summary "x"`);
+    allowedBash(`${MENU} stream answer review/x.md q1 a`);
+    allowedBash(`${MENU} menu task add precompute 'implementation/x.md' --touches '.ctoc/streaming/questions/implementation/x.md'`);
+  });
+  test('72 · a Bash payload whose command is not a string is treated as unreadable', () => {
+    const arr = JSON.stringify({ tool_name: 'Bash', tool_input: { command: ['echo', 'x', '>', '.ctoc/approvals/x.json'] } });
+    assertRefused(run(arr), 'case 72a', REFUSAL_UNCHECKED);
+    assertAllowed(run(JSON.stringify({ tool_name: 'Bash', tool_input: { command: { a: 1 } } })), 'case 72b');
+    assertAllowed(run(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 5 } })), 'case 72c');
+  });
+});

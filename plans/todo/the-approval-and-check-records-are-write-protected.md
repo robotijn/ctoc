@@ -866,3 +866,65 @@ is no CHANGELOG in this repository.
   exports 65, false-green 207 — unchanged.
 - Steps 11, 13 and 16 and the acceptance boxes are left to the session's critic and
   security scanner.
+
+### Step 13 — the security scan and the three fixes
+
+**Verdict: WARN** (the `security-scanner` the session dispatched on this branch). Three
+findings fixed, test first; two HIGH findings accepted as documented limits.
+
+1. **MEDIUM — the menu exemption trusted any `…/src/commands/start.js` by name and then
+   skipped every record check.** Fixed in `src/hooks/protect-records.js`: `menuCallArgs`
+   reads the script argument (`${CLAUDE_PLUGIN_ROOT}` as this plugin's root), resolves it
+   against the session's working directory, and exempts the call only when its real path
+   (`safe-fs` `realpathSync`; a fault means "not the menu") equals the real path of this
+   plugin's own `src/commands/start.js`. Even then, `menuArgsNameRecords` runs every
+   whitespace-free argument through the same `isLedgerWrite` test (approval and check
+   records), so a record path as a menu argument is refused; quoted text with spaces stays
+   data. The answer store is not in that argument check, because the menu's own
+   question-generation recipe passes `--touches '.ctoc/streaming/questions/<ref>'` (case 71
+   holds it allowed).
+   - Case 69 — an agent-written `scratch/src/commands/start.js` run with a `--summary`
+     naming `.ctoc/approvals/`, with `.ctoc/approvals/x.json` as an argument, and by
+     absolute path with `.ctoc/state/verify/x.json`: **red** (exit 0, exempted) → **green**
+     (refused).
+   - Case 70 — the real menu with `.ctoc/approvals/x.json`, `--summary
+     .ctoc/state/verify/x.json` and `src/../.ctoc/approvals/y.json` as arguments: **red**
+     → **green**.
+   - Case 71 — the real menu with `menu task complete t1 --summary "x"`, `stream answer
+     review/x.md q1 a` and the question-generation `--touches` recipe: green before and
+     after (the guard against over-refusing). Case 49 (a `--summary` naming both folders)
+     stays allowed.
+2. **LOW — the header did not say the hook changes its working directory.** The header
+   comment now states that it calls `process.chdir(root)` with a root found from the
+   payload's `cwd`, why (the reused checks measure against `process.cwd()`), and that this
+   is safe only because every call is a fresh subprocess that exits after one decision.
+   The same is in `docs/ENFORCEMENT.md`.
+3. **INFO — a parseable Bash payload whose `command` is not a string was a clean allow.**
+   It is now treated as unreadable: the fail rule refuses it when the raw stdin mentions
+   the records and allows it otherwise. Case 72 — `{"tool_name":"Bash","tool_input":
+   {"command":["echo","x",">",".ctoc/approvals/x.json"]}}`: **red** (exit 0) → **green**
+   (refused with the second sentence); an object and a number with no record mention stay
+   allowed.
+
+Red run before the fix: 72 tests, 69 pass, 3 fail (69, 70, 72). After: 72 of 72.
+Lint zero warnings (the first lint flagged a plain `fs.realpathSync` on a computed path;
+it now goes through `src/lib/safe-fs.js`). Time added per call re-measured: Write +2.5 ms,
+Bash `ls` +5.8 ms over a bare Node start of 17.7 ms.
+
+**Accepted, documented limits (the two HIGH findings).** A path built at run time (a
+variable, a glob, string pieces) or a script written to a file and then run, and a hard
+link to a record, are not caught and cannot be caught by a hook that reads command text;
+both are listed under Risks and in `docs/ENFORCEMENT.md`. **This hook is defense in
+depth, not a boundary, against an agent that holds the shell:** it stops the direct
+forging command and turns forgery into a deliberate several-step act, but an agent with a
+shell that sets out to write a record can still do it.
+
+Remaining limit added by fix 1: a shell whose own `CLAUDE_PLUGIN_ROOT` points somewhere
+other than this plugin would run a different file than the hook resolved; the hook can
+only read the variable as its own plugin root.
+
+Full `npm test` after the three fixes (same procedure; `node_modules` link and approval
+record copy removed after, record not committed): `tests 12567, pass 12567, fail 0,
+skipped 0`; `[CTOC test-gate] coverage 99.9% (threshold 99%), skipped 0, failed 0`;
+`[CTOC test-gate] PASS`. The plan still matches the recorded specification hash
+`522a8f09…`.

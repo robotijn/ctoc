@@ -224,8 +224,20 @@ question-writing agents reach with the Write tool). On the shell the whole
 
 A pure call of the menu entry point (`node <…>/src/commands/start.js …` with no `$` other
 than `${CLAUDE_PLUGIN_ROOT}`, no backtick, no backslash and no unquoted `;`, `&`, `|`, `<`,
-`>` or line break) is allowed first: the menu is the legitimate writer and its arguments
-are data.
+`>` or line break) is checked differently, and only when the script has the same real path
+as this plugin's own `src/commands/start.js` (`${CLAUDE_PLUGIN_ROOT}` read as this plugin's
+root, resolved against the session's working directory; a fault means "not the menu"). An
+agent-written `…/src/commands/start.js` gets no exemption. The menu is the legitimate
+writer, so its quoted text arguments are data (a `--summary` may name a folder), but a
+whitespace-free argument that is a path into the approval or check records is refused, as
+the same operand would be without the menu in front. The answer store is left out of that
+argument check because the menu's question-generation recipe passes
+`--touches .ctoc/streaming/questions/<ref>` as data. A Bash payload whose `command` is not a
+string is treated as unreadable (the fail rule below).
+
+The hook calls `process.chdir(root)` with the project root found from the payload's `cwd`,
+because the reused checks measure against the working directory. That is safe only because
+every call is a fresh subprocess that exits after one decision.
 
 **The refusal** is one sentence on every channel, with no command text echoed back:
 "CTOC refused this call because it writes, or could write, the approval records in

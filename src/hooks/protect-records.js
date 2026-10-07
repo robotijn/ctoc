@@ -29,12 +29,27 @@
  *   whose code is built at run time; a decoded payload piped into an interpreter; and
  *   `ledger-backfill.js` in any form except `--vision` (optionally `--dry-run`).
  *   Reuses `PreToolUse.Bash.js` (`isLedgerForgery`, `isLedgerWrite`, `isInlineEval`,
- *   `isOpaqueDecodedExecution`, `VERIFY_SPEC`). A pure call of the menu entry point
- *   (`node <…>/src/commands/start.js …` with no `$`, backtick, backslash or unquoted
- *   control character) is allowed first: the menu is the legitimate writer and its
- *   arguments are data.
+ *   `isOpaqueDecodedExecution`, `VERIFY_SPEC`). A pure call of THIS plugin's own menu
+ *   entry point is checked differently: no `$` other than `${CLAUDE_PLUGIN_ROOT}`, no
+ *   backtick, backslash or unquoted control character, and the script argument —
+ *   `${CLAUDE_PLUGIN_ROOT}` read as this plugin's root, resolved against the session's
+ *   working directory — must have the same real path as this plugin's
+ *   `src/commands/start.js` (a resolution fault means "not the menu"). The menu is the
+ *   legitimate writer, so its quoted text arguments are data (a `--summary` may name a
+ *   folder); but any whitespace-free argument that is a path into the approval or check
+ *   records is still refused, exactly as the same operand would be without the menu in
+ *   front. The answer store is not in that argument check, because the menu's own
+ *   question-generation recipe passes `--touches .ctoc/streaming/questions/<ref>` as data.
+ *   A Bash payload whose `command` is not a string is treated as unreadable (fail rule).
  *   Nothing else is loaded or run: no plan coverage, no escape phrases, no enforcement
  *   mode, no Iron Loop step gates, no irreversible-command net, no plan-move gate.
+ *
+ * WORKING DIRECTORY
+ *   The hook calls `process.chdir(root)`, where `root` is the project root found by
+ *   walking up from the payload's `cwd` (the same walk the menu uses). It does so because
+ *   the reused checks measure paths against `process.cwd()`. This is safe only because
+ *   every call is a fresh subprocess that exits right after deciding: the changed
+ *   directory never outlives one decision and is never shared with another.
  *
  * WHAT IT CANNOT CATCH (it reads command text; it is not a sandbox)
  *   a script file written elsewhere and then run; a path built at run time (a variable,
@@ -84,30 +99,71 @@ const CHECK_RECORD_EVAL_TOKENS = [
 const UNCHECKED_SUSPECT_RE = /\.ctoc|approval|verify|ledger|backfill|stampAndLedger|approvePlan|crossBySufficiency|streamApprove|streamAnswer|persistVerifyResult/i;
 const EDITING_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 
-const MENU_CALL_RE = /^node\s+(?:"([^"]+)"|'([^']+)'|([^\s"']+))/;
 const BACKFILL_TOKEN_RE = /(^|[/\\])ledger[-_]backfill(\.js)?$/i;
 const JS_RUNTIME_RE = /^(node[0-9.]*|deno|bun|ts-node|tsx)(\.exe)?$/i;
+const PLUGIN_ROOT_TOKEN = '${CLAUDE_PLUGIN_ROOT}';
+const PLUGIN_ROOT = path.resolve(__dirname, '..', '..');
 
 /**
- * A call of the menu entry point and nothing else: no backslash, no backtick, no `$`
- * other than `${CLAUDE_PLUGIN_ROOT}`, the script is `…/src/commands/start.js`, and no
- * `;`, `&`, `|`, `<`, `>`, carriage return or newline outside quotes, every quote closed.
+ * The arguments of a call of THIS plugin's menu entry point and nothing else, or null.
+ * Null when the text holds a backslash, a backtick, a `$` other than
+ * `${CLAUDE_PLUGIN_ROOT}`, an unclosed quote, or a `;`, `&`, `|`, `<`, `>`, carriage
+ * return or newline outside quotes; when it is not `node <script> …`; or when the script,
+ * with `${CLAUDE_PLUGIN_ROOT}` read as this plugin's root and resolved against `base`,
+ * does not have the same real path as this plugin's own `src/commands/start.js`
+ * (a resolution fault is "not the menu").
  * @param {string} command
- * @returns {boolean}
+ * @param {string} base - the session's working directory
+ * @returns {string[]|null} the arguments after the script, quotes removed
  */
-function isPureMenuCall(command) {
+function menuCallArgs(command, base) {
   const s = command.trim();
-  if (/[\\`]/.test(s) || s.split('${CLAUDE_PLUGIN_ROOT}').join('').includes('$')) return false;
-  const m = s.match(MENU_CALL_RE);
-  const script = m && (m[1] || m[2] || m[3]);
-  if (!script || !(script === 'src/commands/start.js' || script.endsWith('/src/commands/start.js'))) return false;
+  if (/[\\`]/.test(s) || s.split(PLUGIN_ROOT_TOKEN).join('').includes('$')) return null;
+  const tokens = [];
+  let cur = '';
+  let inToken = false;
   let quote = null;
   for (const ch of s) {
-    if (quote) { if (ch === quote) quote = null; continue; }
-    if (ch === '"' || ch === "'") quote = ch;
-    else if (';&|<>\r\n'.includes(ch)) return false;
+    if (quote) {
+      if (ch === quote) quote = null; else cur += ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch; inToken = true;
+    } else if (';&|<>\r\n'.includes(ch)) {
+      return null;
+    } else if (/\s/.test(ch)) {
+      if (inToken) tokens.push(cur);
+      cur = ''; inToken = false;
+    } else {
+      cur += ch; inToken = true;
+    }
   }
-  return quote === null;
+  if (quote !== null) return null;
+  if (inToken) tokens.push(cur);
+  if (tokens[0] !== 'node' || !tokens[1]) return null;
+  try {
+    const safeFs = require('../lib/safe-fs');
+    const script = path.resolve(base, tokens[1].split(PLUGIN_ROOT_TOKEN).join(PLUGIN_ROOT));
+    const own = safeFs.realpathSync(path.join(PLUGIN_ROOT, 'src', 'commands', 'start.js'));
+    return safeFs.realpathSync(script) === own ? tokens.slice(2) : null;
+  } catch {
+    return null; // a resolution fault (or safe-fs refusing the path) is "not the menu"
+  }
+}
+
+/**
+ * Does a genuine menu call carry an argument that is a path into the approval or check
+ * records? Quoted text with whitespace is data and is skipped; every whitespace-free
+ * argument gets the same per-segment, `cd`-aware, link-aware test as a shell operand.
+ * @param {string[]} args - from `menuCallArgs`
+ * @param {string} cwdRel - the session's working directory relative to the root, or ''
+ * @param {object} bash - the exports of `PreToolUse.Bash.js`
+ * @returns {boolean}
+ */
+function menuArgsNameRecords(args, cwdRel, bash) {
+  const pathArgs = args.filter((a) => a && !/\s/.test(a));
+  if (pathArgs.length === 0) return false;
+  const synthetic = `${cwdRel ? `cd ./${cwdRel} && ` : ''}node ${pathArgs.join(' ')}`;
+  return bash.isLedgerWrite(synthetic) || bash.isLedgerWrite(synthetic, bash.VERIFY_SPEC);
 }
 
 /**
@@ -138,11 +194,13 @@ function runsBackfillBeyondVision(command, bash) {
  * The shell decision, in the plan's order.
  * @param {string} command
  * @param {string} cwdRel - the session's working directory relative to the root, or ''
+ * @param {string} base - the session's working directory, absolute
  * @param {object} bash - the exports of `PreToolUse.Bash.js`
  * @returns {boolean} true to refuse
  */
-function bashRefuses(command, cwdRel, bash) {
-  if (isPureMenuCall(command)) return false;
+function bashRefuses(command, cwdRel, base, bash) {
+  const menuArgs = menuCallArgs(command, base);
+  if (menuArgs) return menuArgsNameRecords(menuArgs, cwdRel, bash);
   // `./` so a working directory whose name starts with `-` is never read as a `cd` option.
   const analysed = cwdRel ? `cd ./${cwdRel} && ${command}` : command;
   return bash.isLedgerForgery(analysed).deny
@@ -175,11 +233,13 @@ function decide(raw) {
   }
   if (tool === 'Bash') {
     const command = payload.tool_input && payload.tool_input.command;
-    if (typeof command !== 'string' || !command.trim()) return false;
+    // A command that is not a string cannot be read; the fail rule decides it.
+    if (typeof command !== 'string') throw new TypeError('Bash command is not a string');
+    if (!command.trim()) return false;
     const bash = require('./PreToolUse.Bash.js');
     let cwdRel = typeof payload.cwd === 'string' ? path.relative(root, payload.cwd).replace(/\\/g, '/') : '';
     if (!/^[A-Za-z0-9._/-]+$/.test(cwdRel)) cwdRel = '';
-    return bashRefuses(command, cwdRel, bash);
+    return bashRefuses(command, cwdRel, path.resolve(root, payload.cwd || '.'), bash);
   }
   return false;
 }
