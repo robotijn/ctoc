@@ -1295,3 +1295,88 @@ describe('what the end-to-end run showed (cases 41–45)', () => {
     assert.equal(precompute.planQuestionsStatus(root, ref).status, 'ready');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('the session continues after a build agent completed its own task (cases 46–47)', () => {
+  /**
+   * A built plan in review, the build task its agent already completed (what the agent's own
+   * `menu task complete <id>` leaves), and one more slice that crosses into the build queue on
+   * its classified questions, as case 4 builds it.
+   */
+  function builtAndDone(slug) {
+    const root = makeSandbox();
+    const built = seedBuilt(root, slug);
+    let id;
+    taskRegistry.withRegistry(root, (reg) => {
+      const t = taskRegistry.addTask(reg, { kind: 'implement', label: `build ${slug}`, plan: slug, touches: [`src/${slug}.js`] });
+      taskRegistry.updateTask(reg, t.id, { status: 'running' });
+      taskRegistry.updateTask(reg, t.id, { status: 'done', result: { ok: true, summary: 'built' } });
+      id = t.id;
+      return reg;
+    });
+    const nextRef = `implementation/${slug}-next.md`;
+    writePlan(root, nextRef, implBody('Next slice', [`src/${slug}-next.js`]));
+    dropPending(root, nextRef, []);
+    return { root, built, id };
+  }
+  const taskOf = (root, id) => tasks(root).find((t) => t.id === id);
+
+  it("case 46 — the session's --continue on a task its agent completed runs only the continuation", () => {
+    const { root, id } = builtAndDone('c46');
+    const before = structuredClone(taskOf(root, id));
+
+    const res = route(['menu', 'task', 'complete', id, '--continue', '--summary', 'ignored'], root);
+
+    assert.equal(res.ok, true, JSON.stringify(res));
+    assert.equal(res.alreadyCompleted, true);
+    assert.equal(res.completion, null);
+    assert.equal(res.status, 'done');
+    assert.equal(exists(root, 'done/c46.md'), true, 'the built plan finished on its checks');
+    assert.equal(exists(root, 'review/c46.md'), false);
+    assert.equal(ledger.readEntry('c46', root).advanced_by, 'pipeline');
+    assert.match(res.text, /finished on their checks/);
+    assert.ok(res.promote.some((t) => t.kind === 'implement' && t.plan === 'c46-next'),
+      'the next approved slice is claimed for building and returned to launch');
+    assert.deepEqual(taskOf(root, id), before, 'nothing was written to the completed task');
+  });
+
+  it('case 46b — a held built plan stays where it is', () => {
+    const { root, built, id } = builtAndDone('c46b');
+    writeQuestions(root, built.ref, [detail('q10-label', 'Label text?', ['Save', 'Store'])]);
+    route(['stream', 'answer', built.ref, 'q10-label', 'hold'], root);
+    const hold = answers(root).find((l) => l.questionId === 'ctoc-hold');
+    assert.ok(hold && hold.holds === true && hold.questionDigest === precompute.HOLD.digest, "CTOC's hold is recorded");
+    const ledgerFile = ledger.ledgerPath('c46b', root);
+    const ledgerBefore = fs.readFileSync(ledgerFile);
+
+    const res = route(['menu', 'task', 'complete', id, '--continue'], root);
+
+    assert.equal(res.ok, true, JSON.stringify(res));
+    assert.equal(res.alreadyCompleted, true);
+    assert.equal(exists(root, built.ref), true, 'the held plan stays in review');
+    assert.equal(exists(root, 'done/c46b.md'), false);
+    assert.deepEqual(fs.readFileSync(ledgerFile), ledgerBefore, 'the crossing record is byte-identical');
+  });
+
+  it('case 47 — guards: a done task without --continue, and a failed task with it, are refused as today', () => {
+    const { root, id } = builtAndDone('c47');
+    const before = structuredClone(taskOf(root, id));
+    // The router turns taskComplete's throw into its refusal shape.
+    const refused = (res, re) => {
+      assert.equal(res.ok, false, JSON.stringify(res));
+      assert.match(res.error, re);
+      assert.equal(res.alreadyCompleted, undefined);
+    };
+    refused(route(['menu', 'task', 'complete', id], root), /invalid transition done → done/);
+    assert.deepEqual(taskOf(root, id), before);
+    let failedId;
+    taskRegistry.withRegistry(root, (reg) => {
+      const t = taskRegistry.addTask(reg, { kind: 'plan', label: 'a planner', plan: 'c47-other' });
+      taskRegistry.updateTask(reg, t.id, { status: 'failed', result: { ok: false, summary: 'failed' } });
+      failedId = t.id;
+      return reg;
+    });
+    refused(route(['menu', 'task', 'complete', failedId, '--continue'], root), /invalid transition failed → done/);
+    assert.equal(exists(root, 'review/c47.md'), true, 'a refused call continues nothing');
+  });
+});
