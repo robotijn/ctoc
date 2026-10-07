@@ -1,0 +1,9 @@
+{
+  "content_sha256": "275fd33bd9d91f243310fdb8f2775c18a29bf4a2c8f3c465ff690df43ab34a0c",
+  "hash_scope": "specification",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T08:53:25.332Z",
+  "approved_by": "human",
+  "plan_basename": "the-approval-and-check-records-are-write-protected"
+}

@@ -353,7 +353,8 @@ describe('case 16: the guard RETURNS on a corpus of ordinary commands', () => {
 // with the arithmetic tests only: direct spellings stay DENIED (the hook still
 // runs, does not exit 1 / allow-all), and the LINK case is ALLOWED — exactly the
 // degradation the code comment predicts. Driven by a test-only Module._load shim
-// (no product backdoor): the shim throws for that one require, then loads the hook.
+// (no product backdoor): the shim throws for that one require, then runs the hook
+// as the MAIN module — the hook runs its main() only when it is the main module.
 // =============================================================================
 
 describe('case 14: unloadable confinement module degrades, does not crash', () => {
@@ -369,7 +370,8 @@ Module._load = function (request, parent, isMain) {
   }
   return orig.call(this, request, parent, isMain);
 };
-require(${JSON.stringify(HOOK)});
+process.argv[1] = ${JSON.stringify(HOOK)};
+Module.runMain();
 `);
     return spawnSync(process.execPath, [shim], {
       cwd: project,

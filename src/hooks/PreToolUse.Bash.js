@@ -211,6 +211,24 @@ function resolveTokenPath(prefix, token) {
 const LEDGER_DIR_RELATIVE = '.ctoc/approvals';
 
 /**
+ * The CHECK-RECORD twins of the three ledger constants above: the Gate-3 verify
+ * evidence `.ctoc/state/verify/<slug>.json` that `persistVerifyResult` writes and
+ * `validateReviewToDone` believes. Same shapes, same path boundaries, so
+ * `.ctoc/state/verify-notes.md` does not match while `.ctoc/state/verify/x.json` does.
+ */
+const VERIFY_SEGMENT_RE = /(^|[^a-z0-9._-])\.ctoc\/+state\/+verify(\/|\s|$)/i;
+const VERIFY_RESOLVED_RE = /(^|\/)\.ctoc\/+state\/+verify(\/|$)/i;
+const VERIFY_DIR_RELATIVE = '.ctoc/state/verify';
+
+/**
+ * Each protected folder as one frozen spec, so `isLedgerWrite` runs the SAME
+ * per-segment, `cd`-aware, link-aware test against either folder — one policy, never
+ * a second copy of it. `LEDGER_SPEC` is the default, so every existing call is unchanged.
+ */
+const LEDGER_SPEC = Object.freeze({ dir: LEDGER_DIR_RELATIVE, segmentRe: LEDGER_SEGMENT_RE, resolvedRe: LEDGER_RESOLVED_RE });
+const VERIFY_SPEC = Object.freeze({ dir: VERIFY_DIR_RELATIVE, segmentRe: VERIFY_SEGMENT_RE, resolvedRe: VERIFY_RESOLVED_RE });
+
+/**
  * The single-quoted and double-quoted string literals inside a segment, contents
  * only. An interpreter forgery hides the path INSIDE eval code
  * (`node -e "require('fs').writeFileSync('src/link/approvals/f.json','x')"`), where
@@ -271,16 +289,17 @@ const MAX_CANDIDATE_LEN = 4096;
  *
  * @param {string} prefix - accumulated cwd from prior `cd`/`pushd` segments
  * @param {string} token
- * @returns {boolean} true iff the operand really lands in the ledger (or a fault said so)
+ * @param {string} [dir] - the protected folder, relative to the project root
+ * @returns {boolean} true iff the operand really lands in the folder (or a fault said so)
  */
-function operandResolvesIntoLedger(prefix, token) {
+function operandResolvesIntoLedger(prefix, token, dir = LEDGER_DIR_RELATIVE) {
   if (!realPathConfinement) return false; // degraded — the header records this
   const rel = resolveTokenPath(prefix, token);
   if (!rel) return false;
   // A token longer than any real path cannot name a ledger entry; resolving it only
   // manufactures an ENAMETOOLONG fault that fail-closes to a false deny. See the const.
   if (rel.length > MAX_CANDIDATE_LEN) return false;
-  return realPathConfinement.resolvesUnder(rel, LEDGER_DIR_RELATIVE, process.cwd());
+  return realPathConfinement.resolvesUnder(rel, dir, process.cwd());
 }
 
 /**
@@ -307,12 +326,18 @@ function operandResolvesIntoLedger(prefix, token) {
  * Conservative-but-narrow: once the cwd is fully inside `.ctoc/approvals`, every
  * operand resolves under the ledger, so any non-read command there is denied —
  * standing inside the human-approval store to run a non-read command IS the
- * forgery shape (`cd .ctoc/approvals && git status` is denied; fail-closed, not a
- * menu recipe — accepted by design).
+ * forgery shape (fail-closed, not a menu recipe — accepted by design). The eight
+ * git subcommands that write only into `.git/` (`add`, `commit`, `diff`, `log`,
+ * `show`, `status`, `blame`, `ls-files`) count as reads, so `cd .ctoc/approvals &&
+ * git status` and staging a record by name are allowed; see `isReadOnlyLedgerCommand`.
+ *
+ * `spec` names the protected folder (`LEDGER_SPEC` by default, `VERIFY_SPEC` for the
+ * check records): the same test, a different folder.
  * @param {string} command
+ * @param {{dir: string, segmentRe: RegExp, resolvedRe: RegExp}} [spec]
  * @returns {boolean}
  */
-function isLedgerWrite(command) {
+function isLedgerWrite(command, spec = LEDGER_SPEC) {
   const segments = String(command).split(/[\n;]|&&|\|\||\|/);
   let prefix = '';
   for (const rawSeg of segments) {
@@ -375,11 +400,11 @@ function isLedgerWrite(command) {
     //     already match pays no syscall — and (c) touches the filesystem only on the
     //     operands of a segment neither arithmetic test caught.
     //     Redirect operators become separators so `echo x>approvals/y` splits.
-    let touches = LEDGER_SEGMENT_RE.test(normalizeForMatch(seg));
+    let touches = spec.segmentRe.test(normalizeForMatch(seg));
     const tokens = seg.replace(/[<>]+/g, ' ').split(/\s+/).filter(Boolean);
     const operands = tokens.slice(1).filter((t) => !t.startsWith('-'));
     if (!touches) {
-      touches = operands.some((t) => LEDGER_RESOLVED_RE.test(resolveTokenPath(prefix, t)));
+      touches = operands.some((t) => spec.resolvedRe.test(resolveTokenPath(prefix, t)));
     }
     if (!touches) {
       // (c) The filesystem-aware test — the link-through-the-ledger close. Candidates
@@ -389,7 +414,7 @@ function isLedgerWrite(command) {
       // arithmetic verdict above stands.
       const candidates = operands.concat(quotedLiterals(seg));
       touches = candidates.slice(0, OPERAND_RESOLUTION_CAP)
-        .some((t) => operandResolvesIntoLedger(prefix, t));
+        .some((t) => operandResolvesIntoLedger(prefix, t, spec.dir));
     }
     if (touches && !isReadOnlyLedgerCommand(seg)) return true;
   }
@@ -455,10 +480,19 @@ function isInlineEval(command) {
  * provenance is legitimate and stays allowed; anything else that names the ledger
  * path is denied. Fail-CLOSED: an unrecognized command shape touching the ledger is
  * NOT a read.
+ *
+ * Eight git subcommands are reads too: `add`, `commit`, `diff`, `log`, `show`,
+ * `status`, `blame` and `ls-files` write only into `.git/`, never into the working
+ * tree, so staging or committing an approval record by name is not a write of it.
+ * Only when the segment carries no `--output` (`git diff --output=<file>` writes the
+ * file) and no `>`. `checkout`, `restore`, `stash`, `reset` and every other
+ * subcommand naming the folder stay refused.
  * @param {string} command - the raw command
  * @returns {boolean}
  */
 function isReadOnlyLedgerCommand(command) {
+  if (/^\s*git\s+(add|commit|diff|log|show|status|blame|ls-files)\b/i.test(command)
+    && !/--output|>/.test(command)) return true;
   const READ_CMD = /^\s*(cat|ls|head|tail|grep|egrep|rg|find|wc|stat|file|jq|diff|cmp|shasum|sha256sum|md5sum|tree|du|less|more)\b/i;
   const WRITEISH = /(>)|(\btee\b)|(\bcp\b)|(\bmv\b)|(\brm\b)|(\bsed\b)|(\bawk\b)|(\bperl\b)|(\bpython[0-9.]*\b)|(\bnode[0-9.]*\b)|(\b(ba|z)?sh\b)|(\bdd\b)|(\binstall\b)|(\btouch\b)|(\btruncate\b)|(\bchmod\b)|(\bln\b)|(\bcurl\b)|(\bwget\b)|(\bmkdir\b)|(\bpatch\b)/i;
   return READ_CMD.test(command) && !WRITEISH.test(command);
@@ -1051,12 +1085,13 @@ async function main() {
   process.exit(0);
 }
 
-// This hook is invoked ONLY as a subprocess (the registered PreToolUse.Bash
-// command; the security + forgery tests SPAWN it as the harness does). It exports
-// NOTHING on purpose: the ledger-forgery decision (`isLedgerForgery`) is exercised
-// through the real spawned process — the strongest possible test — so there is no
-// live in-process caller for a module export, and adding one would be a dead export
-// (the reachability fence's "a test is not a caller" rule).
+// Run as a subprocess (the security + forgery tests SPAWN it as the harness does),
+// this file runs its own `main()`. Required as a module, it runs nothing and reads no
+// stdin — the `require.main === module` guard below — and lends its record checks to
+// `src/hooks/protect-records.js`, the one CTOC hook Claude Code loads
+// (`hooks/hooks.json`): `isLedgerForgery`, `isLedgerWrite`, `isInlineEval`,
+// `isOpaqueDecodedExecution` and `VERIFY_SPEC`. That entry is their live caller, so
+// the write protection runs exactly this policy and never a second copy of it.
 // FAIL-OPEN CATCH — and this is why the real-path-confinement wiring above must
 // RETURN a refusing value and NEVER throw. `process.exit(1)` is the legacy cosmetic
 // code this file's header records the harness treating as NON-blocking: it is NOT a
@@ -1065,7 +1100,11 @@ async function main() {
 // to prevent. This reaches the same conclusion as the editing hook's fail-open catch
 // by a DIFFERENT route (there, `catch → exit(0)`; here, `catch → exit(1)` = harness
 // non-block); both must be preserved as-is, never "unified" into consistency.
-main().catch(err => {
-  console.error('[CTOC] Bash gate error:', err.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(err => {
+    console.error('[CTOC] Bash gate error:', err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { isLedgerForgery, isLedgerWrite, isInlineEval, isOpaqueDecodedExecution, VERIFY_SPEC };

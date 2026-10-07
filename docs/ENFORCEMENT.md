@@ -1,6 +1,6 @@
 # Enforcement — hooks, approvals and the question store
 
-This text was moved word for word out of this repository's `CLAUDE.md` on 2026-10-06, keeping its original headings, so that `CLAUDE.md` stays small. **These hooks are not registered with Claude Code today**: the text below describes how they work when registered, not what runs on a tool call now. Read it before you touch `src/hooks/**`, plan coverage, approvals, enforcement mode, scope growth, the declared entry point, the continuation gate, the resume watchdog, the question store or the streaming gate.
+This text was moved word for word out of this repository's `CLAUDE.md` on 2026-10-06, keeping its original headings, so that `CLAUDE.md` stays small. **These hooks are not registered with Claude Code today**: the text below describes how they work when registered, not what runs on a tool call now. The one exception is `src/hooks/protect-records.js`, registered alone in `hooks/hooks.json` at the plugin root and described in the last section, "The one loaded hook — write protection for the records". Read it before you touch `src/hooks/**`, plan coverage, approvals, enforcement mode, scope growth, the declared entry point, the continuation gate, the resume watchdog, the question store or the streaming gate.
 
 ## Mandatory Pipeline Use (v7)
 
@@ -184,3 +184,89 @@ Moved from `CLAUDE.md` on 2026-10-06, where these two lines followed the four-tr
 **Enforcement**: Pre-tool hook monitors ALL tool calls. Violations auto-revert the plan, log to `.ctoc/logs/gate-violations.json`, and alert the user. Plans at gate destinations need an `approved_by: human` marker or they get reverted.
 
 **If asked to "complete" or "move to done"**: REFUSE. Explain the human gate requirement.
+
+## The one loaded hook — write protection for the records
+
+Decided by the owner on 2026-10-07. `hooks/hooks.json` at the plugin root registers exactly
+one command, `node "${CLAUDE_PLUGIN_ROOT}/src/hooks/protect-records.js"`, on `PreToolUse`
+for Write, Edit, MultiEdit, NotebookEdit and Bash. `.claude-plugin/hooks.json` and
+`.claude-plugin/plugin.json` are unchanged, so every other hook in this file stays
+unregistered. The entry reuses the checks of `PreToolUse.Edit.js` and `PreToolUse.Bash.js`
+and runs nothing else: no plan coverage, escape phrases, enforcement mode, step gates,
+irreversible-command net or plan-move gate.
+
+**What it protects:** the approval records (`.ctoc/approvals/`), the check records
+(`.ctoc/state/verify/`), and the owner's answers and live question files (everything under
+`.ctoc/streaming/` except the waiting folder `.ctoc/streaming/questions/pending/`, which the
+question-writing agents reach with the Write tool). On the shell the whole
+`.ctoc/streaming/` folder counts, because those agents hold no shell.
+
+**What it refuses:**
+
+1. An editing-tool target inside a protected area — after `..` is resolved, in any letter
+   case, with `\` read as `/`, through a symbolic link, or anywhere a record folder appears
+   as a path segment (so a session outside the project cannot write another copy's records).
+2. A shell command naming a protected folder — quotes removed, `\` read as `/`, any letter
+   case, `..` anywhere — in a segment that is not a pure read (`cat`, `ls`, `grep` and the
+   other read commands, and the git subcommands `add`, `commit`, `diff`, `log`, `show`,
+   `status`, `blame`, `ls-files` without `--output` or `>`).
+3. The same after a `cd` into or toward the folder, including a working directory the
+   session already stands in; and an operand or quoted string that really leads into a
+   folder through a symbolic link (the first 128 per segment).
+4. Inline scripts (`node -e` and its relatives) naming an approval-ledger writer,
+   `step-13-verify`, `persistVerifyResult`, `verifyEvidencePath`, `crossBySufficiency`,
+   `streamApprove` or `streamAnswer`; inline scripts built at run time; a decoded payload
+   piped into an interpreter.
+5. `ledger-backfill.js` in any form except exactly `node <…>/src/scripts/ledger-backfill.js
+   --vision`, optionally with `--dry-run`. `--plan` writes a `backfilled` entry accepted at
+   every stage, `done` included, and `--mark-migrated` arms the bulk revert; both are
+   migrations the human runs in his own terminal.
+
+A pure call of the menu entry point (`node <…>/src/commands/start.js …` with no `$` other
+than `${CLAUDE_PLUGIN_ROOT}`, no backtick, no backslash and no unquoted `;`, `&`, `|`, `<`,
+`>` or line break) is checked differently, and only when the script has the same real path
+as this plugin's own `src/commands/start.js` (`${CLAUDE_PLUGIN_ROOT}` read as this plugin's
+root, resolved against the session's working directory; a fault means "not the menu"). An
+agent-written `…/src/commands/start.js` gets no exemption. The menu is the legitimate
+writer, so its quoted text arguments are data (a `--summary` may name a folder), but a
+whitespace-free argument that is a path into the approval or check records is refused, as
+the same operand would be without the menu in front. The answer store is left out of that
+argument check because the menu's question-generation recipe passes
+`--touches .ctoc/streaming/questions/<ref>` as data. A Bash payload whose `command` is not a
+string is treated as unreadable (the fail rule below).
+
+The hook calls `process.chdir(root)` with the project root found from the payload's `cwd`,
+because the reused checks measure against the working directory. That is safe only because
+every call is a fresh subprocess that exits after one decision.
+
+**The refusal** is one sentence on every channel, with no command text echoed back:
+"CTOC refused this call because it writes, or could write, the approval records, the check
+records or the owner's recorded answers, which only CTOC's menu writes; finish your work,
+report it, and let the menu record the result." It is written as one line to stderr and
+the process exits 2; the deny decision JSON also goes to stdout, but Claude Code ignores
+JSON when a hook exits 2 and shows stderr instead, so stderr is what the agent reads.
+
+**Fail rule.** A crash refuses only a call that mentions the records, with "CTOC refused
+this call because it mentions the approval or check records and CTOC's protection for them
+failed to run; tell the human that this protection is broken.", and allows the rest, so one
+broken release cannot stop every tool call in every project. When the payload parsed, only
+its `tool_input` is scanned, so a project whose path contains one of the words is not
+refused on every call; a payload that will not parse is scanned whole. A failure to load
+`src/lib/hook-deny-signal.js` itself exits 1, which Claude Code treats as not blocked.
+
+**What it cannot catch** (it reads command text; it is not a sandbox):
+
+- a script file written elsewhere and then run (any language, an npm script, a git hook, a
+  test file);
+- a path built at run time: a variable, a glob, string pieces inside a one-liner, `$'…'`;
+- git operations that restore or replace tracked records without naming them (branch
+  checkout, stash pop, merge, pull, reset, rebase, apply);
+- replacing a parent folder (`mv`, `cp -r`, `rsync` or an archive onto `.ctoc`,
+  `.ctoc/state` or the project root);
+- hard links; more than 128 operands in one segment; file-writing tools other than the five;
+- read commands with a write side effect (`find -delete`, `tree -o`), which can delete or
+  corrupt a record but never forge one;
+- any agent with the shell running the menu's own routes (approve, `stream approve`,
+  `stream answer`) — the protection cannot tell the session acting on the human's choice
+  from an agent acting alone;
+- on a crash, a call that reaches a record through a link without naming it.
