@@ -1,9 +1,9 @@
 {
-  "content_sha256": "422575e6dbbca410e5199f2d616fd518128ca2b3c0051e78f1720412840aabda",
+  "content_sha256": "5dcf9da50c051dbb88c87b9c03c86ccd068f806a9955cfcf64e9e4d463df7358",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-07-22T09:24:59.105Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:33.843Z",
   "approved_by": "human",
   "plan_basename": "00177-a-log-directory-manufactures-the-marker-that-gates-setup"
 }

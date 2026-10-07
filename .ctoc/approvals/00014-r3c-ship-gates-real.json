@@ -1,11 +1,9 @@
 {
-  "content_sha256": "6245692faaa99f7a9ed5fbe4e8104b52d135d0c376d23417c081add924b26a02",
+  "content_sha256": "331a6779e6b3ca4f3fa928446cc796e0f0a042d78dace8f6767fe69a96d4d2db",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T10:23:20.519Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:32.024Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00014-r3c-ship-gates-real"
 }

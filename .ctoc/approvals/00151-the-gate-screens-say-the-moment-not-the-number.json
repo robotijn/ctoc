@@ -1,9 +1,9 @@
 {
-  "content_sha256": "e9b93aa46fa5ea4d8f9f795503a84b534a9c3e59300d2f9fc8782bcf411a9667",
+  "content_sha256": "d053563cb65653101d0d7c89ffc91d5b9aef50d6be3191549e6baee171688094",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-07-20T16:09:16.179Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:33.523Z",
   "approved_by": "human",
   "plan_basename": "00151-the-gate-screens-say-the-moment-not-the-number"
 }

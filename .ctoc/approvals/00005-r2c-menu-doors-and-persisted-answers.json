@@ -1,11 +1,9 @@
 {
-  "content_sha256": "e57308ae37ac9b93c7e1b78b974ebbe701335cf7e1481383f912c62582a40f2a",
+  "content_sha256": "c0a16ceda7037c17559d01b9762973f3d430ec3e33fada2528e05481998e7bad",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T10:23:20.046Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:31.774Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00005-r2c-menu-doors-and-persisted-answers"
 }

@@ -1,11 +1,9 @@
 {
-  "content_sha256": "1c2c12117d41de98623c20567f3eed3836fd3dc26216c1e18869b05bf993ef21",
+  "content_sha256": "e4525a303a74bdf11a9d3f420b8c08c042789a57a856f431be9985b9380cad2c",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-05T09:13:43.388Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:34.308Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "Re-recorded at the owner's word on 2026-10-05, answering whether to re-record the approvals the privacy rewrite changed: \"what is the difference just fix it\". Redaction-only change: the home-folder path in the plan text was replaced by a placeholder; nothing the owner ruled on changed.",
   "plan_basename": "00397-deepthink-ships-with-ctoc-s1-decision-format-fold-in"
 }

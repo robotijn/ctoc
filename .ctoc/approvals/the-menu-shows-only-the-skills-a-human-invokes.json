@@ -1,11 +1,9 @@
 {
-  "content_sha256": "417ff7700ce2768bf450b56d6f6c273f2e6ce2d73c5b665932d29d4d7cb2da37",
+  "content_sha256": "02ab7049d08473bcb2404aadcf290284c9a653f1f5b4aa6380f72a6e950cc950",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-30T15:03:00.764Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:33.668Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "The human widened the plan's declared files by one test on 2026-09-30 (his words: ok fix it), in answer to the executor's scope question; the approval is re-recorded against the widened declaration.",
   "plan_basename": "the-menu-shows-only-the-skills-a-human-invokes"
 }

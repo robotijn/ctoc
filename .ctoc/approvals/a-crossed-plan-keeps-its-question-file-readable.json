@@ -1,0 +1,9 @@
+{
+  "content_sha256": "eb15f899f59286c770729c26fa4ad1c1304d92b41334b4e7d2ec9fe82f78eab0",
+  "hash_scope": "specification",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:46:13.559Z",
+  "approved_by": "human",
+  "plan_basename": "a-crossed-plan-keeps-its-question-file-readable"
+}

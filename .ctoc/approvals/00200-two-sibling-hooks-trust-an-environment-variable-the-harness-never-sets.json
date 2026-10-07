@@ -1,11 +1,9 @@
 {
-  "content_sha256": "45690c27f2b41728a5ce3a5e69dd4f7d99a05cd13ee2adb01ddcd08cf97c18e8",
+  "content_sha256": "f8a9099d579b605df2fbe768cdcc2643b1ed56c6e4456b848aa8fd3adb6f197d",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T09:49:35.550Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:33.363Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00200-two-sibling-hooks-trust-an-environment-variable-the-harness-never-sets"
 }

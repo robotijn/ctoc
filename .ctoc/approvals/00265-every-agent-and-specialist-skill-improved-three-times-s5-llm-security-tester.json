@@ -1,9 +1,9 @@
 {
-  "content_sha256": "0f0262cc27d6470183eede4b8b9764fca0625d050418b203fabf3de188a28601",
+  "content_sha256": "796bb23009d580a4238045a9d61cf87b6e614aef7ce2f1a9ab89ac5c8bc8fad7",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-30T07:58:16.614Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:34.281Z",
   "approved_by": "human",
   "plan_basename": "00265-every-agent-and-specialist-skill-improved-three-times-s5-llm-security-tester"
 }

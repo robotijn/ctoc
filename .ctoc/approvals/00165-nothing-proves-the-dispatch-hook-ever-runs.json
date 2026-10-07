@@ -1,11 +1,9 @@
 {
-  "content_sha256": "86cdcafcda9a590f4005051a93d638dc77d63138e19c02242ed17990ceb29948",
+  "content_sha256": "f3ae636953a4f54d7bf97463fbaf661b75967bbe18513dd4e181c64ee5f0ef9d",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-05T09:13:43.365Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:33.710Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "Re-recorded at the owner's word on 2026-10-05, answering whether to re-record the approvals the privacy rewrite changed: \"what is the difference just fix it\". Redaction-only change: the home-folder path in the plan text was replaced by a placeholder; nothing the owner ruled on changed.",
   "plan_basename": "00165-nothing-proves-the-dispatch-hook-ever-runs"
 }

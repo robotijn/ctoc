@@ -1,11 +1,9 @@
 {
-  "content_sha256": "3d8f9327156f3d81e418559bdf64863aa6d599e78c5592d67d2b18e27480b8ce",
+  "content_sha256": "f410849385bd44546eb3ce100b5e2f93a3ab32dcfeca6e53e0491761801fc970",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T10:23:20.465Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:31.996Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00013-r3b-scheduler-enforced-not-advisory"
 }

@@ -1,11 +1,9 @@
 {
-  "content_sha256": "5e285311953bf030cd943c4fc8dcdb2eaf195416275f0ffd36c554aa7a85fb6b",
+  "content_sha256": "3b805f0b64cf6e7d7932e4cdca29b1c1ffe30c4d08e5dd10f87cf67af9397b20",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T10:23:22.779Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:32.964Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00100-the-plan-checker-reads-a-quoted-word-as-a-declaration"
 }

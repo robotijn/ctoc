@@ -740,6 +740,41 @@ describe('X5 — an unrecognised provenance is NOT the human', () => {
   });
 
   // --- Case 4: the proof that NO migration is needed --------------------------
+  //
+  // Why this case changed (2026-10-07, lesson 14): it used to assert COUNT floors
+  // (`backfilled > 200`, `human > 40`). The owner's acceptance of 142 plans replaced
+  // their backfilled ledger entries with genuine review-to-done human entries (one
+  // ledger file per plan holds its latest crossing), so the backfilled count fell to
+  // 190 although nothing was reclassified. A count cannot tell "reclassified" from
+  // "replaced by a real crossing"; a per-entry check can, so it replaces the counts.
+  // It is stricter: a count passes even if individual entries swap kinds, this fails
+  // on the first entry whose markers and classification disagree.
+  //
+  // The rule asserted is the one `entryKind` in src/lib/approval-ledger.js applies, in
+  // its order: an `advanced_by` key decides first ('pipeline' / 'sufficiency', anything
+  // else 'unknown'); then `backfilled === true` gives 'backfilled'; then
+  // `approved_by === 'human'` gives 'human'; else 'unknown'. Per entry here:
+  //   - `backfilled: true` must classify 'backfilled' (so it may carry no `advanced_by`)
+  //     and must carry `approved_by: 'human'`, as `backfillEntry` always writes it;
+  //   - `approved_by: 'human'` with NO `backfilled` key must classify 'human';
+  //   - `advanced_by: 'pipeline'` must classify 'pipeline' (the old sum admitted it);
+  //   - anything else is a mismatch (the old sum admitted no other kind either).
+  function classificationMismatch(entry) {
+    const kind = ledger.entryKind(entry);
+    if (entry.backfilled === true) {
+      if (kind !== 'backfilled') return `backfilled: true but classifies as ${kind}`;
+      if (entry.approved_by !== 'human') return 'backfilled: true without approved_by: human';
+      return null;
+    }
+    if (entry.approved_by === 'human' && !Object.prototype.hasOwnProperty.call(entry, 'backfilled')) {
+      return kind === 'human' ? null : `approved_by: human, not backfilled, but classifies as ${kind}`;
+    }
+    if (entry.advanced_by === 'pipeline') {
+      return kind === 'pipeline' ? null : `advanced_by: pipeline but classifies as ${kind}`;
+    }
+    return `no recognised marker set (classifies as ${kind})`;
+  }
+
   test('case 4: all real ledger entries in this repo keep their current classification', () => {
     const realDir = path.join(REPO, '.ctoc', 'approvals');
     const files = fs.readdirSync(realDir).filter(f => f.endsWith('.json'));
@@ -754,15 +789,35 @@ describe('X5 — an unrecognised provenance is NOT the human', () => {
         `real ledger entry ${f} must parse`);
       const kind = ledger.entryKind(entry);
       tally[kind] = (tally[kind] || 0) + 1;
+      assert.equal(classificationMismatch(entry), null,
+        `real ledger entry ${f}: its markers and its classification disagree`);
     }
 
     assert.equal(tally.unknown, undefined,
       `NO real entry may become unknown — every existing entry already carries its own ` +
       `evidence, so the honest classifier reclassifies nothing (got ${JSON.stringify(tally)})`);
-    assert.ok(tally.backfilled > 200, `backfilled count moved: ${JSON.stringify(tally)}`);
-    assert.ok(tally.human > 40, `human count moved: ${JSON.stringify(tally)}`);
-    assert.equal(tally.backfilled + (tally.human || 0) + (tally.pipeline || 0), files.length,
+    // A floor that cannot pass on an empty set: both kinds must really be present.
+    assert.ok(tally.backfilled >= 1, `no backfilled entry left: ${JSON.stringify(tally)}`);
+    assert.ok(tally.human >= 1, `no human entry left: ${JSON.stringify(tally)}`);
+    assert.equal((tally.backfilled || 0) + (tally.human || 0) + (tally.pipeline || 0), files.length,
       'every real entry must classify into a recognised kind');
+  });
+
+  test('case 4b: the per-entry check fails when a backfilled entry classifies otherwise', () => {
+    // `entryKind` checks `advanced_by` BEFORE `backfilled`, so a `backfilled: true`
+    // entry that also carries `advanced_by` classifies as something other than
+    // 'backfilled' — a real mismatch the classifier allows by construction.
+    const base = { content_sha256: 'a'.repeat(64), stage_from: 'review', stage_to: 'done', approved_by: 'human' };
+    assert.equal(classificationMismatch({ ...base, backfilled: true }), null);
+    assert.equal(classificationMismatch(base), null);
+    assert.match(classificationMismatch({ ...base, backfilled: true, advanced_by: 'pipeline' }),
+      /backfilled: true but classifies as pipeline/);
+    assert.match(classificationMismatch({ ...base, backfilled: true, advanced_by: 'sufficiency-gate' }),
+      /backfilled: true but classifies as unknown/);
+    // A backfill flag that is present but not `true` is not "no backfill flag".
+    assert.match(classificationMismatch({ ...base, backfilled: 'true' }), /no recognised marker set/);
+    assert.match(classificationMismatch({ ...base, approved_by: undefined, backfilled: true }),
+      /backfilled: true without approved_by: human/);
   });
 
   // --- Case 5: the no-false-red guard ----------------------------------------

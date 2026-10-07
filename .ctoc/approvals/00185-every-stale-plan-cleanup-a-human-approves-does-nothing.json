@@ -1,11 +1,9 @@
 {
-  "content_sha256": "3ef711ac67dccf31178c36f0a5e0ce9e430088225d88caee08be47d70c2749b6",
+  "content_sha256": "6d5bac00a3b1e7c0ce800f8b97339cb5f81acae1e31ba854040bcb5860d00916",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T09:49:35.473Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:33.171Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00185-every-stale-plan-cleanup-a-human-approves-does-nothing"
 }

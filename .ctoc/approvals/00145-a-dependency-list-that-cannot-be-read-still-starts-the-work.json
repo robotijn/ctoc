@@ -1,11 +1,9 @@
 {
-  "content_sha256": "e55fe7218fdff092502425553b4af5f0281d73131dbcd6bf1a5103ba3016a25c",
+  "content_sha256": "ab7249f07b5e0c3205c7c910f43e24f82b342e5253f6ac3a542fa5f8b77a152b",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T09:49:35.349Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:32.924Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00145-a-dependency-list-that-cannot-be-read-still-starts-the-work"
 }

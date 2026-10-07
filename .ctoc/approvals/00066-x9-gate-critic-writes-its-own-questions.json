@@ -1,11 +1,9 @@
 {
-  "content_sha256": "809e7e950f1a93b293c7f85c5f72b94cc9c4a4b8f8c22ecfaaaaf0ee9c20b4b0",
+  "content_sha256": "1171ae556dee9e5015b9764695d4a8429267586b5c945f13b95c65e8c282e415",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-05T09:13:43.293Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:32.410Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "Re-recorded at the owner's word on 2026-10-05, answering whether to re-record the approvals the privacy rewrite changed: \"what is the difference just fix it\". Redaction-only change: the home-folder path in the plan text was replaced by a placeholder; nothing the owner ruled on changed.",
   "plan_basename": "00066-x9-gate-critic-writes-its-own-questions"
 }

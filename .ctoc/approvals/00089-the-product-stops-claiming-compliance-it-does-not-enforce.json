@@ -1,0 +1,9 @@
+{
+  "content_sha256": "57e4e8e44b93516d001468a88acdf2aa39ee532307239334400f0a4363d899f4",
+  "hash_scope": "specification",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:32.643Z",
+  "approved_by": "human",
+  "plan_basename": "00089-the-product-stops-claiming-compliance-it-does-not-enforce"
+}

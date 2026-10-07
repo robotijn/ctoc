@@ -1,9 +1,9 @@
 {
-  "content_sha256": "5cc273e1d5ba4ddb19f0c45597561bc42ccf290b72b89f7b7e61d89fc097f988",
+  "content_sha256": "5040a256a3a63892dcc93e2733552507878e55ff0b8445ae1c596b3403551d84",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-07-19T18:29:04.247Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:33.097Z",
   "approved_by": "human",
   "plan_basename": "00122-a-plan-whose-work-already-landed-still-reads-as-live-work"
 }

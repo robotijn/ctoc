@@ -1,11 +1,9 @@
 {
-  "content_sha256": "97ea1d9251264006d681ccef04a1fedb29559b9490946e7d60432066ff91e56d",
+  "content_sha256": "6ee2eca64b12bbd726818e398030f43210dc930caca1aeaee4097cc53aaa4e87",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-05T09:13:43.316Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:33.018Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "Re-recorded at the owner's word on 2026-10-05, answering whether to re-record the approvals the privacy rewrite changed: \"what is the difference just fix it\". Redaction-only change: the home-folder path in the plan text was replaced by a placeholder; nothing the owner ruled on changed.",
   "plan_basename": "00102-git-exclusivity-is-undefended-where-work-actually-starts"
 }

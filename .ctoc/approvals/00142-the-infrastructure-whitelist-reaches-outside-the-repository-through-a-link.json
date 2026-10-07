@@ -1,11 +1,9 @@
 {
-  "content_sha256": "e70d7e31bad91887be9077eb8575dfa15225aeb8a59718e0f6374c68e58a6bfc",
+  "content_sha256": "d2dbc1d50dc2cf1363b8ad6c4b7387bfee65552ea65cd70be7af62e3ce09b100",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T10:23:23.457Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:33.470Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00142-the-infrastructure-whitelist-reaches-outside-the-repository-through-a-link"
 }

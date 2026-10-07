@@ -1,11 +1,9 @@
 {
-  "content_sha256": "495dce8e8aaac7f9e9fbfb3b2796b74e77568396f036c178bb18fd4822d73e54",
+  "content_sha256": "ddcc30a0cca52da0ba1e9ed41d87bde7fb625e13b659c5fa43e857d099eb9dec",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T10:23:20.411Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:31.969Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00012-r3a-ledger-forgery-closed"
 }

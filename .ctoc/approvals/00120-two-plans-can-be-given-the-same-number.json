@@ -1,9 +1,9 @@
 {
-  "content_sha256": "8cd15b6d9721d805dd12cc021e6f287c08e401335cf3e0c120ca74470133ca00",
+  "content_sha256": "be5d46b9ffb3045c37f9e552e3d21d53a60e1a7031ed7a560e9cdf8108537e7b",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-07-19T18:29:04.192Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:33.072Z",
   "approved_by": "human",
   "plan_basename": "00120-two-plans-can-be-given-the-same-number"
 }

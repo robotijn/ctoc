@@ -1,11 +1,9 @@
 {
-  "content_sha256": "d739f1735d2f68dc01dac5a18bfa426af656fe2ed61a35f1ae0fdbc23545de4e",
+  "content_sha256": "06c544241925e29c3950521e2750ad78c894776cd69226899b7ecbb25ff4505a",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T10:23:24.101Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:33.392Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00201-the-shell-gate-works-out-what-a-command-writes-and-says-when-it-cannot"
 }

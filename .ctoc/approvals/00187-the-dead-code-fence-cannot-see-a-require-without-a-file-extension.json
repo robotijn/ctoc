@@ -1,11 +1,9 @@
 {
-  "content_sha256": "0df5b0a01f32fd6e38bf805104cbcd5ecb8ea56406e0ff642a2e91e7c670e0ca",
+  "content_sha256": "b7c313e1a5a2e70940730dec981f280c30d3b87fa32ff874ddc4f6f9b508f640",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T09:49:35.500Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:33.226Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00187-the-dead-code-fence-cannot-see-a-require-without-a-file-extension"
 }

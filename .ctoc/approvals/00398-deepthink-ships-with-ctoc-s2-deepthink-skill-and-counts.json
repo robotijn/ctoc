@@ -1,11 +1,9 @@
 {
-  "content_sha256": "90920fdfefbc62f2f7e90424525f4f49b82de9a21307fdfc909e4f2fe6bcb29a",
+  "content_sha256": "b4e32579be3ee6e22f9414f829c566a932ee71ff235c9b5fe9ea639ba9a9fe4f",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-10-05T09:13:43.411Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:34.335Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "Re-recorded at the owner's word on 2026-10-05, answering whether to re-record the approvals the privacy rewrite changed: \"what is the difference just fix it\". Redaction-only change: the home-folder path in the plan text was replaced by a placeholder; nothing the owner ruled on changed.",
   "plan_basename": "00398-deepthink-ships-with-ctoc-s2-deepthink-skill-and-counts"
 }

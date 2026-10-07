@@ -1,11 +1,9 @@
 {
-  "content_sha256": "47d841df129ccface2d50cee78c6224a7552f56d3e6a7fa7cd503f8123ba3fa4",
+  "content_sha256": "dba5ca96c9df32fde2b0ec9592649be0e00a77fbe5e8b751648b1af72a570d3b",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T09:49:35.421Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:33.065Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00181-an-unflagged-question-blocks-a-gate-instead-of-waving-it-through"
 }

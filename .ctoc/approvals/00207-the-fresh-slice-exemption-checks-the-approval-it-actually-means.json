@@ -1,11 +1,9 @@
 {
-  "content_sha256": "e3f5dd025f7a60e024431bab38e6b382cd94f486214ba9cde5e7413abf8ee65c",
+  "content_sha256": "b1ea7e57b107167eafd99072211c780366203ffa2e71682dbb2e71b966056065",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T09:49:35.597Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:33.551Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00207-the-fresh-slice-exemption-checks-the-approval-it-actually-means"
 }

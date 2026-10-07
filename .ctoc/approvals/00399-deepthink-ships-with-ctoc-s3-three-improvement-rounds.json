@@ -1,9 +1,9 @@
 {
-  "content_sha256": "3e9067a4f8524b894c4658b1a14c139a058ccfe4469ee7fca8ad092fe30afb0e",
+  "content_sha256": "5046805e5325a202adc7464f83c155fe00c8c64b3c9c5d0cd3fc887c289bc450",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-30T11:39:25.424Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:34.364Z",
   "approved_by": "human",
   "plan_basename": "00399-deepthink-ships-with-ctoc-s3-three-improvement-rounds"
 }

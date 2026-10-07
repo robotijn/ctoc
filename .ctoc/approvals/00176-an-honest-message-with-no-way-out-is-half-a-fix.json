@@ -1,9 +1,9 @@
 {
-  "content_sha256": "ec66e6bda2d0ce650a2044598ea8656afe49a151ef6cf7126e8055b0091ab772",
+  "content_sha256": "d6d525407ac74ed5a43ced51f7c1cd10791e3039e1520d7163811ee9e6edf713",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-07-22T08:57:05.700Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:33.814Z",
   "approved_by": "human",
   "plan_basename": "00176-an-honest-message-with-no-way-out-is-half-a-fix"
 }

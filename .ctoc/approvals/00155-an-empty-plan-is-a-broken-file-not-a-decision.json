@@ -1,9 +1,9 @@
 {
-  "content_sha256": "7e92ae2c13169c8cba70f6e8850f2fc03d20ec7b6ac7754f06ec746cc4d31ef7",
+  "content_sha256": "7f2d3009b79ed911c48090fdaf7c9532bece1e029fbecdc9efc089036c41276e",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-07-20T09:18:53.923Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:33.632Z",
   "approved_by": "human",
   "plan_basename": "00155-an-empty-plan-is-a-broken-file-not-a-decision"
 }

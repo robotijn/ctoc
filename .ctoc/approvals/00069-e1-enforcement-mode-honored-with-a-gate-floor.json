@@ -1,11 +1,9 @@
 {
-  "content_sha256": "e8079ca8a1f27d8dcc8d96f9f55b4a021a33f8c65d25a609a472507a9af13d22",
+  "content_sha256": "d33485e7ce8c8a88be7af52231c9ef3edea05bdab41f043d30dc3f400c72a024",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T09:49:35.246Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:32.513Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "exempt table gained the deferred-questions row by human ruling 2026-09-03; digest re-recorded under the new semantics",
   "plan_basename": "00069-e1-enforcement-mode-honored-with-a-gate-floor"
 }

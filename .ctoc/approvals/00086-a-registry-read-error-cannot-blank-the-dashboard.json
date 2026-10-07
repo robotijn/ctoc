@@ -1,11 +1,9 @@
 {
-  "content_sha256": "2339fcbd8e6cdcd8629e441a3516e00be82bb3fd07d28ee94ec845e12198285d",
+  "content_sha256": "2366c182400e7896cff0f8a947eed87426569fe3d843a10a99c79fdf33eeaedc",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-09-03T10:23:22.340Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:24:32.582Z",
   "approved_by": "human",
-  "backfilled": true,
-  "backfill_reason": "binding migration ruled by the human 2026-09-03: entry recorded under the old whole-file hash binding, in which any ordinary execution record invalidated the approval by construction; digest re-recorded over current bytes in one reviewed batch",
   "plan_basename": "00086-a-registry-read-error-cannot-blank-the-dashboard"
 }

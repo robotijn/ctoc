@@ -1,9 +1,9 @@
 {
-  "content_sha256": "8ba97c68551ba2c5025f518cab8babde94faa76ea63e064223b104631efc50d2",
+  "content_sha256": "31ec16be5479580119b1216ee4f10fc9733da546a080f86189db95e21d2f9cdb",
   "hash_scope": "specification",
-  "stage_from": "implementation",
-  "stage_to": "todo",
-  "approved_at": "2026-07-22T12:10:26.391Z",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T07:38:34.136Z",
   "approved_by": "human",
   "plan_basename": "00222-a-contract-test-stops-scaffolding-the-real-repository-root"
 }

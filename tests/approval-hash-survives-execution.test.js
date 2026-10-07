@@ -188,16 +188,26 @@ test('a plain Step 10 sub-item bullet is SPECIFICATION and BREAKS the approval w
 
 // --- 6. THE REAL LIFECYCLE, ON THIS REPOSITORY'S REAL PLAN BYTES ---------------
 
+// Why this test changed (2026-10-07, lesson 14): it used to look ONLY in plans/review/.
+// When the owner accepts the plans in review they move to plans/done/, and review can
+// hold no executed plan at all — the test then failed on repository state, not on the
+// hash. A plan in done/ is just as real an executed plan, so review is still searched
+// first and done/ second. The claim is unchanged: a REAL plan carrying an executor-
+// written execution record must be found (no fallback to a synthetic plan), and every
+// hash assertion below is untouched.
 test('on REAL executed plan bytes, the specification hash is stable across the execution record', () => {
-  const reviewDir = path.join(REPO_ROOT, 'plans', 'review');
-  const files = fs.readdirSync(reviewDir).filter((f) => f.endsWith('.md')).sort();
-  assert.ok(files.length > 0, 'expected real executed plans in plans/review to measure against');
-  // A plan that carries a real, executor-written execution record.
-  const withRecord = files.find((f) => /^##\s*Execution (Record|Log)/m.test(
-    fs.readFileSync(path.join(reviewDir, f), 'utf8'),
-  ));
-  assert.ok(withRecord, 'expected at least one real plan carrying an ## Execution Record section');
-  const real = fs.readFileSync(path.join(reviewDir, withRecord), 'utf8');
+  let real = null;
+  for (const stage of ['review', 'done']) {
+    const dir = path.join(REPO_ROOT, 'plans', stage);
+    if (!fs.existsSync(dir)) continue;
+    for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.md')).sort()) {
+      const bytes = fs.readFileSync(path.join(dir, f), 'utf8');
+      // A plan that carries a real, executor-written execution record.
+      if (/^##\s*Execution (Record|Log)/m.test(bytes)) { real = bytes; break; }
+    }
+    if (real) break;
+  }
+  assert.ok(real, 'expected at least one real plan in plans/review or plans/done carrying an ## Execution Record section');
 
   const before = ledger.computeSpecHash(real);
   assert.equal(before.ok, true, `boundary must be locatable in real bytes: ${before.reason}`);
