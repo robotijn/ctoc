@@ -2543,7 +2543,8 @@ function taskComplete(root, rest) {
  * @param {string} root
  * @param {Array<{ref:string, toStage:string, name:string}>} [extraCrossed]
  * @returns {{crossed: Array<object>, promote: Array<object>, quarantined: Array<object>,
- *   pending: Array<object>, reasons: string[], started: string[]}}
+ *   pending: Array<object>, reasons: string[], started: string[], building: string[]}}
+ *   `building` names the plans whose builds it started.
  */
 function continueAfterCrossing(root, extraCrossed = []) {
   const reasons = [];

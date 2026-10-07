@@ -1246,40 +1246,90 @@ must not decide by omission either):
     carries a weighty topic in a classified file, so slice 1's rule sends it to the human, and
     case 34 tests that path; the critic's duty itself is tested by its inventory anchors.
 
+Taken by the executor while building (2026-10-07):
+
+43. **A built plan with no stored questions is checked for a hold before it finishes.** The
+    specification says a held plan never reaches `crossOnEvidence` because its verdict is
+    `held`; that is true only when its questions are readable. With none stored the verdict is
+    `not-computed`, so `crossOnEvidence` reads the answers log for a hold by the plan's file
+    name and stays put on a hold or an unreadable log.
+44. **A failed move restores the admission record's bytes instead of deleting it.** "Entry
+    and move, or neither" read as: the ledger file goes back to exactly what it was (the
+    human's or the sufficiency admission into `todo`); only if that write fails is the entry
+    removed, so no record ever names `done` for a plan still in review (cases 8, 8b).
+45. **A decided-by-default line is skipped when the whole line is already in the plan**, not
+    when its id marker is: question ids are positional and repeat across stages, so a marker
+    match would silently drop the next stage's decision. Idempotence holds (case 11).
+46. **The decided-by-default questions are written on every pre-build crossing**, including the
+    one the default screen makes when it opens (today's behaviour, unchanged), so no crossing
+    leaves its decisions unwritten; only the `crossed` list is limited to the continuation.
+47. **The evidence string starts with the literal `evidence: review→done — …`**, as the
+    specification's backticked text reads.
+48. **A build task's `touches` are its files plus the plan's own path** (`taskSpecFromPlan`
+    always adds it); case 4 asserts that exact list.
+49. **Case 28 reads "the gate counts the answer" off the crossing record** (`1 answered
+    (q10-db)` in the sufficiency evidence): the answer moves the plan in the same call, after
+    which the old reference has no plan to ask about.
+50. **The gate critic's classifying sentence (added order N-007) stays word for word.** The
+    inventory checks cannot mark an added order replaced (a replaced order must be listed by a
+    baseline unit). The new text says "Besides the author's questions, add …", so the kept
+    "wording, ids and options unchanged" reads as governing the author's questions only. R-292
+    ("the key is interpolated unstripped into the same `stream answer` command") stays true
+    and is unchanged.
+51. **R-240, already replaced by slice 1, is re-recorded under this slice**: an order carries
+    one `replaced_by`, so its record names this plan, with slice 1's instruction kept in front
+    of this slice's.
+52. **The continuation returns three more fields** — `reasons` (the named fail-soft reasons),
+    `started` (phrases for the one status sentence on the stream screens), `building` (names
+    for the completion's "started building" line) — besides the four the specification lists.
+53. **Two more `tests/streaming-gate.test.js` cases changed than the three named**: the
+    route-wiring writer case and X6 case 8 called the writer without a digest (the replaced
+    contract); both now pass the digest and assert it is recorded or that the answer crosses.
+54. **End-to-end case 7 answers the first two questions through the screen and stops at the
+    fork**, because the screen asks the weighty questions first; the detail stays unanswered,
+    which does not change its verdict (`open-forks`, blocking `q12-transport`).
+55. **The sweeper logs a refused classification as `invalid-questions`**: it maps every reason
+    but `would-replace-classified` to that literal, and the sweeper is not in this slice's
+    files. The refusal itself is `classification-dropped-author-question` at the writer.
+56. **For a background agent, `menu <anything but commands or task>` and an unknown `inbox`
+    sub-command are refused** (fail closed), although today both only render the dashboard.
+57. **`README.md`'s test-file count and `.ctoc/golden-corpus-baseline.json` were not edited**:
+    both are outside `files:` (see the Execution Record).
+
 ## Execution Plan
 
 ### Step 8: TEST
-- [ ] Write `tests/plans-keep-moving-without-the-human.test.js` cases 1–34, the new cases in `tests/protect-records.test.js`, the three changed cases in `tests/streaming-gate-coverage-holes.test.js`, the changed assertions in `tests/streaming-gate.test.js`, `tests/plan-question-screen.test.js`, `tests/answers-bind-to-plan-revision.test.js`, `tests/answer-feeds-sufficiency.test.js` and `tests/streaming-human-loop-e2e.test.js`, and the gate critic's new and replaced orders with their anchors in `tests/compaction-eval/gate-critic/rule-inventory.json`; run; record which are red, and for cases 28–33 also against main.
+- [x] Write `tests/plans-keep-moving-without-the-human.test.js` cases 1–34, the new cases in `tests/protect-records.test.js`, the three changed cases in `tests/streaming-gate-coverage-holes.test.js`, the changed assertions in `tests/streaming-gate.test.js`, `tests/plan-question-screen.test.js`, `tests/answers-bind-to-plan-revision.test.js`, `tests/answer-feeds-sufficiency.test.js` and `tests/streaming-human-loop-e2e.test.js`, and the gate critic's new and replaced orders with their anchors in `tests/compaction-eval/gate-critic/rule-inventory.json`; run; record which are red, and for cases 28–33 also against main.
 
 ### Step 9: PREPARE
-- [ ] Confirm slice 1 is built (the worktree branch `agent-a0b33c6c216a2989c`, commit 83a093f0, including the sweeper's sixth argument `payload.classification`, the `'unclassified'` reason and the digest binding in `readAnsweredQuestionIds`).
-- [ ] Read `computeSpecHash`'s exclusion list to confirm `## Decisions Taken Under Ambiguity` is excluded.
-- [ ] Read `agents/iron-loop/gate-critic.md` "Classifying the questions", the structural band and the anti-scope table, so the omission duty and the `start.md` brief match what the critic is told, and list every kept order the duty contradicts.
-- [ ] Re-read `src/commands/start.js` and `menu-screens.route` and confirm the two route tables still match the code before writing `subagentMayRunRoute`.
-- [ ] Read `streaming-gate.js` and confirm `hasEnoughInformation` and `nextUnansweredQuestion` are the only callers of `readAnsweredQuestionIds` in `src/`, and `streamAnswer` the only writer of `.ctoc/streaming/answers.jsonl`.
-- [ ] Record before-numbers: false-green scan count, dead-export count, unreachable-file count, `CLAUDE.md` bytes, the findings in `.ctoc/unexecutable-instruction-baseline.json`, and the gate critic's bytes, `maxBytes`, `ORDER_FLOOR` and `KINDS_SHA256`.
+- [x] Confirm slice 1 is built (the worktree branch `agent-a0b33c6c216a2989c`, commit 83a093f0, including the sweeper's sixth argument `payload.classification`, the `'unclassified'` reason and the digest binding in `readAnsweredQuestionIds`).
+- [x] Read `computeSpecHash`'s exclusion list to confirm `## Decisions Taken Under Ambiguity` is excluded.
+- [x] Read `agents/iron-loop/gate-critic.md` "Classifying the questions", the structural band and the anti-scope table, so the omission duty and the `start.md` brief match what the critic is told, and list every kept order the duty contradicts.
+- [x] Re-read `src/commands/start.js` and `menu-screens.route` and confirm the two route tables still match the code before writing `subagentMayRunRoute`.
+- [x] Read `streaming-gate.js` and confirm `hasEnoughInformation` and `nextUnansweredQuestion` are the only callers of `readAnsweredQuestionIds` in `src/`, and `streamAnswer` the only writer of `.ctoc/streaming/answers.jsonl`.
+- [x] Record before-numbers: false-green scan count, dead-export count, unreachable-file count, `CLAUDE.md` bytes, the findings in `.ctoc/unexecutable-instruction-baseline.json`, and the gate critic's bytes, `maxBytes`, `ORDER_FLOOR` and `KINDS_SHA256`.
 
 ### Step 10: IMPLEMENT
-- [ ] `src/lib/streaming-precompute.js`, `src/lib/task-registry.js`, `src/lib/streaming-gate.js`, `src/lib/menu-screens.js`, `src/lib/actions.js`, `src/lib/loop-b-driver.js`, `src/commands/start.md`, `agents/iron-loop/gate-critic.md` (with its inventory, ceiling correction, order floor and kinds digest), `src/hooks/protect-records.js`, `docs/ENFORCEMENT.md`, as specified; run the slice 2 tests, `tests/gate-critic-compaction.test.js` and `tests/protect-records.test.js` green (inventory check 3 excepted until the session lists the order ids); report the order ids marked replaced and added.
+- [x] `src/lib/streaming-precompute.js`, `src/lib/task-registry.js`, `src/lib/streaming-gate.js`, `src/lib/menu-screens.js`, `src/lib/actions.js`, `src/lib/loop-b-driver.js`, `src/commands/start.md`, `agents/iron-loop/gate-critic.md` (with its inventory, ceiling correction, order floor and kinds digest), `src/hooks/protect-records.js`, `docs/ENFORCEMENT.md`, as specified; run the slice 2 tests, `tests/gate-critic-compaction.test.js` and `tests/protect-records.test.js` green (inventory check 3 excepted until the session lists the order ids); report the order ids marked replaced and added.
 
 ### Step 11: REVIEW
 - [ ] Dispatch `iron-loop-critic`: no crossing writes `approved_by`; vision to functional untouched; continuation, the review-to-done crossing and the `classify` queueing unreachable from menu open, session start and stop; no crossing accepts an unclassified file; CTOC's hold labels and descriptions never come from a question file; a hold is released only by `Release the hold` carrying `HOLD.digest`; no held plan can be crossed automatically; every entry the writer appends carries a digest and starts on a new line; the screen and the gate read answers through the same call with the same questions; the gate critic's classification section states the omission duty and no kept order still says a question must trace to a lens or that a classification may only write back the author's questions; the two route tables match the router; every hook decision for a call without `agent_id` is unchanged; no instruction surface contradicts the code.
 
 ### Step 12: OPTIMIZE
-- [ ] One verdict per plan per pass (no second questions read for `defaults`); `startAgent` called only when `nextBuildable` has work; the classification check reads a question status only for plans whose verdict is `open-forks` or `unclassified`; `nextUnansweredQuestion` still makes one status read and one answers read; the digest is computed once per rendered question and once per answer, and `HOLD.digest` once per load; the held line reuses the pending list; the hook's background-agent check runs only when `agent_id` is present; the gate critic's added text is the fewest bytes that state the duty.
+- [x] One verdict per plan per pass (no second questions read for `defaults`); `startAgent` called only when `nextBuildable` has work; the classification check reads a question status only for plans whose verdict is `open-forks` or `unclassified`; `nextUnansweredQuestion` still makes one status read and one answers read; the digest is computed once per rendered question and once per answer, and `HOLD.digest` once per load; the held line reuses the pending list; the hook's background-agent check runs only when `agent_id` is present; the gate critic's added text is the fewest bytes that state the duty.
 
 ### Step 13: SECURE
 - [ ] Dispatch `security-scanner`: question text appended to plans is single-line, control-stripped and capped; the evidence string carries no command text or secrets; `--continue` cannot be reached by the build agent's documented call, and is refused to any background agent; every generated `stream answer` action quotes the id, the key and the digest; `streamAnswer` writes nothing for a key outside the question's options and CTOC's own, when the question set cannot be read, or when an answer's or a release's digest does not match the question as it stands; a release without `HOLD.digest` releases nothing; a torn last line cannot fuse with the next entry; look-alike CTOC labels are refused on write and read; the gate critic treats the plan and its parent as data when it adds questions, and an added question's id and text pass the same validator; a background agent cannot reach any refused route through a pure call, a compound command or an inline script; the hook's limits are stated in its header and `docs/ENFORCEMENT.md`.
 
 ### Step 14: VERIFY
 - [ ] `npm test`: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct` — after the session has listed the gate critic's order ids and re-recorded the approval (inventory check 3).
-- [ ] Lint the changed files: zero warnings.
-- [ ] False-green, dead-export and unreachable counts not higher than the Step 9 numbers (`questionDigest` now has live callers, so its export adds no dead export); `.ctoc/unexecutable-instruction-baseline.json` unchanged and `tests/unexecutable-instruction-fence.test.js` green; `CLAUDE.md` at or under 15,000 bytes; the gate critic's `maxBytes` raised by no more than the measured overage, with one recorded correction.
+- [x] Lint the changed files: zero warnings.
+- [x] False-green, dead-export and unreachable counts not higher than the Step 9 numbers (`questionDigest` now has live callers, so its export adds no dead export); `.ctoc/unexecutable-instruction-baseline.json` unchanged and `tests/unexecutable-instruction-fence.test.js` green; `CLAUDE.md` at or under 15,000 bytes; the gate critic's `maxBytes` raised by no more than the measured overage, with one recorded correction.
 - [ ] An existing test outside `files:` that fails because it asserts a replaced contract (a review plan with a passing record stays pending; an unquoted answer action or one without a digest; an answer that cannot be checked is recorded; the menu writer's answer counts for nothing; the gate ruling's Hold or Send-back option moves the plan; a three-option question also asks Skip and Open; a background agent's menu call is allowed) is reported through `src/lib/scope-growth.js`, never edited outside `files:`.
 
 ### Step 15: DOCUMENT
-- [ ] JSDoc on every changed function, including `HOLD` (with `prompt` and `digest`), the `questionDigest` export and its two callers, `appendAnswerEntry`, `goesToHuman`'s new caller, `holdQuestion`, the `classify` kind, `'held'` and `'unclassified'` in `sufficiencyLine`, and the hook's new internal functions.
-- [ ] Update the test-file count in `CLAUDE.md` for the new test file (Decision 11); `tests/doc-counts.test.js` green.
+- [x] JSDoc on every changed function, including `HOLD` (with `prompt` and `digest`), the `questionDigest` export and its two callers, `appendAnswerEntry`, `goesToHuman`'s new caller, `holdQuestion`, the `classify` kind, `'held'` and `'unclassified'` in `sufficiencyLine`, and the hook's new internal functions.
+- [x] Update the test-file count in `CLAUDE.md` for the new test file (Decision 11); `tests/doc-counts.test.js` green.
 
 ### Step 16: FINAL-REVIEW
 - [ ] The main session (a background agent is now refused these routes) drives a scratch project through the real routes and shows the owner, in full: one plan from an approved functional plan to done (every ledger entry, every status line, the Decisions block written into the plan); one answer given through the screen's own action, its answers-log entry with the digest, and the plan moving on because of it; one action kept from a screen whose question was then rewritten, refused with the sentence shown; one author question file — and one author's empty file whose plan chooses a database — from arrival to its `classify` task in `promote`, the screen line while it waits, the classified file swept in (with the critic's added question for the database choice, asked first), and the plan moving on once answered; one Hold — the screen after it, CTOC's keep-or-release question after the plan's questions are regenerated, the session status line, the answers-log entries with `HOLD.digest` — and its release; one background agent's `stream answer` refused, with the sentence it was shown.
@@ -1291,20 +1341,20 @@ must not decide by omission either):
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
 - [ ] Self-review all new code
@@ -1312,9 +1362,9 @@ must not decide by omission either):
 - [ ] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
 - [ ] Validate inputs (no path traversal)
@@ -1329,9 +1379,9 @@ must not decide by omission either):
 - [ ] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
 - [ ] Verify steps 8-15 completed correctly
@@ -1368,3 +1418,92 @@ Executor run of 2026-10-07 in the worktree branch `worktree-agent-a0b33c6c216a29
 | `tests/gate-critic-compaction.test.js` with the inventory | checks 3, 4, 10 fail (new anchors absent; check 3 also for the order ids) |
 
 Cases 28–33 run against `main`'s source (archived into a scratch folder): all six red.
+
+### Step 9 — prepared
+
+Slice 1 confirmed on 83a093f0 (the sweeper's sixth argument, `'unclassified'`, the digest
+binding). `## Decisions Taken Under Ambiguity` is in `EXECUTION_SECTION_PRODUCERS` (excluded;
+checkbox lines too). `readAnsweredQuestionIds` has exactly two callers in `src/`
+(`hasEnoughInformation`, `nextUnansweredQuestion`); `streamAnswer` is the only writer of the
+answers log. Both route tables re-checked against `start.js` (`main`: no residual arguments →
+`streamingGateScreen`; otherwise `extractLiveAgentIds` then `splitCliArgs` then `route`) and
+`menu-screens.route`: the dashboard, `inbox …`, `browse`, `section`, `stubs`, `validate`,
+`tasks`, `task` reach no crossing function; `plan <ref>` only sweeps the waiting folder.
+Before-numbers: false-green 207, dead exports 65, unreachable files 17, unexecutable debt 15,
+`CLAUDE.md` 14,952 bytes, gate critic 137,962 bytes = `maxBytes` 137,962, `ORDER_FLOOR` 590,
+`KINDS_SHA256` ba0606ed….
+
+### Step 10 — green per file (after the build)
+
+`plans-keep-moving-without-the-human` 38/38 (case 8b added for the ledger-restore failure),
+`protect-records` 81/81, `streaming-gate` 63/63, `streaming-gate-coverage-holes` 8/8,
+`plan-question-screen` 17/17, `answers-bind-to-plan-revision` 23/23, `answer-feeds-sufficiency`
+4/4, `streaming-human-loop-e2e` 2/2, `streaming-precompute` 61/61, `sufficiency-evidence` 13/13,
+`streaming-questions-sweeper` 34/34; `gate-critic-compaction` 16/17 (check 3, expected).
+Two mutants run by hand were caught: dropping the release-digest test in the reader turns
+case 30 red; dropping `passesValidation` from the review crossing turns case 7 red.
+
+**Route tables as built** (`subagentMayRunRoute`, after `menuRouteArgs`): allowed — `menu`;
+`menu commands`; `menu task add|start|fail|cancel|list|board …`; `menu task complete …`
+without `--continue`; `dashboard`; `tasks`; `task …`; `browse …`; `section …`; `stubs …`;
+`validate …`; `inbox questions|decisions|gates|escalations|migration|verify|stale|cleanup …`;
+`plan <ref>`. Everything else is refused to a background agent: no arguments or only
+`--live-agent-ids`, every `stream …`, bare `plan`, `menu task complete … --continue`, `menu`
+with any other second word, an unknown `inbox` sub-command, any unknown first word. Outside a
+pure call: a segment running a JavaScript runtime on a script ending `start.js` with a refused
+route, or an inline script naming `menu-screens`, `streaming-gate`, `continueAfterCrossing` or
+`approveSubplans`.
+
+**Gate critic orders** — replaced: R-240 (the answer command now
+`stream answer <ref> '<id>' '<key>' '<digest>'`; re-recorded under this slice, slice 1's
+instruction kept), R-251 (the structural band's "only exceptions" now "in a synthesis", plus
+the classification's plan-line trace), R-688 (the anti-scope row). Added: N-010 (read the plan
+and its parent plan), N-011 (add a classified question for every weighty choice left unasked;
+two anchors, the second on the added ids), N-012 (an empty author list classified the same
+way), N-013 (never remove, reword or renumber an author's question). Units 251 and 688 marked
+`replaced`. With the ids listed on the approved line and the approval re-recorded (simulated
+in a scratch copy), all ten inventory checks pass.
+
+**Bytes:** gate critic 137,962 → 139,524; `maxBytes` raised by the measured overage of 1,562,
+one more `ceiling_corrections` entry. `ORDER_FLOOR` 590 → 594. `KINDS_SHA256` re-checked: only
+fates changed, so the digest of the `n:kind` lines is unchanged (ba0606ed…).
+
+**Hook time per call** (median of 7 spawned runs, this machine): main session `ls` 23 ms,
+background agent `ls` 24 ms, main session `stream answer` 25 ms, background agent
+`stream answer` (refused) 26 ms, background agent `menu task complete` 26 ms.
+
+### Step 14 — VERIFY
+
+Lint (`eslint --max-warnings 0`) on every changed JavaScript file: zero warnings. `tsc
+--checkJs`: 0 errors. False-green 207 (not higher; the first full run found two empty catches
+in `crossOnEvidence`, fixed), dead exports and unreachable files within their baselines
+(`HOLD`, `questionDigest`, `continueAfterCrossing`, `recordDeployReadyNotice`, `summarize` each
+have a live caller), unexecutable-instruction baseline unchanged (`classify` is documented in
+`start.md`), `CLAUDE.md` 14,952 bytes (count 563 → 564 by `release.js`).
+
+Full `npm test` (second run, after the fixes from the first): tests 12665, pass 12661, fail 4,
+cancelled 0, skipped 0; coverage 99.87% (floor 99). The four:
+
+1. `tests/gate-critic-compaction.test.js` check 3 — expected: the order ids are not yet on the
+   approved line for `agents/iron-loop/gate-critic.md`.
+2. `tests/question-blocking-default.test.js` case 50 — the same cause (it runs check 3 on the
+   real inventories); green once the line is filled.
+3. `tests/golden-corpus-fence.test.js` "the baseline is exact" — unclaimed progress: the
+   finding `task-registry::src/lib/menu-screens.js` is gone (live 5, baseline 6); the ratchet
+   wants `.ctoc/golden-corpus-baseline.json` lowered to 5 with that key dropped. Outside
+   `files:`; not edited.
+4. `tests/readme-numbers.test.js` — `README.md` says 563 test files; this slice creates one.
+   `release.js` updates it to 564, but `README.md` is outside `files:`; reverted, not edited.
+   Both edits were made in a scratch state and both tests then passed (62/62, 20/20).
+
+Uncovered new lines (fail-soft paths only): the continuation's sweep, crossing-pass and start
+failures and the plan-name fallback; `appendDefaultDecisions`' write failure; the inner
+`removeEntry` failure after a failed restore; the outer catch of `crossOnEvidence`.
+
+### Not verified
+
+- A real Claude Code payload with `agent_id` was not captured here; the rule relies on the
+  coordinator's verification (Decision 16).
+- A claimed build task returned in `promote` is already `running`; whether the session's
+  `menu task start <id>` on it is accepted is slice 3's recipe and was not exercised.
+- No CHANGELOG exists in `files:`; none was written.

@@ -381,6 +381,24 @@ describe('crossings on evidence and the continuation (cases 1–13)', () => {
     assert.equal(fs.readFileSync(ledger.ledgerPath('c8', root), 'utf8'), before, 'no entry into done is left behind');
   });
 
+  it('case 8b — when the admission record cannot be restored it is removed, so no record names done for a plan in review', (t) => {
+    const root = makeSandbox();
+    seedBuilt(root, 'c8b');
+    writePlan(root, 'done/c8b.md', '# another plan with the same name\n\nBody.\n');
+    const safeFs = require('../src/lib/safe-fs.js');
+    const real = safeFs.writeFileSync;
+    const ledgerFile = ledger.ledgerPath('c8b', root);
+    t.mock.method(safeFs, 'writeFileSync', (target, ...rest) => {
+      if (path.resolve(String(target)) === path.resolve(ledgerFile)) throw new Error('injected restore failure');
+      return real(target, ...rest);
+    });
+
+    menuScreens.continueAfterCrossing(root);
+
+    assert.equal(exists(root, 'review/c8b.md'), true);
+    assert.equal(ledger.readEntry('c8b', root), null, 'neither restored nor left naming done: removed');
+  });
+
   it('case 9 — with deployment enabled a finished plan is recorded deploy-ready; nothing deploys', () => {
     const root = makeSandbox();
     fs.writeFileSync(path.join(root, '.ctoc', 'settings.json'), JSON.stringify({ deployment: { enabled: true } }));

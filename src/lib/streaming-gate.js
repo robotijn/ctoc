@@ -708,17 +708,38 @@ function crossOnEvidence(root, planPath, ref, verdict) {
     try {
       newPath = movePlan(planPath, 'done', root);
     } catch {
-      try { safeFs.writeFileSync(ledgerFile, prior); } catch { /* the restore failed: the entry names done, the plan stays in review */ }
+      restoreLedgerFile(ledgerFile, prior, ledger, slug, root);
       return false;
     }
-    try {
-      if (require('./deployment').getDeploymentConfig(root).enabled) {
-        require('./actions').recordDeployReadyNotice(newPath, root);
-      }
-    } catch { /* a notice is a record for the human; its failure never undoes the crossing */ }
+    // Both are fail-soft by contract: the config falls back to its defaults, and the notice
+    // writer logs its own failure; a notice never undoes the crossing.
+    if (require('./deployment').getDeploymentConfig(root).enabled) {
+      require('./actions').recordDeployReadyNotice(newPath, root);
+    }
     return true;
   } catch {
     return false; // fail-soft: never brick the read
+  }
+}
+
+/**
+ * Put the ledger file back to its bytes from before a crossing whose move failed. When even
+ * that write fails, the entry is removed, so no record ever names `done` for a plan still in
+ * review (the plan then lacks its admission record and cannot finish on its evidence — the
+ * fail-closed direction).
+ * @returns {boolean} true when the prior bytes were restored
+ */
+function restoreLedgerFile(ledgerFile, prior, ledger, slug, root) {
+  try {
+    safeFs.writeFileSync(ledgerFile, prior);
+    return true;
+  } catch {
+    try {
+      ledger.removeEntry(slug, root);
+    } catch {
+      return false; // neither restored nor removed: the plan stays in review either way
+    }
+    return false;
   }
 }
 
