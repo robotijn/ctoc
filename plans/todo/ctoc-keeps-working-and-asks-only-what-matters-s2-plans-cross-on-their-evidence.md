@@ -1631,3 +1631,26 @@ Lint zero warnings, `tsc` zero errors. Full `npm test` (once, foreground): tests
 `tests/gate-critic-compaction.test.js` check 3 and `tests/question-blocking-default.test.js`
 case 50 — `order R-223 … never names this order for agents/iron-loop/gate-critic.md in its
 approved specification`, until the session lists R-223, R-271 and R-559 and re-records.
+
+### Verification round
+
+From the security verification of 84bb8501 (verdict: block), test-first on c58f54c4:
+
+- Hook case 87 (the menu recognised by what Node runs: `start` without `.js`, `START.JS`,
+  `Start.js`, another CTOC copy by package.json or plugin.json name, a directory, an
+  unresolvable path into `src/commands`, a `cd` into the menu folder, a session standing in
+  it) — red: `node copy/src/commands/start stream approve review/x.md` allowed.
+- Hook case 88 (inline code naming CTOC's code) — red: `node -e
+  "require('./src/lib/loop-b-driver').loopBDirective(process.cwd())"` allowed.
+- Hook case 89 (the hook and `menu-screens.parseTaskArgs` read the same vectors the same way)
+  — red: `parseTaskArgs` not exported.
+- Case 37 (within one revision every write keeps every question it replaces) — red: a second
+  classified write dropping q10 and q11 was accepted.
+- Case 38 (the digest names the recommended option) — red: moving `recommended` left the
+  digest unchanged and the classification was accepted.
+- Case 39 (an old-style hold line on a question id holds nothing; CTOC's hold keeps a built
+  plan with no questions in review) — red: the old line held.
+- Every in-scope test that derives the digest independently now uses the new format
+  `[prompt, pairs, recommended keys]`, so cases 14, 17, 19, 28, 29, 30, 32 are red until the
+  module changes; case 29's rewrite became a new revision (within one revision a file may only
+  grow).

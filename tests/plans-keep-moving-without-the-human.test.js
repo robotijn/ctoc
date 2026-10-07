@@ -119,12 +119,17 @@ const ATTESTATION = Object.freeze({
     .map((l) => [l, { state: 'clean-pass', coverage: 'full', findings: 0 }])),
 });
 
-/** The answer digest, derived here independently of the module (slice 1's format). */
+/**
+ * The answer digest, derived here independently of the module: sha256 of
+ * JSON [prompt, [[key, label], …] by key, [recommended keys] sorted], every text NFKC-folded,
+ * accents removed, control characters stripped, trimmed, lower-cased.
+ */
 function digestOf(q) {
   const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '')
     .replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
   const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  return crypto.createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs])).digest('hex');
+  const recommended = q.options.filter((o) => o.recommended === true).map((o) => o.key).sort();
+  return crypto.createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs, recommended])).digest('hex');
 }
 
 function fork(id, prompt = 'Which database engine?', labels = ['Postgres', 'SQLite'], topic = 'technology-stack') {
@@ -846,10 +851,13 @@ describe('an answer is bound to the question as shown (cases 28–33)', () => {
     const ref = 'functional/x.md';
     writePlan(root, ref, functionalBody('Customer import'));
     const q = fork('q10-db');
-    const stamp = writeQuestions(root, ref, [q]);
+    writeQuestions(root, ref, [q]);
     const kept = streamingGate.streamingGateScreen(root).actions['Postgres'];
+    // The plan changed and its questions were regenerated with the labels swapped between the
+    // keys (a revision; within one revision a file may only grow).
     const swapped = { ...q, options: [{ key: '1', label: 'SQLite', recommended: true }, { key: '2', label: 'Postgres' }] };
-    writeQuestions(root, ref, [swapped], { stamp });
+    fs.utimesSync(planPathOf(root, ref), new Date(NOW + 9000), new Date(NOW + 9000));
+    writeQuestions(root, ref, [swapped]);
 
     const refusedText = 'Nothing was recorded for x.md: this answer does not match the question as it stands now, so it cannot be checked. The question will be asked again.';
     const screen = runAction(root, kept);
@@ -1132,5 +1140,59 @@ describe('every route a background agent may run moves nothing (case 36)', () =>
     assert.equal(exists(root, fref), true, 'the crossable plan is still waiting');
     assert.equal(exists(root, 'review/r36.md'), true, 'the finishable plan is still in review');
     assert.deepEqual(snapshot(), before, 'the approval ledger is byte-identical');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('the verification round (cases 37–39)', () => {
+  it('case 37 — within one revision every write keeps every question of the file it replaces; the set may only grow', () => {
+    const root = makeSandbox();
+    const ref = 'functional/c37.md';
+    writePlan(root, ref, functionalBody('Exports'));
+    const q10 = fork('q10-db');
+    const q11 = fork('q11-auth', 'Which sign-in provider?', ['Clerk', 'Auth0']);
+    const stamp = writeQuestions(root, ref, [q10, q11]);
+
+    const dropped = precompute.writePlanQuestions(root, ref, [detail('q12-color', 'Which colour?', ['Blue', 'Red'])], stamp, undefined, CLASSIFIED);
+    assert.equal(dropped.ok, false);
+    assert.equal(dropped.reason, 'classification-dropped-question');
+    const v = precompute.hasEnoughInformation(root, ref);
+    assert.equal(v.enough, false, 'the weighty questions are still open');
+    assert.deepEqual(v.blocking.map((b) => b.id), ['q10-db', 'q11-auth']);
+
+    const grown = precompute.writePlanQuestions(root, ref, [q10, q11, detail('q12-color', 'Which colour?', ['Blue', 'Red'])], stamp, undefined, CLASSIFIED);
+    assert.equal(grown.ok, true, 'the set may grow');
+  });
+
+  it('case 38 — the digest names the recommended option: a classification may not move the default', () => {
+    const root = makeSandbox();
+    const ref = 'functional/c38.md';
+    writePlan(root, ref, functionalBody('Reports'));
+    const authored = detail('q10-format', 'Which format?', ['CSV', 'JSON']);
+    const stamp = writeQuestions(root, ref, [authored], { classified: false });
+    const moved = { ...authored, options: [{ key: '1', label: 'CSV' }, { key: '2', label: 'JSON', recommended: true }] };
+    assert.notEqual(precompute.questionDigest(moved), precompute.questionDigest(authored));
+    assert.equal(precompute.questionDigest(authored), digestOf(authored));
+
+    const res = precompute.writePlanQuestions(root, ref, [moved], stamp, undefined, CLASSIFIED);
+    assert.equal(res.ok, false);
+    assert.equal(res.reason, 'classification-dropped-author-question');
+    menuScreens.continueAfterCrossing(root);
+    assert.equal(exists(root, ref), true, 'the plan does not cross on the opposite default');
+  });
+
+  it("case 39 — a hold is CTOC's own hold only: an old-style line on a question id holds nothing", () => {
+    const root = makeSandbox();
+    const ref = 'functional/c39.md';
+    writePlan(root, ref, functionalBody('Imports'));
+    const q = detail('q10-color', 'Which colour?', ['Blue', 'Red']);
+    const stamp = writeQuestions(root, ref, [q]);
+    appendLine(root, { ts: new Date(NOW + 1000).toISOString(), ref, questionId: 'q10-color', optionKey: '1', holds: true, planMtimeMs: stamp, questionDigest: digestOf(q) });
+    assert.notEqual(precompute.hasEnoughInformation(root, ref).reason, 'held');
+
+    const built = seedBuilt(root, 'c39b');
+    appendLine(root, { ts: new Date(NOW + 2000).toISOString(), ref: built.ref, questionId: 'ctoc-hold', optionKey: 'hold', holds: true, questionDigest: precompute.HOLD.digest });
+    menuScreens.continueAfterCrossing(root);
+    assert.equal(exists(root, built.ref), true, "CTOC's hold keeps a built plan with no questions in review");
   });
 });

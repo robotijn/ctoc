@@ -175,7 +175,7 @@ describe('plan <ref> asks the PRODUCT question first', () => {
     const shown = precompute.loadPlanQuestions(root, 'review/session-expiry.md').find((x) => x.id === 'q01-session-idle-timeout');
     const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
     const pairs = shown.options.map((o) => [o.key, ident(o.label)]).sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0));
-    const digest = require('node:crypto').createHash('sha256').update(JSON.stringify([ident(shown.prompt), pairs])).digest('hex');
+    const digest = require('node:crypto').createHash('sha256').update(JSON.stringify([ident(shown.prompt), pairs, shown.options.filter((o) => o.recommended === true).map((o) => o.key).sort()])).digest('hex');
     assert.equal(r.actions['Configurable per account'], `stream answer review/session-expiry.md 'q01-session-idle-timeout' '1' '${digest}'`);
   });
 

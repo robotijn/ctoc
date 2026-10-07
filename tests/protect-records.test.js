@@ -489,3 +489,84 @@ describe('a background agent: one reading of a command (security review leads, 2
     allowedBash('grep -n route src/commands/start.js | head');
   });
 });
+
+describe('the verification round: the menu is recognised by what Node runs, not by its text', () => {
+  const REFUSAL_SUBAGENT = 'CTOC refused this call because a background agent may not answer CTOC\'s '
+    + 'questions, approve a plan or move one on through the menu; report your result and let the '
+    + 'main session do it.';
+  const agentBash = (command, cwd) => ({ ...bash(command, cwd), agent_id: 'a1b2c3', agent_type: 'iron-loop-executor' });
+  const refusedAgent = (command, cwd) => assertRefused(run(agentBash(command, cwd)), command, REFUSAL_SUBAGENT);
+  const allowedAgent = (command, cwd) => assertAllowed(run(agentBash(command, cwd)), command);
+  /** Another copy of CTOC inside the project: named "ctoc" by its package.json or its plugin.json. */
+  function ctocCopy(dir, manifest = 'package') {
+    fs.mkdirSync(p(dir, 'src', 'commands'), { recursive: true });
+    fs.mkdirSync(p(dir, 'src', 'lib'), { recursive: true });
+    fs.writeFileSync(p(dir, 'src', 'commands', 'start.js'), '');
+    fs.writeFileSync(p(dir, 'src', 'lib', 'actions.js'), '');
+    if (manifest === 'package') fs.writeFileSync(p(dir, 'package.json'), '{"name":"CTOC"}');
+    else {
+      fs.mkdirSync(p(dir, '.claude-plugin'), { recursive: true });
+      fs.writeFileSync(p(dir, '.claude-plugin', 'plugin.json'), '{"name":"ctoc"}');
+    }
+  }
+
+  test('87 · every CTOC menu, however Node finds it, gets the same route list', () => {
+    ctocCopy('copy');
+    ctocCopy('cache', 'plugin');
+    for (const command of [
+      'node copy/src/commands/start stream approve review/x.md',
+      'node copy/src/commands/START.JS stream approve review/x.md',
+      'node copy/src/commands/Start.js stream approve review/x.md',
+      'node copy/src/commands/start.js stream approve review/x.md',
+      `node ${p('cache', 'src', 'commands', 'start.js')} stream approve review/x.md`,
+      'node copy/src/commands stream approve review/x.md',
+      'node gone/src/commands/start stream approve review/x.md',
+      'cd copy/src/commands && node start stream approve review/x.md',
+    ]) refusedAgent(command);
+    refusedAgent('node start stream approve review/x.md', p('copy', 'src', 'commands'));
+    allowedAgent('node copy/src/commands/start menu task list');
+    allowedAgent(`node ${p('cache', 'src', 'commands', 'start.js')} menu task list`);
+    allowedAgent('node start menu task list', p('copy', 'src', 'commands'));
+    fs.mkdirSync(p('scripts'), { recursive: true });
+    fs.writeFileSync(p('scripts', 'build.js'), '');
+    allowedAgent('node scripts/build.js --watch');
+    allowedBash('node copy/src/commands/start stream approve review/x.md');
+  });
+
+  test("88 · inline code naming CTOC's code is refused to a background agent", () => {
+    ctocCopy('copy');
+    for (const command of [
+      `node -e "require('./src/lib/loop-b-driver').loopBDirective(process.cwd())"`,
+      `node -e "require('./src/lib/actions').movePlan('a','b')"`,
+      `node -p "require('./src/lib/actions')"`,
+      `node --eval "require('./src/commands/start.js')"`,
+      `node --print "require('./src/lib/actions')"`,
+      `node --input-type=commonjs -e "require('ctoc/lib')"`,
+      `echo "require('./src/lib/actions').movePlan()" | node`,
+      `node -e "require('./copy/src/lib/actions')"`,
+    ]) refusedAgent(command);
+    allowedAgent(`node -e "console.log(1 + 1)"`);
+    allowedAgent(`node -e "require('fs').readdirSync('.')"`);
+    allowedAgent('cat src/lib/actions.js');
+    allowedBash(`node -e "require('./src/lib/loop-b-driver').loopBDirective(process.cwd())"`);
+  });
+
+  test("89 · the hook reads `menu task` arguments with the menu's own parser", () => {
+    const { parseTaskArgs } = require('../src/lib/menu-screens.js');
+    const MENU = 'node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js" menu task complete';
+    const vectors = [
+      [['t7', '--summary', '--continue'], true],
+      [['t7', '--gate', '--continue'], true],
+      [['t7', '--continue'], false],
+      [['t7', '--summary', 'x', '--continue'], false],
+      [['t7', '--force'], false],
+      [['t7', '--fail'], false],
+    ];
+    for (const [args, allowed] of vectors) {
+      const parsed = parseTaskArgs(args);
+      assert.equal(!(parsed.continue || parsed.force || parsed.fail), allowed, `the menu reads ${args.join(' ')} that way`);
+      const res = run(agentBash(`${MENU} ${args.map((a) => `'${a}'`).join(' ')}`));
+      assert.equal(res.status, allowed ? 0 : 2, `the hook agrees on ${args.join(' ')}`);
+    }
+  });
+});
