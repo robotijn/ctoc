@@ -206,11 +206,36 @@ function refToPlanPath(root, ref) {
 
 /**
  * The question topics that always reach the human, whatever the flags say: the owner
- * named them as the questions of huge importance (2026-10-06). `detail` is the one
- * topic that never does on its own account.
+ * named them as the questions of huge importance (2026-10-06). `data-model` means a
+ * persisted data shape or an interface code outside this project depends on (a schema,
+ * a file format, a public interface), never every exported function. `detail` is the
+ * one topic that never reaches the human on its own account.
  */
 const HIGH_STAKES_TOPICS = Object.freeze(['technology-stack', 'algorithm', 'data-model', 'security-posture', 'irreversible', 'cost']);
 const QUESTION_TOPICS = Object.freeze([...HIGH_STAKES_TOPICS, 'detail']);
+
+/**
+ * Is `id` one of the two reserved questions that carry no topic — the gate ruling or the
+ * coverage notice, bare or with a `-r<digits>` revision suffix?
+ * @param {*} id
+ * @returns {boolean}
+ */
+function isTopiclessId(id) {
+  if (typeof id !== 'string') return false;
+  for (const base of ['q98-critique-coverage', 'q99-gate-ruling']) {
+    if (id === base) return true;
+    if (id.startsWith(`${base}-r`) && /^[0-9]+$/.test(id.slice(base.length + 2))) return true;
+  }
+  return false;
+}
+// Zero-width and bidirectional-control characters: text that reads one way and says another.
+const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/;
+const CONTROL = /[\u0000-\u001F\u007F-\u009F]/g;
+
+/** A label as the human tells it apart: control characters stripped, trimmed, lower-cased. */
+function labelIdentity(label) {
+  return label.replace(CONTROL, '').trim().toLowerCase();
+}
 
 /**
  * Validate a raw parsed value against the per-plan QUESTIONS contract. PURE and
@@ -220,15 +245,23 @@ const QUESTION_TOPICS = Object.freeze([...HIGH_STAKES_TOPICS, 'detail']);
  * surfaces.
  *
  *   Question = { id, prompt, critical, important, topic?, options: [Option] }
- *   Option   = { key, label, recommended?, holds?, pros?, cons?, description? }
+ *   Option   = { key, label, recommended?, pros?, cons?, description? }
  *
  * Rules: `id`/`prompt`/`key`/`label` are REQUIRED non-empty strings; question ids
- * are UNIQUE across the array; `options` is REQUIRED with AT LEAST ONE option;
- * `critical` and `important` are REQUIRED booleans on every question (a missing
- * flag is an undeclared fork, refused at the write); `topic` is optional and, when
- * present, one of QUESTION_TOPICS — an unknown topic refuses the WHOLE file, on
- * write and (because `planQuestionsStatus` re-validates) on read; `recommended` and
- * `holds` are optional booleans; `pros`/`cons`/`description` are optional strings.
+ * are UNIQUE across the array; `options` is REQUIRED with one to three options whose
+ * keys are unique and whose labels are unique once control characters are stripped,
+ * the label trimmed and lower-cased; `critical` and `important` are REQUIRED booleans
+ * (a missing flag is an undeclared fork); `topic` is optional and, when present, one of
+ * QUESTION_TOPICS — an absent topic keeps the reading of a file written before topics
+ * existed (isBlockingQuestion condition 4) — and the reserved gate ruling and coverage
+ * notice carry none, so a topic can never turn the ruling into a decided detail;
+ * `recommended` is an optional boolean; `pros`/`cons`/`description` are optional
+ * strings. No human-visible text may carry a zero-width or bidirectional-control
+ * character. A single option with no recommendation is a notice, so it is refused on a
+ * high-stakes topic, where it would decide a weighty question with no answer at all.
+ * `holds` is refused: a hold is the human's answer, recorded by CTOC in the answers
+ * log, never a field a question file may set. A violation anywhere refuses the WHOLE
+ * file, on write and (because `planQuestionsStatus` re-validates) on read.
  *
  * @param {*} raw
  * @returns {{ valid: boolean, errors: string[] }}
@@ -241,6 +274,9 @@ function validatePlanQuestions(raw) {
   }
 
   const seenQuestionIds = new Set();
+  const visible = (where, text) => {
+    if (typeof text === 'string' && INVISIBLE.test(text)) errors.push(`${where} carries an invisible or direction-changing character`);
+  };
 
   raw.forEach((question, qi) => {
     const where = `questions[${qi}]`;
@@ -252,13 +288,14 @@ function validatePlanQuestions(raw) {
       errors.push(`${where} is missing a non-empty string id`);
     } else {
       if (seenQuestionIds.has(question.id)) {
-        errors.push(`duplicate question id ${JSON.stringify(question.id)}`);
+        errors.push(`duplicate question id ${JSON.stringify(safeQuestionId(question.id))}`);
       }
       seenQuestionIds.add(question.id);
     }
     if (!isNonEmptyString(question.prompt)) {
       errors.push(`${where} is missing a non-empty string prompt`);
     }
+    visible(`${where}.prompt`, question.prompt);
     // Both importance flags are MANDATORY booleans, not optional. A missing flag is
     // NOT a statement that the question is unimportant — it is the absence of a
     // statement, and `isBlockingQuestion` fails closed on it (the question BLOCKS).
@@ -275,17 +312,25 @@ function validatePlanQuestions(raw) {
     if (typeof question.important !== 'boolean') {
       errors.push(`${idLabel} must declare a boolean "important" flag (got ${question.important === undefined ? 'no value' : typeof question.important}); an undeclared importance is treated as a fork`);
     }
-    if (question.topic !== undefined && !QUESTION_TOPICS.includes(question.topic)) {
+    const topicless = isTopiclessId(question.id);
+    if (topicless && question.topic !== undefined) {
+      errors.push(`${idLabel} is the gate ruling or the coverage notice and carries no "topic"`);
+    } else if (question.topic !== undefined && !QUESTION_TOPICS.includes(question.topic)) {
       errors.push(`${idLabel} has an unknown "topic"; allowed: ${QUESTION_TOPICS.join(', ')}`);
     }
     if (!Array.isArray(question.options)) {
       errors.push(`${where}.options must be an array`);
       return;
     }
-    if (question.options.length === 0) {
-      errors.push(`${where}.options must have at least one option`);
+    if (question.options.length === 0 || question.options.length > 3) {
+      errors.push(`${where}.options must have one to three options`);
+    }
+    if (question.options.length === 1 && HIGH_STAKES_TOPICS.includes(question.topic)
+        && !(question.options[0] && question.options[0].recommended === true)) {
+      errors.push(`${idLabel} is a ${question.topic} question with one option and no recommendation; a weighty question is never a notice`);
     }
     const seenKeys = new Set();
+    const seenLabels = new Set();
     question.options.forEach((option, oi) => {
       const owhere = `${where}.options[${oi}]`;
       if (!option || typeof option !== 'object' || Array.isArray(option)) {
@@ -302,16 +347,22 @@ function validatePlanQuestions(raw) {
       }
       if (!isNonEmptyString(option.label)) {
         errors.push(`${owhere} is missing a non-empty string label`);
+      } else {
+        const identity = labelIdentity(option.label);
+        if (seenLabels.has(identity)) errors.push(`${owhere}.label repeats another label within ${where}`);
+        seenLabels.add(identity);
       }
-      for (const field of ['recommended', 'holds']) {
-        if (option[field] !== undefined && typeof option[field] !== 'boolean') {
-          errors.push(`${owhere}.${field} must be a boolean when present`);
-        }
+      if (option.recommended !== undefined && typeof option.recommended !== 'boolean') {
+        errors.push(`${owhere}.recommended must be a boolean when present`);
       }
-      for (const field of ['pros', 'cons', 'description']) {
-        if (option[field] !== undefined && typeof option[field] !== 'string') {
+      if (option.holds !== undefined) {
+        errors.push(`${owhere}.holds is not a question field: a hold is the human's answer, recorded by CTOC`);
+      }
+      for (const field of ['label', 'pros', 'cons', 'description']) {
+        if (field !== 'label' && option[field] !== undefined && typeof option[field] !== 'string') {
           errors.push(`${owhere}.${field} must be a string when present`);
         }
+        visible(`${owhere}.${field}`, option[field]);
       }
     });
   });
@@ -710,10 +761,16 @@ function entryRecordedAtMs(entry) {
   return null;
 }
 
+/** The plan's file name — its identity across stage moves — or null for a non-string ref. */
+function planFileOf(ref) {
+  return typeof ref === 'string' ? ref.slice(ref.lastIndexOf('/') + 1) : null;
+}
+
 /**
  * The option key one answers-log entry chose: `optionKey` (what `streamAnswer`
  * writes), else `answer` (the older agent-written shape `entryRecordedAtMs` also
- * reads), else `undefined` — which matches no option, so it can never hold a plan.
+ * reads), else `undefined` — an entry that records no answer, which binds nothing and
+ * neither sets nor releases a hold.
  */
 function chosenKey(entry) {
   return entry.optionKey !== undefined ? entry.optionKey : entry.answer;
@@ -762,22 +819,38 @@ function chosenKey(entry) {
  * enough". Failing hard on one bad line would let a single junk append deadlock the
  * gate forever, since the log is never pruned.
  *
+ * ── AN ANSWER NAMES ONE OF THE QUESTION'S OPTIONS ──────────────────────────────
+ * When the questions are known (derived here, or passed as `revision.questions`), an
+ * entry binds only when its recorded key is one of that question's option keys; any
+ * other entry is counted in `unbound`. A caller that passes a revision WITHOUT the
+ * questions keeps the older id-only binding.
+ *
+ * ── A HOLD IS THE HUMAN'S, RECORDED BY CTOC IN THIS LOG ────────────────────────
+ * A hold is never read from a question file: an author could mark any option. It is
+ * an entry carrying `holds: true` for this plan — matched by the plan's file name, so a
+ * hold survives revisions and stage moves — and it lasts until a LATER entry for the
+ * same plan and question records an answer without it. Entries that record no answer
+ * neither set nor release a hold.
+ *
  * @param {string} root project root
  * @param {string} ref plan reference ("stage/file.md")
- * @param {{questionsRevisionMs:number, planMtimeMs:number}} [revision] omitted ⇒
- *   derived internally from `planQuestionsStatus`. `hasEnoughInformation` passes the
- *   one it already computed, purely to avoid a redundant stat.
- * @returns {{ok:boolean, ids:Set<string>, keys:Map<string,*>,
+ * @param {{questionsRevisionMs:number, planMtimeMs:number, questions?:Array<object>}}
+ *   [revision] omitted ⇒ derived internally from `planQuestionsStatus`.
+ *   `hasEnoughInformation` passes the one it already computed, with its questions,
+ *   purely to avoid a redundant read.
+ * @returns {{ok:boolean, ids:Set<string>, keys:Map<string,*>, held:string[],
  *   bound:{stamped:number, derived:number}, unbound:number}} `keys` maps every id in
  *   `ids` to the option key its bound answer chose (the later log line wins), so a
- *   caller can honour WHAT was answered, not only THAT it was — an empty Map on every
+ *   caller can honour WHAT was answered, not only THAT it was. `held` lists the
+ *   question ids whose latest answer for this plan holds it. Both are empty on every
  *   closed path. `unbound` counts entries for THIS ref that were read but bound
- *   to no revision, so a caller can say so out loud instead of silently re-asking.
+ *   to no revision (or named no option of the question), so a caller can say so out
+ *   loud instead of silently re-asking.
  */
 function readAnsweredQuestionIds(root, ref, revision) {
   const ids = new Set();
   const keys = new Map();
-  const closed = { ok: false, ids, keys, bound: { stamped: 0, derived: 0 }, unbound: 0 };
+  const closed = { ok: false, ids, keys, held: [], bound: { stamped: 0, derived: 0 }, unbound: 0 };
 
   // 1. RESOLVE THE REVISION FIRST, before the file is read. An unestablished
   //    revision cannot bind anything, and saying so as `ok:false` rather than
@@ -787,7 +860,7 @@ function readAnsweredQuestionIds(root, ref, revision) {
   if (rev === undefined) {
     const st = planQuestionsStatus(root, ref);
     if (st.status !== 'ready') return closed;
-    rev = { questionsRevisionMs: st.questionsRevisionMs, planMtimeMs: st.planMtimeMs };
+    rev = { questionsRevisionMs: st.questionsRevisionMs, planMtimeMs: st.planMtimeMs, questions: st.questions };
   }
   if (!rev || typeof rev !== 'object'
       || !Number.isFinite(rev.questionsRevisionMs)
@@ -802,11 +875,15 @@ function readAnsweredQuestionIds(root, ref, revision) {
   // plan's mtime is floored to align the precisions. This is precision alignment,
   // not tolerance: the comparison stays a plain numeric at-or-after.
   const planFloorMs = Math.floor(rev.planMtimeMs);
+  const optionKeys = Array.isArray(rev.questions)
+    ? new Map(rev.questions.filter((q) => q && Array.isArray(q.options)).map((q) => [q.id, new Set(q.options.map((o) => o && o.key))]))
+    : null;
+  const planFile = planFileOf(ref);
 
   const file = path.join(root, '.ctoc', 'streaming', 'answers.jsonl');
   let raw;
   try {
-    if (!safeFs.existsSync(file)) return { ok: true, ids, keys, bound: { stamped: 0, derived: 0 }, unbound: 0 };
+    if (!safeFs.existsSync(file)) return { ok: true, ids, keys, held: [], bound: { stamped: 0, derived: 0 }, unbound: 0 };
     raw = safeFs.readFileSync(file, 'utf8');
   } catch {
     return closed; // unreadable → we do not KNOW what was answered
@@ -815,14 +892,21 @@ function readAnsweredQuestionIds(root, ref, revision) {
   let stamped = 0;
   let derived = 0;
   let unbound = 0;
+  const holdState = new Map();
 
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     let entry;
     try { entry = JSON.parse(trimmed); } catch { continue; }
-    if (!entry || typeof entry !== 'object') continue;
-    if (entry.ref !== ref || typeof entry.questionId !== 'string') continue;
+    if (!entry || typeof entry !== 'object' || typeof entry.questionId !== 'string') continue;
+    const key = chosenKey(entry);
+    if (key !== undefined && planFileOf(entry.ref) === planFile) holdState.set(entry.questionId, entry.holds === true);
+    if (entry.ref !== ref) continue;
+    if (optionKeys !== null && !(optionKeys.has(entry.questionId) && optionKeys.get(entry.questionId).has(key))) {
+      unbound++;
+      continue;
+    }
 
     const stamp = Number(entry.planMtimeMs);
     if (Number.isFinite(stamp)) {
@@ -831,7 +915,7 @@ function readAnsweredQuestionIds(root, ref, revision) {
       //     the whole guard.
       if (stamp === rev.questionsRevisionMs) {
         ids.add(entry.questionId);
-        keys.set(entry.questionId, chosenKey(entry));
+        keys.set(entry.questionId, key);
         stamped++;
       } else {
         unbound++;
@@ -844,14 +928,15 @@ function readAnsweredQuestionIds(root, ref, revision) {
     const at = entryRecordedAtMs(entry);
     if (at !== null && at >= planFloorMs) {
       ids.add(entry.questionId);
-      keys.set(entry.questionId, chosenKey(entry));
+      keys.set(entry.questionId, key);
       derived++;
     } else {
       unbound++;
     }
   }
 
-  return { ok: true, ids, keys, bound: { stamped, derived }, unbound };
+  const held = [...holdState].filter(([, holds]) => holds).map(([id]) => id);
+  return { ok: true, ids, keys, held, bound: { stamped, derived }, unbound };
 }
 
 /**
@@ -877,19 +962,21 @@ function readAnsweredQuestionIds(root, ref, revision) {
  *   'stale'              the questions predate the plan's current text
  *   'invalid'            the questions file is corrupt
  *   'unknown-plan'       the ref is malformed, or the plan file is gone
- *   'held'               the human answered a question with an option marked
- *                        `holds: true` (a Hold or a Reject) — his answer holds;
+ *   'answers-unreadable' the plan has questions and the answers log could not be
+ *                        read: an answer or a hold may be in it. Checked first.
+ *   'held'               the human's latest answer for this plan, in the answers log,
+ *                        carries `holds: true` — his Hold holds, across revisions;
  *                        `blocking` names the held questions. Checked before forks.
  *   'open-forks'         an unanswered question goes to the human (isBlockingQuestion)
- *   'answers-unreadable' a fork exists and the answers log could not be read
  * and `enough: true` with reason 'enough' in every other case — which means: the
  * questions are fresh, nothing the human answered holds the plan, and no unanswered
  * fork remains. Unanswered questions that are not forks do NOT block; each is decided
  * by its recommended option, and they are still reported honestly in `unanswered`.
  *
- * An unreadable answers log deliberately does NOT block a plan with no forks: no
- * critical/important question exists, so the log cannot change the verdict, and
- * blocking there would be a false negative that answering could never clear.
+ * An unreadable answers log blocks every plan that has questions: the log is where a
+ * human's Hold is recorded, so not reading it is not knowing whether he held the plan.
+ * A plan with NO questions has nothing to answer or hold, so its log cannot change the
+ * verdict.
  *
  * NEVER throws. Pure read — writes nothing, and crosses nothing. This is the
  * PREDICATE only: whether and how a gate consumes it is a separate decision.
@@ -930,10 +1017,11 @@ function hasEnoughInformation(root, ref) {
   const answers = readAnsweredQuestionIds(root, ref, {
     questionsRevisionMs: status.questionsRevisionMs,
     planMtimeMs: status.planMtimeMs,
+    questions,
   });
 
-  // An unreadable log yields an EMPTY answered set, so nothing can read as
-  // answered — the ignorance can only ever move the verdict toward false.
+  // An unreadable log yields an EMPTY answered set and no holds; the fail-closed
+  // return below keeps that ignorance from ever reading as a pass.
   const unanswered = questions.filter((q) => !answers.ids.has(q.id));
   const blocking = unanswered.filter(isBlockingQuestion);
   // The count that EXISTED, and the ids that bound — both from the read above, so
@@ -941,18 +1029,22 @@ function hasEnoughInformation(root, ref) {
   const computed = questions.length;
   const answered = questions.filter((q) => answers.ids.has(q.id)).map((q) => q.id);
 
-  // A human's Hold holds: an answer whose chosen option carries `holds: true` keeps
-  // the plan where it is, whatever else is open. Read from the same answers above.
-  const held = questions.filter((q) => answers.ids.has(q.id)
-    && q.options.some((o) => o.holds === true && o.key === answers.keys.get(q.id)));
-  if (held.length > 0) {
-    return { enough: false, reason: 'held', unanswered, blocking: held, unboundAnswers: answers.unbound, computed, answered };
+  // FAIL CLOSED: the log could not be read, and the plan has questions an answer or a
+  // hold could be about.
+  if (!answers.ok && computed > 0) {
+    return { enough: false, reason: 'answers-unreadable', unanswered, blocking, unboundAnswers: answers.unbound, computed, answered };
+  }
+
+  // A human's Hold holds, from the answers log only — never from the question file.
+  if (answers.held.length > 0) {
+    const heldQuestions = answers.held.map((id) => questions.find((q) => q.id === id) || { id });
+    return { enough: false, reason: 'held', unanswered, blocking: heldQuestions, unboundAnswers: answers.unbound, computed, answered };
   }
 
   if (blocking.length > 0) {
     return {
       enough: false,
-      reason: answers.ok ? 'open-forks' : 'answers-unreadable',
+      reason: 'open-forks',
       unanswered,
       blocking,
       unboundAnswers: answers.unbound,

@@ -471,8 +471,8 @@ validates it through `writePlanQuestions` (`src/lib/streaming-precompute.js`) an
 plan's own time.
 
 Each question is `{ id, prompt, critical, important, topic, options: [{ key, label, recommended?,
-holds?, pros?, cons?, description? }] }`, shaped as in `agents/iron-loop/gate-critic.md`, whose
-rule 4a defines `topic` and `holds`. Exactly one option is `recommended: true`, unless the
+pros?, cons?, description? }] }`, shaped as in `agents/iron-loop/gate-critic.md`, whose
+rule 4a defines `topic`. Exactly one option is `recommended: true`, unless the
 evidence cannot settle the answer: then two options and none. Every choice you made of technology
 stack, algorithm, data model, security posture, anything irreversible, or anything with a
 recurring or large cost is a question with that `topic`, never a silent choice; everything else

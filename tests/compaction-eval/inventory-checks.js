@@ -11,13 +11,20 @@
  * The order floor is passed in by the caller and stays written in the caller's test file, so
  * lowering it takes an edit in a second place.
  *
- * A RULE THE OWNER REPLACED. An order may end as `fate: "replaced"` only with a complete
- * `replaced_by` record — `{ instruction, date: "YYYY-MM-DD", plan, new_anchors: [...] }` — and
- * keeps its old `anchors` as history. It is then held to its NEW anchors (present in its
- * section, exactly once, each deletion reported), and its old anchors must be GONE from the
- * agent, so a replaced rule is really replaced and never silently duplicated or dropped. A unit
- * carrying a replaced order is marked `replaced` too (never `kept`); a unit marked `replaced`
- * must carry one. Everything else is held exactly as strictly as before.
+ * A RULE THE OWNER REPLACED OR ADDED. An order may end as `fate: "replaced"` only with a
+ * complete `replaced_by` record — `{ instruction, date: "YYYY-MM-DD", plan, new_anchors: [...] }`
+ * — and keeps its old `anchors` as history. It is then held to its NEW anchors (present in its
+ * section, exactly once, each deletion reported), and every sentence of an old anchor must be
+ * gone from the agent or stand inside one of the new anchors, so a replaced rule is really
+ * replaced and never silently duplicated or dropped. A unit carrying a replaced order is never
+ * `kept`; a unit marked `replaced` must carry one. A rule written after the baseline is an
+ * order with `fate: "added"` and an `added_by` record `{ instruction, date, plan }`; no unit
+ * lists it, and its own anchors are held like any other. For both records: `plan` names a plan
+ * file under `plans/<stage>/` that has an approval record `.ctoc/approvals/<plan>.json` and
+ * whose text names the order id; `date` is a real calendar date, not in the future; no new
+ * anchor already occurs in the baseline. The inventoried file must live under `agents/` or
+ * `skills/`.
+ * Everything else is held exactly as strictly as before.
  */
 
 const assert = require('node:assert/strict');
@@ -33,19 +40,55 @@ const FATES = new Set(['kept', 'tightened', 'merged', 'cut', 'replaced']);
 const CUTTABLE = new Set(['reason', 'history', 'example', 'description', 'reference']);
 
 const isReplaced = (o) => o.fate === 'replaced';
+const isAdded = (o) => o.fate === 'added';
 const nonEmpty = (v) => typeof v === 'string' && units.normalize(v).length > 0;
+const PLAN_SLUG = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+// The instruction surfaces an inventory may hold: agent definitions and specialist skills.
+const INSTRUCTION_ROOTS = ['agents', 'skills'];
 
-/** What is wrong with an order's fate and replacement record; empty when nothing is. */
-function replacementErrors(o) {
+/** True when `date` is a real YYYY-MM-DD calendar date no later than today (UTC). */
+function isPastDate(date) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const ms = Date.parse(`${date}T00:00:00Z`);
+  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === date && date <= new Date().toISOString().slice(0, 10);
+}
+
+/** The text of the approved plan `slug` under root/plans/<stage>/, or null when there is none. */
+function approvedPlanText(root, slug) {
+  if (typeof slug !== 'string' || !PLAN_SLUG.test(slug) || slug.includes('..')) return null;
+  if (!fs.existsSync(path.join(root, '.ctoc', 'approvals', `${slug}.json`))) return null;
+  const plans = path.join(root, 'plans');
+  const stages = fs.existsSync(plans) ? fs.readdirSync(plans, { withFileTypes: true }).filter((d) => d.isDirectory()) : [];
+  for (const stage of stages) {
+    const file = path.join(plans, stage.name, `${slug}.md`);
+    if (fs.existsSync(file)) return fs.readFileSync(file, 'utf8');
+  }
+  return null;
+}
+
+/**
+ * What is wrong with an order's fate and its replaced_by / added_by record; empty when nothing is.
+ * @param {object} o the order
+ * @param {string} root the repository root plans and approvals are read under
+ * @param {string} baselineFlat the normalised baseline: a new anchor must not already be in it
+ */
+function recordErrors(o, root, baselineFlat) {
   if (o.fate === undefined) return [];
-  if (!isReplaced(o)) return [`order ${o.id} has fate ${o.fate}`];
-  const r = o.replaced_by;
-  if (!r || typeof r !== 'object' || Array.isArray(r)) return [`order ${o.id} is replaced with no replaced_by record`];
+  if (!isReplaced(o) && !isAdded(o)) return [`order ${o.id} has fate ${o.fate}`];
+  const field = isReplaced(o) ? 'replaced_by' : 'added_by';
+  const r = o[field];
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return [`order ${o.id} is ${o.fate} with no ${field} record`];
   const errors = [];
-  for (const field of ['instruction', 'plan']) if (!nonEmpty(r[field])) errors.push(`order ${o.id}: replaced_by.${field} is empty`);
-  if (typeof r.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(r.date)) errors.push(`order ${o.id}: replaced_by.date is not YYYY-MM-DD`);
-  if (!Array.isArray(r.new_anchors) || r.new_anchors.length === 0 || !r.new_anchors.every(nonEmpty)) {
-    errors.push(`order ${o.id}: replaced_by.new_anchors is not a non-empty list of anchors`);
+  if (!nonEmpty(r.instruction)) errors.push(`order ${o.id}: ${field}.instruction is empty`);
+  if (!isPastDate(r.date)) errors.push(`order ${o.id}: ${field}.date is not a real YYYY-MM-DD date up to today`);
+  const planText = approvedPlanText(root, r.plan);
+  if (planText === null) errors.push(`order ${o.id}: ${field}.plan names no approved plan under plans/`);
+  else if (!planText.includes(o.id)) errors.push(`order ${o.id}: the plan ${r.plan} never names this order`);
+  const fresh = isReplaced(o) ? r.new_anchors : o.anchors;
+  if (!Array.isArray(fresh) || fresh.length === 0 || !fresh.every(nonEmpty)) {
+    errors.push(`order ${o.id}: its new anchors are not a non-empty list`);
+  } else {
+    for (const a of fresh) if (baselineFlat.includes(units.normalize(a))) errors.push(`order ${o.id}: a new anchor is already in the baseline: ${a.slice(0, 80)}`);
   }
   return errors;
 }
@@ -57,21 +100,28 @@ function liveOrder(o) {
 
 /**
  * Registers the ten inventory checks for one inventory file. Reads nothing until a check runs.
- * @param {{ test: Function, label: string, inventoryPath: string, orderFloor: number }} opts
+ * @param {{ test: Function, label: string, inventoryPath: string, orderFloor: number, root?: string }} opts
  *   test: `node:test`'s `test`; label: prefixes every test name; inventoryPath: absolute, or
- *   relative to the repository root; orderFloor: the order count at extraction, a positive integer.
+ *   relative to the repository root; orderFloor: the order count at extraction, a positive integer;
+ *   root: the repository root (default: this repository) — fixtures pass their own.
  * @throws when orderFloor is not a positive integer or inventoryPath is not a non-empty string
  */
-function defineInventoryTests({ test, label, inventoryPath, orderFloor }) {
+function defineInventoryTests({ test, label, inventoryPath, orderFloor, root = ROOT }) {
   if (!Number.isInteger(orderFloor) || orderFloor <= 0) throw new Error(`orderFloor must be a positive integer, got ${JSON.stringify(orderFloor)}`);
   if (typeof inventoryPath !== 'string' || !inventoryPath) throw new Error('inventoryPath must be a non-empty string');
-  const inventory = path.resolve(ROOT, inventoryPath);
+  const inventory = path.resolve(root, inventoryPath);
   const t = (name, fn) => test(`${label}: ${name}`, fn);
 
   function load() {
     const inv = JSON.parse(fs.readFileSync(inventory, 'utf8'));
-    const baseline = fs.readFileSync(path.resolve(ROOT, inv.baseline), 'utf8');
-    const agent = fs.readFileSync(path.resolve(ROOT, inv.agent), 'utf8');
+    const agentPath = path.resolve(root, inv.agent);
+    const inside = (dir) => {
+      const rel = path.relative(path.join(root, dir), agentPath);
+      return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel);
+    };
+    if (!INSTRUCTION_ROOTS.some(inside)) throw new Error(`the inventoried file ${inv.agent} is not under ${INSTRUCTION_ROOTS.join('/ or ')}/`);
+    const baseline = fs.readFileSync(path.resolve(root, inv.baseline), 'utf8');
+    const agent = fs.readFileSync(agentPath, 'utf8');
     return { inv, baseline, agent, live: inv.orders.map(liveOrder) };
   }
 
@@ -93,11 +143,13 @@ function defineInventoryTests({ test, label, inventoryPath, orderFloor }) {
   });
 
   t('3. every unit is classified, every order is listed, no id repeats', () => {
-    const { inv } = load();
+    const { inv, baseline } = load();
+    const baselineFlat = units.normalize(baseline);
     const ids = inv.orders.map((o) => o.id);
     assert.equal(new Set(ids).size, ids.length, 'an order id repeats');
     const known = new Set(ids);
     const replaced = new Set(inv.orders.filter(isReplaced).map((o) => o.id));
+    const added = new Set(inv.orders.filter(isAdded).map((o) => o.id));
     const listed = new Set();
     for (const u of inv.units) {
       assert.ok(KINDS.has(u.kind), `unit ${u.n} has kind ${u.kind}`);
@@ -108,14 +160,15 @@ function defineInventoryTests({ test, label, inventoryPath, orderFloor }) {
       if (u.fate === 'kept') assert.ok(!u.orders.some((id) => replaced.has(id)), `unit ${u.n} is kept but carries a replaced order`);
       for (const id of u.orders) {
         assert.ok(known.has(id), `unit ${u.n} lists unknown order ${id}`);
+        assert.ok(!added.has(id), `unit ${u.n} lists ${id}, an order added after the baseline`);
         listed.add(id);
       }
     }
     for (const o of inv.orders) {
-      assert.ok(listed.has(o.id), `order ${o.id} is listed by no unit`);
+      assert.ok(listed.has(o.id) || isAdded(o), `order ${o.id} is listed by no unit`);
       assert.ok(o.anchors.length > 0 && o.anchors.every((a) => units.normalize(a).length > 0), `order ${o.id} has an empty anchor`);
       assert.ok(o.says.length <= 160, `order ${o.id}: says is longer than 160 characters`);
-      assert.deepEqual(replacementErrors(o), [], `order ${o.id} has an incomplete replacement record`);
+      assert.deepEqual(recordErrors(o, root, baselineFlat), [], `order ${o.id} has an incomplete replaced or added record`);
     }
   });
 
@@ -124,7 +177,12 @@ function defineInventoryTests({ test, label, inventoryPath, orderFloor }) {
     const failures = units.anchorFailures(units.sectionize(agent), live);
     const flat = units.normalize(agent);
     for (const o of inv.orders.filter(isReplaced)) {
-      for (const anchor of o.anchors) if (flat.includes(units.normalize(anchor))) failures.push({ id: o.id, anchor, reason: 'replaced-but-present' });
+      const fresh = (Array.isArray(o.replaced_by && o.replaced_by.new_anchors) ? o.replaced_by.new_anchors : []).map(units.normalize);
+      for (const anchor of o.anchors) {
+        for (const sentence of units.splitUnits(anchor).map((u) => units.normalize(u.text))) {
+          if (flat.includes(sentence) && !fresh.some((a) => a.includes(sentence))) failures.push({ id: o.id, anchor: sentence, reason: 'replaced-but-present' });
+        }
+      }
     }
     assert.deepEqual(failures, [], failures.slice(0, 20).map((f) => `${f.id} (${f.reason}): ${f.anchor}`).join('\n'));
   });

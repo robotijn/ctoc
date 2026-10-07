@@ -427,6 +427,81 @@ Full `npm test` (pass 2, once, foreground): tests 12591, pass 12591, fail 0, ski
 cancelled 0; coverage 99.89% (floor 99); `[CTOC test-gate] PASS`. Lint on the three changed
 JavaScript files: zero warnings.
 
+### Fix round (Step 11 critic: ship after; Step 13 security scan: block)
+
+Test-first evidence: the new and changed cases were run against the module and the inventory
+checks as they stood at commit 7a9caec7 (saved copies) before the fix took effect: 13 of 46
+slice cases red for A and B (22, 24b, 24c, 24d, 24e, 24f, 26, 27b, 27c, 28, 29, 29b, 29c), and
+all six inventory cases red for C (30-35). After the fix: 47 of 47 pass.
+
+Full `npm test` on the fix round: tests 12601, pass 12600, fail 1, skipped 0; coverage 99.9%.
+The one failure is `tests/streaming-precompute.test.js` "an unreadable answers log does NOT
+deadlock a plan with no forks", which asserts exactly the contract finding A replaces (an
+unreadable log let a plan with only details through). Per Step 14 it is reported here and was
+not edited (outside `files:`). Inventory paths may also point under `skills/` (the
+hallucination-detector and llm-security-tester method inventories hold skill files); anything
+else fails every check.
+
+| Finding | Test | Result |
+|---|---|---|
+| A. A hold was read from the author's question file (bypasses 1a/1b/1c) | 22 (any `holds` on an option is refused), 26, 27 (the same answer without `holds` moves the plan on), 27b (a hold outlives its revision and the plan's stage), 27c (a hold on a question the revision no longer has still holds), 28 (only a later answer releases; a line with no answer releases nothing; older log shape), 29 | Fixed: `hasEnoughInformation` reads a hold only from the answers log — the latest entry with a recorded key for this plan (matched by file name, any revision) and question decides; the validator refuses `holds` |
+| A. An unreadable answers log let a plan with only details through | 29c | Fixed: any question + unreadable log gives `answers-unreadable`; a plan with no questions still moves. The two comments that said otherwise are rewritten |
+| A. An answer naming no option counted as answered | 29b | Fixed when the questions are known (`hasEnoughInformation` passes them); such an entry is counted in `unbound` |
+| B. Invisible and direction-changing characters in human-visible text | 24c | Fixed: refused in prompt, label, pros, cons, description |
+| B. Labels the human cannot tell apart | 24d | Fixed: unique after control-strip, trim, lower-case |
+| B. More than three options | 24e | Fixed |
+| B. A weighty single option with no recommendation decided by default | 24f | Fixed: refused; on a detail it stays a notice |
+| B. A topic on the gate ruling or coverage notice could make the ruling a decided detail | 24, 24b | Fixed: the two reserved ids carry no topic; a look-alike id is ordinary |
+| B. `topic` required; option key `^[1-3]$`; question id `q<NN>-<kebab>` | — | NOT LANDED here: see "Fork" below |
+| C. `replaced` records were self-asserted | 32 (fourteen exact failing-check lists: no record, empty instruction, empty anchors, bad date, impossible date, future date, unknown fate, unit/order mismatch both ways, missing plan, climbing plan path, no approval record, plan not naming the order, new anchor already in the baseline) | Fixed in `inventory-checks.js`, still ten checks |
+| C. An old sentence could survive beside its replacement | 33 | Fixed: every old sentence must be gone or inside a new anchor |
+| C. The agent path could point anywhere | 34 | Fixed: must resolve under `agents/`; otherwise all ten checks fail |
+| C. New rules had no inventory | 35 | Added fate `added` with an `added_by` record; N-001..N-005 pin rule 4a's definitions, the no-topic sentence, the routing sentence, the tie-break sentence and the checklist clause |
+| D. Agent text | the three inventories (orders below) | Done, see below |
+
+Gate critic orders replaced: R-339 (ambiguous evidence, now with its leftover sentence in the
+new anchor), R-437, R-485 (new anchor is the whole rule 8 paragraph, so its kept DEFENSE sentence
+stands inside it), R-486 (findings that go to no human are decided by their recommendation),
+R-538 ("unresolved" added), R-569 (no more "batch-approves it in one keystroke"), R-586 (template
+JSON gains `topic`), R-588 (which flags are required, said exactly), R-636 (worked example gains
+`topic: "detail"`). R-591 is back to its original words and to `kept` (no `holds`). Added:
+N-001, N-002, N-003, N-004, N-005. Removed from all three agents: every mention of `holds` (the
+hold is the human's answer, recorded by CTOC; slice 2 writes it). Rule 4a's `data-model` is
+narrowed to persisted data shapes and interfaces outside code depends on, here and in the
+frozen list's comment. Product owner: R-414, R-415, R-416, R-417, R-418, R-419, R-420, R-423.
+Implementation planner: R-310, R-311, R-312, R-313, R-314, R-315, R-316, R-319.
+
+Bytes after the fix round: gate critic 136,483 (ceiling raised 134,683 to 136,483 by the
+measured overage, one `ceiling_corrections` entry); product owner 30,113 of 30,203; planner
+26,953 of 27,019.
+
+E. Recorded: in this round the topic was still the author's own label. The owner's decision of
+2026-10-07 on who assigns it is recorded under "Decisions Taken Under Ambiguity".
+
+### Fork: what the fix round and the owner's decision need outside `files:`
+
+Three strictness rules of finding B (topic REQUIRED, option key `^[1-3]$`, question id
+`q<NN>-<kebab>`) and the owner's decision (topics decide only in a file the gate critic
+classified; an unclassified file blocks every question) were built and measured. Both change
+the stored-question contract that test fixtures outside this slice encode (keys `a`/`b`, ids
+`q1`/`q10`, no topic, no classification, details expected to move on). Measured with the full
+suite: topic required plus classification gating fails 116 tests in 17 files outside `files:` —
+`tests/streaming-precompute.test.js` (21), `tests/answers-bind-to-plan-revision.test.js` (20),
+`tests/streaming-gate.test.js` (16), `tests/streaming-questions-sweeper.test.js` (7),
+`tests/attestation-round-trip.test.js` (6), `tests/real-question-file-render.test.js` (5),
+`tests/questions-attestation.test.js` (4), `tests/sufficiency-evidence.test.js` (2),
+`tests/streaming-human-loop-e2e.test.js` (2), `tests/streaming-gate-coverage-holes.test.js` (2),
+`tests/plan-question-screen.test.js` (2), `tests/answer-feeds-sufficiency.test.js` (2),
+`tests/sufficiency-audit.test.js` (1), `tests/menu-critique-first.test.js` (1),
+`tests/golden-corpus-fence.test.js` (1), `tests/gate-critic-compaction.test.js` (contract
+fixtures, 1). Classification gating alone (topic optional) still fails tests in
+`tests/streaming-precompute.test.js` (4), `tests/streaming-gate.test.js` (1) and
+`tests/answers-bind-to-plan-revision.test.js` (1). The stored question files would also read
+invalid: 2 in this repository, 15 in the main checkout's `.ctoc/streaming/questions/`. The live
+promotion path also needs one line outside `files:`: `src/lib/streaming-questions-sweeper.js`
+must pass `payload.classification` to `writePlanQuestions` (sixth argument), or no promoted file
+can ever be classified.
+
 ### Decisions taken under ambiguity (executor)
 
 1. The test plan's "Case 6" is the file's case 3 (the only case asserting a two-option,

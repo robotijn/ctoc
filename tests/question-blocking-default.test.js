@@ -278,30 +278,30 @@ describe('isBlockingQuestion — only weighty questions reach the human', () => 
   });
 });
 
-describe('validatePlanQuestions — topic and holds are closed, optional fields', () => {
+describe('validatePlanQuestions — topic is closed, holds is never a question field, the text is what it shows', () => {
   function refused(questions) {
     const root = makeSandbox();
     const planPath = writePlan(root, 'functional', 'closed-fields');
     const ref = 'functional/closed-fields.md';
     const res = precompute.writePlanQuestions(root, ref, questions, fs.statSync(planPath).mtimeMs);
+    assert.equal(res.ok, false, 'the writer must refuse this file');
     assert.equal(fs.existsSync(precompute.questionsPath(root, ref)), false, 'a refused write leaves no file');
-    return res;
+    return res.errors.join(' | ');
   }
+  const detailQ = (extra) => ({ id: 'q10-x', prompt: 'p?', critical: false, important: false, topic: 'detail', options: recOpts(), ...extra });
 
   it('21. the writer refuses an unknown topic, names the question id and lists the allowed values', () => {
-    const res = refused([{ id: 'q-stack', prompt: 'p?', critical: false, important: false, topic: 'stack', options: recOpts() }]);
-    assert.equal(res.ok, false);
-    const joined = res.errors.join(' | ');
+    const joined = refused([detailQ({ id: 'q-stack', topic: 'stack' })]);
     assert.match(joined, /q-stack/, 'the error names the question id');
     assert.match(joined, /technology-stack/, 'the error lists the allowed values');
     assert.match(joined, /detail/, 'the error lists the allowed values');
   });
 
-  it('22. the writer refuses a non-string topic and a non-boolean holds', () => {
-    assert.equal(refused([{ id: 'q1', prompt: 'p?', critical: false, important: false, topic: 7, options: recOpts() }]).ok, false);
-    const res = refused([{ id: 'q2', prompt: 'p?', critical: false, important: false, options: [{ key: 'a', label: 'A', recommended: true, holds: 'yes' }] }]);
-    assert.equal(res.ok, false);
-    assert.match(res.errors.join(' | '), /holds/, 'the error names the mistyped field');
+  it('22. the writer refuses a non-string topic, and refuses `holds` on any option — a hold is the human\'s answer, recorded by CTOC', () => {
+    refused([detailQ({ topic: 7 })]);
+    for (const holds of [true, false, 'yes']) {
+      assert.match(refused([detailQ({ options: [{ key: 'a', label: 'A', recommended: true, holds }, { key: 'b', label: 'B' }] })]), /holds/);
+    }
   });
 
   it('23. an unknown topic is refused on READ too — a file written around the writer reads invalid and never enough', () => {
@@ -310,40 +310,69 @@ describe('validatePlanQuestions — topic and holds are closed, optional fields'
     const ref = 'functional/bypass.md';
     const file = precompute.questionsPath(root, ref);
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    const questions = [{ id: 'q1', prompt: 'p?', critical: false, important: false, topic: 'stack', options: recOpts() }];
-    fs.writeFileSync(file, JSON.stringify({ ref, planMtimeMs: fs.statSync(planPath).mtimeMs, questions }));
+    fs.writeFileSync(file, JSON.stringify({ ref, planMtimeMs: fs.statSync(planPath).mtimeMs, questions: [detailQ({ topic: 'stack' })] }));
     const verdict = precompute.hasEnoughInformation(root, ref);
     assert.equal(verdict.enough, false);
     assert.equal(verdict.reason, 'invalid');
   });
 
-  it('24. a valid topic and holds:true are accepted (guard)', () => {
-    const questions = [{ id: 'q1', prompt: 'p?', critical: false, important: false, topic: 'detail', options: [{ key: 'a', label: 'A', recommended: true, holds: true }, { key: 'b', label: 'B', holds: false }] }];
-    assert.deepEqual(precompute.validatePlanQuestions(questions), { valid: true, errors: [] });
+  it('24. a valid topic is accepted, and the gate ruling and coverage notice carry none (guard)', () => {
+    assert.deepEqual(precompute.validatePlanQuestions([detailQ(), { ...detailQ(), id: 'q99-gate-ruling-r1', topic: undefined }]), { valid: true, errors: [] });
+  });
+
+  it('24b. a topic on the gate ruling or the coverage notice is refused — it could turn the ruling into a decided detail', () => {
+    refused([detailQ({ id: 'q99-gate-ruling-r1786000000000', important: true })]);
+    refused([detailQ({ id: 'q98-critique-coverage' })]);
+    assert.equal(precompute.validatePlanQuestions([detailQ({ id: 'q99-gate-ruling-rx1' })]).valid, true, 'a look-alike id is an ordinary question');
+  });
+
+  it('24c. zero-width and direction-changing characters are refused in every text the human reads', () => {
+    const hidden = ['\u200B', '\u200F', '\u202A', '\u202E', '\u2066', '\uFEFF'];
+    for (const ch of hidden) {
+      refused([detailQ({ prompt: `Approve${ch}?` })]);
+      refused([detailQ({ options: [{ key: 'a', label: `A${ch}`, recommended: true }, { key: 'b', label: 'B' }] })]);
+      for (const field of ['pros', 'cons', 'description']) {
+        refused([detailQ({ options: [{ key: 'a', label: 'A', recommended: true, [field]: `x${ch}y` }, { key: 'b', label: 'B' }] })]);
+      }
+    }
+  });
+
+  it('24d. two labels the human cannot tell apart are refused: case, surrounding space and control characters do not count', () => {
+    refused([detailQ({ options: [{ key: 'a', label: 'Approve', recommended: true }, { key: 'b', label: ' approve\u0007 ' }] })]);
+  });
+
+  it('24e. more than three options is refused', () => {
+    refused([detailQ({ options: [1, 2, 3, 4].map((k) => ({ key: String(k), label: `L${k}`, recommended: k === 1 })) })]);
+  });
+
+  it('24f. a single option with no recommendation on a weighty topic is refused; on a detail it is a notice (guard)', () => {
+    refused([detailQ({ topic: 'algorithm', options: [{ key: '1', label: 'Noted' }] })]);
+    assert.equal(precompute.validatePlanQuestions([detailQ({ options: [{ key: '1', label: 'Noted' }] })]).valid, true);
   });
 });
 
-describe('hasEnoughInformation — details move on, a Hold holds', () => {
-  function setup(slug, questions) {
+describe('hasEnoughInformation — details move on; a Hold is the human\'s, read from the answers log', () => {
+  function setup(slug, questions, stage = 'functional') {
     const root = makeSandbox();
-    const planPath = writePlan(root, 'functional', slug);
-    const ref = `functional/${slug}.md`;
+    const planPath = writePlan(root, stage, slug);
+    const ref = `${stage}/${slug}.md`;
     const stamp = fs.statSync(planPath).mtimeMs;
     const res = precompute.writePlanQuestions(root, ref, questions, stamp);
     assert.equal(res.ok, true, (res.errors || []).join('; '));
     return { root, ref, stamp };
   }
 
-  /** A gate-ruling-shaped question: Hold (recommended, holds) or Approve. */
+  /** A gate-ruling-shaped question. Its options carry no hold: holds live in the log. */
   function ruling() {
     return {
       id: 'q99-gate-ruling', prompt: 'Lens verdict: HOLD — reason. Rule now.', critical: false, important: true,
-      options: [{ key: '1', label: 'Hold until the red-team critique runs', recommended: true, holds: true }, { key: '2', label: 'Approve it across Gate 1' }]
+      options: [{ key: '1', label: 'Hold until the red-team critique runs', recommended: true }, { key: '2', label: 'Approve it across Gate 1' }]
     };
   }
+  const answer = (ref, stamp, optionKey, extra) => ({ ts: new Date().toISOString(), ref, questionId: 'q99-gate-ruling', optionKey, planMtimeMs: stamp, ...extra });
 
   it('25. three unanswered important DETAIL questions with a recommendation are enough — they never stop the plan', () => {
-    const questions = [1, 2, 3].map((i) => ({ id: `q${i}`, prompt: `Detail ${i}?`, critical: false, important: true, topic: 'detail', options: recOpts() }));
+    const questions = [1, 2, 3].map((i) => ({ id: `q1${i}-d`, prompt: `Detail ${i}?`, critical: false, important: true, topic: 'detail', options: recOpts() }));
     const { root, ref } = setup('details', questions);
     const verdict = precompute.hasEnoughInformation(root, ref);
     assert.equal(verdict.enough, true, verdict.reason);
@@ -351,9 +380,9 @@ describe('hasEnoughInformation — details move on, a Hold holds', () => {
     assert.equal(verdict.blocking.length, 0);
   });
 
-  it('26. a question answered with its holds:true option keeps the plan where it is — reason "held"', () => {
+  it('26. an answer the log records with holds:true keeps the plan where it is — reason "held"', () => {
     const { root, ref, stamp } = setup('held', [ruling()]);
-    appendAnswer(root, { ts: new Date().toISOString(), ref, questionId: 'q99-gate-ruling', optionKey: '1', planMtimeMs: stamp });
+    appendAnswer(root, answer(ref, stamp, '1', { holds: true }));
     const verdict = precompute.hasEnoughInformation(root, ref);
     assert.equal(verdict.enough, false);
     assert.equal(verdict.reason, 'held');
@@ -361,110 +390,185 @@ describe('hasEnoughInformation — details move on, a Hold holds', () => {
     assert.deepEqual(verdict.answered, ['q99-gate-ruling']);
   });
 
-  it('27. the same question answered with the other option moves the plan on', () => {
+  it('27. the same answer without holds moves the plan on — the question file cannot hold it', () => {
     const { root, ref, stamp } = setup('approved', [ruling()]);
-    appendAnswer(root, { ts: new Date().toISOString(), ref, questionId: 'q99-gate-ruling', optionKey: '2', planMtimeMs: stamp });
+    appendAnswer(root, answer(ref, stamp, '1'));
     const verdict = precompute.hasEnoughInformation(root, ref);
     assert.equal(verdict.enough, true, verdict.reason);
     assert.equal(verdict.reason, 'enough');
   });
 
-  it('28. the older log shape ({answer, at}) is read too, and the later answer wins', () => {
+  it('27b. a hold outlives the revision it was given on, and the stage the plan was in', () => {
+    const { root, ref, stamp } = setup('outlives', [ruling()], 'implementation');
+    appendAnswer(root, answer('functional/outlives.md', stamp - 5000, '1', { holds: true }));
+    const verdict = precompute.hasEnoughInformation(root, ref);
+    assert.equal(verdict.reason, 'held');
+    assert.deepEqual(verdict.answered, [], 'the old-revision answer binds nothing, yet the hold stands');
+  });
+
+  it('27c. a hold on a question the current revision no longer has still holds, and names its id', () => {
+    const { root, ref, stamp } = setup('gone-q', [ruling()]);
+    appendAnswer(root, { ts: new Date().toISOString(), ref, questionId: 'q10-removed', optionKey: '1', planMtimeMs: stamp, holds: true });
+    const verdict = precompute.hasEnoughInformation(root, ref);
+    assert.equal(verdict.reason, 'held');
+    assert.deepEqual(verdict.blocking, [{ id: 'q10-removed' }]);
+  });
+
+  it('28. only a LATER answer releases a hold; an entry that records no answer changes nothing; the older log shape counts', () => {
     const { root, ref } = setup('older-shape', [ruling()]);
     const later = new Date(Date.now() + 60000).toISOString();
     appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '2', at: later });
-    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '1', at: later });
-    assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'held', 'the later line (Hold) wins');
+    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '1', at: later, holds: true });
+    assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'held', 'the later line (the hold) wins');
+    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', at: later });
+    assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'held', 'a line with no answer releases nothing');
     appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '2', at: later });
-    assert.equal(precompute.hasEnoughInformation(root, ref).enough, true, 'a later Approve releases the hold');
+    assert.equal(precompute.hasEnoughInformation(root, ref).enough, true, 'a later answer without holds releases it');
   });
 
-  it('29. readAnsweredQuestionIds reports the chosen option per question, and an empty Map on a closed path', () => {
+  it('29. readAnsweredQuestionIds reports the chosen option and the holds, and empty ones on a closed path', () => {
     const { root, ref, stamp } = setup('keys', [ruling()]);
-    appendAnswer(root, { ts: new Date().toISOString(), ref, questionId: 'q99-gate-ruling', optionKey: '1', planMtimeMs: stamp });
+    appendAnswer(root, answer(ref, stamp, '1', { holds: true }));
     const read = precompute.readAnsweredQuestionIds(root, ref);
     assert.equal(read.keys.get('q99-gate-ruling'), '1');
+    assert.deepEqual(read.held, ['q99-gate-ruling']);
     const closed = precompute.readAnsweredQuestionIds(root, 'functional/no-such-plan.md');
     assert.equal(closed.ok, false);
     assert.ok(closed.keys instanceof Map && closed.keys.size === 0);
+    assert.deepEqual(closed.held, []);
+  });
+
+  it('29b. an answer whose key is none of the question\'s options does not count as answered', () => {
+    const { root, ref, stamp } = setup('bad-key', [{ ...ruling(), critical: true }]);
+    appendAnswer(root, answer(ref, stamp, '7'));
+    const verdict = precompute.hasEnoughInformation(root, ref);
+    assert.equal(verdict.reason, 'open-forks');
+    assert.deepEqual(verdict.answered, []);
+    assert.equal(verdict.unboundAnswers, 1, 'the bad answer is reported, not silently dropped');
+  });
+
+  it('29c. an unreadable answers log fails closed for a plan with ANY question; a plan with none still moves', () => {
+    const detail = { id: 'q10-d', prompt: 'p?', critical: false, important: false, topic: 'detail', options: recOpts() };
+    const a = setup('unreadable', [detail]);
+    fs.mkdirSync(path.join(a.root, '.ctoc', 'streaming', 'answers.jsonl'), { recursive: true }); // EISDIR
+    const verdict = precompute.hasEnoughInformation(a.root, a.ref);
+    assert.equal(verdict.enough, false);
+    assert.equal(verdict.reason, 'answers-unreadable');
+    const b = setup('unreadable-empty', []);
+    fs.mkdirSync(path.join(b.root, '.ctoc', 'streaming', 'answers.jsonl'), { recursive: true });
+    assert.equal(precompute.hasEnoughInformation(b.root, b.ref).enough, true);
   });
 });
 
 // The agent rules this slice rewrites are held word for word by the compaction rule
-// inventories. A rule the owner replaced ends as `replaced`, with a record of who replaced
-// it and the anchors of its new words; it never disappears silently. These cases drive the
-// shared inventory checks against a four-sentence fixture agent.
-describe('compaction inventories — a rule the owner replaced is recorded, never silently dropped', () => {
+// inventories. A rule the owner replaced ends as `replaced`, and a rule written after the
+// baseline is `added`; both carry a record naming an approved plan that names them. These
+// cases drive the shared inventory checks against a four-sentence fixture repository.
+describe('compaction inventories — a rule the owner replaced or added is recorded, never silently dropped', () => {
   const crypto = require('node:crypto');
   const { defineInventoryTests } = require('./compaction-eval/inventory-checks');
+  const { splitUnits } = require('./compaction-eval/units');
 
   const BASELINE = '# Agent\n\n## Rules\n\nAlways do A. Never do B.\n';
-  const REPLACED_BY = { instruction: 'the owner replaced A with C', date: '2026-10-07', plan: 'fixture-plan', new_anchors: ['Always do C.'] };
+  const NEW = '# Agent\n\n## Rules\n\nAlways do C. Never do B.\n';
+  const PLAN = 'fixture-plan';
+  const today = new Date().toISOString().slice(0, 10);
+  const record = (extra) => ({ instruction: 'the owner replaced A with C', date: '2026-10-07', plan: PLAN, new_anchors: ['Always do C.'], ...extra });
+  const replaced = (extra) => ({ fate: 'replaced', replaced_by: record(extra) });
 
-  /** Runs the ten checks over a fixture; returns the numbers of the checks that failed. */
-  function failingChecks({ agent, unitFate = 'replaced', order3 }) {
-    const dir = makeSandbox();
-    const at = (name) => path.join(dir, name);
-    fs.writeFileSync(at('baseline.md'), BASELINE);
-    fs.writeFileSync(at('agent.md'), agent);
-    const units = require('./compaction-eval/units').splitUnits(BASELINE);
+  /**
+   * Runs the ten checks over a fixture repository and returns the numbers of the checks that
+   * failed. The fixture holds agents/agent.md, the baseline, an approved plan naming R-3 and N-1.
+   */
+  function failingChecks({ agent = NEW, unitFate = 'replaced', order3 = replaced(), extraOrders = [], planText = 'Replaces R-3 and adds N-1.', approval = true, agentRel = 'agents/agent.md' }) {
+    const root = makeSandbox();
+    fs.mkdirSync(path.join(root, 'agents'), { recursive: true });
+    fs.mkdirSync(path.join(root, '.ctoc', 'approvals'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'baseline.md'), BASELINE);
+    fs.writeFileSync(path.join(root, ...agentRel.split('/')), agent);
+    fs.writeFileSync(path.join(root, 'plans', 'todo', `${PLAN}.md`), planText);
+    if (approval) fs.writeFileSync(path.join(root, '.ctoc', 'approvals', `${PLAN}.json`), '{}');
+    const u = splitUnits(BASELINE);
     const inventory = {
-      agent: at('agent.md'),
-      baseline: at('baseline.md'),
+      agent: agentRel,
+      baseline: 'baseline.md',
       baseline_sha256: crypto.createHash('sha256').update(BASELINE).digest('hex'),
       baseline_commit: '0'.repeat(40),
       maxBytes: 10000,
       units: [
-        { n: 1, sha: units[0].sha, kind: 'heading', orders: [], fate: 'kept' },
-        { n: 2, sha: units[1].sha, kind: 'heading', orders: [], fate: 'kept' },
-        { n: 3, sha: units[2].sha, kind: 'order', orders: ['R-3'], fate: unitFate },
-        { n: 4, sha: units[3].sha, kind: 'order', orders: ['R-4'], fate: 'kept' },
+        { n: 1, sha: u[0].sha, kind: 'heading', orders: [], fate: 'kept' },
+        { n: 2, sha: u[1].sha, kind: 'heading', orders: [], fate: 'kept' },
+        { n: 3, sha: u[2].sha, kind: 'order', orders: ['R-3'], fate: unitFate },
+        { n: 4, sha: u[3].sha, kind: 'order', orders: ['R-4'], fate: 'kept' },
       ],
       orders: [
         { id: 'R-3', says: 'Always do A.', now_in: '## Rules', anchors: ['Always do A.'], ...order3 },
         { id: 'R-4', says: 'Never do B.', now_in: '## Rules', anchors: ['Never do B.'] },
+        ...extraOrders,
       ],
     };
-    fs.writeFileSync(at('inventory.json'), JSON.stringify(inventory));
+    fs.writeFileSync(path.join(root, 'inventory.json'), JSON.stringify(inventory));
     const checks = [];
-    defineInventoryTests({ test: (name, fn) => checks.push({ name, fn }), label: 'fixture', inventoryPath: at('inventory.json'), orderFloor: 2 });
+    defineInventoryTests({ test: (name, fn) => checks.push({ name, fn }), label: 'fixture', inventoryPath: 'inventory.json', orderFloor: 2, root });
     assert.equal(checks.length, 10, 'still exactly ten checks');
     const failed = [];
     for (const c of checks) {
-      try { c.fn(); } catch (err) { failed.push(Number(c.name.match(/fixture: (\d+)\./)[1])); }
+      try { c.fn(); } catch { failed.push(Number(c.name.match(/fixture: (\d+)\./)[1])); }
     }
     return failed;
   }
 
   it('30. a correct replacement passes all ten checks', () => {
-    assert.deepEqual(failingChecks({ agent: '# Agent\n\n## Rules\n\nAlways do C. Never do B.\n', order3: { fate: 'replaced', replaced_by: REPLACED_BY } }), []);
+    assert.deepEqual(failingChecks({}), []);
   });
 
-  it('31. the untouched fixture still passes (guard) and a silently rewritten kept rule still fails', () => {
+  it('31. the untouched fixture passes (guard); a silently rewritten kept rule fails 4, 9 and 10', () => {
     assert.deepEqual(failingChecks({ agent: BASELINE, unitFate: 'kept', order3: {} }), []);
-    assert.deepEqual(failingChecks({ agent: '# Agent\n\n## Rules\n\nAlways do C. Never do B.\n', unitFate: 'kept', order3: {} }), [4, 9, 10]);
+    assert.deepEqual(failingChecks({ unitFate: 'kept', order3: {} }), [4, 9, 10]);
   });
 
-  it('32. replaced without a complete replaced_by record fails the classification check', () => {
-    const agent = '# Agent\n\n## Rules\n\nAlways do C. Never do B.\n';
-    assert.ok(failingChecks({ agent, order3: { fate: 'replaced' } }).includes(3));
-    for (const field of ['instruction', 'date', 'plan', 'new_anchors']) {
-      const partial = { ...REPLACED_BY, [field]: field === 'new_anchors' ? [] : '' };
-      assert.ok(failingChecks({ agent, order3: { fate: 'replaced', replaced_by: partial } }).includes(3), `an empty ${field} must fail`);
+  it('32. an incomplete or untrue replaced_by record fails the classification check, and only it', () => {
+    const cases = {
+      'no record': [{ order3: { fate: 'replaced' } }, [3, 4, 10]],
+      'empty instruction': [{ order3: replaced({ instruction: '' }) }, [3]],
+      'empty new anchors': [{ order3: replaced({ new_anchors: [] }) }, [3]],
+      'date not YYYY-MM-DD': [{ order3: replaced({ date: '7 Oct 2026' }) }, [3]],
+      'date that does not exist': [{ order3: replaced({ date: '2026-02-30' }) }, [3]],
+      'date in the future': [{ order3: replaced({ date: '2999-01-01' }) }, [3]],
+      'unknown fate': [{ order3: { fate: 'gone', replaced_by: record() } }, [3, 4, 10]],
+      'replaced unit, order not replaced': [{ order3: {} }, [3, 4, 10]],
+      'kept unit carrying a replaced order': [{ unitFate: 'kept' }, [3, 9]],
+      'plan that does not exist': [{ order3: replaced({ plan: 'no-such-plan' }) }, [3]],
+      'plan path that climbs out': [{ order3: replaced({ plan: '../fixture-plan' }) }, [3]],
+      'plan with no approval record': [{ approval: false }, [3]],
+      'plan that never names the order': [{ planText: 'Replaces nothing.' }, [3]],
+      'new anchor already in the baseline': [{ agent: BASELINE, order3: replaced({ new_anchors: ['Always do A. Never do B.'] }) }, [3]],
+    };
+    assert.equal(failingChecks({ order3: replaced({ date: today }) }).length, 0, 'today is not the future');
+    for (const [name, [fixture, expected]] of Object.entries(cases)) {
+      assert.deepEqual(failingChecks(fixture), expected, name);
     }
-    assert.ok(failingChecks({ agent, order3: { fate: 'replaced', replaced_by: { ...REPLACED_BY, date: '7 Oct 2026' } } }).includes(3));
-    assert.ok(failingChecks({ agent, order3: { fate: 'gone', replaced_by: REPLACED_BY } }).includes(3), 'an unknown order fate fails');
-    assert.ok(failingChecks({ agent, unitFate: 'replaced', order3: {} }).includes(3), 'a unit marked replaced must carry a replaced order');
-    assert.ok(failingChecks({ agent, unitFate: 'kept', order3: { fate: 'replaced', replaced_by: REPLACED_BY } }).includes(3), 'a kept unit cannot carry a replaced order');
   });
 
-  it('33. the old words still present fails — the old rule must really be gone, not duplicated', () => {
-    const failed = failingChecks({ agent: '# Agent\n\n## Rules\n\nAlways do A. Always do C. Never do B.\n', order3: { fate: 'replaced', replaced_by: REPLACED_BY } });
-    assert.ok(failed.includes(4), JSON.stringify(failed));
+  it('33. an old sentence still present fails, unless it stands inside a new anchor', () => {
+    assert.deepEqual(failingChecks({ agent: '# Agent\n\n## Rules\n\nAlways do A. Always do C. Never do B.\n' }), [4]);
+    const kept = '# Agent\n\n## Rules\n\nAlways do C, then: Always do A. Never do B.\n';
+    assert.deepEqual(failingChecks({ agent: kept, order3: replaced({ new_anchors: ['Always do C, then: Always do A.'] }) }), []);
   });
 
-  it('34. the new words missing fails, and a doubled new anchor fails uniqueness', () => {
-    assert.ok(failingChecks({ agent: '# Agent\n\n## Rules\n\nNever do B.\n', order3: { fate: 'replaced', replaced_by: REPLACED_BY } }).includes(4));
-    assert.ok(failingChecks({ agent: '# Agent\n\n## Rules\n\nAlways do C. Always do C. Never do B.\n', order3: { fate: 'replaced', replaced_by: REPLACED_BY } }).includes(10));
+  it('34. the new words missing fails 4 and 10; a doubled new anchor fails 10; a file outside agents/ and skills/ fails every check', () => {
+    assert.deepEqual(failingChecks({ agent: '# Agent\n\n## Rules\n\nNever do B.\n' }), [4, 10]);
+    assert.deepEqual(failingChecks({ agent: '# Agent\n\n## Rules\n\nAlways do C. Always do C. Never do B.\n' }), [10]);
+    assert.deepEqual(failingChecks({ agentRel: 'plans/todo/agent.md' }), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  });
+
+  it('35. an added order is held like any other, and needs its own record', () => {
+    const added = (extra) => ({ id: 'N-1', says: 'Then do D.', now_in: '## Rules', anchors: ['Then do D.'], fate: 'added', added_by: { instruction: 'the owner added D', date: '2026-10-07', plan: PLAN }, ...extra });
+    const withD = '# Agent\n\n## Rules\n\nAlways do C. Never do B. Then do D.\n';
+    assert.deepEqual(failingChecks({ agent: withD, extraOrders: [added()] }), []);
+    assert.deepEqual(failingChecks({ extraOrders: [added()] }), [4, 10], 'its anchor missing from the agent');
+    assert.deepEqual(failingChecks({ agent: withD, extraOrders: [added({ added_by: undefined })] }), [3]);
+    assert.deepEqual(failingChecks({ agent: withD, extraOrders: [added({ fate: undefined })] }), [3], 'an order no unit lists');
+    assert.deepEqual(failingChecks({ agent: withD + 'Never do B.\n', extraOrders: [added({ anchors: ['Never do B.'] })] }), [3, 10], 'an added anchor already in the baseline');
   });
 });

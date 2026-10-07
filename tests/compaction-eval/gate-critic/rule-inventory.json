@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/gate-critic/baseline-agent.md",
  "baseline_sha256": "d8d10528cffd6e9c0af1b1174d5286b79b08d820416894c16ce117e2f39fed5e",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 136327,
+ "maxBytes": 136483,
  "units": [
   {
    "n": 1,
@@ -4211,7 +4211,7 @@
    "orders": [
     "R-486"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 487,
@@ -4657,7 +4657,7 @@
    "orders": [
     "R-538"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 539,
@@ -4930,7 +4930,7 @@
    "orders": [
     "R-569"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 570,
@@ -5079,7 +5079,7 @@
    "orders": [
     "R-586"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 587,
@@ -5097,7 +5097,7 @@
    "orders": [
     "R-588"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 589,
@@ -5122,7 +5122,7 @@
    "orders": [
     "R-591"
    ],
-   "fate": "replaced"
+   "fate": "kept"
   },
   {
    "n": 592,
@@ -5515,7 +5515,7 @@
    "orders": [
     "R-636"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 637,
@@ -9234,11 +9234,11 @@
    "wire": false,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan: every finding question carries a topic; an ambiguous-evidence finding carries two options and no recommended one, an exception to \"exactly one recommended\"; Rule 8 recommends Approve when no surviving question goes to the human, and an important finding with topic detail no longer holds the plan; options carry an optional boolean holds.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
-     "A finding you cannot tier because the evidence is ambiguous is `important` with two options and NO recommended one, the exception to rule 7's \"exactly one\"."
+     "A finding you cannot tier because the evidence is ambiguous is `important` with two options and NO recommended one, the exception to rule 7's \"exactly one\". Key `1` carries rule 5's confidence sentence, and its `cons` states what evidence would settle it."
     ]
    }
   },
@@ -9985,7 +9985,7 @@
    "wire": false,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan: every finding question carries a topic; an ambiguous-evidence finding carries two options and no recommended one, an exception to \"exactly one recommended\"; Rule 8 recommends Approve when no surviving question goes to the human, and an important finding with topic detail no longer holds the plan; options carry an optional boolean holds.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
@@ -10354,12 +10354,11 @@
    "wire": false,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan: every finding question carries a topic; an ambiguous-evidence finding carries two options and no recommended one, an exception to \"exactly one recommended\"; Rule 8 recommends Approve when no surviving question goes to the human, and an important finding with topic detail no longer holds the plan; options carry an optional boolean holds.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
-     "Recommend \"approve/cross\" ONLY when all three PROSECUTION lenses actually RAN and no surviving question goes to the human under rule 4a.",
-     "An `important` finding with topic `detail` and one recommended option no longer holds the plan: it counts as resolved here and in rule 10, and its recommended fix is recorded in the plan when the plan moves on."
+     "Recommend \"approve/cross\" ONLY when all three PROSECUTION lenses actually RAN and no surviving question goes to the human under rule 4a. An `important` finding with topic `detail` and one recommended option no longer holds the plan: it counts as resolved here and in rule 10, and its recommended fix is recorded in the plan when the plan moves on. The DEFENSE lens's state is not part of this test in either direction: its absence never blocks Approve, and its presence never licenses one."
     ]
    }
   },
@@ -10371,7 +10370,16 @@
     "Surviving `normal` findings do not block Approve — they are tie-breakers the human rules on individually, and the gate ruling still names them in its reason line (`Lens verdict: APPROVE — no critical or important finding survived the three prosecution lenses; <N> normal-tier questions remain for your call.`)."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "Surviving findings that go to no human under rule 4a do not block Approve — each is decided by its recommended option, and the gate ruling still names them in its reason line (`Lens verdict: APPROVE — no finding that needs you survived the three prosecution lenses; <N> questions are decided by their recommended option.`)."
+    ]
+   }
   },
   {
    "id": "R-489",
@@ -10772,7 +10780,16 @@
     "These three conditions are EXHAUSTIVE by construction: Approve is the only verdict available when all three prosecution lenses ran, the ancestry was complete, `planMtimeMs` was supplied, your budget held, and no `critical` or `important` finding survived. If you cannot place your case in exactly one of the three, take the STRONGER of the two it sits between and say in the reason line why the case was ambiguous — never invent a fourth verdict word and never default to Approve."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "These three conditions are EXHAUSTIVE by construction: Approve is the only verdict available when all three prosecution lenses ran, the ancestry was complete, `planMtimeMs` was supplied, your budget held, and no unresolved `critical` or `important` finding survived. If you cannot place your case in exactly one of the three, take the STRONGER of the two it sits between and say in the reason line why the case was ambiguous — never invent a fourth verdict word and never default to Approve."
+    ]
+   }
   },
   {
    "id": "R-539",
@@ -11061,7 +11078,16 @@
     "If you are unsure whether a finding is below the floor, it is NOT below the floor — emit it as `normal` with your recommendation, where the human batch-approves it in one keystroke."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "If you are unsure whether a finding is below the floor, it is NOT below the floor — emit it as `normal` with your recommendation, which then decides it and is recorded in the plan."
+    ]
+   }
   },
   {
    "id": "R-570",
@@ -11201,7 +11227,16 @@
     "```json { \"ref\": \"<stage>/<file>.md\", \"self_assessment\": { \"lenses_merged\": [\"premortem\", \"devils-advocate\", \"red-team\", \"advocate\"], \"lenses_failed\": [], \"ancestry_read\": [\"vision\", \"functional\", \"implementation\"], \"ancestry_missing\": [], \"findings_in\": 7, \"findings_after_dedup\": 4, \"findings_dropped_below_floor\": 1, \"findings_dropped_ungrounded\": 0, \"findings_dropped_out_of_scope\": 0, \"findings_carried_into_q97\": 0, \"inputs_unsupplied\": [], \"contract_violations\": [\"<lens>: <the field that was off-contract, and how you repaired it>\"], \"blind_spots\": [\"<what you could not check, and why>\"] }, \"questions\": [ { \"id\": \"q10-<short-kebab-topic>-r<planMtimeMs, decimal digits copied verbatim>\", \"prompt\": \"<the decision the human must make, stated as a question>\", \"critical\": true, \"important\": false, \"options\": [ { \"key\": \"1\", \"label\": \"<option>\", \"recommended\": true, \"pros\": \"<confidence sentence per rule 5, then at least one further sentence arguing in its own words why THIS OPTION produces the better outcome — never a restatement of the confidence level or the label>\", \"cons\": \"<the REAL cost of the path you are recommending, per rule 7c>\", \"description\": \"<one line of extra context, optional>\" }, { \"key\": \"2\", \"label\": \"<option>\", \"pros\": \"<the strongest honest case for THIS option, comparable in specificity and length to option 1's — never 'Unblocks now'>\", \"cons\": \"<the real cost of taking it>\" } ] } ] } ```"
    ],
    "pinned_by": null,
-   "wire": true
+   "wire": true,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "```json { \"ref\": \"<stage>/<file>.md\", \"self_assessment\": { \"lenses_merged\": [\"premortem\", \"devils-advocate\", \"red-team\", \"advocate\"], \"lenses_failed\": [], \"ancestry_read\": [\"vision\", \"functional\", \"implementation\"], \"ancestry_missing\": [], \"findings_in\": 7, \"findings_after_dedup\": 4, \"findings_dropped_below_floor\": 1, \"findings_dropped_ungrounded\": 0, \"findings_dropped_out_of_scope\": 0, \"findings_carried_into_q97\": 0, \"inputs_unsupplied\": [], \"contract_violations\": [\"<lens>: <the field that was off-contract, and how you repaired it>\"], \"blind_spots\": [\"<what you could not check, and why>\"] }, \"questions\": [ { \"id\": \"q10-<short-kebab-topic>-r<planMtimeMs, decimal digits copied verbatim>\", \"prompt\": \"<the decision the human must make, stated as a question>\", \"critical\": true, \"important\": false, \"topic\": \"<one of rule 4a's values>\", \"options\": [ { \"key\": \"1\", \"label\": \"<option>\", \"recommended\": true, \"pros\": \"<confidence sentence per rule 5, then at least one further sentence arguing in its own words why THIS OPTION produces the better outcome — never a restatement of the confidence level or the label>\", \"cons\": \"<the REAL cost of the path you are recommending, per rule 7c>\", \"description\": \"<one line of extra context, optional>\" }, { \"key\": \"2\", \"label\": \"<option>\", \"pros\": \"<the strongest honest case for THIS option, comparable in specificity and length to option 1's — never 'Unblocks now'>\", \"cons\": \"<the real cost of taking it>\" } ] } ] } ```"
+    ]
+   }
   },
   {
    "id": "R-587",
@@ -11221,7 +11256,16 @@
     "`critical`, `important`, and `recommended` are optional booleans."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "`critical` and `important` are required booleans and `recommended` an optional one; this document requires `topic`, one of rule 4a's values, on every question but the gate ruling and `q98-critique-coverage`."
+    ]
+   }
   },
   {
    "id": "R-589",
@@ -11241,16 +11285,7 @@
     "Before emitting, re-read every option object and confirm each key is one of: `key`, `label`, `recommended`, `pros`, `cons`, `description`."
    ],
    "pinned_by": null,
-   "wire": true,
-   "fate": "replaced",
-   "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan: every finding question carries a topic; an ambiguous-evidence finding carries two options and no recommended one, an exception to \"exactly one recommended\"; Rule 8 recommends Approve when no surviving question goes to the human, and an important finding with topic detail no longer holds the plan; options carry an optional boolean holds.",
-    "date": "2026-10-07",
-    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
-    "new_anchors": [
-     "Before emitting, re-read every option object and confirm each key is one of: `key`, `label`, `recommended`, `holds`, `pros`, `cons`, `description`."
-    ]
-   }
+   "wire": true
   },
   {
    "id": "R-592",
@@ -11614,7 +11649,16 @@
     "```json { \"id\": \"q10-checkout-e2e-never-driven-r1784500000000\", \"prompt\": \"The pay button is never clicked in any test — checkout is only proven to render. Approve checkout-flow-s2-payment across Gate 3?\", \"critical\": true, \"important\": false, \"options\": [ { \"key\": \"1\", \"label\": \"Send back — add a real end-to-end payment test first\", \"recommended\": true, \"pros\": \"Confidence HIGH — the pre-mortem and red-team lenses flagged this independently on different evidence — the pre-mortem at tests/checkout.test.js:41, the red-team at src/checkout/pay.js:112 — so the convergence raise carries the highest inbound label one step to HIGH. Proves a human can actually pay. A render test passing while checkout is broken is false green — the failure mode Operating Lesson 6 exists to catch.\", \"cons\": \"Costs roughly one more slice before this ships, and an end-to-end payment test is the slowest and most brittle kind to keep green — it will need a stub payment provider that is itself a maintenance surface.\", \"description\": \"I opened tests/checkout.test.js:41 and confirmed it asserts the button exists and dispatches no click; I opened src/checkout/pay.js:112 and confirmed the pay handler there is named in no test file.\" }, { \"key\": \"2\", \"label\": \"Approve now, add the test in a follow-up\", \"pros\": \"The render test does prove the button reaches the user, and the payment path is exercised by hand on every release, so the untested case is a regression risk rather than a known break. The test can be written in the slice that next touches this handler, with the same coverage and no gate cycle spent holding the wave.\", \"cons\": \"Gate 3 exists to stop exactly this. The first evidence that payment is broken would be a human failing to pay, and the by-hand check is not run by anyone the plan names.\" } ] } ```"
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "```json { \"id\": \"q10-checkout-e2e-never-driven-r1784500000000\", \"prompt\": \"The pay button is never clicked in any test — checkout is only proven to render. Approve checkout-flow-s2-payment across Gate 3?\", \"critical\": true, \"important\": false, \"topic\": \"detail\", \"options\": [ { \"key\": \"1\", \"label\": \"Send back — add a real end-to-end payment test first\", \"recommended\": true, \"pros\": \"Confidence HIGH — the pre-mortem and red-team lenses flagged this independently on different evidence — the pre-mortem at tests/checkout.test.js:41, the red-team at src/checkout/pay.js:112 — so the convergence raise carries the highest inbound label one step to HIGH. Proves a human can actually pay. A render test passing while checkout is broken is false green — the failure mode Operating Lesson 6 exists to catch.\", \"cons\": \"Costs roughly one more slice before this ships, and an end-to-end payment test is the slowest and most brittle kind to keep green — it will need a stub payment provider that is itself a maintenance surface.\", \"description\": \"I opened tests/checkout.test.js:41 and confirmed it asserts the button exists and dispatches no click; I opened src/checkout/pay.js:112 and confirmed the pay handler there is named in no test file.\" }, { \"key\": \"2\", \"label\": \"Approve now, add the test in a follow-up\", \"pros\": \"The render test does prove the button reaches the user, and the payment path is exercised by hand on every release, so the untested case is a regression risk rather than a known break. The test can be written in the slice that next touches this handler, with the same coverage and no gate cycle spent holding the wave.\", \"cons\": \"Gate 3 exists to stop exactly this. The first evidence that payment is broken would be a human failing to pay, and the by-hand check is not run by anyone the plan names.\" } ] } ```"
+    ]
+   }
   },
   {
    "id": "R-662",
@@ -12267,13 +12311,83 @@
    ],
    "pinned_by": null,
    "wire": false
+  },
+  {
+   "id": "N-001",
+   "says": "Rule 4a: every finding question carries a topic, one of seven defined values.",
+   "now_in": "## The synthesis",
+   "anchors": [
+    "4a. Every finding question carries `topic`: `technology-stack`, adding, removing or replacing a language, framework, library, database or hosted service (a version bump inside one major version is a detail); `algorithm`, the method by which a central result is computed, ranked, matched or scheduled; `data-model`, a persisted data shape or an interface that code outside this project depends on (a schema, a file format, a public interface), never every exported function; `security-posture`, who may do what, what is exposed, where trust boundaries sit, how secrets are held; `irreversible`, cannot be undone by a later plan; `cost`, a recurring cost or a large one-off cost; `detail`, everything else."
+   ],
+   "fate": "added",
+   "added_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
+   }
+  },
+  {
+   "id": "N-002",
+   "says": "The gate ruling and the coverage notice carry no topic.",
+   "now_in": "## The synthesis",
+   "anchors": [
+    "The gate ruling and `q98-critique-coverage` carry none."
+   ],
+   "fate": "added",
+   "added_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
+   }
+  },
+  {
+   "id": "N-003",
+   "says": "Only critical, weighty-topic, untopiced important or no-single-recommendation questions reach the human.",
+   "now_in": "## The synthesis",
+   "anchors": [
+    "A question goes to the human only when it is `critical`, has a topic other than `detail`, is `important` with no topic, or has two or more options and not exactly one recommended; any other is decided by its recommended option."
+   ],
+   "fate": "added",
+   "added_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
+   }
+  },
+  {
+   "id": "N-004",
+   "says": "When unsure between detail and a weighty topic, choose the weighty topic.",
+   "now_in": "## The synthesis",
+   "anchors": [
+    "When unsure whether a finding is a detail or a weighty topic, choose the weighty topic; never choose detail to let a plan through."
+   ],
+   "fate": "added",
+   "added_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
+   }
+  },
+  {
+   "id": "N-005",
+   "says": "The pre-emit checklist: a finding question also carries topic.",
+   "now_in": "## Output — decision questions in the streaming contract (JSON ONLY)",
+   "anchors": [
+    "`description`, `pros`, and `cons` are OPTION fields only, and a finding question also carries `topic`"
+   ],
+   "fate": "added",
+   "added_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
+   }
   }
  ],
  "ceiling_corrections": [
   {
    "date": "2026-10-07",
    "from": 134683,
-   "to": 136327,
+   "to": 136483,
    "reason": "owner's question contract of 2026-10-06 (plan ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human) adds rules"
   }
  ]

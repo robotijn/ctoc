@@ -4520,8 +4520,8 @@
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
-     "Each question is `{ id, prompt, critical, important, topic, options: [{ key, label, recommended?, holds?, pros?, cons?, description? }] }`",
-     "shaped as in `agents/iron-loop/gate-critic.md`, whose rule 4a defines `topic` and `holds`."
+     "Each question is `{ id, prompt, critical, important, topic, options: [{ key, label, recommended?, pros?, cons?, description? }] }`",
+     "shaped as in `agents/iron-loop/gate-critic.md`, whose rule 4a defines `topic`."
     ]
    }
   },
