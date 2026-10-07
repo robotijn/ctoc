@@ -208,7 +208,7 @@ Each feedback item must include:
 
 The plan passes when ALL scores are 5/5.
 
-If max rounds (10) reached without all 5s, the remaining feedback becomes "Deferred Questions" for manual review.
+The loop stops at the first round that raises no finding an earlier round of this plan had not already raised, and after three rounds at most. What is still open becomes a decision taken under ambiguity, or a question when the classification sends it to the human.
 
 ## Searching the repository (shared rule)
 

@@ -95,18 +95,18 @@ You are EXPLICITLY FORBIDDEN from these transitions:
 
 | From | To | Why | Revert To |
 |------|-----|-----|-----------|
-| ANY | implementation/ | Human gate 1 | functional/ |
-| ANY | todo/ | Human gate 2 | implementation/ |
-| ANY | done/ | Human gate 3 | review/ |
+| ANY | implementation/ | Gate 1 — only the menu crosses it | functional/ |
+| ANY | todo/ | Gate 2 — only the menu crosses it | implementation/ |
+| ANY | done/ | Gate 3 — only the menu crosses it | review/ |
 
 The ONLY non-gate transitions your plan legitimately makes — and NEITHER is a file
 move you perform by hand (Rule 2):
 - todo/ → in-progress/ — the SCHEDULER does this when it hands you the plan (Rule 1)
 - in-progress/ → review/ — the COMPLETION route does this (see "Completing a plan")
 
-If asked to cross a human gate, REFUSE:
+If asked to cross a gate, REFUSE:
 ```
-⛔ CANNOT COMPLY - This is a HUMAN GATE requiring user approval via menu.
+⛔ CANNOT COMPLY - Only the menu crosses this gate, on recorded evidence or the user's approval.
 ```
 
 A pre-tool hook monitors ALL tool calls. If you somehow move a plan across
@@ -171,7 +171,9 @@ with this contract, the plan wins.
 │                                                              │
 │  5. REPORT the completion result and STOP.                   │
 │     └─ Never pick up another plan. The scheduler decides     │
-│        what runs next.                                       │
+│        what runs next. The session then continues: a plan    │
+│        whose checks passed finishes unless a question        │
+│        needs the human.                                      │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -199,7 +201,8 @@ in `src/lib/actions.js`):
 Read the response and report it honestly:
 
 - `{ ok: true, completion: { verify: { passed: true } } }` → done; the plan is in
-  review with passing evidence, and the human can cross Gate 3 with one decision.
+  review with passing evidence. When the session continues after your run, it moves
+  on to done on those checks unless a question needs the human; you never move it.
 - `verify.passed === false` → the plan is in review with evidence that records the
   FAILURE. Say so plainly. Gate 3 will refuse it and the circuit breaker counts a
   Step-14 kickback. **NEVER** hand-edit the evidence artifact, re-run until it looks
@@ -311,7 +314,7 @@ Completed: {plan-name}
   Steps: 9/9 complete
   Tests: 24 passed, 0 failed
   Completion: menu task complete t7 → plan in review, VERIFY passed, evidence recorded
-  The built work is waiting for the human's OK to call it done.
+  It finishes on its recorded checks when the session continues, unless a question needs the human.
 ```
 
 Then STOP. Do not look for more work — the scheduler promotes the next plan.

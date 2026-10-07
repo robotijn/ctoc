@@ -87,14 +87,16 @@ Resolve the user's reply to an action string `A`, then classify:
    `dashboard` → **NAV**: render the screen synchronously, record no task, minimal
    reasoning. `stream approve` is a foreground NAV route that crosses a human gate
    through the gate-safe `approvePlan` — the human's "Approve" reply IS the gate
-   approval (Gate 4 stays sacred: only a human-answered reply crosses, never a
-   background task).
+   approval (Rule 4: no background task ever crosses a gate).
 2. `A` is a **NAV-claude** action (`view-edit`, `approve`, `reject`, `delete`,
    `edit`, `edit-stubs`, `add-stub`, `cleanup-exec`, `sync`, `set-environment`,
    `env-keep-defaults`, `dismiss-stale`, `set-compliance-regime`, `stop-agent`,
    `vision`) → run it in the **foreground**, then render. EXCEPTION: a gate-approve on
-   a functional plan (Gate 1) with an autonomous follow-on runs the foreground approve,
-   then dispatches `implementation-planner` as **WORK**.
+   a functional plan (Gate 1) has one autonomous follow-on, the `implementation-planner`.
+   Through `stream approve` its `plan` task comes back in the screen's `promote[]`: launch
+   that one and add none. Through `claude:approve`, which returns no `promote[]`, run the
+   foreground approve, then dispatch `implementation-planner` as **WORK**. Never dispatch it
+   twice for one plan.
 3. `A` is a **WORK-claude** action (`start-agent` → `implement`, `decompose`,
    `discuss`, `approve-stubs` → `plan`, a `create-plan` discussion → `discuss`,
    `generate-questions` → `precompute`) →
@@ -123,17 +125,20 @@ Resolve the user's reply to an action string `A`, then classify:
 
 When a background task fires its task-notification:
 
-1. `menu task complete <id> --summary "…" [--gate N] [--next <navroute>]` (the store rejects a `claude:` `--next`), or `menu task fail <id> --summary "…"` on failure — a failure is surfaced in the inbox, never silently lost.
+1. `menu task complete <id> --continue --summary "…" [--gate N] [--next <navroute>]` (the store rejects a `claude:` `--next`), or `menu task fail <id> --summary "…"` on failure — a failure is surfaced in the inbox, never silently lost. Your call always carries `--continue`, which runs the menu's continuation: plans whose recorded evidence is enough move on, a built plan whose checks passed finishes, planners and the gate critic's classifications are queued, approved plans start building. A build agent completes its own task with `menu task complete <id>` and no flag (the only form a background agent may run); your `--continue` call on that same task then runs only the continuation. Never put `--continue` in an agent's brief.
 2. Emit **ONE** compact, pull-based inbox notice — a **high-level, human-phrased status line** (see "Foreground status plane" below). **Do not** change or hijack the user's current screen — completions pull, they never push.
 3. **Promote.** For each task in the response's `promote[]` (the scheduler's newly-runnable `nextRunnable` set with the concurrent-edit guard applied — that set MINUS the candidates the guard held, never the raw set), launch `Agent(run_in_background)` + `menu task start <id>`. This is the ONLY sanctioned promotion — never start a queued task the scheduler did not return in `promote[]`.
 
 **Every screen that carries `promote[]` is launched the same way.** `stream answer`,
-`stream approve` and `menu task complete <id> --continue` keep the work moving and can return
+`stream approve`, `stream check` and `menu task complete <id> --continue` keep the work moving and can return
 `promote[]` too — planners, the gate critic's classifications, and builds the menu already
 claimed. After any such screen, launch each entry exactly as step 3 does, then stamp it:
 `menu task start <id> --agent-id <the harness agent id>`. A claimed build is already running
 with no agent id, and that command records the id; a task that already carries an agent id
-is refused, so a build is never launched twice.
+is refused, so a build is never launched twice. A promoted `plan` task whose plan is in
+`plans/implementation/` is the `implementation-planner`'s: brief it with the task id and the
+plan path; it decomposes the plan into slices and, as its last act, writes each slice's
+questions to the waiting folder (its own agent file says how).
 
 **Foreground status plane — high-level, human-phrased (Tijn, non-negotiable).** The work
 runs in the background; the FOREGROUND is the status plane. At each milestone show the human
@@ -143,6 +148,7 @@ Phrase it in the human's OWN terms, naming the real feature or plan by its actua
 - **Started:** "Starting implementation of <feature>." / "Reviewing <feature>."
 - **Milestone passed:** "<feature>: tests green." / "Committed, bumped patch v<X.Y.Z>."
 - **Ready for inspection (gate-ready):** "<feature> ready for your inspection — <nav route>."
+- **Finished on its checks:** "<feature> finished on its checks — no question needed you."
 - **Decision surfaced (a real fork):** end the line with the decision, e.g. "Committed and
   bumped patch v<X.Y.Z>. Push?" — the human answers "push"/"yes" to proceed.
 
@@ -165,6 +171,10 @@ refuses it. Read the response:
   is HONEST and expected sometimes: the plan still reaches review, the evidence records
   the failure, Gate 3 will refuse it, and the circuit breaker counts a Step-14 kickback.
   Never re-run or overwrite the evidence to make it green.
+  On the session's `--continue` call — the same call, or the later one when the build agent
+  completed its own task — a plan whose checks passed moves on to done when no question needs
+  the human and nothing holds it; the response text names it under "finished on their
+  checks"; say so. A plan whose checks failed stays in review.
 - `{ ok: false, blocked: true, errors }` → the plan **failed pre-review validation**. This
   is a KICKBACK, not a completion: the task stays `running`, the plan stays in
   in-progress, and **no evidence is minted**. Surface the errors, fix the named step, and
@@ -208,22 +218,31 @@ renders.
 
 ### Human gates stay foreground
 
-The four human gates are **never** auto-crossed by a background task. A background
-agent that reaches a gate STOPS there, reports that the work is waiting for the
-human's OK in plain-moment words (never a gate number — see
+No background task or agent ever crosses a gate or writes an approval. Vision → functional
+is crossed only by the human's own approve. The other three are crossed only by the menu's
+own code — when the default screen opens (the two pre-build crossings), and on the session's
+`menu task complete <id> --continue`, `stream answer` and `stream approve` — when the
+recorded evidence is enough and no question needs the human, recorded as evidence, never as
+his approval; or by his own approve. A background agent that reaches a point where the human
+must decide STOPS, reports that the work is waiting for the human's OK in plain-moment words
+(never a gate number — see
 [`skills/agent-fragments/plain-gate-words.md`](../../skills/agent-fragments/plain-gate-words.md))
-plus a nav route, and becomes a waiting-for-your-OK inbox item. A completion records
-the stop with the `--gate N` flag, and
-any `--next` route is navigation-only — never a gate transition. Crossing the gate
-is a foreground NAV action the user takes deliberately. No completion, promotion, or
-`--next` may ever perform a gate transition.
+plus a nav route, and becomes a waiting-for-your-OK inbox item. A completion records the stop
+with the `--gate N` flag, and any `--next` route is navigation-only. The session and its
+agents never auto-cross a gate: no `--next`, no promotion and no file move performs a
+transition; only the menu's code does.
 
-### Streaming gate questions — generated only when the human asks
+### Streaming gate questions — written with the plan, the fleet only on request
 
 **Nothing is generated when the menu opens, and the human never waits for a critique.**
-A plan's decision questions are written when the human ASKS for them: the adversarial
-gate-critique fleet writes that one plan's questions to a file, and the foreground
-streaming screen reads only the already-computed files. A plan whose questions are not
+A plan's questions are written by the agent that writes the plan, as its last act, into the
+waiting folder. An author's file moves nothing until the gate critic classifies it (the
+`classify` paragraph below); while it waits, the screen says so and offers "Check its
+questions" (`stream check {ref}`), which queues that same task and returns it in
+`promote[]`, and never shows the author's questions to the human. The adversarial four-lens
+fleet runs only when the human ASKS ("Generate its questions"): it writes that one plan's
+questions to a file, and the foreground streaming screen reads only the already-computed
+files. A plan whose questions are not
 ready is not asked with rich questions — the screen falls back to the plain
 Approve/Open/Skip for that plan (from `richQuestionScreen` returning null) and, while
 its questions are missing or stale, also offers **"Generate its questions"**, which
@@ -389,8 +408,8 @@ yet. Cancelling never crosses a human gate.
 1. **Numbers are reserved EXCLUSIVELY for opening a plan.** A number must NEVER be a shortcut for navigation or any other action, on any screen. On a plan list (`inputMode: "plan-select"`) do NOT call AskUserQuestion — render the list and accept a FREE-TEXT reply: a number of any length (e.g. `25`) opens that plan via `actions[number]`; `n`/`new` and `b`/`back` are the only non-plan shortcuts (words, never numbers). On other screens, present the options and accept the option's word/label (case-insensitive) — AskUserQuestion may be used there, but a number must never map to a non-plan action.
 2. Auto-discuss when creating new plans — ask every discussion question via the `.ctoc/ask-me-questions.md` matrix format: one question per turn, the Unicode-box matrix first, then AskUserQuestion
 3. Dashboard pipeline shows the 3 v7 sections: Business, Implementation, Execution, More (counts in descriptions, labels are stable)
-4. **Four human gates** (Gate 0–3, per CLAUDE.md's "4 Mandatory Approval Points"): vision->functional (Gate 0), functional->implementation (Gate 1), implementation->todo (Gate 2), review->done (Gate 3). Each is foreground and human-only; no background task ever crosses one.
-5. **Pre-validate before every approve; then WAIT for the human's explicit click — never auto-run the approve.** Run the `validate {stage}/{file}` screen first. On a CLEAN validation it offers a single `Confirm approve` option whose action is `claude:approve {ref}`: present it and run that action ONLY after the human explicitly picks it. There is NO one-turn signal — a human gate ALWAYS requires an explicit human action, so never run an approve in the same turn as the validation on the model's own initiative. On a FAILED validation the screen lists the errors and buries "Approve anyway" (carrying `--override`) as the LAST option — never recommend it, and cross it only on the human's explicit, deliberate pick. The human crosses every gate; the model never crosses one for them.
+4. **Four human gates** (Gate 0–3, per CLAUDE.md's Critical Rule 1): vision->functional (Gate 0) is crossed only by the human's own approve; functional->implementation (Gate 1), implementation->todo (Gate 2) and review->done (Gate 3) are crossed by the menu's own code on recorded evidence when no question needs him — recorded as evidence, never as his approval — or by his approve. No background task ever crosses one.
+5. **Pre-validate before every approve; then WAIT for the human's explicit click — never auto-run the approve.** Run the `validate {stage}/{file}` screen first. On a CLEAN validation it offers a single `Confirm approve` option whose action is `claude:approve {ref}`: present it and run that action ONLY after the human explicitly picks it. There is NO one-turn signal — an approve ALWAYS requires an explicit human action, so never run an approve in the same turn as the validation on the model's own initiative. On a FAILED validation the screen lists the errors and buries "Approve anyway" (carrying `--override`) as the LAST option — never recommend it, and cross it only on the human's explicit, deliberate pick. The model never crosses a gate for the human; only his approve or the menu's own crossing on recorded evidence does.
 6. Menu rendering and all CTOC slash commands inherit the user's chosen session model; no model pin is set in command frontmatter (removed in v6.9.28 to avoid forced context compaction in long sessions)
 7. The menu auto-initializes CTOC on first run: if the project has no `.ctoc/` directory, `start.js` runs `initProject()` before rendering (creates `.ctoc/`, `plans/`, `CLAUDE.md` if absent). There is no separate init command — opening the menu is the trigger.
 8. Environment question rides along, never gates: when the CTOC environment is unset (`general.environment: ask`), `start.js` renders the **normal dashboard** (plan overview across all phases) and attaches the environment question as a **second** question in `ask`. Present both questions in one AskUserQuestion call. Handle the answers in this order: if the environment answer is Development/Staging/Production, run `claude:set-environment {env}` first; then follow the pipeline-section action (when a 'Stale plans' question is also present, navigation defers to Rule 10's stale-first precedence). "Keep defaults, stop asking" maps to `claude:env-keep-defaults`, which durably records the choice (`general.environment_prompt_dismissed: true`) so the environment question stops riding along. The dashboard must NEVER be replaced by the environment question. The environment (dev/staging/prod) only tunes CTOC's own behavior — it never weakens the four human gates.
@@ -403,7 +422,7 @@ yet. Cancelling never crosses a human gate.
 
 12. **WORK dispatch is record-first (split-brain rule).** A WORK turn calls `menu task add` FIRST and reads the scheduler's `canRun` decision BEFORE any `Agent` launch: `run` → dispatch `Agent(run_in_background)` + `menu task start`; `queue` → record only, no agent. Then render immediately — never `await` the agent. Claude NEVER launches a background agent that has not been recorded and cleared by the scheduler (the vision §8 split-brain rule: never route around the scheduler).
 
-13. **Completions pull, promote via the scheduler, and never auto-cross a gate.** A completion turn calls `menu task complete` (or `menu task fail`), emits ONE compact pull-based inbox notice without hijacking the current screen, and promotes ONLY the tasks the scheduler returns in `promote[]` (its `nextRunnable` set) — dispatching each as background work. Human gates are never auto-crossed: a gate-reached task becomes a waiting-for-your-OK inbox item and the user crosses the gate deliberately in the foreground (Rule 4 stays sacred — no background work weakens a human gate).
+13. **Completions pull and promote via the scheduler; only the menu's code crosses a gate.** A completion turn calls `menu task complete <id> --continue` (or `menu task fail`), emits ONE compact pull-based inbox notice without hijacking the current screen, and promotes ONLY the tasks the response returns in `promote[]` (the scheduler's `nextRunnable` set, plus the planners, classifications and builds the continuation started) — dispatching each as background work. The session and its agents never auto-cross a gate: a plan crosses only in the menu's own code on recorded evidence, or by the human's approve; a task that needs the human becomes a waiting-for-your-OK inbox item (Rule 4).
 
 14. **Compliance question rides along, never gates:** when neither EU compliance profile is active (`regulatory_regime.active_profiles` contains neither `gdpr` nor `eu-ai-act-high-risk`), `start.js` attaches a **second/third** question (`header: 'Compliance'`) alongside Pipeline (and Environment when Rule 8 is also active). Present all in one AskUserQuestion call (≤4 questions). Apply the compliance side-effect (`claude:set-compliance-regime {profile}`) — after any environment side-effect (Rule 8) and before falling through to the pipeline-section answer. The dashboard is **NEVER** replaced by the compliance question; activating a compliance profile only writes `active_profiles` and the four human gates stay mandatory.
 
