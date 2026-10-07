@@ -428,6 +428,9 @@ function nextUnansweredQuestion(root, ref) {
     return null;
   }
   if (answered.held.length > 0) return { question: holdQuestion(precompute.HOLD), index: 0, total: 1, held: true };
+  // An author's file the gate critic has not checked is never put to the human as his
+  // decision: the screen says it is being checked, or offers to check it.
+  if (classified !== true) return null;
   if (!Array.isArray(questions) || questions.length === 0) return null;
   // A question whose only answer belongs to an OLDER revision is offered again —
   // that is the point, not a regression: the human never saw this question.
@@ -560,11 +563,13 @@ function precomputedQuestionParts(q, ref, header) {
  * @returns {{enough:boolean, reason:string, unansweredQuestionIds:string[],
  *   blockingQuestionIds:string[], computed:(number|null),
  *   answeredQuestionIds:string[], unboundAnswers:number,
- *   defaults:Array<{id:string, prompt:string, choice:string}>}}
+ *   defaults:Array<{id:string, prompt:string, choice:string}>,
+ *   questionsClassified:(boolean|null), questionsRevisionMs:(number|null)}} the last two say
+ *   whether the gate critic classified the stored questions, and their revision stamp
  */
 function sufficiencyFor(root, ref) {
   const closed = (reason) => ({
-    enough: false, reason, defaults: [],
+    enough: false, reason, defaults: [], questionsClassified: null, questionsRevisionMs: null,
     unansweredQuestionIds: [], blockingQuestionIds: [],
     // A predicate that could not run knows NEITHER the denominator nor the answered
     // set — `computed: null` (never 0), empty lists, 0 unbound. The evidence composer
@@ -586,6 +591,8 @@ function sufficiencyFor(root, ref) {
     return {
       enough: v.enough === true,
       defaults,
+      questionsClassified: typeof v.classified === 'boolean' ? v.classified : null,
+      questionsRevisionMs: Number.isFinite(v.revisionMs) ? v.revisionMs : null,
       reason: stripCtl(String(v.reason)),
       unansweredQuestionIds: ids(v.unanswered),
       blockingQuestionIds: ids(v.blocking),
@@ -655,8 +662,14 @@ function composeDoneEvidence(slug, record, verdict) {
   const questions = verdict.reason === 'not-computed'
     ? 'none were stored'
     : `${evidenceNumber(verdict.computed)} stored, none needs the human`;
+  // Coverage is said as it was measured: with its floor, without one, or not at all.
+  const coverage = !Number.isFinite(t.coverage)
+    ? 'coverage not measured'
+    : Number.isFinite(t.coverageFloor)
+      ? `coverage ${t.coverage}% against a floor of ${t.coverageFloor}%`
+      : `coverage ${t.coverage}% (no floor declared)`;
   return `evidence: review→done — checks passed, recorded ${when} in .ctoc/state/verify/${slug}.json (${summary}); `
-    + `coverage ${evidenceNumber(t.coverage)}% against a floor of ${evidenceNumber(t.coverageFloor)}%, ${evidenceNumber(t.skipped)} skipped; `
+    + `${coverage}, ${evidenceNumber(t.skipped)} skipped; `
     + 'every required step 8–16 is checked in the plan, including REVIEW, SECURE and FINAL-REVIEW (checked by the build itself); '
     + `questions: ${questions}; crossed on evidence, not approved by the human`;
 }
@@ -704,6 +717,8 @@ function crossOnEvidence(root, planPath, ref, verdict) {
       evidence: composeDoneEvidence(stripCtl(fileSlug), record, verdict),
       plan_basename: fileSlug,
     }, root);
+    // The plan's status file stays with the stage it leaves, exactly as approvePlan clears it.
+    require('./background').clearStatus(planPath);
     let newPath;
     try {
       newPath = movePlan(planPath, 'done', root);
@@ -714,7 +729,7 @@ function crossOnEvidence(root, planPath, ref, verdict) {
     // Both are fail-soft by contract: the config falls back to its defaults, and the notice
     // writer logs its own failure; a notice never undoes the crossing.
     if (require('./deployment').getDeploymentConfig(root).enabled) {
-      require('./actions').recordDeployReadyNotice(newPath, root);
+      require('./actions').recordDeployReadyNotice(newPath, root, 'evidence');
     }
     return true;
   } catch {
@@ -913,7 +928,8 @@ function crossBySufficiency(root, planPath, ref, fromStage, toStage, verdict) {
  *   fromStage:string, toStage:string, moment:string, chip:string,
  *   approveLabel:string, passesValidation:boolean,
  *   critical:boolean, enough:boolean, sufficiencyReason:string,
- *   unansweredQuestionIds:string[], blockingQuestionIds:string[]}>}
+ *   unansweredQuestionIds:string[], blockingQuestionIds:string[],
+ *   questionsClassified:(boolean|null), questionsRevisionMs:(number|null)}>}
  */
 function pendingGateDecisions(projectRoot, opts = {}) {
   const crossed = opts && Array.isArray(opts.crossed) ? opts.crossed : null;
@@ -994,6 +1010,10 @@ function pendingGateDecisions(projectRoot, opts = {}) {
         sufficiencyReason: sufficiency.reason,
         unansweredQuestionIds: sufficiency.unansweredQuestionIds,
         blockingQuestionIds: sufficiency.blockingQuestionIds,
+        // Whether the gate critic classified its stored questions (null: none stored or not
+        // readable) and their revision — so the screen never offers an unchecked author's file.
+        questionsClassified: sufficiency.questionsClassified,
+        questionsRevisionMs: sufficiency.questionsRevisionMs,
       });
     }
   }
@@ -1516,6 +1536,21 @@ function planDecisionScreen(ref, projectRoot) {
     actions[approveLabel] = `stream approve ${ref}`;
     actions['Check validation'] = `validate ${stage}/${file}`;
     actions['Other'] = `stream comment ${ref}`;
+    // An author's file the gate critic has not checked: offer the check, never its questions.
+    let st = null;
+    try {
+      st = require('./streaming-precompute').planQuestionsStatus(projectRoot, ref);
+    } catch {
+      st = null; // no stored questions to speak of
+    }
+    if (st && st.status === 'ready' && st.classified === false && options.length < 4) {
+      const state = checkState(projectRoot, ref, st.questionsRevisionMs);
+      text += CHECK_LINES[state];
+      if (state === 'none') {
+        options.push({ label: CHECK_LABEL, description: 'Ask the gate critic to check the questions its author wrote, in the background. Nothing else changes.' });
+        actions[CHECK_LABEL] = `stream check ${ref}`;
+      }
+    }
     questions.push({
       question: gateWords.question(stage, name),
       header: gateWords.chip(stage),
@@ -1597,6 +1632,37 @@ function sufficiencyLine(d) {
 
 /** The option label that asks for one plan's questions to be generated. */
 const GENERATE_LABEL = 'Generate its questions';
+/** The option label that asks the gate critic to check an author's questions. */
+const CHECK_LABEL = 'Check its questions';
+
+/**
+ * Where the gate critic's check of an author's question file stands, read from the task
+ * registry: `'checking'` while a `classify` task for this revision is queued or running,
+ * `'ended'` when one finished or failed (it is never retried in a loop), `'none'` otherwise.
+ * A registry that cannot be read reads `'none'` (the human may ask; the menu adds nothing twice).
+ * @param {string} root
+ * @param {string} ref
+ * @param {number} revisionMs the question file's revision stamp
+ * @returns {'checking'|'ended'|'none'}
+ */
+function checkState(root, ref, revisionMs) {
+  const label = `revision-${Math.floor(revisionMs)}`;
+  let tasks = [];
+  try {
+    tasks = require('./task-registry').load(root).tasks.filter((t) => t.kind === 'classify' && t.plan === ref && t.label === label);
+  } catch {
+    tasks = []; // an unreadable registry: the menu itself refuses a second task for one revision
+  }
+  if (tasks.some((t) => t.status === 'queued' || t.status === 'running' || t.status === 'cancelling')) return 'checking';
+  return tasks.length > 0 ? 'ended' : 'none';
+}
+
+/** The one plain line a screen shows for a plan whose questions the gate critic has not checked. */
+const CHECK_LINES = Object.freeze({
+  checking: '  Its questions are being checked by the gate critic; it moves on by itself once they are, or when you approve it.\n',
+  none: '  The gate critic has not yet checked the questions its author wrote; choose Check its questions, or approve it yourself.\n',
+  ended: "  The gate critic's check of its questions did not finish; approve it yourself, or change the plan to have them checked again.\n",
+});
 
 /**
  * The sufficiency reasons that ARE a question-store status other than 'ready'
@@ -1722,13 +1788,17 @@ function gateScreenAt(decisions, index, statusLine, root) {
   // second read and no require here: a store that cannot even load yields
   // 'unavailable', which offers nothing, and the screen still renders.
   const canGenerate = isNonEmptyStr(root) && QUESTIONS_NOT_READY.has(d.sufficiencyReason);
+  // An author's file the gate critic has not checked: one plain line, and one action to check
+  // it when no check exists for this revision. Its questions are never offered as options.
+  const unchecked = isNonEmptyStr(root) && d.questionsClassified === false && d.sufficiencyReason !== 'held'
+    ? checkState(root, d.ref, d.questionsRevisionMs) : null;
 
   let text = '';
   if (statusLine) text += `${stripCtl(statusLine)}\n\n`;
   text += `Topic: ${humanPlanName(d.title, d.slug)}  ·  ${d.moment}  ·  decision ${index + 1} of ${total}\n`;
   text += `${'─'.repeat(40)}\n\n`;
   text += `  ${d.summary}\n\n`;
-  text += sufficiencyLine(d);
+  text += unchecked ? CHECK_LINES[unchecked] : sufficiencyLine(d);
   text += '\n\n';
 
   const actions = {
@@ -1739,6 +1809,11 @@ function gateScreenAt(decisions, index, statusLine, root) {
     'Other': `stream comment ${d.ref}`,
   };
   if (canGenerate) actions[GENERATE_LABEL] = `claude:generate-questions ${d.ref}`;
+  const options = buildOptions(d, canGenerate);
+  if (unchecked === 'none') {
+    options.push({ label: CHECK_LABEL, description: 'Ask the gate critic to check the questions its author wrote, in the background. Nothing else changes.' });
+    actions[CHECK_LABEL] = `stream check ${d.ref}`;
+  }
 
   return {
     text,
@@ -1746,7 +1821,7 @@ function gateScreenAt(decisions, index, statusLine, root) {
       questions: [{
         question: gateWords.question(d.fromStage, humanPlanName(d.title, d.slug)),
         header: d.chip,
-        options: buildOptions(d, canGenerate),
+        options,
       }],
     },
     actions,
@@ -1771,6 +1846,18 @@ function gateScreenAt(decisions, index, statusLine, root) {
  *   banner (streamAnswer sets this because it appends loopBDirective itself).
  */
 function streamingGateScreen(projectRoot, statusLine, opts) {
+  // Sweep the waiting folder FIRST, so the banner and the decisions describe the questions
+  // this very render shows (a file swept in later in the render would read as missing above).
+  // Fail-soft: a sweep that throws is reported on the status line, and the render below sweeps
+  // again before it reads any question.
+  let sweepFault = '';
+  if (isNonEmptyStr(projectRoot)) {
+    try {
+      require('./streaming-questions-sweeper').sweepPendingQuestions(projectRoot);
+    } catch (err) {
+      sweepFault = `New questions could not be taken in (${stripCtl((err && err.message) || String(err))}).`;
+    }
+  }
   // THE ON-OPEN ENGINE BANNER. Compute it BEFORE pendingGateDecisions so
   // loopBDirective's own before/after snapshot straddles the sufficiency cross (the
   // same ordering streamAnswer uses at its call site). The banner is added ONCE, here
@@ -1786,7 +1873,7 @@ function streamingGateScreen(projectRoot, statusLine, opts) {
   const notice = unsafe > 0
     ? `${unsafe} plan file(s) have a name CTOC will not pass to a command — rename them.`
     : '';
-  const status = [statusLine, notice].filter((x) => isNonEmptyStr(x)).join('  ');
+  const status = [statusLine, notice, sweepFault].filter((x) => isNonEmptyStr(x)).join('  ');
   const screen = gateScreenAt(decisions, 0, status || statusLine, projectRoot);
   if (banner && screen && typeof screen.text === 'string') {
     screen.text = banner + screen.text;

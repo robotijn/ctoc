@@ -1557,8 +1557,11 @@ function surfaceEscalation(escalation, planName, root) {
  *
  * @param {string} planPath - the approved plan's (done-stage) path
  * @param {string} root - project root
+ * @param {'human'|'evidence'} [how] - how the plan reached done: the human's approval
+ *   (approvePlan, the default) or its own checks (streaming-gate.crossOnEvidence). The notice
+ *   says which, in plain words and with no gate number.
  */
-function recordDeployReadyNotice(planPath, root) {
+function recordDeployReadyNotice(planPath, root, how = 'human') {
   try {
     const logDir = path.join(root, '.ctoc', 'logs');
     if (!safeFs.existsSync(logDir)) safeFs.mkdirSync(logDir, { recursive: true });
@@ -1573,9 +1576,11 @@ function recordDeployReadyNotice(planPath, root) {
       at: new Date().toISOString(),
       status: 'deploy-ready',
       message:
-        'Plan approved at Gate 3 (review → done) and is DEPLOY-READY. Deploy is a ' +
-        'separate human ship gate, authorized per crossing: approve with the deploy ' +
-        'stamp to deploy this crossing, or deploy manually. No standing setting deploys.'
+        (how === 'evidence'
+          ? 'It finished on its checks — nobody approved it by hand — and is ready to deploy. '
+          : 'It is finished: you approved it, and it is ready to deploy. ') +
+        'Deploying it is a separate decision, made each time: approve it with the deploy ' +
+        'stamp, or deploy it yourself. No standing setting deploys.'
     });
     if (log.length > 500) log = log.slice(-500);
     // Handover (b): write ATOMICALLY (temp sibling + rename), mirroring stale-cleanup's

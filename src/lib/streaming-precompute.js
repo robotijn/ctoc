@@ -1217,7 +1217,9 @@ function readAnsweredQuestionIds(root, ref, revision) {
  * @param {string} ref plan reference ("stage/file.md")
  * @returns {{enough: boolean, reason: string, unanswered: Array<object>,
  *   blocking: Array<object>, unboundAnswers: number, computed: (number|null),
- *   answered: string[]}} `unanswered` is EVERY still-open question (nothing hidden);
+ *   answered: string[], classified: (boolean|null), revisionMs: (number|null)}} `unanswered`
+ *   is EVERY still-open question (nothing hidden); `classified` says whether the gate critic
+ *   classified the file and `revisionMs` is its revision stamp (both null when not ready);
  *   `blocking` is the subset that is a fork and therefore fails the gate;
  *   `unboundAnswers` is how many recorded answers could not be tied to this revision
  *   of the plan, so a screen can say "3 recorded answers are being asked again"
@@ -1240,7 +1242,7 @@ function hasEnoughInformation(root, ref) {
     // Nothing was read, so nothing was evaluated against a revision — 0 unbound is
     // literally true here and never means "everything bound". `computed: null` (not
     // 0): the count is UNKNOWN here, and writing 0 would forge an empty-list record.
-    return { enough: false, reason: status.status, unanswered: [], blocking: [], unboundAnswers: 0, computed: null, answered: [] };
+    return { enough: false, reason: status.status, unanswered: [], blocking: [], unboundAnswers: 0, computed: null, answered: [], classified: null, revisionMs: null };
   }
 
   const questions = status.questions;
@@ -1262,17 +1264,20 @@ function hasEnoughInformation(root, ref) {
   // only ids of CURRENT questions count (answered.length + unanswered.length === computed).
   const computed = questions.length;
   const answered = questions.filter((q) => answers.ids.has(q.id)).map((q) => q.id);
+  // Read once with the questions, for a screen that must not show an unchecked author's file.
+  const classified = status.classified === true;
+  const revisionMs = status.questionsRevisionMs;
 
   // FAIL CLOSED: the log could not be read, so an answer or a hold in it is unknown — even
   // for a plan whose questions were regenerated as none, since a hold may predate them.
   if (!answers.ok) {
-    return { enough: false, reason: 'answers-unreadable', unanswered, blocking, unboundAnswers: answers.unbound, computed, answered };
+    return { enough: false, reason: 'answers-unreadable', unanswered, blocking, unboundAnswers: answers.unbound, computed, answered, classified, revisionMs };
   }
 
   // A human's Hold holds, from the answers log only — never from the question file.
   if (answers.held.length > 0) {
     const heldQuestions = answers.held.map((id) => questions.find((q) => q.id === id) || { id });
-    return { enough: false, reason: 'held', unanswered, blocking: heldQuestions, unboundAnswers: answers.unbound, computed, answered };
+    return { enough: false, reason: 'held', unanswered, blocking: heldQuestions, unboundAnswers: answers.unbound, computed, answered, classified, revisionMs };
   }
 
   if (blocking.length > 0) {
@@ -1284,15 +1289,17 @@ function hasEnoughInformation(root, ref) {
       unboundAnswers: answers.unbound,
       computed,
       answered,
+      classified,
+      revisionMs,
     };
   }
 
   // Only the independent gate critic can say nothing weighty is missing from the list.
   if (!status.classified) {
-    return { enough: false, reason: 'unclassified', unanswered, blocking: [], unboundAnswers: answers.unbound, computed, answered };
+    return { enough: false, reason: 'unclassified', unanswered, blocking: [], unboundAnswers: answers.unbound, computed, answered, classified, revisionMs };
   }
 
-  return { enough: true, reason: 'enough', unanswered, blocking: [], unboundAnswers: answers.unbound, computed, answered };
+  return { enough: true, reason: 'enough', unanswered, blocking: [], unboundAnswers: answers.unbound, computed, answered, classified, revisionMs };
 }
 
 module.exports = {

@@ -300,6 +300,7 @@ unchanged.
 | `stream answer <ref> <id> <key> [<digest>]` | writes the answers log (answers, holds, releases), then the continuation, which crosses plans (review to done included) |
 | `stream skip <ref>` | re-renders through the crossing pass |
 | `stream comment <ref> <text>` | writes `.ctoc/streaming/comments.jsonl`, then the same re-render |
+| `stream check <ref>` | queues the gate critic's classification of that plan's questions (the human's "Check its questions"), then the same re-render |
 | `stream` with no or an unknown sub-command | the default screen |
 | `plan` with no reference | the default screen |
 | `menu task complete <id> … --continue` | the continuation: crossings, planner and classification tasks, builds started |

@@ -45,6 +45,9 @@ const gateWords = require('../src/lib/gate-words.js');
 const NO_GATE_NUMBER = /\bgates?\s*[0-9]/i;
 const { route } = require('../src/lib/menu-screens.js');
 
+/** The gate critic's classification block: only a file it checked is put to the human (slice 2). */
+const CLASSIFIED = Object.freeze({ by: 'gate-critic', at: 1786000000000 });
+
 const STAGES = ['vision', 'canvas', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
 const sandboxes = [];
 let counter = 0;
@@ -151,7 +154,7 @@ describe('plan <ref> asks the PRODUCT question first', () => {
         },
       ],
     }];
-    const w = precompute.writePlanQuestions(root, 'review/session-expiry.md', questions, fs.statSync(p).mtimeMs);
+    const w = precompute.writePlanQuestions(root, 'review/session-expiry.md', questions, fs.statSync(p).mtimeMs, undefined, CLASSIFIED);
     assert.equal(w.ok, true, 'fixture questions must write');
 
     const r = route(['plan', 'review/session-expiry.md'], root);
@@ -187,7 +190,7 @@ describe('plan <ref> asks the PRODUCT question first', () => {
       prompt: 'Which format should an export produce?',
       critical: false, important: false, topic: 'detail',
       options: [{ key: '1', label: 'Comma-separated values', recommended: true, pros: 'Opens anywhere.', cons: 'No types.' }],
-    }], fs.statSync(p).mtimeMs);
+    }], fs.statSync(p).mtimeMs, undefined, CLASSIFIED);
 
     const r = route(['plan', 'functional/export-rules.md'], root);
 

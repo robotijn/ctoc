@@ -1792,3 +1792,51 @@ unchecked question was offered as the owner's decision; 42 the deploy-ready noti
 "approved at Gate 3" for a plan that finished on its checks; 43 the `.status` file stayed in
 review; 44 the evidence read "unknown% against a floor of unknown%"; 45 the header counted the
 plan as waiting for questions in the very render that swept them in.
+
+Built (green after, inside `files:`):
+
+1. **An unchecked author's file is never the owner's decision.** `nextUnansweredQuestion`
+   returns no question for a file the gate critic has not classified (CTOC's own hold question
+   still comes first for a held plan). The verdict now carries `classified` and `revisionMs`,
+   the descriptor `questionsClassified` and `questionsRevisionMs`. The default screen and the
+   plan screen show one plain line — "Its questions are being checked by the gate critic; …"
+   while a `classify` task for this revision is queued or running, "The gate critic has not
+   yet checked the questions its author wrote; choose Check its questions, or approve it
+   yourself." when none exists (with exactly one more action, Check its questions →
+   `stream check <ref>`), or "The gate critic's check of its questions did not finish; …"
+   when one ended — and never the author's questions. `stream check <ref>` queues the
+   classification through the same `queueClassification` the continuation uses (once per
+   revision) and returns it in `promote`. Nothing is queued at menu open.
+2. **The deploy-ready notice** says how the plan finished: "It finished on its checks —
+   nobody approved it by hand — …" (`recordDeployReadyNotice(…, 'evidence')`) or "It is
+   finished: you approved it, …" (the default, `approvePlan`), then "Deploying it is a
+   separate decision, made each time …"; no gate number.
+3. **`crossOnEvidence` clears the `.status` file** (`background.clearStatus`) before it moves
+   the plan, as `approvePlan` does.
+4. **Coverage in the evidence** reads "coverage X% against a floor of Y%", "coverage X% (no
+   floor declared)", or "coverage not measured" — the second form is mine: a measured figure
+   with no floor is not "not measured".
+5. **The default screen sweeps the waiting folder first**, so the header counts the plans
+   still waiting for questions after the sweep; a sweep that throws is said on the status line
+   (my first form swallowed it and the false-green fence refused it).
+
+Fixtures moved to the new contract (old → new → why): `tests/streaming-gate.test.js` nine
+render cases (the first precomputed question, the decision-matrix and width cases, the open-
+a-plan matrix), `tests/streaming-gate-coverage-holes.test.js` the broken-store and wide-token
+cases, `tests/plan-question-screen.test.js` its two product-question fixtures — an author's
+file → the gate critic's classified file (sixth argument) → only a checked file is put to the
+owner; every assertion unchanged. Case 33 in the slice's own test answered the author's
+questions through the screen's actions → through the answer route with each question's digest
+→ the screen no longer offers them; its screen line is now the "being checked" line.
+
+Transcripts (session scratchpad, `e2e-keeps-working/`): the first run `transcript.txt`, the run
+after these fixes `transcript-2.txt` (its step-2 caption in the driver was corrected to print
+the plan's line and options before the final run).
+
+Full `npm test` (once after the fixes): tests 12687, pass 12679, fail 8, skipped 0; coverage
+99.87%. All 8 are in three test files OUTSIDE `files:` whose fixtures stage an unchecked file
+and expect its question on the screen, not edited: `tests/real-question-file-render.test.js`
+(5: the staged real sample carries no classification block), `tests/streaming-questions-
+sweeper.test.js` (2: cases 19 and 20, a "critic-authored" pending file without a
+classification block), `tests/menu-critique-first.test.js` (1: its product question is written
+unclassified). Each needs only the gate critic's classification block on its fixture.

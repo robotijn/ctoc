@@ -181,7 +181,7 @@ describe('streaming-gate — a check that could not run never crosses a plan', (
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'broken-store', validFunctionalBody('broken-store'));
     // A REAL unanswered fork is on disk: with a working store this screen asks it.
-    precompute.writePlanQuestions(root, 'functional/broken-store.md', [forkQuestion('q10-db')], mtimeOf(p));
+    precompute.writePlanQuestions(root, 'functional/broken-store.md', [forkQuestion('q10-db')], mtimeOf(p), undefined, CLASSIFIED);
 
     // Sanity, unpatched: the rich question screen is what the human would get.
     const healthy = streamingGate.streamingGateScreen(root);
@@ -312,7 +312,7 @@ describe('streaming-gate — the decision matrix never overflows and never drops
         { key: '1', label: 'Alpha', recommended: true, pros: 'A short readable reason.' },
         { key: '2', label: 'Beta', pros: TOKEN },
       ],
-    }], mtimeOf(p));
+    }], mtimeOf(p), undefined, CLASSIFIED);
 
     const screen = streamingGate.streamingGateScreen(root);
     const matrixLines = screen.text.split('\n').filter((l) => l.startsWith('│'));

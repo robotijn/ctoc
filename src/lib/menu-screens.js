@@ -2591,17 +2591,9 @@ function continueAfterCrossing(root, extraCrossed = []) {
   const classifying = [];
   for (const d of pending) {
     if (d.sufficiencyReason !== 'open-forks' && d.sufficiencyReason !== 'unclassified') continue;
-    try {
-      const st = require('./streaming-precompute').planQuestionsStatus(root, d.ref);
-      if (st.status !== 'ready' || st.classified !== false) continue;
-      const label = `revision-${Math.floor(st.questionsRevisionMs)}`;
-      if (taskRegistry.load(root).tasks.some((t) => t.kind === 'classify' && t.plan === d.ref && t.label === label)) continue;
-      const added = taskAdd(root, ['classify', d.ref, '--touches', `.ctoc/streaming/questions/${d.ref}`, '--label', label]);
-      if (!added || added.ok !== true) throw new Error('not queued');
-      classifying.push(streamingGate.humanPlanName(d.title, d.slug));
-    } catch {
-      reasons.push('classify-not-queued');
-    }
+    const queued = queueClassification(root, d.ref);
+    if (queued === 'queued') classifying.push(streamingGate.humanPlanName(d.title, d.slug));
+    else if (queued === 'failed') reasons.push('classify-not-queued');
   }
 
   const claimed = [];
@@ -2626,6 +2618,54 @@ function continueAfterCrossing(root, extraCrossed = []) {
   if (planned.length) started.push(`planning ${planned.join(', ')}`);
   if (classifying.length) started.push(`the gate critic checking the questions of ${classifying.join(', ')}`);
   return { crossed, promote, quarantined: base.quarantined, pending, reasons, started, building };
+}
+
+/**
+ * Queue the gate critic's classification of one plan's question file — once per question
+ * revision (task label `revision-<whole millisecond>`, any status), only for a file its author
+ * wrote. The one encoding the continuation and the human's "Check its questions" share.
+ * @param {string} root
+ * @param {string} ref `stage/file.md`
+ * @returns {'queued'|'exists'|'not-needed'|'failed'}
+ */
+function queueClassification(root, ref) {
+  try {
+    const st = require('./streaming-precompute').planQuestionsStatus(root, ref);
+    if (st.status !== 'ready' || st.classified !== false) return 'not-needed';
+    const label = `revision-${Math.floor(st.questionsRevisionMs)}`;
+    if (taskRegistry.load(root).tasks.some((t) => t.kind === 'classify' && t.plan === ref && t.label === label)) return 'exists';
+    const added = taskAdd(root, ['classify', ref, '--touches', `.ctoc/streaming/questions/${ref}`, '--label', label]);
+    return added && added.ok === true ? 'queued' : 'failed';
+  } catch {
+    return 'failed'; // the plan stays where it is and its questions stay with the human
+  }
+}
+
+/** A plan reference at a gate, in the plain characters the menu passes to a command. */
+const GATE_REF = /^(functional|implementation|review)\/[A-Za-z0-9_][A-Za-z0-9._-]*\.md$/;
+
+/**
+ * `stream check <ref>` — the human chose "Check its questions": queue the gate critic's
+ * classification of that plan's author-written questions (as the continuation does), and
+ * return the screen with the queued task in `promote` for the session to launch. Moves nothing.
+ * @param {string} ref
+ * @param {string} [projectPath]
+ */
+function streamCheck(ref, projectPath) {
+  const root = getProjectPath(projectPath);
+  const safe = typeof ref === 'string' && GATE_REF.test(ref);
+  const file = safe ? ref.slice(ref.indexOf('/') + 1) : stripCtl(String(ref));
+  const outcome = safe ? queueClassification(root, ref) : 'not-needed';
+  const status = {
+    queued: `Asked the gate critic to check the questions of ${file}.`,
+    exists: `The gate critic's check of ${file} is already recorded; nothing was added.`,
+    'not-needed': `Nothing to check for ${file}: it has no unchecked questions.`,
+    failed: `Could not ask for a check of ${file}; its questions stay with you.`,
+  }[outcome];
+  const screen = streamingGate.streamingGateScreen(root, status);
+  const { promote } = computePromote(loadReg(root));
+  if (promote.length > 0) screen.promote = promote;
+  return screen;
 }
 
 /** The human name of the plan at `planPath`, read from its `# Heading`, else its slug. */
@@ -2756,6 +2796,8 @@ function route(args, projectPath, opts = {}) {
       if (sub === 'approve') return streamingGate.streamApprove(ref, projectPath);
       if (sub === 'skip') return streamingGate.streamSkip(ref, projectPath);
       if (sub === 'comment') return streamingGate.streamComment(ref, args.slice(3).join(' '), projectPath);
+      // `stream check <ref>` — the human asks the gate critic to check an author's questions.
+      if (sub === 'check') return streamCheck(ref, projectPath);
       // `stream answer <ref> <questionId> <optionKey>` — record a precomputed-
       // question answer (out-of-band log; never edits the plan, never crosses a
       // gate) and advance to the next question / final Approve.

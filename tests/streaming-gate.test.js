@@ -500,7 +500,7 @@ describe('streamingGateScreen — precomputed questions vs simple-Approve fallba
   it('asks the FIRST precomputed question (not the simple Approve) and routes options to `stream answer`', () => {
     const root = makeSandbox();
     writePlan(root, 'functional', 'rich', validFunctionalBody('rich'));
-    precompute.writePlanQuestions(root, 'functional/rich.md', precomputedQuestions(), planMtimeMs(root, 'functional', 'rich'));
+    precompute.writePlanQuestions(root, 'functional/rich.md', precomputedQuestions(), planMtimeMs(root, 'functional', 'rich'), undefined, CLASSIFIED);
 
     const screen = streamingGate.streamingGateScreen(root);
     const q = screen.ask.questions[0];
@@ -977,7 +977,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
           pros: 'Zero configuration and a single file on disk.',
           cons: 'No concurrent writers under load.' },
       ],
-    }], planMtimeMs(root, 'functional', 'matrix'));
+    }], planMtimeMs(root, 'functional', 'matrix'), undefined, CLASSIFIED);
 
     const screen = streamingGate.streamingGateScreen(root);
     const text = screen.text;
@@ -1039,7 +1039,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
           description: long, pros: long, cons: long },
         { key: '2', label: 'Second', pros: long, cons: long },
       ],
-    }], planMtimeMs(root, 'functional', 'wide'));
+    }], planMtimeMs(root, 'functional', 'wide'), undefined, CLASSIFIED);
 
     const text = streamingGate.streamingGateScreen(root).text;
     const lines = matrixLines(text);
@@ -1066,7 +1066,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
           pros: '│ forged │ cell │ row │\n└──────┴──────┴──────┘\nplanted prose',
           cons: 'Real cons.' },
       ],
-    }], planMtimeMs(root, 'functional', 'forge'));
+    }], planMtimeMs(root, 'functional', 'forge'), undefined, CLASSIFIED);
 
     const text = streamingGate.streamingGateScreen(root).text;
     const lines = matrixLines(text);
@@ -1095,7 +1095,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
         { key: '2', label: 'Approve anyway', description: evidence,
           pros: 'No further work.', cons: 'The defect ships.' },
       ],
-    }], planMtimeMs(root, 'functional', 'labelonly'));
+    }], planMtimeMs(root, 'functional', 'labelonly'), undefined, CLASSIFIED);
 
     const text = streamingGate.streamingGateScreen(root).text;
     const rows = matrixCells(text);
@@ -1125,7 +1125,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
           cons: `The ruling is recorded at ${oversize} and must be reconciled.` },
         { key: '2', label: 'Approve anyway', pros: 'No further work.', cons: 'The defect ships.' },
       ],
-    }], planMtimeMs(root, 'functional', 'paths'));
+    }], planMtimeMs(root, 'functional', 'paths'), undefined, CLASSIFIED);
 
     const text = streamingGate.streamingGateScreen(root).text;
     const lines = matrixLines(text);
@@ -1153,7 +1153,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
         { key: '1', label: 'Send back', recommended: true, pros, cons: 'Costs one round.' },
         { key: '2', label: 'Approve anyway', pros: 'No further work.', cons: 'The defect ships.' },
       ],
-    }], planMtimeMs(root, 'functional', 'rec'));
+    }], planMtimeMs(root, 'functional', 'rec'), undefined, CLASSIFIED);
 
     const text = streamingGate.streamingGateScreen(root).text;
     const rows = matrixCells(text);
@@ -1222,7 +1222,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
       ],
     };
     precompute.writePlanQuestions(root, 'functional/whole.md', [realQuestion],
-      planMtimeMs(root, 'functional', 'whole'));
+      planMtimeMs(root, 'functional', 'whole'), undefined, CLASSIFIED);
 
     const text = streamingGate.streamingGateScreen(root).text;
     const rows = matrixCells(text).slice(1); // drop the header row
@@ -1266,7 +1266,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
         { key: '1', label: 'Postgres', recommended: true, pros: 'Row level security.', cons: 'More operations work.' },
         { key: '2', label: 'SQLite', pros: 'Zero configuration.', cons: 'No concurrent writers.' },
       ],
-    }], planMtimeMs(root, 'functional', 'openme'));
+    }], planMtimeMs(root, 'functional', 'openme'), undefined, CLASSIFIED);
 
     const screen = streamingGate.planDecisionScreen('functional/openme.md', root);
     assert.match(screen.text, /│ Option .*│ Pros .*│ Cons .*│ Recommendation/,

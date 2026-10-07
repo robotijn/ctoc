@@ -985,10 +985,12 @@ describe('an answer is bound to the question as shown (cases 28–33)', () => {
     assert.match(aTask[0].label, /^revision-[0-9]+$/);
     assert.ok(cont.promote.some((t) => t.id === aTask[0].id));
     const screen = streamingGate.streamingGateScreen(root);
-    assert.match(screen.text, /the gate critic has not yet checked the questions its author wrote, so it cannot move on by itself; it waits for that check or for your approval/);
+    assert.match(screen.text, /Its questions are being checked by the gate critic; it moves on by itself once they are, or when you approve it\./);
     assert.doesNotMatch(screen.text, /unclassified/);
 
-    for (let i = 0; i < 2; i++) runAction(root, route(['plan', bRef], root).actions[i === 0 ? 'CSV' : 'report']);
+    // The screen never offers an unchecked author's questions; the human answers them through
+    // the answer route with the digest of each question, as the menu records an answer.
+    for (const q of bqs) route(['stream', 'answer', bRef, q.id, '1', digestOf(q)], root);
     assert.equal(exists(root, bRef), true);
     assert.equal(precompute.hasEnoughInformation(root, bRef).reason, 'unclassified');
     assert.equal(tasks(root).filter((t) => t.kind === 'classify' && t.plan === bRef).length, 1);
