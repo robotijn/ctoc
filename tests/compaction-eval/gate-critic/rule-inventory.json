@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/gate-critic/baseline-agent.md",
  "baseline_sha256": "d8d10528cffd6e9c0af1b1174d5286b79b08d820416894c16ce117e2f39fed5e",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 134683,
+ "maxBytes": 136327,
  "units": [
   {
    "n": 1,
@@ -2946,7 +2946,7 @@
    "orders": [
     "R-339"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 340,
@@ -3794,7 +3794,7 @@
    "orders": [
     "R-437"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 438,
@@ -4202,7 +4202,7 @@
    "orders": [
     "R-485"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 486,
@@ -5122,7 +5122,7 @@
    "orders": [
     "R-591"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 592,
@@ -9231,7 +9231,16 @@
     "- A finding you cannot tier because the evidence is ambiguous is `important`, and its `cons` must state what evidence would settle it."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan: every finding question carries a topic; an ambiguous-evidence finding carries two options and no recommended one, an exception to \"exactly one recommended\"; Rule 8 recommends Approve when no surviving question goes to the human, and an important finding with topic detail no longer holds the plan; options carry an optional boolean holds.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "A finding you cannot tier because the evidence is ambiguous is `important` with two options and NO recommended one, the exception to rule 7's \"exactly one\"."
+    ]
+   }
   },
   {
    "id": "R-341",
@@ -9973,7 +9982,16 @@
     "Exactly one option is `recommended: true`."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan: every finding question carries a topic; an ambiguous-evidence finding carries two options and no recommended one, an exception to \"exactly one recommended\"; Rule 8 recommends Approve when no surviving question goes to the human, and an important finding with topic detail no longer holds the plan; options carry an optional boolean holds.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "Exactly one option is `recommended: true`, except under rule 4's ambiguous-evidence boundary rule, where none is."
+    ]
+   }
   },
   {
    "id": "R-438",
@@ -10333,7 +10351,17 @@
     "Recommend \"approve/cross\" ONLY when all three PROSECUTION lenses actually RAN and none surfaced an unresolved `critical` or `important` finding. The DEFENSE lens's state is not part of this test in either direction: its absence never blocks Approve, and its presence never licenses one."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan: every finding question carries a topic; an ambiguous-evidence finding carries two options and no recommended one, an exception to \"exactly one recommended\"; Rule 8 recommends Approve when no surviving question goes to the human, and an important finding with topic detail no longer holds the plan; options carry an optional boolean holds.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "Recommend \"approve/cross\" ONLY when all three PROSECUTION lenses actually RAN and no surviving question goes to the human under rule 4a.",
+     "An `important` finding with topic `detail` and one recommended option no longer holds the plan: it counts as resolved here and in rule 10, and its recommended fix is recorded in the plan when the plan moves on."
+    ]
+   }
   },
   {
    "id": "R-486",
@@ -11213,7 +11241,16 @@
     "Before emitting, re-read every option object and confirm each key is one of: `key`, `label`, `recommended`, `pros`, `cons`, `description`."
    ],
    "pinned_by": null,
-   "wire": true
+   "wire": true,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan: every finding question carries a topic; an ambiguous-evidence finding carries two options and no recommended one, an exception to \"exactly one recommended\"; Rule 8 recommends Approve when no surviving question goes to the human, and an important finding with topic detail no longer holds the plan; options carry an optional boolean holds.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "Before emitting, re-read every option object and confirm each key is one of: `key`, `label`, `recommended`, `holds`, `pros`, `cons`, `description`."
+    ]
+   }
   },
   {
    "id": "R-592",
@@ -12230,6 +12267,14 @@
    ],
    "pinned_by": null,
    "wire": false
+  }
+ ],
+ "ceiling_corrections": [
+  {
+   "date": "2026-10-07",
+   "from": 134683,
+   "to": 136327,
+   "reason": "owner's question contract of 2026-10-06 (plan ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human) adds rules"
   }
  ]
 }

@@ -389,3 +389,82 @@ describe('hasEnoughInformation — details move on, a Hold holds', () => {
     assert.ok(closed.keys instanceof Map && closed.keys.size === 0);
   });
 });
+
+// The agent rules this slice rewrites are held word for word by the compaction rule
+// inventories. A rule the owner replaced ends as `replaced`, with a record of who replaced
+// it and the anchors of its new words; it never disappears silently. These cases drive the
+// shared inventory checks against a four-sentence fixture agent.
+describe('compaction inventories — a rule the owner replaced is recorded, never silently dropped', () => {
+  const crypto = require('node:crypto');
+  const { defineInventoryTests } = require('./compaction-eval/inventory-checks');
+
+  const BASELINE = '# Agent\n\n## Rules\n\nAlways do A. Never do B.\n';
+  const REPLACED_BY = { instruction: 'the owner replaced A with C', date: '2026-10-07', plan: 'fixture-plan', new_anchors: ['Always do C.'] };
+
+  /** Runs the ten checks over a fixture; returns the numbers of the checks that failed. */
+  function failingChecks({ agent, unitFate = 'replaced', order3 }) {
+    const dir = makeSandbox();
+    const at = (name) => path.join(dir, name);
+    fs.writeFileSync(at('baseline.md'), BASELINE);
+    fs.writeFileSync(at('agent.md'), agent);
+    const units = require('./compaction-eval/units').splitUnits(BASELINE);
+    const inventory = {
+      agent: at('agent.md'),
+      baseline: at('baseline.md'),
+      baseline_sha256: crypto.createHash('sha256').update(BASELINE).digest('hex'),
+      baseline_commit: '0'.repeat(40),
+      maxBytes: 10000,
+      units: [
+        { n: 1, sha: units[0].sha, kind: 'heading', orders: [], fate: 'kept' },
+        { n: 2, sha: units[1].sha, kind: 'heading', orders: [], fate: 'kept' },
+        { n: 3, sha: units[2].sha, kind: 'order', orders: ['R-3'], fate: unitFate },
+        { n: 4, sha: units[3].sha, kind: 'order', orders: ['R-4'], fate: 'kept' },
+      ],
+      orders: [
+        { id: 'R-3', says: 'Always do A.', now_in: '## Rules', anchors: ['Always do A.'], ...order3 },
+        { id: 'R-4', says: 'Never do B.', now_in: '## Rules', anchors: ['Never do B.'] },
+      ],
+    };
+    fs.writeFileSync(at('inventory.json'), JSON.stringify(inventory));
+    const checks = [];
+    defineInventoryTests({ test: (name, fn) => checks.push({ name, fn }), label: 'fixture', inventoryPath: at('inventory.json'), orderFloor: 2 });
+    assert.equal(checks.length, 10, 'still exactly ten checks');
+    const failed = [];
+    for (const c of checks) {
+      try { c.fn(); } catch (err) { failed.push(Number(c.name.match(/fixture: (\d+)\./)[1])); }
+    }
+    return failed;
+  }
+
+  it('30. a correct replacement passes all ten checks', () => {
+    assert.deepEqual(failingChecks({ agent: '# Agent\n\n## Rules\n\nAlways do C. Never do B.\n', order3: { fate: 'replaced', replaced_by: REPLACED_BY } }), []);
+  });
+
+  it('31. the untouched fixture still passes (guard) and a silently rewritten kept rule still fails', () => {
+    assert.deepEqual(failingChecks({ agent: BASELINE, unitFate: 'kept', order3: {} }), []);
+    assert.deepEqual(failingChecks({ agent: '# Agent\n\n## Rules\n\nAlways do C. Never do B.\n', unitFate: 'kept', order3: {} }), [4, 9, 10]);
+  });
+
+  it('32. replaced without a complete replaced_by record fails the classification check', () => {
+    const agent = '# Agent\n\n## Rules\n\nAlways do C. Never do B.\n';
+    assert.ok(failingChecks({ agent, order3: { fate: 'replaced' } }).includes(3));
+    for (const field of ['instruction', 'date', 'plan', 'new_anchors']) {
+      const partial = { ...REPLACED_BY, [field]: field === 'new_anchors' ? [] : '' };
+      assert.ok(failingChecks({ agent, order3: { fate: 'replaced', replaced_by: partial } }).includes(3), `an empty ${field} must fail`);
+    }
+    assert.ok(failingChecks({ agent, order3: { fate: 'replaced', replaced_by: { ...REPLACED_BY, date: '7 Oct 2026' } } }).includes(3));
+    assert.ok(failingChecks({ agent, order3: { fate: 'gone', replaced_by: REPLACED_BY } }).includes(3), 'an unknown order fate fails');
+    assert.ok(failingChecks({ agent, unitFate: 'replaced', order3: {} }).includes(3), 'a unit marked replaced must carry a replaced order');
+    assert.ok(failingChecks({ agent, unitFate: 'kept', order3: { fate: 'replaced', replaced_by: REPLACED_BY } }).includes(3), 'a kept unit cannot carry a replaced order');
+  });
+
+  it('33. the old words still present fails — the old rule must really be gone, not duplicated', () => {
+    const failed = failingChecks({ agent: '# Agent\n\n## Rules\n\nAlways do A. Always do C. Never do B.\n', order3: { fate: 'replaced', replaced_by: REPLACED_BY } });
+    assert.ok(failed.includes(4), JSON.stringify(failed));
+  });
+
+  it('34. the new words missing fails, and a doubled new anchor fails uniqueness', () => {
+    assert.ok(failingChecks({ agent: '# Agent\n\n## Rules\n\nNever do B.\n', order3: { fate: 'replaced', replaced_by: REPLACED_BY } }).includes(4));
+    assert.ok(failingChecks({ agent: '# Agent\n\n## Rules\n\nAlways do C. Always do C. Never do B.\n', order3: { fate: 'replaced', replaced_by: REPLACED_BY } }).includes(10));
+  });
+});

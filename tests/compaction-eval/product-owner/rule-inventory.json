@@ -3401,7 +3401,7 @@
    "orders": [
     "R-414"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 415,
@@ -3410,7 +3410,7 @@
    "orders": [
     "R-415"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 416,
@@ -3419,7 +3419,7 @@
    "orders": [
     "R-416"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 417,
@@ -3428,7 +3428,7 @@
    "orders": [
     "R-417"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 418,
@@ -3437,7 +3437,7 @@
    "orders": [
     "R-418"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 419,
@@ -3446,7 +3446,7 @@
    "orders": [
     "R-419"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 420,
@@ -3455,7 +3455,7 @@
    "orders": [
     "R-420"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 421,
@@ -3482,7 +3482,7 @@
    "orders": [
     "R-423"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 424,
@@ -5925,7 +5925,16 @@
     "Write your questions through the real store-writer, never by hand:"
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan replaces the \"Writing questions to the streaming store\" section, which orders a function call the agent has no tool to make: as the last act, Write the pending questions file; every stack, algorithm, data-model, security, irreversible or costly choice becomes a question with that topic.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "You also write it unasked, as your last act after the plan file's final write."
+    ]
+   }
   },
   {
    "id": "R-415",
@@ -5935,7 +5944,16 @@
     "const { writePlanQuestions } = require(\"./src/lib/streaming-precompute.js\"); writePlanQuestions(root, ref, questions, planMtimeMs);"
    ],
    "pinned_by": "tests/session-start-question-dispatch.test.js (writePlanQuestions + streaming-precompute)",
-   "wire": true
+   "wire": true,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan replaces the \"Writing questions to the streaming store\" section, which orders a function call the agent has no tool to make: as the last act, Write the pending questions file; every stack, algorithm, data-model, security, irreversible or costly choice becomes a question with that topic.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "Use Write:"
+    ]
+   }
   },
   {
    "id": "R-416",
@@ -5945,7 +5963,16 @@
     "- `root` — the project root."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan replaces the \"Writing questions to the streaming store\" section, which orders a function call the agent has no tool to make: as the last act, Write the pending questions file; every stack, algorithm, data-model, security, irreversible or costly choice becomes a question with that topic.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "`.ctoc/streaming/questions/pending/functional__<file>.md.json`"
+    ]
+   }
   },
   {
    "id": "R-417",
@@ -5955,7 +5982,16 @@
     "- `ref` — the plan reference, `functional/<file>.md`."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan replaces the \"Writing questions to the streaming store\" section, which orders a function call the agent has no tool to make: as the last act, Write the pending questions file; every stack, algorithm, data-model, security, irreversible or costly choice becomes a question with that topic.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "`{ \"ref\": \"functional/<file>.md\", \"questions\": [ … ] }`"
+    ]
+   }
   },
   {
    "id": "R-418",
@@ -5965,7 +6001,17 @@
     "- `planMtimeMs` — the plan file's current mtime in milliseconds (the freshness stamp; questions generated against an older plan read as STALE and are regenerated)."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan replaces the \"Writing questions to the streaming store\" section, which orders a function call the agent has no tool to make: as the last act, Write the pending questions file; every stack, algorithm, data-model, security, irreversible or costly choice becomes a question with that topic.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "and no `planMtimeMs`",
+     "stamps the plan's own time."
+    ]
+   }
   },
   {
    "id": "R-419",
@@ -5975,7 +6021,17 @@
     "- `questions` — an ARRAY in the streaming Question contract, exactly: `[{ id, prompt, critical?, important?, options: [{ key, label, recommended?, pros?, cons?, description? }] }]`."
    ],
    "pinned_by": "src/lib/streaming-precompute.js (the streaming Question contract)",
-   "wire": true
+   "wire": true,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan replaces the \"Writing questions to the streaming store\" section, which orders a function call the agent has no tool to make: as the last act, Write the pending questions file; every stack, algorithm, data-model, security, irreversible or costly choice becomes a question with that topic.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "Each question is `{ id, prompt, critical, important, topic, options: [{ key, label, recommended?, holds?, pros?, cons?, description? }] }`",
+     "shaped as in `agents/iron-loop/gate-critic.md`, whose rule 4a defines `topic` and `holds`."
+    ]
+   }
   },
   {
    "id": "R-420",
@@ -5985,7 +6041,17 @@
     "`id`/`prompt`/`key`/`label` are non-empty strings; question ids are unique; option keys are unique within a question; mark exactly one option `recommended: true`; a real fork the builder must confront is `critical: true`, a strong-preference fork `important: true`, a detail resolvable while building is neither."
    ],
    "pinned_by": "src/lib/streaming-precompute.js (the streaming Question contract)",
-   "wire": true
+   "wire": true,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan replaces the \"Writing questions to the streaming store\" section, which orders a function call the agent has no tool to make: as the last act, Write the pending questions file; every stack, algorithm, data-model, security, irreversible or costly choice becomes a question with that topic.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "Exactly one option is `recommended: true`, unless the evidence cannot settle the answer: then two options and none.",
+     "Every choice you made of technology stack, algorithm, data model, security posture, anything irreversible, or anything with a recurring or large cost is a question with that `topic`, never a silent choice; everything else goes into the plan's `## Decisions Taken Under Ambiguity`."
+    ]
+   }
   },
   {
    "id": "R-421",
@@ -6015,7 +6081,16 @@
     "`writePlanQuestions` validates the set and refuses a malformed one; it is fail-soft and never throws."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan replaces the \"Writing questions to the streaming store\" section, which orders a function call the agent has no tool to make: as the last act, Write the pending questions file; every stack, algorithm, data-model, security, irreversible or costly choice becomes a question with that topic.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "the menu's sweeper validates it through `writePlanQuestions` (`src/lib/streaming-precompute.js`)"
+    ]
+   }
   },
   {
    "id": "R-425",

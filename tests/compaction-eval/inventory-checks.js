@@ -10,6 +10,14 @@
  *
  * The order floor is passed in by the caller and stays written in the caller's test file, so
  * lowering it takes an edit in a second place.
+ *
+ * A RULE THE OWNER REPLACED. An order may end as `fate: "replaced"` only with a complete
+ * `replaced_by` record — `{ instruction, date: "YYYY-MM-DD", plan, new_anchors: [...] }` — and
+ * keeps its old `anchors` as history. It is then held to its NEW anchors (present in its
+ * section, exactly once, each deletion reported), and its old anchors must be GONE from the
+ * agent, so a replaced rule is really replaced and never silently duplicated or dropped. A unit
+ * carrying a replaced order is marked `replaced` too (never `kept`); a unit marked `replaced`
+ * must carry one. Everything else is held exactly as strictly as before.
  */
 
 const assert = require('node:assert/strict');
@@ -21,8 +29,31 @@ const units = require('./units');
 
 const ROOT = path.join(__dirname, '..', '..');
 const KINDS = new Set(['order', 'reason', 'history', 'example', 'reference', 'description', 'heading', 'frontmatter']);
-const FATES = new Set(['kept', 'tightened', 'merged', 'cut']);
+const FATES = new Set(['kept', 'tightened', 'merged', 'cut', 'replaced']);
 const CUTTABLE = new Set(['reason', 'history', 'example', 'description', 'reference']);
+
+const isReplaced = (o) => o.fate === 'replaced';
+const nonEmpty = (v) => typeof v === 'string' && units.normalize(v).length > 0;
+
+/** What is wrong with an order's fate and replacement record; empty when nothing is. */
+function replacementErrors(o) {
+  if (o.fate === undefined) return [];
+  if (!isReplaced(o)) return [`order ${o.id} has fate ${o.fate}`];
+  const r = o.replaced_by;
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return [`order ${o.id} is replaced with no replaced_by record`];
+  const errors = [];
+  for (const field of ['instruction', 'plan']) if (!nonEmpty(r[field])) errors.push(`order ${o.id}: replaced_by.${field} is empty`);
+  if (typeof r.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(r.date)) errors.push(`order ${o.id}: replaced_by.date is not YYYY-MM-DD`);
+  if (!Array.isArray(r.new_anchors) || r.new_anchors.length === 0 || !r.new_anchors.every(nonEmpty)) {
+    errors.push(`order ${o.id}: replaced_by.new_anchors is not a non-empty list of anchors`);
+  }
+  return errors;
+}
+
+/** The order as the agent is held to it now: a replaced order answers for its new anchors. */
+function liveOrder(o) {
+  return isReplaced(o) && o.replaced_by && Array.isArray(o.replaced_by.new_anchors) ? { ...o, anchors: o.replaced_by.new_anchors } : o;
+}
 
 /**
  * Registers the ten inventory checks for one inventory file. Reads nothing until a check runs.
@@ -39,9 +70,9 @@ function defineInventoryTests({ test, label, inventoryPath, orderFloor }) {
 
   function load() {
     const inv = JSON.parse(fs.readFileSync(inventory, 'utf8'));
-    const baseline = fs.readFileSync(path.join(ROOT, inv.baseline), 'utf8');
-    const agent = fs.readFileSync(path.join(ROOT, inv.agent), 'utf8');
-    return { inv, baseline, agent };
+    const baseline = fs.readFileSync(path.resolve(ROOT, inv.baseline), 'utf8');
+    const agent = fs.readFileSync(path.resolve(ROOT, inv.agent), 'utf8');
+    return { inv, baseline, agent, live: inv.orders.map(liveOrder) };
   }
 
   t('1. the baseline is the snapshot the inventory was labelled against', () => {
@@ -66,12 +97,15 @@ function defineInventoryTests({ test, label, inventoryPath, orderFloor }) {
     const ids = inv.orders.map((o) => o.id);
     assert.equal(new Set(ids).size, ids.length, 'an order id repeats');
     const known = new Set(ids);
+    const replaced = new Set(inv.orders.filter(isReplaced).map((o) => o.id));
     const listed = new Set();
     for (const u of inv.units) {
       assert.ok(KINDS.has(u.kind), `unit ${u.n} has kind ${u.kind}`);
       assert.ok(FATES.has(u.fate), `unit ${u.n} has fate ${u.fate}`);
       if (u.fate === 'cut') assert.ok(CUTTABLE.has(u.kind), `unit ${u.n} is a ${u.kind} and may not be cut`);
       if (u.kind === 'order') assert.ok(u.orders.length > 0, `order unit ${u.n} lists no order`);
+      if (u.fate === 'replaced') assert.ok(u.orders.some((id) => replaced.has(id)), `unit ${u.n} is marked replaced but carries no replaced order`);
+      if (u.fate === 'kept') assert.ok(!u.orders.some((id) => replaced.has(id)), `unit ${u.n} is kept but carries a replaced order`);
       for (const id of u.orders) {
         assert.ok(known.has(id), `unit ${u.n} lists unknown order ${id}`);
         listed.add(id);
@@ -81,12 +115,17 @@ function defineInventoryTests({ test, label, inventoryPath, orderFloor }) {
       assert.ok(listed.has(o.id), `order ${o.id} is listed by no unit`);
       assert.ok(o.anchors.length > 0 && o.anchors.every((a) => units.normalize(a).length > 0), `order ${o.id} has an empty anchor`);
       assert.ok(o.says.length <= 160, `order ${o.id}: says is longer than 160 characters`);
+      assert.deepEqual(replacementErrors(o), [], `order ${o.id} has an incomplete replacement record`);
     }
   });
 
   t('4. every anchor of every order is in the agent, inside the section it now lives in', () => {
-    const { inv, agent } = load();
-    const failures = units.anchorFailures(units.sectionize(agent), inv.orders);
+    const { inv, agent, live } = load();
+    const failures = units.anchorFailures(units.sectionize(agent), live);
+    const flat = units.normalize(agent);
+    for (const o of inv.orders.filter(isReplaced)) {
+      for (const anchor of o.anchors) if (flat.includes(units.normalize(anchor))) failures.push({ id: o.id, anchor, reason: 'replaced-but-present' });
+    }
     assert.deepEqual(failures, [], failures.slice(0, 20).map((f) => `${f.id} (${f.reason}): ${f.anchor}`).join('\n'));
   });
 
@@ -110,10 +149,10 @@ function defineInventoryTests({ test, label, inventoryPath, orderFloor }) {
   });
 
   t('8. deleting any anchor makes check 4 report its order by id', () => {
-    const { inv, agent } = load();
+    const { agent, live } = load();
     const sections = units.sectionize(agent);
     const silent = [];
-    for (const order of inv.orders) {
+    for (const order of live) {
       for (const anchor of order.anchors) {
         const a = units.normalize(anchor);
         const mutated = sections.map((s) => (s.heading === order.now_in ? { ...s, text: s.text.split(a).join('') } : s));
@@ -132,10 +171,10 @@ function defineInventoryTests({ test, label, inventoryPath, orderFloor }) {
   });
 
   t('10. every anchor occurs exactly once in the agent, so it can only stand for its own order', () => {
-    const { inv, agent } = load();
+    const { agent, live } = load();
     const flat = units.normalize(agent);
     const owners = new Map();
-    for (const o of inv.orders) for (const a of o.anchors) owners.set(units.normalize(a), (owners.get(units.normalize(a)) || new Set()).add(o.id));
+    for (const o of live) for (const a of o.anchors) owners.set(units.normalize(a), (owners.get(units.normalize(a)) || new Set()).add(o.id));
     const bad = [];
     for (const [a, ids] of owners) {
       const count = flat.split(a).length - 1;

@@ -14,6 +14,11 @@ files:
   - agents/iron-loop/gate-critic.md
   - agents/planning/product-owner.md
   - agents/planning/implementation-planner.md
+  # Added 2026-10-07 by the session under the owner's standing instruction: the rules this slice replaces are held word for word by the compaction inventories
+  - tests/compaction-eval/inventory-checks.js
+  - tests/compaction-eval/gate-critic/rule-inventory.json
+  - tests/compaction-eval/product-owner/rule-inventory.json
+  - tests/compaction-eval/implementation-planner/rule-inventory.json
 approved_by: human
 approved_at: 2026-10-07T08:53:43.148Z
 gate_crossed: implementation → todo
@@ -208,7 +213,7 @@ New, from slicing:
 - [x] Record before-numbers: false-green scan count, dead-export count, unreachable-file count, `CLAUDE.md` bytes.
 
 ### Step 10: IMPLEMENT
-- [ ] `src/lib/streaming-precompute.js`, `agents/iron-loop/gate-critic.md`, `agents/planning/product-owner.md`, `agents/planning/implementation-planner.md`, as specified; run the slice 1 tests green.
+- [x] `src/lib/streaming-precompute.js`, `agents/iron-loop/gate-critic.md`, `agents/planning/product-owner.md`, `agents/planning/implementation-planner.md`, as specified; run the slice 1 tests green.
 
 ### Step 11: REVIEW
 - [ ] Dispatch `iron-loop-critic`: the five conditions match the table exactly and in order; no instruction surface in this slice contradicts the code; whichever queued agent-improvement slice lands second keeps the other's text.
@@ -248,9 +253,9 @@ New, from slicing:
 - [ ] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
 - [ ] Self-review all new code
@@ -275,7 +280,7 @@ New, from slicing:
 - [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
+- [x] Update relevant documentation
 - [x] Add JSDoc comments to new functions
 - [ ] Update CHANGELOG if needed
 
@@ -296,9 +301,11 @@ findings from a critic that read this plan._
 
 ## Execution Record
 
-Executor run of 2026-10-07, worktree branch. The code half is built and green; the agent half
-is STOPPED at a real fork the plan did not foresee (below). Steps 11, 13 and 16 are left for the
-session's dedicated critic and security scan.
+Executor run of 2026-10-07, worktree branch, in two passes. Pass 1 built the code half and
+stopped at a fork (recorded below as it was). The session then widened `files:` with the four
+compaction-inventory files (approval re-recorded, specification hash f6a476234385e6dc…, matched
+after the frontmatter edit) and set the design for the agent half; pass 2 built it. Steps 11, 13
+and 16 are left for the session's dedicated critic and security scan.
 
 ### What landed
 
@@ -336,7 +343,7 @@ coverage 99.9% (floor 99); `streaming-precompute.js` 100% line, 98.87% branch, 1
 `[CTOC test-gate] PASS`. Lint on both changed files: zero warnings. No existing test failed
 on the replaced contract, so no scope-growth report was needed for that item.
 
-### STOPPED: the agent half cannot be built inside `files:` — a fork for the owner
+### Pass 1 stop (resolved by the session's scope widening): the agent half could not be built inside the original `files:`
 
 All three agent files sit EXACTLY at their byte ceiling (`maxBytes` in
 `tests/compaction-eval/<agent>/rule-inventory.json`), and the sentences this plan says to
@@ -364,6 +371,62 @@ refused: the code rule ships, but the three agents keep telling producers that e
 `important` question blocks, never emit `topic` or `holds`, and the product owner and planner
 keep an order to call a function they hold no tool to call.
 
+### Pass 2 — the agent half
+
+**A rule the owner replaced is recorded, never silently dropped.**
+`tests/compaction-eval/inventory-checks.js` gains a fourth way an order ends: `fate: "replaced"`,
+allowed only with a complete `replaced_by` record (`instruction`, `date` YYYY-MM-DD, `plan`,
+non-empty `new_anchors`); the old `anchors` stay as history. Still exactly ten checks: check 3
+refuses an incomplete record, an unknown order fate, a unit marked `replaced` that carries no
+replaced order, and a `kept` unit that carries one; check 4 holds a replaced order to its new
+anchors in its section AND fails if any old anchor is still in the agent; checks 8 and 10 run on
+the new anchors. Inventory paths now resolve with `path.resolve` (absolute fixture paths work;
+every relative path resolves as before).
+
+Red/green for it (cases 30-34 in `tests/question-blocking-default.test.js`): before the change,
+30 and 31 were red (2 of 37 failing); 32, 33 and 34 passed only vacuously, because an absolute
+fixture path made every check fail. After: 37 of 37 pass. One expectation of my own (case 31's
+silently rewritten kept rule) first named checks 4, 8, 9; the run showed 4, 9, 10, which is the
+correct behaviour (a missing anchor is already reported by check 4, so check 8 has nothing
+silent; check 10 counts it zero times). Corrected to 4, 9, 10.
+
+**Agents, bytes against ceilings:**
+
+| Agent file | Before | After | Ceiling before | Ceiling after |
+|---|---|---|---|---|
+| `agents/iron-loop/gate-critic.md` | 134,683 | 136,327 | 134,683 | 136,327 (`ceiling_corrections`: 2026-10-07, 134,683 to 136,327, measured overage 1,644) |
+| `agents/planning/product-owner.md` | 30,203 | 30,133 | 30,203 | 30,203 (unchanged) |
+| `agents/planning/implementation-planner.md` | 27,019 | 26,973 | 27,019 | 27,019 (unchanged) |
+
+No earlier `ceiling_corrections` entry existed anywhere in the repository, so the form is the one
+the session specified: `{ date, from, to, reason }`.
+
+**Orders marked replaced** (each with the owner's words of 2026-10-06, the plan's instruction,
+date 2026-10-07 and this plan's slug):
+- gate critic: R-339 (ambiguous evidence: two options, none recommended), R-437 (exactly one
+  recommended, except that case), R-485 (Rule 8: Approve when no surviving question goes to the
+  human; an important `detail` finding no longer holds the plan), R-591 (option keys include
+  `holds`).
+- product owner: R-414, R-415, R-416, R-417, R-418, R-419, R-420, R-423.
+- implementation planner: R-310, R-311, R-312, R-313, R-314, R-315, R-316, R-319.
+
+Added to the gate critic without replacing any order: rule 4a (every finding question carries
+`topic`, with the seven definitions copied from this plan; the ruling and `q98` carry none; the
+five routing conditions in words; `holds: true` means "do not move this plan"); a sentence in
+rule 10 putting `holds: true` on the ruling's Hold and Reject options and on rule 9's
+`Hold until the <lens> critique runs`; and an insertion in the pre-emit checklist after its first
+anchor (which stays whole): a finding question also carries `topic`, `holds` is an optional
+boolean option field.
+
+Kept verbatim in both planning agents: the heading, R-412/R-308 and R-413/R-309 (the dispatch-
+brief sentences, pinned by `tests/session-start-question-dispatch.test.js`), R-421/R-317 and
+R-422/R-318 (empty array is honest; never invent a question). `writePlanQuestions` and
+`streaming-precompute` stay named in both.
+
+Full `npm test` (pass 2, once, foreground): tests 12591, pass 12591, fail 0, skipped 0,
+cancelled 0; coverage 99.89% (floor 99); `[CTOC test-gate] PASS`. Lint on the three changed
+JavaScript files: zero warnings.
+
 ### Decisions taken under ambiguity (executor)
 
 1. The test plan's "Case 6" is the file's case 3 (the only case asserting a two-option,
@@ -376,9 +439,27 @@ keep an order to call a function they hold no tool to call.
    "Enough information: NO — held." and does not cross the plan by itself.
 5. Decisions are recorded here, not in the plan's own "Decisions Taken Under Ambiguity", so the
    approved body is unchanged.
+6. The specification says the menu "refuses the file if the plan changed afterwards". The
+   sweeper checks supersession only when a `planMtimeMs` is present, and the agents write none,
+   so the agent text says only what is true: the sweeper validates through `writePlanQuestions`
+   and stamps the plan's own time. A plan changed after promotion reads its questions as stale.
+7. The inventory-checks cases live in `tests/question-blocking-default.test.js`, the only test
+   file in `files:`; `tests/compaction-eval.test.js` pins exactly ten checks, so the replaced
+   fate was folded into checks 3, 4, 8 and 10 rather than added as an eleventh.
+8. Rule 8's second sentence (R-486, "Surviving `normal` findings do not block Approve — they are
+   tie-breakers the human rules on individually …") and the Hold line of rule 10 (R-532, "one or
+   more `important` findings survived deduplication unresolved") were NOT replaced: the
+   specification names neither, and the new Rule 8 defines an important `detail` finding as
+   resolved "here and in rule 10". Step 11 should judge whether R-486's "the human rules on
+   individually" still reads true now that such questions are decided by their recommendation.
+9. R-588 ("`critical`, `important`, and `recommended` are optional booleans") was already wrong
+   before this slice (the two flags are required) and is not in the specification; left as is.
+10. The worked-example and template JSON blocks (kept units) carry no `topic`; changing them is
+    not in the specification. Rule 4a and the checklist state the field.
+11. For bytes, rule 4a's "that is how high uncertainty reaches the human" was not repeated at the
+    ambiguous-evidence rule; rule 4a's routing sentence says the same.
 
 ### Not verified
 
-- The agent half (above). Nothing in the three agent files was changed.
 - The live counts of the false-green, dead-export and unreachable fences were not printed; the
   evidence is that the fences passed inside `npm test`.
