@@ -55,9 +55,12 @@ function renderMatrixFromRealSample() {
     fs.mkdirSync(qDir, { recursive: true });
     // The real sample predates the contract the owner replaced on 2026-10-07 (a topic on every
     // question but the ruling and the notice). Stage it with only the topics added, exactly as
-    // the gate critic would classify it; every field the renderer is tested on is byte for byte real.
+    // the gate critic would classify it, and with the fleet's attestation its reserved ruling now
+    // needs (security re-scan, 2026-10-07); every field the renderer is tested on is byte for byte real.
     const real = JSON.parse(fs.readFileSync(QUESTION_SAMPLE, 'utf8'));
-    const upgraded = { ...real, questions: real.questions.map((q) => (/^q9[89]-/.test(q.id) ? q : { ...q, topic: 'detail' })) };
+    const lens = { state: 'clean-pass', coverage: 'full', findings: 0 };
+    const attestation = { generated_by: 'gate-critic', generated_at: 1, lenses: { premortem: lens, 'devils-advocate': lens, 'red-team': lens, advocate: lens } };
+    const upgraded = { ...real, attestation, questions: real.questions.map((q) => (/^q9[89]-/.test(q.id) ? q : { ...q, topic: 'detail' })) };
     fs.writeFileSync(path.join(qDir, 'review__00003-r2a-scheduler-lifecycle-honesty.md.json'), JSON.stringify(upgraded));
 
     const planDir = path.join(dir, 'plans', 'review');

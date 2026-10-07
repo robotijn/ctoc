@@ -757,9 +757,9 @@ describe('hasEnoughInformation — THE GATE PREDICATE, and it FAILS CLOSED', () 
 
   // The contract the owner replaced on 2026-10-07: a human's Hold is recorded only in the
   // answers log, so an unreadable log is no longer irrelevant to a plan with no forks — it
-  // may hold a Hold. It fails closed for any plan with questions; a plan with NO questions
-  // has nothing to answer or hold, so it is still not deadlocked.
-  it('an unreadable answers log blocks a plan with only details (a Hold may be in it), and never deadlocks a plan with no questions', () => {
+  // may hold a Hold. It fails closed for every plan, even one whose questions were regenerated
+  // as none: a hold logged earlier must never be ignored (security re-scan, 2026-10-07).
+  it('an unreadable answers log blocks a plan with only details, and one with no questions (a Hold may be in it)', () => {
     const root = makeSandbox();
     const { ref } = seedReady(root, 'functional', 'G11', normalOnlyQuestions());
     const dir = path.join(root, '.ctoc', 'streaming');
@@ -770,7 +770,9 @@ describe('hasEnoughInformation — THE GATE PREDICATE, and it FAILS CLOSED', () 
     assert.equal(v.enough, false, 'an unread log may hold the human\'s Hold');
     assert.equal(v.reason, 'answers-unreadable');
     const { ref: none } = seedReady(root, 'functional', 'G11b', []);
-    assert.equal(precompute.hasEnoughInformation(root, none).enough, true, 'no questions → nothing the log could change');
+    const v2 = precompute.hasEnoughInformation(root, none);
+    assert.equal(v2.enough, false, 'a hold may be logged for questions since regenerated away');
+    assert.equal(v2.reason, 'answers-unreadable');
   });
 
   it("an answer for a DIFFERENT plan never clears this plan's fork", () => {

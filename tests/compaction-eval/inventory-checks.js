@@ -22,8 +22,9 @@
  * `kept`; a unit marked `replaced` must carry one. A rule written after the baseline is an
  * order with `fate: "added"` and an `added_by` record `{ instruction, date, plan }`; no unit
  * lists it, and its own anchors are held like any other. For both records: `plan` names a plan
- * file under `plans/<stage>/` that has an approval record `.ctoc/approvals/<plan>.json` and
- * whose text names the order id; `date` is a real calendar date, not in the future; no new
+ * file under `plans/<stage>/` whose approval record `.ctoc/approvals/<plan>.json` is a human or
+ * backfilled ledger entry matching the plan's specification hash now, and whose approved
+ * specification (never its execution record) names the order id; `date` is a real calendar date, not in the future; no new
  * anchor already occurs in the baseline. The inventoried file must live under `agents/` or
  * `skills/`.
  * Everything else is held exactly as strictly as before.
@@ -35,6 +36,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const units = require('./units');
+const ledger = require('../../src/lib/approval-ledger');
 
 const ROOT = path.join(__dirname, '..', '..');
 const KINDS = new Set(['order', 'reason', 'history', 'example', 'reference', 'description', 'heading', 'frontmatter']);
@@ -55,17 +57,59 @@ function isPastDate(date) {
   return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === date && date <= new Date().toISOString().slice(0, 10);
 }
 
-/** The text of the approved plan `slug` under root/plans/<stage>/, or null when there is none. */
+/**
+ * The approved SPECIFICATION of plan `slug` under root/plans/<stage>/ — the part its approval
+ * hash covers, with the sections the hash excludes (the execution record, the decisions,
+ * the checkbox lines) removed — or null when there is no such approved plan. Approved means:
+ * `.ctoc/approvals/<slug>.json` parses as a ledger entry of kind human or backfilled, its
+ * `hash_scope` is `specification`, and its `content_sha256` equals the plan file's
+ * specification hash now. A record anyone could write (`{}`), a record of another text, or a
+ * machine crossing never counts.
+ */
 function approvedPlanText(root, slug) {
   if (typeof slug !== 'string' || !PLAN_SLUG.test(slug) || slug.includes('..')) return null;
-  if (!fs.existsSync(path.join(root, '.ctoc', 'approvals', `${slug}.json`))) return null;
+  let entry;
+  try {
+    entry = JSON.parse(fs.readFileSync(path.join(root, '.ctoc', 'approvals', `${slug}.json`), 'utf8'));
+  } catch {
+    return null; // absent or unparseable: no approval to speak of
+  }
+  if (!['human', 'backfilled'].includes(ledger.entryKind(entry)) || entry.hash_scope !== 'specification') return null;
   const plans = path.join(root, 'plans');
   const stages = fs.existsSync(plans) ? fs.readdirSync(plans, { withFileTypes: true }).filter((d) => d.isDirectory()) : [];
   for (const stage of stages) {
     const file = path.join(plans, stage.name, `${slug}.md`);
-    if (fs.existsSync(file)) return fs.readFileSync(file, 'utf8');
+    if (!fs.existsSync(file)) continue;
+    const text = fs.readFileSync(file, 'utf8');
+    const spec = ledger.computeSpecHash(text);
+    return spec.ok && spec.hash === entry.content_sha256 ? specificationPart(text) : null;
   }
   return null;
+}
+
+/**
+ * The plan text the specification hash covers: every section whose heading the hash
+ * excludes (`approval-ledger.EXECUTION_SECTIONS`, to the next heading of the same or a higher
+ * level) and every checkbox line removed — the same walk `computeSpecHash` makes.
+ */
+function specificationPart(text) {
+  const kept = [];
+  let excludeLevel = 0;
+  for (const line of text.split(/\r?\n/)) {
+    const m = /^(#{1,6})[ \t]+(.*)$/.exec(line.trim());
+    if (m) {
+      const level = m[1].length;
+      if (excludeLevel && level <= excludeLevel) excludeLevel = 0;
+      const title = m[2].trim().toLowerCase();
+      if (!excludeLevel && ledger.EXECUTION_SECTIONS.some((name) => title.startsWith(name))) {
+        excludeLevel = level;
+        continue;
+      }
+    }
+    if (excludeLevel || /^- \[[ xX]\]/.test(line.trim())) continue;
+    kept.push(line);
+  }
+  return kept.join('\n');
 }
 
 /**

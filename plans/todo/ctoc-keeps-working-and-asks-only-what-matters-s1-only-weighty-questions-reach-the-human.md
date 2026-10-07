@@ -189,6 +189,14 @@ gate critic.
 - The three agent files are live on their next dispatch by the CTO Chief. The pending file
   each one writes is promoted by the sweeper above.
 
+## Agent rules this slice replaces or adds
+
+The owner replaced the question contract on 2026-10-06 ("do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)") and decided on 2026-10-07 that the independent gate critic assigns every topic and that a Hold belongs to CTOC. These are the compaction-inventory orders this slice may mark replaced or added, and no others:
+
+- `agents/iron-loop/gate-critic.md` — replaced: R-165, R-240, R-269, R-292, R-339, R-437, R-485, R-486, R-505, R-506, R-538, R-569, R-586, R-588, R-593, R-605, R-608, R-636; added: N-001, N-002, N-003, N-004, N-005, N-006, N-007, N-008, N-009.
+- `agents/planning/product-owner.md` — replaced: R-414, R-415, R-416, R-417, R-418, R-419, R-420, R-423; added: N-101.
+- `agents/planning/implementation-planner.md` — replaced: R-310, R-311, R-312, R-313, R-314, R-315, R-316, R-319; added: N-201.
+
 ## Acceptance criteria
 
 - [ ] A question reaches the human only under the five conditions; every other open question is decided by its recommended option. Proven here by the slice 1 cases (parent criterion 1; its end-to-end half, slice 2 case 1, belongs to slice 2).
@@ -702,3 +710,41 @@ vision advisor has no ceiling.
 Full `npm test`: tests 12611, pass 12611, fail 0, cancelled 0, skipped 0; coverage 99.89%;
 `[CTOC test-gate] PASS`. `streaming-precompute.js` 100% line, `sufficiency-audit.js` 100% line.
 Lint on every changed JavaScript file: zero warnings.
+
+### Security re-scan round (verdict: block) — reserved ids, approval records, the empty-plan log, invisible characters
+
+Spec sync first: the session's section "## Agent rules this slice replaces or adds" was inserted
+byte for byte before "## Acceptance criteria"; the worktree copy's specification hash then
+equalled the main approval record (bcd9cc8c…) before any other edit.
+
+Test-first: the new and changed cases ran red against the code of 3616c461 — 4 of 56 in
+`tests/question-blocking-default.test.js` (24c, 29c, 32, 43) — and green after.
+
+| Finding | Test | Result |
+|---|---|---|
+| 1. HIGH — the topic-exempt reserved ids could hide a weighty question, any number, anywhere, any author | case 43: an author file with a database question under `q99-gate-ruling-r1` is refused, and so is a classification-only file; two rulings, a ruling not last, two coverage notices — refused; a file written around the writer reads `invalid`; one notice and one ruling, last, in an attested file — accepted | `reservedIdErrors` in `streaming-precompute.js`, checked at the write and on every read: a reserved id only in a file with a valid attestation (the fleet's synthesis), at most one ruling and one notice, the ruling last |
+| 2. HIGH — any file named `.ctoc/approvals/<plan>.json` approved a replaced or added rule | case 32 gains five exact cases: `{}`, a record of another text, a machine (`advanced_by`) record, a record of another hash scope, an order id only in the execution record — each fails check 3 alone; a backfilled record of this text passes | `approvedPlanText` requires a ledger entry of kind human or backfilled, `hash_scope: "specification"`, and `content_sha256` equal to `computeSpecHash` of the plan now; the order id must appear in the hashed specification part (the excluded sections and checkbox lines removed by the same walk) |
+| 3. An unreadable log was ignored when the questions were regenerated as none | case 29c; `tests/streaming-precompute.test.js` "an unreadable answers log blocks …" | The `computed > 0` condition is gone: an unreadable log fails closed for every plan |
+| 4. The invisible-character list was hand-made | case 24c gains U+00AD, U+034F, U+180E, U+2028, U+2029, U+3164, U+115F, U+FE0F, U+E0041, U+2800 in the prompt, a label, pros, cons and description | `/[\p{Default_Ignorable_Code_Point}\p{Cf}\p{Zl}\p{Zp}⠀]/u` |
+| 5. Screen-side items | — | Not this slice (slice 2): the screen's answered-check without the questions, quoting the plan reference in action strings, CTOC's Hold option key. `streaming-gate.js` untouched |
+
+Changed tests, one line each (old → new → why):
+- `tests/question-blocking-default.test.js` helper `setup`: wrote a ruling with no attestation → a set holding a reserved id is written with a valid attestation → only the fleet's attested synthesis may carry the ruling (finding 1).
+- `tests/question-blocking-default.test.js` case 28b: the ruling was the first of two questions → it is the last → the ruling must be last (finding 1).
+- `tests/question-blocking-default.test.js` case 29c: a plan with no questions and an unreadable log was enough → it is `answers-unreadable` → a hold may predate the regeneration (finding 3).
+- `tests/question-blocking-default.test.js` cases 30-35, 42: the fixture approval was `{}` and the plan had no frontmatter → a human ledger entry carrying the plan's specification hash, and a plan with frontmatter naming R-3 and N-1 in its specification → finding 2.
+- `tests/streaming-precompute.test.js` "an unreadable answers log blocks …": a plan with no questions still moved → it is `answers-unreadable` → finding 3.
+- `tests/golden-corpus-fence.test.js` and `tests/real-question-file-render.test.js`: the upgraded real sample gained topics → topics and a valid attestation → its reserved ruling now needs the fleet's attestation, which the real samples predate (finding 1).
+
+Full `npm test`: tests 12612, pass 12612, fail 0, cancelled 0, skipped 0; coverage 99.88%;
+`[CTOC test-gate] PASS`. The first full run of this round failed 7: the two real-sample files
+above (fixed), and "the dead-export fence scans a surface in LINEAR time" in
+`tests/reachability-surface-scan-is-linear.test.js`, a wall-clock bound that passed alone in
+1.3 s and in the second full run; that scanner was not touched. Lint on every changed
+JavaScript file: zero warnings.
+
+Not changed, needs the owner: two kept gate-critic orders now say less than the code does —
+R-182 ("It changes NO gate behaviour") and R-205 ("Report the classification you made, or write
+no block at all"). A synthesis written with no attestation now has its ruling refused, so the
+whole file is refused and the plan fails closed. Neither order is in the approved list of orders
+this slice may replace, so they were left verbatim.

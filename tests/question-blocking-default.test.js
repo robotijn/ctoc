@@ -72,6 +72,10 @@ function recOpts() {
 /** The gate critic's record that it assigned the topics (the owner's decision of 2026-10-07). */
 const CLASSIFIED = Object.freeze({ by: 'gate-critic', at: 1786000000000 });
 
+/** A valid critique-ran record: only a file carrying one is the fleet's synthesis. */
+const lens = (state) => ({ state, coverage: state === 'clean-pass' ? 'full' : 'none', findings: 0 });
+const ATTESTED = Object.freeze({ generated_by: 'gate-critic', generated_at: 1786000000000, lenses: { premortem: lens('clean-pass'), 'devils-advocate': lens('clean-pass'), 'red-team': lens('clean-pass'), advocate: lens('clean-pass') } });
+
 /** Appends one line to the sandbox's answers log, in the shape the real writer uses. */
 function appendAnswer(root, entry) {
   const dir = path.join(root, '.ctoc', 'streaming');
@@ -336,7 +340,8 @@ describe('validatePlanQuestions — topic is closed, holds is never a question f
   });
 
   it('24c. zero-width and direction-changing characters are refused in every text the human reads', () => {
-    const hidden = ['\u200B', '\u200F', '\u202A', '\u202E', '\u2066', '\uFEFF'];
+    const hidden = ['\u200B', '\u200F', '\u202A', '\u202E', '\u2066', '\uFEFF',
+      '\u00AD', '\u034F', '\u180E', '\u2028', '\u2029', '\u3164', '\u115F', '\uFE0F', '\u{E0041}', '\u2800'];
     for (const ch of hidden) {
       assert.match(refused([detailQ({ prompt: `Approve${ch}?` })]), /invisible/);
       assert.match(refused([detailQ({ options: [{ key: '1', label: `A${ch}`, recommended: true }, { key: '2', label: 'B' }] })]), /invisible/);
@@ -366,7 +371,9 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
     const planPath = writePlan(root, stage, slug);
     const ref = `${stage}/${slug}.md`;
     const stamp = fs.statSync(planPath).mtimeMs;
-    const res = precompute.writePlanQuestions(root, ref, questions, stamp, undefined, classification);
+    // A set holding the reserved ruling is the fleet's synthesis, so it carries the attestation.
+    const attested = questions.some((q) => /^q9[89]-/.test(q.id)) ? ATTESTED : undefined;
+    const res = precompute.writePlanQuestions(root, ref, questions, stamp, attested, classification);
     assert.equal(res.ok, true, (res.errors || []).join('; '));
     return { root, ref, stamp };
   }
@@ -436,7 +443,7 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
   });
 
   it('28b. a hold is released only by a LATER answer to the SAME question that names one of its options, without holds', () => {
-    const { root, ref, stamp } = setup('release', [ruling(), { id: 'q10-other', prompt: 'p?', critical: true, important: false, topic: 'detail', options: recOpts() }]);
+    const { root, ref, stamp } = setup('release', [{ id: 'q10-other', prompt: 'p?', critical: true, important: false, topic: 'detail', options: recOpts() }, ruling()]);
     appendAnswer(root, answer(ref, stamp, '1', { holds: true }));
     const notReleased = [
       { ts: new Date().toISOString(), ref, questionId: 'q10-other', optionKey: '1', planMtimeMs: stamp },
@@ -541,16 +548,42 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
     }
   });
 
-  it('29c. an unreadable answers log fails closed for a plan with ANY question; a plan with none still moves', () => {
+  it('29c. an unreadable answers log fails closed — even for a plan whose questions were regenerated as none, since a hold may be logged', () => {
     const detail = { id: 'q10-d', prompt: 'p?', critical: false, important: false, topic: 'detail', options: recOpts() };
     const a = setup('unreadable', [detail]);
     fs.mkdirSync(path.join(a.root, '.ctoc', 'streaming', 'answers.jsonl'), { recursive: true }); // EISDIR
     const verdict = precompute.hasEnoughInformation(a.root, a.ref);
     assert.equal(verdict.enough, false);
     assert.equal(verdict.reason, 'answers-unreadable');
+    // Security re-scan of 2026-10-07: a hold logged before the questions were regenerated as []
+    // must never be ignored because the log cannot be read.
     const b = setup('unreadable-empty', []);
     fs.mkdirSync(path.join(b.root, '.ctoc', 'streaming', 'answers.jsonl'), { recursive: true });
-    assert.equal(precompute.hasEnoughInformation(b.root, b.ref).enough, true);
+    const empty = precompute.hasEnoughInformation(b.root, b.ref);
+    assert.equal(empty.enough, false);
+    assert.equal(empty.reason, 'answers-unreadable');
+  });
+
+  it('43. a reserved id belongs only to the fleet\'s attested synthesis: one ruling, last, at most one coverage notice', () => {
+    const root = makeSandbox();
+    const planPath = writePlan(root, 'functional', 'reserved');
+    const ref = 'functional/reserved.md';
+    const stamp = fs.statSync(planPath).mtimeMs;
+    const write = (questions, attestation, classification) => precompute.writePlanQuestions(root, ref, questions, stamp, attestation, classification);
+    const db = { id: 'q99-gate-ruling-r1', prompt: 'Move the store from SQLite to Postgres?', critical: false, important: false, options: recOpts() };
+    const cov = { id: 'q98-critique-coverage', prompt: 'Coverage', critical: false, important: false, options: [{ key: '1', label: 'Noted', recommended: true }] };
+    const finding = { id: 'q10-x', prompt: 'p?', critical: true, important: false, topic: 'detail', options: recOpts() };
+    const refusedFor = (res, re) => { assert.equal(res.ok, false); assert.match(res.errors.join(' | '), re); };
+    refusedFor(write([db]), /only in the fleet's attested synthesis/);
+    refusedFor(write([db], undefined, CLASSIFIED), /only in the fleet's attested synthesis/);
+    refusedFor(write([finding, ruling(), { ...ruling(), id: 'q99-gate-ruling-r2' }], ATTESTED), /at most one gate ruling/);
+    refusedFor(write([ruling(), finding], ATTESTED), /the gate ruling must be the last question/);
+    refusedFor(write([cov, { ...cov, id: 'q98-critique-coverage-r2' }, ruling()], ATTESTED), /at most one coverage notice/);
+    assert.equal(fs.existsSync(precompute.questionsPath(root, ref)), false, 'nothing was written');
+    assert.deepEqual(write([finding, cov, ruling()], ATTESTED, CLASSIFIED), { ok: true });
+    // Refused on read too: a file written around the writer reads invalid.
+    fs.writeFileSync(precompute.questionsPath(root, ref), JSON.stringify({ ref, planMtimeMs: stamp, questions: [db] }));
+    assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'invalid');
   });
 });
 
@@ -574,14 +607,18 @@ describe('compaction inventories — a rule the owner replaced or added is recor
    * Runs the ten checks over a fixture repository and returns the numbers of the checks that
    * failed. The fixture holds agents/agent.md, the baseline, an approved plan naming R-3 and N-1.
    */
-  function failingChecks({ agent = NEW, unitFate = 'replaced', order3 = replaced(), extraOrders = [], planText = 'Replaces R-3 and adds N-1.', approval = true, agentRel = 'agents/agent.md', kind3 = 'order', kindsSha256 }) {
+  /** An approved fixture plan: frontmatter, the order ids in its specification, an execution record. */
+  const PLAN_TEXT = '---\ntitle: fixture plan\n---\n\n# Fixture plan\n\n## Agent rules\nReplaces R-3 and adds N-1.\n\n## Execution Record\nBuilt.\n';
+  const approvalFor = (text, extra) => JSON.stringify({ content_sha256: require('../src/lib/approval-ledger').computeSpecHash(text).hash, hash_scope: 'specification', approved_by: 'human', ...extra });
+
+  function failingChecks({ agent = NEW, unitFate = 'replaced', order3 = replaced(), extraOrders = [], planText = PLAN_TEXT, approval, agentRel = 'agents/agent.md', kind3 = 'order', kindsSha256 }) {
     const root = makeSandbox();
     fs.mkdirSync(path.join(root, 'agents'), { recursive: true });
     fs.mkdirSync(path.join(root, '.ctoc', 'approvals'), { recursive: true });
     fs.writeFileSync(path.join(root, 'baseline.md'), BASELINE);
     fs.writeFileSync(path.join(root, ...agentRel.split('/')), agent);
     fs.writeFileSync(path.join(root, 'plans', 'todo', `${PLAN}.md`), planText);
-    if (approval) fs.writeFileSync(path.join(root, '.ctoc', 'approvals', `${PLAN}.json`), '{}');
+    if (approval !== false) fs.writeFileSync(path.join(root, '.ctoc', 'approvals', `${PLAN}.json`), approval === undefined ? approvalFor(planText) : approval);
     const u = splitUnits(BASELINE);
     const inventory = {
       agent: agentRel,
@@ -635,10 +672,16 @@ describe('compaction inventories — a rule the owner replaced or added is recor
       'plan that does not exist': [{ order3: replaced({ plan: 'no-such-plan' }) }, [3]],
       'plan path that climbs out': [{ order3: replaced({ plan: '../fixture-plan' }) }, [3]],
       'plan with no approval record': [{ approval: false }, [3]],
-      'plan that never names the order': [{ planText: 'Replaces nothing.' }, [3]],
+      'plan that never names the order': [{ planText: PLAN_TEXT.replace('Replaces R-3 and adds N-1.', 'Replaces nothing.') }, [3]],
+      'approval record that is no ledger entry': [{ approval: '{}' }, [3]],
+      'approval record of another text': [{ approval: approvalFor(PLAN_TEXT.replace('fixture plan', 'other plan')) }, [3]],
+      'approval record that is not human or backfilled': [{ approval: approvalFor(PLAN_TEXT, { advanced_by: 'sufficiency' }) }, [3]],
+      'approval record of another hash scope': [{ approval: approvalFor(PLAN_TEXT, { hash_scope: 'content' }) }, [3]],
+      'order id only in the execution record': [{ planText: PLAN_TEXT.replace('Replaces R-3 and adds N-1.', 'Adds N-1.').replace('Built.', 'Built R-3.') }, [3]],
       'new anchor already in the baseline': [{ agent: BASELINE, order3: replaced({ new_anchors: ['Always do A. Never do B.'] }) }, [3]],
     };
     assert.equal(failingChecks({ order3: replaced({ date: today }) }).length, 0, 'today is not the future');
+    assert.deepEqual(failingChecks({ approval: approvalFor(PLAN_TEXT, { approved_by: undefined, backfilled: true, backfill_reason: 'scope recorded' }) }), [], 'a backfilled record of this text counts');
     for (const [name, [fixture, expected]] of Object.entries(cases)) {
       assert.deepEqual(failingChecks(fixture), expected, name);
     }

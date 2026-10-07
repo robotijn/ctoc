@@ -87,13 +87,17 @@ const READERS = {
       // the coverage notice must carry a `topic`, which these real samples predate. The real
       // persisted shape must therefore be REFUSED by the canonical reader for exactly that
       // reason (fail closed, never waved through) — and, with only the topics added as the
-      // gate critic would, read back every question unchanged.
+      // gate critic would, read back every question unchanged. Since the security re-scan of
+      // 2026-10-07 its reserved ruling and coverage notice also need the fleet's attestation,
+      // which the real samples (written before attestations existed) do not carry.
       const { planQuestionsStatus } = require('../src/lib/streaming-precompute');
       const status = planQuestionsStatus(root, ref);
       assert.equal(status.status, 'invalid', `real sample ${sampleName}, written before topics, must be refused`);
       assert.ok(status.errors.length > 0 && status.errors.every((e) => /must declare a "topic"/.test(e)),
         `real sample ${sampleName} is refused only for its missing topics: ${status.errors.join('; ')}`);
-      const upgraded = { ...stored, questions: stored.questions.map((q) => (/^q9[89]-/.test(q.id) ? q : { ...q, topic: 'detail' })) };
+      const lens = { state: 'clean-pass', coverage: 'full', findings: 0 };
+      const attestation = { generated_by: 'gate-critic', generated_at: 1, lenses: { premortem: lens, 'devils-advocate': lens, 'red-team': lens, advocate: lens } };
+      const upgraded = { ...stored, attestation, questions: stored.questions.map((q) => (/^q9[89]-/.test(q.id) ? q : { ...q, topic: 'detail' })) };
       fs.writeFileSync(path.join(qDir, sampleName), JSON.stringify(upgraded));
       const out = loadPlanQuestions(root, ref);
       assert.ok(Array.isArray(out), `loadPlanQuestions returned ${out} for real sample ${sampleName} with topics added`);

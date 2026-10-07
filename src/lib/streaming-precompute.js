@@ -232,8 +232,11 @@ function isTopiclessId(id) {
 // character class covers it. Option keys are the three the screen can show.
 const QUESTION_ID = /^q[0-9]{2}-[a-z0-9-]+$/;
 const OPTION_KEY = /^[1-3]$/;
-// Zero-width and bidirectional-control characters: text that reads one way and says another.
-const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/;
+// Text that reads one way and says another: every default-ignorable code point (zero-width
+// characters, variation selectors, Hangul fillers, tag characters), every format character
+// (bidirectional controls, the soft hyphen, the Mongolian vowel separator), the line and
+// paragraph separators, and the braille blank.
+const INVISIBLE = /[\p{Default_Ignorable_Code_Point}\p{Cf}\p{Zl}\p{Zp}\u2800]/u;
 const CONTROL = /[\u0000-\u001F\u007F-\u009F]/g;
 
 /**
@@ -466,6 +469,29 @@ function validateAttestation(attestation) {
 }
 
 /**
+ * What is wrong with where the two reserved ids — the gate ruling and the coverage notice,
+ * the only questions that carry no topic — appear in a questions file. They belong only to
+ * the fleet's synthesis, which carries a valid attestation: an author's file or a
+ * classification-only file must not use one to slip a weighty question past its topic. At
+ * most one ruling and one notice, and the ruling is the last question.
+ * @param {Array<object>} questions an array that already passed validatePlanQuestions
+ * @param {*} attestation the file's attestation block, if any
+ * @returns {string[]}
+ */
+function reservedIdErrors(questions, attestation) {
+  const ids = questions.map((q) => q.id);
+  const rulings = ids.filter((id) => id === 'q99-gate-ruling' || id.startsWith('q99-gate-ruling-r'));
+  const notices = ids.filter((id) => id === 'q98-critique-coverage' || id.startsWith('q98-critique-coverage-r'));
+  if (rulings.length + notices.length === 0) return [];
+  const errors = [];
+  if (!validateAttestation(attestation).valid) errors.push('the gate ruling and the coverage notice belong only in the fleet\'s attested synthesis');
+  if (rulings.length > 1) errors.push('a questions file carries at most one gate ruling');
+  if (notices.length > 1) errors.push('a questions file carries at most one coverage notice');
+  if (rulings.length > 0 && !rulings.includes(ids[ids.length - 1])) errors.push('the gate ruling must be the last question');
+  return errors;
+}
+
+/**
  * Atomically write the per-plan questions file for `ref`. Validates the questions
  * FIRST (a malformed set is refused and NO file is written), then commits via a
  * temp-file + rename so a reader never observes a half-written file. NEVER throws:
@@ -503,6 +529,8 @@ function writePlanQuestions(root, ref, questions, planMtimeMs, attestation, clas
 
   const { valid, errors } = validatePlanQuestions(questions);
   if (!valid) return { ok: false, errors };
+  const placement = reservedIdErrors(questions, attestation);
+  if (placement.length > 0) return { ok: false, errors: placement };
 
   // An unusable mtime (non-finite) stamps as 0 → the file reads as STALE against
   // any real plan mtime, forcing regeneration. Safer than storing a bad stamp.
@@ -630,7 +658,9 @@ function planQuestionsStatus(root, ref) {
     };
   }
 
-  const { valid, errors } = validatePlanQuestions(parsed.questions);
+  const checked = validatePlanQuestions(parsed.questions);
+  const errors = checked.valid ? reservedIdErrors(parsed.questions, parsed.attestation) : checked.errors;
+  const valid = errors.length === 0;
   if (!valid) {
     return { status: 'invalid', errors, reason: `the questions stored for ${shownRef} do not meet the questions contract` };
   }
@@ -1029,8 +1059,8 @@ function readAnsweredQuestionIds(root, ref, revision) {
  *   'stale'              the questions predate the plan's current text
  *   'invalid'            the questions file is corrupt
  *   'unknown-plan'       the ref is malformed, or the plan file is gone
- *   'answers-unreadable' the plan has questions and the answers log could not be
- *                        read: an answer or a hold may be in it. Checked first.
+ *   'answers-unreadable' the answers log could not be read: an answer or a hold may
+ *                        be in it. Checked first, for every plan.
  *   'held'               the human's latest answer for this plan, in the answers log,
  *                        carries `holds: true` — his Hold holds, across revisions;
  *                        `blocking` names the held questions. Checked before forks.
@@ -1043,10 +1073,9 @@ function readAnsweredQuestionIds(root, ref, revision) {
  * fork remains. Unanswered questions that are not forks do NOT block; each is decided
  * by its recommended option, and they are still reported honestly in `unanswered`.
  *
- * An unreadable answers log blocks every plan that has questions: the log is where a
- * human's Hold is recorded, so not reading it is not knowing whether he held the plan.
- * A plan with NO questions has nothing to answer or hold, so its log cannot change the
- * verdict.
+ * An unreadable answers log blocks every plan, even one with no questions: the log is
+ * where a human's Hold is recorded — a hold may predate a regeneration that left no
+ * questions — so not reading it is not knowing whether he held the plan.
  *
  * NEVER throws. Pure read — writes nothing, and crosses nothing. This is the
  * PREDICATE only: whether and how a gate consumes it is a separate decision.
@@ -1101,9 +1130,9 @@ function hasEnoughInformation(root, ref) {
   const computed = questions.length;
   const answered = questions.filter((q) => answers.ids.has(q.id)).map((q) => q.id);
 
-  // FAIL CLOSED: the log could not be read, and the plan has questions an answer or a
-  // hold could be about.
-  if (!answers.ok && computed > 0) {
+  // FAIL CLOSED: the log could not be read, so an answer or a hold in it is unknown — even
+  // for a plan whose questions were regenerated as none, since a hold may predate them.
+  if (!answers.ok) {
     return { enough: false, reason: 'answers-unreadable', unanswered, blocking, unboundAnswers: answers.unbound, computed, answered };
   }
 
