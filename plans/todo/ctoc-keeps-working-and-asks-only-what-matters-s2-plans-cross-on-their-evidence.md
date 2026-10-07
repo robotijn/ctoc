@@ -1761,3 +1761,23 @@ scratch copy. Test-first: hook case 90 (the verification's three commands verbat
 variant; guards `cat src/lib/x.js`, `grep -n foo src/lib/x.js`, `npm test`, `git status`, the
 menu's allowed routes) — red: the first python command exits 0. Case 40 (the question writer
 refuses a stamp later than now) — red: the future stamp was written.
+
+Built (green after): `subagentMenuRefusal` also gives the strict one-call reading to any
+command whose text carries a path into `src/lib/` or `src/commands/` (`CTOC_PATH_TEXT_RE`), so
+python, ruby, perl or any other interpreter carrying CTOC code paths is refused unless the
+command is a plain read or the direct menu call; the package-name pattern is deliberately not
+in this check (`cd …/ctoc && npm test` stays allowed). `writePlanQuestions` refuses a stamp
+later than now (`reason: 'future-stamp'`), compared in whole milliseconds because a file's time
+carries a sub-millisecond fraction `Date.now()` does not (my first form compared the raw
+values and refused freshly written plans; corrected before the full run). Four of my fixtures
+set plan times in the future to make a new revision and were moved into the past, intent
+unchanged (old → new → why): case 20 and case 29 in `plans-keep-moving-without-the-human` —
+revision at now + 5 s / + 9 s → plan starts at now − 60 s, revision at now − 30 s → a future
+stamp is refused; `question-blocking-default` case 45 — "a newer revision" written at
+stamp + 1000 (twice) → "another revision" at stamp − 1000 → same; case 46 — the new revision at
+stamp + 5000 → the plan's text reverted to stamp − 5000 → same. Accepted cost: a background
+agent's `git diff src/lib/x.js` is refused (git is not a read-only program here); `git diff`
+without a path and `git status` pass.
+
+Full `npm test` (once): tests 12682, pass 12682, fail 0, cancelled 0, skipped 0, todo 0;
+coverage 99.87%; `[CTOC test-gate] PASS`. Lint zero warnings.

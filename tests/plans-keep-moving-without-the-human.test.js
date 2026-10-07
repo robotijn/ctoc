@@ -659,6 +659,7 @@ describe("the owner's Hold, written and released by CTOC (cases 14–23)", () =>
     const root = makeSandbox();
     const ref = 'functional/x.md';
     const planPath = writePlan(root, ref, functionalBody('Payments'));
+    fs.utimesSync(planPath, new Date(NOW - 60000), new Date(NOW - 60000)); // revisions stay in the past
     const r = ruling('q99-gate-ruling', 'hold');
     writeQuestions(root, ref, [r], { attested: true });
     route(['stream', 'answer', ref, 'q99-gate-ruling', '1', digestOf(r)], root);
@@ -672,7 +673,7 @@ describe("the owner's Hold, written and released by CTOC (cases 14–23)", () =>
     }
 
     fs.writeFileSync(planPath, functionalBody('Payments', ' It changed.'));
-    fs.utimesSync(planPath, new Date(NOW + 5000), new Date(NOW + 5000));
+    fs.utimesSync(planPath, new Date(NOW - 30000), new Date(NOW - 30000));
     const r3 = { ...ruling('q99-gate-ruling-r3', 'hold'), prompt: 'Lens verdict: HOLD for the new text. Rule now.' };
     writeQuestions(root, ref, [r3], { attested: true });
     const still = route(['plan', ref], root);
@@ -849,14 +850,15 @@ describe('an answer is bound to the question as shown (cases 28–33)', () => {
   it('case 29 — an answer whose question changed after it was shown records nothing', () => {
     const root = makeSandbox();
     const ref = 'functional/x.md';
-    writePlan(root, ref, functionalBody('Customer import'));
+    const planPath = writePlan(root, ref, functionalBody('Customer import'));
+    fs.utimesSync(planPath, new Date(NOW - 60000), new Date(NOW - 60000)); // revisions stay in the past
     const q = fork('q10-db');
     writeQuestions(root, ref, [q]);
     const kept = streamingGate.streamingGateScreen(root).actions['Postgres'];
     // The plan changed and its questions were regenerated with the labels swapped between the
     // keys (a revision; within one revision a file may only grow).
     const swapped = { ...q, options: [{ key: '1', label: 'SQLite', recommended: true }, { key: '2', label: 'Postgres' }] };
-    fs.utimesSync(planPathOf(root, ref), new Date(NOW + 9000), new Date(NOW + 9000));
+    fs.utimesSync(planPathOf(root, ref), new Date(NOW - 30000), new Date(NOW - 30000));
     writeQuestions(root, ref, [swapped]);
 
     const refusedText = 'Nothing was recorded for x.md: this answer does not match the question as it stands now, so it cannot be checked. The question will be asked again.';

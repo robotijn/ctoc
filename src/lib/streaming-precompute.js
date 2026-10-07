@@ -616,7 +616,9 @@ function keepsQuestions(existing, questions) {
  *
  * A file the gate critic classified is never replaced by an unclassified one for the SAME
  * plan revision (the same stamp): that would erase a weighty question the critic found and let
- * the author's own list decide. Refused with `reason: 'would-replace-classified'`; the critic
+ * the author's own list decide. Refused with `reason: 'would-replace-classified'`. A stamp later
+ * than now is refused (`reason: 'future-stamp'`): it would read fresh against every later edit
+ * and escape the only-grow rule of the plan's real revision. The critic
  * may replace its own file, and a new revision of the plan may be written by anyone.
  *
  * The other way round, a classified file written over any file for the SAME revision — the
@@ -643,6 +645,12 @@ function writePlanQuestions(root, ref, questions, planMtimeMs, attestation, clas
   // An unusable mtime (non-finite) stamps as 0 → the file reads as STALE against
   // any real plan mtime, forcing regeneration. Safer than storing a bad stamp.
   const mtime = Number.isFinite(planMtimeMs) ? planMtimeMs : 0;
+  // A stamp from the future would read fresh against every later edit of the plan and put the
+  // file outside the only-grow rule of its real revision: refused, nothing written.
+  // Whole milliseconds: a file's time carries a sub-millisecond fraction `Date.now()` does not.
+  if (Math.floor(mtime) > Date.now()) {
+    return { ok: false, reason: 'future-stamp', errors: ['the revision stamp is later than now; a question file is stamped with the plan\'s own modification time'] };
+  }
   const existing = existingFor(file, mtime);
   const existingClassified = existing !== null && isGateCriticClassification(existing.classification);
   if (!isGateCriticClassification(classification)) {

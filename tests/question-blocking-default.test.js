@@ -667,11 +667,11 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
     // ... and a write that keeps every question is accepted (guard).
     const grown = [fork(), { id: 'q11-name', prompt: 'Name?', critical: false, important: false, topic: 'detail', options: recOpts() }];
     assert.deepEqual(precompute.writePlanQuestions(root, ref, grown, stamp, undefined, CLASSIFIED), { ok: true });
-    // A newer revision may be anyone's.
-    assert.deepEqual(precompute.writePlanQuestions(root, ref, [fork()], stamp + 1000), { ok: true });
+    // Another revision may be anyone's (an earlier stamp: a stamp later than now is refused).
+    assert.deepEqual(precompute.writePlanQuestions(root, ref, [fork()], stamp - 1000), { ok: true });
     // A corrupt file at the live path is nothing classified to keep: it is replaced.
     fs.writeFileSync(precompute.questionsPath(root, ref), '{"classification":');
-    assert.deepEqual(precompute.writePlanQuestions(root, ref, [fork()], stamp + 1000), { ok: true });
+    assert.deepEqual(precompute.writePlanQuestions(root, ref, [fork()], stamp - 1000), { ok: true });
   });
 
   it('46. an answer counts only for the question it was given for: the log entry must carry that question\'s digest', () => {
@@ -698,9 +698,10 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
     const sameRevision = precompute.writePlanQuestions(root, ref, [replayed], stamp, undefined, CLASSIFIED);
     assert.equal(sameRevision.reason, 'classification-dropped-question');
     assert.deepEqual(precompute.hasEnoughInformation(root, ref).answered, ['q10-db']);
-    // As a new revision of the plan it is written, and the earlier answer is not inherited.
+    // As a new revision of the plan (its text reverted to an earlier time; a stamp later than
+    // now is refused) it is written, and the earlier answer is not inherited.
     const planPath = precompute.refToPlanPath(root, ref);
-    fs.utimesSync(planPath, new Date(stamp + 5000), new Date(stamp + 5000));
+    fs.utimesSync(planPath, new Date(stamp - 5000), new Date(stamp - 5000));
     assert.deepEqual(precompute.writePlanQuestions(root, ref, [replayed], fs.statSync(planPath).mtimeMs, undefined, CLASSIFIED), { ok: true });
     verdict = precompute.hasEnoughInformation(root, ref);
     assert.equal(verdict.reason, 'open-forks', 'the earlier answer is not inherited by the rewritten question');

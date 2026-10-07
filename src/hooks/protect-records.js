@@ -516,7 +516,8 @@ function inlineCtocCode(command) {
  * menu, a menu module or a crossing function (`MENU_MENTION_RE`), any of its words resolves —
  * as Node resolves a script, from the working directory or a directory the command `cd`s into
  * — to CTOC's menu or code in any CTOC copy, a word points into a `src/commands` folder that
- * holds no such file, or it hands Node inline code naming CTOC's code. Such a command is
+ * holds no such file, its text carries a path into `src/lib/` or `src/commands/` (whatever
+ * interpreter carries it), or it hands Node inline code naming CTOC's code. Such a command is
  * allowed only as (a) one simple call of a read-only program, or (b) one simple direct call:
  * `node` (or an absolute node path), immediately a script that resolves to a CTOC menu
  * (`src/commands/start.js` under a directory whose manifest names "ctoc"), then a route that —
@@ -529,7 +530,10 @@ function inlineCtocCode(command) {
  */
 function subagentMenuRefusal(command, base) {
   if (inlineCtocCode(command)) return REFUSAL_SUBAGENT;
-  if (!MENU_MENTION_RE.test(command) && !reachesCtocCode(command, base)) return null;
+  // Any command whose text carries a path into `src/lib/` or `src/commands/` gets the strict
+  // reading too, whatever interpreter carries it (python, ruby, perl, osascript …): only a plain
+  // read or the direct menu call passes. (Not the package name: `cd …/ctoc && npm test` must pass.)
+  if (!MENU_MENTION_RE.test(command) && !CTOC_PATH_TEXT_RE.test(command) && !reachesCtocCode(command, base)) return null;
   const words = simpleWords(command);
   if (words === 'quote') return REFUSAL_QUOTE;
   if (!words || words.length === 0) return REFUSAL_SUBAGENT;
