@@ -1,5 +1,5 @@
 {
-  "description": "CTOC loads only its write protection for approval records and check records; every other CTOC hook stays unregistered on purpose.",
+  "description": "CTOC loads only its write protection for the approval records, the check records and the owner's recorded answers; every other CTOC hook stays unregistered on purpose.",
   "hooks": {
     "PreToolUse": [
       {

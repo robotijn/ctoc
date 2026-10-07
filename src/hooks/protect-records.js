@@ -59,22 +59,27 @@
  *   menu's own routes. The full list is in `docs/ENFORCEMENT.md`.
  *
  * FAIL RULE
- *   A crash fails CLOSED only for a call whose raw payload mentions the records
+ *   A crash fails CLOSED only for a call that mentions the records
  *   (`UNCHECKED_SUSPECT_RE`, tested without loading anything but the dependency-free
  *   deny signal) and fails OPEN for the rest, so one broken release cannot stop every
- *   Write, Edit and Bash call in every project. A failure to load `hook-deny-signal.js`
- *   itself exits 1, which Claude Code treats as "not blocked".
+ *   Write, Edit and Bash call in every project. When the payload parsed, only its
+ *   `tool_input` is scanned, so a project whose path happens to contain one of the
+ *   words (a `verify-project` folder) is not refused on every call; only a payload that
+ *   will not parse is scanned whole. A failure to load `hook-deny-signal.js` itself
+ *   exits 1, which Claude Code treats as "not blocked".
  *
- * Refusal = the deny decision JSON on stdout and exit 2 (`emitDeny`); allow = exit 0
- * with nothing on stdout. No banner, no log file: the refusal lands in the transcript.
+ * Refusal = the refusal sentence as one line on stderr, then the deny decision JSON on
+ * stdout and exit 2 (`emitDeny`). Claude Code ignores the JSON when a hook exits 2 and
+ * shows stderr to the agent instead, so the stderr line is how the agent learns why.
+ * Allow = exit 0 with nothing on stdout. No banner, no log file.
  */
 
 const fs = require('fs');
 const path = require('path');
 const { emitDeny } = require('../lib/hook-deny-signal');
 
-const REFUSAL = 'CTOC refused this call because it writes, or could write, the approval records in '
-  + ".ctoc/approvals/ or the check records in .ctoc/state/verify/, which only CTOC's menu writes; "
+const REFUSAL = 'CTOC refused this call because it writes, or could write, the approval records, '
+  + "the check records or the owner's recorded answers, which only CTOC's menu writes; "
   + 'finish your work, report it, and let the menu record the result.';
 const REFUSAL_UNCHECKED = 'CTOC refused this call because it mentions the approval or check records '
   + "and CTOC's protection for them failed to run; tell the human that this protection is broken.";
@@ -214,11 +219,10 @@ function bashRefuses(command, cwdRel, base, bash) {
 /**
  * The decision for one payload. Requires are inside, so a module that fails to load is
  * a throw the caller's fail rule handles.
- * @param {string} raw - the stdin text
+ * @param {object} payload - the parsed stdin JSON
  * @returns {boolean} true to refuse
  */
-function decide(raw) {
-  const payload = JSON.parse(raw);
+function decide(payload) {
   const { findProjectRoot } = require('../lib/project-root');
   const root = findProjectRoot(payload.cwd || process.cwd());
   process.chdir(root); // the reused checks measure against process.cwd()
@@ -244,18 +248,35 @@ function decide(raw) {
   return false;
 }
 
+/**
+ * Refuse: the sentence on stderr (what Claude Code shows the agent on exit 2), then the
+ * decision JSON on stdout and exit 2.
+ * @param {string} sentence
+ */
+function refuse(sentence) {
+  process.stderr.write(`${sentence}\n`);
+  emitDeny(sentence);
+}
+
 function main() {
   let raw;
   try { raw = fs.readFileSync(0, 'utf8'); } catch { process.exit(0); }
   if (!raw) process.exit(0);
-  let refuse;
+  let payload = null;
+  try { payload = JSON.parse(raw); } catch { payload = null; }
+  let refused;
   try {
-    refuse = decide(raw);
+    if (payload === null || typeof payload !== 'object') throw new TypeError('payload is not a JSON object');
+    refused = decide(payload);
   } catch {
-    if (UNCHECKED_SUSPECT_RE.test(raw)) emitDeny(REFUSAL_UNCHECKED);
+    // Fail rule: scan only what the call does when the payload parsed, else the raw text.
+    const scanned = payload !== null && typeof payload === 'object'
+      ? String(JSON.stringify(payload.tool_input === undefined ? null : payload.tool_input))
+      : raw;
+    if (UNCHECKED_SUSPECT_RE.test(scanned)) refuse(REFUSAL_UNCHECKED);
     process.exit(0);
   }
-  if (refuse) emitDeny(REFUSAL);
+  if (refused) refuse(REFUSAL);
   process.exit(0);
 }
 

@@ -240,16 +240,19 @@ because the reused checks measure against the working directory. That is safe on
 every call is a fresh subprocess that exits after one decision.
 
 **The refusal** is one sentence on every channel, with no command text echoed back:
-"CTOC refused this call because it writes, or could write, the approval records in
-.ctoc/approvals/ or the check records in .ctoc/state/verify/, which only CTOC's menu writes;
-finish your work, report it, and let the menu record the result."
+"CTOC refused this call because it writes, or could write, the approval records, the check
+records or the owner's recorded answers, which only CTOC's menu writes; finish your work,
+report it, and let the menu record the result." It is written as one line to stderr and
+the process exits 2; the deny decision JSON also goes to stdout, but Claude Code ignores
+JSON when a hook exits 2 and shows stderr instead, so stderr is what the agent reads.
 
-**Fail rule.** A crash refuses only a call whose raw payload mentions the records, with
-"CTOC refused this call because it mentions the approval or check records and CTOC's
-protection for them failed to run; tell the human that this protection is broken.", and
-allows the rest, so one broken release cannot stop every tool call in every project. A
-failure to load `src/lib/hook-deny-signal.js` itself exits 1, which Claude Code treats as
-not blocked.
+**Fail rule.** A crash refuses only a call that mentions the records, with "CTOC refused
+this call because it mentions the approval or check records and CTOC's protection for them
+failed to run; tell the human that this protection is broken.", and allows the rest, so one
+broken release cannot stop every tool call in every project. When the payload parsed, only
+its `tool_input` is scanned, so a project whose path contains one of the words is not
+refused on every call; a payload that will not parse is scanned whole. A failure to load
+`src/lib/hook-deny-signal.js` itself exits 1, which Claude Code treats as not blocked.
 
 **What it cannot catch** (it reads command text; it is not a sandbox):
 

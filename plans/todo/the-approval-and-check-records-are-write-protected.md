@@ -549,6 +549,33 @@ Registration:
     `plans/functional/ctocs-hooks-are-actually-loaded-by-claude-code.md`).
 14. **No test seam.** The crash path is driven by a real copy of the entry whose dependencies
     are absent, which is what a broken release looks like.
+15. **The menu exemption is a real-path rule, not a name rule (supersedes Decision 5 and the
+    "isPureMenuCall" description above, added during the build on 2026-10-07).** The
+    security scan disproved Decision 5's "the exemption adds no hole": matching any
+    `…/src/commands/start.js` by name let an agent write its own `start.js` and run it with
+    every record check skipped, which is worse than the plain script-file case because the
+    check is skipped, not just blind. The built rule: the call keeps the strict text shape
+    (no `$` other than `${CLAUDE_PLUGIN_ROOT}`, no backtick, backslash or unquoted control
+    character), and the script — `${CLAUDE_PLUGIN_ROOT}` read as this plugin's root,
+    resolved against the session's working directory — must have the same real path as this
+    plugin's own `src/commands/start.js` (a resolution fault means "not the menu"). Even
+    then, every whitespace-free argument that is a path into the approval or check records
+    is refused; quoted text with spaces stays data, and the answer store is left out of
+    that argument check because the menu's question-generation recipe passes
+    `--touches '.ctoc/streaming/questions/<ref>'`.
+16. **The refusal sentence names records in general (supersedes the first sentence under
+    "The refusal" above).** The built sentence is "CTOC refused this call because it writes,
+    or could write, the approval records, the check records or the owner's recorded
+    answers, which only CTOC's menu writes; finish your work, report it, and let the menu
+    record the result." — so a refusal for the answers store is not described as a write to
+    the other two folders, as the owner's-answers section asks.
+17. **The refusal is also written to stderr, and the crash rule scans the call, not the
+    whole payload (refine `main()` steps 7 and 8 above).** Claude Code ignores the JSON
+    when a hook exits 2 and shows stderr, so the sentence goes to stderr as one line before
+    the JSON and exit 2. On a crash with a parseable payload, `UNCHECKED_SUSPECT_RE` is
+    applied to `JSON.stringify(payload.tool_input)` only, so a project path containing
+    `verify`, `ledger`, `approval`, `backfill` or `.ctoc` does not refuse every call; an
+    unparseable payload is still scanned whole.
 
 ## Execution Plan
 
@@ -928,3 +955,50 @@ record copy removed after, record not committed): `tests 12567, pass 12567, fail
 skipped 0`; `[CTOC test-gate] coverage 99.9% (threshold 99%), skipped 0, failed 0`;
 `[CTOC test-gate] PASS`. The plan still matches the recorded specification hash
 `522a8f09…`.
+
+### Step 16 — the final review and its four fixes
+
+**Verdict: SHIP AFTER four fixes** (the `iron-loop-critic` the session dispatched on this
+branch). All four made test first, inside the declared files.
+
+1. **MEDIUM — the refusal reason never reached the agent.** Claude Code's hooks
+   documentation (quoted in `plans/functional/ctocs-hooks-are-actually-loaded-by-claude-code.md`):
+   "Use exit 2 to block with a stderr message, or exit 0 with JSON for structured control.
+   Don't mix them: Claude Code ignores JSON when you exit 2." The hook wrote nothing to
+   stderr. Now `refuse()` writes the sentence as one line to stderr, then calls `emitDeny`
+   (JSON on stdout, exit 2), on both the normal and the crash path.
+   `src/lib/hook-deny-signal.js` is unchanged. `assertRefused` now also requires stderr
+   to be exactly the sentence plus a newline. This also means the earlier note in this
+   record that both sentences are "byte-identical to the plan" no longer holds for the
+   first one (fix 2).
+2. **LOW — an answers-file refusal named only the approval and check folders.** The first
+   sentence is now "CTOC refused this call because it writes, or could write, the approval
+   records, the check records or the owner's recorded answers, which only CTOC's menu
+   writes; finish your work, report it, and let the menu record the result." The
+   `hooks/hooks.json` description names the answers too; `docs/ENFORCEMENT.md` quotes the
+   new sentence.
+3. **LOW — the plan's menu rule and Decision 5 describe the old name exemption.** The
+   specification sections were not edited (they are under the approval hash); Decisions 15,
+   16 and 17 were added under `## Decisions Taken Under Ambiguity`, which the hash leaves
+   out: the real-path menu rule and that the security scan disproved Decision 5's "adds no
+   hole"; the new refusal sentence; the stderr line and the narrowed crash scan. The plan
+   still matches `522a8f09fd78fc005eb32de745daccf17afe4e5cfbb2c844d42e58bb55e54038`
+   (recomputed after the edit).
+4. **LOW — after a crash, a project path containing a record word refused every call.**
+   When the payload parses, the crash rule now scans only `JSON.stringify(payload.tool_input)`;
+   an unparseable payload is still scanned whole (case 59 keeps that). Case 73, with the
+   hook's dependencies missing as in cases 55–57 and `cwd` `/x/verify-project`: `ls` →
+   allowed; `echo x > .ctoc/approvals/a.json` → refused with the second sentence.
+
+**Red before the fix:** 73 tests, 20 pass, 53 fail — every case that asserts a refusal
+(no stderr line, and the old sentence) plus case 73a (refused, because the raw payload's
+`/x/verify-project` matched). **After:** 73 of 73. Lint zero warnings. Time added per call
+re-measured on a busier machine: bare Node 20.1 ms, Write +4.4 ms, Bash `ls` +7.2 ms.
+
+Full `npm test` (same procedure; the `node_modules` link and the approval record copy
+removed after, record not committed): `tests 12568, pass 12568, fail 0, skipped 0`;
+`[CTOC test-gate] coverage 99.9% (threshold 99%), skipped 0, failed 0`;
+`[CTOC test-gate] PASS`.
+
+Still open: the live check after release (a real session refused, and the refusal quoted
+as shown) — not runnable from this worktree.

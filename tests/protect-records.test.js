@@ -21,8 +21,8 @@ const REPO = path.resolve(__dirname, '..');
 const ENTRY = path.join(REPO, 'src', 'hooks', 'protect-records.js');
 const MENU_MD = path.join(REPO, 'src', 'commands', 'start.md');
 
-const REFUSAL = 'CTOC refused this call because it writes, or could write, the approval records in '
-  + ".ctoc/approvals/ or the check records in .ctoc/state/verify/, which only CTOC's menu writes; "
+const REFUSAL = 'CTOC refused this call because it writes, or could write, the approval records, '
+  + "the check records or the owner's recorded answers, which only CTOC's menu writes; "
   + 'finish your work, report it, and let the menu record the result.';
 const REFUSAL_UNCHECKED = 'CTOC refused this call because it mentions the approval or check records '
   + "and CTOC's protection for them failed to run; tell the human that this protection is broken.";
@@ -67,6 +67,9 @@ function deny(sentence) {
 function assertRefused(res, what, sentence = REFUSAL) {
   assert.equal(res.status, 2, `${what}: expected exit 2, got ${res.status}; stderr: ${res.stderr}`);
   assert.equal(res.stdout, deny(sentence), `${what}: stdout must be exactly the deny decision`);
+  // Claude Code ignores the JSON when a hook exits 2 and shows stderr instead, so the
+  // agent learns why only from this line.
+  assert.equal(res.stderr, `${sentence}\n`, `${what}: stderr must be exactly the refusal sentence`);
 }
 
 function assertAllowed(res, what) {
@@ -222,6 +225,14 @@ describe('when the protection cannot run (a release missing its dependencies)', 
   });
   test('57 · an ordinary call is allowed', () => {
     assertAllowed(run(bash('ls'), { entry: brokenEntry }), 'case 57');
+  });
+  test('73 · a project path that mentions a record word does not refuse every call', () => {
+    const elsewhere = (command) => ({
+      session_id: 't', transcript_path: '/x/verify-project/t.jsonl', cwd: '/x/verify-project',
+      permission_mode: 'default', hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command },
+    });
+    assertAllowed(run(elsewhere('ls'), { entry: brokenEntry }), 'case 73a');
+    assertRefused(run(elsewhere('echo x > .ctoc/approvals/a.json'), { entry: brokenEntry }), 'case 73b', REFUSAL_UNCHECKED);
   });
 });
 
