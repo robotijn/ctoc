@@ -144,6 +144,12 @@ From `docs/ENFORCEMENT.md`, the attestation paragraph:
 
 This is a RECORD for audit, NOT a crossing-enabler: it changes no gate behaviour, the empty→ready/enough contract is unchanged, and `gate-critic` still NEVER emits `questions: []`.
 
+From `CLAUDE.md`, two clauses deleted because they were no longer true — the end of the Agent Architecture sentence about the CTO Chief, and the end of the sentence after the step table:
+
+, and it is the final approver before a plan is called done
+
+ until the human reviews
+
 From `CLAUDE.md`, the words it carried from 2026-10-06 until 2026-10-07 — lesson 2, the methodology line and the refusal under Critical Rule 1:
 
 2. **Never route around CTOC or self-cross its gates.** The four human gates belong to the human: no auto-approval, no skipping the pipeline.

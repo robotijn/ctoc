@@ -949,3 +949,55 @@ questions reach the human.
   `docs/PROJECT_REFERENCE.md` (the plan keeps that sentence), the build agent's "A pre-tool
   hook monitors ALL tool calls" lines, `docs/IRON_LOOP.md` line 14, `README.md`.
 - The parent's idle-time measurement (Decision 22) needs real use after release.
+
+### Review fixes and the end-to-end run (2026-10-07, after the session's review and security scan)
+
+The security scan passed; the review asked for four fixes, all in files this plan lists:
+
+1. `docs/AGENT_ARCHITECTURE.md`: the CTO Chief "Approves all gate crossings" became "Approves
+   no gate crossing: the vision crossing is the owner's approval, and the other three move on
+   recorded evidence in the menu's own code unless a question needs him"; "Three human gates"
+   became "Four gates", saying which is the owner's and which move on evidence.
+2. `docs/IRON_LOOP.md`: the gates table ("4 Gates") now matches the checkpoints at its top —
+   Gate 0 always the user's approval, Gates 1 and 2 move on their recorded evidence unless a
+   weighty question needs the user, Gate 3 finishes on its recorded checks, pushing stays the
+   user's. The kanban markers now sit in the gaps between the boxes: `[HUMAN]` under vision →
+   functional, `[EVIDENCE]` under functional → implementation and implementation → todo,
+   `[CHECKS]` under review → done, with the sentence below rewritten to match.
+3. `src/commands/start.md` Rule 14: a compliance profile "changes no crossing: the vision still
+   needs the human's own approve, and the other three still move on recorded evidence unless a
+   question needs him" (was "the four human gates stay mandatory").
+4. `docs/OPERATING_LESSONS.md`: the two clauses deleted from `CLAUDE.md` (", and it is the final
+   approver before a plan is called done" and " until the human reviews") are kept there word
+   for word, so Decision 33 holds.
+
+Full `npm test` after the fixes: tests 12,690, pass 12,690, fail 0, skipped 0; coverage 99.87%
+against 99%; `[CTOC test-gate] PASS`. Lint with zero warnings allowed: clean.
+
+**End-to-end run** (driver and transcript in the session scratchpad, `e2e-slice3/`, never in
+the repository): a fresh scratch project whose `npm test` runs a real test suite, driven only
+through this branch's `src/commands/start.js`. The human approved plans A ("Search by title")
+and C ("Audit trail"); the menu claimed both builds. C's build agent completed its own task
+(`menu task complete t2 --summary built`): Step 14 ran `npm test` for real, C moved to review
+with a passing record. The human held C (`stream answer review/audit.md ctoc-hold hold`). A's
+build agent completed its own task (`menu task complete t1 --summary built`): review, passing
+record. The gate critic's classified empty question file was dropped for plan B ("Export to
+CSV"). The session's `menu task complete t1 --continue --summary ignored` returned `ok: true,
+alreadyCompleted: true, completion: null`, text "Task t1 was already completed by its agent ·
+finished on their checks: Search by title · moved on: Export to CSV · started building: Export
+to CSV", and `promote` holding the claimed build t3 of B. After it: A in `done/` with a
+`pipeline` entry ending "crossed on evidence, not approved by the human"; C still in `review/`,
+its human crossing record unchanged; B crossed into `todo` on a `sufficiency` entry and on into
+building; t1's stored record unchanged. A second `--continue` on t1 crossed nothing; the same
+call without `--continue` is still refused ("invalid transition done → done").
+
+**What the run showed that this plan's files do not cover** (reported, not changed):
+- The default screen shows the held plan C as "Is “Audit trail” finished?" with "Yes — it's
+  finished — Recommended — everything checks out", and does not say it is held. Case 20 of
+  slice 2 covers a held plan that has questions; a held plan with no questions file falls back
+  to the plain screen (`src/lib/streaming-gate.js`).
+- The environment and compliance lines the default screen prints still say "The four human
+  gates stay mandatory" (`src/commands/start.js` / its screen code).
+- The status lines "nothing is finished until you say so" (beside the held plan, and on the
+  decision header) are untrue for plans that finish on their checks.
+- The answers log starts with an empty line before the first entry.

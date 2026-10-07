@@ -569,14 +569,14 @@ Implemented in `src/lib/iron-loop.js`. Triggered automatically when an implement
 
 ---
 
-## 4 Human Gates
+## 4 Gates
 
 | Gate | Transition | User Decision |
 |------|------------|---------------|
-| Gate 0 | Vision -> Functional | "Approve idea to explore?" |
-| Gate 1 | Functional -> Implementation | "Approve functional plan?" |
-| Gate 2 | Implementation -> Todo | "Approve technical approach?" |
-| Gate 3 | Final Review -> Done | "Commit or send back?" |
+| Gate 0 | Vision -> Functional | "Approve idea to explore?" — always the user's own approval |
+| Gate 1 | Functional -> Implementation | None, unless a question of high uncertainty or huge importance needs the user; otherwise it moves on its recorded evidence |
+| Gate 2 | Implementation -> Todo | None, unless a question of high uncertainty or huge importance needs the user; otherwise it moves on its recorded evidence |
+| Gate 3 | Final Review -> Done | None, unless a question needs the user; otherwise it finishes on its recorded checks. Pushing stays the user's |
 
 ---
 
@@ -623,13 +623,14 @@ invocations across every automatic path.
 |          | | BDD specs| | Technical| | Ready to | | Active    | | Finishes | |          |
 |          | |          | | approach | | start    | | work      | | on checks| |          |
 +----------+ +----------+ +----------+ +----------+ +-----------+ +----------+ +----------+
-               |             |                                        |
-            [HUMAN]     [EVIDENCE]                                [CHECKS]
+            |            |            |                                      |
+         [HUMAN]    [EVIDENCE]   [EVIDENCE]                              [CHECKS]
 ```
 
-`[HUMAN]` is the vision crossing, always the human's own approval. `[EVIDENCE]` and `[CHECKS]`
-mark crossings the menu's own code makes on recorded evidence (the move into `todo` too)
-unless a question needs the human, who can also approve them himself.
+`[HUMAN]` marks the vision → functional crossing, always the human's own approval.
+`[EVIDENCE]` marks the moves into implementation and into todo, and `[CHECKS]` the move into
+done: the menu's own code makes them on recorded evidence unless a question needs the human,
+who can also approve them himself.
 
 Column order follows the plan lifecycle left-to-right. `in-progress` is a logical state tracked in plan YAML frontmatter; plans physically remain in `todo/` until moved to `review/`.
 
