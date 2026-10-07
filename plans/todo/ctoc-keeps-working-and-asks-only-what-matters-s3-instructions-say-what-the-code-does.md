@@ -289,7 +289,7 @@ order's `new_anchors`. No new text says "User outcome: Gate N".
   evidence, or user approve" (Gate 3: "Menu: recorded checks, or user approve"). The Gate 0
   row stays (R-437, pinned by `tests/cto-chief-compliance-dispatch.test.js`, which needs the
   strings "Gate 0" to "Gate 3").
-- Monitoring duties (lines 722–724; R-443, R-444, R-445): "- [ ] No plans in
+- Monitoring duties (lines 722–724; R-443, R-444, R-445): "- [x] No plans in
   implementation/ (todo/, done/) without a crossing record in `.ctoc/approvals/` that
   `src/lib/approval-residency.js` accepts — the user's approval or the menu's recorded
   evidence."
@@ -577,10 +577,10 @@ mark replaced or added, and no others:
 
 From the parent table (criteria 9 and 10), and one this refresh adds:
 
-- [ ] Every instruction surface and `CLAUDE.md` says what the code does — vision → functional the human's own approval, the other three crossings in the menu's code on recorded evidence unless a question needs him, never recorded as his approval; questions written with the plan, classified by the gate critic, the fleet only on request — and no rule is lost: every test named in the Test plan green, every replaced rule recorded (the rule inventory's `new`/`old_home` with the old words verbatim in `docs/OPERATING_LESSONS.md`; each replaced order's `replaced_by` naming this plan).
-- [ ] Step 7 text says the loop stops at the first round with no new finding, three rounds at most, in every place of Decision 13 — Step 16 review.
-- [ ] After a build agent completes its own task, the session's `menu task complete <id> --continue` runs the continuation: a built plan whose checks passed finishes on them, a held plan stays, and the next approved plan starts; without the flag, or on any other settled status, the call is refused as today — cases 46, 46b, 47.
-- [ ] `CLAUDE.md` is at or under 15,000 bytes, and its lessons block is byte-identical to `.ctoc/templates/operating-lessons.md`'s.
+- [x] Every instruction surface and `CLAUDE.md` says what the code does — vision → functional the human's own approval, the other three crossings in the menu's code on recorded evidence unless a question needs him, never recorded as his approval; questions written with the plan, classified by the gate critic, the fleet only on request — and no rule is lost: every test named in the Test plan green, every replaced rule recorded (the rule inventory's `new`/`old_home` with the old words verbatim in `docs/OPERATING_LESSONS.md`; each replaced order's `replaced_by` naming this plan).
+- [x] Step 7 text says the loop stops at the first round with no new finding, three rounds at most, in every place of Decision 13 — Step 16 review.
+- [x] After a build agent completes its own task, the session's `menu task complete <id> --continue` runs the continuation: a built plan whose checks passed finishes on them, a held plan stays, and the next approved plan starts; without the flag, or on any other settled status, the call is refused as today — cases 46, 46b, 47.
+- [x] `CLAUDE.md` is at or under 15,000 bytes, and its lessons block is byte-identical to `.ctoc/templates/operating-lessons.md`'s.
 
 ## Risks
 
@@ -731,13 +731,13 @@ Taken by the build, 2026-10-07:
 - [x] Report the order ids actually marked replaced; if they differ from "Agent rules this slice replaces or adds", stop for the session and the human.
 
 ### Step 11: REVIEW
-- [ ] Dispatch `iron-loop-critic`: every changed sentence matches the code it describes (where plans cross, the hold, the classification, the continuation after a build); vision → functional stays the human's on every surface; no surface claims nothing moves when the menu opens; the kept text around each replaced order still reads true; whichever queued agent-improvement slice lands second keeps the other's text.
+- [x] Dispatch `iron-loop-critic`: every changed sentence matches the code it describes (where plans cross, the hold, the classification, the continuation after a build); vision → functional stays the human's on every surface; no surface claims nothing moves when the menu opens; the kept text around each replaced order still reads true; whichever queued agent-improvement slice lands second keeps the other's text.
 
 ### Step 12: OPTIMIZE
 - [x] `CLAUDE.md` at or under 15,000 bytes; no new sentence longer than its fact needs; no ceiling raised beyond its measured overage; the new branch adds no registry write and no second registry read.
 
 ### Step 13: SECURE
-- [ ] Dispatch `security-scanner`: no instruction tells an agent to write an approval or check record, move a plan file, cross a gate or pass `--continue`; the new branch persists nothing from `--summary`, `--gate`, `--next` or `--b64`; `tests/protect-records.test.js` green, so a background agent's `--continue` is still refused.
+- [x] Dispatch `security-scanner`: no instruction tells an agent to write an approval or check record, move a plan file, cross a gate or pass `--continue`; the new branch persists nothing from `--summary`, `--gate`, `--next` or `--b64`; `tests/protect-records.test.js` green, so a background agent's `--continue` is still refused.
 
 ### Step 14: VERIFY
 - [x] `npm test`: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct`.
@@ -750,8 +750,8 @@ Taken by the build, 2026-10-07:
 - [x] `docs/ENFORCEMENT.md` carries the review-to-done paragraph and the classification rule (item 13).
 
 ### Step 16: FINAL-REVIEW
-- [ ] Dispatch `iron-loop-critic` against the acceptance criteria, including the Step 7 text in the places of Decision 13.
-- [ ] The main session drives a scratch project through the real routes and shows the owner, in full: a running build task completed in the build agent's form (`menu task complete <id> --summary built`), then the session's `menu task complete <id> --continue`; both outputs, the ledger entry and the status line.
+- [x] Dispatch `iron-loop-critic` against the acceptance criteria, including the Step 7 text in the places of Decision 13.
+- [x] The main session drives a scratch project through the real routes and shows the owner, in full: a running build task completed in the build agent's form (`menu task complete <id> --summary built`), then the session's `menu task complete <id> --continue`; both outputs, the ledger entry and the status line.
 
 
 ---
@@ -775,9 +775,9 @@ Taken by the build, 2026-10-07:
 - [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
 - [x] Remove redundant operations
@@ -785,10 +785,10 @@ Taken by the build, 2026-10-07:
 - [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
 - [x] Run lint + type check
@@ -802,10 +802,10 @@ Taken by the build, 2026-10-07:
 - [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
 
 
 ## Deferred Questions
@@ -1039,3 +1039,10 @@ inventory check 3 under it.
 - Left for the separate plan, as the session decided: the environment and compliance lines
   ("The four human gates stay mandatory") and the "nothing is finished until you say so"
   phrase, which still appears in the held plan's topic line.
+
+### Review, security and final review — the session's record (2026-10-07)
+
+- Step 11 and Step 16 (iron-loop-critic): SHIP AFTER four fixes (AGENT_ARCHITECTURE crossings, IRON_LOOP gates table and kanban markers, start.md Rule 14, two CLAUDE.md clauses kept in OPERATING_LESSONS); all made in 696e9a37.
+- Step 13 (security-scanner): PASS on eba3da12 — the done-and-continue path returns before any completion or check step, writes nothing to the task, and the loaded hook still refuses --continue for subagent calls in every form tried.
+- Step 16's end-to-end runs through the real routes of this branch (scratchpad e2e-slice3): after a build agent's own completion, the session's --continue finished the built plan on its evidence and started the next; a held plan stayed. The run showed a held plan without a question file offered as ready to finish; the session widened files: by src/lib/streaming-gate.js and it was fixed test-first (case 48, 8c100d11); the rerun shows only keep-or-release.
+- Acceptance criteria ticked on the review's per-criterion evidence, the end-to-end transcripts and the full suite (12,699 passed, 0 failed, 0 skipped, coverage 99.87%). Untrue lines outside this slice go to the plan the-manual-and-the-docs-stop-claiming-what-ctoc-no-longer-does.
