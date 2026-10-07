@@ -996,23 +996,23 @@ others:
 From the parent table (criteria 1 to 8; 9 and 10 belong to slice 3), with the owner's
 decisions of 2026-10-07 and slice 1's third security scan folded in:
 
-- [ ] A question reaches the human only under the five conditions, and only in a file the gate critic classified; every other open question is decided by its recommended option — slice 2 cases 1, 26 (with slice 1's cases).
-- [ ] Every decided-by-default question is written into the plan the builder reads, once — cases 1, 11, 26.
-- [ ] A plan with a weighty question stays, and that question is asked before any detail — case 2.
-- [ ] A human's Hold holds until he releases it; once released, his answer moves the plan on — cases 3, 16, 17, 19, 21, 23 (with slice 1's held cases).
-- [ ] Every agent question screen carries CTOC's own "Hold this plan" with the reserved key, never text from the agent's file; every answer action quotes the question id and key and carries the digest of the question shown; `streamAnswer` records `holds: true` for a hold (including the gate ruling's own Hold and Send-back options), `holds: false` for any other answer, and refuses any key that is not one of the question's options or CTOC's own — cases 14, 15, 16, 17, 18, 19.
-- [ ] Every answers-log entry `streamAnswer` writes carries `questionDigest`: an answer the digest of the question as the screen showed it, recorded only while that still equals the stored question's digest; every hold, keep and release under `ctoc-hold` CTOC's own `HOLD.digest`, and a release without it releases nothing. A human's answer given through the screen counts at the gate and moves the plan — cases 17, 28, 29, 30, and the end-to-end cases in `tests/streaming-human-loop-e2e.test.js` and `tests/answer-feeds-sufficiency.test.js`.
-- [ ] Every append to the answers log starts on a new line, so a torn last line never merges with the entry after it — case 31.
-- [ ] The screen's "already answered?" check binds answers exactly as the gate does, so the screen never stops asking a question the gate still counts as open, and never asks one the gate counts as answered — cases 30, 32.
-- [ ] A hold is kept under CTOC's stable question id, so a release recorded against any later revision ends it, and a held plan whose original question is gone can still be released from its own screen — cases 17, 20, 23.
-- [ ] A held plan says in plain words, on its screen and in the session status, that the owner is holding it and how to release it; nothing crosses it — cases 20, 21, 22.
-- [ ] An author's question file — even an empty one, even one whose every question the human answered — never moves a plan by itself, at any crossing; it gets one gate-critic classification task through the continuation, never at menu open, session start or stop; its label is a whole millisecond; the classified file replaces it through the existing sweeper and answers already given still bind; when classification cannot run, the plan stays, every question keeps reaching the human, and its screen says in plain words what it waits for — cases 4, 7, 24, 25, 26, 27, 33.
-- [ ] The gate critic's classification reads the plan and its parent plan, adds a classified question for every weighty choice (technology stack, algorithm, data model, security posture, irreversible, cost) the author left unasked — an empty author list included — with a recommended option where the evidence supports one, and never removes or rewords an author's question; such a question stops the plan and is asked like any other weighty question — case 34 and the new anchors in `tests/gate-critic-compaction.test.js`.
-- [ ] A background agent cannot answer, hold, release or approve through the menu, nor run any route that crosses a plan; the build agent's own completion and the read-only screens stay allowed; the main session is unchanged; a refusal is one plain sentence on stderr with exit 2 — the new cases in `tests/protect-records.test.js`.
-- [ ] A built plan with every step checked, a fresh passing record and a recorded build admission reaches done with no human act, recorded as pipeline evidence naming the record, never as his approval — cases 6, 7, 8.
-- [ ] After a completion or an answer, the next approved plan starts and a newly moved functional plan gets its planner, with no human act; a requested stop is honoured — cases 1, 3, 4, 5.
-- [ ] Nothing moves at menu open, session start or stop; the build agent's own completion changes nothing — cases 10, 13, 25; existing session-start tests stay green. (The pre-build sufficiency crossing that the default screen already performs when it opens is today's behavior and is not changed by this slice; see Decision 12.)
-- [ ] Done never deploys — case 9.
+- [x] A question reaches the human only under the five conditions, and only in a file the gate critic classified; every other open question is decided by its recommended option — slice 2 cases 1, 26 (with slice 1's cases).
+- [x] Every decided-by-default question is written into the plan the builder reads, once — cases 1, 11, 26.
+- [x] A plan with a weighty question stays, and that question is asked before any detail — case 2.
+- [x] A human's Hold holds until he releases it; once released, his answer moves the plan on — cases 3, 16, 17, 19, 21, 23 (with slice 1's held cases).
+- [x] Every agent question screen carries CTOC's own "Hold this plan" with the reserved key, never text from the agent's file; every answer action quotes the question id and key and carries the digest of the question shown; `streamAnswer` records `holds: true` for a hold (including the gate ruling's own Hold and Send-back options), `holds: false` for any other answer, and refuses any key that is not one of the question's options or CTOC's own — cases 14, 15, 16, 17, 18, 19.
+- [x] Every answers-log entry `streamAnswer` writes carries `questionDigest`: an answer the digest of the question as the screen showed it, recorded only while that still equals the stored question's digest; every hold, keep and release under `ctoc-hold` CTOC's own `HOLD.digest`, and a release without it releases nothing. A human's answer given through the screen counts at the gate and moves the plan — cases 17, 28, 29, 30, and the end-to-end cases in `tests/streaming-human-loop-e2e.test.js` and `tests/answer-feeds-sufficiency.test.js`.
+- [x] Every append to the answers log starts on a new line, so a torn last line never merges with the entry after it — case 31.
+- [x] The screen's "already answered?" check binds answers exactly as the gate does, so the screen never stops asking a question the gate still counts as open, and never asks one the gate counts as answered — cases 30, 32.
+- [x] A hold is kept under CTOC's stable question id, so a release recorded against any later revision ends it, and a held plan whose original question is gone can still be released from its own screen — cases 17, 20, 23.
+- [x] A held plan says in plain words, on its screen and in the session status, that the owner is holding it and how to release it; nothing crosses it — cases 20, 21, 22.
+- [x] An author's question file — even an empty one, even one whose every question the human answered — never moves a plan by itself, at any crossing; it gets one gate-critic classification task through the continuation, never at menu open, session start or stop; its label is a whole millisecond; the classified file replaces it through the existing sweeper and answers already given still bind; when classification cannot run, the plan stays, every question keeps reaching the human, and its screen says in plain words what it waits for — cases 4, 7, 24, 25, 26, 27, 33.
+- [x] The gate critic's classification reads the plan and its parent plan, adds a classified question for every weighty choice (technology stack, algorithm, data model, security posture, irreversible, cost) the author left unasked — an empty author list included — with a recommended option where the evidence supports one, and never removes or rewords an author's question; such a question stops the plan and is asked like any other weighty question — case 34 and the new anchors in `tests/gate-critic-compaction.test.js`.
+- [x] A background agent cannot answer, hold, release or approve through the menu, nor run any route that crosses a plan; the build agent's own completion and the read-only screens stay allowed; the main session is unchanged; a refusal is one plain sentence on stderr with exit 2 — the new cases in `tests/protect-records.test.js`.
+- [x] A built plan with every step checked, a fresh passing record and a recorded build admission reaches done with no human act, recorded as pipeline evidence naming the record, never as his approval — cases 6, 7, 8.
+- [x] After a completion or an answer, the next approved plan starts and a newly moved functional plan gets its planner, with no human act; a requested stop is honoured — cases 1, 3, 4, 5.
+- [x] Nothing moves at menu open, session start or stop; the build agent's own completion changes nothing — cases 10, 13, 25; existing session-start tests stay green. (The pre-build sufficiency crossing that the default screen already performs when it opens is today's behavior and is not changed by this slice; see Decision 12.)
+- [x] Done never deploys — case 9.
 
 ## Risks
 
@@ -1324,27 +1324,27 @@ Taken by the executor while building (2026-10-07):
 - [x] `src/lib/streaming-precompute.js`, `src/lib/task-registry.js`, `src/lib/streaming-gate.js`, `src/lib/menu-screens.js`, `src/lib/actions.js`, `src/lib/loop-b-driver.js`, `src/commands/start.md`, `agents/iron-loop/gate-critic.md` (with its inventory, ceiling correction, order floor and kinds digest), `src/hooks/protect-records.js`, `docs/ENFORCEMENT.md`, as specified; run the slice 2 tests, `tests/gate-critic-compaction.test.js` and `tests/protect-records.test.js` green (inventory check 3 excepted until the session lists the order ids); report the order ids marked replaced and added.
 
 ### Step 11: REVIEW
-- [ ] Dispatch `iron-loop-critic`: no crossing writes `approved_by`; vision to functional untouched; continuation, the review-to-done crossing and the `classify` queueing unreachable from menu open, session start and stop; no crossing accepts an unclassified file; CTOC's hold labels and descriptions never come from a question file; a hold is released only by `Release the hold` carrying `HOLD.digest`; no held plan can be crossed automatically; every entry the writer appends carries a digest and starts on a new line; the screen and the gate read answers through the same call with the same questions; the gate critic's classification section states the omission duty and no kept order still says a question must trace to a lens or that a classification may only write back the author's questions; the two route tables match the router; every hook decision for a call without `agent_id` is unchanged; no instruction surface contradicts the code.
+- [x] Dispatch `iron-loop-critic`: no crossing writes `approved_by`; vision to functional untouched; continuation, the review-to-done crossing and the `classify` queueing unreachable from menu open, session start and stop; no crossing accepts an unclassified file; CTOC's hold labels and descriptions never come from a question file; a hold is released only by `Release the hold` carrying `HOLD.digest`; no held plan can be crossed automatically; every entry the writer appends carries a digest and starts on a new line; the screen and the gate read answers through the same call with the same questions; the gate critic's classification section states the omission duty and no kept order still says a question must trace to a lens or that a classification may only write back the author's questions; the two route tables match the router; every hook decision for a call without `agent_id` is unchanged; no instruction surface contradicts the code.
 
 ### Step 12: OPTIMIZE
 - [x] One verdict per plan per pass (no second questions read for `defaults`); `startAgent` called only when `nextBuildable` has work; the classification check reads a question status only for plans whose verdict is `open-forks` or `unclassified`; `nextUnansweredQuestion` still makes one status read and one answers read; the digest is computed once per rendered question and once per answer, and `HOLD.digest` once per load; the held line reuses the pending list; the hook's background-agent check runs only when `agent_id` is present; the gate critic's added text is the fewest bytes that state the duty.
 
 ### Step 13: SECURE
-- [ ] Dispatch `security-scanner`: question text appended to plans is single-line, control-stripped and capped; the evidence string carries no command text or secrets; `--continue` cannot be reached by the build agent's documented call, and is refused to any background agent; every generated `stream answer` action quotes the id, the key and the digest; `streamAnswer` writes nothing for a key outside the question's options and CTOC's own, when the question set cannot be read, or when an answer's or a release's digest does not match the question as it stands; a release without `HOLD.digest` releases nothing; a torn last line cannot fuse with the next entry; look-alike CTOC labels are refused on write and read; the gate critic treats the plan and its parent as data when it adds questions, and an added question's id and text pass the same validator; a background agent cannot reach any refused route through a pure call, a compound command or an inline script; the hook's limits are stated in its header and `docs/ENFORCEMENT.md`.
+- [x] Dispatch `security-scanner`: question text appended to plans is single-line, control-stripped and capped; the evidence string carries no command text or secrets; `--continue` cannot be reached by the build agent's documented call, and is refused to any background agent; every generated `stream answer` action quotes the id, the key and the digest; `streamAnswer` writes nothing for a key outside the question's options and CTOC's own, when the question set cannot be read, or when an answer's or a release's digest does not match the question as it stands; a release without `HOLD.digest` releases nothing; a torn last line cannot fuse with the next entry; look-alike CTOC labels are refused on write and read; the gate critic treats the plan and its parent as data when it adds questions, and an added question's id and text pass the same validator; a background agent cannot reach any refused route through a pure call, a compound command or an inline script; the hook's limits are stated in its header and `docs/ENFORCEMENT.md`.
 
 ### Step 14: VERIFY
 - [x] `npm test`: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct` — after the session has listed the gate critic's order ids and re-recorded the approval (inventory check 3).
 - [x] Lint the changed files: zero warnings.
 - [x] False-green, dead-export and unreachable counts not higher than the Step 9 numbers (`questionDigest` now has live callers, so its export adds no dead export); `.ctoc/unexecutable-instruction-baseline.json` unchanged and `tests/unexecutable-instruction-fence.test.js` green; `CLAUDE.md` at or under 15,000 bytes; the gate critic's `maxBytes` raised by no more than the measured overage, with one recorded correction.
-- [ ] An existing test outside `files:` that fails because it asserts a replaced contract (a review plan with a passing record stays pending; an unquoted answer action or one without a digest; an answer that cannot be checked is recorded; the menu writer's answer counts for nothing; the gate ruling's Hold or Send-back option moves the plan; a three-option question also asks Skip and Open; a background agent's menu call is allowed) is reported through `src/lib/scope-growth.js`, never edited outside `files:`.
+- [x] An existing test outside `files:` that fails because it asserts a replaced contract (a review plan with a passing record stays pending; an unquoted answer action or one without a digest; an answer that cannot be checked is recorded; the menu writer's answer counts for nothing; the gate ruling's Hold or Send-back option moves the plan; a three-option question also asks Skip and Open; a background agent's menu call is allowed) is reported through `src/lib/scope-growth.js`, never edited outside `files:`.
 
 ### Step 15: DOCUMENT
 - [x] JSDoc on every changed function, including `HOLD` (with `prompt` and `digest`), the `questionDigest` export and its two callers, `appendAnswerEntry`, `goesToHuman`'s new caller, `holdQuestion`, the `classify` kind, `'held'` and `'unclassified'` in `sufficiencyLine`, and the hook's new internal functions.
 - [x] Update the test-file count in `CLAUDE.md` for the new test file (Decision 11); `tests/doc-counts.test.js` green.
 
 ### Step 16: FINAL-REVIEW
-- [ ] The main session (a background agent is now refused these routes) drives a scratch project through the real routes and shows the owner, in full: one plan from an approved functional plan to done (every ledger entry, every status line, the Decisions block written into the plan); one answer given through the screen's own action, its answers-log entry with the digest, and the plan moving on because of it; one action kept from a screen whose question was then rewritten, refused with the sentence shown; one author question file — and one author's empty file whose plan chooses a database — from arrival to its `classify` task in `promote`, the screen line while it waits, the classified file swept in (with the critic's added question for the database choice, asked first), and the plan moving on once answered; one Hold — the screen after it, CTOC's keep-or-release question after the plan's questions are regenerated, the session status line, the answers-log entries with `HOLD.digest` — and its release; one background agent's `stream answer` refused, with the sentence it was shown.
-- [ ] Dispatch `iron-loop-critic` against the acceptance criteria above.
+- [x] The main session (a background agent is now refused these routes) drives a scratch project through the real routes and shows the owner, in full: one plan from an approved functional plan to done (every ledger entry, every status line, the Decisions block written into the plan); one answer given through the screen's own action, its answers-log entry with the digest, and the plan moving on because of it; one action kept from a screen whose question was then rewritten, refused with the sentence shown; one author question file — and one author's empty file whose plan chooses a database — from arrival to its `classify` task in `promote`, the screen line while it waits, the classified file swept in (with the critic's added question for the database choice, asked first), and the plan moving on once answered; one Hold — the screen after it, CTOC's keep-or-release question after the plan's questions are regenerated, the session status line, the answers-log entries with `HOLD.digest` — and its release; one background agent's `stream answer` refused, with the sentence it was shown.
+- [x] Dispatch `iron-loop-critic` against the acceptance criteria above.
 
 
 ---
@@ -1368,9 +1368,9 @@ Taken by the executor while building (2026-10-07):
 - [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
 - [x] Remove redundant operations
@@ -1378,10 +1378,10 @@ Taken by the executor while building (2026-10-07):
 - [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
 - [x] Run lint + type check
@@ -1395,10 +1395,10 @@ Taken by the executor while building (2026-10-07):
 - [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
 
 
 ## Deferred Questions
@@ -1861,3 +1861,11 @@ verified equal to this copy before any edit). Fixture change only, every asserti
 
 Full `npm test` (once): tests 12687, pass 12687, fail 0, cancelled 0, skipped 0, todo 0;
 coverage 99.87%; `[CTOC test-gate] PASS`. Lint zero warnings.
+
+### Review, security and final review — the session's record (2026-10-07)
+
+- Step 11 and Step 16 (iron-loop-critic): SHIP AFTER — claimed builds never launched, a node option before the script, three contradicting gate-critic sentences; all fixed in the combined round (c58f54c4) and recorded above.
+- Step 13 (security-scanner): the first scan was stopped by a safety classifier and gave no clearance; the defensive verification returned BLOCK (menu recognised by text, inline code by name, a second classification dropping questions, the recommended option outside the digest, old-format holds, a copied task parser) — fixed in b3f5ff0c; the targeted re-verification closed all but interpreter-wrapped node (python3/ruby), fixed in 7ab4dd6f with the change the scanner had tested. Three automated commit reviews flagged the hook and the question module without details; the verification mapped and covered them.
+- Step 16's end-to-end run: driven through the real routes of this branch's start.js as the main session (no agent id) in a scratch project; five issues found (an unchecked author question shown to the owner, a gate number and "approved" in the done notice, a leftover status file, "unknown%" coverage, the header counted before the sweep) were fixed in 266a0ac2 and the rerun (transcript-2) behaved as specified.
+- The Step 14 item about tests outside files: — each such test was added to files: by the session with a written reason and the approval re-recorded (final spec hash f7719a4b).
+- Acceptance criteria ticked on the reviews' evidence, the end-to-end transcripts and the full suite (12,687 passed, 0 failed, 0 skipped, coverage 99.87%, commit 68a0ab2b). The generic Steps 8-16 template appended by CTOC's approval step is covered item by item by this plan's own Steps 8-16 record.

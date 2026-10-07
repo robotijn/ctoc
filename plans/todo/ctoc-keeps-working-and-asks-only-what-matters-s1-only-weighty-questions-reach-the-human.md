@@ -199,9 +199,9 @@ The owner replaced the question contract on 2026-10-06 ("do not bother the user 
 
 ## Acceptance criteria
 
-- [ ] A question reaches the human only under the five conditions; every other open question is decided by its recommended option. Proven here by the slice 1 cases (parent criterion 1; its end-to-end half, slice 2 case 1, belongs to slice 2).
-- [ ] A human's Hold holds; his other answer moves the plan on. Proven here by the held cases: the `holds:true` answer gives `reason: 'held'`, the other answer gives `enough: true` (parent criterion 4; its screen half, slice 2 case 3, belongs to slice 2).
-- [ ] The gate critic, the product owner and the implementation planner say what the code now does: `topic` and its definitions, `holds`, the no-recommendation exception, the quarantine write as the last act, and every stack, algorithm, data-model, security, irreversible or costly choice raised as a question (this slice's share of parent criterion 9; checked at Step 11 and Step 16).
+- [x] A question reaches the human only under the five conditions; every other open question is decided by its recommended option. Proven here by the slice 1 cases (parent criterion 1; its end-to-end half, slice 2 case 1, belongs to slice 2).
+- [x] A human's Hold holds; his other answer moves the plan on. Proven here by the held cases: the `holds:true` answer gives `reason: 'held'`, the other answer gives `enough: true` (parent criterion 4; its screen half, slice 2 case 3, belongs to slice 2).
+- [x] The gate critic, the product owner and the implementation planner say what the code now does: `topic` and its definitions, `holds`, the no-recommendation exception, the quarantine write as the last act, and every stack, algorithm, data-model, security, irreversible or costly choice raised as a question (this slice's share of parent criterion 9; checked at Step 11 and Step 16).
 
 ## Risks
 
@@ -272,13 +272,13 @@ Recorded 2026-10-07 at the session's instruction, after the security scan of tha
 - [x] `src/lib/streaming-precompute.js`, `agents/iron-loop/gate-critic.md`, `agents/planning/product-owner.md`, `agents/planning/implementation-planner.md`, as specified; run the slice 1 tests green.
 
 ### Step 11: REVIEW
-- [ ] Dispatch `iron-loop-critic`: the five conditions match the table exactly and in order; no instruction surface in this slice contradicts the code; whichever queued agent-improvement slice lands second keeps the other's text.
+- [x] Dispatch `iron-loop-critic`: the five conditions match the table exactly and in order; no instruction surface in this slice contradicts the code; whichever queued agent-improvement slice lands second keeps the other's text.
 
 ### Step 12: OPTIMIZE
 - [x] `isBlockingQuestion` stays a pure check of the question object with no file read; `held` is computed from the answers already read for `answered`, with no second read of the answer log.
 
 ### Step 13: SECURE
-- [ ] Dispatch `security-scanner`: an unknown `topic` or a non-boolean `holds` is refused on write and on read; the error names the question id sanitized; a malformed question still blocks (condition 1).
+- [x] Dispatch `security-scanner`: an unknown `topic` or a non-boolean `holds` is refused on write and on read; the error names the question id sanitized; a malformed question still blocks (condition 1).
 
 ### Step 14: VERIFY
 - [x] `npm test`: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct`.
@@ -290,7 +290,7 @@ Recorded 2026-10-07 at the session's instruction, after the security scan of tha
 - [x] JSDoc on every changed function in `src/lib/streaming-precompute.js`, including the `'held'` reason.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Dispatch `iron-loop-critic` against the acceptance criteria above; each box quotes its evidence.
+- [x] Dispatch `iron-loop-critic` against the acceptance criteria above; each box quotes its evidence.
 
 
 ---
@@ -303,10 +303,10 @@ Recorded 2026-10-07 at the session's instruction, after the security scan of tha
 - [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
+- [x] Install dependencies if needed
 - [x] Check prerequisites
 - [x] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
 - [x] Implement the feature according to requirements
@@ -314,20 +314,20 @@ Recorded 2026-10-07 at the session's instruction, after the security scan of tha
 - [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
 - [x] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
 - [x] Run lint + type check
@@ -338,13 +338,13 @@ Recorded 2026-10-07 at the session's instruction, after the security scan of tha
 ### Step 15: DOCUMENT
 - [x] Update relevant documentation
 - [x] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
 
 
 ## Deferred Questions
@@ -819,3 +819,10 @@ For slice 2 (not built here):
 - The screen's answered check (`streaming-gate.nextUnansweredQuestion`) must pass the questions so
   it binds the way the gate does.
 - Every author file now waits for the gate critic's classification before a plan can move.
+
+### Review, security and final review — the session's record (2026-10-07)
+
+- Step 11 and Step 16 (iron-loop-critic): first review SHIP AFTER (Hold paths, contradicting gate-critic sentences, replaced-fate holes); re-review SHIP AFTER (rule-count floors, four contradictions, fleet dropping author questions, vision advisor format, fractional stamps). Every listed fix was built (commits 0949c838 to 83a093f0) and is recorded above.
+- Step 13 (security-scanner): BLOCK three times (Hold decided by the agent's file, key changes, duplicate labels, self-declared topic, unquoted command, replaced fate; reserved ids, approval-file check; author's empty list, file swap, answer replay, replaced-rule matching, hash walk). Each was fixed test-first; the targeted re-run of every attack at 83a093f0 returned PASS.
+- Owner decisions folded in: the independent gate critic assigns every topic; a Hold is CTOC's (2026-10-07).
+- Acceptance criteria ticked on the reviews' per-criterion evidence and the full suite on the shipped branch (12,687 passed, 0 failed, 0 skipped, coverage 99.87%, commit 68a0ab2b). The generic Steps 8-16 template appended by CTOC's approval step is covered item by item by this plan's own Steps 8-16 record.
