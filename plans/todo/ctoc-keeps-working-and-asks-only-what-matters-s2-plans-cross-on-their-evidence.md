@@ -981,7 +981,7 @@ session derived on the same day that the author must not decide by omission eith
 42). These are the compaction-inventory orders this slice may mark replaced or added, and no
 others:
 
-- `agents/iron-loop/gate-critic.md` — replaced: R-240, R-251, R-688; added: N-010, N-011, N-012, N-013.
+- `agents/iron-loop/gate-critic.md` — replaced: R-223, R-240, R-251, R-271, R-559, R-688; added: N-010, N-011, N-012, N-013.
 
 ## Acceptance criteria
 

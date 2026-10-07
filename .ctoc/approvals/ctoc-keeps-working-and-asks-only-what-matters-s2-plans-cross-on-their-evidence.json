@@ -1,11 +1,11 @@
 {
-  "content_sha256": "5ad76fe4cd805aca2d7c59049218722e7ed6662a49923ed46fdc6a64dec15bee",
+  "content_sha256": "45cdda2bc6b6c72341b0e57e4e567657b57e96f86ddf806ca1e36ced95c4092f",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-10-07T14:24:48.130Z",
+  "approved_at": "2026-10-07T15:40:25.458Z",
   "approved_by": "human",
   "backfilled": true,
-  "backfill_reason": "Session, 2026-10-07: after the build, the approved rule line lists the gate-critic orders this slice replaces (R-240, R-251, R-688) and adds (N-010 to N-013); files widened to the README count and the golden-corpus ceiling, both moving down",
+  "backfill_reason": "Session, 2026-10-07: the combined fix round replaced three more gate-critic orders (R-223, R-271, R-559) that contradicted the classification duty and the digest binding; listed on the approved line",
   "plan_basename": "ctoc-keeps-working-and-asks-only-what-matters-s2-plans-cross-on-their-evidence"
 }
