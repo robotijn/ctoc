@@ -235,6 +235,47 @@ argument check because the menu's question-generation recipe passes
 `--touches .ctoc/streaming/questions/<ref>` as data. A Bash payload whose `command` is not a
 string is treated as unreadable (the fail rule below).
 
+**A background agent may not answer, approve or move a plan through the menu** (the owner's
+decision of 2026-10-07). Claude Code's `PreToolUse` input carries `agent_id` only when a
+subagent makes the call, never for the main session. When the payload carries a non-empty
+`agent_id`, a menu call runs only if its route is on the allowed list below; every other
+route — including one the router gains later — is refused with "CTOC refused this call
+because a background agent may not answer CTOC's questions, approve a plan or move one on
+through the menu; report your result and let the main session do it." on stderr and exit 2.
+The route is read as `start.js` reads it (`--live-agent-ids` and its value removed, a single
+remaining argument split on whitespace). The rule also covers the menu reached outside a pure
+call: a command segment running a JavaScript runtime on a script ending in `start.js` with a
+refused route, and an inline script naming `menu-screens`, `streaming-gate`,
+`continueAfterCrossing` or `approveSubplans`. Every decision for a call without an `agent_id`
+is unchanged.
+
+| Refused when the call carries an `agent_id` | Why |
+|---|---|
+| No arguments, or only `--live-agent-ids <ids>` | the default screen crosses pre-build plans on sufficiency (an entry in `.ctoc/approvals/` and a move across a gate) |
+| `stream approve <ref>` | `approvePlan`: an approval record and a gate crossing, then the continuation |
+| `stream answer <ref> <id> <key> [<digest>]` | writes the answers log (answers, holds, releases), then the continuation, which crosses plans (review to done included) |
+| `stream skip <ref>` | re-renders through the crossing pass |
+| `stream comment <ref> <text>` | writes `.ctoc/streaming/comments.jsonl`, then the same re-render |
+| `stream` with no or an unknown sub-command | the default screen |
+| `plan` with no reference | the default screen |
+| `menu task complete <id> … --continue` | the continuation: crossings, planner and classification tasks, builds started |
+| any route not in the allowed table | fail closed |
+
+| Allowed for a background agent | Why |
+|---|---|
+| `menu task complete <id> [--summary …] [--gate N] [--next <route>] [--b64 …]` without `--continue` | the build agent's documented completion: in-progress to review and its check record; no approval, no answer, no human gate |
+| `menu task add …`, `start …`, `fail …`, `cancel …`, `list`, `board` | the task registry only |
+| `menu`, `menu commands`, `dashboard` | the pipeline dashboard: task reconcile and orphan recovery (in-progress back to todo, not a human gate) |
+| `tasks`, `task <id>` | read-only task screens |
+| `browse <stage>`, `section <name>`, `stubs <slug>`, `validate <stage>/<file>` | read-only screens |
+| `inbox questions`, `decisions`, `gates`, `escalations`, `migration`, `verify`, `stale`, `cleanup …` | read-only screens |
+| `plan <stage>/<file>` | the plan screen: it sweeps the waiting folder (validated promotion) and moves nothing |
+
+A crash on a background agent's call whose tool input mentions `start.js`, `menu-screens` or
+`streaming-gate` refuses with the "protection failed to run" sentence; the same crash on the
+main session's menu call is allowed, so one broken release cannot lock the human out of his
+own menu.
+
 The hook calls `process.chdir(root)` with the project root found from the payload's `cwd`,
 because the reused checks measure against the working directory. That is safe only because
 every call is a fresh subprocess that exits after one decision.
@@ -266,7 +307,11 @@ refused on every call; a payload that will not parse is scanned whole. A failure
 - hard links; more than 128 operands in one segment; file-writing tools other than the five;
 - read commands with a write side effect (`find -delete`, `tree -o`), which can delete or
   corrupt a record but never forge one;
-- any agent with the shell running the menu's own routes (approve, `stream approve`,
-  `stream answer`) — the protection cannot tell the session acting on the human's choice
-  from an agent acting alone;
+- a background agent reaching the menu's refused routes through a script file it wrote and
+  then ran, a path built at run time, or a tool other than the five matched;
+- the main session itself running `stream answer` or `stream approve` without the human's
+  reply — it carries no `agent_id` by design and is trusted to run only answers the human
+  gave; every answer, hold and release stays a timestamped entry in the answers log;
+- a future Claude Code that stops sending `agent_id` for subagents: such calls read as the
+  main session's, which only widens back to the behaviour before this rule;
 - on a crash, a call that reaches a record through a link without naming it.

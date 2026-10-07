@@ -2481,6 +2481,9 @@ module.exports = {
   // Agent orchestration functions
   startAgent,
   stopAgent,
+  // Second caller: streaming-gate.crossOnEvidence, when a built plan finishes on its evidence
+  // with deployment enabled — recorded deploy-ready, never deployed.
+  recordDeployReadyNotice,
   cleanupStaleInProgress,
   // F1-s2: plan→task translation, cancel, and wave-sync scheduler surfaces
   taskSpecFromPlan,

@@ -41,6 +41,14 @@
  *   front. The answer store is not in that argument check, because the menu's own
  *   question-generation recipe passes `--touches .ctoc/streaming/questions/<ref>` as data.
  *   A Bash payload whose `command` is not a string is treated as unreadable (fail rule).
+ *   A BACKGROUND AGENT (a payload with a non-empty `agent_id`, which Claude Code sends only
+ *   for subagent calls) may run only the menu routes that write no answer, no approval and
+ *   move no plan across a gate (`subagentMayRunRoute`: the build agent's own `menu task
+ *   complete` without `--continue`, the task registry, the dashboard, the read-only screens,
+ *   `plan <ref>`); every other route is refused with its own sentence, fail closed. The same
+ *   holds outside a pure call: a segment running a JavaScript runtime on a `start.js` with a
+ *   refused route, or an inline script naming `menu-screens`, `streaming-gate`,
+ *   `continueAfterCrossing` or `approveSubplans`. A call without `agent_id` is unchanged.
  *   Nothing else is loaded or run: no plan coverage, no escape phrases, no enforcement
  *   mode, no Iron Loop step gates, no irreversible-command net, no plan-move gate.
  *
@@ -55,8 +63,10 @@
  *   a script file written elsewhere and then run; a path built at run time (a variable,
  *   a glob, string pieces, `$'…'`); git operations that restore records without naming
  *   them; replacing a parent folder; hard links; operands beyond the first 128 per
- *   segment; file-writing tools other than the five matched; and any agent running the
- *   menu's own routes. The full list is in `docs/ENFORCEMENT.md`.
+ *   segment; file-writing tools other than the five matched; a background agent reaching a
+ *   refused menu route through a script file, a path built at run time or another tool; and
+ *   the main session running the menu's answering routes without the human's reply (it
+ *   carries no `agent_id`). The full list is in `docs/ENFORCEMENT.md`.
  *
  * FAIL RULE
  *   A crash fails CLOSED only for a call that mentions the records
@@ -65,7 +75,9 @@
  *   Write, Edit and Bash call in every project. When the payload parsed, only its
  *   `tool_input` is scanned, so a project whose path happens to contain one of the
  *   words (a `verify-project` folder) is not refused on every call; only a payload that
- *   will not parse is scanned whole. A failure to load `hook-deny-signal.js` itself
+ *   will not parse is scanned whole. A crash on a background agent's call whose tool input
+ *   mentions `start.js`, `menu-screens` or `streaming-gate` also fails closed; the main
+ *   session's menu call does not. A failure to load `hook-deny-signal.js` itself
  *   exits 1, which Claude Code treats as "not blocked".
  *
  * Refusal = the refusal sentence as one line on stderr, then the deny decision JSON on
@@ -83,6 +95,12 @@ const REFUSAL = 'CTOC refused this call because it writes, or could write, the a
   + 'finish your work, report it, and let the menu record the result.';
 const REFUSAL_UNCHECKED = 'CTOC refused this call because it mentions the approval or check records '
   + "and CTOC's protection for them failed to run; tell the human that this protection is broken.";
+const REFUSAL_SUBAGENT = "CTOC refused this call because a background agent may not answer CTOC's questions, "
+  + 'approve a plan or move one on through the menu; report your result and let the main session do it.';
+/** Text that marks a background agent's call as one that reaches the menu, for the fail rule. */
+const MENU_SUSPECT_RE = /start\.js|menu-screens|streaming-gate/;
+/** Inline-script names that reach the menu's routes or a plan move. */
+const MENU_EVAL_RE = /menu-screens|streaming-gate|continueAfterCrossing|approveSubplans/;
 
 /** A record area as a path segment anywhere in an absolute path; the waiting folder is excluded. */
 const RECORD_SEGMENT_RE = /(^|\/)\.ctoc\/+(approvals|state\/+verify|streaming(?!\/+questions\/+pending(\/|$)))(\/|$)/i;
@@ -196,31 +214,111 @@ function runsBackfillBeyondVision(command, bash) {
 }
 
 /**
+ * Is this call a background agent's? Claude Code's PreToolUse input carries `agent_id` only
+ * when a subagent makes the call, never for the main session; only a non-empty one counts.
+ * @param {object} payload
+ * @returns {boolean}
+ */
+function isSubagent(payload) {
+  return Boolean(payload) && typeof payload.agent_id === 'string' && payload.agent_id.trim() !== '';
+}
+
+/**
+ * The menu route a call names: the arguments after the menu script with `--live-agent-ids`
+ * and its value removed, and a single remaining argument split on whitespace — the reading
+ * `start.js` applies (`extractLiveAgentIds`, then `splitCliArgs`).
+ * @param {string[]} args
+ * @returns {string[]}
+ */
+function menuRouteArgs(args) {
+  const rest = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--live-agent-ids') { i++; continue; }
+    rest.push(args[i]);
+  }
+  return rest.length === 1 ? String(rest[0]).split(/\s+/).filter(Boolean) : rest;
+}
+
+/** Task sub-commands that write only the task registry. */
+const REGISTRY_TASK_SUBS = new Set(['add', 'start', 'fail', 'cancel', 'list', 'board']);
+/** Inbox screens that read only. */
+const READ_INBOX = new Set(['questions', 'decisions', 'gates', 'escalations', 'migration', 'verify', 'stale', 'cleanup']);
+/** Top-level routes that read only (or, `dashboard`, reconcile tasks — no human gate). */
+const READ_ROUTES = new Set(['dashboard', 'tasks', 'task', 'browse', 'section', 'stubs', 'validate']);
+
+/**
+ * May a background agent run this menu route? Only the routes that write no answer, no
+ * approval and move no plan across a gate: the build agent's own completion (never with
+ * `--continue`), the task registry, the dashboard and the read-only screens, and a plan screen
+ * with a reference. Every other route — the default screen, `stream …`, a bare `plan`, and any
+ * route the router gains later — is refused (fail closed).
+ * @param {string[]} route - from `menuRouteArgs`
+ * @returns {boolean}
+ */
+function subagentMayRunRoute(route) {
+  const [cmd, sub, third] = route;
+  if (cmd === 'menu') {
+    if (route.length === 1 || (sub === 'commands' && route.length === 2)) return true;
+    if (sub !== 'task') return false;
+    if (third === 'complete') return !route.includes('--continue');
+    return REGISTRY_TASK_SUBS.has(third);
+  }
+  if (cmd === 'inbox') return READ_INBOX.has(sub);
+  if (cmd === 'plan') return typeof sub === 'string' && sub !== '';
+  return READ_ROUTES.has(cmd);
+}
+
+/**
+ * Does a command that is not a pure menu call still reach a menu route a background agent may
+ * not run — a segment running a JavaScript runtime on a script ending in `start.js`, or an
+ * inline script naming the router, the gate module, the continuation or the batch approve?
+ * @param {string} command
+ * @param {{isInlineEval: function(string): boolean}} bash
+ * @returns {boolean}
+ */
+function reachesRefusedRoute(command, bash) {
+  if (bash.isInlineEval(command) && MENU_EVAL_RE.test(command)) return true;
+  for (const seg of command.split(/\r?\n|;|&&|\|\||\||&/)) {
+    const tokens = seg.trim().split(/\s+/).filter(Boolean).map((t) => t.replace(/['"`]/g, ''));
+    const at = tokens.findIndex((t) => JS_RUNTIME_RE.test(t.split(/[/\\]/).pop()));
+    if (at === -1 || !tokens[at + 1] || !/start\.js$/.test(tokens[at + 1])) continue;
+    if (!subagentMayRunRoute(menuRouteArgs(tokens.slice(at + 2)))) return true;
+  }
+  return false;
+}
+
+/**
  * The shell decision, in the plan's order.
  * @param {string} command
  * @param {string} cwdRel - the session's working directory relative to the root, or ''
  * @param {string} base - the session's working directory, absolute
  * @param {object} bash - the exports of `PreToolUse.Bash.js`
- * @returns {boolean} true to refuse
+ * @param {boolean} [subagent] - the call carries a non-empty `agent_id`
+ * @returns {string|null} the refusal sentence, or null to allow
  */
-function bashRefuses(command, cwdRel, base, bash) {
+function bashRefuses(command, cwdRel, base, bash, subagent = false) {
   const menuArgs = menuCallArgs(command, base);
-  if (menuArgs) return menuArgsNameRecords(menuArgs, cwdRel, bash);
+  if (menuArgs) {
+    if (menuArgsNameRecords(menuArgs, cwdRel, bash)) return REFUSAL;
+    return subagent && !subagentMayRunRoute(menuRouteArgs(menuArgs)) ? REFUSAL_SUBAGENT : null;
+  }
+  if (subagent && reachesRefusedRoute(command, bash)) return REFUSAL_SUBAGENT;
   // `./` so a working directory whose name starts with `-` is never read as a `cd` option.
   const analysed = cwdRel ? `cd ./${cwdRel} && ${command}` : command;
-  return bash.isLedgerForgery(analysed).deny
+  const refused = bash.isLedgerForgery(analysed).deny
     || bash.isOpaqueDecodedExecution(command)
     || bash.isLedgerWrite(analysed, bash.VERIFY_SPEC)
     || bash.isLedgerWrite(analysed, STREAMING_SPEC)
     || (bash.isInlineEval(command) && CHECK_RECORD_EVAL_TOKENS.some((re) => re.test(command)))
     || runsBackfillBeyondVision(command, bash);
+  return refused ? REFUSAL : null;
 }
 
 /**
  * The decision for one payload. Requires are inside, so a module that fails to load is
  * a throw the caller's fail rule handles.
  * @param {object} payload - the parsed stdin JSON
- * @returns {boolean} true to refuse
+ * @returns {string|null} the refusal sentence, or null to allow
  */
 function decide(payload) {
   const { findProjectRoot } = require('../lib/project-root');
@@ -230,22 +328,22 @@ function decide(payload) {
   if (EDITING_TOOLS.has(tool)) {
     const edit = require('./PreToolUse.Edit.js');
     const target = edit.getTargetFile(payload);
-    if (!target) return false;
+    if (!target) return null;
     const abs = path.resolve(payload.cwd || root, target);
     return edit.isProtectedLedgerPath(abs) || edit.isProtectedVerifyPath(abs)
-      || edit.targetsStreamingLive(abs) || RECORD_SEGMENT_RE.test(abs.replace(/\\/g, '/'));
+      || edit.targetsStreamingLive(abs) || RECORD_SEGMENT_RE.test(abs.replace(/\\/g, '/')) ? REFUSAL : null;
   }
   if (tool === 'Bash') {
     const command = payload.tool_input && payload.tool_input.command;
     // A command that is not a string cannot be read; the fail rule decides it.
     if (typeof command !== 'string') throw new TypeError('Bash command is not a string');
-    if (!command.trim()) return false;
+    if (!command.trim()) return null;
     const bash = require('./PreToolUse.Bash.js');
     let cwdRel = typeof payload.cwd === 'string' ? path.relative(root, payload.cwd).replace(/\\/g, '/') : '';
     if (!/^[A-Za-z0-9._/-]+$/.test(cwdRel)) cwdRel = '';
-    return bashRefuses(command, cwdRel, path.resolve(root, payload.cwd || '.'), bash);
+    return bashRefuses(command, cwdRel, path.resolve(root, payload.cwd || '.'), bash, isSubagent(payload));
   }
-  return false;
+  return null;
 }
 
 /**
@@ -270,13 +368,18 @@ function main() {
     refused = decide(payload);
   } catch {
     // Fail rule: scan only what the call does when the payload parsed, else the raw text.
-    const scanned = payload !== null && typeof payload === 'object'
+    const parsed = payload !== null && typeof payload === 'object';
+    const scanned = parsed
       ? String(JSON.stringify(payload.tool_input === undefined ? null : payload.tool_input))
       : raw;
-    if (UNCHECKED_SUSPECT_RE.test(scanned)) refuse(REFUSAL_UNCHECKED);
+    // A background agent's call that reaches for the menu fails closed too; the main
+    // session's menu call does not, so one broken release never locks the human out.
+    if (UNCHECKED_SUSPECT_RE.test(scanned) || (parsed && isSubagent(payload) && MENU_SUSPECT_RE.test(scanned))) {
+      refuse(REFUSAL_UNCHECKED);
+    }
     process.exit(0);
   }
-  if (refused) refuse(REFUSAL);
+  if (refused) refuse(refused);
   process.exit(0);
 }
 

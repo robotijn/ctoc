@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/gate-critic/baseline-agent.md",
  "baseline_sha256": "d8d10528cffd6e9c0af1b1174d5286b79b08d820416894c16ce117e2f39fed5e",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 137962,
+ "maxBytes": 139524,
  "units": [
   {
    "n": 1,
@@ -12601,6 +12601,12 @@
    "from": 134683,
    "to": 137962,
    "reason": "owner's question contract of 2026-10-06 (plan ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human) adds rules"
+  },
+  {
+   "date": "2026-10-07",
+   "from": 137962,
+   "to": 139524,
+   "reason": "the omission duty, the quoted answer command and the two rows it makes false (plan ctoc-keeps-working-and-asks-only-what-matters-s2-plans-cross-on-their-evidence, Decision 42); measured overage 1562 bytes"
   }
  ]
 }

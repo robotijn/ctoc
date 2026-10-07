@@ -164,22 +164,54 @@ function nameForRef(root, ref, deps) {
   return deps.humanPlanName(titleOf(content, slug, deps.parseMetadata), slug);
 }
 
-/** (a) plans the sufficiency side effect just moved out of a pre-build stage. */
+const MOVED_FORWARD = 'Moved forward on their own — enough was known to proceed without your OK';
+
+/**
+ * (a) plans the sufficiency side effect just moved out of a pre-build stage, and the pending
+ * list that same call returned (kept for the held line, never a second pass).
+ * @returns {{lines: string[], pending: (Array<object>|null)}}
+ */
 function crossedLines(root, deps) {
   try {
     const before = preBuildSnapshot(root, deps);
-    deps.pendingGateDecisions(root); // sanctioned side effect: sufficiency auto-cross
+    const pending = deps.pendingGateDecisions(root); // sanctioned side effect: sufficiency auto-cross
     const after = preBuildSnapshot(root, deps);
     const crossed = [];
     for (const [ref, name] of before) {
       if (!after.has(ref)) crossed.push(name);
     }
-    return crossed.length
-      ? [`Moved forward on their own — enough was known to proceed without your OK: ${summarize(crossed)}.`]
-      : [];
+    return { lines: crossed.length ? [`${MOVED_FORWARD}: ${summarize(crossed)}.`] : [], pending: Array.isArray(pending) ? pending : null };
   } catch {
-    return [];
+    return { lines: [], pending: null };
   }
+}
+
+/**
+ * (a') the crossings the continuation already made and handed in — named, never re-derived.
+ * A built plan finishing on its checks gets its own line.
+ * @param {Array<{toStage:string, name:string}>} crossed
+ * @returns {string[]}
+ */
+function namedCrossedLines(crossed) {
+  const done = crossed.filter((c) => c && c.toStage === 'done').map((c) => String(c.name));
+  const moved = crossed.filter((c) => c && c.toStage !== 'done').map((c) => String(c.name));
+  const lines = [];
+  if (moved.length) lines.push(`${MOVED_FORWARD}: ${summarize(moved)}.`);
+  if (done.length) lines.push(`Finished on their checks — no question needed you: ${summarize(done)}.`);
+  return lines;
+}
+
+/**
+ * (a'') the plans the owner is holding, from the pending list the directive already has: each
+ * stays where it is until he releases it, and is named in no other line.
+ * @returns {string[]}
+ */
+function heldLines(pending, deps) {
+  if (!Array.isArray(pending)) return [];
+  const names = pending.filter((d) => d && d.sufficiencyReason === 'held').map((d) => deps.humanPlanName(d.title, d.slug));
+  return names.length
+    ? [`You are holding: ${summarize(names)}. Each stays where it is until you choose Release the hold on it in /ctoc:start.`]
+    : [];
 }
 
 /**
@@ -199,7 +231,7 @@ function needQuestionLines(root, deps) {
     const working = [];
     const waiting = [];
     for (const d of needing) {
-      if (!d) continue;
+      if (!d || d.sufficiencyReason === 'held') continue; // named in the held line only
       const name = deps.humanPlanName(d.title, d.slug);
       if (!name) continue;
       if (isWaitingForOk(d)) {
@@ -239,21 +271,32 @@ function nextBuildLines(root, deps) {
 
 /**
  * Compose the Loop-B directive for `root`. See the module header.
+ *
+ * With `opts.crossed` (the continuation's crossings, from `stream answer`) the crossed lines
+ * name those plans and no crossing pass runs here; the held line then reads `opts.pending`
+ * (none given, no held line). Without it — the on-open banner and the session-start status —
+ * the directive runs its own pass as before and keeps the pending list that pass returns.
  * @param {string} root - project root
+ * @param {{crossed?: Array<object>, pending?: Array<object>}} [opts]
  * @returns {string} a leading-newline directive, or '' when there is nothing to report
  */
-function loopBDirective(root) {
+function loopBDirective(root, opts = {}) {
   if (typeof root !== 'string' || root.length === 0) return '';
   // buildDeps only requires local modules; a failure there is a broken install, and the
   // sole live caller (src/hooks/SessionStart.js) already wraps this call fail-open. Each
   // of the three source helpers below is independently try/caught for fault isolation.
   const deps = buildDeps();
+  const given = opts && Array.isArray(opts.crossed);
+  const own = given ? null : crossedLines(root, deps);
+  const pending = given ? (Array.isArray(opts.pending) ? opts.pending : null) : own.pending;
   const lines = [
-    ...crossedLines(root, deps),
+    ...(given ? namedCrossedLines(opts.crossed) : own.lines),
+    ...heldLines(pending, deps),
     ...needQuestionLines(root, deps),
     ...nextBuildLines(root, deps),
   ];
   return lines.length ? `\n${lines.join('\n')}` : '';
 }
 
-module.exports = { loopBDirective };
+// `summarize` is also the cap the completion's status lines use (menu-screens.continuationText).
+module.exports = { loopBDirective, summarize };

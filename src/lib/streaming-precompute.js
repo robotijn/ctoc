@@ -284,6 +284,40 @@ function questionDigest(question) {
 }
 
 /**
+ * CTOC's own Hold — the one source of it (the owner's decisions of 2026-10-07). Every agent
+ * question screen offers `hold` (label `Hold this plan`); a held plan's screen asks CTOC's own
+ * keep-or-release question (`prompt`, options `keep` and `release`) whatever its question file
+ * holds. A hold is recorded in the answers log under CTOC's stable question id `ctoc-hold`,
+ * never under an agent's id, so it is the same hold across every revision and stage of the
+ * plan. `ctoc-hold` cannot collide with an agent id (`q<NN>-<kebab>`) and the keys `hold` and
+ * `release` cannot collide with an agent key (`1`–`3`); a question file using any of the three
+ * labels is refused (`validatePlanQuestions`). `digest` is `questionDigest` of the
+ * keep-or-release question exactly as the screen shows it, computed once at load: every
+ * `ctoc-hold` entry carries it, and a release counts only when it does
+ * (`readAnsweredQuestionIds`).
+ * @type {Readonly<{questionId: string, prompt: string, hold: object, keep: object, release: object, digest: string}>}
+ */
+const HOLD = (() => {
+  const prompt = 'You are holding this plan. Keep holding it, or release the hold so it can move on?';
+  const keep = Object.freeze({ key: 'hold', label: 'Keep holding this plan', description: 'Nothing moves it.' });
+  const release = Object.freeze({
+    key: 'release',
+    label: 'Release the hold',
+    description: 'It can move on again: the questions that need you are asked again, and the others are decided by their recommended option.',
+  });
+  return Object.freeze({
+    questionId: 'ctoc-hold',
+    prompt,
+    hold: Object.freeze({ key: 'hold', label: 'Hold this plan', description: 'Keep this plan where it is. Nothing moves it until you release the hold.' }),
+    keep,
+    release,
+    digest: questionDigest({ prompt, options: [keep, release] }),
+  });
+})();
+/** The identities of CTOC's three hold labels, which no question file may use. */
+const HOLD_LABEL_IDENTITIES = new Set([HOLD.hold.label, HOLD.keep.label, HOLD.release.label].map(labelIdentity));
+
+/**
  * Validate a raw parsed value against the per-plan QUESTIONS contract. PURE and
  * NON-throwing: always returns `{ valid, errors }`. Aligned with
  * streaming-topics.validateTopics for the Question/Option shape, extended with the
@@ -307,7 +341,9 @@ function questionDigest(question) {
  * character. A single option with no recommendation is a notice, so it is refused on a
  * high-stakes topic, where it would decide a weighty question with no answer at all.
  * `holds` is refused: a hold is the human's answer, recorded by CTOC in the answers
- * log, never a field a question file may set. A violation anywhere refuses the WHOLE
+ * log, never a field a question file may set. A label that reads, by `labelIdentity`, as one
+ * of CTOC's own hold options (`HOLD`) is refused, so no agent can put a look-alike of the
+ * Hold on the screen under its own key. A violation anywhere refuses the WHOLE
  * file, on write and (because `planQuestionsStatus` re-validates) on read.
  *
  * @param {*} raw
@@ -400,6 +436,7 @@ function validatePlanQuestions(raw) {
       } else {
         const identity = labelIdentity(option.label);
         if (seenLabels.has(identity)) errors.push(`${owhere}.label repeats another label within ${where}`);
+        if (HOLD_LABEL_IDENTITIES.has(identity)) errors.push(`${owhere}.label is one of CTOC's own hold options`);
         seenLabels.add(identity);
       }
       if (option.recommended !== undefined && typeof option.recommended !== 'boolean') {
@@ -519,17 +556,31 @@ function reservedIdErrors(questions, attestation) {
 }
 
 /**
- * Is the questions file at `file` the gate critic's classified file for the plan revision
- * `mtime`? An unreadable or unparseable file is not.
+ * The questions file at `file` when it was written for the plan revision `mtime`, or null —
+ * absent, unreadable, unparseable, or written for another revision (nothing to keep then).
  */
-function holdsClassifiedFor(file, mtime) {
+function existingFor(file, mtime) {
   try {
-    if (!safeFs.existsSync(file)) return false;
+    if (!safeFs.existsSync(file)) return null;
     const existing = JSON.parse(safeFs.readFileSync(file, 'utf8'));
-    return Boolean(existing) && existing.planMtimeMs === mtime && isGateCriticClassification(existing.classification);
+    return existing && typeof existing === 'object' && existing.planMtimeMs === mtime ? existing : null;
   } catch {
-    return false; // not readable as a classified file, so there is nothing classified to keep
+    return null; // not readable, so there is nothing to keep
   }
+}
+
+/**
+ * Does the classified set `questions` keep every question of the author's file `existing` —
+ * the same id and the same `questionDigest` (prompt and key-to-label pairs)? The gate critic
+ * may add questions to an author's list; it may never drop or reword one, or the author's
+ * question would reach nobody.
+ */
+function keepsAuthorQuestions(existing, questions) {
+  const authored = Array.isArray(existing.questions) ? existing.questions : [];
+  return authored.every((a) => {
+    const kept = questions.find((q) => q.id === (a && a.id));
+    return Boolean(kept) && questionDigest(a) !== null && questionDigest(kept) === questionDigest(a);
+  });
 }
 
 /**
@@ -563,6 +614,11 @@ function holdsClassifiedFor(file, mtime) {
  * the author's own list decide. Refused with `reason: 'would-replace-classified'`; the critic
  * may replace its own file, and a new revision of the plan may be written by anyone.
  *
+ * The other way round, a classified file written over an author's file for the SAME revision
+ * must keep every author question with the same id and the same `questionDigest`; it may add
+ * questions (the omission duty), never drop or reword one. Otherwise refused with
+ * `reason: 'classification-dropped-author-question'` and the author's file stays.
+ *
  * @param {object} [attestation] optional critique-ran record (see validateAttestation)
  * @param {object} [classification] optional `{ by: "gate-critic", at }` record
  * @returns {{ ok: true } | { ok: false, errors: string[], reason?: string }}
@@ -581,8 +637,14 @@ function writePlanQuestions(root, ref, questions, planMtimeMs, attestation, clas
   // An unusable mtime (non-finite) stamps as 0 → the file reads as STALE against
   // any real plan mtime, forcing regeneration. Safer than storing a bad stamp.
   const mtime = Number.isFinite(planMtimeMs) ? planMtimeMs : 0;
-  if (!isGateCriticClassification(classification) && holdsClassifiedFor(file, mtime)) {
-    return { ok: false, reason: 'would-replace-classified', errors: ['the gate critic classified the questions for this revision of the plan; an unclassified file may not replace them'] };
+  const existing = existingFor(file, mtime);
+  const existingClassified = existing !== null && isGateCriticClassification(existing.classification);
+  if (!isGateCriticClassification(classification)) {
+    if (existingClassified) {
+      return { ok: false, reason: 'would-replace-classified', errors: ['the gate critic classified the questions for this revision of the plan; an unclassified file may not replace them'] };
+    }
+  } else if (existing !== null && !existingClassified && !keepsAuthorQuestions(existing, questions)) {
+    return { ok: false, reason: 'classification-dropped-author-question', errors: ["a classification must keep every question of the author's file for this revision, with the same id and wording; it may only add questions"] };
   }
   const record = { ref, planMtimeMs: mtime, questions };
   // Carry the attestation ONLY when it is an object — never a stray string/number,
@@ -980,8 +1042,11 @@ function chosenKey(entry) {
  * ── A HOLD IS THE HUMAN'S, RECORDED BY CTOC IN THIS LOG ────────────────────────
  * A hold is never read from a question file: an author could mark any option. It is
  * an entry carrying `holds: true` for this plan — matched by the plan's file name, so a
- * hold survives revisions and stage moves — and it lasts until a LATER entry for the
- * same plan and question records an answer without it. Entries that record no answer
+ * hold survives revisions and stage moves. CTOC writes every hold under its own stable id
+ * `HOLD.questionId` (`ctoc-hold`); such an entry is never an answer, and only a later
+ * `ctoc-hold` entry with key `release`, no `holds` other than `false`, and `HOLD.digest`
+ * releases it. An older entry holding an agent question id lasts until a LATER entry for the
+ * same plan and question records a bound answer without it. Entries that record no answer
  * neither set nor release a hold.
  *
  * @param {string} root project root
@@ -1058,6 +1123,18 @@ function readAnsweredQuestionIds(root, ref, revision) {
     }
     if (!entry || typeof entry !== 'object' || typeof entry.questionId !== 'string') continue;
     const key = chosenKey(entry);
+    if (entry.questionId === HOLD.questionId) {
+      // CTOC's own Hold follows its own rule and is never an answer: it enters neither `ids`,
+      // `keys` nor `unbound`, in both binding modes. A hold sets it (with a recorded key; no
+      // digest needed — holding is the fail-closed direction); only an explicit release
+      // carrying CTOC's digest ends it; any other `ctoc-hold` entry changes nothing.
+      if (planFileOf(entry.ref) === planFile) {
+        if (entry.holds === true && typeof key === 'string' && key !== '') holdState.set(HOLD.questionId, true);
+        else if (key === HOLD.release.key && (entry.holds === undefined || entry.holds === false)
+            && entry.questionDigest === HOLD.digest) holdState.set(HOLD.questionId, false);
+      }
+      continue;
+    }
     if (planFileOf(entry.ref) === planFile && isHoldOrRelease(entry, key, optionKeys, digests)) {
       holdState.set(entry.questionId, entry.holds === true);
     }
@@ -1241,6 +1318,10 @@ module.exports = {
   isBlockingQuestion,
   isGateCriticClassification,
   goesToHuman,
+  // Live callers: streaming-gate.precomputedQuestionParts / holdQuestion / streamAnswer /
+  // nextUnansweredQuestion, which render and record CTOC's Hold and bind every answer.
+  HOLD,
+  questionDigest,
   isFresh,
   plansNeedingQuestions,
 };

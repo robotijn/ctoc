@@ -145,10 +145,16 @@ const MAX_TOUCH_LENGTH = 512;
  * Its absence was load-bearing: `menu task add precompute` threw, the record-first
  * step failed, no lens critic was ever dispatched, no questions file was ever
  * written, and the streaming screen silently fell back to the bare gate prompt.
+ *
+ * `classify` is the gate critic's classification of one plan's question file, queued only by
+ * `menu-screens.continueAfterCrossing`, once per question revision (label
+ * `revision-<whole millisecond>`). It writes only the waiting folder
+ * `.ctoc/streaming/questions/pending/`, never a plan file, so completion never runs plan
+ * completion for it (that is gated on `implement`).
  */
 const KINDS = Object.freeze(new Set([
   'implement', 'plan', 'review', 'quality', 'security', 'decompose', 'discuss', 'sync',
-  'precompute'
+  'precompute', 'classify'
 ]));
 /**
  * All valid task statuses. `cancelling` is a NON-terminal in-flight state (C1-2):

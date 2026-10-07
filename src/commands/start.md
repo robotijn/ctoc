@@ -320,6 +320,19 @@ Any failure falls back silently to the plain gate question — the human is neve
 or shown a crash. This is the async-overnight / precompute-never-wait principle applied
 to the gates.
 
+**A promoted `classify` task is the gate critic's classification of one plan's questions.**
+The menu records it itself, once per question set, when a plan's question file came from its
+author (an empty one included) — the same record as
+`menu task add classify '{ref}' --touches '.ctoc/streaming/questions/{ref}'`, which you never
+add yourself. Until it is classified, that plan cannot move on without the human. Launch
+`gate-critic` alone as background WORK, then `menu task start <id>`; its brief: the task id,
+the plan path, and "classify the questions of `{ref}`" (its section "Classifying the
+questions", which has it read the plan and its parent plan, classify the author's questions
+and add a question for every weighty choice the author left unasked); never the three lens
+critics. It writes the classified file to the waiting folder; the next continuation sweeps it
+in. If it fails, the plan stays where it is: every question keeps reaching the human, and only
+his approval moves it.
+
 ### Build-flow idea submit — dispatch vision-decomposer (warm, never-wait)
 
 **When the human submits a free-text idea in the streaming Build flow, DISPATCH the
