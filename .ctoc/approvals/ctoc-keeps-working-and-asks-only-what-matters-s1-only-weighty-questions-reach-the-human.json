@@ -1,0 +1,11 @@
+{
+  "content_sha256": "bcd9cc8c1faa905132a503fc70ea848440649bd62da0889a4c5f330af8336d84",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-07T10:46:30.696Z",
+  "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "Scope recorded 2026-10-07 by the session: the specification now lists every agent-inventory order the slice replaces or adds, so each replacement is covered by the approved text (security re-scan finding)",
+  "plan_basename": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
+}
