@@ -342,24 +342,85 @@ describe('regimeSummary shape', () => {
 // listAvailableProfiles
 // ---------------------------------------------------------------------------
 
+// The profiles CTOC ships, read here straight from the repository folder (independent of the
+// module under test).
+const SHIPPED_DIR = path.join(__dirname, '..', '.ctoc', 'regulatory-regimes');
+const SHIPPED = fs.readdirSync(SHIPPED_DIR).filter(f => f.endsWith('.yaml')).map(f => f.slice(0, -5)).sort();
+
 describe('listAvailableProfiles', () => {
-  it('returns an empty array when the profiles directory is absent', () => {
+  // Contract replaced by the session decision of 2026-10-07: a project with no profile folder
+  // still knows the profiles shipped with the plugin (it used to list none).
+  it('lists exactly the profiles shipped with the plugin when the project has no profile folder', () => {
     const raw = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-regime-empty-'));
     const root = fs.realpathSync(raw);
     createdDirs.push(root);
     // no .ctoc/regulatory-regimes directory created
-    assert.deepEqual(listAvailableProfiles(root), []);
+    assert.ok(SHIPPED.includes('gdpr') && SHIPPED.length >= 10, 'fixture: the shipped folder was read');
+    assert.deepEqual(listAvailableProfiles(root), SHIPPED);
   });
 
-  it('lists .yaml profiles by base name, sorted, ignoring non-yaml files', () => {
+  it("lists the project's .yaml profiles with the shipped ones, by base name, sorted, once each, ignoring non-yaml files", () => {
     const root = makeProject();
     writeProfile(root, 'zeta', shippedStyleProfile(['audit_hash_chain']));
     writeProfile(root, 'alpha', shippedStyleProfile(['legal_hold']));
+    writeProfile(root, 'gdpr', shippedStyleProfile(['legal_hold']));
     fs.writeFileSync(
       path.join(root, '.ctoc', 'regulatory-regimes', 'README.md'),
       '# not a profile\n'
     );
-    assert.deepEqual(listAvailableProfiles(root), ['alpha', 'zeta']);
+    assert.deepEqual(listAvailableProfiles(root), [...new Set(['alpha', 'zeta', ...SHIPPED])].sort());
+  });
+});
+
+describe('profiles shipped with the plugin (a project with no profile folder)', () => {
+  function bareProject(settingsBody) {
+    const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-regime-bare-')));
+    createdDirs.push(root);
+    fs.mkdirSync(path.join(root, '.ctoc'), { recursive: true });
+    if (settingsBody) writeSettings(root, settingsBody);
+    return root;
+  }
+
+  it('loads a shipped profile when the project has no copy of it', () => {
+    const root = bareProject('regulatory_regime:\n  active_profiles: [gdpr]\n');
+    const profile = loadProfile(root, 'gdpr');
+    assert.ok(profile, 'the shipped gdpr profile loads');
+    assert.equal(profile.name, 'gdpr');
+    assert.deepEqual(regime.unloadableProfiles(root), []);
+  });
+
+  it('activates the controls of a shipped profile', () => {
+    const root = bareProject('regulatory_regime:\n  active_profiles: [do-178c-level-a]\n');
+    assert.deepEqual(regime.unloadableProfiles(root), []);
+    assert.ok(effectiveControls(root).has('independent_verification_validation'));
+  });
+
+  it("a project's own copy still wins over the shipped one", () => {
+    const root = makeProject();
+    writeProfile(root, 'gdpr', 'name: project-own-gdpr\nrequired_controls:\n  - legal_hold\n');
+    writeActiveProfiles(root, ['gdpr']);
+    assert.equal(loadProfile(root, 'gdpr').name, 'project-own-gdpr');
+    assert.deepEqual([...effectiveControls(root)], ['legal_hold']);
+  });
+
+  it('a name in neither folder stays unreadable', () => {
+    const root = bareProject('regulatory_regime:\n  active_profiles: [do-178c-levl-a]\n');
+    assert.equal(loadProfile(root, 'do-178c-levl-a'), null);
+    assert.deepEqual(regime.unloadableProfiles(root), ['do-178c-levl-a']);
+  });
+
+  it('a name that could climb out of either folder is refused', () => {
+    const root = makeProject();
+    // `../x` from <project>/.ctoc/regulatory-regimes is <project>/.ctoc/x.yaml: plant it.
+    fs.writeFileSync(path.join(root, '.ctoc', 'x.yaml'), 'name: escaped\nrequired_controls:\n  - legal_hold\n');
+    // and the shipped folder's parent is the plugin's .ctoc/: `../regulatory-regimes/gdpr`
+    // would reach a real file through a climb.
+    for (const name of ['../x', '../regulatory-regimes/gdpr', 'a/b', 'a\\b', '..', '', 'GDPR', '-gdpr', 'gdpr.yaml', ' gdpr']) {
+      assert.equal(loadProfile(root, name), null, `refused: ${JSON.stringify(name)}`);
+    }
+    writeActiveProfiles(root, ['../x']);
+    assert.deepEqual(regime.unloadableProfiles(root), ['../x']);
+    assert.equal(effectiveControls(root).size, 0);
   });
 });
 

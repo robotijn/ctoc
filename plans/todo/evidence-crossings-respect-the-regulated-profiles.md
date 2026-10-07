@@ -15,6 +15,9 @@ files:
   - src/commands/start.md
   # its paragraph on finishing on recorded evidence lists every condition; this plan adds the regime conditions
   - docs/ENFORCEMENT.md
+  # Added 2026-10-07 by the session after the scratch-project run: profiles are read only from the project's own copy, which no real project has; the loader falls back to the profiles shipped with the plugin
+  - src/lib/regulatory-regime.js
+  - tests/lib-regulatory-regime.test.js
 approved_by: human
 approved_at: 2026-10-07T17:38:58.663Z
 gate_crossed: implementation → todo

@@ -1443,14 +1443,16 @@ const REPO_REGIMES = path.join(__dirname, '..', '.ctoc', 'regulatory-regimes');
 
 /**
  * Write `.ctoc/settings.yaml` as a `regulatory_regime:` block and copy each named profile
- * CTOC ships into the sandbox (a name with no shipped file is not copied).
+ * CTOC ships into the sandbox (a name with no shipped file is not copied). `copy: false`
+ * leaves the sandbox with no profile folder at all, as a real project has.
  */
-function setRegime(root, { profiles = [], overrides = {}, declined = false } = {}) {
+function setRegime(root, { profiles = [], overrides = {}, declined = false, copy = true } = {}) {
   let yaml = `regulatory_regime:\n  active_profiles: [${profiles.join(', ')}]\n`;
   if (declined) yaml += '  declined: true\n';
   const entries = Object.entries(overrides);
   if (entries.length > 0) yaml += `  overrides:\n${entries.map(([k, v]) => `    ${k}: ${v}\n`).join('')}`;
   fs.writeFileSync(path.join(root, '.ctoc', 'settings.yaml'), yaml);
+  if (!copy) return;
   const dir = path.join(root, '.ctoc', 'regulatory-regimes');
   fs.mkdirSync(dir, { recursive: true });
   for (const name of profiles) {
@@ -1634,5 +1636,34 @@ describe('a regulated project: the plan waits where the regime has no record (ca
     assert.equal(descriptorOf(root, 'review/c53p.md').regimeHold, null);
     menuScreens.continueAfterCrossing(root);
     assert.equal(exists(root, 'done/c53p.md'), true, 'it finishes on its checks');
+  });
+});
+
+describe('a real project has no profile folder: the shipped profiles are read (case 54)', () => {
+  it('case 54 — GDPR on, no profile folder: a built plan still finishes on its checks', () => {
+    const root = makeSandbox();
+    setRegime(root, { profiles: ['gdpr'], copy: false });
+    assert.equal(fs.existsSync(path.join(root, '.ctoc', 'regulatory-regimes')), false, 'fixture: no profile folder');
+    seedBuilt(root, 'c54g');
+    assert.equal(descriptorOf(root, 'review/c54g.md').regimeHold, null);
+    menuScreens.continueAfterCrossing(root);
+    assert.equal(exists(root, 'done/c54g.md'), true, 'it finishes on its checks');
+  });
+
+  for (const [profile, reason] of [['do-178c-level-a', 'independent-verification'], ['sox-itgc', 'review-sign-off']]) {
+    it(`case 54 — ${profile} on, no profile folder: the built plan waits with the ${reason} reason, not "could not read"`, () => {
+      const root = makeSandbox();
+      setRegime(root, { profiles: [profile], copy: false });
+      seedBuilt(root, 'c54');
+      const { screen } = assertBuiltHeld(root, 'c54', reason);
+      assert.equal(screen.text.includes(REGIME_SENTENCES['regime-unreadable']), false, screen.text);
+    });
+  }
+
+  it('case 54 — a misspelled profile, no profile folder: the built plan still waits as unreadable', () => {
+    const root = makeSandbox();
+    setRegime(root, { profiles: ['do-178c-levl-a'], copy: false });
+    seedBuilt(root, 'c54m');
+    assertBuiltHeld(root, 'c54m', 'regime-unreadable');
   });
 });
