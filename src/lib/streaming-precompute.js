@@ -232,6 +232,19 @@ function isTopiclessId(id) {
 const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/;
 const CONTROL = /[\u0000-\u001F\u007F-\u009F]/g;
 
+/**
+ * Is `c` the independent classification block — `{ by: "gate-critic", at: <ms> }`, exactly
+ * those two keys? The owner's decision of 2026-10-07: the gate critic assigns every topic;
+ * the plan's author never grades its own question. Anything else is "not classified".
+ * @param {*} c
+ * @returns {boolean}
+ */
+function isGateCriticClassification(c) {
+  return Boolean(c) && typeof c === 'object' && !Array.isArray(c)
+    && Object.keys(c).sort().join(',') === 'at,by'
+    && c.by === 'gate-critic' && Number.isSafeInteger(c.at) && c.at > 0;
+}
+
 /** A label as the human tells it apart: control characters stripped, trimmed, lower-cased. */
 function labelIdentity(label) {
   return label.replace(CONTROL, '').trim().toLowerCase();
@@ -244,17 +257,16 @@ function labelIdentity(label) {
  * optional per-option `pros` / `cons` / `description` strings the streaming screen
  * surfaces.
  *
- *   Question = { id, prompt, critical, important, topic?, options: [Option] }
+ *   Question = { id, prompt, critical, important, topic, options: [Option] }
  *   Option   = { key, label, recommended?, pros?, cons?, description? }
  *
  * Rules: `id`/`prompt`/`key`/`label` are REQUIRED non-empty strings; question ids
  * are UNIQUE across the array; `options` is REQUIRED with one to three options whose
  * keys are unique and whose labels are unique once control characters are stripped,
  * the label trimmed and lower-cased; `critical` and `important` are REQUIRED booleans
- * (a missing flag is an undeclared fork); `topic` is optional and, when present, one of
- * QUESTION_TOPICS — an absent topic keeps the reading of a file written before topics
- * existed (isBlockingQuestion condition 4) — and the reserved gate ruling and coverage
- * notice carry none, so a topic can never turn the ruling into a decided detail;
+ * (a missing flag is an undeclared fork); `topic` is REQUIRED and one of
+ * QUESTION_TOPICS, except on the reserved gate ruling and coverage notice, which carry
+ * none, so a topic can never turn the ruling into a decided detail;
  * `recommended` is an optional boolean; `pros`/`cons`/`description` are optional
  * strings. No human-visible text may carry a zero-width or bidirectional-control
  * character. A single option with no recommendation is a notice, so it is refused on a
@@ -315,8 +327,8 @@ function validatePlanQuestions(raw) {
     const topicless = isTopiclessId(question.id);
     if (topicless && question.topic !== undefined) {
       errors.push(`${idLabel} is the gate ruling or the coverage notice and carries no "topic"`);
-    } else if (question.topic !== undefined && !QUESTION_TOPICS.includes(question.topic)) {
-      errors.push(`${idLabel} has an unknown "topic"; allowed: ${QUESTION_TOPICS.join(', ')}`);
+    } else if (!topicless && !QUESTION_TOPICS.includes(question.topic)) {
+      errors.push(`${idLabel} must declare a "topic"; allowed: ${QUESTION_TOPICS.join(', ')}`);
     }
     if (!Array.isArray(question.options)) {
       errors.push(`${where}.options must be an array`);
@@ -466,10 +478,16 @@ function validateAttestation(attestation) {
  * @param {string} ref plan reference ("stage/file.md")
  * @param {Array<object>} questions the decision questions (Question contract)
  * @param {number} planMtimeMs the plan file's mtime (ms) at generation time
+ * ── The optional `classification` (sixth parameter) ───────────────────────────
+ * The gate critic's record that IT assigned the topics. Carried verbatim when it is an
+ * object, like the attestation; the reader (`isGateCriticClassification`) decides
+ * whether it counts. Without a valid one, every question in the file blocks.
+ *
  * @param {object} [attestation] optional critique-ran record (see validateAttestation)
+ * @param {object} [classification] optional `{ by: "gate-critic", at }` record
  * @returns {{ ok: true } | { ok: false, errors: string[] }}
  */
-function writePlanQuestions(root, ref, questions, planMtimeMs, attestation) {
+function writePlanQuestions(root, ref, questions, planMtimeMs, attestation, classification) {
   const file = questionsPath(root, ref);
   if (file === null) {
     return { ok: false, errors: [`invalid ref: ${typeof ref === 'string' ? JSON.stringify(ref) : typeof ref}`] };
@@ -486,6 +504,9 @@ function writePlanQuestions(root, ref, questions, planMtimeMs, attestation) {
   // and never an `attestation` key at all for a four-arg call (byte-shape unchanged).
   if (attestation && typeof attestation === 'object' && !Array.isArray(attestation)) {
     record.attestation = attestation;
+  }
+  if (classification && typeof classification === 'object' && !Array.isArray(classification)) {
+    record.classification = classification;
   }
   const payload = JSON.stringify(record, null, 2);
 
@@ -546,7 +567,7 @@ function writePlanQuestions(root, ref, questions, planMtimeMs, attestation) {
  * @param {string} root project root
  * @param {string} ref plan reference ("stage/file.md")
  * @returns {{status:string, questions?:Array<object>, questionsRevisionMs?:number,
- *   planMtimeMs?:number, attested?:boolean, attestation?:(object|null),
+ *   planMtimeMs?:number, attested?:boolean, attestation?:(object|null), classified?:boolean,
  *   errors?:string[], reason:string}}
  */
 function planQuestionsStatus(root, ref) {
@@ -641,6 +662,8 @@ function planQuestionsStatus(root, ref) {
     planMtimeMs: currentMtimeMs,        // the plan file's CURRENT mtime
     attested,
     attestation: parsed.attestation === undefined ? null : parsed.attestation,
+    // Did the independent gate critic assign these topics? Without it no topic decides.
+    classified: isGateCriticClassification(parsed.classification),
     reason: `${shownRef} has fresh precomputed questions`,
   };
 }
@@ -732,7 +755,8 @@ function isBlockingQuestion(question) {
   if (!question || typeof question !== 'object' || Array.isArray(question)) return true;
   if (typeof question.critical !== 'boolean' || typeof question.important !== 'boolean') return true;
   if (!Array.isArray(question.options)) return true;
-  if (question.topic !== undefined && !QUESTION_TOPICS.includes(question.topic)) return true;
+  const topicless = isTopiclessId(question.id);
+  if (topicless ? question.topic !== undefined : !QUESTION_TOPICS.includes(question.topic)) return true;
   if (question.critical) return true;
   if (HIGH_STAKES_TOPICS.includes(question.topic)) return true;
   if (question.important && question.topic === undefined) return true;
@@ -967,7 +991,10 @@ function readAnsweredQuestionIds(root, ref, revision) {
  *   'held'               the human's latest answer for this plan, in the answers log,
  *                        carries `holds: true` — his Hold holds, across revisions;
  *                        `blocking` names the held questions. Checked before forks.
- *   'open-forks'         an unanswered question goes to the human (isBlockingQuestion)
+ *   'open-forks'         an unanswered question goes to the human: in a file the gate
+ *                        critic classified, by isBlockingQuestion; in any other file,
+ *                        EVERY unanswered question (the author's own topic decides
+ *                        nothing — the owner's decision of 2026-10-07)
  * and `enough: true` with reason 'enough' in every other case — which means: the
  * questions are fresh, nothing the human answered holds the plan, and no unanswered
  * fork remains. Unanswered questions that are not forks do NOT block; each is decided
@@ -1023,7 +1050,9 @@ function hasEnoughInformation(root, ref) {
   // An unreadable log yields an EMPTY answered set and no holds; the fail-closed
   // return below keeps that ignorance from ever reading as a pass.
   const unanswered = questions.filter((q) => !answers.ids.has(q.id));
-  const blocking = unanswered.filter(isBlockingQuestion);
+  // The author's own topic decides nothing: unless the gate critic classified this file,
+  // every open question is treated as weighty and goes to the human.
+  const blocking = unanswered.filter((q) => !status.classified || isBlockingQuestion(q));
   // The count that EXISTED, and the ids that bound — both from the read above, so
   // only ids of CURRENT questions count (answered.length + unanswered.length === computed).
   const computed = questions.length;

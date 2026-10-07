@@ -69,6 +69,9 @@ function recOpts() {
   return [{ key: 'a', label: 'Option A', recommended: true }, { key: 'b', label: 'Option B' }];
 }
 
+/** The gate critic's record that it assigned the topics (the owner's decision of 2026-10-07). */
+const CLASSIFIED = Object.freeze({ by: 'gate-critic', at: 1786000000000 });
+
 /** Appends one line to the sandbox's answers log, in the shape the real writer uses. */
 function appendAnswer(root, entry) {
   const dir = path.join(root, '.ctoc', 'streaming');
@@ -89,12 +92,12 @@ describe('isBlockingQuestion — absence of a declaration is not a declaration o
     assert.equal(precompute.isBlockingQuestion({ id: 'q', prompt: 'p', critical: false, important: true, options: opts() }), true);
   });
 
-  it('3. both explicitly false, one recommended option, does NOT block (the positive declaration is honoured)', () => {
-    assert.equal(precompute.isBlockingQuestion({ id: 'q', prompt: 'p', critical: false, important: false, options: recOpts() }), false);
+  it('3. both explicitly false, topic "detail", one recommended option, does NOT block (the positive declaration is honoured)', () => {
+    assert.equal(precompute.isBlockingQuestion({ id: 'q', prompt: 'p', critical: false, important: false, topic: 'detail', options: recOpts() }), false);
   });
 
   it('3b. both explicitly false but NO recommended option BLOCKS — nobody could say which answer is better', () => {
-    assert.equal(precompute.isBlockingQuestion({ id: 'q', prompt: 'p', critical: false, important: false, options: opts() }), true);
+    assert.equal(precompute.isBlockingQuestion({ id: 'q', prompt: 'p', critical: false, important: false, topic: 'detail', options: opts() }), true);
   });
 
   it('4. both flags absent BLOCKS — the defect', () => {
@@ -167,7 +170,7 @@ describe('hasEnoughInformation — unflagged unanswered questions do NOT wave a 
     // reachable only from a unit test (Operating Lesson 16).
     const questions = [];
     for (let i = 0; i < 12; i++) {
-      questions.push({ id: `q${i}`, prompt: `Fork ${i}?`, critical: true, important: false, options: opts() });
+      questions.push({ id: `q${i}`, prompt: `Fork ${i}?`, critical: true, important: false, topic: 'detail', options: opts() });
     }
     const res = precompute.writePlanQuestions(root, ref, questions, fs.statSync(planPath).mtimeMs);
     assert.equal(res.ok, true, 'well-declared forks are accepted by the writer');
@@ -225,14 +228,17 @@ describe('validatePlanQuestions — both importance flags are mandatory booleans
     assert.notEqual(verdict.reason, 'enough');
   });
 
-  it('13. the real stored questions files still validate under the tightened rule', () => {
+  it('13. a stored questions file written before topics were required is refused on read — it fails closed and is regenerated, never waved through', () => {
     const dir = path.join(__dirname, '..', '.ctoc', 'streaming', 'questions');
     const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')) : [];
     assert.ok(files.length > 0, 'the repository ships real stored questions files to check against');
     for (const f of files) {
       const parsed = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+      const findings = parsed.questions.filter((q) => !/^q9[89]-/.test(q.id));
+      const topicless = findings.filter((q) => q.topic === undefined);
       const { valid, errors } = precompute.validatePlanQuestions(parsed.questions);
-      assert.equal(valid, true, `${f} must remain valid; the tightening broke stored data: ${errors.join('; ')}`);
+      assert.equal(valid, topicless.length === 0, `${f}: ${errors.join('; ')}`);
+      if (topicless.length) assert.ok(errors.some((e) => /must declare a "topic"/.test(e)), `${f} is refused for its missing topics`);
     }
   });
 });
@@ -250,8 +256,11 @@ describe('isBlockingQuestion — only weighty questions reach the human', () => 
     }
   });
 
-  it('16. important with NO topic still blocks — a question written before topic existed keeps its meaning (guard)', () => {
-    assert.equal(precompute.isBlockingQuestion({ id: 'q', prompt: 'p', critical: false, important: true, options: recOpts() }), true);
+  it('16. a question with NO topic blocks — topic is required, so its absence is malformed; only the reserved ruling and notice go without', () => {
+    assert.equal(precompute.isBlockingQuestion({ id: 'q10-x', prompt: 'p', critical: false, important: false, options: recOpts() }), true);
+    assert.equal(precompute.isBlockingQuestion({ id: 'q99-gate-ruling', prompt: 'p', critical: false, important: true, options: recOpts() }), true, 'a HOLD ruling reaches the human');
+    assert.equal(precompute.isBlockingQuestion({ id: 'q99-gate-ruling-r1', prompt: 'p', critical: false, important: false, options: recOpts() }), false, 'an APPROVE ruling is decided');
+    assert.equal(precompute.isBlockingQuestion({ id: 'q99-gate-ruling', prompt: 'p', critical: false, important: false, topic: 'detail', options: recOpts() }), true, 'a topic on the ruling is malformed');
   });
 
   it('17. critical + topic "detail" blocks — critical always reaches the human (guard)', () => {
@@ -259,7 +268,7 @@ describe('isBlockingQuestion — only weighty questions reach the human', () => 
   });
 
   it('18. a single option with none recommended is a notice, not an uncertainty — does NOT block (guard)', () => {
-    assert.equal(precompute.isBlockingQuestion({ id: 'q', prompt: 'p', critical: false, important: false, options: [{ key: '1', label: 'Noted' }] }), false);
+    assert.equal(precompute.isBlockingQuestion({ id: 'q', prompt: 'p', critical: false, important: false, topic: 'detail', options: [{ key: '1', label: 'Noted' }] }), false);
   });
 
   it('19. a detail with TWO recommended options blocks — not exactly one recommended', () => {
@@ -352,12 +361,12 @@ describe('validatePlanQuestions — topic is closed, holds is never a question f
 });
 
 describe('hasEnoughInformation — details move on; a Hold is the human\'s, read from the answers log', () => {
-  function setup(slug, questions, stage = 'functional') {
+  function setup(slug, questions, stage = 'functional', classification = CLASSIFIED) {
     const root = makeSandbox();
     const planPath = writePlan(root, stage, slug);
     const ref = `${stage}/${slug}.md`;
     const stamp = fs.statSync(planPath).mtimeMs;
-    const res = precompute.writePlanQuestions(root, ref, questions, stamp);
+    const res = precompute.writePlanQuestions(root, ref, questions, stamp, undefined, classification);
     assert.equal(res.ok, true, (res.errors || []).join('; '));
     return { root, ref, stamp };
   }
@@ -445,6 +454,59 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
     assert.equal(verdict.reason, 'open-forks');
     assert.deepEqual(verdict.answered, []);
     assert.equal(verdict.unboundAnswers, 1, 'the bad answer is reported, not silently dropped');
+  });
+
+  it('36. an author\'s own file labelling a database switch "detail" BLOCKS — the author never grades its own question', () => {
+    const q = { id: 'q10-switch-database', prompt: 'Move the store from SQLite to Postgres?', critical: false, important: false, topic: 'detail', options: recOpts() };
+    const { root, ref } = setup('author-only', [q], 'functional', null);
+    const verdict = precompute.hasEnoughInformation(root, ref);
+    assert.equal(verdict.reason, 'open-forks');
+    assert.deepEqual(verdict.blocking.map((x) => x.id), ['q10-switch-database']);
+    assert.equal(precompute.planQuestionsStatus(root, ref).classified, false);
+  });
+
+  it('37. the same question in a file the gate critic classified as "detail", one recommended option, is decided by default', () => {
+    const q = { id: 'q10-switch-database', prompt: 'Move the store from SQLite to Postgres?', critical: false, important: false, topic: 'detail', options: recOpts() };
+    const { root, ref } = setup('classified', [q]);
+    assert.equal(precompute.planQuestionsStatus(root, ref).classified, true);
+    assert.equal(precompute.hasEnoughInformation(root, ref).enough, true);
+  });
+
+  it('38. a classification block that is not exactly { by: "gate-critic", at: <ms> } does not count', () => {
+    const q = { id: 'q10-d', prompt: 'p?', critical: false, important: false, topic: 'detail', options: recOpts() };
+    const forged = [
+      { by: 'product-owner', at: 1786000000000 },
+      { by: 'gate-critic' },
+      { by: 'gate-critic', at: '1786000000000' },
+      { by: 'gate-critic', at: -1 },
+      { by: 'gate-critic', at: 1.5 },
+      { by: 'gate-critic', at: 1786000000000, also: 'x' },
+      ['gate-critic', 1786000000000],
+      'gate-critic',
+    ];
+    for (const [i, c] of forged.entries()) {
+      const { root, ref } = setup(`forged-${i}`, [q], 'functional', c);
+      assert.equal(precompute.planQuestionsStatus(root, ref).classified, false, JSON.stringify(c));
+      assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'open-forks', JSON.stringify(c));
+    }
+  });
+
+  it('39. the writer carries a classification object verbatim and leaves the file\'s shape unchanged without one', () => {
+    const q = { id: 'q10-d', prompt: 'p?', critical: false, important: false, topic: 'detail', options: recOpts() };
+    const a = setup('carried', [q]);
+    assert.deepEqual(JSON.parse(fs.readFileSync(precompute.questionsPath(a.root, a.ref), 'utf8')).classification, CLASSIFIED);
+    const b = setup('bare', [q], 'functional', null);
+    assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(precompute.questionsPath(b.root, b.ref), 'utf8'))), ['ref', 'planMtimeMs', 'questions']);
+  });
+
+  it('40. topic is required on every question but the gate ruling and the coverage notice', () => {
+    const errors = precompute.validatePlanQuestions([{ id: 'q10-no-topic', prompt: 'p?', critical: false, important: false, options: recOpts() }]).errors;
+    assert.ok(errors.some((e) => /q10-no-topic/.test(e) && /must declare a "topic"/.test(e)), errors.join('; '));
+    const reserved = [
+      { id: 'q98-critique-coverage', prompt: 'Coverage', critical: false, important: false, options: [{ key: '1', label: 'Noted', recommended: true }] },
+      { id: 'q99-gate-ruling-r1', prompt: 'Lens verdict: APPROVE — r. Rule now.', critical: false, important: false, options: recOpts() },
+    ];
+    assert.deepEqual(precompute.validatePlanQuestions(reserved), { valid: true, errors: [] });
   });
 
   it('29c. an unreadable answers log fails closed for a plan with ANY question; a plan with none still moves', () => {

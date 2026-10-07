@@ -203,6 +203,20 @@ New, from slicing:
 11. **Depends on the protection plan.** The parent now depends on
     `the-approval-and-check-records-are-write-protected`, and this is the first slice to build.
 
+Owner decision, 2026-10-07 (answer "a" to "Who should decide whether a question is weighty
+enough to reach you?"):
+
+12. **The independent gate critic assigns every topic; the plan's author never grades its own
+    question.** A question's `topic` decides blocking only in a questions file that carries the
+    gate critic's classification block `{ "by": "gate-critic", "at": <ms> }` (exactly those two
+    keys). In any other file every open question reaches the human, whatever topic it declares.
+    The product owner and the implementation planner still write their questions with a proposed
+    topic; they never write a classification block. This replaces point E of the fix round.
+13. **The honest limit.** The classification block is written by an agent through the same
+    waiting folder as every other questions file, so a different agent could forge one. That
+    would be deliberate deception visible in the record, not a mislabel; there is no trusted
+    provenance channel for it today.
+
 ## Execution Plan
 
 ### Step 8: TEST
@@ -478,6 +492,33 @@ measured overage, one `ceiling_corrections` entry); product owner 30,113 of 30,2
 E. Recorded: in this round the topic was still the author's own label. The owner's decision of
 2026-10-07 on who assigns it is recorded under "Decisions Taken Under Ambiguity".
 
+### Owner decision round — the independent gate critic assigns every topic
+
+Folded into the fix round on the session's instruction (decisions 12 and 13 above).
+
+Test-first: cases 13 (changed: a stored file without topics is refused on read and fails
+closed), 16 (changed: a missing topic blocks; the HOLD and APPROVE rulings behave), 36, 37, 38,
+39 and 40 were written and run against the fix-round module: 7 red (13, 16, 36, 37, 38, 39, 40).
+After the change: 52 of 52 pass.
+
+| Owner decision point | Test | Result |
+|---|---|---|
+| 1. Topic decides only in a file the gate critic classified | 36 (an author's own file labelling a database switch `detail` blocks), 37 (the same question in a classified file is decided by default) | `hasEnoughInformation` treats every open question in an unclassified file as going to the human; `planQuestionsStatus` reports `classified` |
+| 1. The block is validated strictly | 38 (`by: "product-owner"`, missing `at`, string, negative or fractional `at`, an extra key, an array, a string — none counts) | `isGateCriticClassification` |
+| 1. The writer carries it | 39 | `writePlanQuestions` sixth parameter; a file without one keeps its exact shape |
+| 1. Topic required for shape | 13, 16, 40 | the validator refuses a finding with no topic; the reserved ruling and notice carry none; the predicate blocks a topicless finding |
+| 2. Product owner and planner propose, never classify | inventory orders N-101, N-201 | "Your `topic` is a proposal: the gate critic classifies before anything is decided; never write a `classification` block." |
+| 3. Gate critic classifies | inventory orders N-006, N-007, N-008, R-165, R-505, R-506 | New section "Classifying the questions — the topic is yours, never the author's"; the pending file carries the classification block (R-165); rule 10's ruling governs every synthesis, not a classification (R-505, R-506) |
+| 4. Recorded | decisions 12 and 13 | the approval hash is unchanged (f6a476234385e6dc…) |
+
+Bytes: gate critic 137,503 (ceiling 134,683 raised to 137,503 by the measured overage, one
+`ceiling_corrections` entry); product owner 30,173 of 30,203; planner 27,013 of 27,019.
+
+The live promotion path does not carry the block yet: `src/lib/streaming-questions-sweeper.js`
+passes only `payload.questions` and `payload.attestation` to `writePlanQuestions`. Until it also
+passes `payload.classification` (one line, outside `files:`), every promoted file is
+unclassified and every question in it reaches the human — the fail-closed direction.
+
 ### Fork: what the fix round and the owner's decision need outside `files:`
 
 Three strictness rules of finding B (topic REQUIRED, option key `^[1-3]$`, question id
@@ -485,7 +526,9 @@ Three strictness rules of finding B (topic REQUIRED, option key `^[1-3]$`, quest
 classified; an unclassified file blocks every question) were built and measured. Both change
 the stored-question contract that test fixtures outside this slice encode (keys `a`/`b`, ids
 `q1`/`q10`, no topic, no classification, details expected to move on). Measured with the full
-suite: topic required plus classification gating fails 116 tests in 17 files outside `files:` —
+suite on the final state (`npm test`: tests 12606, pass 12513, fail 93, skipped 0; coverage
+99.63%): topic required plus classification gating fails 93 tests in 16 files, every one outside
+`files:`, none in this slice's files —
 `tests/streaming-precompute.test.js` (21), `tests/answers-bind-to-plan-revision.test.js` (20),
 `tests/streaming-gate.test.js` (16), `tests/streaming-questions-sweeper.test.js` (7),
 `tests/attestation-round-trip.test.js` (6), `tests/real-question-file-render.test.js` (5),

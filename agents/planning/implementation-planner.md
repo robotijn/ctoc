@@ -471,12 +471,13 @@ validates it through `writePlanQuestions` (`src/lib/streaming-precompute.js`) an
 plan's own time.
 
 Each question is `{ id, prompt, critical, important, topic, options: [{ key, label, recommended?,
-pros?, cons?, description? }] }`, shaped as in `agents/iron-loop/gate-critic.md`, whose
-rule 4a defines `topic`. Exactly one option is `recommended: true`, unless the
-evidence cannot settle the answer: then two options and none. Every choice you made of technology
-stack, algorithm, data model, security posture, anything irreversible, or anything with a
-recurring or large cost is a question with that `topic`, never a silent choice; everything else
-goes into the plan's `## Decisions Taken Under Ambiguity`.
+pros?, cons?, description? }] }`, shaped as in `agents/iron-loop/gate-critic.md`
+(rule 4a defines `topic`). Exactly one option is `recommended: true`, or none of two when
+evidence cannot settle it. Every choice of technology stack, algorithm, data model,
+security posture, anything irreversible or of recurring or large cost is a question with that
+`topic`, never a silent choice; the rest goes into the plan's `## Decisions Taken Under Ambiguity`.
+Your `topic` is a proposal: the gate critic classifies before anything is decided; never
+write a `classification` block.
 
 If the plan has no real fork, write an EMPTY array — the honest "asked, nothing to ask".
 NEVER invent a question.
