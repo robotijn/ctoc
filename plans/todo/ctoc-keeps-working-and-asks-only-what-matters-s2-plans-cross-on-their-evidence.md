@@ -1533,3 +1533,36 @@ difference in `src/hooks/protect-records.js`). Test-first: cases 82–84 in
 `{continue: true}` allowed (not decoded), and the allowed half of 82 red because
 `node server/start.js --port 3000` — another project's `start.js` — was refused (the old
 segment reading took any `…start.js` for the menu).
+
+Built (green after): `subagentMenuRefusal` gives a background agent's command one reading. When
+the command names the menu (`start.js`), a menu module or a crossing function, it must be one
+simple call (`simpleWords`: no shell operator or expansion outside quotes, one pair of quotes
+around a whole word, nothing the shell interprets inside double quotes, `${CLAUDE_PLUGIN_ROOT}`
+only in the script word); it is then allowed only as a read-only program, `node --test <test
+files>`, `node` on a script that is not this plugin's `start.js` and whose other words name
+nothing of the menu, or `node` (or an absolute node path) on this plugin's real `start.js`
+with an allowed route. The route is read with `start.js`'s own exported `extractLiveAgentIds`
+and `splitCliArgs` (required from the plugin; nothing reproduced). The old segment reading
+(`reachesRefusedRoute`, the whitespace split) is deleted. `subagentMayRunRoute` matches the
+whole route; `menu task` sub-commands follow a fixed grammar (`--force`, `--continue`,
+`--fail` refused; `--next` and a decoded `nextAction` must be navigation routes, checked with
+`task-view.isNavRoute`, the menu's own check); `--b64` is decoded with the task parser's
+`decodeB64` (now exported from `src/lib/menu-screens.js`, its second caller is the hook) and
+must be a plain object with only the keys that sub-command reads; `inbox cleanup confirm` and
+`override` are refused. A call without `agent_id` is decided as before.
+
+One fixture of my own corrected during the green run: case 83/84's "nearest allowed" used
+`--next dashboard`, which `isNavRoute` does not accept (the menu itself rejects it); it now
+uses `tasks`. The refused cases are unchanged.
+
+Hook time per call (median of 7): main session `ls` 24 ms, background agent `ls` 24 ms,
+`menu task list` 35 ms, `menu task complete --b64` 37 ms, `stream answer` (refused) 34 ms —
+the subagent menu path now loads `start.js` (and `menu-screens` for `--b64`).
+
+Lint zero warnings, `tsc` zero errors. Full `npm test` (once, foreground): tests 12671, pass
+12671, fail 0, cancelled 0, skipped 0, todo 0; coverage 99.87% (floor 99);
+`[CTOC test-gate] PASS`.
+
+Accepted cost, stated in `docs/ENFORCEMENT.md`: a background agent's compound command that
+merely names `start.js` or a menu module (for example `grep … src/commands/start.js | head`) is
+refused; the simple form is allowed.

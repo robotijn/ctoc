@@ -45,10 +45,12 @@
  *   for subagent calls) may run only the menu routes that write no answer, no approval and
  *   move no plan across a gate (`subagentMayRunRoute`: the build agent's own `menu task
  *   complete` without `--continue`, the task registry, the dashboard, the read-only screens,
- *   `plan <ref>`); every other route is refused with its own sentence, fail closed. The same
- *   holds outside a pure call: a segment running a JavaScript runtime on a `start.js` with a
- *   refused route, or an inline script naming `menu-screens`, `streaming-gate`,
- *   `continueAfterCrossing` or `approveSubplans`. A call without `agent_id` is unchanged.
+ *   `plan <ref>`), matched as the WHOLE route with `menu task` held to its grammar and a
+ *   `--b64` payload decoded by the task parser's own decoder; every other route is refused
+ *   with its own sentence, fail closed. Its command gets ONE reading (`subagentMenuRefusal`):
+ *   naming the menu, a menu module or a crossing function, it must be one simple call with no
+ *   shell operator or expansion, read with `start.js`'s own argument functions; anything else
+ *   naming them is refused. A call without `agent_id` is unchanged.
  *   Nothing else is loaded or run: no plan coverage, no escape phrases, no enforcement
  *   mode, no Iron Loop step gates, no irreversible-command net, no plan-move gate.
  *
@@ -97,10 +99,6 @@ const REFUSAL_UNCHECKED = 'CTOC refused this call because it mentions the approv
   + "and CTOC's protection for them failed to run; tell the human that this protection is broken.";
 const REFUSAL_SUBAGENT = "CTOC refused this call because a background agent may not answer CTOC's questions, "
   + 'approve a plan or move one on through the menu; report your result and let the main session do it.';
-/** Text that marks a background agent's call as one that reaches the menu, for the fail rule. */
-const MENU_SUSPECT_RE = /start\.js|menu-screens|streaming-gate/;
-/** Inline-script names that reach the menu's routes or a plan move. */
-const MENU_EVAL_RE = /menu-screens|streaming-gate|continueAfterCrossing|approveSubplans/;
 
 /** A record area as a path segment anywhere in an absolute path; the waiting folder is excluded. */
 const RECORD_SEGMENT_RE = /(^|\/)\.ctoc\/+(approvals|state\/+verify|streaming(?!\/+questions\/+pending(\/|$)))(\/|$)/i;
@@ -223,68 +221,182 @@ function isSubagent(payload) {
   return Boolean(payload) && typeof payload.agent_id === 'string' && payload.agent_id.trim() !== '';
 }
 
+/** Read-only inbox screens, matched as the whole route. */
+const READ_INBOX = new Set(['questions', 'decisions', 'gates', 'escalations', 'migration', 'verify', 'stale']);
+/** Read-only top-level routes taking exactly one argument. */
+const ONE_ARG_ROUTES = new Set(['task', 'browse', 'section', 'stubs', 'validate', 'plan']);
 /**
- * The menu route a call names: the arguments after the menu script with `--live-agent-ids`
- * and its value removed, and a single remaining argument split on whitespace — the reading
- * `start.js` applies (`extractLiveAgentIds`, then `splitCliArgs`).
- * @param {string[]} args
- * @returns {string[]}
+ * `menu task <sub>`: the flags each allowed sub-command takes (true = takes a value) and how
+ * many positional words it takes. `--force` (the human's override), `--continue` and `--fail`
+ * are on none of them; an unknown flag refuses.
  */
-function menuRouteArgs(args) {
-  const rest = [];
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--live-agent-ids') { i++; continue; }
-    rest.push(args[i]);
-  }
-  return rest.length === 1 ? String(rest[0]).split(/\s+/).filter(Boolean) : rest;
+const TASK_GRAMMAR = Object.freeze({
+  add: { flags: { '--touches': true, '--blocked': true, '--gitop': false, '--label': true, '--b64': true }, min: 1, max: 2 },
+  start: { flags: { '--agent-id': true }, min: 1, max: 1 },
+  fail: { flags: { '--summary': true }, min: 1, max: 1 },
+  cancel: { flags: {}, min: 1, max: 1 },
+  complete: { flags: { '--summary': true, '--gate': true, '--next': true, '--b64': true }, min: 1, max: 1 },
+  list: { flags: {}, min: 0, max: 0 },
+  board: { flags: {}, min: 0, max: 0 },
+});
+/** The keys a decoded `--b64` payload may carry, per sub-command (what the menu reads). */
+const B64_KEYS = Object.freeze({
+  add: new Set(['kind', 'plan', 'label', 'touches', 'blockedBy', 'gitOp']),
+  complete: new Set(['summary', 'nextAction', 'gate']),
+});
+
+/** Is `route` a navigation route (`taskView.isNavRoute`, the check `menu task complete` applies)? */
+function isNavRoute(route) {
+  return typeof route === 'string' && require('../lib/task-view').isNavRoute(route);
 }
 
-/** Task sub-commands that write only the task registry. */
-const REGISTRY_TASK_SUBS = new Set(['add', 'start', 'fail', 'cancel', 'list', 'board']);
-/** Inbox screens that read only. */
-const READ_INBOX = new Set(['questions', 'decisions', 'gates', 'escalations', 'migration', 'verify', 'stale', 'cleanup']);
-/** Top-level routes that read only (or, `dashboard`, reconcile tasks — no human gate). */
-const READ_ROUTES = new Set(['dashboard', 'tasks', 'task', 'browse', 'section', 'stubs', 'validate']);
+/**
+ * Does a `--b64` value decode — with the task parser's own decoder — to a plain object
+ * carrying only the keys the sub-command reads, and nothing that crosses a gate?
+ */
+function b64Allowed(sub, value) {
+  const decoded = require('../lib/menu-screens').decodeB64(value);
+  if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) return false;
+  if (!Object.keys(decoded).every((k) => B64_KEYS[sub].has(k))) return false;
+  return decoded.nextAction === undefined || isNavRoute(decoded.nextAction);
+}
+
+/** Do the words after `menu task <sub>` fit that sub-command's grammar exactly? */
+function taskArgsAllowed(sub, words) {
+  const grammar = Object.prototype.hasOwnProperty.call(TASK_GRAMMAR, sub) ? TASK_GRAMMAR[sub] : null;
+  if (!grammar) return false;
+  let positional = 0;
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    if (!w.startsWith('--')) { positional += 1; continue; }
+    if (!Object.prototype.hasOwnProperty.call(grammar.flags, w)) return false;
+    if (!grammar.flags[w]) continue;
+    const value = words[++i];
+    if (value === undefined) return false;
+    if (w === '--b64' && !b64Allowed(sub, value)) return false;
+    if (w === '--next' && !isNavRoute(value)) return false;
+  }
+  return positional >= grammar.min && positional <= grammar.max;
+}
 
 /**
- * May a background agent run this menu route? Only the routes that write no answer, no
- * approval and move no plan across a gate: the build agent's own completion (never with
- * `--continue`), the task registry, the dashboard and the read-only screens, and a plan screen
- * with a reference. Every other route — the default screen, `stream …`, a bare `plan`, and any
- * route the router gains later — is refused (fail closed).
- * @param {string[]} route - from `menuRouteArgs`
+ * May a background agent run this menu route? The WHOLE route, as the router will dispatch
+ * it, must be one of the routes that write no answer, no approval and move no plan across a
+ * gate: `menu`, `menu commands`, the task registry's sub-commands within their grammar (the
+ * build agent's own completion without `--continue`), `dashboard`, `tasks`, one-argument
+ * read screens, the read-only inbox screens, and `inbox cleanup` / `cleanup category` /
+ * `cleanup plan <slug>` (never confirm or override). An unknown or extra word refuses, and so
+ * does any route the router gains later (fail closed).
+ * @param {string[]} route - as `start.js` hands it to the router
  * @returns {boolean}
  */
 function subagentMayRunRoute(route) {
-  const [cmd, sub, third] = route;
+  const [cmd, sub] = route;
+  const n = route.length;
   if (cmd === 'menu') {
-    if (route.length === 1 || (sub === 'commands' && route.length === 2)) return true;
-    if (sub !== 'task') return false;
-    if (third === 'complete') return !route.includes('--continue');
-    return REGISTRY_TASK_SUBS.has(third);
+    if (n === 1 || (n === 2 && sub === 'commands')) return true;
+    return sub === 'task' && n >= 3 && taskArgsAllowed(route[2], route.slice(3));
   }
-  if (cmd === 'inbox') return READ_INBOX.has(sub);
-  if (cmd === 'plan') return typeof sub === 'string' && sub !== '';
-  return READ_ROUTES.has(cmd);
+  if (cmd === 'dashboard' || cmd === 'tasks') return n === 1;
+  if (ONE_ARG_ROUTES.has(cmd)) return n === 2 && route[1] !== '';
+  if (cmd === 'inbox') {
+    if (n === 2 && (READ_INBOX.has(sub) || sub === 'cleanup')) return true;
+    if (sub !== 'cleanup') return false;
+    return (n === 3 && route[2] === 'category') || (n === 4 && route[2] === 'plan' && route[3] !== '');
+  }
+  return false;
+}
+
+/** Names that reach the menu or a gate crossing; a background agent's command naming one gets the strict reading. */
+const MENU_MENTION_RE = /start\.js|menu-screens|streaming-gate|streaming-precompute|continueAfterCrossing|approveSubplans|approvePlan|streamAnswer|streamApprove|crossBySufficiency|crossOnEvidence|pendingGateDecisions/;
+/** Shell syntax that makes a command more than one plain call; none is accepted outside quotes. */
+const SHELL_SPECIAL_RE = /[;&|`$(){}<>*?[\]~!#\\\r\n]/;
+/** Characters the shell still interprets inside double quotes. */
+const DOUBLE_QUOTE_SPECIAL_RE = /[$`\\!]/;
+/** Programs that only read the files they are given. */
+const READ_PROGRAMS = new Set(['grep', 'rg', 'cat', 'head', 'tail', 'wc', 'ls', 'diff']);
+const ROOT_MARK = '\u0001';
+
+/**
+ * The words of `command` when it is ONE simple call the shell reads exactly as written, or
+ * null: no shell operator or expansion outside quotes; each quoted argument is a single pair
+ * of quotes around the whole word (no `$`, backtick, backslash or `!` inside double quotes);
+ * `${CLAUDE_PLUGIN_ROOT}` only inside the second word, the script. With no expansion and no
+ * operator there is nothing the shell can read differently from this.
+ * @param {string} command
+ * @returns {string[]|null}
+ */
+function simpleWords(command) {
+  const text = command.trim().split(PLUGIN_ROOT_TOKEN).join(ROOT_MARK);
+  if (/[\u0000\u0002-\u0008\u000b-\u001f\u007f]/.test(text)) return null;
+  const words = [];
+  let cur = '';
+  let inWord = false;
+  let quote = null;
+  let closed = false;
+  for (const ch of text) {
+    if (quote) {
+      if (ch === quote) { quote = null; closed = true; continue; }
+      if (quote === '"' && DOUBLE_QUOTE_SPECIAL_RE.test(ch)) return null;
+      cur += ch;
+    } else if (ch === ' ' || ch === '\t') {
+      if (inWord) words.push(cur);
+      cur = ''; inWord = false; closed = false;
+    } else if (closed) {
+      return null; // a quote must close at the end of its word
+    } else if (ch === '"' || ch === "'") {
+      if (inWord) return null; // a quote must open at the start of its word
+      quote = ch; inWord = true;
+    } else if (SHELL_SPECIAL_RE.test(ch)) {
+      return null;
+    } else {
+      cur += ch; inWord = true;
+    }
+  }
+  if (quote) return null;
+  if (inWord) words.push(cur);
+  if (words.some((w, i) => i !== 1 && w.includes(ROOT_MARK))) return null;
+  return words;
+}
+
+/** `node`, or an absolute path to a node binary. */
+function isNodeProgram(word) {
+  return word === 'node' || (path.isAbsolute(word) && /^node(\.exe)?$/i.test(path.basename(word)));
 }
 
 /**
- * Does a command that is not a pure menu call still reach a menu route a background agent may
- * not run — a segment running a JavaScript runtime on a script ending in `start.js`, or an
- * inline script naming the router, the gate module, the continuation or the batch approve?
+ * A background agent's command that names the menu, a menu module or a crossing function gets
+ * ONE reading. Allowed only when it is (a) one simple call of a read-only program, (b) `node
+ * --test <test files>`, (c) one simple `node <script>` whose script is not this plugin's
+ * `start.js` and whose other words name nothing of the menu, or (d) one simple direct call of
+ * this plugin's real `start.js` whose route — read by `start.js`'s own `extractLiveAgentIds`
+ * and `splitCliArgs` — is on the allowed list. Everything else is refused (fail closed).
  * @param {string} command
- * @param {{isInlineEval: function(string): boolean}} bash
- * @returns {boolean}
+ * @param {string} base - the session's working directory
+ * @returns {string|null} the refusal sentence, or null to go on to the record checks
  */
-function reachesRefusedRoute(command, bash) {
-  if (bash.isInlineEval(command) && MENU_EVAL_RE.test(command)) return true;
-  for (const seg of command.split(/\r?\n|;|&&|\|\||\||&/)) {
-    const tokens = seg.trim().split(/\s+/).filter(Boolean).map((t) => t.replace(/['"`]/g, ''));
-    const at = tokens.findIndex((t) => JS_RUNTIME_RE.test(t.split(/[/\\]/).pop()));
-    if (at === -1 || !tokens[at + 1] || !/start\.js$/.test(tokens[at + 1])) continue;
-    if (!subagentMayRunRoute(menuRouteArgs(tokens.slice(at + 2)))) return true;
+function subagentMenuRefusal(command, base) {
+  if (!MENU_MENTION_RE.test(command)) return null;
+  const words = simpleWords(command);
+  if (!words || words.length === 0) return REFUSAL_SUBAGENT;
+  if (READ_PROGRAMS.has(words[0])) return null;
+  if (!isNodeProgram(words[0]) || !words[1]) return REFUSAL_SUBAGENT;
+  if (words[1] === '--test') {
+    return words.length > 2 && words.slice(2).every((w) => /^[A-Za-z0-9_./-]+\.test\.js$/.test(w) && !w.startsWith('-'))
+      ? null : REFUSAL_SUBAGENT;
   }
-  return false;
+  if (words[1].startsWith('-')) return REFUSAL_SUBAGENT;
+  const safeFs = require('../lib/safe-fs');
+  const own = safeFs.realpathSync(path.join(PLUGIN_ROOT, 'src', 'commands', 'start.js'));
+  let real = null;
+  try {
+    real = safeFs.realpathSync(path.resolve(base, words[1].split(ROOT_MARK).join(PLUGIN_ROOT)));
+  } catch {
+    real = null; // no such file: node cannot run it, so it is not the menu
+  }
+  if (real !== own) return words.slice(2).some((w) => MENU_MENTION_RE.test(w)) ? REFUSAL_SUBAGENT : null;
+  const { extractLiveAgentIds, splitCliArgs } = require('../commands/start.js');
+  return subagentMayRunRoute(splitCliArgs(extractLiveAgentIds(words.slice(2)).rest)) ? null : REFUSAL_SUBAGENT;
 }
 
 /**
@@ -297,12 +409,12 @@ function reachesRefusedRoute(command, bash) {
  * @returns {string|null} the refusal sentence, or null to allow
  */
 function bashRefuses(command, cwdRel, base, bash, subagent = false) {
-  const menuArgs = menuCallArgs(command, base);
-  if (menuArgs) {
-    if (menuArgsNameRecords(menuArgs, cwdRel, bash)) return REFUSAL;
-    return subagent && !subagentMayRunRoute(menuRouteArgs(menuArgs)) ? REFUSAL_SUBAGENT : null;
+  if (subagent) {
+    const refused = subagentMenuRefusal(command, base);
+    if (refused) return refused;
   }
-  if (subagent && reachesRefusedRoute(command, bash)) return REFUSAL_SUBAGENT;
+  const menuArgs = menuCallArgs(command, base);
+  if (menuArgs) return menuArgsNameRecords(menuArgs, cwdRel, bash) ? REFUSAL : null;
   // `./` so a working directory whose name starts with `-` is never read as a `cd` option.
   const analysed = cwdRel ? `cd ./${cwdRel} && ${command}` : command;
   const refused = bash.isLedgerForgery(analysed).deny
@@ -374,7 +486,7 @@ function main() {
       : raw;
     // A background agent's call that reaches for the menu fails closed too; the main
     // session's menu call does not, so one broken release never locks the human out.
-    if (UNCHECKED_SUSPECT_RE.test(scanned) || (parsed && isSubagent(payload) && MENU_SUSPECT_RE.test(scanned))) {
+    if (UNCHECKED_SUSPECT_RE.test(scanned) || (parsed && isSubagent(payload) && MENU_MENTION_RE.test(scanned))) {
       refuse(REFUSAL_UNCHECKED);
     }
     process.exit(0);

@@ -2851,6 +2851,9 @@ module.exports = {
   // The work keeps moving: called by taskComplete here and by streaming-gate's
   // streamApprove and streamAnswer.
   continueAfterCrossing,
+  // The task parser's `--b64` decoder; also read by src/hooks/protect-records.js, so the
+  // protection decodes a background agent's payload exactly as `menu task` will.
+  decodeB64,
   taskBoardScreen,
   taskDetailScreen,
   // Router

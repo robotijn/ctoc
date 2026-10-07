@@ -242,12 +242,33 @@ subagent makes the call, never for the main session. When the payload carries a 
 route — including one the router gains later — is refused with "CTOC refused this call
 because a background agent may not answer CTOC's questions, approve a plan or move one on
 through the menu; report your result and let the main session do it." on stderr and exit 2.
-The route is read as `start.js` reads it (`--live-agent-ids` and its value removed, a single
-remaining argument split on whitespace). The rule also covers the menu reached outside a pure
-call: a command segment running a JavaScript runtime on a script ending in `start.js` with a
-refused route, and an inline script naming `menu-screens`, `streaming-gate`,
-`continueAfterCrossing` or `approveSubplans`. Every decision for a call without an `agent_id`
-is unchanged.
+**One reading of a command.** A background agent's command that names the menu (`start.js`),
+a menu module (`menu-screens`, `streaming-gate`, `streaming-precompute`) or a crossing function
+(`continueAfterCrossing`, `approveSubplans`, `approvePlan`, `streamAnswer`, `streamApprove`,
+`crossBySufficiency`, `crossOnEvidence`, `pendingGateDecisions`) is accepted only when it is
+ONE simple call the shell reads exactly as written: none of `;` `&` `|` `$` `(` `)` `<` `>`
+`{` `}` `*` `?` `[` `]` `~` `!` `#`, a backtick, a backslash, a newline or a carriage return
+outside quotes; a quoted argument is one pair of
+quotes around the whole word, with no `$`, backtick, backslash or `!` inside double quotes;
+`${CLAUDE_PLUGIN_ROOT}` only in the script word. Such a call is then allowed only as a
+read-only program (`grep`, `rg`, `cat`, `head`, `tail`, `wc`, `ls`, `diff`), as `node --test
+<test files>`, as `node <script>` whose script is not this plugin's `start.js` and whose other
+words name nothing of the menu, or as `node` (or an absolute path to a node binary) on this
+plugin's real `start.js` (real-path compare) with an allowed route. The route is read with
+`start.js`'s own `extractLiveAgentIds` and `splitCliArgs`, required from the plugin, so the
+hook and the menu cannot read it differently. Every other form is refused (fail closed).
+
+**The whole route must match.** Every word must be one the router accepts for that allowed
+route: an extra or unknown word refuses. `menu task` sub-commands are held to their grammar
+(`add <kind> [<plan>]` with `--touches`, `--blocked`, `--gitop`, `--label`, `--b64`; `start
+<id>` with `--agent-id`; `fail <id>` with `--summary`; `cancel <id>`; `complete <id>` with
+`--summary`, `--gate`, `--next`, `--b64`; `list`; `board`); `--force`, `--continue` and
+`--fail` are refused, and a `--next` or decoded `nextAction` must be a navigation route. A
+`--b64` value is decoded with the task parser's own decoder (`menu-screens.decodeB64`) and must
+be a plain object carrying only the keys that sub-command reads (`complete`: `summary`,
+`nextAction`, `gate`; `add`: `kind`, `plan`, `label`, `touches`, `blockedBy`, `gitOp`); a value
+that does not decode is refused. Every decision for a call without an `agent_id` is
+unchanged.
 
 | Refused when the call carries an `agent_id` | Why |
 |---|---|
@@ -263,12 +284,12 @@ is unchanged.
 
 | Allowed for a background agent | Why |
 |---|---|
-| `menu task complete <id> [--summary …] [--gate N] [--next <route>] [--b64 …]` without `--continue` | the build agent's documented completion: in-progress to review and its check record; no approval, no answer, no human gate |
-| `menu task add …`, `start …`, `fail …`, `cancel …`, `list`, `board` | the task registry only |
+| `menu task complete <id> [--summary …] [--gate N] [--next <route>] [--b64 …]`, no other word | the build agent's documented completion: in-progress to review and its check record; no approval, no answer, no human gate |
+| `menu task add …`, `start <id>`, `fail <id>`, `cancel <id>`, `list`, `board`, each within its grammar | the task registry only |
 | `menu`, `menu commands`, `dashboard` | the pipeline dashboard: task reconcile and orphan recovery (in-progress back to todo, not a human gate) |
 | `tasks`, `task <id>` | read-only task screens |
 | `browse <stage>`, `section <name>`, `stubs <slug>`, `validate <stage>/<file>` | read-only screens |
-| `inbox questions`, `decisions`, `gates`, `escalations`, `migration`, `verify`, `stale`, `cleanup …` | read-only screens |
+| `inbox questions`, `decisions`, `gates`, `escalations`, `migration`, `verify`, `stale`, `cleanup`, `cleanup category`, `cleanup plan <slug>` | read-only screens; `cleanup confirm` and `cleanup override` are refused |
 | `plan <stage>/<file>` | the plan screen: it sweeps the waiting folder (validated promotion) and moves nothing |
 
 A crash on a background agent's call whose tool input mentions `start.js`, `menu-screens` or
@@ -308,7 +329,10 @@ refused on every call; a payload that will not parse is scanned whole. A failure
 - read commands with a write side effect (`find -delete`, `tree -o`), which can delete or
   corrupt a record but never forge one;
 - a background agent reaching the menu's refused routes through a script file it wrote and
-  then ran, a path built at run time, or a tool other than the five matched;
+  then ran (including a test file run by `node --test`), a path held in a variable set by an
+  earlier call, or a tool other than the five matched; a background agent's compound command
+  that merely names `start.js` or a menu module (a pipe after a `grep`, say) is refused even
+  when harmless — the fail-closed cost of one reading;
 - the main session itself running `stream answer` or `stream approve` without the human's
   reply — it carries no `agent_id` by design and is trusted to run only answers the human
   gave; every answer, hold and release stays a timestamped entry in the answers log;

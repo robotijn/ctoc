@@ -439,7 +439,7 @@ describe('a background agent: one reading of a command (security review leads, 2
   test('83 · the nearest allowed routes stay allowed', () => {
     for (const route of ['menu', 'menu commands', 'menu task list', 'menu task board',
       'menu task add implement p --touches a.js --label l', 'menu task start t7 --agent-id abc',
-      'menu task fail t7 --summary x', 'menu task cancel t7', 'menu task complete t7 --summary "built" --gate 3 --next dashboard',
+      'menu task fail t7 --summary x', 'menu task cancel t7', 'menu task complete t7 --summary "built" --gate 3 --next tasks',
       'dashboard', 'tasks', 'task t7', 'browse review', 'inbox questions', 'inbox verify', 'inbox cleanup',
       'inbox cleanup category', 'inbox cleanup plan s', 'plan review/x.md', 'validate review/x.md']) {
       allowedAgent(`${MENU} ${route}`);
@@ -452,7 +452,7 @@ describe('a background agent: one reading of a command (security review leads, 2
     refusedAgent(`${MENU} menu task complete t7 --b64 ${b64('not json at all')}`);
     refusedAgent(`${MENU} menu task complete t7 --b64 ${b64([1, 2])}`);
     refusedAgent(`${MENU} menu task add implement p --b64 ${b64({ kind: 'implement', approve: true })}`);
-    allowedAgent(`${MENU} menu task complete t7 --b64 ${b64({ summary: 'built', gate: 3, nextAction: 'dashboard' })}`);
+    allowedAgent(`${MENU} menu task complete t7 --b64 ${b64({ summary: 'built', gate: 3, nextAction: 'tasks' })}`);
     allowedAgent(`${MENU} menu task add implement p --b64 ${b64({ kind: 'implement', plan: 'p', touches: ['a.js'] })}`);
     allowedBash(`${MENU} menu task complete t7 --b64 ${b64({ continue: true })}`);
   });
