@@ -31,7 +31,7 @@ protection (shipped) and three pieces built in order.
     (untracked in main; its approval `.ctoc/approvals/…-s1-….json`, spec hash `bcd9cc8c…`,
     untracked, backfilled by the session under the owner's standing instruction).
   - Built on worktree `.claude/worktrees/agent-a0b33c6c216a2989c`, branch
-    `worktree-agent-a0b33c6c216a2989c`, last commit `f4838d93`, full suite green (12,612
+    `worktree-agent-a0b33c6c216a2989c` (pushed as `origin/keeps-working-piece-one`, `c05f4dbe`, with its approval record), last build commit `f4838d93`, full suite green (12,612
     passed, 0 failed, 0 skipped, coverage 99.88%). Not merged, not pushed.
   - Review history: critic SHIP AFTER (twice) and security BLOCK (twice); every listed fix is
     built. The second security BLOCK's fixes (reserved ids only in an attested synthesis file;
@@ -40,7 +40,7 @@ protection (shipped) and three pieces built in order.
     invisible-character class) are in `f4838d93` but NOT yet re-scanned.
 - Next — piece two, "plans cross on their evidence":
   `plans/implementation/ctoc-keeps-working-and-asks-only-what-matters-s2-plans-cross-on-their-evidence.md`
-  (untracked in main, on disk), amended by the planner and ready to cross to todo: CTOC's fixed
+  (committed), amended by the planner and ready to cross to todo: CTOC's fixed
   hold question id `ctoc-hold` with "Hold this plan" / "Keep holding" / "Release the hold";
   `streamAnswer` writes `holds` into the protected answers log; a held plan's screen asks keep
   or release first; a `classify` task launched by the continuation so the gate critic
