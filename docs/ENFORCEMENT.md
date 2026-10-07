@@ -130,11 +130,11 @@ the moment the human returns. It does NOT — and by the runtime's physics canno
 closed or idle session on its own. Same guardrails as the Stop gate: OPT-IN, FORK-AWARE,
 ESCAPABLE (`CTOC_SKIP_CONTINUATION=1`). Enforced by `tests/resume-watchdog.test.js`.
 
-## Streaming questions — generated only when the human asks (never a second Claude)
+## Streaming questions — written with the plan, checked by the gate critic, the fleet only when the human asks (never a second Claude)
 
-CTOC is a plugin inside the Claude command-line interface: plain code cannot dispatch a CTOC subagent, and it must never spawn a second Claude (no `claude -p`, no online API calls). A plan's decision questions are generated only when the human asks: while a decision's questions are missing or stale, its screen in `/ctoc:start` offers "Generate its questions" (`claude:generate-questions {ref}`), and choosing it runs the existing critique fleet for that one plan as background work, writing through `streaming-precompute.writePlanQuestions(root, ref, questions, planMtimeMs)`. Nothing is generated when the menu opens. Session start gives no order: it shows one line with the count of plans waiting for their questions and how to ask (`src/lib/loop-b-driver.js`). The Stop hook never orders question generation. `/ctoc:start` otherwise only READS the store (instant, fail-soft); the human never waits for a critique.
+CTOC is a plugin inside the Claude command-line interface: plain code cannot dispatch a CTOC subagent, and it must never spawn a second Claude (no `claude -p`, no online API calls). The agent that writes a plan (the vision advisor, the product owner, the implementation planner) writes its questions, as its last act, into `.ctoc/streaming/questions/pending/`; the menu's sweeper validates them through `streaming-precompute.writePlanQuestions` and stamps the plan's own time. An author's file moves nothing until the gate critic classifies it — the continuation queues one `classify` task per question revision, and the human can ask with "Check its questions" (`stream check {ref}`). The four-lens critique fleet runs only when the human asks: while a decision's questions are missing or stale, its screen in `/ctoc:start` offers "Generate its questions" (`claude:generate-questions {ref}`), and choosing it runs the fleet for that one plan as background work. Nothing is generated when the menu opens. Session start gives no order: it shows one line with the count of plans waiting for their questions and how to ask (`src/lib/loop-b-driver.js`). The Stop hook never orders question generation. `/ctoc:start` otherwise only READS the store (instant, fail-soft); the human never waits for a critique.
 
-**The critique fleet RECORDS that it ran — an audit attestation, never a licence to cross.** The adversarial `gate-critic` may add an `attestation` block to its quarantined pending object: per expected lens (`premortem`, `devils-advocate`, `red-team`, `advocate`), the `state` it classified (`clean-pass` | `partial` | `failed` | `absent`), a `coverage` DERIVED from that state (`full`/`partial`/`none` — the critic's input is `{ ref, lens, findings }` and it does NOT receive a lens's own coverage, so it never copies one), and the post-dedup `findings` count. `streaming-questions-sweeper.promotePendingFile` threads that block through `writePlanQuestions`'s optional fifth parameter into the live store, where the sufficiency auditor and the Doctor screen read it via `planQuestionsStatus.attested` / `.attestation`. This is a RECORD for audit, NOT a crossing-enabler: it changes no gate behaviour, the empty→ready/enough contract is unchanged, and `gate-critic` still NEVER emits `questions: []`. Honesty is preserved at both ends — the sweeper validates and fabricates nothing (an absent block passes straight through), and the reader (`validateAttestation`) fails toward NOT-ATTESTED on an absent or malformed block, so a missing or broken attestation is always safe and only a fabricated clean one would lie. Round-tripped by `tests/attestation-round-trip.test.js`.
+**The critique fleet RECORDS that it ran — an audit attestation, never a licence to cross.** The adversarial `gate-critic` may add an `attestation` block to its quarantined pending object: per expected lens (`premortem`, `devils-advocate`, `red-team`, `advocate`), the `state` it classified (`clean-pass` | `partial` | `failed` | `absent`), a `coverage` DERIVED from that state (`full`/`partial`/`none` — the critic's input is `{ ref, lens, findings }` and it does NOT receive a lens's own coverage, so it never copies one), and the post-dedup `findings` count. `streaming-questions-sweeper.promotePendingFile` threads that block through `writePlanQuestions`'s optional fifth parameter into the live store, where the sufficiency auditor and the Doctor screen read it via `planQuestionsStatus.attested` / `.attestation`. This is a RECORD for audit, NOT a crossing-enabler: its one effect on a gate is that a questions file carrying the gate ruling or the coverage notice without a valid attestation is refused whole, so its plan does not move; whether a question's topic may decide it is the gate critic's classification block, not the attestation, and `gate-critic` emits `questions: []` only in a classification, never in a synthesis. Honesty is preserved at both ends — the sweeper validates and fabricates nothing (an absent block passes straight through), and the reader (`validateAttestation`) fails toward NOT-ATTESTED on an absent or malformed block, so a missing or broken attestation is always safe and only a fabricated clean one would lie. Round-tripped by `tests/attestation-round-trip.test.js`.
 
 **An empty question list MAY carry an attestation that a critique ran — recorded, not
 enforced (yet).** A well-formed empty `questions: []` is honest — "the critique ran and
@@ -151,9 +151,10 @@ subagent-authored, therefore untrusted, so validation FAILS TOWARD NOT-ATTESTED 
 absent, unreadable, or malformed block reads `attested:false`, never attested).
 `planQuestionsStatus(...)` exposes the verdict on its `ready` result (`attested` boolean
 + the raw `attestation` block) so a reader — the sufficiency audit, the Doctor screen —
-can tell "a critique ran" from "no record either way". **This is ADDITIVE and does NOT
-gate:** an unattested empty list still reads `ready`/`enough:true`, so auto-crossing for
-clean plans is unchanged. Every existing four-argument caller is byte-for-byte unaffected
+can tell "a critique ran" from "no record either way". **The attestation does not gate an
+empty list; the classification does:** a gate-critic-classified empty list reads
+`enough: true` with or without an attestation, and an author's empty list reads
+`unclassified` and moves nothing until the gate critic classifies it. Every existing four-argument caller is byte-for-byte unaffected
 (no `attestation` key is written). Making an unattested empty list read `enough:false`
 (the enforcement / refusal) is a high-stakes gate change deferred until an
 attestation-PRODUCING path exists, and is the human's decision. Enforced by
@@ -175,9 +176,35 @@ the counts are threaded from the SINGLE verdict that authorised the crossing (ne
 second read that could observe a different revision). `attested by: not recorded` is
 a fixed forward-compatible slot until a critique-record source exists.
 
+**Review to done on recorded evidence.** Only inside `menu-screens.continueAfterCrossing` —
+the session's `menu task complete <id> --continue` (also on a task its build agent already
+completed: the call then runs only the continuation), `stream answer` and `stream approve`;
+never when the menu opens, at session start or at stop. `streaming-gate.crossOnEvidence`
+requires `validateReviewToDone` (every required step 8–16 checked, a fresh passing check
+record in `.ctoc/state/verify/<slug>.json`), a ledger crossing into `todo`, no hold and no
+question that goes to the human (an author's unclassified file counts as one). It writes the
+pipeline-kind entry (`advanced_by: 'pipeline'`, accepted at done by
+`approval-residency.js`) whose evidence names the record, its time, the coverage against the
+floor and the skipped count, and ends "crossed on evidence, not approved by the human"; it
+clears the plan's status file. A plan whose checks failed stays in review. Done never deploys;
+with deployment enabled it records the deploy-ready notice ("It finished on its checks —
+nobody approved it by hand"). Held by `tests/plans-keep-moving-without-the-human.test.js`.
+
+**Which questions reach the human.** `streaming-precompute.goesToHuman(question,
+classified)` is the one rule the gate, the screen and the audit share: in a file carrying the
+gate critic's classification block, a question reaches the human only under the conditions of
+`isBlockingQuestion` (a malformed question, a critical one, a high-stakes topic, an important
+one with no topic, or options without exactly one recommendation); in any other file every
+open question does, and the file moves nothing. Every other open question is decided by its
+recommended option and written under the plan's `## Decisions Taken Under Ambiguity` when the
+plan moves on. A Hold is CTOC's own question (`ctoc-hold`) in the write-protected answers log,
+released only by the human's "Release the hold"; nothing crosses a held plan.
+
 ## Critical Rules
 
 ### 1. Human Gates (4 Mandatory Approval Points)
+
+These are the words before the owner's instruction of 2026-10-06. `CLAUDE.md` Critical Rule 1 now says which crossing is the human's and which move on recorded evidence; a crossing on evidence carries a `sufficiency` or `pipeline` ledger entry, never an `approved_by: human` marker.
 
 Moved from `CLAUDE.md` on 2026-10-06, where these two lines followed the four-transitions table:
 

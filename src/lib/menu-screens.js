@@ -2346,6 +2346,15 @@ function taskTransition(root, rest, kind) {
  * task whose plan file is not on disk, is a registry-only completion (reported via
  * `completion`, never thrown) so a scheduler task can never be wedged by a missing
  * plan file.
+ *
+ * A TASK ITS AGENT ALREADY COMPLETED. A build agent completes its own task with
+ * `menu task complete <id>` (no flag); the session's later `menu task complete <id>
+ * --continue` on that `done` task runs ONLY `continueAfterCrossing` and returns
+ * `{ ok: true, alreadyCompleted: true, completion: null, text, promote }` (plus
+ * `quarantined` when non-empty). Nothing is written to the task: `--summary`, `--gate`,
+ * `--next` and `--b64` are ignored, so the agent's verify-derived result stands. A
+ * `done` task WITHOUT `--continue`, and every other settled status, is refused as before
+ * (`invalid transition <status> → done`).
  */
 function taskComplete(root, rest) {
   const p = parseTaskArgs(rest);
@@ -2353,6 +2362,24 @@ function taskComplete(root, rest) {
   const reg = taskRegistry.load(root);
   const task = reg.tasks.find((t) => t.id === id);
   if (!task) throw new Error('task-registry: unknown task id ' + String(id));
+  // A task its own agent already completed (a build agent runs `menu task complete <id>`
+  // itself): the session's `--continue` call runs ONLY the continuation and writes nothing
+  // to the task, so the agent's verify-derived result stands. Without `--continue` a done
+  // task is still refused below. The hook refuses `--continue` to background agents.
+  if (p.continue === true && task.status === 'done') {
+    const cont = continueAfterCrossing(root);
+    const res = {
+      ok: true,
+      taskId: id,
+      status: 'done',
+      alreadyCompleted: true,
+      completion: null,
+      text: `Task ${id} was already completed by its agent` + continuationText(cont),
+      promote: cont.promote,
+    };
+    if (cont.quarantined.length > 0) res.quarantined = cont.quarantined;
+    return res;
+  }
   // C3 (CRITICAL): legality is asked of the registry's ONE lifecycle encoding, not a
   // local mirror. The registry PERMITS `orphaned → done` (a falsely-orphaned agent's
   // late completion is ACCEPTED, not dropped). The old mirror listed `orphaned` as

@@ -416,7 +416,8 @@ function nextUnansweredQuestion(root, ref) {
     // single read (`loadPlanQuestions` would call the same status internally and
     // then throw the revision away).
     const st = precompute.planQuestionsStatus(root, ref);
-    if (st.status !== 'ready') return null;
+    // A held plan is asked keep-or-release first even when it has no readable question file.
+    if (st.status !== 'ready') return heldWithoutQuestions(precompute, root, ref) ? { question: holdQuestion(precompute.HOLD), index: 0, total: 1, held: true } : null;
     questions = st.questions;
     classified = st.classified;
     answered = precompute.readAnsweredQuestionIds(root, ref, {
@@ -438,6 +439,22 @@ function nextUnansweredQuestion(root, ref) {
   if (open.length === 0) return null;
   const [question, index] = open.find(([q]) => precompute.goesToHuman(q, classified)) || open[0];
   return { question, index, total: questions.length, held: false };
+}
+
+/**
+ * Is the plan at `ref` held when it has no readable question file? A hold lives in the answers
+ * log, matched by the plan's file name and independent of any question revision, so it is read
+ * with no revision to bind. An unreadable log reads as not held here: the crossings stay closed
+ * on it on their own (`crossOnEvidence`, the not-ready verdict), and the screen keeps its
+ * fail-soft fallback.
+ * @param {object} precompute the loaded `streaming-precompute` module
+ * @param {string} root
+ * @param {string} ref
+ * @returns {boolean}
+ */
+function heldWithoutQuestions(precompute, root, ref) {
+  const answers = precompute.readAnsweredQuestionIds(root, ref, { questionsRevisionMs: 0, planMtimeMs: 0 });
+  return answers.ok === true && answers.held.length > 0;
 }
 
 /**
@@ -504,7 +521,8 @@ function precomputedQuestionParts(q, ref, header) {
   return {
     question: {
       question: stripCtl(q.prompt),
-      header,
+      // CTOC's own keep-or-release question is about the hold, never the stage's moment.
+      header: own ? 'Held' : header,
       options,
     },
     // The same structured fields, tabulated for the screen TEXT. The flattened
@@ -578,8 +596,12 @@ function sufficiencyFor(root, ref) {
   });
   if (!isNonEmptyStr(root)) return closed('unavailable');
   try {
-    const { hasEnoughInformation } = require('./streaming-precompute');
-    const v = hasEnoughInformation(root, ref);
+    const precompute = require('./streaming-precompute');
+    const v = precompute.hasEnoughInformation(root, ref);
+    // With no readable question file the predicate never reads the answers log, so a hold
+    // there would read as "not computed": the plan is named as held instead, everywhere the
+    // verdict is shown (the screen, the session status), and still never crosses.
+    if (QUESTIONS_NOT_READY.has(v.reason) && heldWithoutQuestions(precompute, root, ref)) v.reason = 'held';
     const ids = (list) => (Array.isArray(list) ? list.map((q) => stripCtl(String(q && q.id))) : []);
     const blockingIds = new Set(ids(v.blocking));
     const defaults = (Array.isArray(v.unanswered) ? v.unanswered : [])

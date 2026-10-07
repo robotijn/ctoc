@@ -88,7 +88,7 @@ USER (human CTO) → CTO CHIEF (Tier 0) → SUB-ORCHESTRATORS (Tier 1)
                                        → SYNTHESIZER (Tier 1, cross-pillar)
 ```
 
-CTO Chief is the **final approver** before any plan crosses Gate 3 (review → done). It verifies the 14 quality dimensions and the human-approval marker exist before approving. When sub-orchestrator outputs conflict, the **synthesizer** produces a minimal change list using priority rules (Security > Correctness > Maintainability > Performance > Readability > Consistency); CTO Chief approves.
+CTO Chief owns the **final review** (Step 16) and verifies the 14 quality dimensions before a plan's completion; review → done then crosses in the menu's code on the recorded checks, or on the human's approval when a question needs him. When sub-orchestrator outputs conflict, the **synthesizer** produces a minimal change list using priority rules (Security > Correctness > Maintainability > Performance > Readability > Consistency); CTO Chief approves.
 
 Dispatch logging is an instruction-level protocol (per [`DISPATCH_PROTOCOL.md`](./DISPATCH_PROTOCOL.md)) that the session model follows — each dispatch is recorded to `.ctoc/audit/dispatches/YYYY-MM-DD/<dispatch_id>.yaml` by that discipline, not by an enforcement hook today. Structural invariants (the tier and dispatch shape) ARE enforced by `tests/architecture-invariants.test.js`.
 
@@ -164,7 +164,7 @@ When user selects `[8] release` from dashboard, show:
 
 16 steps across 4 phases. Full details in [IRON_LOOP.md](./IRON_LOOP.md).
 
-**Steps 1-7 are collaborative**: agents ask questions, present options, and wait for the user's decision. They work WITH the user, not in isolation. **Steps 8-16 are automated**: agents execute without interruption, user reviews at Gate 3.
+**Steps 1-7 are collaborative**: agents ask the user only what is of high uncertainty or huge importance and record every other choice in the plan. **Steps 8-16 are automated**: agents execute without interruption, and a built plan finishes on its recorded checks unless a question needs the user.
 
 **Step 1 (IDEATE)**: User dumps an idea → vision-advisor + product-owner agents explore and decompose it into plans. Skip if the request is already specific. This is the recommended entry point — it prevents Claude from bypassing the planning pipeline.
 
@@ -173,10 +173,10 @@ When user selects `[8] release` from dashboard, show:
 | 1 | IDEATE | vision-advisor, product-owner (opus) | Ideation — Gate 0: User approves vision |
 | 2 | ASSESS | product-owner (opus) | Phase 1: Functional |
 | 3 | ALIGN | product-owner (opus) | |
-| 4 | CAPTURE | iron-loop-critic (opus) | Gate 1: User approves plan |
+| 4 | CAPTURE | iron-loop-critic (opus) | Gate 1: moves on its evidence |
 | 5 | PLAN | implementation-planner (opus) | Phase 2: Technical |
 | 6 | DESIGN | implementation-planner (opus) | |
-| 7 | SPEC | iron-loop-critic (opus) then iron-loop-integrator+iron-loop-critic (10 rounds) | Gate 2: User approves approach |
+| 7 | SPEC | iron-loop-critic (opus) then iron-loop-integrator+iron-loop-critic (until nothing new, 3 rounds at most) | Gate 2: moves on its evidence |
 | 8 | TEST | iron-loop-executor (opus) | Phase 3: Implementation |
 | 9 | PREPARE | iron-loop-executor (opus) | |
 | 10 | IMPLEMENT | iron-loop-executor (opus) | |
@@ -185,13 +185,13 @@ When user selects `[8] release` from dashboard, show:
 | 13 | SECURE | security-scanner (opus) | |
 | 14 | VERIFY | iron-loop-executor (opus) | |
 | 15 | DOCUMENT | iron-loop-executor (opus) | |
-| 16 | FINAL-REVIEW | iron-loop-critic (opus) | Gate 3: User approves result |
+| 16 | FINAL-REVIEW | iron-loop-critic (opus) | Gate 3: finishes on its checks |
 
 **Step labels are MANDATORY.** The wired `src/lib/plan-validator.js` rejects a plan that is missing a required step (matched by step *number*). Label-*text* correctness (e.g. `TEST`, not `TESTING`) is checked by `src/hooks/validate-plan-steps.js`, which today runs only as a standalone script (`node src/hooks/validate-plan-steps.js`) and is NOT wired as a runtime hook — so a present-but-mislabeled step is not auto-rejected at runtime.
 
 **Step 10 is ONE step** with sub-items for multiple files. Never create multiple IMPLEMENT steps.
 
-**1 functional plan → N small implementation plans (SIP1).** Steps 5–7 decompose the functional plan into cohesive slices (~1–3 files, a module + its test kept together), each `parent_plan`-linked and `depends_on`-ordered, named `<parent-slug>-s<N>-<slice-name>.md`, each with its own Step 8–16. The `implementation-planner` typically emits many more implementation plans than functional plans. The parent implementation plan is an INDEX of its slices. Gates 2 & 3 batch per parent via `approveSubplans(parentSlug, fromStage)` in `src/lib/actions.js` — one human decision crosses every sibling (each stamped `approved_by: human`; loops the gate-safe `approvePlan`, no new auto-cross). `listSubplans(parentSlug)` enumerates a parent's set.
+**1 functional plan → N small implementation plans (SIP1).** Steps 5–7 decompose the functional plan into cohesive slices (~1–3 files, a module + its test kept together), each `parent_plan`-linked and `depends_on`-ordered, named `<parent-slug>-s<N>-<slice-name>.md`, each with its own Step 8–16. The `implementation-planner` typically emits many more implementation plans than functional plans. The parent implementation plan is an INDEX of its slices. When the human crosses Gates 2 and 3 himself he can batch per parent via `approveSubplans(parentSlug, fromStage)` in `src/lib/actions.js` — one human decision crosses every sibling (each stamped `approved_by: human`; loops the gate-safe `approvePlan`); plans whose evidence is enough also cross on their own in the menu's code. `listSubplans(parentSlug)` enumerates a parent's set.
 
 **Step 14 VERIFY is the quality gate**: lint, typecheck, ALL tests, coverage at or above the enforced floor (`.ctoc/coverage-baseline.json` `minPct` — **99** today, measured 99.37% src line coverage scoped to `src/**`, a ratchet that may only rise), 0 skipped, 0 flaky. The gate runs via `npm test` (`src/scripts/test-gate.js`); `node --test tests/*.test.js` does NOT enforce coverage or zero-skipped. Review agents use 14 quality dimensions (ISO 25010 aligned) defined in [IRON_LOOP.md](./IRON_LOOP.md).
 

@@ -7,9 +7,11 @@ This text was moved word for word out of this repository's `CLAUDE.md` on 2026-1
    get a fast, legible response. Green tests, a finished job, or a running engine
    are not "working" if the human sees nothing happen. Grinding with no feedback
    is broken.
-2. **Never route around CTOC or self-cross its gates.** The four human gates
-   belong to the human. No auto-approval, no skipping the pipeline — rot
-   accumulates exactly where the pipeline is bypassed.
+2. **Never route around CTOC or self-cross its gates.** Only the menu crosses a
+   gate: the vision on the human's approval, the other three in the menu's own code
+   on recorded evidence when no question needs him, or on his approval. A crossing
+   on evidence is recorded as evidence, never as his approval. No auto-approval, no
+   skipping the pipeline — rot accumulates exactly where the pipeline is bypassed.
 3. **Always implement via the Iron Loop** (TDD-Red → implement → verify →
    review). No ad-hoc edits to plan-covered files.
 4. **Use CTOC's own agents** for pipeline work; never substitute a generic or
@@ -94,9 +96,10 @@ This text was moved word for word out of this repository's `CLAUDE.md` on 2026-1
     agents; `src/lib/instruction-gate-words-scan.js` fences the instruction surfaces
     (wired as `instruction-gate-words-fence` in `iron-loop-enforcer.js`).
 
-**Methodology reference:** CTOC runs a **16-step** Iron Loop across **4 human gates**
-(Gate 0 vision→functional, Gate 1 functional→implementation, Gate 2
-implementation→todo, Gate 3 review→done). Key step labels: **8:TEST** (TDD), **10:IMPLEMENT**
+**Methodology reference:** CTOC runs a **16-step** Iron Loop across **4 gates**
+(Gate 0 vision→functional, crossed only on the human's approval; the other three cross in the
+menu's own code on recorded evidence when no question needs him, or on his approval: Gate 1
+functional→implementation, Gate 2 implementation→todo, Gate 3 review→done). Key step labels: **8:TEST** (TDD), **10:IMPLEMENT**
 (one step, files as sub-items), **14:VERIFY** (quality gate: lint, typecheck, all
 tests, coverage at or above the enforced floor — `.ctoc/coverage-baseline.json`
 `minPct`, **99** today — that file is the single source of truth for the number,
@@ -106,3 +109,51 @@ target at review — 0
 skipped, 0 flaky, run via `npm test`). CTOC ships exactly **3 slash commands** —
 `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and is **always installed from the
 marketplace**, never from a local path.
+
+
+## Replaced on the owner's instructions of 2026-10-06 and 2026-10-07
+
+The owner asked on 2026-10-06 not to be bothered with gates, only with questions of high
+uncertainty or huge importance, and decided on 2026-10-07 that the independent gate critic
+decides which questions reach him. The code now moves a plan into implementation and into
+the build queue on its recorded evidence, and finishes a built plan on its recorded checks;
+only the vision is always his approval. The rules below said otherwise; they are kept here
+word for word, each with the file it came from.
+
+From this file's lesson 2:
+
+2. **Never route around CTOC or self-cross its gates.** The four human gates belong to the human. No auto-approval, no skipping the pipeline — rot accumulates exactly where the pipeline is bypassed.
+
+From this file's methodology paragraph:
+
+**Methodology reference:** CTOC runs a **16-step** Iron Loop across **4 human gates** (Gate 0 vision→functional, Gate 1 functional→implementation, Gate 2 implementation→todo, Gate 3 review→done). Key step labels: **8:TEST** (TDD), **10:IMPLEMENT** (one step, files as sub-items), **14:VERIFY** (quality gate: lint, typecheck, all tests, coverage at or above the enforced floor — `.ctoc/coverage-baseline.json` `minPct`, **99** today — that file is the single source of truth for the number, ratchet-up only, and an unreadable baseline REFUSES rather than defaulting; 80 is the aspirational default for a project with no baseline at all, and the new-code target at review — 0 skipped, 0 flaky, run via `npm test`). CTOC ships exactly **3 slash commands** — `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and is **always installed from the marketplace**, never from a local path.
+
+From `CLAUDE.md`, Critical Rule 1 (its heading, its first two sentences, and the line after its table):
+
+1. Human Gates (4 Mandatory Approval Points)
+
+Four transitions REQUIRE human approval. NEVER cross these automatically.
+
+Only the human moves a plan across these four transitions, through the `/ctoc:start` menu; never move, approve or stamp a plan yourself.
+
+From `docs/ENFORCEMENT.md`, the heading of the streaming-questions section:
+
+Streaming questions — generated only when the human asks (never a second Claude)
+
+From `docs/ENFORCEMENT.md`, the attestation paragraph:
+
+This is a RECORD for audit, NOT a crossing-enabler: it changes no gate behaviour, the empty→ready/enough contract is unchanged, and `gate-critic` still NEVER emits `questions: []`.
+
+From `CLAUDE.md`, two clauses deleted because they were no longer true — the end of the Agent Architecture sentence about the CTO Chief, and the end of the sentence after the step table:
+
+, and it is the final approver before a plan is called done
+
+ until the human reviews
+
+From `CLAUDE.md`, the words it carried from 2026-10-06 until 2026-10-07 — lesson 2, the methodology line and the refusal under Critical Rule 1:
+
+2. **Never route around CTOC or self-cross its gates.** The four human gates belong to the human: no auto-approval, no skipping the pipeline.
+
+**Methodology:** a **16-step** Iron Loop across **4 human gates**. **8:TEST** is test-driven development, **10:IMPLEMENT** is one step, **14:VERIFY** is the quality gate (lint, typecheck, all tests, coverage at or above `.ctoc/coverage-baseline.json` `minPct`, 0 skipped, 0 flaky). CTOC ships exactly **3 slash commands** — `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and is always installed from the marketplace, never from a local path. Full wording and reasons: `docs/OPERATING_LESSONS.md` in the CTOC repository.
+
+**If asked to "complete" or "move to done"**: REFUSE, and say in plain words that it needs his OK.

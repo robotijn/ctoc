@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/red-team-critic/baseline-agent.md",
  "baseline_sha256": "f7c96106c5a260c920d23845101e33fb1e653dfbd5fd1d26882ffbd1fc4dbafa",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 96537,
+ "maxBytes": 96572,
  "units": [
   {
    "n": 1,
@@ -5166,7 +5166,7 @@
    "orders": [
     "RT-604"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 605,
@@ -10003,7 +10003,16 @@
     "The human's answer at the gate"
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\" and \"optimize the shit out of ctoc\". The owner's decisions of 2026-10-07: the independent gate critic assigns every question's topic and adds a question for every weighty choice the author left unasked; an author's question file moves nothing until the gate critic has classified it; a Hold is CTOC's own question, released only by the owner; the one loaded hook refuses the menu's answering, approving and crossing routes to any background agent. The code now crosses functional to implementation and implementation to todo on sufficiency, and review to done on the recorded checks; only vision to functional is always the human's. The instructions say what the code does.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does",
+    "new_anchors": [
+     "The menu's own code crosses the gate, on the human's answer or on recorded evidence — never on your finding."
+    ]
+   }
   },
   {
    "id": "RT-605",
@@ -10385,6 +10394,14 @@
    ],
    "pinned_by": null,
    "wire": false
+  }
+ ],
+ "ceiling_corrections": [
+  {
+   "date": "2026-10-07",
+   "from": 96537,
+   "to": 96572,
+   "reason": "the advisory line says who crosses a gate (plan ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does); measured overage 35 bytes"
   }
  ]
 }

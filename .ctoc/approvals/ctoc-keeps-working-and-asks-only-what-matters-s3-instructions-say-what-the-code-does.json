@@ -1,0 +1,9 @@
+{
+  "content_sha256": "9e2d84cfccdf9fa80200b5958f6219a785ad5d7418105a817e4138c5789e6fb1",
+  "hash_scope": "specification",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T17:30:21.240Z",
+  "approved_by": "human",
+  "plan_basename": "ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does"
+}

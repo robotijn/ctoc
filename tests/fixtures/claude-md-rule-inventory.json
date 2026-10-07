@@ -209,7 +209,9 @@
       "id": "r0032",
       "line": 256,
       "old": "Streaming questions — generated only when the human asks (never a second Claude)",
-      "home": "docs/ENFORCEMENT.md"
+      "home": "docs/ENFORCEMENT.md",
+      "new": "Streaming questions — written with the plan, checked by the gate critic, the fleet only when the human asks (never a second Claude)",
+      "old_home": "docs/OPERATING_LESSONS.md"
     },
     {
       "id": "r0033",
@@ -239,7 +241,9 @@
       "id": "r0037",
       "line": 260,
       "old": "This is a RECORD for audit, NOT a crossing-enabler: it changes no gate behaviour, the empty→ready/enough contract is unchanged, and `gate-critic` still NEVER emits `questions: []`.",
-      "home": "docs/ENFORCEMENT.md"
+      "home": "docs/ENFORCEMENT.md",
+      "new": "This is a RECORD for audit, NOT a crossing-enabler: its one effect on a gate is that a questions file carrying the gate ruling or the coverage notice without a valid attestation is refused whole, so its plan does not move; whether a question's topic may decide it is the gate critic's classification block, not the attestation, and `gate-critic` emits `questions: []` only in a classification, never in a synthesis.",
+      "old_home": "docs/OPERATING_LESSONS.md"
     },
     {
       "id": "r0038",
@@ -257,20 +261,24 @@
       "id": "r0040",
       "line": 289,
       "old": "1. Human Gates (4 Mandatory Approval Points)",
-      "home": "CLAUDE.md"
+      "home": "CLAUDE.md",
+      "new": "1. Gates (4 points where a plan moves on)",
+      "old_home": "docs/OPERATING_LESSONS.md"
     },
     {
       "id": "r0041",
       "line": 291,
       "old": "NEVER cross these automatically.",
-      "home": "CLAUDE.md"
+      "home": "CLAUDE.md",
+      "new": "NEVER cross a gate by hand: never move a plan file or write an approval yourself.",
+      "old_home": "docs/OPERATING_LESSONS.md"
     },
     {
       "id": "r0042",
       "line": 302,
       "old": "**If asked to \"complete\" or \"move to done\"**: REFUSE.",
       "home": "CLAUDE.md",
-      "new": "**If asked to \"complete\" or \"move to done\"**: REFUSE, and say in plain words that it needs his OK.",
+      "new": "**If asked to \"complete\" or \"move to done\"**: REFUSE to move it by hand; it moves on its recorded checks or his OK.",
       "old_home": "docs/ENFORCEMENT.md"
     },
     {
@@ -617,7 +625,7 @@
       "old": "2. **Never route around CTOC or self-cross its gates.** The four human gates belong to the human. No auto-approval, no skipping the pipeline — rot accumulates exactly where the pipeline is bypassed.",
       "home": ".ctoc/templates/operating-lessons.md",
       "old_home": "docs/OPERATING_LESSONS.md",
-      "new": "2. **Never route around CTOC or self-cross its gates.** The four human gates belong to the human: no auto-approval, no skipping the pipeline."
+      "new": "2. **Never route around CTOC or self-cross its gates.** Only the menu crosses one, on recorded evidence or the human's OK: no auto-approval, no skipping the pipeline."
     },
     {
       "id": "r0100",
@@ -760,7 +768,7 @@
       "old": "**Methodology reference:** CTOC runs a **16-step** Iron Loop across **4 human gates** (Gate 0 vision→functional, Gate 1 functional→implementation, Gate 2 implementation→todo, Gate 3 review→done). Key step labels: **8:TEST** (TDD), **10:IMPLEMENT** (one step, files as sub-items), **14:VERIFY** (quality gate: lint, typecheck, all tests, coverage at or above the enforced floor — `.ctoc/coverage-baseline.json` `minPct`, **99** today — that file is the single source of truth for the number, ratchet-up only, and an unreadable baseline REFUSES rather than defaulting; 80 is the aspirational default for a project with no baseline at all, and the new-code target at review — 0 skipped, 0 flaky, run via `npm test`). CTOC ships exactly **3 slash commands** — `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and is **always installed from the marketplace**, never from a local path.",
       "home": ".ctoc/templates/operating-lessons.md",
       "old_home": "docs/OPERATING_LESSONS.md",
-      "new": "**Methodology:** a **16-step** Iron Loop across **4 human gates**. **8:TEST** is test-driven development, **10:IMPLEMENT** is one step, **14:VERIFY** is the quality gate (lint, typecheck, all tests, coverage at or above `.ctoc/coverage-baseline.json` `minPct`, 0 skipped, 0 flaky). CTOC ships exactly **3 slash commands** — `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and is always installed from the marketplace, never from a local path. Full wording and reasons: `docs/OPERATING_LESSONS.md` in the CTOC repository."
+      "new": "**Methodology:** a **16-step** Iron Loop across **4 gates**. **8:TEST** is test-driven development, **10:IMPLEMENT** is one step, **14:VERIFY** is the quality gate (lint, typecheck, all tests, coverage at or above `.ctoc/coverage-baseline.json` `minPct`, 0 skipped, 0 flaky). CTOC ships exactly **3 slash commands** — `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and is always installed from the marketplace, never from a local path. Full wording and reasons: `docs/OPERATING_LESSONS.md` in the CTOC repository."
     },
     {
       "id": "r0118",
@@ -924,6 +932,27 @@
       "old": "Irreversible actions (force-push, hard reset, recursive delete, sends, deploys, migrations) and commits wait for an explicit request.",
       "home": "CLAUDE.md",
       "added": "2026-10-06 review fix: the craft manual left this file, so its irreversible-actions rule is restated here"
+    },
+    {
+      "id": "r0145",
+      "line": null,
+      "old": "2. **Never route around CTOC or self-cross its gates.** The four human gates belong to the human: no auto-approval, no skipping the pipeline.",
+      "home": "docs/OPERATING_LESSONS.md",
+      "added": "2026-10-07, plan ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does: the words CLAUDE.md carried from 2026-10-06 until the owner's instruction of 2026-10-06 was built into the instructions (lesson 2)"
+    },
+    {
+      "id": "r0146",
+      "line": null,
+      "old": "**Methodology:** a **16-step** Iron Loop across **4 human gates**. **8:TEST** is test-driven development, **10:IMPLEMENT** is one step, **14:VERIFY** is the quality gate (lint, typecheck, all tests, coverage at or above `.ctoc/coverage-baseline.json` `minPct`, 0 skipped, 0 flaky). CTOC ships exactly **3 slash commands** — `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and is always installed from the marketplace, never from a local path. Full wording and reasons: `docs/OPERATING_LESSONS.md` in the CTOC repository.",
+      "home": "docs/OPERATING_LESSONS.md",
+      "added": "2026-10-07, plan ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does: the words CLAUDE.md carried from 2026-10-06 until the owner's instruction of 2026-10-06 was built into the instructions (the methodology line)"
+    },
+    {
+      "id": "r0147",
+      "line": null,
+      "old": "**If asked to \"complete\" or \"move to done\"**: REFUSE, and say in plain words that it needs his OK.",
+      "home": "docs/OPERATING_LESSONS.md",
+      "added": "2026-10-07, plan ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does: the words CLAUDE.md carried from 2026-10-06 until the owner's instruction of 2026-10-06 was built into the instructions (the refusal under Critical Rule 1)"
     }
   ]
 }

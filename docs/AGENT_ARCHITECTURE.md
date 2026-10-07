@@ -69,7 +69,7 @@ that pre-screened the watchers above and skipped them on `pass`. See
 
 **Members**: `cto-chief` (sole occupant).
 
-**Authority**: dispatches all other agents. Approves all gate crossings. Owns the audit log. Final say in cross-pillar conflicts (delegating synthesis to the synthesizer sub-orchestrator).
+**Authority**: dispatches all other agents. Approves no gate crossing: the vision crossing is the owner's approval, and the other three move on recorded evidence in the menu's own code unless a question needs him. Owns the audit log. Final say in cross-pillar conflicts (delegating synthesis to the synthesizer sub-orchestrator).
 
 **Frontmatter contract** (enforced by `tests/cto-chief-toplevel.test.js`):
 ```yaml
@@ -95,7 +95,7 @@ dispatches: [<all-19-categories>]
 - Pipeline (5): `agent-writer`, `agent-critic`, `agent-tester`, `agent-qa`, `agent-publisher`
 - Implementation reviewers (1): `implementation-reviewer`
 - Synthesis (1): `synthesizer` — cross-pillar finding integration
-- Gate critique (4, NEW): `premortem-critic`, `devils-advocate-critic`, `red-team-critic` — three independent adversarial lenses run in parallel — and `gate-critic` — synthesizes their findings into the human's per-gate decision questions. Advisory (Read/Grep) and run in the background precompute so the human never waits; the human's streaming answer is the gate crossing.
+- Gate critique (4, NEW): `premortem-critic`, `devils-advocate-critic`, `red-team-critic` — three independent adversarial lenses run in parallel — and `gate-critic` — synthesizes their findings into the human's per-gate decision questions. Advisory (Read/Grep) and run in the background only when the human asks, so he never waits; a gate is crossed only in the menu's own code, on the human's answer or on recorded evidence.
 
 **Authority**: recommend dispatches; never execute peer dispatches directly. Read full plan ancestry. Defer-and-continue on ambiguity (no stubs).
 
@@ -270,7 +270,7 @@ Every dispatch goes to `.ctoc/audit/dispatches/YYYY-MM-DD/<dispatch_id>.yaml`.
 - **No-stub rule**: defer-and-continue with a documented choice.
 - **Async overnight**: drain the pipeline while user sleeps; review at morning.
 - **Literal interpretation**: prompts are explicit, name effort, declare ancestry-read.
-- **Three human gates**: functional → impl, impl → todo, review → done.
+- **Four gates**: vision → functional is the owner's approval; functional → impl, impl → todo and review → done move on recorded evidence in the menu's own code unless a question needs him, or on his approve.
 
 ## Cross-references
 

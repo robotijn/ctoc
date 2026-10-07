@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/gate-critic/baseline-agent.md",
  "baseline_sha256": "d8d10528cffd6e9c0af1b1174d5286b79b08d820416894c16ce117e2f39fed5e",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 139799,
+ "maxBytes": 140070,
  "units": [
   {
    "n": 1,
@@ -1180,7 +1180,7 @@
    "orders": [
     "R-135"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 136,
@@ -1587,7 +1587,7 @@
    "orders": [
     "R-182"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 183,
@@ -1605,7 +1605,7 @@
    "orders": [
     "R-184"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 185,
@@ -1778,7 +1778,7 @@
    "orders": [
     "R-205"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 206,
@@ -5859,7 +5859,7 @@
    "orders": [
     "R-680"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 681,
@@ -5868,7 +5868,7 @@
    "orders": [
     "R-681"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 682,
@@ -7534,7 +7534,16 @@
     "The only approval is the marker the pipeline itself checks; the only gate crossing is the human's answer in the streaming flow; the transition validation is run by the streaming gate screen and is not yours to assert."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\" and \"optimize the shit out of ctoc\". The owner's decisions of 2026-10-07: the independent gate critic assigns every question's topic and adds a question for every weighty choice the author left unasked; an author's question file moves nothing until the gate critic has classified it; a Hold is CTOC's own question, released only by the owner; the one loaded hook refuses the menu's answering, approving and crossing routes to any background agent. The code now crosses functional to implementation and implementation to todo on sufficiency, and review to done on the recorded checks; only vision to functional is always the human's. The instructions say what the code does.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does",
+    "new_anchors": [
+     "The only approval is the marker the pipeline itself checks; a gate is crossed only in the menu's own code, on recorded evidence or the human's answer; the transition validation is run by the streaming gate screen and is not yours to assert."
+    ]
+   }
   },
   {
    "id": "R-136",
@@ -7934,7 +7943,16 @@
     "This is a RECORD for audit — it is NOT a crossing-enabler. It changes NO gate behaviour."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\" and \"optimize the shit out of ctoc\". The owner's decisions of 2026-10-07: the independent gate critic assigns every question's topic and adds a question for every weighty choice the author left unasked; an author's question file moves nothing until the gate critic has classified it; a Hold is CTOC's own question, released only by the owner; the one loaded hook refuses the menu's answering, approving and crossing routes to any background agent. The code now crosses functional to implementation and implementation to todo on sufficiency, and review to done on the recorded checks; only vision to functional is always the human's. The instructions say what the code does.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does",
+    "new_anchors": [
+     "This is a RECORD for audit — it is NOT a crossing-enabler. Its one effect on a gate: a file carrying the gate ruling or the coverage notice without a valid attestation is refused whole, so the plan does not move."
+    ]
+   }
   },
   {
    "id": "R-183",
@@ -7954,7 +7972,16 @@
     "A clean plan still crosses exactly as it did before — on your non-empty `q99-gate-ruling` and the human's answer, never on this record."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\" and \"optimize the shit out of ctoc\". The owner's decisions of 2026-10-07: the independent gate critic assigns every question's topic and adds a question for every weighty choice the author left unasked; an author's question file moves nothing until the gate critic has classified it; a Hold is CTOC's own question, released only by the owner; the one loaded hook refuses the menu's answering, approving and crossing routes to any background agent. The code now crosses functional to implementation and implementation to todo on sufficiency, and review to done on the recorded checks; only vision to functional is always the human's. The instructions say what the code does.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does",
+    "new_anchors": [
+     "A plan never crosses on this record: it crosses in the menu's code when no question in a classified file goes to the human, or on the human's answer."
+    ]
+   }
   },
   {
    "id": "R-185",
@@ -8074,7 +8101,16 @@
     "Report the classification you made, or write no block at all."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\" and \"optimize the shit out of ctoc\". The owner's decisions of 2026-10-07: the independent gate critic assigns every question's topic and adds a question for every weighty choice the author left unasked; an author's question file moves nothing until the gate critic has classified it; a Hold is CTOC's own question, released only by the owner; the one loaded hook refuses the menu's answering, approving and crossing routes to any background agent. The code now crosses functional to implementation and implementation to todo on sufficiency, and review to done on the recorded checks; only vision to functional is always the human's. The instructions say what the code does.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does",
+    "new_anchors": [
+     "Report the classification you made; a synthesis carrying the gate ruling with no valid attestation block is refused whole."
+    ]
+   }
   },
   {
    "id": "R-207",
@@ -11937,7 +11973,16 @@
     "| Stamping `approved_by: human`, calling `approvePlan` or `approveSubplans`, or moving a plan between stages | The human's answer in the streaming flow, applied by `src/lib/actions.js`; plan moves are [[iron-loop-executor]]'s |"
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\" and \"optimize the shit out of ctoc\". The owner's decisions of 2026-10-07: the independent gate critic assigns every question's topic and adds a question for every weighty choice the author left unasked; an author's question file moves nothing until the gate critic has classified it; a Hold is CTOC's own question, released only by the owner; the one loaded hook refuses the menu's answering, approving and crossing routes to any background agent. The code now crosses functional to implementation and implementation to todo on sufficiency, and review to done on the recorded checks; only vision to functional is always the human's. The instructions say what the code does.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does",
+    "new_anchors": [
+     "| Stamping `approved_by: human`, calling `approvePlan` or `approveSubplans`, or moving a plan between stages | The human's answer in the streaming flow, applied by `src/lib/actions.js`; every other plan move is the menu's own code |"
+    ]
+   }
   },
   {
    "id": "R-681",
@@ -11947,7 +11992,16 @@
     "| Crossing a human gate for any reason, including a unanimous clean pass from all three prosecution lenses and a strong case from the advocate | The human, always. A clean pass changes your recommendation, never your authority |"
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\" and \"optimize the shit out of ctoc\". The owner's decisions of 2026-10-07: the independent gate critic assigns every question's topic and adds a question for every weighty choice the author left unasked; an author's question file moves nothing until the gate critic has classified it; a Hold is CTOC's own question, released only by the owner; the one loaded hook refuses the menu's answering, approving and crossing routes to any background agent. The code now crosses functional to implementation and implementation to todo on sufficiency, and review to done on the recorded checks; only vision to functional is always the human's. The instructions say what the code does.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does",
+    "new_anchors": [
+     "| Crossing a human gate for any reason, including a unanimous clean pass from all three prosecution lenses and a strong case from the advocate | The menu's own code, on recorded evidence or the human's answer. A clean pass changes your recommendation, never your authority |"
+    ]
+   }
   },
   {
    "id": "R-682",
@@ -12647,6 +12701,12 @@
    "from": 139695,
    "to": 139799,
    "reason": "a classification and a synthesis keep every question, its options and its recommendation unchanged (plan ctoc-keeps-working-and-asks-only-what-matters-s2-plans-cross-on-their-evidence, verification round); measured overage 104 bytes"
+  },
+  {
+   "date": "2026-10-07",
+   "from": 139799,
+   "to": 140070,
+   "reason": "rule 5, the attestation section, its report line and two anti-scope rows say who crosses a gate (plan ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does); measured overage 271 bytes"
   }
  ]
 }
