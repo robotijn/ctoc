@@ -1560,24 +1560,32 @@ describe('a regulated project: the plan waits where the regime has no record (ca
     assert.ok(text.includes(REGIME_SENTENCES['regime-unreadable']), text);
   });
 
-  it('case 51(b) — fail closed: a declared profile CTOC cannot load holds the built plan, not the functional one', () => {
-    const root = makeSandbox();
-    setRegime(root, { profiles: ['do-178c-levl-a'] });
-    const fref = 'functional/c51f.md';
-    writePlan(root, fref, functionalBody('Misspelled regime'));
-    writeQuestions(root, fref, []);
-    seedBuilt(root, 'c51r');
+  // Session decision 2026-10-07 after the review: a profile CTOC cannot load holds both
+  // crossings, so a misspelled or hand-quoted name never lets a plan skip the compliance review.
+  for (const name of ['do-178c-levl-a', 'gpdr', '"gdpr"']) {
+    it(`case 51(b) — fail closed: a declared profile CTOC cannot load (${name}) holds both crossings`, () => {
+      const root = makeSandbox();
+      setRegime(root, { profiles: [name], copy: false });
+      const fref = 'functional/c51f.md';
+      writePlan(root, fref, functionalBody('Misspelled regime'));
+      writeQuestions(root, fref, []);
+      seedBuilt(root, 'c51r');
 
-    const crossed = [];
-    const ds = streamingGate.pendingGateDecisions(root, { crossed });
+      const crossed = [];
+      const ds = streamingGate.pendingGateDecisions(root, { crossed });
 
-    assert.equal(exists(root, 'implementation/c51f.md'), true, 'the compliance trigger reads profile names only');
-    assert.equal(exists(root, 'review/c51r.md'), true, 'the built plan stays');
-    assert.equal(crossed.some((c) => c.toStage === 'done'), false);
-    const b = ds.find((d) => d.ref === 'review/c51r.md');
-    assert.equal(b.regimeHold, 'regime-unreadable');
-    assert.equal(b.passesValidation, true);
-  });
+      assert.deepEqual(crossed, [], 'nothing crossed');
+      assert.equal(exists(root, fref), true, 'the functional plan stays');
+      assert.equal(exists(root, 'review/c51r.md'), true, 'the built plan stays');
+      const f = ds.find((d) => d.ref === fref);
+      assert.equal(f.regimeHold, 'regime-unreadable');
+      assert.equal(f.passesValidation, true);
+      assert.equal(f.enough, true);
+      const b = ds.find((d) => d.ref === 'review/c51r.md');
+      assert.equal(b.regimeHold, 'regime-unreadable');
+      assert.equal(b.passesValidation, true);
+    });
+  }
 
   it('case 52 — guards: no regime changes nothing, and each regime holds only the crossing it governs', () => {
     // No regime, declined: both crossings happen.
@@ -1659,6 +1667,26 @@ describe('a real project has no profile folder: the shipped profiles are read (c
       assert.equal(screen.text.includes(REGIME_SENTENCES['regime-unreadable']), false, screen.text);
     });
   }
+
+  it('case 55 — GDPR on, an author\'s questions being checked: the screen gives the compliance reason and never says it moves on by itself', () => {
+    const root = makeSandbox();
+    setRegime(root, { profiles: ['gdpr'], copy: false });
+    const ref = 'functional/c55.md';
+    writePlan(root, ref, functionalBody('Unchecked idea'));
+    writeQuestions(root, ref, [detail('q10-label', 'Label text?', ['Save', 'Store'])], { classified: false });
+    const queued = route(['stream', 'check', ref], root);
+    assert.ok(tasks(root).some((t) => t.kind === 'classify' && t.plan === ref && t.status === 'queued'),
+      `fixture: the check is queued (${JSON.stringify(queued.text || queued)})`);
+
+    const d = descriptorOf(root, ref);
+    assert.equal(d.regimeHold, 'compliance-review');
+    assert.equal(d.questionsClassified, false);
+    const text = streamingGate.streamingGateScreen(root).text;
+    assert.match(text, /Its questions are being checked by the gate critic/);
+    assert.ok(text.includes(REGIME_SENTENCES['compliance-review']), text);
+    assert.doesNotMatch(text, /moves on by itself/);
+    assert.equal(exists(root, ref), true);
+  });
 
   it('case 54 — a misspelled profile, no profile folder: the built plan still waits as unreadable', () => {
     const root = makeSandbox();

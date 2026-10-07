@@ -91,11 +91,11 @@ screen says why.
     try {
       const regime = require('./regulatory-regime');
       regime.loadActiveProfiles(root); // throws when .ctoc/settings.yaml cannot be read: hold
+      if (regime.unloadableProfiles(root).length > 0) return 'regime-unreadable'; // both crossings (session decision 2026-10-07)
       if (stage === 'functional') {
         const t = require('./iron-loop-compliance-trigger').evaluateComplianceTrigger(root);
         return t.runGdpr || t.runEuAiAct ? 'compliance-review' : null;
       }
-      if (regime.unloadableProfiles(root).length > 0) return 'regime-unreadable';
       const controls = regime.effectiveControls(root);
       if (controls.has('independent_verification_validation')) return 'independent-verification';
       return REVIEW_SIGN_OFF_CONTROLS.some((c) => controls.has(c)) ? 'review-sign-off' : null;
@@ -252,7 +252,7 @@ Cases 1–47 run without a `.ctoc/settings.yaml` and stay green unchanged.
    under the session's decision the crossing does not happen while GDPR or the EU AI Act is on.
 4. **No reader of the verification chief's findings is built here.** None exists, so under the
    session's decision review → done on evidence does not happen while the control is on.
-5. **A declared profile CTOC cannot load holds review, not functional.** At review it might
+5. **A declared profile CTOC cannot load holds both crossings (changed by the session on 2026-10-07 after the review: a misspelled or hand-quoted profile name must not let a plan skip the compliance review).** Original wording: A declared profile CTOC cannot load holds review, not functional. At review it might
    require one of the four controls; at functional the compliance trigger reads profile names
    only, so a missing file changes nothing it reports.
 6. **Each regime holds only the crossing it governs.** Implementation → todo is unchanged; a

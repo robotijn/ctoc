@@ -1,11 +1,11 @@
 {
-  "content_sha256": "6c71ba371283dc08ecd1a66c1a61290c49a0c856e9419bd7e1839d8b3ebe7445",
+  "content_sha256": "c35c27767c4ea458325b764aa8f2068130f6d0b639081108274c215369596d6d",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-10-07T17:48:45.535Z",
+  "approved_at": "2026-10-07T17:50:33.200Z",
   "approved_by": "human",
   "backfilled": true,
-  "backfill_reason": "Session, 2026-10-07: the scratch-project run showed every active profile unreadable in a real project (profiles are read only from the project's own .ctoc/regulatory-regimes copy); the loader falls back to the plugin's shipped profiles",
+  "backfill_reason": "Session, 2026-10-07: after the review, a profile CTOC cannot load holds both crossings (a misspelled profile must not skip the compliance review); regimeHold checks it before the per-stage branch",
   "plan_basename": "evidence-crossings-respect-the-regulated-profiles"
 }
