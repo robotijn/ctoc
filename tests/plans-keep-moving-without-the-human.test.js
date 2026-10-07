@@ -1380,3 +1380,55 @@ describe('the session continues after a build agent completed its own task (case
     assert.equal(exists(root, 'review/c47.md'), true, 'a refused call continues nothing');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("a held plan is always asked CTOC's keep-or-release question first (case 48)", () => {
+  /** Assert that `screen` asks only keep-or-release and offers no way to finish or approve. */
+  function asksKeepOrRelease(screen, ref, label) {
+    assert.equal(promptOf(screen), precompute.HOLD.prompt, `${label}: CTOC's own question`);
+    const opts = screen.ask.questions[0].options;
+    assert.deepEqual(opts.slice(0, 2).map((o) => o.label), [precompute.HOLD.keep.label, precompute.HOLD.release.label], label);
+    assert.equal(opts.some((o) => /Recommended/.test(o.description)), false, `${label}: nothing is recommended`);
+    assert.equal(opts.some((o) => /finished|build it|approve/i.test(o.label)), false, `${label}: no finish or approve option`);
+    assert.equal(Object.values(screen.actions).some((a) => /^stream approve /.test(a) || /^claude:approve /.test(a)), false,
+      `${label}: no action approves it`);
+    assert.equal(screen.actions[precompute.HOLD.release.label],
+      `stream answer ${ref} 'ctoc-hold' 'release' '${precompute.HOLD.digest}'`, `${label}: release carries CTOC's digest`);
+  }
+
+  const variants = [
+    { stage: 'functional', make: (root, ref) => writePlan(root, ref, functionalBody('Held idea')), name: 'Held idea' },
+    { stage: 'implementation', make: (root, ref) => writePlan(root, ref, implBody('Held slice', ['src/held.js'])), name: 'Held slice' },
+    { stage: 'review', make: (root, ref) => seedBuilt(root, ref.slice('review/'.length, -3)), name: null },
+  ];
+  const files = {
+    'no question file': () => {},
+    "an author's unclassified file": (root, ref) => writeQuestions(root, ref, [detail('q10-label', 'Label text?', ['Save', 'Store'])], { classified: false }),
+    'a classified file of details': (root, ref) => writeQuestions(root, ref, [detail('q10-label', 'Label text?', ['Save', 'Store'])]),
+  };
+
+  for (const v of variants) {
+    for (const [fileLabel, writeFile] of Object.entries(files)) {
+      it(`case 48 — held at ${v.stage}, ${fileLabel}: keep or release first, never finish or approve; the status names it as held`, () => {
+        const root = makeSandbox();
+        const slug = `h48${v.stage[0]}`;
+        const ref = `${v.stage}/${slug}.md`;
+        v.make(root, ref);
+        writeFile(root, ref);
+        const held = route(['stream', 'answer', ref, 'ctoc-hold', 'hold'], root);
+        assert.match(held.text, new RegExp(`You are holding ${slug}\\.md`));
+        assert.equal(exists(root, ref), true, 'the held plan stays');
+
+        const label = `${v.stage}, ${fileLabel}`;
+        asksKeepOrRelease(streamingGate.streamingGateScreen(root), ref, `${label} (default screen)`);
+        asksKeepOrRelease(route(['plan', ref], root), ref, `${label} (plan screen)`);
+
+        const name = v.name || `${slug} built feature`;
+        const lines = loopBDirective(root).split('\n').filter(Boolean);
+        assert.ok(lines.some((l) => l.startsWith('You are holding: ') && l.includes(name)), lines.join('\n'));
+        assert.equal(lines.some((l) => l.startsWith('Waiting for your OK') && l.includes(name)), false,
+          `${label}: never listed as waiting for his OK`);
+      });
+    }
+  }
+});

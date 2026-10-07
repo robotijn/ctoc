@@ -43,6 +43,8 @@ files:
   - docs/IRON_LOOP.md
   - docs/ENFORCEMENT.md
   - docs/AGENT_ARCHITECTURE.md
+  # Added 2026-10-07 by the session after the end-to-end run: a held plan with no question file is shown as ready to finish without saying it is held
+  - src/lib/streaming-gate.js
 approved_by: human
 approved_at: 2026-10-07T16:55:17.940Z
 gate_crossed: implementation → todo
