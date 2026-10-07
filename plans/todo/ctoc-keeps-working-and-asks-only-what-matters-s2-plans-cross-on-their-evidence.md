@@ -1752,3 +1752,12 @@ kept, no case deleted (old assertion → new assertion → why):
 
 Full `npm test` (once, foreground): tests 12680, pass 12680, fail 0, cancelled 0, skipped 0,
 todo 0; coverage 99.88% (floor 99); `[CTOC test-gate] PASS`. Lint zero warnings.
+
+### Re-verification round
+
+Re-verification of a8fec536: one case open — another interpreter (python, ruby) launching
+`node -e` with a path into `src/lib/` was allowed to a background agent and moved a plan in a
+scratch copy. Test-first: hook case 90 (the verification's three commands verbatim plus a perl
+variant; guards `cat src/lib/x.js`, `grep -n foo src/lib/x.js`, `npm test`, `git status`, the
+menu's allowed routes) — red: the first python command exits 0. Case 40 (the question writer
+refuses a stamp later than now) — red: the future stamp was written.

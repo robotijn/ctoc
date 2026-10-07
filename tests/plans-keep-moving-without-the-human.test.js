@@ -1196,3 +1196,16 @@ describe('the verification round (cases 37–39)', () => {
     assert.equal(exists(root, built.ref), true, "CTOC's hold keeps a built plan with no questions in review");
   });
 });
+
+describe('the question writer refuses a revision stamp later than now (case 40)', () => {
+  it('case 40 — a future stamp is refused; the plan\'s own time is accepted (guard)', () => {
+    const root = makeSandbox();
+    const ref = 'functional/c40.md';
+    const planPath = writePlan(root, ref, functionalBody('Exports'));
+    const future = precompute.writePlanQuestions(root, ref, [fork('q10-db')], Date.now() + 60000, undefined, CLASSIFIED);
+    assert.equal(future.ok, false);
+    assert.equal(future.reason, 'future-stamp');
+    assert.equal(fs.existsSync(precompute.questionsPath(root, ref)), false, 'nothing is written');
+    assert.deepEqual(precompute.writePlanQuestions(root, ref, [fork('q10-db')], fs.statSync(planPath).mtimeMs, undefined, CLASSIFIED), { ok: true });
+  });
+});

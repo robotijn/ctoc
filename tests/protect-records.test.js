@@ -570,3 +570,25 @@ describe('the verification round: the menu is recognised by what Node runs, not 
     }
   });
 });
+
+describe('the re-verification: any interpreter carrying a path into CTOC code gets the strict reading', () => {
+  const REFUSAL_SUBAGENT = 'CTOC refused this call because a background agent may not answer CTOC\'s '
+    + 'questions, approve a plan or move one on through the menu; report your result and let the '
+    + 'main session do it.';
+  const agentBash = (command) => ({ ...bash(command), agent_id: 'a1b2c3', agent_type: 'iron-loop-executor' });
+  const MENU = 'node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js"';
+
+  test('90 · python, ruby and perl carrying `src/lib/` code are refused; plain reads and the menu list stay allowed', () => {
+    for (const command of [
+      `python3 -c "import subprocess; subprocess.run(['node','-e','require(\\'./src/lib/loop-b-driver\\').loopBDirective(process.cwd())'])"`,
+      `python3 -c "import subprocess; subprocess.run(['node','-e','require(\\"./src/lib/actions\\").movePlan(\\'a\\',\\'b\\')'])"`,
+      `ruby -e "system('node', '-e', 'require(\\"./src/lib/actions\\").movePlan(\\"a\\",\\"b\\")')"`,
+      `perl -e 'system("node", "-e", "require(\\"./src/lib/actions\\").movePlan()")'`,
+    ]) assertRefused(run(agentBash(command)), command, REFUSAL_SUBAGENT);
+    for (const command of ['cat src/lib/x.js', 'grep -n foo src/lib/x.js', 'npm test', 'git status',
+      `${MENU} menu task list`, `${MENU} menu task complete t7 --summary 'built src/lib/x.js'`, `${MENU} inbox questions`]) {
+      assertAllowed(run(agentBash(command)), command);
+    }
+    allowedBash(`python3 -c "import subprocess; subprocess.run(['node','-e','require(\\'./src/lib/loop-b-driver\\').loopBDirective(process.cwd())'])"`);
+  });
+});
