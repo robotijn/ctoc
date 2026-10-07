@@ -83,9 +83,22 @@ const READERS = {
       fs.writeFileSync(planPath, '# staged plan\n');
       const t = Math.floor(Number(stored.planMtimeMs) / 1000) - 5;
       fs.utimesSync(planPath, t, t);
+      // The contract the owner replaced on 2026-10-07: every question but the gate ruling and
+      // the coverage notice must carry a `topic`, which these real samples predate. The real
+      // persisted shape must therefore be REFUSED by the canonical reader for exactly that
+      // reason (fail closed, never waved through) — and, with only the topics added as the
+      // gate critic would, read back every question unchanged.
+      const { planQuestionsStatus } = require('../src/lib/streaming-precompute');
+      const status = planQuestionsStatus(root, ref);
+      assert.equal(status.status, 'invalid', `real sample ${sampleName}, written before topics, must be refused`);
+      assert.ok(status.errors.length > 0 && status.errors.every((e) => /must declare a "topic"/.test(e)),
+        `real sample ${sampleName} is refused only for its missing topics: ${status.errors.join('; ')}`);
+      const upgraded = { ...stored, questions: stored.questions.map((q) => (/^q9[89]-/.test(q.id) ? q : { ...q, topic: 'detail' })) };
+      fs.writeFileSync(path.join(qDir, sampleName), JSON.stringify(upgraded));
       const out = loadPlanQuestions(root, ref);
-      assert.ok(Array.isArray(out), `loadPlanQuestions returned ${out} for real sample ${sampleName}`);
+      assert.ok(Array.isArray(out), `loadPlanQuestions returned ${out} for real sample ${sampleName} with topics added`);
       assert.ok(out.length > 0, `real question sample ${sampleName} parsed to zero questions`);
+      assert.deepEqual(out.map((q) => q.id), stored.questions.map((q) => q.id), 'every real question reads back');
       return out;
     }),
   'verify-evidence': (sampleAbs, sampleName) =>

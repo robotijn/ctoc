@@ -61,10 +61,10 @@ function forkQuestion(id) {
   return {
     id,
     prompt: `Which store backs ${id}?`,
-    critical: true, important: false,
+    critical: true, important: false, topic: 'technology-stack',
     options: [
-      { key: 'pg', label: 'Postgres', recommended: true, pros: 'Relational.', cons: 'Ops cost.' },
-      { key: 'sqlite', label: 'SQLite', pros: 'Zero ops.', cons: 'Single writer.' },
+      { key: '1', label: 'Postgres', recommended: true, pros: 'Relational.', cons: 'Ops cost.' },
+      { key: '2', label: 'SQLite', pros: 'Zero ops.', cons: 'Single writer.' },
     ],
   };
 }
@@ -219,8 +219,8 @@ describe('crossBySufficiency — the crossing records the enriched evidence and 
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff-nine', validFunctionalBody('suff-nine'));
     const ref = 'functional/suff-nine.md';
-    precompute.writePlanQuestions(root, ref, [forkQuestion('db')], fs.statSync(p).mtimeMs);
-    streamingGate.streamAnswer(ref, 'db', 'pg', root);
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs);
+    streamingGate.streamAnswer(ref, 'q10-db', '1', root);
 
     streamingGate.pendingGateDecisions(root); // crosses
 
@@ -245,7 +245,7 @@ describe('crossBySufficiency — the crossing records the enriched evidence and 
 
     const v = {
       enough: true, reason: 'enough', computed: 1,
-      answeredQuestionIds: ['db'], unansweredQuestionIds: [], blockingQuestionIds: [], unboundAnswers: 0,
+      answeredQuestionIds: ['q10-db'], unansweredQuestionIds: [], blockingQuestionIds: [], unboundAnswers: 0,
     };
     const crossed = streamingGate.crossBySufficiency(root, p, ref, 'functional', 'implementation', v);
 
@@ -258,8 +258,8 @@ describe('crossBySufficiency — the crossing records the enriched evidence and 
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff-idem', validFunctionalBody('suff-idem'));
     const ref = 'functional/suff-idem.md';
-    precompute.writePlanQuestions(root, ref, [forkQuestion('db')], fs.statSync(p).mtimeMs);
-    streamingGate.streamAnswer(ref, 'db', 'pg', root);
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs);
+    streamingGate.streamAnswer(ref, 'q10-db', '1', root);
 
     streamingGate.pendingGateDecisions(root); // first pass: crosses
     const entryPath = ledgerFile(root, 'suff-idem');

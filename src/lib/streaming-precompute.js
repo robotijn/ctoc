@@ -228,6 +228,10 @@ function isTopiclessId(id) {
   }
   return false;
 }
+// `q<NN>-<kebab>`; an optional `-r<digits>` revision suffix is itself kebab, so this one
+// character class covers it. Option keys are the three the screen can show.
+const QUESTION_ID = /^q[0-9]{2}-[a-z0-9-]+$/;
+const OPTION_KEY = /^[1-3]$/;
 // Zero-width and bidirectional-control characters: text that reads one way and says another.
 const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/;
 const CONTROL = /[\u0000-\u001F\u007F-\u009F]/g;
@@ -260,9 +264,10 @@ function labelIdentity(label) {
  *   Question = { id, prompt, critical, important, topic, options: [Option] }
  *   Option   = { key, label, recommended?, pros?, cons?, description? }
  *
- * Rules: `id`/`prompt`/`key`/`label` are REQUIRED non-empty strings; question ids
- * are UNIQUE across the array; `options` is REQUIRED with one to three options whose
- * keys are unique and whose labels are unique once control characters are stripped,
+ * Rules: `id`/`prompt`/`key`/`label` are REQUIRED non-empty strings; a question id
+ * matches `q<NN>-<kebab>` (an `-r<digits>` revision suffix included) and is UNIQUE across
+ * the array; `options` is REQUIRED with one to three options whose keys are `"1"`, `"2"`
+ * or `"3"` and unique — no key can carry a shell word into a typed command — and whose labels are unique once control characters are stripped,
  * the label trimmed and lower-cased; `critical` and `important` are REQUIRED booleans
  * (a missing flag is an undeclared fork); `topic` is REQUIRED and one of
  * QUESTION_TOPICS, except on the reserved gate ruling and coverage notice, which carry
@@ -303,6 +308,9 @@ function validatePlanQuestions(raw) {
         errors.push(`duplicate question id ${JSON.stringify(safeQuestionId(question.id))}`);
       }
       seenQuestionIds.add(question.id);
+      if (!QUESTION_ID.test(question.id)) {
+        errors.push(`${where}.id must match q<NN>-<kebab-topic> with an optional -r<digits> suffix`);
+      }
     }
     if (!isNonEmptyString(question.prompt)) {
       errors.push(`${where} is missing a non-empty string prompt`);
@@ -349,8 +357,8 @@ function validatePlanQuestions(raw) {
         errors.push(`${owhere} must be an object`);
         return;
       }
-      if (!isNonEmptyString(option.key)) {
-        errors.push(`${owhere} is missing a non-empty string key`);
+      if (!isNonEmptyString(option.key) || !OPTION_KEY.test(option.key)) {
+        errors.push(`${owhere}.key must be "1", "2" or "3"`);
       } else {
         if (seenKeys.has(option.key)) {
           errors.push(`duplicate option key ${JSON.stringify(option.key)} within ${where}`);

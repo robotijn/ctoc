@@ -59,6 +59,13 @@ function validFunctionalBody(slug, extra = '') {
     `## Acceptance Criteria\n- [ ] the thing works\n\n## Scope\nThe module.\n`;
 }
 
+/**
+ * The gate critic's classification block. Every question set here is written classified:
+ * under the owner's decision of 2026-10-07 only a classified file lets a question's topic
+ * decide anything, and these cases test answer binding, not who assigned the topics.
+ */
+const CLASSIFIED = Object.freeze({ by: 'gate-critic', at: 1786000000000 });
+
 /** Force a plan file's modification time to an exact millisecond value. */
 function setPlanMtime(planPath, ms) {
   const seconds = ms / 1000;
@@ -76,7 +83,7 @@ function seedAt(root, stage, slug, questions, planMs, body) {
   fs.writeFileSync(planPath, body || validFunctionalBody(slug));
   const planMtimeMs = setPlanMtime(planPath, planMs);
   const ref = `${stage}/${slug}.md`;
-  const res = precompute.writePlanQuestions(root, ref, questions, planMtimeMs);
+  const res = precompute.writePlanQuestions(root, ref, questions, planMtimeMs, undefined, CLASSIFIED);
   assert.equal(res.ok, true, 'fixture precondition: the questions file was written');
   return {
     ref,
@@ -90,7 +97,7 @@ function seedAt(root, stage, slug, questions, planMs, body) {
 function reviseTo(root, seeded, slug, questions, planMs) {
   fs.writeFileSync(seeded.planPath, validFunctionalBody(slug, ' It is broken in a new way.'));
   const planMtimeMs = setPlanMtime(seeded.planPath, planMs);
-  const res = precompute.writePlanQuestions(root, seeded.ref, questions, planMtimeMs);
+  const res = precompute.writePlanQuestions(root, seeded.ref, questions, planMtimeMs, undefined, CLASSIFIED);
   assert.equal(res.ok, true, 'fixture precondition: the regenerated questions were written');
   return { ...seeded, planMtimeMs, revision: { questionsRevisionMs: planMtimeMs, planMtimeMs } };
 }
@@ -112,10 +119,10 @@ function fork(id, prompt) {
   return {
     id,
     prompt: prompt || `${id}?`,
-    critical: true, important: false,
+    critical: true, important: false, topic: 'technology-stack',
     options: [
-      { key: 'a', label: 'Option A', recommended: true, pros: 'Simple', cons: 'Narrow' },
-      { key: 'b', label: 'Option B', pros: 'Broad', cons: 'Costly' },
+      { key: '1', label: 'Option A', recommended: true, pros: 'Simple', cons: 'Narrow' },
+      { key: '2', label: 'Option B', pros: 'Broad', cons: 'Costly' },
     ],
   };
 }
@@ -125,8 +132,8 @@ function detail(id) {
   return {
     id,
     prompt: `${id}?`,
-    critical: false, important: false,
-    options: [{ key: 'a', label: 'Option A', recommended: true }, { key: 'b', label: 'Option B' }],
+    critical: false, important: false, topic: 'detail',
+    options: [{ key: '1', label: 'Option A', recommended: true }, { key: '2', label: 'Option B' }],
   };
 }
 
@@ -155,9 +162,9 @@ const iso = (ms) => new Date(ms).toISOString();
 describe('the shared binding rule — readAnsweredQuestionIds', () => {
   it('case 1 — THE DEFECT: an answer given on revision A never suppresses revision B\'s reused id', () => {
     const root = makeSandbox();
-    let s = seedAt(root, 'functional', 'c1', [fork('q10', 'Should the sync barrier settle an unconfirmed orphan?')], T0);
+    let s = seedAt(root, 'functional', 'c1', [fork('q10-a', 'Should the sync barrier settle an unconfirmed orphan?')], T0);
     appendAnswer(root, {
-      ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10', optionKey: 'a',
+      ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10-a', optionKey: '1',
       planMtimeMs: s.revision.questionsRevisionMs,
     });
     // Sanity: on revision A the answer binds and the plan is sufficient.
@@ -166,27 +173,27 @@ describe('the shared binding rule — readAnsweredQuestionIds', () => {
 
     // The plan is edited; the questions are regenerated and `q10` now names a
     // DIFFERENT question. The human has never seen this one.
-    s = reviseTo(root, s, 'c1', [fork('q10', 'Does step 14 exclude the quality gate?')], T0 + 60000);
+    s = reviseTo(root, s, 'c1', [fork('q10-a', 'Does step 14 exclude the quality gate?')], T0 + 60000);
 
     const v = precompute.hasEnoughInformation(root, s.ref);
-    assert.deepEqual(v.unanswered.map((q) => q.id), ['q10'],
+    assert.deepEqual(v.unanswered.map((q) => q.id), ['q10-a'],
       'the regenerated question is ASKED, not suppressed by an answer about other text');
-    assert.deepEqual(v.blocking.map((q) => q.id), ['q10'], 'and it blocks, because it is a fork');
+    assert.deepEqual(v.blocking.map((q) => q.id), ['q10-a'], 'and it blocks, because it is a fork');
     assert.equal(v.enough, false, 'a verdict is never reported on input the human never received');
     assert.equal(v.unboundAnswers, 1, 'the verdict reports the answer that could not be tied to this revision');
   });
 
   it('case 2 — a stamp matching the current question set counts', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c2', [fork('q10')], T0);
+    const s = seedAt(root, 'functional', 'c2', [fork('q10-a')], T0);
     appendAnswer(root, {
-      ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10', optionKey: 'a',
+      ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10-a', optionKey: '1',
       planMtimeMs: s.revision.questionsRevisionMs,
     });
 
     const r = precompute.readAnsweredQuestionIds(root, s.ref, s.revision);
     assert.equal(r.ok, true);
-    assert.deepEqual([...r.ids], ['q10']);
+    assert.deepEqual([...r.ids], ['q10-a']);
     assert.equal(r.bound.stamped, 1, 'bound by its explicit stamp');
     assert.equal(r.bound.derived, 0);
     assert.equal(r.unbound, 0);
@@ -195,12 +202,12 @@ describe('the shared binding rule — readAnsweredQuestionIds', () => {
 
   it('case 3 — an UNSTAMPED answer recorded AFTER the plan mtime binds (the derived rule)', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c3', [fork('q10')], T0);
-    appendAnswer(root, { ts: iso(T0 + 5000), ref: s.ref, questionId: 'q10', optionKey: 'a' });
+    const s = seedAt(root, 'functional', 'c3', [fork('q10-a')], T0);
+    appendAnswer(root, { ts: iso(T0 + 5000), ref: s.ref, questionId: 'q10-a', optionKey: '1' });
 
     const r = precompute.readAnsweredQuestionIds(root, s.ref, s.revision);
     assert.equal(r.ok, true);
-    assert.deepEqual([...r.ids], ['q10'], 'the plan has not changed since the answer, so the answer is about this text');
+    assert.deepEqual([...r.ids], ['q10-a'], 'the plan has not changed since the answer, so the answer is about this text');
     assert.equal(r.bound.derived, 1, 'bound by DERIVATION from two facts on disk, never asserted');
     assert.equal(r.bound.stamped, 0);
     assert.equal(r.unbound, 0);
@@ -209,8 +216,8 @@ describe('the shared binding rule — readAnsweredQuestionIds', () => {
 
   it('case 4 — an UNSTAMPED answer recorded BEFORE the plan mtime does NOT bind', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c4', [fork('q10')], T0);
-    appendAnswer(root, { ts: iso(T0 - 5000), ref: s.ref, questionId: 'q10', optionKey: 'a' });
+    const s = seedAt(root, 'functional', 'c4', [fork('q10-a')], T0);
+    appendAnswer(root, { ts: iso(T0 - 5000), ref: s.ref, questionId: 'q10-a', optionKey: '1' });
 
     const r = precompute.readAnsweredQuestionIds(root, s.ref, s.revision);
     assert.equal(r.ok, true);
@@ -223,35 +230,35 @@ describe('the shared binding rule — readAnsweredQuestionIds', () => {
 
   it('case 5 — the boundary counts: an answer recorded exactly at the plan mtime binds', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c5', [fork('q10')], T0);
-    appendAnswer(root, { ts: iso(Math.floor(s.planMtimeMs)), ref: s.ref, questionId: 'q10', optionKey: 'a' });
+    const s = seedAt(root, 'functional', 'c5', [fork('q10-a')], T0);
+    appendAnswer(root, { ts: iso(Math.floor(s.planMtimeMs)), ref: s.ref, questionId: 'q10-a', optionKey: '1' });
 
     const r = precompute.readAnsweredQuestionIds(root, s.ref, s.revision);
-    assert.deepEqual([...r.ids], ['q10'], 'at-or-after, not strictly after');
+    assert.deepEqual([...r.ids], ['q10-a'], 'at-or-after, not strictly after');
     assert.equal(r.bound.derived, 1);
   });
 
   it('case 6 — BOTH observed log shapes parse for the derived rule ({ts,…} and {at,…})', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c6', [fork('q10'), fork('q11')], T0);
-    appendAnswer(root, { ts: iso(T0 + 5000), ref: s.ref, questionId: 'q10', optionKey: 'a' });
+    const s = seedAt(root, 'functional', 'c6', [fork('q10-a'), fork('q11-b')], T0);
+    appendAnswer(root, { ts: iso(T0 + 5000), ref: s.ref, questionId: 'q10-a', optionKey: '1' });
     // The nine entries in this project's real log use this second shape — written by
     // an ad-hoc script, not by any JavaScript in src/. It must READ correctly.
-    appendAnswer(root, { ref: s.ref, questionId: 'q11', answer: 'Some prose answer', at: iso(T0 + 6000) });
+    appendAnswer(root, { ref: s.ref, questionId: 'q11-b', answer: '1', at: iso(T0 + 6000) });
 
     const r = precompute.readAnsweredQuestionIds(root, s.ref, s.revision);
-    assert.deepEqual([...r.ids].sort(), ['q10', 'q11']);
+    assert.deepEqual([...r.ids].sort(), ['q10-a', 'q11-b']);
     assert.equal(r.bound.derived, 2, 'both shapes carry a usable recorded time');
     assert.equal(r.unbound, 0);
   });
 
   it('case 7 — a present-but-MISMATCHED stamp is never rescued by the derived rule', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c7', [fork('q10')], T0);
+    const s = seedAt(root, 'functional', 'c7', [fork('q10-a')], T0);
     // Recorded AFTER the plan's current mtime (the derived rule would say yes) but
     // stamped with a DIFFERENT question set (the direct evidence says no).
     appendAnswer(root, {
-      ts: iso(T0 + 9000), ref: s.ref, questionId: 'q10', optionKey: 'a',
+      ts: iso(T0 + 9000), ref: s.ref, questionId: 'q10-a', optionKey: '1',
       planMtimeMs: s.revision.questionsRevisionMs - 12345,
     });
 
@@ -263,22 +270,22 @@ describe('the shared binding rule — readAnsweredQuestionIds', () => {
 
   it('case 8 — a NON-FINITE stamp falls through to the derived rule', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c8', [fork('q10')], T0);
+    const s = seedAt(root, 'functional', 'c8', [fork('q10-a')], T0);
     appendAnswer(root, {
-      ts: iso(T0 + 9000), ref: s.ref, questionId: 'q10', optionKey: 'a', planMtimeMs: 'yesterday',
+      ts: iso(T0 + 9000), ref: s.ref, questionId: 'q10-a', optionKey: '1', planMtimeMs: 'yesterday',
     });
 
     const r = precompute.readAnsweredQuestionIds(root, s.ref, s.revision);
-    assert.deepEqual([...r.ids], ['q10'], 'an unusable stamp is no stamp at all');
+    assert.deepEqual([...r.ids], ['q10-a'], 'an unusable stamp is no stamp at all');
     assert.equal(r.bound.derived, 1);
   });
 
   it('case 9 — an UNESTABLISHED revision is ignorance: ok:false, nothing bound, log not consulted', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c9', [fork('q10')], T0);
+    const s = seedAt(root, 'functional', 'c9', [fork('q10-a')], T0);
     // An answer that WOULD bind under a usable revision.
     appendAnswer(root, {
-      ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10', optionKey: 'a',
+      ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10-a', optionKey: '1',
       planMtimeMs: s.revision.questionsRevisionMs,
     });
 
@@ -298,13 +305,13 @@ describe('the shared binding rule — readAnsweredQuestionIds', () => {
 
   it('case 10 — an ABSENT log is knowledge; an UNREADABLE log is ignorance', () => {
     const rootA = makeSandbox();
-    const a = seedAt(rootA, 'functional', 'c10a', [fork('q10')], T0);
+    const a = seedAt(rootA, 'functional', 'c10a', [fork('q10-a')], T0);
     const ra = precompute.readAnsweredQuestionIds(rootA, a.ref, a.revision);
     assert.equal(ra.ok, true, 'nothing answered YET is a fact, not a failure');
     assert.deepEqual([...ra.ids], []);
 
     const rootB = makeSandbox();
-    const b = seedAt(rootB, 'functional', 'c10b', [fork('q10')], T0);
+    const b = seedAt(rootB, 'functional', 'c10b', [fork('q10-a')], T0);
     fs.mkdirSync(path.join(rootB, '.ctoc', 'streaming', 'answers.jsonl'), { recursive: true }); // EISDIR
     const rb = precompute.readAnsweredQuestionIds(rootB, b.ref, b.revision);
     assert.equal(rb.ok, false, 'could not read ≠ nothing answered');
@@ -314,21 +321,21 @@ describe('the shared binding rule — readAnsweredQuestionIds', () => {
 
   it('case 11 — a malformed line is skipped, never fatal', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c11', [fork('q10')], T0);
+    const s = seedAt(root, 'functional', 'c11', [fork('q10-a')], T0);
     const dir = path.join(root, '.ctoc', 'streaming');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'answers.jsonl'), [
       'not json',
       '{"broken":',
       'null',
-      JSON.stringify({ ts: iso(T0 + 1000), ref: s.ref, optionKey: 'a' }), // names no question
-      JSON.stringify({ ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10', optionKey: 'a' }),
+      JSON.stringify({ ts: iso(T0 + 1000), ref: s.ref, optionKey: '1' }), // names no question
+      JSON.stringify({ ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10-a', optionKey: '1' }),
       '',
     ].join('\n'));
 
     const r = precompute.readAnsweredQuestionIds(root, s.ref, s.revision);
     assert.equal(r.ok, true);
-    assert.deepEqual([...r.ids], ['q10'], 'the good record survives the junk around it');
+    assert.deepEqual([...r.ids], ['q10-a'], 'the good record survives the junk around it');
   });
 
   it('case 12 — the shared function is EXPORTED (a module is done when a caller can reach it)', () => {
@@ -340,12 +347,12 @@ describe('the shared binding rule — readAnsweredQuestionIds', () => {
 
   it('case 12b — the revision is omittable and derived internally from planQuestionsStatus', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c12b', [fork('q10')], T0);
-    appendAnswer(root, { ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10', optionKey: 'a' });
+    const s = seedAt(root, 'functional', 'c12b', [fork('q10-a')], T0);
+    appendAnswer(root, { ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10-a', optionKey: '1' });
 
     const r = precompute.readAnsweredQuestionIds(root, s.ref);
     assert.equal(r.ok, true);
-    assert.deepEqual([...r.ids], ['q10']);
+    assert.deepEqual([...r.ids], ['q10-a']);
 
     // A ref whose questions are not ready cannot establish a revision → ok:false.
     const closed = precompute.readAnsweredQuestionIds(root, 'functional/nope.md');
@@ -355,7 +362,7 @@ describe('the shared binding rule — readAnsweredQuestionIds', () => {
 
   it('case 12c — planQuestionsStatus carries BOTH revision values on ready', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c12c', [fork('q10')], T0);
+    const s = seedAt(root, 'functional', 'c12c', [fork('q10-a')], T0);
     const st = precompute.planQuestionsStatus(root, s.ref);
     assert.equal(st.status, 'ready');
     assert.equal(st.questionsRevisionMs, s.planMtimeMs, 'the stamp the question set was generated against');
@@ -384,51 +391,51 @@ describe('the gate-side caller runs the SAME binding matrix', () => {
 
   it('case 14 — the next-question path RE-OFFERS a question whose only answer is unbound', () => {
     const root = makeSandbox();
-    let s = seedAt(root, 'functional', 'c14', [fork('q10', 'The old question')], T0);
+    let s = seedAt(root, 'functional', 'c14', [fork('q10-a', 'The old question')], T0);
     appendAnswer(root, {
-      ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10', optionKey: 'a',
+      ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10-a', optionKey: '1',
       planMtimeMs: s.revision.questionsRevisionMs,
     });
-    s = reviseTo(root, s, 'c14', [fork('q10', 'A DIFFERENT question in the same slot')], T0 + 60000);
+    s = reviseTo(root, s, 'c14', [fork('q10-a', 'A DIFFERENT question in the same slot')], T0 + 60000);
 
-    assert.equal(offeredQuestionId(root), 'q10', 'the human is shown the question they never saw');
+    assert.equal(offeredQuestionId(root), 'q10-a', 'the human is shown the question they never saw');
   });
 
   it('case 15 — the next-question path still SKIPS a bound answer', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c15', [fork('q10'), fork('q11')], T0);
+    const s = seedAt(root, 'functional', 'c15', [fork('q10-a'), fork('q11-b')], T0);
     appendAnswer(root, {
-      ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10', optionKey: 'a',
+      ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10-a', optionKey: '1',
       planMtimeMs: s.revision.questionsRevisionMs,
     });
 
-    assert.equal(offeredQuestionId(root), 'q11', 'an answered question is not asked twice');
+    assert.equal(offeredQuestionId(root), 'q11-b', 'an answered question is not asked twice');
   });
 
   it('case 16 — the DERIVED rule applies on the gate path too (positive)', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c16', [fork('q10'), fork('q11')], T0);
-    appendAnswer(root, { ts: iso(T0 + 5000), ref: s.ref, questionId: 'q10', optionKey: 'a' });
+    const s = seedAt(root, 'functional', 'c16', [fork('q10-a'), fork('q11-b')], T0);
+    appendAnswer(root, { ts: iso(T0 + 5000), ref: s.ref, questionId: 'q10-a', optionKey: '1' });
 
-    assert.equal(offeredQuestionId(root), 'q11', 'same verdict as the predicate side, through the other caller');
+    assert.equal(offeredQuestionId(root), 'q11-b', 'same verdict as the predicate side, through the other caller');
   });
 
   it('case 17 — the DERIVED rule applies on the gate path too (negative)', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c17', [fork('q10'), fork('q11')], T0);
-    appendAnswer(root, { ts: iso(T0 - 5000), ref: s.ref, questionId: 'q10', optionKey: 'a' });
+    const s = seedAt(root, 'functional', 'c17', [fork('q10-a'), fork('q11-b')], T0);
+    appendAnswer(root, { ts: iso(T0 - 5000), ref: s.ref, questionId: 'q10-a', optionKey: '1' });
 
-    assert.equal(offeredQuestionId(root), 'q10', 'an answer older than the plan re-opens its question');
+    assert.equal(offeredQuestionId(root), 'q10-a', 'an answer older than the plan re-opens its question');
   });
 
   it('case 18 — the sufficiency-ledger evidence counts ONLY bound answers, and says what did not bind', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c18', [fork('q10'), fork('q11')], T0);
+    const s = seedAt(root, 'functional', 'c18', [fork('q10-a'), fork('q11-b')], T0);
     const stamp = s.revision.questionsRevisionMs;
-    appendAnswer(root, { ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10', optionKey: 'a', planMtimeMs: stamp });
-    appendAnswer(root, { ts: iso(T0 + 2000), ref: s.ref, questionId: 'q11', optionKey: 'a', planMtimeMs: stamp });
+    appendAnswer(root, { ts: iso(T0 + 1000), ref: s.ref, questionId: 'q10-a', optionKey: '1', planMtimeMs: stamp });
+    appendAnswer(root, { ts: iso(T0 + 2000), ref: s.ref, questionId: 'q11-b', optionKey: '1', planMtimeMs: stamp });
     // A third recorded answer that belongs to an older question set.
-    appendAnswer(root, { ts: iso(T0 + 3000), ref: s.ref, questionId: 'q12', optionKey: 'a', planMtimeMs: stamp - 99999 });
+    appendAnswer(root, { ts: iso(T0 + 3000), ref: s.ref, questionId: 'q12-c', optionKey: '1', planMtimeMs: stamp - 99999 });
 
     streamingGate.pendingGateDecisions(root); // sufficiency crosses the plan and writes the entry
     const entry = JSON.parse(fs.readFileSync(path.join(root, '.ctoc', 'approvals', 'c18.json'), 'utf8'));
@@ -438,22 +445,22 @@ describe('the gate-side caller runs the SAME binding matrix', () => {
     // M answered". Both are asserted here so a future edit cannot drop either count.
     assert.match(entry.evidence, /2 question\(s\) computed/, 'the count that EXISTED is recorded');
     assert.match(entry.evidence, /2 answered/, 'only the answers that bind are counted');
-    assert.match(entry.evidence, /q10, q11/);
-    assert.equal(/q12/.test(entry.evidence), false, 'an unbound answer is not evidence of sufficiency');
+    assert.match(entry.evidence, /q10-a, q11-b/);
+    assert.equal(/q12-c/.test(entry.evidence), false, 'an unbound answer is not evidence of sufficiency');
     assert.match(entry.evidence, /1 recorded answer\(s\) did not bind to this revision/,
       'the ledger records the whole truth, including what was discarded');
   });
 
   it('case 19 — streamAnswer STAMPS the revision it was answering', () => {
     const root = makeSandbox();
-    const s = seedAt(root, 'functional', 'c19', [fork('q10'), fork('q11')], T0);
+    const s = seedAt(root, 'functional', 'c19', [fork('q10-a'), fork('q11-b')], T0);
 
-    route(['stream', 'answer', s.ref, 'q10', 'a'], root);
+    route(['stream', 'answer', s.ref, 'q10-a', '1'], root);
 
     const lines = readAnswerLines(root);
     assert.equal(lines.length, 1);
-    assert.equal(lines[0].questionId, 'q10');
-    assert.equal(lines[0].optionKey, 'a');
+    assert.equal(lines[0].questionId, 'q10-a');
+    assert.equal(lines[0].optionKey, '1');
     assert.equal(lines[0].planMtimeMs, s.revision.questionsRevisionMs,
       "the answer records which question set it was given for");
   });
@@ -463,7 +470,7 @@ describe('the gate-side caller runs the SAME binding matrix', () => {
     const planPath = path.join(root, 'plans', 'functional', 'c20.md');
     fs.writeFileSync(planPath, validFunctionalBody('c20')); // NO questions file → no revision
 
-    const screen = route(['stream', 'answer', 'functional/c20.md', 'q10', 'a'], root);
+    const screen = route(['stream', 'answer', 'functional/c20.md', 'q10-a', '1'], root);
 
     const lines = readAnswerLines(root);
     assert.equal(lines.length, 1, 'refusing the answer would lose the human\'s input');
@@ -482,12 +489,12 @@ describe('the gate-side caller runs the SAME binding matrix', () => {
     fs.writeFileSync(path.join(root, 'plans', 'functional', 'nc.md'), validFunctionalBody('nc'));
     assert.equal(precompute.hasEnoughInformation(root, 'functional/nc.md').reason, 'not-computed');
 
-    const st = seedAt(root, 'functional', 'st', [fork('q10')], T0);
+    const st = seedAt(root, 'functional', 'st', [fork('q10-a')], T0);
     fs.writeFileSync(st.planPath, validFunctionalBody('st', ' changed'));
     setPlanMtime(st.planPath, T0 + 120000);
     assert.equal(precompute.hasEnoughInformation(root, st.ref).reason, 'stale');
 
-    const inv = seedAt(root, 'functional', 'inv', [fork('q10')], T0);
+    const inv = seedAt(root, 'functional', 'inv', [fork('q10-a')], T0);
     fs.writeFileSync(precompute.questionsPath(root, inv.ref), '{not json');
     assert.equal(precompute.hasEnoughInformation(root, inv.ref).reason, 'invalid');
 
@@ -495,11 +502,11 @@ describe('the gate-side caller runs the SAME binding matrix', () => {
 
     // An UNBOUND answer to a NORMAL question leaves enough:true, and the question is
     // still listed honestly in `unanswered`.
-    const n = seedAt(root, 'functional', 'norm', [detail('q30')], T0);
-    appendAnswer(root, { ts: iso(T0 - 5000), ref: n.ref, questionId: 'q30', optionKey: 'a' });
+    const n = seedAt(root, 'functional', 'norm', [detail('q30-d')], T0);
+    appendAnswer(root, { ts: iso(T0 - 5000), ref: n.ref, questionId: 'q30-d', optionKey: '1' });
     const v = precompute.hasEnoughInformation(root, n.ref);
     assert.equal(v.enough, true, 'a normal question is a detail, never a fork');
-    assert.deepEqual(v.unanswered.map((q) => q.id), ['q30'], 'nothing is hidden');
+    assert.deepEqual(v.unanswered.map((q) => q.id), ['q30-d'], 'nothing is hidden');
     assert.equal(v.unboundAnswers, 1);
   });
 });

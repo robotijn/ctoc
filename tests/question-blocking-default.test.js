@@ -61,12 +61,12 @@ function writePlan(root, stage, slug) {
 
 /** A single valid option so a question is otherwise well-formed. */
 function opts() {
-  return [{ key: 'a', label: 'Option A' }, { key: 'b', label: 'Option B' }];
+  return [{ key: '1', label: 'Option A' }, { key: '2', label: 'Option B' }];
 }
 
 /** Two options, exactly one recommended — a declared detail with a known best answer. */
 function recOpts() {
-  return [{ key: 'a', label: 'Option A', recommended: true }, { key: 'b', label: 'Option B' }];
+  return [{ key: '1', label: 'Option A', recommended: true }, { key: '2', label: 'Option B' }];
 }
 
 /** The gate critic's record that it assigned the topics (the owner's decision of 2026-10-07). */
@@ -170,7 +170,7 @@ describe('hasEnoughInformation — unflagged unanswered questions do NOT wave a 
     // reachable only from a unit test (Operating Lesson 16).
     const questions = [];
     for (let i = 0; i < 12; i++) {
-      questions.push({ id: `q${i}`, prompt: `Fork ${i}?`, critical: true, important: false, topic: 'detail', options: opts() });
+      questions.push({ id: `q${10 + i}-fork`, prompt: `Fork ${i}?`, critical: true, important: false, topic: 'detail', options: opts() });
     }
     const res = precompute.writePlanQuestions(root, ref, questions, fs.statSync(planPath).mtimeMs);
     assert.equal(res.ok, true, 'well-declared forks are accepted by the writer');
@@ -187,7 +187,7 @@ describe('validatePlanQuestions — both importance flags are mandatory booleans
     const root = makeSandbox();
     const planPath = writePlan(root, 'functional', 'miss-crit');
     const ref = 'functional/miss-crit.md';
-    const questions = [{ id: 'needs-decl', prompt: 'p?', important: false, options: opts() }];
+    const questions = [{ id: 'q10-needs-decl', topic: 'detail', prompt: 'p?', important: false, options: opts() }];
 
     const res = precompute.writePlanQuestions(root, ref, questions, fs.statSync(planPath).mtimeMs);
     assert.equal(res.ok, false, 'a question missing critical is refused');
@@ -203,12 +203,12 @@ describe('validatePlanQuestions — both importance flags are mandatory booleans
     const root = makeSandbox();
     const planPath = writePlan(root, 'functional', 'bad-flag');
     const ref = 'functional/bad-flag.md';
-    const questions = [{ id: 'q1', prompt: 'p?', critical: 'yes', important: false, options: opts() }];
+    const questions = [{ id: 'q11-bad-flag', topic: 'detail', prompt: 'p?', critical: 'yes', important: false, options: opts() }];
 
     const res = precompute.writePlanQuestions(root, ref, questions, fs.statSync(planPath).mtimeMs);
     assert.equal(res.ok, false, 'a non-boolean flag is refused');
     const joined = res.errors.join(' | ');
-    assert.match(joined, /q1/, 'the error names the question id');
+    assert.match(joined, /q11-bad-flag/, 'the error names the question id');
     assert.match(joined, /critical/, 'the error names the mistyped key');
   });
 
@@ -216,7 +216,7 @@ describe('validatePlanQuestions — both importance flags are mandatory booleans
     const root = makeSandbox();
     const planPath = writePlan(root, 'functional', 'refused');
     const ref = 'functional/refused.md';
-    const questions = [{ id: 'q1', prompt: 'p?', important: false, options: opts() }];
+    const questions = [{ id: 'q10-refused', topic: 'detail', prompt: 'p?', important: false, options: opts() }];
 
     const res = precompute.writePlanQuestions(root, ref, questions, fs.statSync(planPath).mtimeMs);
     assert.equal(res.ok, false, 'precondition: the malformed write is refused');
@@ -272,7 +272,7 @@ describe('isBlockingQuestion — only weighty questions reach the human', () => 
   });
 
   it('19. a detail with TWO recommended options blocks — not exactly one recommended', () => {
-    const options = [{ key: 'a', label: 'A', recommended: true }, { key: 'b', label: 'B', recommended: true }];
+    const options = [{ key: '1', label: 'A', recommended: true }, { key: '2', label: 'B', recommended: true }];
     assert.equal(precompute.isBlockingQuestion({ id: 'q', prompt: 'p', critical: false, important: true, topic: 'detail', options }), true);
   });
 
@@ -300,16 +300,16 @@ describe('validatePlanQuestions — topic is closed, holds is never a question f
   const detailQ = (extra) => ({ id: 'q10-x', prompt: 'p?', critical: false, important: false, topic: 'detail', options: recOpts(), ...extra });
 
   it('21. the writer refuses an unknown topic, names the question id and lists the allowed values', () => {
-    const joined = refused([detailQ({ id: 'q-stack', topic: 'stack' })]);
-    assert.match(joined, /q-stack/, 'the error names the question id');
+    const joined = refused([detailQ({ id: 'q10-stack', topic: 'stack' })]);
+    assert.match(joined, /q10-stack/, 'the error names the question id');
     assert.match(joined, /technology-stack/, 'the error lists the allowed values');
     assert.match(joined, /detail/, 'the error lists the allowed values');
   });
 
   it('22. the writer refuses a non-string topic, and refuses `holds` on any option — a hold is the human\'s answer, recorded by CTOC', () => {
-    refused([detailQ({ topic: 7 })]);
+    assert.match(refused([detailQ({ topic: 7 })]), /must declare a "topic"/);
     for (const holds of [true, false, 'yes']) {
-      assert.match(refused([detailQ({ options: [{ key: 'a', label: 'A', recommended: true, holds }, { key: 'b', label: 'B' }] })]), /holds/);
+      assert.match(refused([detailQ({ options: [{ key: '1', label: 'A', recommended: true, holds }, { key: '2', label: 'B' }] })]), /holds/);
     }
   });
 
@@ -330,32 +330,32 @@ describe('validatePlanQuestions — topic is closed, holds is never a question f
   });
 
   it('24b. a topic on the gate ruling or the coverage notice is refused — it could turn the ruling into a decided detail', () => {
-    refused([detailQ({ id: 'q99-gate-ruling-r1786000000000', important: true })]);
-    refused([detailQ({ id: 'q98-critique-coverage' })]);
+    assert.match(refused([detailQ({ id: 'q99-gate-ruling-r1786000000000', important: true })]), /carries no "topic"/);
+    assert.match(refused([detailQ({ id: 'q98-critique-coverage' })]), /carries no "topic"/);
     assert.equal(precompute.validatePlanQuestions([detailQ({ id: 'q99-gate-ruling-rx1' })]).valid, true, 'a look-alike id is an ordinary question');
   });
 
   it('24c. zero-width and direction-changing characters are refused in every text the human reads', () => {
     const hidden = ['\u200B', '\u200F', '\u202A', '\u202E', '\u2066', '\uFEFF'];
     for (const ch of hidden) {
-      refused([detailQ({ prompt: `Approve${ch}?` })]);
-      refused([detailQ({ options: [{ key: 'a', label: `A${ch}`, recommended: true }, { key: 'b', label: 'B' }] })]);
+      assert.match(refused([detailQ({ prompt: `Approve${ch}?` })]), /invisible/);
+      assert.match(refused([detailQ({ options: [{ key: '1', label: `A${ch}`, recommended: true }, { key: '2', label: 'B' }] })]), /invisible/);
       for (const field of ['pros', 'cons', 'description']) {
-        refused([detailQ({ options: [{ key: 'a', label: 'A', recommended: true, [field]: `x${ch}y` }, { key: 'b', label: 'B' }] })]);
+        assert.match(refused([detailQ({ options: [{ key: '1', label: 'A', recommended: true, [field]: `x${ch}y` }, { key: '2', label: 'B' }] })]), /invisible/);
       }
     }
   });
 
   it('24d. two labels the human cannot tell apart are refused: case, surrounding space and control characters do not count', () => {
-    refused([detailQ({ options: [{ key: 'a', label: 'Approve', recommended: true }, { key: 'b', label: ' approve\u0007 ' }] })]);
+    assert.match(refused([detailQ({ options: [{ key: '1', label: 'Approve', recommended: true }, { key: '2', label: ' approve\u0007 ' }] })]), /label repeats/);
   });
 
   it('24e. more than three options is refused', () => {
-    refused([detailQ({ options: [1, 2, 3, 4].map((k) => ({ key: String(k), label: `L${k}`, recommended: k === 1 })) })]);
+    assert.match(refused([detailQ({ options: [1, 2, 3, 3].map((k, i) => ({ key: String(k), label: `L${i}`, recommended: i === 0 })) })]), /one to three options/);
   });
 
   it('24f. a single option with no recommendation on a weighty topic is refused; on a detail it is a notice (guard)', () => {
-    refused([detailQ({ topic: 'algorithm', options: [{ key: '1', label: 'Noted' }] })]);
+    assert.match(refused([detailQ({ topic: 'algorithm', options: [{ key: '1', label: 'Noted' }] })]), /never a notice/);
     assert.equal(precompute.validatePlanQuestions([detailQ({ options: [{ key: '1', label: 'Noted' }] })]).valid, true);
   });
 });
@@ -507,6 +507,19 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
       { id: 'q99-gate-ruling-r1', prompt: 'Lens verdict: APPROVE — r. Rule now.', critical: false, important: false, options: recOpts() },
     ];
     assert.deepEqual(precompute.validatePlanQuestions(reserved), { valid: true, errors: [] });
+  });
+
+  it('41. option keys are "1", "2" or "3", and question ids are q<NN>-<kebab> with an optional -r<digits>', () => {
+    const q = (extra) => ({ id: 'q10-x', prompt: 'p?', critical: false, important: false, topic: 'detail', options: [{ key: '1', label: 'A', recommended: true }, { key: '2', label: 'B' }], ...extra });
+    assert.deepEqual(precompute.validatePlanQuestions([q(), q({ id: 'q11-y-r1786000000000' })]), { valid: true, errors: [] });
+    for (const key of ['a', '0', '4', '1 ', '12', '$(rm)']) {
+      const errors = precompute.validatePlanQuestions([q({ options: [{ key, label: 'A', recommended: true }] })]).errors;
+      assert.ok(errors.some((e) => /key must be "1", "2" or "3"/.test(e)), `${JSON.stringify(key)}: ${errors.join('; ')}`);
+    }
+    for (const id of ['q1', 'q10', 'Q10-x', 'q10-X', 'q10_x', 'q10-', 'q10-x;rm', 'q100-x']) {
+      const errors = precompute.validatePlanQuestions([q({ id })]).errors;
+      assert.ok(errors.some((e) => /id must match q<NN>-<kebab-topic>/.test(e)), `${JSON.stringify(id)}: ${errors.join('; ')}`);
+    }
   });
 
   it('29c. an unreadable answers log fails closed for a plan with ANY question; a plan with none still moves', () => {

@@ -19,6 +19,24 @@ files:
   - tests/compaction-eval/gate-critic/rule-inventory.json
   - tests/compaction-eval/product-owner/rule-inventory.json
   - tests/compaction-eval/implementation-planner/rule-inventory.json
+  # Added 2026-10-07 by the session: the owner replaced the question contract (topic, classification by the gate critic, fixed key and id shapes); these fixtures encode the old one, and the sweeper must carry the classification
+  - src/lib/streaming-questions-sweeper.js
+  - tests/streaming-precompute.test.js
+  - tests/answers-bind-to-plan-revision.test.js
+  - tests/streaming-gate.test.js
+  - tests/streaming-questions-sweeper.test.js
+  - tests/attestation-round-trip.test.js
+  - tests/real-question-file-render.test.js
+  - tests/questions-attestation.test.js
+  - tests/sufficiency-evidence.test.js
+  - tests/streaming-human-loop-e2e.test.js
+  - tests/streaming-gate-coverage-holes.test.js
+  - tests/plan-question-screen.test.js
+  - tests/answer-feeds-sufficiency.test.js
+  - tests/sufficiency-audit.test.js
+  - tests/menu-critique-first.test.js
+  - tests/golden-corpus-fence.test.js
+  - tests/gate-critic-compaction.test.js
 approved_by: human
 approved_at: 2026-10-07T08:53:43.148Z
 gate_crossed: implementation → todo
@@ -519,7 +537,7 @@ passes only `payload.questions` and `payload.attestation` to `writePlanQuestions
 passes `payload.classification` (one line, outside `files:`), every promoted file is
 unclassified and every question in it reaches the human — the fail-closed direction.
 
-### Fork: what the fix round and the owner's decision need outside `files:`
+### Fork (resolved by the contract round below): what the fix round and the owner's decision needed outside the original `files:`
 
 Three strictness rules of finding B (topic REQUIRED, option key `^[1-3]$`, question id
 `q<NN>-<kebab>`) and the owner's decision (topics decide only in a file the gate critic
@@ -581,3 +599,53 @@ can ever be classified.
 
 - The live counts of the false-green, dead-export and unreachable fences were not printed; the
   evidence is that the fences passed inside `npm test`.
+
+### Contract round — the fork resolved: files widened, key and id shapes, fixtures to the new contract
+
+The owner approved widening `files:` (approval record e4e66836…; the worktree copy's
+specification hash was recomputed after inserting the 18 lines and matched before any edit).
+
+Test-first:
+- Sweeper: case 13b in `tests/streaming-questions-sweeper.test.js` first ran red for the
+  wrong reason (its shared fixture had no topic); with the fixture brought to the contract it
+  ran red for the right one (`classification` was `undefined` on the promoted file). Then the
+  one line in `src/lib/streaming-questions-sweeper.js` passes `payload.classification` as the
+  sixth argument to `writePlanQuestions`; 13b green.
+- Key and id shapes: case 41 in `tests/question-blocking-default.test.js` ran red (no key or
+  id rule), then the validator gained option key `^[1-3]$` and question id
+  `^q[0-9]{2}-[a-z0-9-]+$`. The approved `(-r[0-9]+)?` suffix is itself kebab, so the single
+  class already covers it; writing it as a separate group only added a nested quantifier that
+  the security linter flags. Case 41 green. Every `refused(...)` case now also asserts WHICH
+  rule refused it, so a fixture refused for a different reason cannot pass by accident.
+
+Per changed test (old assertion → new assertion → why):
+- `tests/question-blocking-default.test.js`, shared `opts`/`recOpts` and the writer-path fixtures (cases 9b, 10-12, 21-24f, 36-41): keys `a`/`b` and ids `q`/`q1`/`needs-decl`/`q-stack` → keys `1`/`2`, ids `q10-…`/`q11-…`, each refusal asserting its own error text → the key and id shapes (owner 2026-10-07); a refused write must be refused for the rule the case names.
+- `tests/streaming-precompute.test.js`, fixtures `sampleQuestions`, `tieredQuestions`, `normalOnlyQuestions` and every `answer(...)` call (20 cases): ids `db`/`crit`/... and keys `pg`/`clerk`/... → `q10-db`/`q10-crit`/... and keys `1`/`2`, each question with a topic (stack, security posture, detail) → the same assertions on the renamed ids → the key and id shapes and the required topic (finding B, owner 2026-10-07).
+- `tests/streaming-precompute.test.js`, `seedReady`: wrote an author file → writes a gate-critic-classified file by default (`null` for an author file) → the tier cases test the arithmetic of a classified file; only there may a topic decide (owner 2026-10-07).
+- `tests/streaming-precompute.test.js`, "an unreadable answers log does NOT deadlock a plan with no forks": `enough === true` for a details-only plan with an unreadable log → `enough === false`, reason `answers-unreadable`, and a plan with NO questions still `enough === true` → a Hold is recorded only in the log, so an unread log may hold one (finding A of the fix round, under the contract the owner replaced on 2026-10-07).
+- `tests/answers-bind-to-plan-revision.test.js`, fixtures `fork`, `detail`, `seedAt`, `reviseTo` and every answer line (cases 1-21): ids `q10`/`q11`/`q12`/`q30` and keys `a`/`b` → `q10-a`/`q11-b`/`q12-c`/`q30-d` and keys `1`/`2`, forks topic `technology-stack`, details topic `detail`, every seeded file gate-critic-classified → the same binding assertions on the renamed ids → key and id shapes, required topic, and a detail decides only in a classified file (owner 2026-10-07).
+- `tests/answers-bind-to-plan-revision.test.js`, case 6: the older log shape answered `'Some prose answer'` → it answers `'1'`, and still binds → under the new contract an answer counts only when it names one of the question's options (fix round, finding A); the case still proves both log shapes parse.
+- `tests/streaming-gate.test.js`, fixtures `precomputedQuestions`, `forkQuestion`, `detailQuestion` and the inline question sets (16 cases: the screen, X6 crossing, decision matrix, generate-questions cases): ids `db`/`auth`/`w`/`f`/`q`/`name` and keys `pg`/`sqlite`/`clerk`/`roll`/`a`/`b` → `q10-db`/`q11-auth`/`q10-w`/`q10-f`/`q10-q`/`q12-name` and keys `1`/`2`, each question with a topic, and the expected `stream answer …` action strings carry the new id and key → same assertions → key and id shapes, required topic (owner 2026-10-07).
+- `tests/streaming-gate.test.js`, case 9: an author file whose detail did not block → the same file written gate-critic-classified, and the detail still does not block → only a classified file lets a topic decide (owner 2026-10-07).
+- `tests/streaming-questions-sweeper.test.js`, fixture `validQuestions` (cases 1-13 and the ladder): ids `store`/`expiry`, keys `pg`/`sqlite`/`15m`/`1h` → `q10-store`/`q11-expiry`, keys `1`/`2`, topics `technology-stack`/`security-posture`; case 1 now expects `['q10-store', 'q11-expiry']` → the same promotion assertions → key and id shapes, required topic (owner 2026-10-07).
+- `tests/streaming-questions-sweeper.test.js`, new case 13b: a gate-critic-classified pending file arrives classified, an author file arrives unclassified → covers the one sweeper line that passes `payload.classification` through.
+- `tests/golden-corpus-fence.test.js`, the streaming-questions reader: the real captured sample read back as a non-empty question list → the same real sample is refused by the canonical reader (`invalid`) for missing topics and nothing else, and with only `topic` added reads back every question by id → the real samples predate the required topic (owner 2026-10-07); the fence still drives the real persisted shape through its reader.
+- `tests/real-question-file-render.test.js`, the staged worked example (5 cases): the real sample was copied as is → it is staged with only `topic: "detail"` added to each finding, every other field byte for byte → the renderer cases test the real long text, which an untopiced file no longer reaches (owner 2026-10-07).
+- `tests/attestation-round-trip.test.js`, fixture `validQuestions` (6 cases): id `store` → `q10-store` with topic `technology-stack` → same assertions → id shape and required topic.
+- `tests/questions-attestation.test.js`, fixture `nonEmptyQuestions` (4 cases): id `q10`, keys `pg`/`sqlite` → `q10-datastore`, keys `1`/`2`, topic `technology-stack` → same assertions → id and key shapes, required topic.
+- `tests/sufficiency-evidence.test.js`, fixture `forkQuestion` and cases 9-11: id `db`, keys `pg`/`sqlite` → `q10-db`, keys `1`/`2`, topic `technology-stack`; the evidence's answered ids expect `q10-db` → same assertions → id and key shapes, required topic.
+- `tests/streaming-gate-coverage-holes.test.js`, fixture `forkQuestion`, the wide-token question and the answer-record cases: ids `db`/`wide`, keys `pg`/`sqlite`/`a`/`b` → `q10-db`/`q10-wide`, keys `1`/`2`, topics; the recorded answer expects `q10-db`/`1` → same assertions → id and key shapes, required topic.
+- `tests/streaming-human-loop-e2e.test.js`, fixture `magicLinkQuestions` and cases 6-7: ids `store`/`expiry`/`transport`/`copy`, keys `pg`/`15m`/`resend`/`signin`… → `q10-store`/`q11-expiry`/`q12-transport`/`q13-copy`, keys `1`/`2`, topics stack/security/stack/detail; case 7 expects `['q12-transport']` blocking → same end-to-end assertions → id and key shapes, required topic. The file stays unclassified (an author's file): case 7's verdict holds because the only unanswered question is the fork.
+- `tests/sufficiency-audit.test.js`, helper `q` and its callers: ids `q10`/`q11`/`q12`, key `a`, no recommendation, no topic → `q10-a`/`q11-b`/`q12-c`, key `1` recommended, topic weighty for a fork and `detail` otherwise → the same counts (3 questions, 2 blocking) → id and key shapes, required topic, and a weighty single option must carry a recommendation.
+- `tests/answer-feeds-sufficiency.test.js`, fixture `forkQuestion` and cases a-d: ids `db`/`cache`, keys `pg`/`sqlite` → `q10-db`/`q11-cache`, keys `1`/`2`, topic `technology-stack`; the log assertions expect `"questionId":"q10-db"` → same assertions → id and key shapes, required topic.
+- `tests/plan-question-screen.test.js`, the two product-question fixtures: no topic → topic `technology-stack` (the critical one) and `detail` → same screen assertions → required topic.
+- `tests/menu-critique-first.test.js`, case 8's product question: no topic → topic `detail` → same assertion → required topic.
+- `tests/gate-critic-compaction.test.js`, the adapter fixtures (lens-unavailable question and the finding helper): no topic → topic `detail` → same adapter assertions → every question but the ruling and the coverage notice carries a topic.
+
+Full `npm test`: tests 12608, pass 12608, fail 0, cancelled 0, skipped 0; coverage 99.89%
+(floor 99); `[CTOC test-gate] PASS`. Lint on every changed JavaScript file: zero warnings.
+
+Consequence the owner should know: every questions file stored before this contract (2 in this
+repository, 15 in the main checkout's `.ctoc/streaming/questions/`) now reads `invalid` — they
+carry no topic (the two here; the main checkout's were counted, not inspected) — so each such plan fails closed and asks for its
+questions again (case 13 pins this).

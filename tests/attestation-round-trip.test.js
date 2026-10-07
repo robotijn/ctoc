@@ -60,10 +60,11 @@ function pendingFileFor(root, ref) {
 function validQuestions() {
   return [
     {
-      id: 'store',
+      id: 'q10-store',
       prompt: 'Which store backs the fixture?',
       critical: true,
       important: false,
+      topic: 'technology-stack',
       options: [
         { key: '1', label: 'Postgres', recommended: true, pros: 'Row level security', cons: 'More ops' },
         { key: '2', label: 'SQLite', pros: 'Zero-config', cons: 'Single writer' },

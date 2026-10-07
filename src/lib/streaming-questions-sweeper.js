@@ -207,8 +207,11 @@ function promotePendingFile(root, absFile) {
   // absent `attestation` is `undefined` and passes straight through — the writer then
   // leaves the file byte-identical to a four-argument call, so the record reads
   // honestly NOT-ATTESTED rather than clean.
+  // The gate critic's classification block rides through the same way: the reader
+  // (`streaming-precompute.isGateCriticClassification`) decides whether it counts, and
+  // without one every question in the file reaches the human (the owner, 2026-10-07).
   const written = precompute.writePlanQuestions(
-    root, ref, payload.questions, currentMtimeMs, payload.attestation,
+    root, ref, payload.questions, currentMtimeMs, payload.attestation, payload.classification,
   );
   if (written.ok === true) return { ok: true, ref };
   return { ok: false, reason: 'invalid-questions', errors: written.errors };

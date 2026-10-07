@@ -67,7 +67,7 @@ test('gate-critic adapter: the pending path is the sanitised ref under pending/'
 test('gate-critic adapter: a well-formed file yields one finding per question plus the ruling word', () => {
   const lens = {
     id: `q00-lens-unavailable-red-team-r${STAMP}`, prompt: 'The red-team critique did not run. Cross title-search without it?',
-    critical: true, important: false, options: [{ key: '1', label: 'Hold until the red-team critique runs', recommended: true }]
+    critical: true, important: false, topic: 'detail', options: [{ key: '1', label: 'Hold until the red-team critique runs', recommended: true }]
   };
   const c = check(run({ ref: REF, planMtimeMs: STAMP, questions: [lens, ruling('hold')] }), fx);
   assert.equal(c.valid, true, c.errors.join('\n'));
@@ -85,7 +85,7 @@ test('gate-critic adapter: approve is normal, reject is important', () => {
 });
 
 test('gate-critic adapter: forbid_text and count_text are measured on the text the human reads', () => {
-  const finding = (n, text) => ({ id: `q${n}-topic-${n}-r${STAMP}`, prompt: `About ${text}?`, critical: true, important: false, options: [{ key: '1', label: 'Fix', recommended: true }] });
+  const finding = (n, text) => ({ id: `q${n}-topic-${n}-r${STAMP}`, prompt: `About ${text}?`, critical: true, important: false, topic: 'detail', options: [{ key: '1', label: 'Fix', recommended: true }] });
   const payload = { ref: REF, planMtimeMs: STAMP, questions: [finding(10, 'src/routes/export.js'), finding(11, 'src/routes/export.js'), ruling('reject')] };
   const c = check(run(payload), { ...fx, count_text: 'export.js', forbid_text: 'routes/export' });
   assert.equal(c.payload.count_text_questions, 2);

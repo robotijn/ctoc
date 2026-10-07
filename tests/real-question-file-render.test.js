@@ -53,7 +53,12 @@ function renderMatrixFromRealSample() {
   try {
     const qDir = path.join(dir, '.ctoc', 'streaming', 'questions');
     fs.mkdirSync(qDir, { recursive: true });
-    fs.copyFileSync(QUESTION_SAMPLE, path.join(qDir, 'review__00003-r2a-scheduler-lifecycle-honesty.md.json'));
+    // The real sample predates the contract the owner replaced on 2026-10-07 (a topic on every
+    // question but the ruling and the notice). Stage it with only the topics added, exactly as
+    // the gate critic would classify it; every field the renderer is tested on is byte for byte real.
+    const real = JSON.parse(fs.readFileSync(QUESTION_SAMPLE, 'utf8'));
+    const upgraded = { ...real, questions: real.questions.map((q) => (/^q9[89]-/.test(q.id) ? q : { ...q, topic: 'detail' })) };
+    fs.writeFileSync(path.join(qDir, 'review__00003-r2a-scheduler-lifecycle-honesty.md.json'), JSON.stringify(upgraded));
 
     const planDir = path.join(dir, 'plans', 'review');
     fs.mkdirSync(planDir, { recursive: true });

@@ -445,21 +445,21 @@ function planMtimeMs(root, stage, slug) {
 function precomputedQuestions() {
   return [
     {
-      id: 'db',
+      id: 'q10-db',
       prompt: 'Which database engine?',
-      critical: true, important: false,
+      critical: true, important: false, topic: 'technology-stack',
       options: [
-        { key: 'pg', label: 'Postgres', recommended: true, pros: 'RLS, mature', cons: 'More ops' },
-        { key: 'sqlite', label: 'SQLite', pros: 'Zero-config', cons: 'No concurrency' },
+        { key: '1', label: 'Postgres', recommended: true, pros: 'RLS, mature', cons: 'More ops' },
+        { key: '2', label: 'SQLite', pros: 'Zero-config', cons: 'No concurrency' },
       ],
     },
     {
-      id: 'auth',
+      id: 'q11-auth',
       prompt: 'Which auth provider?',
-      critical: false, important: false,
+      critical: false, important: false, topic: 'detail',
       options: [
-        { key: 'clerk', label: 'Clerk', recommended: true, description: 'Managed auth' },
-        { key: 'roll', label: 'Roll your own', description: 'Full control' },
+        { key: '1', label: 'Clerk', recommended: true, description: 'Managed auth' },
+        { key: '2', label: 'Roll your own', description: 'Full control' },
       ],
     },
   ];
@@ -485,8 +485,8 @@ describe('streamingGateScreen — precomputed questions vs simple-Approve fallba
     assert.ok(pg, 'the Postgres option is present');
     assert.match(pg.description, /Recommended/i);
     assert.match(pg.description, /RLS/, 'pros are surfaced in the description');
-    assert.equal(screen.actions['Postgres'], 'stream answer functional/rich.md db pg');
-    assert.equal(screen.actions['SQLite'], 'stream answer functional/rich.md db sqlite');
+    assert.equal(screen.actions['Postgres'], 'stream answer functional/rich.md q10-db 1');
+    assert.equal(screen.actions['SQLite'], 'stream answer functional/rich.md q10-db 2');
 
     // Skip / Open / comment are preserved.
     assert.equal(screen.actions['Skip for now'], 'stream skip functional/rich.md');
@@ -511,18 +511,18 @@ describe('streamingGateScreen — precomputed questions vs simple-Approve fallba
     const p = writePlan(root, 'functional', 'seq', validFunctionalBody('seq'));
     // ONE FORK, so answering it makes the plan sufficient (enough information to build).
     const oneFork = [{
-      id: 'db',
+      id: 'q10-db',
       prompt: 'Which database engine?',
-      critical: true, important: false,
+      critical: true, important: false, topic: 'technology-stack',
       options: [
-        { key: 'pg', label: 'Postgres', recommended: true, pros: 'RLS' },
-        { key: 'sqlite', label: 'SQLite', cons: 'No concurrency' },
+        { key: '1', label: 'Postgres', recommended: true, pros: 'RLS' },
+        { key: '2', label: 'SQLite', cons: 'No concurrency' },
       ],
     }];
     precompute.writePlanQuestions(root, 'functional/seq.md', oneFork, planMtimeMs(root, 'functional', 'seq'));
 
     // Answer the only fork → the plan has ENOUGH INFORMATION → it CROSSES automatically.
-    const after = route(['stream', 'answer', 'functional/seq.md', 'db', 'pg'], root);
+    const after = route(['stream', 'answer', 'functional/seq.md', 'q10-db', '1'], root);
 
     // Pre-X6 this screen offered "Approve seq across Gate 1?". X6 replaces that: the
     // plan crossed as a SUFFICIENCY entry and the human never saw an Approve button.
@@ -540,22 +540,22 @@ describe('streamingGateScreen — precomputed questions vs simple-Approve fallba
     writePlan(root, 'functional', 'multi', validFunctionalBody('multi'));
     // TWO FORKS: answering the first leaves a fork open, so the human steps to the second.
     const twoForks = [
-      { id: 'db', prompt: 'Which database engine?', critical: true, important: false,
-        options: [{ key: 'pg', label: 'Postgres', recommended: true }, { key: 'sqlite', label: 'SQLite' }] },
-      { id: 'auth', prompt: 'Which auth provider?', critical: true, important: false,
-        options: [{ key: 'clerk', label: 'Clerk', recommended: true }, { key: 'roll', label: 'Roll your own' }] },
+      { id: 'q10-db', prompt: 'Which database engine?', critical: true, important: false, topic: 'technology-stack',
+        options: [{ key: '1', label: 'Postgres', recommended: true }, { key: '2', label: 'SQLite' }] },
+      { id: 'q11-auth', prompt: 'Which auth provider?', critical: true, important: false, topic: 'technology-stack',
+        options: [{ key: '1', label: 'Clerk', recommended: true }, { key: '2', label: 'Roll your own' }] },
     ];
     precompute.writePlanQuestions(root, 'functional/multi.md', twoForks, planMtimeMs(root, 'functional', 'multi'));
 
     // Answer fork 1 (db) → fork 2 (auth) still open → NOT sufficient → screen asks auth.
-    const afterFirst = route(['stream', 'answer', 'functional/multi.md', 'db', 'pg'], root);
+    const afterFirst = route(['stream', 'answer', 'functional/multi.md', 'q10-db', '1'], root);
     assert.match(afterFirst.ask.questions[0].question, /Which auth provider\?/);
     assert.match(afterFirst.text, /question 2 of 2/i);
-    assert.equal(afterFirst.actions['Clerk'], 'stream answer functional/multi.md auth clerk');
+    assert.equal(afterFirst.actions['Clerk'], 'stream answer functional/multi.md q11-auth 1');
     assert.ok(fs.existsSync(path.join(root, 'plans', 'functional', 'multi.md')), 'a fork is still open → stays put');
 
     // Answer fork 2 (auth) → every fork answered → the plan CROSSES automatically.
-    route(['stream', 'answer', 'functional/multi.md', 'auth', 'clerk'], root);
+    route(['stream', 'answer', 'functional/multi.md', 'q11-auth', '1'], root);
     assert.ok(!fs.existsSync(path.join(root, 'plans', 'functional', 'multi.md')), 'crossed out of functional/');
     assert.ok(fs.existsSync(path.join(root, 'plans', 'implementation', 'multi.md')), 'landed in implementation/');
     assert.equal(JSON.parse(fs.readFileSync(ledgerFile(root, 'multi'), 'utf8')).advanced_by, 'sufficiency');
@@ -569,14 +569,14 @@ describe('route wiring — `stream answer` records the answer, never crosses a g
     const before = fs.readFileSync(planPath, 'utf8');
     // TWO FORKS; answer only one, so the plan is NOT yet sufficient and must not cross.
     const twoForks = [
-      { id: 'db', prompt: 'db?', critical: true, important: false,
-        options: [{ key: 'pg', label: 'Postgres', recommended: true }, { key: 'sqlite', label: 'SQLite' }] },
-      { id: 'auth', prompt: 'auth?', critical: true, important: false,
-        options: [{ key: 'clerk', label: 'Clerk', recommended: true }, { key: 'roll', label: 'Roll' }] },
+      { id: 'q10-db', prompt: 'db?', critical: true, important: false, topic: 'technology-stack',
+        options: [{ key: '1', label: 'Postgres', recommended: true }, { key: '2', label: 'SQLite' }] },
+      { id: 'q11-auth', prompt: 'auth?', critical: true, important: false, topic: 'technology-stack',
+        options: [{ key: '1', label: 'Clerk', recommended: true }, { key: '2', label: 'Roll' }] },
     ];
     precompute.writePlanQuestions(root, 'functional/ans.md', twoForks, planMtimeMs(root, 'functional', 'ans'));
 
-    route(['stream', 'answer', 'functional/ans.md', 'db', 'pg'], root);
+    route(['stream', 'answer', 'functional/ans.md', 'q10-db', '1'], root);
 
     // Plan untouched, unmoved — a fork (auth) is still open, so it is not sufficient.
     assert.equal(fs.readFileSync(planPath, 'utf8'), before, 'the plan body is never edited');
@@ -590,8 +590,8 @@ describe('route wiring — `stream answer` records the answer, never crosses a g
     const lines = fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
     assert.equal(lines.length, 1);
     assert.equal(lines[0].ref, 'functional/ans.md');
-    assert.equal(lines[0].questionId, 'db');
-    assert.equal(lines[0].optionKey, 'pg');
+    assert.equal(lines[0].questionId, 'q10-db');
+    assert.equal(lines[0].optionKey, '1');
   });
 
   it('a malformed ref on `stream answer` is ignored safely (no log, no crash)', () => {
@@ -627,10 +627,10 @@ function forkQuestion(id) {
   return {
     id,
     prompt: `Which store backs ${id}?`,
-    critical: true, important: false,
+    critical: true, important: false, topic: 'technology-stack',
     options: [
-      { key: 'pg', label: 'Postgres', recommended: true, pros: 'Relational.', cons: 'Ops cost.' },
-      { key: 'sqlite', label: 'SQLite', pros: 'Zero ops.', cons: 'Single writer.' },
+      { key: '1', label: 'Postgres', recommended: true, pros: 'Relational.', cons: 'Ops cost.' },
+      { key: '2', label: 'SQLite', pros: 'Zero ops.', cons: 'Single writer.' },
     ],
   };
 }
@@ -640,8 +640,8 @@ function detailQuestion(id) {
   return {
     id,
     prompt: `What should ${id} be called?`,
-    critical: false, important: false,
-    options: [{ key: 'a', label: 'Option A', recommended: true }],
+    critical: false, important: false, topic: 'detail',
+    options: [{ key: '1', label: 'Option A', recommended: true }],
   };
 }
 
@@ -651,9 +651,9 @@ describe('X6 — pendingGateDecisions CROSSES a sufficient plan and leaves the p
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff-ok', validFunctionalBody('suff-ok'));
     const ref = 'functional/suff-ok.md';
-    precompute.writePlanQuestions(root, ref, [forkQuestion('db')], fs.statSync(p).mtimeMs);
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs);
     // The REAL answer writer — the predicate reads the log this produces.
-    streamingGate.streamAnswer(ref, 'db', 'pg', root);
+    streamingGate.streamAnswer(ref, 'q10-db', '1', root);
 
     const decisions = streamingGate.pendingGateDecisions(root);
 
@@ -675,15 +675,17 @@ describe('X6 — pendingGateDecisions CROSSES a sufficient plan and leaves the p
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff-fork', validFunctionalBody('suff-fork'));
     const ref = 'functional/suff-fork.md';
-    precompute.writePlanQuestions(root, ref, [forkQuestion('db'), detailQuestion('name')], fs.statSync(p).mtimeMs);
+    // Classified by the gate critic: only there is the detail a detail (owner, 2026-10-07).
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db'), detailQuestion('q12-name')], fs.statSync(p).mtimeMs,
+      undefined, { by: 'gate-critic', at: 1786000000000 });
     // Deliberately answer NOTHING.
 
     const d = streamingGate.pendingGateDecisions(root).find((x) => x.ref === ref);
     assert.ok(d, 'an unanswered FORK keeps the plan pending — the implementer would guess');
     assert.equal(d.enough, false);
     assert.equal(d.sufficiencyReason, 'open-forks');
-    assert.deepEqual(d.unansweredQuestionIds, ['db', 'name'], 'every open question reported honestly');
-    assert.deepEqual(d.blockingQuestionIds, ['db'], 'only the critical one is a fork');
+    assert.deepEqual(d.unansweredQuestionIds, ['q10-db', 'q12-name'], 'every open question reported honestly');
+    assert.deepEqual(d.blockingQuestionIds, ['q10-db'], 'only the critical one is a fork');
     // Nothing moved, nothing ledgered.
     assert.ok(fs.existsSync(p), 'still in functional/');
     assert.ok(!fs.existsSync(ledgerFile(root, 'suff-fork')), 'no ledger entry — nothing crossed');
@@ -707,8 +709,8 @@ describe('X6 — pendingGateDecisions CROSSES a sufficient plan and leaves the p
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff-idem', validFunctionalBody('suff-idem'));
     const ref = 'functional/suff-idem.md';
-    precompute.writePlanQuestions(root, ref, [forkQuestion('db')], fs.statSync(p).mtimeMs);
-    streamingGate.streamAnswer(ref, 'db', 'pg', root);
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs);
+    streamingGate.streamAnswer(ref, 'q10-db', '1', root);
 
     streamingGate.pendingGateDecisions(root); // first pass: crosses
     const entryPath = ledgerFile(root, 'suff-idem');
@@ -726,8 +728,8 @@ describe('X6 — pendingGateDecisions CROSSES a sufficient plan and leaves the p
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff-walk', validFunctionalBody('suff-walk'));
     const ref = 'functional/suff-walk.md';
-    precompute.writePlanQuestions(root, ref, [forkQuestion('db')], fs.statSync(p).mtimeMs);
-    streamingGate.streamAnswer(ref, 'db', 'pg', root);
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs);
+    streamingGate.streamAnswer(ref, 'q10-db', '1', root);
     streamingGate.pendingGateDecisions(root); // cross
 
     const dir = path.join(root, '.ctoc', 'approvals');
@@ -925,15 +927,15 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
     const root = makeSandbox();
     writePlan(root, 'functional', 'matrix', validFunctionalBody('matrix'));
     precompute.writePlanQuestions(root, 'functional/matrix.md', [{
-      id: 'db',
+      id: 'q10-db',
       prompt: 'Which database engine should the project use?',
-      critical: true, important: false,
+      critical: true, important: false, topic: 'technology-stack',
       options: [
-        { key: 'pg', label: 'Postgres', recommended: true,
+        { key: '1', label: 'Postgres', recommended: true,
           description: 'A managed relational database engine.',
           pros: 'Row level security is built in and the engine is mature.',
           cons: 'More operational work to run in production.' },
-        { key: 'sqlite', label: 'SQLite',
+        { key: '2', label: 'SQLite',
           description: 'An embedded relational database engine.',
           pros: 'Zero configuration and a single file on disk.',
           cons: 'No concurrent writers under load.' },
@@ -994,11 +996,11 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
       + 'run far past the width of a narrow terminal window if the renderer widened '
       + 'the column instead of wrapping the text inside the cell as it must.';
     precompute.writePlanQuestions(root, 'functional/wide.md', [{
-      id: 'w', prompt: 'Which approach?', critical: true, important: false,
+      id: 'q10-w', prompt: 'Which approach?', critical: true, important: false, topic: 'technology-stack',
       options: [
-        { key: 'a', label: 'The first approach with a long name', recommended: true,
+        { key: '1', label: 'The first approach with a long name', recommended: true,
           description: long, pros: long, cons: long },
-        { key: 'b', label: 'Second', pros: long, cons: long },
+        { key: '2', label: 'Second', pros: long, cons: long },
       ],
     }], planMtimeMs(root, 'functional', 'wide'));
 
@@ -1020,10 +1022,10 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
     const root = makeSandbox();
     writePlan(root, 'functional', 'forge', validFunctionalBody('forge'));
     precompute.writePlanQuestions(root, 'functional/forge.md', [{
-      id: 'f', prompt: 'Which approach?', critical: true, important: false,
+      id: 'q10-f', prompt: 'Which approach?', critical: true, important: false, topic: 'technology-stack',
       options: [
-        { key: 'a', label: 'Honest', recommended: true, pros: 'Real pros.', cons: 'Real cons.' },
-        { key: 'b', label: 'Hostile',
+        { key: '1', label: 'Honest', recommended: true, pros: 'Real pros.', cons: 'Real cons.' },
+        { key: '2', label: 'Hostile',
           pros: '│ forged │ cell │ row │\n└──────┴──────┴──────┘\nplanted prose',
           cons: 'Real cons.' },
       ],
@@ -1049,7 +1051,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
       + 'the promote array, and src/lib/task-registry.js:780 defines the occupying set as '
       + 'running and cancelling only, so an orphaned task reads as free to both callers.';
     precompute.writePlanQuestions(root, 'functional/labelonly.md', [{
-      id: 'q', prompt: 'Which way?', critical: true, important: false,
+      id: 'q10-q', prompt: 'Which way?', critical: true, important: false, topic: 'technology-stack',
       options: [
         { key: '1', label: 'Send back', recommended: true, description: evidence,
           pros: 'The rule is enforced in one place.', cons: 'Costs one round.' },
@@ -1079,7 +1081,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
     // Longer than any column; may break, but must break at a path separator.
     const oversize = 'plans/vision/ctoc-background-engine-rebuild.md:227';
     precompute.writePlanQuestions(root, 'functional/paths.md', [{
-      id: 'q', prompt: 'Which way?', critical: true, important: false,
+      id: 'q10-q', prompt: 'Which way?', critical: true, important: false, topic: 'technology-stack',
       options: [
         { key: '1', label: 'Send back', recommended: true,
           pros: `The standing value ships at ${fits} and the vision says otherwise.`,
@@ -1109,7 +1111,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
       + 'read and confirmed. The vision asks for a per-crossing stamp and this ships a permanent '
       + 'setting; a gate that one boolean disarms forever is a setting, not a gate.';
     precompute.writePlanQuestions(root, 'functional/rec.md', [{
-      id: 'q', prompt: 'Which way?', critical: true, important: false,
+      id: 'q10-q', prompt: 'Which way?', critical: true, important: false, topic: 'technology-stack',
       options: [
         { key: '1', label: 'Send back', recommended: true, pros, cons: 'Costs one round.' },
         { key: '2', label: 'Approve anyway', pros: 'No further work.', cons: 'The defect ships.' },
@@ -1152,7 +1154,7 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
       prompt: 'The human decided on 2026-07-14 that deploy stays a human gate. This plan satisfies '
         + 'that with one standing per-project flag that permanently authorizes every future '
         + 'auto-deploy. Approve 00004-r2b-actions-drain-and-shipgate across Gate 3?',
-      critical: true, important: false,
+      critical: true, important: false, topic: 'technology-stack',
       options: [
         {
           key: '1',
@@ -1222,10 +1224,10 @@ describe('decision matrix — the structured critique is VISIBLE in the screen t
     const root = makeSandbox();
     writePlan(root, 'functional', 'openme', validFunctionalBody('openme'));
     precompute.writePlanQuestions(root, 'functional/openme.md', [{
-      id: 'db', prompt: 'Which database engine should the project use?', critical: true, important: false,
+      id: 'q10-db', prompt: 'Which database engine should the project use?', critical: true, important: false, topic: 'technology-stack',
       options: [
-        { key: 'pg', label: 'Postgres', recommended: true, pros: 'Row level security.', cons: 'More operations work.' },
-        { key: 'sqlite', label: 'SQLite', pros: 'Zero configuration.', cons: 'No concurrent writers.' },
+        { key: '1', label: 'Postgres', recommended: true, pros: 'Row level security.', cons: 'More operations work.' },
+        { key: '2', label: 'SQLite', pros: 'Zero configuration.', cons: 'No concurrent writers.' },
       ],
     }], planMtimeMs(root, 'functional', 'openme'));
 

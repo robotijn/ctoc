@@ -134,7 +134,7 @@ describe('plan <ref> asks the PRODUCT question first', () => {
     const questions = [{
       id: 'q01-session-idle-timeout',
       prompt: 'A session with no activity — should it end, and when?',
-      critical: true, important: false,
+      critical: true, important: false, topic: 'technology-stack',
       options: [
         {
           key: '1',
@@ -181,7 +181,7 @@ describe('plan <ref> asks the PRODUCT question first', () => {
     precompute.writePlanQuestions(root, 'functional/export-rules.md', [{
       id: 'q01-export-format',
       prompt: 'Which format should an export produce?',
-      critical: false, important: false,
+      critical: false, important: false, topic: 'detail',
       options: [{ key: '1', label: 'Comma-separated values', recommended: true, pros: 'Opens anywhere.', cons: 'No types.' }],
     }], fs.statSync(p).mtimeMs);
 

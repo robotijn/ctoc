@@ -53,10 +53,10 @@ function seedPlan(root, slug) {
 
 function nonEmptyQuestions() {
   return [{
-    id: 'q10', prompt: 'Which datastore?', critical: true, important: false,
+    id: 'q10-datastore', prompt: 'Which datastore?', critical: true, important: false, topic: 'technology-stack',
     options: [
-      { key: 'pg', label: 'Postgres', recommended: true },
-      { key: 'sqlite', label: 'SQLite' },
+      { key: '1', label: 'Postgres', recommended: true },
+      { key: '2', label: 'SQLite' },
     ],
   }];
 }
