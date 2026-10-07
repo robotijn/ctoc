@@ -1211,3 +1211,85 @@ describe('the question writer refuses a revision stamp later than now (case 40)'
     assert.deepEqual(precompute.writePlanQuestions(root, ref, [fork('q10-db')], fs.statSync(planPath).mtimeMs, undefined, CLASSIFIED), { ok: true });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('what the end-to-end run showed (cases 41–45)', () => {
+  it("case 41 — an author's unchecked questions are never shown as his decision; the screen says they are being checked, or offers Check its questions", () => {
+    const root = makeSandbox();
+    const ref = 'functional/c41.md';
+    writePlan(root, ref, functionalBody('Remember signed-in users'));
+    const stamp = writeQuestions(root, ref, [detail('q10-cookie', 'What is the session cookie called?', ['sid', 'session_id'])], { classified: false });
+
+    for (const screen of [streamingGate.streamingGateScreen(root), route(['plan', ref], root)]) {
+      const labels = screen.ask.questions.flatMap((q) => q.options.map((o) => o.label));
+      assert.equal(labels.includes('sid') || labels.includes('session_id'), false, "the author's options are not offered");
+      assert.equal(screen.ask.questions.some((q) => q.question === 'What is the session cookie called?'), false);
+      assert.ok(labels.includes('Check its questions'), 'one action launches the check');
+      assert.equal(screen.actions['Check its questions'], `stream check ${ref}`);
+    }
+    assert.match(streamingGate.streamingGateScreen(root).text, /^ {2}The gate critic has not yet checked the questions its author wrote; choose Check its questions, or approve it yourself\.$/m);
+    assert.equal(fs.existsSync(registryFile(root)), false, 'nothing is queued at menu open');
+
+    const checked = route(['stream', 'check', ref], root);
+    const queued = tasks(root).filter((t) => t.kind === 'classify');
+    assert.deepEqual(queued.map((t) => [t.plan, t.label]), [[ref, `revision-${Math.floor(stamp)}`]]);
+    assert.ok(checked.promote.some((t) => t.id === queued[0].id), 'returned for the session to launch');
+    route(['stream', 'check', ref], root);
+    assert.equal(tasks(root).filter((t) => t.kind === 'classify').length, 1, 'once per revision');
+
+    const screen = streamingGate.streamingGateScreen(root);
+    assert.match(screen.text, /^ {2}Its questions are being checked by the gate critic; it moves on by itself once they are, or when you approve it\.$/m);
+    assert.equal(Object.prototype.hasOwnProperty.call(screen.actions, 'Check its questions'), false);
+    assert.equal(exists(root, ref), true, 'nothing moved');
+  });
+
+  it('case 42 — the deploy-ready notice says how the plan finished, in plain words, with no gate number', () => {
+    const root = makeSandbox();
+    fs.writeFileSync(path.join(root, '.ctoc', 'settings.json'), JSON.stringify({ deployment: { enabled: true } }));
+    seedBuilt(root, 'c42a');
+    menuScreens.continueAfterCrossing(root);
+    seedBuilt(root, 'c42b');
+    route(['stream', 'approve', 'review/c42b.md'], root);
+    const notices = JSON.parse(fs.readFileSync(path.join(root, '.ctoc', 'logs', 'deploy-ready.json'), 'utf8'));
+    const byPlan = Object.fromEntries(notices.map((n) => [n.plan, n.message]));
+    assert.match(byPlan['c42a.md'], /finished on its checks/);
+    assert.match(byPlan['c42b.md'], /you approved it/);
+    for (const m of Object.values(byPlan)) {
+      assert.doesNotMatch(m, /gate\s*[0-9]/i);
+      assert.match(m, /Deploying it is a separate decision/);
+    }
+  });
+
+  it("case 43 — finishing on its evidence clears the plan's status file in the stage it leaves", () => {
+    const root = makeSandbox();
+    seedBuilt(root, 'c43');
+    fs.writeFileSync(planPathOf(root, 'review/c43.md') + '.status', JSON.stringify({ status: 'idle' }));
+    menuScreens.continueAfterCrossing(root);
+    assert.equal(exists(root, 'done/c43.md'), true);
+    assert.equal(fs.existsSync(planPathOf(root, 'review/c43.md') + '.status'), false);
+  });
+
+  it('case 44 — coverage that was not measured is said plainly in the evidence', () => {
+    const root = makeSandbox();
+    seedBuilt(root, 'c44');
+    const ev = verifyEvidencePath(root, 'c44');
+    const record = JSON.parse(fs.readFileSync(ev, 'utf8'));
+    record.checks.tests.coverage = null;
+    record.checks.tests.coverageFloor = null;
+    fs.writeFileSync(ev, JSON.stringify(record));
+    menuScreens.continueAfterCrossing(root);
+    const evidence = ledger.readEntry('c44', root).evidence;
+    assert.match(evidence, /coverage not measured, 0 skipped/);
+    assert.doesNotMatch(evidence, /unknown%/);
+  });
+
+  it("case 45 — the header's count of plans waiting for their questions is taken after the sweep", () => {
+    const root = makeSandbox();
+    const ref = 'functional/c45.md';
+    writePlan(root, ref, functionalBody('Remember signed-in users'));
+    dropPending(root, ref, [detail('q10-cookie', 'What is the session cookie called?', ['sid', 'session_id'])], null);
+    const screen = streamingGate.streamingGateScreen(root);
+    assert.doesNotMatch(screen.text, /plan\(s\) wait for their questions/);
+    assert.equal(precompute.planQuestionsStatus(root, ref).status, 'ready');
+  });
+});

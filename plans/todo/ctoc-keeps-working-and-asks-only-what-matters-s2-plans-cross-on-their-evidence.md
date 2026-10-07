@@ -1781,3 +1781,14 @@ without a path and `git status` pass.
 
 Full `npm test` (once): tests 12682, pass 12682, fail 0, cancelled 0, skipped 0, todo 0;
 coverage 99.87%; `[CTOC test-gate] PASS`. Lint zero warnings.
+
+### End-to-end run and its fixes
+
+Step 16's end-to-end run through the real routes (driver and transcript in the session
+scratchpad, `e2e-keeps-working/drive.js` and `e2e-keeps-working/transcript.txt`) behaved as
+the plan says and showed five things to fix. Test-first, cases 41–45 in
+`tests/plans-keep-moving-without-the-human.test.js`, all red on 7ab4dd6f: 41 the author's
+unchecked question was offered as the owner's decision; 42 the deploy-ready notice said
+"approved at Gate 3" for a plan that finished on its checks; 43 the `.status` file stayed in
+review; 44 the evidence read "unknown% against a floor of unknown%"; 45 the header counted the
+plan as waiting for questions in the very render that swept them in.
