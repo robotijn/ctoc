@@ -81,6 +81,56 @@ function readStored(root, ref) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
+/** The stage directories in pipeline order; a plan only ever moves rightward. */
+const STAGE_ORDER = ['vision', 'canvas', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
+const PLAN_FILE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.md$/;
+
+/**
+ * The live-store compatibility check, run against `root`.
+ *
+ * Why it changed (2026-10-07): a questions file is keyed by the plan's stage and name
+ * (`review__<plan>.md.json`). When the owner accepted plans 00003 and 00004 they moved
+ * from review to done, their tracked files still named `review/…`, and
+ * `planQuestionsStatus` honestly answered `unknown-plan` — failing this check although
+ * no stored data broke. The check is TIGHTENED, not loosened: it now parses every file's
+ * bytes itself (before, a resolvable plan meant the bytes were never read here), and an
+ * `unknown-plan` passes ONLY when the named plan sits in a strictly later stage — a real
+ * crossing, not a dangling or corrupt reference. `invalid` and `not-computed` still fail.
+ */
+function assertStoredQuestionsReadable(root) {
+  const dir = path.join(root, '.ctoc', 'streaming', 'questions');
+  let files;
+  try {
+    files = fs.readdirSync(dir).filter((f) => f.endsWith('.json'));
+  } catch {
+    return; // no live store on this machine — nothing to prove
+  }
+  for (const f of files) {
+    const ref = f.replace(/\.json$/, '').replace(/__/g, '/');
+
+    // The stored data itself is intact: an object carrying a questions array.
+    const parsed = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+    assert.ok(parsed && typeof parsed === 'object' && !Array.isArray(parsed), `${ref} must hold a JSON object`);
+    assert.ok(Array.isArray(parsed.questions), `${ref} must hold a questions array`);
+
+    const st = precompute.planQuestionsStatus(root, ref);
+    if (st.status === 'unknown-plan') {
+      // Validate stage and name against fixed shapes BEFORE any path is built.
+      const [stage, planFile, ...rest] = ref.split('/');
+      const from = STAGE_ORDER.indexOf(stage);
+      assert.ok(from !== -1 && rest.length === 0 && PLAN_FILE.test(planFile || ''), `${ref} is not a well-formed plan reference`);
+      const crossedTo = STAGE_ORDER.slice(from + 1)
+        .find((later) => fs.existsSync(path.join(root, 'plans', later, planFile)));
+      assert.ok(crossedTo, `${ref} names a plan that is in no later stage — a dangling reference, not a crossing`);
+      continue;
+    }
+    assert.ok(['ready', 'stale'].includes(st.status), `${ref} must still read as a present, usable file (got ${st.status})`);
+    if (st.status === 'ready') {
+      assert.equal(st.attested, false, `${ref} carries no attestation, so it reads unattested`);
+    }
+  }
+}
+
 afterEach(() => {
   while (sandboxes.length) {
     const root = sandboxes.pop();
@@ -226,21 +276,42 @@ describe('COMPATIBILITY — the additive change does not disturb existing caller
     // 'stale' — several are stale because their plans were edited after generation,
     // which predates and is unrelated to this change), never 'invalid'/'not-computed'/
     // 'unknown-plan'. On the ready path, a file with no attestation reads attested:false.
-    const repoRoot = path.resolve(__dirname, '..');
-    const dir = path.join(repoRoot, '.ctoc', 'streaming', 'questions');
-    let files;
-    try {
-      files = fs.readdirSync(dir).filter((f) => f.endsWith('.json'));
-    } catch {
-      return; // no live store on this machine — nothing to prove
+    assertStoredQuestionsReadable(path.resolve(__dirname, '..'));
+  });
+});
+
+describe('the live-store check — a plan that crossed to a later stage is not broken data', () => {
+  /** A fixture root with one stored questions file named `review__x.md.json`. */
+  function crossedRoot({ planStage, bytes }) {
+    const root = makeSandbox();
+    if (planStage) {
+      fs.mkdirSync(path.join(root, 'plans', planStage), { recursive: true });
+      fs.writeFileSync(path.join(root, 'plans', planStage, 'x.md'), '---\ntitle: x\n---\n\n# x\n');
     }
-    for (const f of files) {
-      const ref = f.replace(/\.json$/, '').replace(/__/g, '/');
-      const st = precompute.planQuestionsStatus(repoRoot, ref);
-      assert.ok(['ready', 'stale'].includes(st.status), `${ref} must still read as a present, usable file (got ${st.status})`);
-      if (st.status === 'ready') {
-        assert.equal(st.attested, false, `${ref} carries no attestation, so it reads unattested`);
-      }
-    }
+    const qdir = path.join(root, '.ctoc', 'streaming', 'questions');
+    fs.mkdirSync(qdir, { recursive: true });
+    const stored = bytes !== undefined
+      ? bytes
+      : JSON.stringify({ ref: 'review/x.md', planMtimeMs: 1, questions: nonEmptyQuestions() });
+    fs.writeFileSync(path.join(qdir, 'review__x.md.json'), stored);
+    return root;
+  }
+
+  it('passes when the file names review/x.md and plans/done/x.md exists', () => {
+    assert.doesNotThrow(() => assertStoredQuestionsReadable(crossedRoot({ planStage: 'done' })));
+  });
+
+  it('fails when x.md is in no later stage', () => {
+    assert.throws(() => assertStoredQuestionsReadable(crossedRoot({ planStage: null })), 'a plan that is nowhere is a dangling reference');
+    assert.throws(() => assertStoredQuestionsReadable(crossedRoot({ planStage: 'todo' })), 'an EARLIER stage is not a crossing');
+  });
+
+  it('fails when the stored bytes are not JSON, even though the plan crossed', () => {
+    assert.throws(() => assertStoredQuestionsReadable(crossedRoot({ planStage: 'done', bytes: '{not json' })));
+  });
+
+  it('fails when the stored object has no questions array, even though the plan crossed', () => {
+    const bytes = JSON.stringify({ ref: 'review/x.md', planMtimeMs: 1 });
+    assert.throws(() => assertStoredQuestionsReadable(crossedRoot({ planStage: 'done', bytes })));
   });
 });
