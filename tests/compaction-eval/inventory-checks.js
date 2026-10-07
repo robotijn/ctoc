@@ -9,7 +9,9 @@
  * compacted file to it. Paths inside the inventory are relative to the repository root.
  *
  * The order floor is passed in by the caller and stays written in the caller's test file, so
- * lowering it takes an edit in a second place.
+ * lowering it takes an edit in a second place. So may a digest of every unit's kind
+ * (`kindsSha256`, sha256 of the `n:kind` lines): with it pinned, an order unit cannot be
+ * relabelled as a cuttable kind and then cut without an edit in the caller as well.
  *
  * A RULE THE OWNER REPLACED OR ADDED. An order may end as `fate: "replaced"` only with a
  * complete `replaced_by` record — `{ instruction, date: "YYYY-MM-DD", plan, new_anchors: [...] }`
@@ -103,12 +105,15 @@ function liveOrder(o) {
  * @param {{ test: Function, label: string, inventoryPath: string, orderFloor: number, root?: string }} opts
  *   test: `node:test`'s `test`; label: prefixes every test name; inventoryPath: absolute, or
  *   relative to the repository root; orderFloor: the order count at extraction, a positive integer;
- *   root: the repository root (default: this repository) — fixtures pass their own.
- * @throws when orderFloor is not a positive integer or inventoryPath is not a non-empty string
+ *   root: the repository root (default: this repository) — fixtures pass their own;
+ *   kindsSha256: optional sha256 hex of the units' `n:kind` lines, joined by newlines.
+ * @throws when orderFloor is not a positive integer, inventoryPath is not a non-empty string,
+ *   or kindsSha256 is given and is not a sha256 hex digest
  */
-function defineInventoryTests({ test, label, inventoryPath, orderFloor, root = ROOT }) {
+function defineInventoryTests({ test, label, inventoryPath, orderFloor, root = ROOT, kindsSha256 }) {
   if (!Number.isInteger(orderFloor) || orderFloor <= 0) throw new Error(`orderFloor must be a positive integer, got ${JSON.stringify(orderFloor)}`);
   if (typeof inventoryPath !== 'string' || !inventoryPath) throw new Error('inventoryPath must be a non-empty string');
+  if (kindsSha256 !== undefined && !/^[0-9a-f]{64}$/.test(kindsSha256)) throw new Error('kindsSha256 must be a sha256 hex digest');
   const inventory = path.resolve(root, inventoryPath);
   const t = (name, fn) => test(`${label}: ${name}`, fn);
 
@@ -147,6 +152,10 @@ function defineInventoryTests({ test, label, inventoryPath, orderFloor, root = R
     const baselineFlat = units.normalize(baseline);
     const ids = inv.orders.map((o) => o.id);
     assert.equal(new Set(ids).size, ids.length, 'an order id repeats');
+    if (kindsSha256 !== undefined) {
+      const kinds = crypto.createHash('sha256').update(inv.units.map((u) => `${u.n}:${u.kind}`).join('\n')).digest('hex');
+      assert.equal(kinds, kindsSha256, 'a unit\'s kind changed since it was pinned in the caller');
+    }
     const known = new Set(ids);
     const replaced = new Set(inv.orders.filter(isReplaced).map((o) => o.id));
     const added = new Set(inv.orders.filter(isAdded).map((o) => o.id));

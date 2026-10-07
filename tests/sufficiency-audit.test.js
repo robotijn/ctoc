@@ -125,7 +125,9 @@ test('a sufficiency crossing backed by 3 questions is crossed and attested', () 
   try {
     const ref = 'todo/00043-attested.md';
     ledger.writeSufficiencyEntry('c-attested', { content_sha256: HASH, stage_from: 'implementation', stage_to: 'todo', evidence: evidenceFor(ref, ['q10-a', 'q11-b', 'q12-c']) }, root);
-    precompute.writePlanQuestions(root, ref, [q('q10-a', { critical: true }), q('q11-b', { important: true }), q('q12-c')], 2000);
+    // Classified by the gate critic, so the detail decides itself (owner, 2026-10-07).
+    precompute.writePlanQuestions(root, ref, [q('q10-a', { critical: true }), q('q11-b', { important: true }), q('q12-c')], 2000,
+      undefined, { by: 'gate-critic', at: 1786000000000 });
     const res = auditSufficiencyCrossings(root);
     assert.equal(res.verdict, 'crossed');
     const cr = res.crossings[0];
@@ -135,6 +137,29 @@ test('a sufficiency crossing backed by 3 questions is crossed and attested', () 
     assert.equal(cr.questions.blocking, 2);
     assert.equal(cr.questions.empty, false);
     assert.equal(cr.questions.unattested, false);
+  } finally { cleanup(); }
+});
+
+// ── 4b — the audit counts blocking with the SAME rule the gate uses ───────────────
+// The owner's decision of 2026-10-07: in a file the gate critic did not classify, every
+// question goes to the human, whatever its flags or topic. The audit must agree with the
+// gate's own verdict, never count critical-or-important on its own.
+test('the audit counts blocking exactly as the gate does, classified or not', () => {
+  const root = tmpRoot();
+  try {
+    const questions = [q('q10-a', { critical: true }), q('q11-b', { important: true }), q('q12-c')];
+    for (const [slug, classification, expected] of [['00045-author', undefined, 3], ['00046-classified', { by: 'gate-critic', at: 1786000000000 }, 2]]) {
+      const ref = `todo/${slug}.md`;
+      const planPath = path.join(root, 'plans', 'todo', `${slug}.md`);
+      fs.mkdirSync(path.dirname(planPath), { recursive: true });
+      fs.writeFileSync(planPath, `---\ntitle: ${slug}\n---\n\n# ${slug}\n`);
+      ledger.writeSufficiencyEntry(slug, { content_sha256: HASH, stage_from: 'implementation', stage_to: 'todo', evidence: evidenceFor(ref, []) }, root);
+      precompute.writePlanQuestions(root, ref, questions, fs.statSync(planPath).mtimeMs, undefined, classification);
+      const gate = precompute.hasEnoughInformation(root, ref);
+      const audited = auditSufficiencyCrossings(root).crossings.find((c) => c.ref === ref);
+      assert.equal(audited.questions.blocking, expected, slug);
+      assert.equal(audited.questions.blocking, gate.blocking.length, `${slug}: the audit agrees with the gate`);
+    }
   } finally { cleanup(); }
 });
 

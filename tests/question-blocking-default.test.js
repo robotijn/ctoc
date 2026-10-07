@@ -435,6 +435,25 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
     assert.equal(precompute.hasEnoughInformation(root, ref).enough, true, 'a later answer without holds releases it');
   });
 
+  it('28b. a hold is released only by a LATER answer to the SAME question that names one of its options, without holds', () => {
+    const { root, ref, stamp } = setup('release', [ruling(), { id: 'q10-other', prompt: 'p?', critical: true, important: false, topic: 'detail', options: recOpts() }]);
+    appendAnswer(root, answer(ref, stamp, '1', { holds: true }));
+    const notReleased = [
+      { ts: new Date().toISOString(), ref, questionId: 'q10-other', optionKey: '1', planMtimeMs: stamp },
+      answer(ref, stamp, '7'),
+      answer(ref, stamp, null),
+      answer(ref, stamp, ''),
+      answer(ref, stamp, '2', { holds: 'false' }),
+      answer(ref, stamp, '2', { holds: 0 }),
+    ];
+    for (const line of notReleased) {
+      appendAnswer(root, line);
+      assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'held', `${JSON.stringify(line)} must not release the hold`);
+    }
+    appendAnswer(root, answer(ref, stamp, '2'));
+    assert.notEqual(precompute.hasEnoughInformation(root, ref).reason, 'held', 'a later real answer without holds releases it');
+  });
+
   it('29. readAnsweredQuestionIds reports the chosen option and the holds, and empty ones on a closed path', () => {
     const { root, ref, stamp } = setup('keys', [ruling()]);
     appendAnswer(root, answer(ref, stamp, '1', { holds: true }));
@@ -555,7 +574,7 @@ describe('compaction inventories — a rule the owner replaced or added is recor
    * Runs the ten checks over a fixture repository and returns the numbers of the checks that
    * failed. The fixture holds agents/agent.md, the baseline, an approved plan naming R-3 and N-1.
    */
-  function failingChecks({ agent = NEW, unitFate = 'replaced', order3 = replaced(), extraOrders = [], planText = 'Replaces R-3 and adds N-1.', approval = true, agentRel = 'agents/agent.md' }) {
+  function failingChecks({ agent = NEW, unitFate = 'replaced', order3 = replaced(), extraOrders = [], planText = 'Replaces R-3 and adds N-1.', approval = true, agentRel = 'agents/agent.md', kind3 = 'order', kindsSha256 }) {
     const root = makeSandbox();
     fs.mkdirSync(path.join(root, 'agents'), { recursive: true });
     fs.mkdirSync(path.join(root, '.ctoc', 'approvals'), { recursive: true });
@@ -573,7 +592,7 @@ describe('compaction inventories — a rule the owner replaced or added is recor
       units: [
         { n: 1, sha: u[0].sha, kind: 'heading', orders: [], fate: 'kept' },
         { n: 2, sha: u[1].sha, kind: 'heading', orders: [], fate: 'kept' },
-        { n: 3, sha: u[2].sha, kind: 'order', orders: ['R-3'], fate: unitFate },
+        { n: 3, sha: u[2].sha, kind: kind3, orders: ['R-3'], fate: unitFate },
         { n: 4, sha: u[3].sha, kind: 'order', orders: ['R-4'], fate: 'kept' },
       ],
       orders: [
@@ -584,7 +603,7 @@ describe('compaction inventories — a rule the owner replaced or added is recor
     };
     fs.writeFileSync(path.join(root, 'inventory.json'), JSON.stringify(inventory));
     const checks = [];
-    defineInventoryTests({ test: (name, fn) => checks.push({ name, fn }), label: 'fixture', inventoryPath: 'inventory.json', orderFloor: 2, root });
+    defineInventoryTests({ test: (name, fn) => checks.push({ name, fn }), label: 'fixture', inventoryPath: 'inventory.json', orderFloor: 2, root, kindsSha256 });
     assert.equal(checks.length, 10, 'still exactly ten checks');
     const failed = [];
     for (const c of checks) {
@@ -645,5 +664,13 @@ describe('compaction inventories — a rule the owner replaced or added is recor
     assert.deepEqual(failingChecks({ agent: withD, extraOrders: [added({ added_by: undefined })] }), [3]);
     assert.deepEqual(failingChecks({ agent: withD, extraOrders: [added({ fate: undefined })] }), [3], 'an order no unit lists');
     assert.deepEqual(failingChecks({ agent: withD + 'Never do B.\n', extraOrders: [added({ anchors: ['Never do B.'] })] }), [3, 10], 'an added anchor already in the baseline');
+  });
+
+  it('42. a pinned digest of the units\' kinds catches an order relabelled as a cuttable kind', () => {
+    const digest = (k3) => crypto.createHash('sha256').update(['1:heading', '2:heading', `3:${k3}`, '4:order'].join('\n')).digest('hex');
+    assert.deepEqual(failingChecks({ kindsSha256: digest('order') }), [], 'the true kinds match their pin');
+    assert.deepEqual(failingChecks({ kind3: 'reason' }), [], 'unpinned, a relabel goes unseen — which is why the caller pins it');
+    assert.deepEqual(failingChecks({ kind3: 'reason', kindsSha256: digest('order') }), [3], 'pinned, the relabel fails the classification check');
+    assert.throws(() => defineInventoryTests({ test: () => {}, label: 'x', inventoryPath: 'x.json', orderFloor: 1, kindsSha256: 'abc' }), /kindsSha256/);
   });
 });

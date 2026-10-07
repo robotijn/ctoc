@@ -17,13 +17,21 @@ const assert = require('node:assert/strict');
 const { defineInventoryTests } = require('./compaction-eval/inventory-checks');
 const contract = require('./compaction-eval/implementation-planner/contract');
 
-const ORDER_FLOOR = 184;
+const ORDER_FLOOR = 185;
+
+/**
+ * sha256 of the inventory's units as `n:kind` lines, pinned here so an order unit cannot be
+ * relabelled as a cuttable kind (and then cut) without an edit in this file too. Unchanged
+ * since extraction; the floor above equals the order count, added rules included (2026-10-07).
+ */
+const KINDS_SHA256 = '3b9ddc7f69f7c093b76c4c38e164bc24fbd9e68ea0daad740e75cb474cc994be';
 
 defineInventoryTests({
   test,
   label: 'implementation-planner compaction',
   inventoryPath: 'tests/compaction-eval/implementation-planner/rule-inventory.json',
-  orderFloor: ORDER_FLOOR
+  orderFloor: ORDER_FLOOR,
+  kindsSha256: KINDS_SHA256
 });
 
 // ── Part 2: the contract adapter ────────────────────────────────────────────

@@ -773,6 +773,20 @@ function isBlockingQuestion(question) {
 }
 
 /**
+ * THE shared rule for whether an open question goes to the human, used by the gate
+ * (`hasEnoughInformation`) and by the sufficiency audit alike, so the two never count
+ * differently. In a file the gate critic classified, `isBlockingQuestion` decides; in any
+ * other file every question goes to the human — the author's own topic decides nothing
+ * (the owner's decision of 2026-10-07).
+ * @param {*} question
+ * @param {boolean} classified whether the file carries a valid gate-critic classification
+ * @returns {boolean}
+ */
+function goesToHuman(question, classified) {
+  return classified !== true || isBlockingQuestion(question);
+}
+
+/**
  * The recorded time of one answers-log entry, in milliseconds since the epoch, or
  * `null` when it has none that can be parsed.
  *
@@ -796,6 +810,25 @@ function entryRecordedAtMs(entry) {
 /** The plan's file name — its identity across stage moves — or null for a non-string ref. */
 function planFileOf(ref) {
   return typeof ref === 'string' ? ref.slice(ref.lastIndexOf('/') + 1) : null;
+}
+
+/**
+ * Does this answers-log entry for the plan set or release a hold on its question? A hold is
+ * `holds: true` with a recorded key (the human's answer, recorded by CTOC; the key may be a
+ * CTOC-added option the question file does not list). A release is a LATER real answer to the
+ * same question without a hold: a non-empty string key that, when the question is known, is one
+ * of its option keys, and no `holds` field of any other shape. Anything else changes nothing.
+ * @param {object} entry
+ * @param {*} key the entry's chosen key (`chosenKey`)
+ * @param {Map<string, Set<string>>|null} optionKeys the current questions' keys, when known
+ * @returns {boolean}
+ */
+function isHoldOrRelease(entry, key, optionKeys) {
+  if (typeof key !== 'string' || key === '') return false;
+  if (entry.holds === true) return true;
+  if (entry.holds !== undefined && entry.holds !== false) return false;
+  const known = optionKeys !== null && optionKeys.has(entry.questionId) ? optionKeys.get(entry.questionId) : null;
+  return known === null || known.has(key);
 }
 
 /**
@@ -933,7 +966,9 @@ function readAnsweredQuestionIds(root, ref, revision) {
     try { entry = JSON.parse(trimmed); } catch { continue; }
     if (!entry || typeof entry !== 'object' || typeof entry.questionId !== 'string') continue;
     const key = chosenKey(entry);
-    if (key !== undefined && planFileOf(entry.ref) === planFile) holdState.set(entry.questionId, entry.holds === true);
+    if (planFileOf(entry.ref) === planFile && isHoldOrRelease(entry, key, optionKeys)) {
+      holdState.set(entry.questionId, entry.holds === true);
+    }
     if (entry.ref !== ref) continue;
     if (optionKeys !== null && !(optionKeys.has(entry.questionId) && optionKeys.get(entry.questionId).has(key))) {
       unbound++;
@@ -1060,7 +1095,7 @@ function hasEnoughInformation(root, ref) {
   const unanswered = questions.filter((q) => !answers.ids.has(q.id));
   // The author's own topic decides nothing: unless the gate critic classified this file,
   // every open question is treated as weighty and goes to the human.
-  const blocking = unanswered.filter((q) => !status.classified || isBlockingQuestion(q));
+  const blocking = unanswered.filter((q) => goesToHuman(q, status.classified));
   // The count that EXISTED, and the ids that bound — both from the read above, so
   // only ids of CURRENT questions count (answered.length + unanswered.length === computed).
   const computed = questions.length;
@@ -1104,6 +1139,8 @@ module.exports = {
   readAnsweredQuestionIds,
   hasEnoughInformation,
   isBlockingQuestion,
+  isGateCriticClassification,
+  goesToHuman,
   isFresh,
   plansNeedingQuestions,
 };

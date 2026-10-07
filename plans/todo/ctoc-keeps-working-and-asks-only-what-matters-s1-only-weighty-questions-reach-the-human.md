@@ -37,6 +37,11 @@ files:
   - tests/menu-critique-first.test.js
   - tests/golden-corpus-fence.test.js
   - tests/gate-critic-compaction.test.js
+  # Added 2026-10-07 by the session after the re-review: the rule-count floors must equal the counts, the vision advisor writes question files to the old contract, and the audit counts blocking differently from the gate
+  - tests/product-owner-compaction.test.js
+  - tests/implementation-planner-compaction.test.js
+  - agents/planning/vision-advisor.md
+  - src/lib/sufficiency-audit.js
 approved_by: human
 approved_at: 2026-10-07T08:53:43.148Z
 gate_crossed: implementation → todo
@@ -234,6 +239,17 @@ enough to reach you?"):
     waiting folder as every other questions file, so a different agent could forge one. That
     would be deliberate deception visible in the record, not a mislabel; there is no trusted
     provenance channel for it today.
+
+Recorded 2026-10-07 at the session's instruction, after the security scan of that day:
+
+14. **The `holds` reversal.** A hold belongs to CTOC, never to a question file: it is read only
+    from the answers log (an entry carrying `holds: true` for the plan, released only by a later
+    real answer to the same question without it), and a question file that carries `holds` on any
+    option is refused. The specification's lines about a `holds` option field — in the technical
+    approach, the `validatePlanQuestions` and `hasEnoughInformation` items, the gate critic's
+    ruling options, and the test plan's holds cases — and acceptance criteria 2 and 3 where they
+    describe `holds` as an option field, are superseded by this decision and by the security scan
+    of 2026-10-07.
 
 ## Execution Plan
 
@@ -649,3 +665,40 @@ Consequence the owner should know: every questions file stored before this contr
 repository, 15 in the main checkout's `.ctoc/streaming/questions/`) now reads `invalid` — they
 carry no topic (the two here; the main checkout's were counted, not inspected) — so each such plan fails closed and asks for its
 questions again (case 13 pins this).
+
+### Re-review round (verdict: ship after) — floors, kinds, contradictions, audit, release
+
+`files:` widened again (approval record 0299d102…); the worktree copy's specification hash
+matched 0299d102… after inserting the 5 lines and before any edit.
+
+Gate critic orders replaced this round: R-240 (the validator refuses any id outside the shape),
+R-292 (the validator refuses any key but "1", "2", "3"), R-269 (the `-r` suffix is the
+whole-millisecond stamp), R-593 and R-608 (the sweeper keeps the attestation and the
+classification block), R-605 (the checklist's suffix item); R-586 re-anchored (template suffix);
+added N-009 (a synthesis carries every question of an unclassified author file into the fleet's
+file, classified, ids unchanged); N-008 re-anchored ("A classification payload …").
+
+| Finding | Test (red first) | Result |
+|---|---|---|
+| 1. Order floors below the counts | the three callers' `ORDER_FLOOR` | Raised to the real counts: gate critic 590 (589 plus N-009 added this round), product owner 256, implementation planner 185 |
+| 1. A unit's kind could be relabelled cuttable unseen | case 42: a pinned digest passes the true kinds and fails a relabel (red: `kindsSha256` was not an option) | `defineInventoryTests` takes an optional `kindsSha256` (sha256 of the `n:kind` lines), checked in check 3; the three callers pin theirs. The digests equal those of the inventories at 00a64b10, so no kind has changed since extraction |
+| 2. Gate critic said the validator only checks a non-empty id and key | inventory orders R-240, R-292 | Now says the validator refuses any other id shape and any key but "1"-"3" |
+| 2. Gate critic said the sweeper discards everything but the questions | R-593, R-608 | Now says the attestation and classification blocks are kept |
+| 2. A fractional plan stamp would put a `.` in an id | R-269, R-605, R-586 | The suffix is the whole-millisecond stamp (`Math.floor`), with the example `1784271999196.2705` → `-r1784271999196` |
+| 2. A synthesis replaced the author's file and dropped its questions | N-009 | A synthesis carries every question of an unclassified author file into the fleet's file, classified, ids unchanged |
+| 3. Vision advisor wrote to the old contract | `tests/session-start-question-dispatch.test.js` still passes (names `writePlanQuestions`, `streaming-precompute`, the dispatch-brief sentence) | Rewritten: Write to the pending file as the last act; required flags; keys "1"-"3"; id shape; topic as a proposal; never a classification block; never `holds`; no invisible characters |
+| 4. The audit counted critical-or-important | `tests/sufficiency-audit.test.js` case 4b: an author file counts 3 blocking and a classified one 2, each equal to `hasEnoughInformation(...).blocking.length` (red: the author file counted 2) | `streaming-precompute.goesToHuman(question, classified)` is the one rule; the gate and `sufficiency-audit.js` both call it, with `isGateCriticClassification` |
+| 5. Any line with any answer released a hold | case 28b: a later answer to another question, a key that is no option, `null`, `""`, `holds: "false"`, `holds: 0` — none releases; a later real answer does (red: key `"7"` released it) | `isHoldOrRelease`: a hold needs `holds: true` and a recorded key; a release needs a later answer to the same question naming one of its options, with no `holds` of any other shape |
+| 6. The `holds` reversal unrecorded | — | Decision 14 under "Decisions Taken Under Ambiguity" |
+
+Changed test, one line each (old → new → why): `tests/sufficiency-audit.test.js` case 4 wrote an
+author file and expected 2 blocking → writes a gate-critic-classified file, still 2 → in an
+author's file every question now blocks (owner 2026-10-07), and the case means a classified one.
+
+Bytes: gate critic 137,962 (ceiling raised 134,683 → 137,962 by the measured overage, the one
+`ceiling_corrections` entry updated); product owner 30,173 of 30,203; planner 27,013 of 27,019;
+vision advisor has no ceiling.
+
+Full `npm test`: tests 12611, pass 12611, fail 0, cancelled 0, skipped 0; coverage 99.89%;
+`[CTOC test-gate] PASS`. `streaming-precompute.js` 100% line, `sufficiency-audit.js` 100% line.
+Lint on every changed JavaScript file: zero warnings.

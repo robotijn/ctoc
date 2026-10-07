@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/gate-critic/baseline-agent.md",
  "baseline_sha256": "d8d10528cffd6e9c0af1b1174d5286b79b08d820416894c16ce117e2f39fed5e",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 137503,
+ "maxBytes": 137962,
  "units": [
   {
    "n": 1,
@@ -2079,7 +2079,7 @@
    "orders": [
     "R-240"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 241,
@@ -2334,7 +2334,7 @@
    "orders": [
     "R-269"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 270,
@@ -5140,7 +5140,7 @@
    "orders": [
     "R-593"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 594,
@@ -5267,7 +5267,7 @@
    "orders": [
     "R-608"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 609,
@@ -7788,7 +7788,7 @@
    "wire": true,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
@@ -8368,7 +8368,16 @@
     "The validator's only test is that the id is a non-empty string (`streaming-precompute.validatePlanQuestions`, `src/lib/streaming-precompute.js:229`), and the streaming screen interpolates the id UNSTRIPPED into the command the session model runs to record the human's answer — `stream answer <ref> <id> <key>` (`src/lib/streaming-gate.js:315`)."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "The validator refuses any id outside `^q[0-9]{2}-[a-z0-9-]+$` (`streaming-precompute.validatePlanQuestions`), and the streaming screen interpolates the id UNSTRIPPED into the command the session model runs to record the human's answer — `stream answer <ref> <id> <key>` (`src/lib/streaming-gate.js:315`)."
+    ]
+   }
   },
   {
    "id": "R-241",
@@ -8628,7 +8637,16 @@
     "Every id carries a revision suffix — the answers log is append-only and never pruned. Append `-r<planMtimeMs>` — the decimal digits of `planMtimeMs`, COPIED CHARACTER FOR CHARACTER from the brief, never re-encoded — to EVERY id you mint, structural, finding, and reserved alike: `q99-gate-ruling-r1784500000000`, `q10-vacuous-acceptance-criteria-r1784500000000`, `q96-plan-unreadable-r1784500000000`."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "Every id carries a revision suffix — the answers log is append-only and never pruned. Append `-r<planMtimeMs>` — the WHOLE-MILLISECOND digits of the brief's `planMtimeMs` (`Math.floor`: `1784271999196.2705` gives `-r1784271999196`, because a `.` fails the id rule), never otherwise re-encoded — to EVERY id you mint, structural, finding, and reserved alike: `q99-gate-ruling-r1784500000000`, `q10-vacuous-acceptance-criteria-r1784500000000`, `q96-plan-unreadable-r1784500000000`."
+    ]
+   }
   },
   {
    "id": "R-270",
@@ -8810,7 +8828,16 @@
     "), and the validator tests only that it is a non-empty string (`src/lib/streaming-precompute.js:260`)."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "The key is interpolated unstripped into the same `stream answer` command as the id (`src/lib/streaming-gate.js:310,315`), and the validator refuses any key but `\"1\"`, `\"2\"` or `\"3\"`."
+    ]
+   }
   },
   {
    "id": "R-294",
@@ -9243,7 +9270,7 @@
    "wire": false,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
@@ -9994,7 +10021,7 @@
    "wire": false,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
@@ -10363,7 +10390,7 @@
    "wire": false,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
@@ -10382,7 +10409,7 @@
    "wire": false,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
@@ -10501,7 +10528,7 @@
    "wire": false,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
@@ -10520,7 +10547,7 @@
    "wire": false,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
@@ -10810,7 +10837,7 @@
    "wire": false,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
@@ -11108,7 +11135,7 @@
    "wire": false,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
@@ -11257,11 +11284,11 @@
    "wire": true,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
-     "```json { \"ref\": \"<stage>/<file>.md\", \"self_assessment\": { \"lenses_merged\": [\"premortem\", \"devils-advocate\", \"red-team\", \"advocate\"], \"lenses_failed\": [], \"ancestry_read\": [\"vision\", \"functional\", \"implementation\"], \"ancestry_missing\": [], \"findings_in\": 7, \"findings_after_dedup\": 4, \"findings_dropped_below_floor\": 1, \"findings_dropped_ungrounded\": 0, \"findings_dropped_out_of_scope\": 0, \"findings_carried_into_q97\": 0, \"inputs_unsupplied\": [], \"contract_violations\": [\"<lens>: <the field that was off-contract, and how you repaired it>\"], \"blind_spots\": [\"<what you could not check, and why>\"] }, \"questions\": [ { \"id\": \"q10-<short-kebab-topic>-r<planMtimeMs, decimal digits copied verbatim>\", \"prompt\": \"<the decision the human must make, stated as a question>\", \"critical\": true, \"important\": false, \"topic\": \"<one of rule 4a's values>\", \"options\": [ { \"key\": \"1\", \"label\": \"<option>\", \"recommended\": true, \"pros\": \"<confidence sentence per rule 5, then at least one further sentence arguing in its own words why THIS OPTION produces the better outcome — never a restatement of the confidence level or the label>\", \"cons\": \"<the REAL cost of the path you are recommending, per rule 7c>\", \"description\": \"<one line of extra context, optional>\" }, { \"key\": \"2\", \"label\": \"<option>\", \"pros\": \"<the strongest honest case for THIS option, comparable in specificity and length to option 1's — never 'Unblocks now'>\", \"cons\": \"<the real cost of taking it>\" } ] } ] } ```"
+     "```json { \"ref\": \"<stage>/<file>.md\", \"self_assessment\": { \"lenses_merged\": [\"premortem\", \"devils-advocate\", \"red-team\", \"advocate\"], \"lenses_failed\": [], \"ancestry_read\": [\"vision\", \"functional\", \"implementation\"], \"ancestry_missing\": [], \"findings_in\": 7, \"findings_after_dedup\": 4, \"findings_dropped_below_floor\": 1, \"findings_dropped_ungrounded\": 0, \"findings_dropped_out_of_scope\": 0, \"findings_carried_into_q97\": 0, \"inputs_unsupplied\": [], \"contract_violations\": [\"<lens>: <the field that was off-contract, and how you repaired it>\"], \"blind_spots\": [\"<what you could not check, and why>\"] }, \"questions\": [ { \"id\": \"q10-<short-kebab-topic>-r<planMtimeMs, whole milliseconds>\", \"prompt\": \"<the decision the human must make, stated as a question>\", \"critical\": true, \"important\": false, \"topic\": \"<one of rule 4a's values>\", \"options\": [ { \"key\": \"1\", \"label\": \"<option>\", \"recommended\": true, \"pros\": \"<confidence sentence per rule 5, then at least one further sentence arguing in its own words why THIS OPTION produces the better outcome — never a restatement of the confidence level or the label>\", \"cons\": \"<the REAL cost of the path you are recommending, per rule 7c>\", \"description\": \"<one line of extra context, optional>\" }, { \"key\": \"2\", \"label\": \"<option>\", \"pros\": \"<the strongest honest case for THIS option, comparable in specificity and length to option 1's — never 'Unblocks now'>\", \"cons\": \"<the real cost of taking it>\" } ] } ] } ```"
     ]
    }
   },
@@ -11286,7 +11313,7 @@
    "wire": false,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
@@ -11332,7 +11359,16 @@
     "The sweeper passes `payload.questions` — the array, never the whole object — as the third argument to `writePlanQuestions(root, ref, questions, planMtimeMs)`, which stores `{ ref, planMtimeMs, questions }` and discards every other field."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "The sweeper passes `payload.questions` — the array, never the whole object — as the third argument to `writePlanQuestions`, with your `attestation` and `classification` blocks after it; it stores `{ ref, planMtimeMs, questions }` and those two blocks, and discards every other field."
+    ]
+   }
   },
   {
    "id": "R-594",
@@ -11406,7 +11442,16 @@
     "every recommended option's `pros` carries at least one sentence after the confidence sentence that argues the decision in its own words and does not restate the confidence level, the option label, or point at another field; the single-option `q98-critique-coverage` is exempt from the symmetry checks and from the second-sentence check."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "Before emitting, verify by inspection: every question `id` appears exactly once; within each question every option `key` appears exactly once; every option `label` within a question appears exactly once and is none of the three reserved words; every `id`, `prompt`, `key`, and `label` is a non-empty string; every question object carries EXACTLY the keys `id`, `prompt`, `critical`, `important`, `options` — `description`, `pros`, and `cons` are OPTION fields only, and every question but the gate ruling and `q98-critique-coverage` also carries `topic`; `options` has between one and three entries; `critical`/`important`/`recommended` are booleans and `pros`/`cons`/`description` are strings; every question `id` matches `^q[0-9]{2}-[a-z0-9-]+-r[0-9]+$` — and the digits after `-r` are the whole-millisecond part of the brief's `planMtimeMs` in every id — when `planMtimeMs` was supplied, and matches the bare `^q[0-9]{2}-[a-z0-9-]+$` with no revision suffix at all when it was not, in which case confirm the gate ruling is Hold and its Approve-option `cons` carries the unsupplied-`planMtimeMs` sentence verbatim; and every option `key` is exactly `\"1\"`, `\"2\"`, or `\"3\"`; check these two FIRST and hardest; no `prompt`, `label`, `pros`, `cons`, or `description` contains a newline, tab, or any other control character; every rendered `<slug>` is at most 60 characters and contains no composer string or marker fragment; the `description` of any `read-scope-violation` or `read-redirection` question carries a path capped at 120 characters and containing no composer string or marker fragment; the last question's id begins with `q99-gate-ruling`, it carries exactly two options, its `critical`/`important` flags match its verdict per rule 10, and it carries an option whose `cons` ends with the verbatim coverage sentence with every other mandated sentence placed BEFORE it, none dropped; every option's `pros` and `cons` names something concrete rather than only speed or effort, and no `pros` is any of the strings `Unblocks now.`, `Ships today.`, `No work at all.`, or a variation carrying no argument; within each question having two or more options, no option's `pros` is shorter than half the longest `pros` in that question and the recommended option's `cons` is not shorter than half the longest `cons` in that question — a floor to be met by writing the missing argument, never by shortening a real one, and applying ONLY to option text you authored for THIS plan: the `read-scope-violation`, `read-redirection`, and `lens-unavailable-<lens>` questions carry option text this document mandates verbatim and are EXEMPT from both floors, per the exemption stated in rule 7b, which this check must always match; every recommended option's `pros` carries at least one sentence after the confidence sentence that argues the decision in its own words and does not restate the confidence level, the option label, or point at another field; the single-option `q98-critique-coverage` is exempt from the symmetry checks and from the second-sentence check."
+    ]
+   }
   },
   {
    "id": "R-606",
@@ -11436,7 +11481,16 @@
     "It also never reaches disk and never reaches the human: the sweeper passes only the `questions` array to `writePlanQuestions`, which persists `{ ref, planMtimeMs, questions }`, and the streaming screen renders each question's `prompt` plus its options' `label` and composed text — nothing else."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
+    "new_anchors": [
+     "It also never reaches disk and never reaches the human: the sweeper passes only the `questions` array, the `attestation` and the `classification` to `writePlanQuestions`, which persists them with `ref` and `planMtimeMs`, and the streaming screen renders each question's `prompt` plus its options' `label` and composed text — nothing else."
+    ]
+   }
   },
   {
    "id": "R-609",
@@ -11679,7 +11733,7 @@
    "wire": false,
    "fate": "replaced",
    "replaced_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human",
     "new_anchors": [
@@ -12348,7 +12402,7 @@
    ],
    "fate": "added",
    "added_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
    }
@@ -12362,7 +12416,7 @@
    ],
    "fate": "added",
    "added_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
    }
@@ -12376,7 +12430,7 @@
    ],
    "fate": "added",
    "added_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
    }
@@ -12390,7 +12444,7 @@
    ],
    "fate": "added",
    "added_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
    }
@@ -12404,7 +12458,7 @@
    ],
    "fate": "added",
    "added_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
    }
@@ -12418,7 +12472,7 @@
    ],
    "fate": "added",
    "added_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
    }
@@ -12432,7 +12486,7 @@
    ],
    "fate": "added",
    "added_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
    }
@@ -12442,11 +12496,25 @@
    "says": "A classification payload carries no gate ruling and no attestation.",
    "now_in": "## Classifying the questions — the topic is yours, never the author's",
    "anchors": [
-    "That payload carries no gate ruling and no attestation; rule 10 and the checklist's ruling and id items govern a synthesis, not a classification."
+    "A classification payload carries no gate ruling and no attestation; rule 10 and the checklist's ruling and id items govern a synthesis, not a classification."
    ],
    "fate": "added",
    "added_by": {
-    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question.",
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
+   }
+  },
+  {
+   "id": "N-009",
+   "says": "In a synthesis, carry every question of an unclassified author file into the fleet file, classified, ids unchanged.",
+   "now_in": "## Classifying the questions — the topic is yours, never the author's",
+   "anchors": [
+    "In a synthesis, read that file too when it carries no classification block, and carry every one of its questions into your file, classified the same way, its id unchanged (the band and suffix rules govern only ids you mint) and none of yours repeating it: your file replaces it, and an author's weighty question must never vanish because no lens raised it."
+   ],
+   "fate": "added",
+   "added_by": {
+    "instruction": "The owner, 2026-10-06: \"do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)\". The plan and its security fix round: every finding question carries a topic, defined in rule 4a; an ambiguous-evidence finding carries two options and no recommended one; Rule 8 recommends Approve when no surviving question goes to the human; a detail decided by its recommendation is recorded in the plan; the examples carry a topic; a hold is the human's answer, recorded by CTOC, never a question field. The owner, 2026-10-07: the independent gate critic assigns every topic; the plan's author never grades its own question. The re-review of 2026-10-07: the validator enforces the key and id shapes, the sweeper keeps the classification block, the id suffix is the whole-millisecond stamp, and a synthesis carries the author's questions.",
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
    }
@@ -12456,7 +12524,7 @@
   {
    "date": "2026-10-07",
    "from": 134683,
-   "to": 137503,
+   "to": 137962,
    "reason": "owner's question contract of 2026-10-06 (plan ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human) adds rules"
   }
  ]

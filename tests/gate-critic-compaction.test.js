@@ -24,13 +24,21 @@ const { defineInventoryTests } = require('./compaction-eval/inventory-checks');
 const { check, pendingRel, topic } = require('./compaction-eval/gate-critic/contract');
 
 /** The order count at extraction. A floor: it may rise, never fall. */
-const ORDER_FLOOR = 581;
+const ORDER_FLOOR = 590;
+
+/**
+ * sha256 of the inventory's units as `n:kind` lines, pinned here so an order unit cannot be
+ * relabelled as a cuttable kind (and then cut) without an edit in this file too. Unchanged
+ * since extraction; the floor above equals the order count, added rules included (2026-10-07).
+ */
+const KINDS_SHA256 = 'ba0606ed78d722811dfb8f5f1b6f6347a8815a97e030b7ca50ab6e7acd46aa2c';
 
 defineInventoryTests({
   test,
   label: 'gate-critic',
   inventoryPath: path.join(__dirname, 'compaction-eval', 'gate-critic', 'rule-inventory.json'),
-  orderFloor: ORDER_FLOOR
+  orderFloor: ORDER_FLOOR,
+  kindsSha256: KINDS_SHA256
 });
 
 const REF = 'functional/title-search.md';
