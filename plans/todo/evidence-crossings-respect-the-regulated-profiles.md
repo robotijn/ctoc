@@ -275,37 +275,57 @@ Cases 1–47 run without a `.ctoc/settings.yaml` and stay green unchanged.
 10. **Recorded fact, not changed here:** after this fix the owner's approve on a GDPR or EU AI Act
     project moves the plan exactly as before v6.14.119, and the compliance review still runs only
     if the CTO Chief is dispatched at that crossing — no code triggers it on that path either.
+11. **(Executor, Step 8) Case numbers moved by one.** On the tree this was built on (main
+    4e15041c, v6.14.120, slice 3 included) the test file already ended at case 48 (a held plan
+    is asked keep-or-release first). The plan's cases 48, 49, 50, 51 and 52 are the file's
+    cases 49, 50, 51, 52 and 53; the specification is unchanged.
+12. **(Executor, Step 8) "Green today" for the guard case was not literally true.** Its
+    `regimeHold: null` assertions read `undefined` before the field existed, so the guard case
+    (file case 52) and the override-off project (file case 53) were red on that assertion
+    alone; the first crossing the guard case asserts (no regime: the functional plan moved)
+    passed before it. The assertions were kept as specified, not loosened.
+13. **(Executor, Step 8) "Every descriptor read before the crossing".** A pre-build plan that
+    crosses yields no descriptor (`pendingGateDecisions` crosses it on the same call), so the
+    guard case asserts `regimeHold: null` on every descriptor the call returns (the review
+    plans) and takes the pre-build crossing itself as the evidence for the pre-build plans.
+14. **(Executor, Step 10) The fail-closed screen check reads the first decision shown.** In
+    file case 51(a) the review plan is listed before the functional one, so the
+    unreadable-regime sentence is asserted on that screen.
+15. **(Executor, Step 10) `NOT ENFORCED` kept on one line** in `docs/ENFORCEMENT.md`: the
+    compliance-claims fence matches the marker per line, and a wrapped marker would not count.
+16. **(Executor, Step 15) No CHANGELOG edit.** It is not in this plan's `files:`; the release
+    step writes it.
 
 ## Execution Plan
 
 ### Step 8: TEST
-- [ ] Add `setRegime` and cases 48–52 to `tests/plans-keep-moving-without-the-human.test.js`; run the file; record 48, 49, 50(a), 50(b)'s built plan and 52's held projects red for the named reason (the plan crossed or finished), 51 and 52's override-off project green, cases 1–47 green.
+- [x] Add `setRegime` and cases 48–52 to `tests/plans-keep-moving-without-the-human.test.js`; run the file; record 48, 49, 50(a), 50(b)'s built plan and 52's held projects red for the named reason (the plan crossed or finished), 51 and 52's override-off project green, cases 1–47 green.
 
 ### Step 9: PREPARE
-- [ ] Confirm slice 3 is built and `.ctoc/approvals/evidence-crossings-respect-the-regulated-profiles.json` is a human approval matching this plan's specification; if not, stop and report.
-- [ ] Re-read `pendingGateDecisions`, `sufficiencyLine`, `richQuestionScreen`, Rule 14 of `start.md` and the "Review to done on recorded evidence" paragraph as slice 3 left them.
-- [ ] Record the dead-export, unreachable-file and false-green counts.
+- [x] Confirm slice 3 is built and `.ctoc/approvals/evidence-crossings-respect-the-regulated-profiles.json` is a human approval matching this plan's specification; if not, stop and report.
+- [x] Re-read `pendingGateDecisions`, `sufficiencyLine`, `richQuestionScreen`, Rule 14 of `start.md` and the "Review to done on recorded evidence" paragraph as slice 3 left them.
+- [x] Record the dead-export, unreachable-file and false-green counts.
 
 ### Step 10: IMPLEMENT
-- [ ] `src/lib/streaming-gate.js`: `REVIEW_SIGN_OFF_CONTROLS`, `regimeHold`, `REGIME_LINES`, `regimeLine`, the two `!regime` conditions, the descriptor field, `sufficiencyLine` and `richQuestionScreen`; cases 48–52 green.
-- [ ] `src/commands/start.md` Rule 14 and the two `docs/ENFORCEMENT.md` paragraphs, as specified.
+- [x] `src/lib/streaming-gate.js`: `REVIEW_SIGN_OFF_CONTROLS`, `regimeHold`, `REGIME_LINES`, `regimeLine`, the two `!regime` conditions, the descriptor field, `sufficiencyLine` and `richQuestionScreen`; cases 48–52 green.
+- [x] `src/commands/start.md` Rule 14 and the two `docs/ENFORCEMENT.md` paragraphs, as specified.
 
 ### Step 11: REVIEW
 - [ ] Dispatch `iron-loop-critic`: no crossing on evidence remains on a held stage; projects with no regime behave byte for byte as before; the texts say what the code does and claim no enforcement of the three sign-off controls' own checks.
 
 ### Step 12: OPTIMIZE
-- [ ] The regime is read once per stage that has plans, never per plan; the control set once per review read; no new export.
+- [x] The regime is read once per stage that has plans, never per plan; the control set once per review read; no new export.
 
 ### Step 13: SECURE
 - [ ] Dispatch `security-scanner`: every failure to read the regime holds the plan; the screen renders only the four fixed sentences; the profile-name path is used for an existence check and a shallow parse only.
 
 ### Step 14: VERIFY
-- [ ] `npm test`: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct`.
-- [ ] Lint `src/lib/streaming-gate.js` and the test file: zero warnings; `tsc --checkJs`: zero errors.
-- [ ] Dead-export, unreachable-file and false-green counts not higher than at Step 9; `tests/compliance-claims-match-code.test.js` green with no marker moved.
+- [x] `npm test`: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct`.
+- [x] Lint `src/lib/streaming-gate.js` and the test file: zero warnings; `tsc --checkJs`: zero errors.
+- [x] Dead-export, unreachable-file and false-green counts not higher than at Step 9; `tests/compliance-claims-match-code.test.js` green with no marker moved.
 
 ### Step 15: DOCUMENT
-- [ ] JSDoc on `regimeHold`, `regimeLine` and the changed `pendingGateDecisions`, `sufficiencyLine` and `richQuestionScreen`.
+- [x] JSDoc on `regimeHold`, `regimeLine` and the changed `pendingGateDecisions`, `sufficiencyLine` and `richQuestionScreen`.
 
 ### Step 16: FINAL-REVIEW
 - [ ] Dispatch `iron-loop-critic` against the acceptance criteria; each box quotes its evidence.
@@ -317,20 +337,20 @@ Cases 1–47 run without a `.ctoc/settings.yaml` and stay green unchanged.
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
 - [ ] Self-review all new code
@@ -338,9 +358,9 @@ Cases 1–47 run without a `.ctoc/settings.yaml` and stay green unchanged.
 - [ ] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
 - [ ] Validate inputs (no path traversal)
@@ -349,15 +369,15 @@ Cases 1–47 run without a `.ctoc/settings.yaml` and stay green unchanged.
 - [ ] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
 - [ ] Verify steps 8-15 completed correctly
@@ -373,3 +393,66 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record
+
+Built in worktree `agent-a72785c0a9e7794d3` on main 4e15041c (v6.14.120, slice 3 included).
+Specification hash before editing and after: `dcf362a98ad2637438592e1a584cba0df853c34fc85d6e3c64b3ba8cb379f256`,
+equal to the approval record's `content_sha256` (`approved_by: human`).
+
+**Step 8 — test first.** Plan case → file case: 48 → 49, 49 → 50, 50 → 51, 51 → 52, 52 → 53.
+Red run (before any code), `node --test --test-name-pattern="case (49|5[0-3])"`: 11 tests, 0 pass, 11 fail:
+
+| File case | Red reason (today) | Green after Step 10 |
+|---|---|---|
+| 49, gdpr | "the plan stays in functional" — it crossed as in case 1 | green |
+| 49, eu-ai-act-high-risk | "the plan stays in functional" — it crossed | green |
+| 50, do-178c-level-a | "the built plan stays in review" — it finished as in case 6 | green |
+| 51(a), unreadable settings | "nothing crossed" — both crossed (done/c51b, implementation/c51) | green |
+| 51(b), misspelled profile | "the built plan stays" — it finished | green |
+| 52, guards | `regimeHold` read `undefined`, not `null` (field absent); first crossing passed | green |
+| 53, four_eyes_gate3 alone | "the built plan stays in review" — it finished | green |
+| 53, spec_code_reconciliation alone | "the built plan stays in review" — it finished | green |
+| 53, lessons_learned_closure alone | "the built plan stays in review" — it finished | green |
+| 53, sox-itgc profile | "the built plan stays in review" — it finished | green |
+| 53, pci-dss-v4 with four_eyes_gate3 off | `regimeHold` read `undefined`, not `null` | green |
+
+Cases 1–48 green before and after (file: 60 pass / 11 fail red; 71 pass / 0 fail green).
+The red tests were committed before the implementation.
+
+**Step 9 — prepare.** Approval record is human-kind and matches. Re-read on this tree:
+`pendingGateDecisions` (sufficiency condition and the review condition), `sufficiencyLine`,
+`richQuestionScreen`, `gateScreenAt`, Rule 14 of `start.md` (clause text as specified, found
+once) and the "Review to done on recorded evidence" paragraph — all as the plan names them.
+Counts before: unreachable files 17, dead exports 65, false-green findings 207 (all equal to
+their baselines; ratchet tests pass).
+
+**Step 10 — implement.** `src/lib/streaming-gate.js`: `REVIEW_SIGN_OFF_CONTROLS`, `regimeHold`
+(as specified, no literal call of the control-enabled function), the regime read once per
+non-empty stage, `&& !regime` on the sufficiency crossing and on the review crossing,
+`regimeHold` on every descriptor, `REGIME_LINES`, `regimeLine`, `sufficiencyLine` appends it
+on both branches, `richQuestionScreen` adds it after the separator. `src/commands/start.md`
+Rule 14 clause replaced with the specified text. `docs/ENFORCEMENT.md`: the two paragraphs
+after "Review to done on recorded evidence"; the sign-off paragraph carries the marker and does
+not name the independent verification control.
+
+**Step 12 — optimize.** The regime is read only for a stage with plans and only for the two
+governed stages; `effectiveControls` once per review read; no new export. (Inside
+`regimeHold` the settings file is parsed by `loadActiveProfiles`, then again inside
+`unloadableProfiles` and `effectiveControls` — the specified shape; a few small reads once
+per stage.)
+
+**Step 14 — verify.** `npm test` (foreground): tests 12710, pass 12710, fail 0, cancelled 0,
+skipped 0, todo 0; `[CTOC test-gate] coverage 99.87% (threshold 99%), skipped 0, failed 0`,
+`PASS`. `streaming-gate.js` 99.39 % lines; its uncovered lines are all pre-existing, none in
+the new code. `eslint --max-warnings 0` on `src/lib/streaming-gate.js` and the test file: clean.
+`tests/typecheck.test.js`: pass. Counts after: unreachable files 17, dead exports 65,
+false-green findings 207 — none higher. `tests/compliance-claims-match-code.test.js` green, no
+marker moved.
+
+**Step 15 — document.** JSDoc on `REVIEW_SIGN_OFF_CONTROLS`, `regimeHold`, `REGIME_LINES`,
+`regimeLine`, and the changed `pendingGateDecisions` (header section and `@returns`),
+`sufficiencyLine` and `richQuestionScreen`.
+
+Steps 11, 13 and 16 are left to the session (critic, security scanner, final review and the
+three scratch projects shown to the owner).

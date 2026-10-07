@@ -190,6 +190,22 @@ clears the plan's status file. A plan whose checks failed stays in review. Done 
 with deployment enabled it records the deploy-ready notice ("It finished on its checks —
 nobody approved it by hand"). Held by `tests/plans-keep-moving-without-the-human.test.js`.
 
+**Regulated projects.** While the GDPR or EU AI Act high-risk profile is on (the CTO Chief's
+compliance trigger), a functional plan never crosses into implementation on sufficiency,
+because nothing records that the compliance review ran for that version of the plan; while the
+regime requires independent verification and validation, a built plan never finishes on its
+checks, because CTOC cannot read the verification chief's findings; a regime CTOC cannot read
+(an unreadable `.ctoc/settings.yaml`, or, at review, a declared profile it cannot load) holds
+the plan the same way. Each waits for the owner's approve and the screen says why in one
+sentence (`streaming-gate.regimeHold`). A project with no regime is unchanged. Held by
+`tests/plans-keep-moving-without-the-human.test.js`.
+
+While `four_eyes_gate3`, `spec_code_reconciliation` or `lessons_learned_closure` is active, a
+built plan also never finishes on its checks and waits for the owner's approve.
+**NOT ENFORCED**: their own checks (two distinct approvers, the reconciliation, the closing
+lesson) do not run; only the crossing on evidence waits, so the owner's approve still crosses
+with one approver.
+
 **Which questions reach the human.** `streaming-precompute.goesToHuman(question,
 classified)` is the one rule the gate, the screen and the audit share: in a file carrying the
 gate critic's classification block, a question reaches the human only under the conditions of
