@@ -60,7 +60,8 @@ function renderMatrixFromRealSample() {
     const real = JSON.parse(fs.readFileSync(QUESTION_SAMPLE, 'utf8'));
     const lens = { state: 'clean-pass', coverage: 'full', findings: 0 };
     const attestation = { generated_by: 'gate-critic', generated_at: 1, lenses: { premortem: lens, 'devils-advocate': lens, 'red-team': lens, advocate: lens } };
-    const upgraded = { ...real, attestation, questions: real.questions.map((q) => (/^q9[89]-/.test(q.id) ? q : { ...q, topic: 'detail' })) };
+    // The gate critic's classification block too: only a file it classified is put to the owner (slice 2).
+    const upgraded = { ...real, attestation, classification: { by: 'gate-critic', at: 1 }, questions: real.questions.map((q) => (/^q9[89]-/.test(q.id) ? q : { ...q, topic: 'detail' })) };
     fs.writeFileSync(path.join(qDir, 'review__00003-r2a-scheduler-lifecycle-honesty.md.json'), JSON.stringify(upgraded));
 
     const planDir = path.join(dir, 'plans', 'review');

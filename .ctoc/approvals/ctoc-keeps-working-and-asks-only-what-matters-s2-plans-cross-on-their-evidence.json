@@ -1,11 +1,11 @@
 {
-  "content_sha256": "e4e6c90f564cc757a165795240510cdb0cd01187c3f8df8314ffff86a6924bc0",
+  "content_sha256": "f7719a4bd81908e166e123ce813504d1e32b4b193a09876ecb4d3cfc684a4bae",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-10-07T15:53:22.357Z",
+  "approved_at": "2026-10-07T16:24:22.432Z",
   "approved_by": "human",
   "backfilled": true,
-  "backfill_reason": "Session, 2026-10-07: the verification round rewrote slice 1's added gate-critic rules N-007 and N-009 and replaced the digest format and question-id holds; three slice 1 test files encode the old contracts",
+  "backfill_reason": "Session, 2026-10-07: after the end-to-end run, an unchecked author question is never shown to the owner; three test files stage such files and need the gate critic's classification block",
   "plan_basename": "ctoc-keeps-working-and-asks-only-what-matters-s2-plans-cross-on-their-evidence"
 }

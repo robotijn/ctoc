@@ -52,6 +52,10 @@ files:
   - tests/question-blocking-default.test.js
   - tests/streaming-precompute.test.js
   - tests/sufficiency-evidence.test.js
+  # Added 2026-10-07 by the session after the end-to-end run: these fixtures stage an unchecked author file and expect it on screen, which the owner's decision now forbids
+  - tests/real-question-file-render.test.js
+  - tests/streaming-questions-sweeper.test.js
+  - tests/menu-critique-first.test.js
 approved_by: human
 approved_at: 2026-10-07T13:42:48.628Z
 gate_crossed: implementation → todo
@@ -1840,3 +1844,20 @@ and expect its question on the screen, not edited: `tests/real-question-file-ren
 sweeper.test.js` (2: cases 19 and 20, a "critic-authored" pending file without a
 classification block), `tests/menu-critique-first.test.js` (1: its product question is written
 unclassified). Each needs only the gate critic's classification block on its fixture.
+
+The session widened `files:` with the three test files and re-recorded the approval (f7719a4b…,
+verified equal to this copy before any edit). Fixture change only, every assertion kept (old
+→ new → why):
+
+- `tests/real-question-file-render.test.js`, the staged real sample (all 5 cases): attestation
+  and topics, no classification block → the gate critic's classification block added, as its
+  comment already said ("exactly as the gate critic would classify it") → only a file the gate
+  critic checked is put to the owner.
+- `tests/streaming-questions-sweeper.test.js` cases 19 and 20: a "critic-authored" pending file
+  without a classification block → with the gate critic's block → same reason.
+- `tests/menu-critique-first.test.js`, "critique stays reachable even when a PRODUCT question
+  owns the screen": the product question written unclassified → written with the gate critic's
+  block → same reason.
+
+Full `npm test` (once): tests 12687, pass 12687, fail 0, cancelled 0, skipped 0, todo 0;
+coverage 99.87%; `[CTOC test-gate] PASS`. Lint zero warnings.

@@ -542,6 +542,7 @@ describe('streaming-questions-sweeper — REACHABILITY from the live gate screen
       ref,
       planMtimeMs: fs.statSync(planPathFor(root, ref)).mtimeMs,
       questions: validQuestions(),
+      classification: { by: 'gate-critic', at: 1786000000000 }, // critic-authored, so classified
     });
 
     // NO sweeper call here — the live entry point must do the sweeping.
@@ -564,6 +565,7 @@ describe('streaming-questions-sweeper — REACHABILITY from the live gate screen
       ref,
       planMtimeMs: fs.statSync(planPathFor(root, ref)).mtimeMs,
       questions: validQuestions(),
+      classification: { by: 'gate-critic', at: 1786000000000 }, // critic-authored, so classified
     });
 
     streamingGate.streamingGateScreen(root);
