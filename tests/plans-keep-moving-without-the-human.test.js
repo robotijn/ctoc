@@ -1688,6 +1688,79 @@ describe('a real project has no profile folder: the shipped profiles are read (c
     assert.equal(exists(root, ref), true);
   });
 
+  // Security check of bf484a62 (finding 1): a settings or profile file that opens but is misread
+  // must never read as "no regime" or "fewer controls".
+  const INIT_LINE = '  active_profiles: []  # opt-in industry profiles (e.g. gdpr); none by default\n';
+  /** A functional plan with a classified empty question file and a built plan, both ready to cross. */
+  function readyPair(root) {
+    const fref = 'functional/c56f.md';
+    writePlan(root, fref, functionalBody('Misread regime'));
+    writeQuestions(root, fref, []);
+    seedBuilt(root, 'c56r');
+    return fref;
+  }
+  const writeSettingsText = (root, text) => fs.writeFileSync(path.join(root, '.ctoc', 'settings.yaml'), text);
+
+  const misreadSettings = {
+    'a flow list split over two lines': 'regulatory_regime:\n  active_profiles: [do-178c-level-a,\n    sox-itgc]\n',
+    'a scalar active_profiles': 'regulatory_regime:\n  active_profiles: gdpr\n',
+    'a header with a comment': 'regulatory_regime: # EU\n  active_profiles: [gdpr]\n',
+    'a flow mapping': 'regulatory_regime: {active_profiles: [gdpr]}\n',
+    'a quoted name': 'regulatory_regime:\n  active_profiles: ["gdpr"]\n',
+    'a misspelled key': 'regulatory_regime:\n  active_profile: [gdpr]\n',
+  };
+  for (const [label, text] of Object.entries(misreadSettings)) {
+    it(`case 56 — settings with ${label}: both crossings wait as unreadable`, () => {
+      const root = makeSandbox();
+      writeSettingsText(root, text);
+      const fref = readyPair(root);
+      const crossed = [];
+      const ds = streamingGate.pendingGateDecisions(root, { crossed });
+      assert.deepEqual(crossed, [], 'nothing crossed');
+      assert.equal(exists(root, fref), true);
+      assert.equal(exists(root, 'review/c56r.md'), true);
+      for (const ref of [fref, 'review/c56r.md']) {
+        const d = ds.find((x) => x.ref === ref);
+        assert.equal(d.regimeHold, 'regime-unreadable', ref);
+        assert.equal(d.passesValidation, true, ref);
+      }
+    });
+  }
+
+  const misreadProfiles = {
+    'an empty profile file': '',
+    'required_controls as a flow list': 'name: acme\nrequired_controls: [four_eyes_gate3]\n',
+    'required_controls as a scalar': 'name: acme\nrequired_controls: four_eyes_gate3\n',
+  };
+  for (const [label, body] of Object.entries(misreadProfiles)) {
+    it(`case 56 — ${label}: the built plan waits as unreadable`, () => {
+      const root = makeSandbox();
+      writeSettingsText(root, 'regulatory_regime:\n  active_profiles: [acme]\n');
+      fs.mkdirSync(path.join(root, '.ctoc', 'regulatory-regimes'), { recursive: true });
+      fs.writeFileSync(path.join(root, '.ctoc', 'regulatory-regimes', 'acme.yaml'), body);
+      seedBuilt(root, 'c56p');
+      assertBuiltHeld(root, 'c56p', 'regime-unreadable');
+    });
+  }
+
+  const noRegime = {
+    'a fresh project (an empty list with its comment)': `regulatory_regime:\n${INIT_LINE}`,
+    'a declined regime': `regulatory_regime:\n  declined: true\n${INIT_LINE}`,
+    'no regulatory_regime block at all': 'timezone: "UTC"\n',
+  };
+  for (const [label, text] of Object.entries(noRegime)) {
+    it(`case 56 — guard, ${label}: both plans cross as today`, () => {
+      const root = makeSandbox();
+      writeSettingsText(root, text);
+      const fref = readyPair(root);
+      assert.equal(descriptorOf(root, 'review/c56r.md').regimeHold, null);
+      assert.equal(exists(root, 'implementation/c56f.md'), true, 'the functional plan moved on');
+      menuScreens.continueAfterCrossing(root);
+      assert.equal(exists(root, 'done/c56r.md'), true, 'the built plan finished on its checks');
+      assert.equal(exists(root, fref), false);
+    });
+  }
+
   it('case 54 — a misspelled profile, no profile folder: the built plan still waits as unreadable', () => {
     const root = makeSandbox();
     setRegime(root, { profiles: ['do-178c-levl-a'], copy: false });
