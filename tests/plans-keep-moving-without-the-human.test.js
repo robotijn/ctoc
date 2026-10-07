@@ -1386,6 +1386,7 @@ describe("a held plan is always asked CTOC's keep-or-release question first (cas
   /** Assert that `screen` asks only keep-or-release and offers no way to finish or approve. */
   function asksKeepOrRelease(screen, ref, label) {
     assert.equal(promptOf(screen), precompute.HOLD.prompt, `${label}: CTOC's own question`);
+    assert.equal(screen.ask.questions[0].header, 'Held', `${label}: the header says held, not finished or build`);
     const opts = screen.ask.questions[0].options;
     assert.deepEqual(opts.slice(0, 2).map((o) => o.label), [precompute.HOLD.keep.label, precompute.HOLD.release.label], label);
     assert.equal(opts.some((o) => /Recommended/.test(o.description)), false, `${label}: nothing is recommended`);

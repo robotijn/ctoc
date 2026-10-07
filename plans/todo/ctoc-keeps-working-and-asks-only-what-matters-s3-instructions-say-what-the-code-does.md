@@ -1003,3 +1003,39 @@ call without `--continue` is still refused ("invalid transition done → done").
 - The status lines "nothing is finished until you say so" (beside the held plan, and on the
   decision header) are untrue for plans that finish on their checks.
 - The answers log starts with an empty line before the first entry.
+
+### A held plan is always asked keep-or-release first (2026-10-07, after the end-to-end run)
+
+The session widened `files:` by `src/lib/streaming-gate.js` and re-recorded the approval
+(spec hash `27dd033c…4b164a8`, a backfilled entry carrying its reason); the hash of this plan
+was checked equal to the record before the work, and the replaced-order records still pass
+inventory check 3 under it.
+
+- **Case 48** (nine tests, `tests/plans-keep-moving-without-the-human.test.js`): a plan held
+  at functional, implementation and review, each with no question file, with an author's
+  unclassified file, and with a classified file of details. On the default screen and on the
+  plan's own screen it is asked CTOC's keep-or-release question first, headed "Held", with
+  nothing recommended, no finish or approve option and no approve action, and the release
+  action carries CTOC's digest; the session status names it in "You are holding: …" and never
+  under "Waiting for your OK". Red run: the three no-question-file variants failed (the plain
+  "Is … the thing to build?", "Shall I build …?" and "Is … finished?" screens), the other six
+  passed; committed red as 069110b3. The header assertion was added next and ran red in all
+  nine ("Build it?", "Build this?", "Finished?").
+- **The fix** (`src/lib/streaming-gate.js`): `heldWithoutQuestions` reads the answers log for
+  CTOC's hold with no revision to bind (a hold is matched by the plan's file name); the
+  screen's question reader asks the hold question when the question file is not readable and
+  the plan is held; `sufficiencyFor` names such a plan `held` instead of "not computed", so the
+  sufficiency line and the session status say it is held; CTOC's own question is headed
+  "Held". An unreadable answers log reads as not held on the screen; the crossings already stay
+  closed on it. Case 48 green; the file 60/60; `streaming-gate`, `streaming-render` and
+  `menu-screens` tests green.
+- **The driver rerun** (same driver, step 7): the default screen now says "You are holding:
+  Audit trail. Each stays where it is until you choose Release the hold on it in /ctoc:start."
+  and asks "You are holding this plan. Keep holding it, or release the hold so it can move
+  on?", header "Held", options Keep holding this plan / Release the hold / Skip for now / Open
+  the plan, with no approve action. Steps 1–6 gave the same results as before.
+- Full `npm test`: tests 12,699, pass 12,699, fail 0, skipped 0; coverage 99.87% against 99%;
+  `[CTOC test-gate] PASS`. Lint with zero warnings allowed: clean.
+- Left for the separate plan, as the session decided: the environment and compliance lines
+  ("The four human gates stay mandatory") and the "nothing is finished until you say so"
+  phrase, which still appears in the held plan's topic line.
