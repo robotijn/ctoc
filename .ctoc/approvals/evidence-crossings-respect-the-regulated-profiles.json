@@ -1,0 +1,9 @@
+{
+  "content_sha256": "dcf362a98ad2637438592e1a584cba0df853c34fc85d6e3c64b3ba8cb379f256",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-07T17:38:58.711Z",
+  "approved_by": "human",
+  "plan_basename": "evidence-crossings-respect-the-regulated-profiles"
+}
