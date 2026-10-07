@@ -47,15 +47,15 @@ Phase 0: IDEATION (Step 1)                       [vision-advisor, product-owner]
 
 Phase 1: FUNCTIONAL PLANNING (Steps 2-4)         [product-owner, functional-reviewer]
   ASSESS -> ALIGN -> CAPTURE
-  Human Gate 1: User approves functional plan (functional → implementation)
+  Gate 1: moves on its recorded evidence; asks the user only on high uncertainty or huge importance (functional → implementation)
 
 Phase 2: IMPLEMENTATION PLANNING (Steps 5-7)     [implementation-planner]
   PLAN -> DESIGN -> SPEC
-  Human Gate 2: User approves technical approach (implementation → todo)
+  Gate 2: moves on its recorded evidence; asks the user only on high uncertainty or huge importance (implementation → todo)
 
 Phase 3: IMPLEMENTATION (Steps 8-16)             [Autonomous]
   TEST -> PREPARE -> IMPLEMENT -> REVIEW -> OPTIMIZE -> SECURE -> VERIFY -> DOCUMENT -> FINAL-REVIEW
-  Human Gate 3: User approves commit/push (review → done)
+  Gate 3: finishes on its recorded checks unless a weighty question needs the user; pushing stays the user's, /ctoc:push (review → done)
 ```
 
 **Step 8 is TEST (TDD)** -- write tests FIRST, not "identify coverage".
@@ -87,7 +87,7 @@ plans/
   implementation/  Technical design + blueprint (Gate 2)
   todo/            Ready for execution (Iron Loop injected)
   in-progress/     Currently being worked on
-  review/          Awaiting human review (Gate 3)
+  review/          Built; finishes on its recorded checks (Gate 3)
   done/            Shipped
 ```
 

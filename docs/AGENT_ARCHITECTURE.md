@@ -95,7 +95,7 @@ dispatches: [<all-19-categories>]
 - Pipeline (5): `agent-writer`, `agent-critic`, `agent-tester`, `agent-qa`, `agent-publisher`
 - Implementation reviewers (1): `implementation-reviewer`
 - Synthesis (1): `synthesizer` — cross-pillar finding integration
-- Gate critique (4, NEW): `premortem-critic`, `devils-advocate-critic`, `red-team-critic` — three independent adversarial lenses run in parallel — and `gate-critic` — synthesizes their findings into the human's per-gate decision questions. Advisory (Read/Grep) and run in the background precompute so the human never waits; the human's streaming answer is the gate crossing.
+- Gate critique (4, NEW): `premortem-critic`, `devils-advocate-critic`, `red-team-critic` — three independent adversarial lenses run in parallel — and `gate-critic` — synthesizes their findings into the human's per-gate decision questions. Advisory (Read/Grep) and run in the background only when the human asks, so he never waits; a gate is crossed only in the menu's own code, on the human's answer or on recorded evidence.
 
 **Authority**: recommend dispatches; never execute peer dispatches directly. Read full plan ancestry. Defer-and-continue on ambiguity (no stubs).
 

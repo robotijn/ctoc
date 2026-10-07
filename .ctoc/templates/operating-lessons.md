@@ -6,7 +6,7 @@
 ## CTOC Operating Lessons
 
 1. **The measure is the human.** Working means a person acts and gets a fast, legible response; grinding with no feedback is broken.
-2. **Never route around CTOC or self-cross its gates.** The four human gates belong to the human: no auto-approval, no skipping the pipeline.
+2. **Never route around CTOC or self-cross its gates.** Only the menu crosses one, on recorded evidence or the human's OK: no auto-approval, no skipping the pipeline.
 3. **Always implement via the Iron Loop** (test first → implement → verify → review). No ad-hoc edits to plan-covered files.
 4. **Use CTOC's own agents** for pipeline work, never a generic one. If CTOC looks unavailable, stop and surface the blocker.
 5. **Honesty is the mechanism.** Report reality plainly and show the real data; never point at a file in place of showing it.
@@ -26,6 +26,6 @@
 19. **Never say a gate number to a human — say the moment** in plain words ("built and waiting for your OK to call it done"). Numbers stay legal where only a machine reads them.
 20. **Never wait in a sleep loop.** To wait for a long build or test, run it in the foreground with a timeout long enough for it, up to 10 minutes; if it can take longer and you were dispatched in the background, start it with run_in_background and end your turn — you are woken when it finishes; never wait in a loop that sleeps and checks a file, log or marker.
 
-**Methodology:** a **16-step** Iron Loop across **4 human gates**. **8:TEST** is test-driven development, **10:IMPLEMENT** is one step, **14:VERIFY** is the quality gate (lint, typecheck, all tests, coverage at or above `.ctoc/coverage-baseline.json` `minPct`, 0 skipped, 0 flaky). CTOC ships exactly **3 slash commands** — `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and is always installed from the marketplace, never from a local path. Full wording and reasons: `docs/OPERATING_LESSONS.md` in the CTOC repository.
+**Methodology:** a **16-step** Iron Loop across **4 gates**. **8:TEST** is test-driven development, **10:IMPLEMENT** is one step, **14:VERIFY** is the quality gate (lint, typecheck, all tests, coverage at or above `.ctoc/coverage-baseline.json` `minPct`, 0 skipped, 0 flaky). CTOC ships exactly **3 slash commands** — `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and is always installed from the marketplace, never from a local path. Full wording and reasons: `docs/OPERATING_LESSONS.md` in the CTOC repository.
 
 <!-- CTOC:LESSONS v1 END -->

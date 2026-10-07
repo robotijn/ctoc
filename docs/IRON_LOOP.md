@@ -13,12 +13,11 @@ AI coding assistants write code fast. Too fast. Without discipline, they produce
 
 Iron Loop is the discipline. It forces AI to plan before coding, test before implementing, and verify before shipping. File-edit, commit, and gate-residency enforcement ARE hooked — a PreToolUse hook blocks an Edit/Write before planning, and a plan parked at a gate without a human marker is auto-reverted. Step execution, dispatch logging, and the two-plane task protocol are instruction-level discipline the session model follows, not hook-enforced. So the methodology is enforced by hooks where a hook can enforce, and by disciplined honor where it cannot — never a claim of enforcement the code does not keep.
 
-Three checkpoints give the human final authority:
-1. **You approve what to build** (after functional planning)
-2. **You approve how to build it** (after technical planning)
-3. **You approve the result** (after implementation and verification)
+Four checkpoints, and the human holds the ones that matter:
+1. **You approve the idea** (the vision, before functional planning) — always your own approval.
+2. **What to build** (after functional planning), **how to build it** (after technical planning) and **the result** (after implementation and verification) move on their recorded evidence, unless a question of high uncertainty or huge importance needs you.
 
-Nothing ships without your explicit approval.
+Nothing is pushed or deployed without your own act.
 
 ---
 
@@ -46,7 +45,7 @@ The boundary at `todo` is load-bearing: everything before it builds context; eve
 | 4 | CAPTURE | Write requirements as testable BDD scenarios |
 | 5 | PLAN | Choose the technical approach with tradeoffs documented |
 | 6 | DESIGN | Define the architecture and **slice the work into N small, independently-buildable implementation plans** |
-| 7 | SPEC | Refine until the plan survives 10 rounds of adversarial review (**per slice**) |
+| 7 | SPEC | Refine (**per slice**) until a round of adversarial review raises nothing new, three rounds at most |
 | 8 | TEST | Write failing tests first — code does not exist yet |
 | 9 | PREPARE | Set up the environment and scan existing code for risks |
 | 10 | IMPLEMENT | Write all the code in one step, sub-items for each file |
@@ -55,7 +54,7 @@ The boundary at `todo` is load-bearing: everything before it builds context; eve
 | 13 | SECURE | Scan for vulnerabilities: OWASP Top 10, input validation, secrets |
 | 14 | VERIFY | Automated gate: lint + typecheck + ALL tests + coverage >= 80% |
 | 15 | DOCUMENT | Update docs to match the code that was actually written |
-| 16 | FINAL-REVIEW | Human reviews the result and decides: ship, fix, or scrap |
+| 16 | FINAL-REVIEW | Final review; the result finishes on its recorded checks unless a question needs you |
 
 ---
 
@@ -63,9 +62,9 @@ The boundary at `todo` is load-bearing: everything before it builds context; eve
 
 ### Two Modes: Collaborative and Automated
 
-**Steps 1-7 are collaborative.** Agents ask questions, present options with pros and cons, and wait for your decision. They don't generate plans in isolation — they work WITH you. The product-owner agent shapes your idea through conversation; the implementation-planner designs architecture with your input.
+**Steps 1-7 are collaborative.** Agents ask you only what is of high uncertainty or huge importance and record every other choice in the plan; the gate critic decides which questions reach you. They don't generate plans in isolation — they work WITH you. The product-owner agent shapes your idea through conversation; the implementation-planner designs architecture with your input.
 
-**Steps 8-16 are automated.** Once you approve the plan at Gate 2, agents execute all 9 implementation steps without interruption. You review the final result at Gate 3.
+**Steps 8-16 are automated.** Once the plan moves to building — on its recorded evidence or your approval — agents execute all 9 implementation steps without interruption. The result finishes on its recorded checks unless a question needs you.
 
 ```
 COLLABORATIVE — agents ask, you decide
@@ -88,7 +87,7 @@ PHASE 1: FUNCTIONAL PLANNING (Steps 2-4) - Product Owner Role
 3. ALIGN         Agent proposes goals, you approve   [product-owner]
 4. CAPTURE       Agent writes BDD specs, you review  [functional-reviewer] <--|
    |-> Reject? Back to Step 2 ------------------------------------------|
-   |-> HUMAN GATE: User approves functional plan
+   |-> Moves on: on its recorded evidence, or your answer when a question needs you
 
 PHASE 2: IMPLEMENTATION PLANNING (Steps 5-7) - Technical Role
 -------------------------------------------------------------
@@ -97,10 +96,10 @@ PHASE 2: IMPLEMENTATION PLANNING (Steps 5-7) - Technical Role
 7. SPEC          Agent writes specs, you review      [implementation-plan-reviewer] <--|
    |-> Reject? Back to Step 5 ---------------------------------------------------|
    |-> Approve -> [iron-loop-plan-integrator] + [iron-loop-plan-critic] refine
-       |-- 10 rounds max refinement (6-dimension rubric)
-       |-- All 5/5? -> Iron-solid execution plan
-       |-- Max rounds? -> Auto-approve + Deferred Questions for Step 16
-   |-> HUMAN GATE: User approves technical approach
+       |-- Stops at the first round with no new finding, 3 rounds max (6-dimension rubric)
+       |-- Nothing new? -> Iron-solid execution plan
+       |-- Still open? -> A decision taken under ambiguity, or a question for you
+   |-> Moves on: on its recorded evidence, or your answer when a question needs you
 
 ### 1 functional plan → N small implementation plans (SIP1)
 
@@ -119,14 +118,15 @@ The parent functional-derived implementation plan becomes an **INDEX** of its sl
 Small slices mean no single Iron Loop dispatch is too large to complete cleanly; a
 crash loses one slice, not a whole feature.
 
-**Batched gates:** Gate 2 (implementation→todo) and Gate 3 (review→done) are approved
-for ALL siblings of a parent AT ONCE via `approveSubplans(parentSlug, fromStage,
-projectPath)` in `src/lib/actions.js` — ONE human decision crosses every sibling, each
-stamped `approved_by: human` (the helper loops the existing gate-safe `approvePlan`; no
-new auto-cross path). The human triggers each batch by typing a WORD shortcut on the
-parent's stage list — `todo-all` on the implementation list (Gate 2) and `done-all` on
-the review list (Gate 3); **typing the word `done-all` IS the Gate-3 approval** (there
-is no auto-cross — a human types it). So more plans does NOT mean more prompts. Build
+**Batched gates:** when the human crosses Gate 2 (implementation→todo) or Gate 3
+(review→done) himself, he can approve ALL siblings of a parent AT ONCE via
+`approveSubplans(parentSlug, fromStage, projectPath)` in `src/lib/actions.js` — ONE human
+decision crosses every sibling, each stamped `approved_by: human` (the helper loops the
+existing gate-safe `approvePlan`). He triggers each batch by typing a WORD shortcut on the
+parent's stage list — `todo-all` on the implementation list (Gate 2) and `done-all` on the
+review list (Gate 3); **typing the word `done-all` IS the Gate-3 approval**. Plans
+whose recorded evidence is enough also cross on their own in the menu's code, recorded as
+evidence, never as his approval. So more plans does NOT mean more prompts. Build
 stays sequential + dependency-ordered; `listSubplans(parentSlug)` enumerates a parent's
 set.
 
@@ -145,9 +145,9 @@ PHASE 3: IMPLEMENTATION (Steps 8-16) - Execution
 13. SECURE       Security vulnerability check       [security-scanner]
 14. VERIFY       Run ALL quality checks (gate)      [verifier]
 15. DOCUMENT     Update documentation               [documenter]
-16. FINAL-REVIEW Verify steps 8-15, human gate      [implementation-reviewer]
+16. FINAL-REVIEW Verify steps 8-15                  [implementation-reviewer]
     |-> Issues? Smart kickback to affected step
-    |-> HUMAN GATE: User approves commit/push
+    |-> Finishes on its recorded checks unless a question needs you; pushing stays yours
 ```
 
 ### Why Ideation Matters
@@ -176,13 +176,13 @@ Each phase has entry criteria. Work cannot proceed until these are met.
 - No duplicate plan already in progress
 
 ### Phase 2 Entry (Steps 5-7)
-- Functional plan approved by user (Gate 1 passed)
+- Functional plan crossed into implementation on its recorded evidence or the user's approval (Gate 1 passed)
 - BDD scenarios defined with Given/When/Then
 - Definition of Done is testable and measurable
 
 ### Phase 3 Entry (Steps 8-16)
-- Implementation plan approved by user (Gate 2 passed)
-- Integrator+Critic loop completed (all 5/5 or max rounds)
+- Implementation plan crossed into todo on its recorded evidence or the user's approval (Gate 2 passed)
+- Integrator+Critic loop ended (a round with no new finding, or three rounds)
 - Execution plan has concrete file paths and actions
 - No blocking dependencies on other in-progress plans
 - *Guideline*: plan touches <= 15 files (if more, consider splitting into multiple plans)
@@ -208,7 +208,7 @@ TEST -> PREPARE -> IMPLEMENT -> REVIEW -> OPTIMIZE -> SECURE -> VERIFY -> DOCUME
 | 13 | SECURE | Security vulnerability check | IMPLEMENT |
 | 14 | VERIFY | Run ALL quality checks (lint, type, tests, coverage) | Manual verification |
 | 15 | DOCUMENT | Update documentation | VERIFY |
-| 16 | FINAL-REVIEW | Verify steps 8-15, ready for human gate | VERIFY, COMMIT |
+| 16 | FINAL-REVIEW | Verify steps 8-15, ready to finish | VERIFY, COMMIT |
 
 ### Key Rules
 
@@ -274,7 +274,7 @@ Not every change needs the full 16-step ceremony. Match rigor to risk:
 | **Typo/config** | Fix spelling, update timeout | 10, 14 | All others |
 | **Bug fix (obvious)** | Off-by-one in loop | 8, 10, 14, 16 | 1-7, 9, 11-13, 15 |
 | **Standard feature** | Add copy-to-clipboard button | All 16 | None |
-| **Architecture change** | Replace REST with GraphQL | All 16 + extended I+C (15 rounds) | None |
+| **Architecture change** | Replace REST with GraphQL | All 16 + the same I+C loop (three rounds at most) | None |
 
 **The rule**: You can skip PREPARE, REVIEW, OPTIMIZE, SECURE, DOCUMENT. You can NEVER skip TEST (8) or VERIFY (14).
 
@@ -479,7 +479,7 @@ Input: Approved Implementation Plan
 
   Termination:
     - All 5/5: Iron-solid plan ready
-    - Max rounds (10): Auto-approve + Deferred Questions
+    - Nothing new, or three rounds reached: what is still open becomes a decision taken under ambiguity, or a question for the human
 
   Output: Execution plan appended to the plan file in plans/implementation/
 ```
@@ -512,7 +512,7 @@ Each dimension is judged 1-5 by the reviewer.
 > never was, the output of `src/lib/iron-loop.js`.
 
 ```
-Round 3 of 10:
+Round 2 of 3:
 
   Completeness:   5/5
   Clarity:        5/5
@@ -554,9 +554,10 @@ piece of real work it always did: appending the Steps 8-16 execution section whe
 the plan lacks one, and reporting checkable structural facts (which canonical step
 labels are missing, which are present under a wrong label, how many IMPLEMENT steps
 exist). Approvals are human, are recorded in the approval ledger, and are checked at
-the four gates. There is no "auto-approve after max rounds" — that setting was
-documented but had zero code consumers, which is worse than a wrong default: it
-described a machine crossing a gate that no machine actually crosses.
+the four gates. The menu's own code also crosses three of them on recorded evidence,
+recorded as evidence, never as an approval. There is no "auto-approve after max rounds" —
+that setting was documented but had zero code consumers, which is worse than a wrong
+default: it described a round limit approving a plan, and no round limit approves anything.
 
 **A real critic is separate work the human schedules.** Until it exists, the honest
 report is the deliverable: blindness reported as blindness, following the in-repo
@@ -603,7 +604,9 @@ are two decisions. `src/lib/actions.js` triggers the deployment pipeline on a Ga
 approval only when that specific approval carries the per-crossing deploy stamp
 (`options.deploy === true`). There is deliberately no standing config flag that arms
 this — a persisted flag would permanently disarm the gate, so `actions.js` refuses to
-honor one. Absent the stamp, Gate 3 records a deploy-ready notice and deploys nothing.
+honor one. Absent the stamp, Gate 3 records a deploy-ready notice and deploys nothing. A crossing into
+done on recorded evidence never deploys either; with deployment enabled it records the same
+deploy-ready notice.
 
 Both are fenced by `tests/ship-gate-real.test.js`: with default settings, ZERO push
 invocations across every automatic path.
@@ -617,12 +620,16 @@ invocations across every automatic path.
 |  vision  | |functional| |implement.| |   todo   | |in-progress| |  review  | |   done   |
 +----------+ +----------+ +----------+ +----------+ +-----------+ +----------+ +----------+
 | Ideas    | | Steps 2-4| | Steps 5-7| | Backlog  | | Steps 8-15| | Step 16  | |Completed |
-|          | | BDD specs| | Technical| | Ready to | | Active    | | Human    | |          |
-|          | |          | | approach | | start    | | work      | | gate     | |          |
+|          | | BDD specs| | Technical| | Ready to | | Active    | | Finishes | |          |
+|          | |          | | approach | | start    | | work      | | on checks| |          |
 +----------+ +----------+ +----------+ +----------+ +-----------+ +----------+ +----------+
                |             |                                        |
-            [HUMAN]       [HUMAN]                                  [HUMAN]
+            [HUMAN]     [EVIDENCE]                                [CHECKS]
 ```
+
+`[HUMAN]` is the vision crossing, always the human's own approval. `[EVIDENCE]` and `[CHECKS]`
+mark crossings the menu's own code makes on recorded evidence (the move into `todo` too)
+unless a question needs the human, who can also approve them himself.
 
 Column order follows the plan lifecycle left-to-right. `in-progress` is a logical state tracked in plan YAML frontmatter; plans physically remain in `todo/` until moved to `review/`.
 
@@ -670,7 +677,7 @@ Model assignments indicate recommended complexity tier. Actual model depends on 
 | security-scanner | opus | 13 | Security vulnerability check |
 | verifier | sonnet | 14 | Quality gate (lint, type, tests, SAST) |
 | documenter | sonnet | 15 | Documentation |
-| implementation-reviewer | opus | 16 | Final review + human gate |
+| implementation-reviewer | opus | 16 | Final review |
 
 ---
 
@@ -712,7 +719,7 @@ plans/
 |-- functional/             # Steps 2-4 plans (BDD specs)
 |-- implementation/         # Steps 5-7 plans (technical approach)
 |-- todo/                   # Backlog (ready for execution)
-|-- review/                 # Awaiting final human review (Step 16)
+|-- review/                 # Built; finishes on its recorded checks (Step 16)
 |-- done/                   # Completed
 ```
 
@@ -729,7 +736,7 @@ These are guidelines, not hard limits. If a step takes significantly longer, the
 | 1 (IDEATE) | 5-15 minutes | Idea may need more exploration |
 | 2-4 (Functional) | 5-15 minutes | Problem may be poorly defined |
 | 5-6 (Technical) | 10-30 minutes | Plan may need splitting |
-| 7 (Integrator+Critic) | 5-20 minutes | Max 10 rounds, auto-approve if stuck |
+| 7 (Integrator+Critic) | 5-20 minutes | Three rounds at most; stops at the first round with nothing new |
 | 8 (TEST) | 5-15 minutes | Too many test cases; focus on critical paths |
 | 9 (PREPARE) | 2-5 minutes | Environment issues; fix before proceeding |
 | 10 (IMPLEMENT) | 10-60 minutes | Plan touches too many files (>15 = split) |

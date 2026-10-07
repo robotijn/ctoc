@@ -7,7 +7,7 @@
 
 ## Agent Architecture
 
-Three tiers: CTO Chief (`agents/coordinator/cto-chief.md`) → sub-orchestrators → specialists. **CTO Chief** is the only agent with top-level authority: it alone dispatches, and it is the final approver before a plan is called done. Slash commands MUST NOT declare `model:`; no agent declares `model: haiku`. Dispatch logging is an instruction-level protocol (`docs/DISPATCH_PROTOCOL.md`), not by an enforcement hook today.
+Three tiers: CTO Chief (`agents/coordinator/cto-chief.md`) → sub-orchestrators → specialists. **CTO Chief** is the only agent with top-level authority: it alone dispatches. Slash commands MUST NOT declare `model:`; no agent declares `model: haiku`. Dispatch logging is an instruction-level protocol (`docs/DISPATCH_PROTOCOL.md`), not by an enforcement hook today.
 
 ## Pipeline Philosophy
 
@@ -22,9 +22,9 @@ Ask the human only on high uncertainty or huge importance: technology stack, alg
 
 ## Critical Rules
 
-### 1. Human Gates (4 Mandatory Approval Points)
+### 1. Gates (4 points where a plan moves on)
 
-Four transitions REQUIRE human approval. NEVER cross these automatically.
+Vision -> functional is the human's approval; the other three cross in the menu's code on recorded evidence when no question needs him, never recorded as his approval.
 
 | Gate | Transition | Revert To | Why |
 |------|------------|-----------|-----|
@@ -33,9 +33,9 @@ Four transitions REQUIRE human approval. NEVER cross these automatically.
 | Gate 2 | implementation -> todo | implementation | Prevents wrong technical approach |
 | Gate 3 | review -> done | review | Prevents shipping unreviewed code |
 
-Only the human moves a plan across these four transitions, through the `/ctoc:start` menu; never move, approve or stamp a plan yourself.
+NEVER cross a gate by hand: never move a plan file or write an approval yourself.
 
-**If asked to "complete" or "move to done"**: REFUSE, and say in plain words that it needs his OK.
+**If asked to "complete" or "move to done"**: REFUSE to move it by hand; it moves on its recorded checks or his OK.
 
 ### 2. Marketplace Only
 
@@ -122,10 +122,10 @@ Full details: `docs/IRON_LOOP.md`.
 | 1 | IDEATE | vision-advisor, product-owner (opus) | Ideation — Gate 0: User approves vision |
 | 2 | ASSESS | product-owner (opus) | Phase 1: Functional |
 | 3 | ALIGN | product-owner (opus) | |
-| 4 | CAPTURE | iron-loop-critic (opus) | Gate 1: User approves plan |
+| 4 | CAPTURE | iron-loop-critic (opus) | Gate 1: moves on its evidence |
 | 5 | PLAN | implementation-planner (opus) | Phase 2: Technical |
 | 6 | DESIGN | implementation-planner (opus) | |
-| 7 | SPEC | iron-loop-critic (opus) then iron-loop-integrator+iron-loop-critic (10 rounds) | Gate 2: User approves approach |
+| 7 | SPEC | iron-loop-critic (opus) then iron-loop-integrator+iron-loop-critic (until nothing new, 3 rounds at most) | Gate 2: moves on its evidence |
 | 8 | TEST | iron-loop-executor (opus) | Phase 3: Implementation |
 | 9 | PREPARE | iron-loop-executor (opus) | |
 | 10 | IMPLEMENT | iron-loop-executor (opus) | |
@@ -134,9 +134,9 @@ Full details: `docs/IRON_LOOP.md`.
 | 13 | SECURE | security-scanner (opus) | |
 | 14 | VERIFY | iron-loop-executor (opus) | |
 | 15 | DOCUMENT | iron-loop-executor (opus) | |
-| 16 | FINAL-REVIEW | iron-loop-critic (opus) | Gate 3: User approves result |
+| 16 | FINAL-REVIEW | iron-loop-critic (opus) | Gate 3: finishes on its checks |
 
-Steps 1–7 are collaborative (agents ask, the user decides); Steps 8–16 run without interruption until the human reviews. Step labels are MANDATORY: `src/lib/plan-validator.js` rejects a missing step; the label-text checker `src/hooks/validate-plan-steps.js` is not wired as a runtime hook. **Step 10 is ONE step** with sub-items per file. One functional plan becomes N small implementation plans (~1–3 files each, linked by `parent_plan`, ordered by `depends_on`). **Step 14 VERIFY** is the quality gate: lint, typecheck, all tests, coverage at or above the floor, 0 skipped, 0 flaky, via `npm test`. **Circuit breaker**: max 3 kickbacks to one step, 5 per plan, then escalate to the user.
+Steps 1–7 are collaborative (agents ask, the user decides); Steps 8–16 run without interruption. Step labels are MANDATORY: `src/lib/plan-validator.js` rejects a missing step; the label-text checker `src/hooks/validate-plan-steps.js` is not wired as a runtime hook. **Step 10 is ONE step** with sub-items per file. One functional plan becomes N small implementation plans (~1–3 files each, linked by `parent_plan`, ordered by `depends_on`). **Step 14 VERIFY** is the quality gate: lint, typecheck, all tests, coverage at or above the floor, 0 skipped, 0 flaky, via `npm test`. **Circuit breaker**: max 3 kickbacks to one step, 5 per plan, then escalate to the user.
 
 ## Menu System Rules
 
@@ -208,7 +208,7 @@ New design histories go into these files, never into this one; a test holds this
 ## CTOC Operating Lessons
 
 1. **The measure is the human.** Working means a person acts and gets a fast, legible response; grinding with no feedback is broken.
-2. **Never route around CTOC or self-cross its gates.** The four human gates belong to the human: no auto-approval, no skipping the pipeline.
+2. **Never route around CTOC or self-cross its gates.** Only the menu crosses one, on recorded evidence or the human's OK: no auto-approval, no skipping the pipeline.
 3. **Always implement via the Iron Loop** (test first → implement → verify → review). No ad-hoc edits to plan-covered files.
 4. **Use CTOC's own agents** for pipeline work, never a generic one. If CTOC looks unavailable, stop and surface the blocker.
 5. **Honesty is the mechanism.** Report reality plainly and show the real data; never point at a file in place of showing it.
@@ -228,6 +228,6 @@ New design histories go into these files, never into this one; a test holds this
 19. **Never say a gate number to a human — say the moment** in plain words ("built and waiting for your OK to call it done"). Numbers stay legal where only a machine reads them.
 20. **Never wait in a sleep loop.** To wait for a long build or test, run it in the foreground with a timeout long enough for it, up to 10 minutes; if it can take longer and you were dispatched in the background, start it with run_in_background and end your turn — you are woken when it finishes; never wait in a loop that sleeps and checks a file, log or marker.
 
-**Methodology:** a **16-step** Iron Loop across **4 human gates**. **8:TEST** is test-driven development, **10:IMPLEMENT** is one step, **14:VERIFY** is the quality gate (lint, typecheck, all tests, coverage at or above `.ctoc/coverage-baseline.json` `minPct`, 0 skipped, 0 flaky). CTOC ships exactly **3 slash commands** — `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and is always installed from the marketplace, never from a local path. Full wording and reasons: `docs/OPERATING_LESSONS.md` in the CTOC repository.
+**Methodology:** a **16-step** Iron Loop across **4 gates**. **8:TEST** is test-driven development, **10:IMPLEMENT** is one step, **14:VERIFY** is the quality gate (lint, typecheck, all tests, coverage at or above `.ctoc/coverage-baseline.json` `minPct`, 0 skipped, 0 flaky). CTOC ships exactly **3 slash commands** — `/ctoc:start`, `/ctoc:push`, `/ctoc:update` — and is always installed from the marketplace, never from a local path. Full wording and reasons: `docs/OPERATING_LESSONS.md` in the CTOC repository.
 
 <!-- CTOC:LESSONS v1 END -->
