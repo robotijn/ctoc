@@ -1566,3 +1566,22 @@ Lint zero warnings, `tsc` zero errors. Full `npm test` (once, foreground): tests
 Accepted cost, stated in `docs/ENFORCEMENT.md`: a background agent's compound command that
 merely names `start.js` or a menu module (for example `grep … src/commands/start.js | head`) is
 refused; the simple form is allowed.
+
+### Combined fix round
+
+From the coordinator on 2026-10-07 (critic: ship after; a commit review: "allowlist semantic
+escape" in the hook). Test-first, on 84bb8501:
+
+- Case 4 extended (the claimed build stamped with `--agent-id`, a second stamp refused, a
+  running task without an id refused) — red: `invalid transition running → running`.
+- Case 36 (every route a background agent may run, through the real hook and the real router,
+  in a sandbox with a crossable functional plan and a finishable review plan) — green on
+  84bb8501 as well: a guard proving the allowed list moves nothing.
+- Hook case 85 (naming the menu, the only node form is the direct menu call: no other script,
+  no `node --test`, no option before the script, no `env` or `NAME=value` prefix, no other
+  runtime) — red: `node --test tests/streaming-gate.test.js` was allowed.
+- Hook case 86 (the build agent's completion summary) — red: a double-quoted summary holding
+  `;` `#` `&` `|` `(` `)` was refused.
+- Hook cases 80 and 82 changed: their "allowed" `node --test tests/streaming-gate.test.js` and
+  `node server/start.js` contradict the replaced rule and moved into case 85's refused list.
+- Inventory: R-223, R-271, R-559 marked replaced with new anchors — red: checks 3, 4, 10.

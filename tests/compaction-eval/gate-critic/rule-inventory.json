@@ -1938,7 +1938,7 @@
    "orders": [
     "R-223"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 224,
@@ -2352,7 +2352,7 @@
    "orders": [
     "R-271"
    ],
-   "fate": "tightened"
+   "fate": "replaced"
   },
   {
    "n": 272,
@@ -4842,7 +4842,7 @@
    "orders": [
     "R-559"
    ],
-   "fate": "tightened"
+   "fate": "replaced"
   },
   {
    "n": 560,
@@ -8257,7 +8257,16 @@
     "Never emit `questions: []` — an empty array is indistinguishable from \"this plan is clean\"."
    ],
    "pinned_by": "CLAUDE.md",
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-07: the independent gate critic decides what reaches him; derived the same day (Decision 42 of the plan), a classification may hold only the questions the critic added, or none, and carries no gate ruling — so the never-empty rule and the ruling-alone rule govern a synthesis. The same plan binds every answer to the digest of the question shown, so the answers log is no longer keyed on the reference and id alone.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s2-plans-cross-on-their-evidence",
+    "new_anchors": [
+     "Never emit `questions: []` in a synthesis — an empty array is indistinguishable from \"this plan is clean\"; a classification may be empty and carries no ruling."
+    ]
+   }
   },
   {
    "id": "R-226",
@@ -8676,7 +8685,17 @@
     "`richQuestionScreen` returns null (`src/lib/streaming-gate.js:809`)"
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-07: the independent gate critic decides what reaches him; derived the same day (Decision 42 of the plan), a classification may hold only the questions the critic added, or none, and carries no gate ruling — so the never-empty rule and the ruling-alone rule govern a synthesis. The same plan binds every answer to the digest of the question shown, so the answers log is no longer keyed on the reference and id alone.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s2-plans-cross-on-their-evidence",
+    "new_anchors": [
+     "an answer binds to its question's id, the digest of its prompt and options, and the plan revision (`streaming-precompute.readAnsweredQuestionIds`)",
+     "`richQuestionScreen` returns null (`src/lib/streaming-gate.js`)"
+    ]
+   }
   },
   {
    "id": "R-273",
@@ -11051,7 +11070,16 @@
     "| Zero questions survive | Any occurrence | Never emit an empty array. Emit the gate ruling alone, with your honest basis in the recommended option's `pros`: which lenses ran, what ancestry you read, and that no lens surfaced a defect."
    ],
    "pinned_by": null,
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-07: the independent gate critic decides what reaches him; derived the same day (Decision 42 of the plan), a classification may hold only the questions the critic added, or none, and carries no gate ruling — so the never-empty rule and the ruling-alone rule govern a synthesis. The same plan binds every answer to the digest of the question shown, so the answers log is no longer keyed on the reference and id alone.",
+    "date": "2026-10-07",
+    "plan": "ctoc-keeps-working-and-asks-only-what-matters-s2-plans-cross-on-their-evidence",
+    "new_anchors": [
+     "| Zero questions survive | Any occurrence | In a synthesis, never emit an empty array: emit the gate ruling alone, with your honest basis in the recommended option's `pros`: which lenses ran, what ancestry you read, and that no lens surfaced a defect. A classification may be empty and carries no ruling."
+    ]
+   }
   },
   {
    "id": "R-560",

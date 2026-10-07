@@ -365,7 +365,7 @@ describe('a background agent may not answer, approve or move a plan through the 
   });
   test("80 · a background agent's ordinary work is allowed", () => {
     allowedAgent('npm test');
-    allowedAgent('node --test tests/streaming-gate.test.js');
+    allowedAgent('node --test tests/plans-keep-moving-without-the-human.test.js');
     allowedAgent('grep -n route src/commands/start.js');
   });
   test('81 · a crash on a background agent\'s menu call refuses; on the main session\'s it allows', () => {
@@ -421,10 +421,37 @@ describe('a background agent: one reading of a command (security review leads, 2
     allowedAgent(`${process.execPath} "\${CLAUDE_PLUGIN_ROOT}/src/commands/start.js" menu task list`);
     allowedAgent('grep -n route src/commands/start.js');
     allowedAgent('cat src/lib/menu-screens.js');
-    allowedAgent('node --test tests/streaming-gate.test.js');
+  });
+  test('85 · naming the menu, the ONLY node form allowed is the direct menu call: no other script, option, prefix or runtime', () => {
     fs.mkdirSync(p('server'), { recursive: true });
     fs.writeFileSync(p('server', 'start.js'), '');
-    allowedAgent('node server/start.js --port 3000');
+    const SCRIPT = '"${CLAUDE_PLUGIN_ROOT}/src/commands/start.js"';
+    for (const command of [
+      'node --test tests/streaming-gate.test.js',
+      'node server/start.js --port 3000',
+      `node --no-warnings ${SCRIPT} menu task list`,
+      `node -- ${SCRIPT} menu task list`,
+      `node -r ./x.js ${SCRIPT} menu task list`,
+      `node --require ./x.js ${SCRIPT} menu task list`,
+      `env node ${SCRIPT} menu task list`,
+      `FOO=1 node ${SCRIPT} menu task list`,
+      `bun ${SCRIPT} menu task list`,
+      `deno run ${SCRIPT} menu task list`,
+      `tsx ${SCRIPT} menu task list`,
+      `npx node ${SCRIPT} menu task list`,
+      `bash -c 'node ${SCRIPT} menu task list'`,
+      `sh -c 'node src/commands/start.js menu task list'`,
+    ]) refusedAgent(command);
+    allowedAgent(`node ${SCRIPT} menu task list`);
+    allowedAgent('head -n 5 src/commands/start.js');
+    allowedAgent('wc -l src/lib/streaming-gate.js');
+  });
+  test("86 · the build agent's completion: single quotes take anything; double quotes take all but $ and backtick", () => {
+    const RETRY = 'Put the summary in single quotes and run the same command again.';
+    allowedAgent(`${MENU} menu task complete t7 --summary 'cost $5; done # (x) & y | z \`ls\`'`);
+    allowedAgent(`${MENU} menu task complete t7 --summary "a; b # c & d | (e) done!"`);
+    assertRefused(run(agentBash(`${MENU} menu task complete t7 --summary "cost $5"`)), 'dollar in double quotes', RETRY);
+    assertRefused(run(agentBash(`${MENU} menu task complete t7 --summary "ran \`ls\`"`)), 'backtick in double quotes', RETRY);
   });
   test('83 · the allowed list matches the whole route: an unknown or extra word refuses', () => {
     for (const route of ['menu commands extra', 'menu task list extra', 'menu task board x', 'dashboard extra',

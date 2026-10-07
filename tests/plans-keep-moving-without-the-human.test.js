@@ -303,6 +303,21 @@ describe('crossings on evidence and the continuation (cases 1–13)', () => {
     assert.equal(tasks(root).some((t) => t.kind === 'classify'), false, 'a classified file needs no classification');
     assert.match(res.text, /· moved on: Session store/);
     assert.match(res.text, /· started building: Session store/);
+
+    // The session launches the claimed build and stamps it with the harness agent id.
+    const stamped = route(['menu', 'task', 'start', impl.id, '--agent-id', 'agent-c4'], root);
+    assert.equal(stamped.ok, true, JSON.stringify(stamped));
+    const claimed = () => tasks(root).find((t) => t.id === impl.id);
+    assert.equal(claimed().status, 'running');
+    assert.equal(claimed().agentTaskId, 'agent-c4');
+    // A second stamp is refused: one build, one agent.
+    const again = route(['menu', 'task', 'start', impl.id, '--agent-id', 'agent-other'], root);
+    assert.equal(again.ok, false);
+    assert.equal(claimed().agentTaskId, 'agent-c4');
+    // A running task cannot be "started" without an agent id to stamp.
+    const add2 = route(['menu', 'task', 'add', 'plan', 'other'], root);
+    route(['menu', 'task', 'start', add2.taskId], root);
+    assert.equal(route(['menu', 'task', 'start', add2.taskId], root).ok, false);
   });
 
   it('case 5 — a requested stop is honoured: nothing starts', () => {
@@ -1073,5 +1088,49 @@ describe('what the author left unasked (case 34) and what a classification keeps
     const kept = precompute.writePlanQuestions(root, ref, [store, auth, fork('q12-db')], stamp, undefined, CLASSIFIED);
     assert.equal(kept.ok, true);
     assert.deepEqual(precompute.planQuestionsStatus(root, ref).questions.map((q) => q.id), ['q10-store', 'q11-auth', 'q12-db']);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('every route a background agent may run moves nothing (case 36)', () => {
+  it('case 36 — the allowed routes leave a crossable plan and a finishable plan where they are, the ledger byte-identical', () => {
+    const root = makeSandbox();
+    const fref = 'functional/f36.md';
+    writePlan(root, fref, functionalBody('Crossable idea'));
+    writeQuestions(root, fref, [detail('q10-color', 'Which colour?', ['Blue', 'Red'])]);
+    seedBuilt(root, 'r36');
+    const approvals = path.join(root, '.ctoc', 'approvals');
+    const snapshot = () => fs.readdirSync(approvals).sort().map((f) => [f, fs.readFileSync(path.join(approvals, f), 'utf8')]);
+    const before = snapshot();
+
+    const t1 = route(['menu', 'task', 'add', 'review', 'p', '--touches', 'a.js', '--label', 'l'], root).taskId;
+    const t2 = route(['menu', 'task', 'add', 'plan', 'q'], root).taskId;
+    const t3 = route(['menu', 'task', 'add', 'plan', 'r'], root).taskId;
+    const routes = [
+      ['menu', 'task', 'start', t1, '--agent-id', 'abc'], ['menu', 'task', 'fail', t1, '--summary', 'x'],
+      ['menu', 'task', 'cancel', t2], ['menu', 'task', 'start', t3],
+      ['menu', 'task', 'complete', t3, '--summary', 'built', '--gate', '3', '--next', 'tasks'],
+      ['menu', 'task', 'list'], ['menu', 'task', 'board'], ['menu'], ['menu', 'commands'], ['dashboard'],
+      ['tasks'], ['task', t1], ['browse', 'review'], ['section', 'execution'], ['stubs', 's'],
+      ['validate', 'review/r36.md'], ['inbox', 'questions'], ['inbox', 'decisions'], ['inbox', 'gates'],
+      ['inbox', 'escalations'], ['inbox', 'migration'], ['inbox', 'verify'], ['inbox', 'stale'],
+      ['inbox', 'cleanup'], ['inbox', 'cleanup', 'category'], ['inbox', 'cleanup', 'plan', 'r36'],
+      ['plan', fref], ['plan', 'review/r36.md'],
+    ];
+    const MENU = 'node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js"';
+    const hook = path.join(__dirname, '..', 'src', 'hooks', 'protect-records.js');
+    for (const r of routes) {
+      const command = `${MENU} ${r.map((w) => `'${w}'`).join(' ')}`;
+      const verdict = require('node:child_process').spawnSync(process.execPath, [hook], {
+        cwd: root, encoding: 'utf8',
+        input: JSON.stringify({ cwd: root, tool_name: 'Bash', tool_input: { command }, agent_id: 'a1', agent_type: 'x' }),
+      });
+      assert.equal(verdict.status, 0, `the protection allows a background agent: ${r.join(' ')} (${verdict.stderr})`);
+      route(r, root);
+    }
+
+    assert.equal(exists(root, fref), true, 'the crossable plan is still waiting');
+    assert.equal(exists(root, 'review/r36.md'), true, 'the finishable plan is still in review');
+    assert.deepEqual(snapshot(), before, 'the approval ledger is byte-identical');
   });
 });
