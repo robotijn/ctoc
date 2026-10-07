@@ -1,11 +1,11 @@
 {
-  "content_sha256": "45cdda2bc6b6c72341b0e57e4e567657b57e96f86ddf806ca1e36ced95c4092f",
+  "content_sha256": "e4e6c90f564cc757a165795240510cdb0cd01187c3f8df8314ffff86a6924bc0",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-10-07T15:40:25.458Z",
+  "approved_at": "2026-10-07T15:53:22.357Z",
   "approved_by": "human",
   "backfilled": true,
-  "backfill_reason": "Session, 2026-10-07: the combined fix round replaced three more gate-critic orders (R-223, R-271, R-559) that contradicted the classification duty and the digest binding; listed on the approved line",
+  "backfill_reason": "Session, 2026-10-07: the verification round rewrote slice 1's added gate-critic rules N-007 and N-009 and replaced the digest format and question-id holds; three slice 1 test files encode the old contracts",
   "plan_basename": "ctoc-keeps-working-and-asks-only-what-matters-s2-plans-cross-on-their-evidence"
 }

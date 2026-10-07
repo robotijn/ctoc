@@ -87,14 +87,14 @@ function appendAnswer(root, entry) {
 
 /**
  * The digest an answers-log entry must carry for its answer to count: sha256 hex of
- * JSON [prompt, [[key, label], ...] sorted by key], each text normalised the way labels are
+ * JSON [prompt, [[key, label], ...] sorted by key, [recommended keys] sorted], each text normalised the way labels are
  * compared (NFKC, combining marks removed, control characters stripped, trimmed, lower-cased).
  * Derived here independently of the module, so it pins the format slice 2's writer must use.
  */
 const ident = (s) => s.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
 function digestOf(q) {
   const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  return crypto.createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs])).digest('hex');
+  return crypto.createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs, q.options.filter((o) => o.recommended === true).map((o) => o.key).sort()])).digest('hex');
 }
 
 afterEach(() => {
@@ -411,14 +411,20 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
     assert.equal(verdict.blocking.length, 0);
   });
 
-  it('26. an answer the log records with holds:true keeps the plan where it is — reason "held"', () => {
-    const { root, ref, stamp } = setup('held', [ruling()]);
-    appendAnswer(root, answer(ref, stamp, '1', { holds: true }));
+  // A hold is CTOC's own: an entry under `ctoc-hold` carrying CTOC's hold digest, written by the
+  // menu when the human chooses "Hold this plan" (slice 2). It records no answer.
+  const { HOLD } = precompute;
+  const hold = (ref, extra) => ({ ts: new Date().toISOString(), ref, questionId: HOLD.questionId, optionKey: HOLD.hold.key, holds: true, heldOn: 'q99-gate-ruling', questionDigest: HOLD.digest, ...extra });
+  const release = (ref, extra) => ({ ts: new Date(Date.now() + 1000).toISOString(), ref, questionId: HOLD.questionId, optionKey: HOLD.release.key, holds: false, questionDigest: HOLD.digest, ...extra });
+
+  it('26. a hold the log records keeps the plan where it is — reason "held"', () => {
+    const { root, ref } = setup('held', [ruling()]);
+    appendAnswer(root, hold(ref));
     const verdict = precompute.hasEnoughInformation(root, ref);
     assert.equal(verdict.enough, false);
     assert.equal(verdict.reason, 'held');
-    assert.deepEqual(verdict.blocking.map((q) => q.id), ['q99-gate-ruling'], 'the held question is named');
-    assert.deepEqual(verdict.answered, ['q99-gate-ruling']);
+    assert.deepEqual(verdict.blocking.map((q) => q.id), ['ctoc-hold'], "the hold is named, by CTOC's own id");
+    assert.deepEqual(verdict.answered, [], 'a hold is never an answer');
   });
 
   it('27. the same answer without holds moves the plan on — the question file cannot hold it', () => {
@@ -430,61 +436,63 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
   });
 
   it('27b. a hold outlives the revision it was given on, and the stage the plan was in', () => {
-    const { root, ref, stamp } = setup('outlives', [ruling()], 'implementation');
-    appendAnswer(root, answer('functional/outlives.md', stamp - 5000, '1', { holds: true }));
+    const { root, ref } = setup('outlives', [ruling()], 'implementation');
+    appendAnswer(root, hold('functional/outlives.md'));
     const verdict = precompute.hasEnoughInformation(root, ref);
     assert.equal(verdict.reason, 'held');
-    assert.deepEqual(verdict.answered, [], 'the old-revision answer binds nothing, yet the hold stands');
+    assert.deepEqual(verdict.answered, [], 'nothing was answered, yet the hold stands');
   });
 
-  it('27c. a hold on a question the current revision no longer has still holds, and names its id', () => {
-    const { root, ref, stamp } = setup('gone-q', [ruling()]);
-    appendAnswer(root, { ts: new Date().toISOString(), ref, questionId: 'q10-removed', optionKey: '1', planMtimeMs: stamp, holds: true });
+  it('27c. a hold on a question the current revision no longer has still holds, under CTOC\'s own id', () => {
+    const { root, ref } = setup('gone-q', [ruling()]);
+    appendAnswer(root, hold(ref, { heldOn: 'q10-removed' }));
     const verdict = precompute.hasEnoughInformation(root, ref);
     assert.equal(verdict.reason, 'held');
-    assert.deepEqual(verdict.blocking, [{ id: 'q10-removed' }]);
+    assert.deepEqual(verdict.blocking, [{ id: 'ctoc-hold' }]);
   });
 
-  it('28. only a LATER answer releases a hold; an entry that records no answer changes nothing; the older log shape counts', () => {
+  it('28. only a LATER release ends a hold; an entry that records no answer changes nothing; the older log shape counts', () => {
     const { root, ref } = setup('older-shape', [ruling()]);
     const later = new Date(Date.now() + 60000).toISOString();
-    const questionDigest = digestOf(ruling());
-    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '2', at: later, questionDigest });
-    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '1', at: later, holds: true, questionDigest });
+    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '2', at: later, questionDigest: digestOf(ruling()) });
+    appendAnswer(root, { ref, questionId: HOLD.questionId, answer: HOLD.hold.key, at: later, holds: true, questionDigest: HOLD.digest });
     assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'held', 'the later line (the hold) wins');
-    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', at: later });
+    appendAnswer(root, { ref, questionId: HOLD.questionId, at: later });
     assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'held', 'a line with no answer releases nothing');
-    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '2', at: later, questionDigest });
-    assert.equal(precompute.hasEnoughInformation(root, ref).enough, true, 'a later answer without holds releases it');
+    appendAnswer(root, { ref, questionId: HOLD.questionId, answer: HOLD.release.key, at: later, questionDigest: HOLD.digest });
+    assert.equal(precompute.hasEnoughInformation(root, ref).enough, true, 'a later release in the older shape releases it');
   });
 
-  it('28b. a hold is released only by a LATER answer to the SAME question that names one of its options, without holds', () => {
+  it("28b. a hold is released only by a LATER release of CTOC's own question carrying CTOC's hold digest", () => {
     const { root, ref, stamp } = setup('release', [{ id: 'q10-other', prompt: 'p?', critical: true, important: false, topic: 'detail', options: recOpts() }, ruling()]);
-    appendAnswer(root, answer(ref, stamp, '1', { holds: true }));
+    appendAnswer(root, hold(ref));
     const notReleased = [
-      { ts: new Date().toISOString(), ref, questionId: 'q10-other', optionKey: '1', planMtimeMs: stamp },
-      answer(ref, stamp, '7'),
-      answer(ref, stamp, null),
-      answer(ref, stamp, ''),
-      answer(ref, stamp, '2', { holds: 'false' }),
-      answer(ref, stamp, '2', { holds: 0 }),
-      answer(ref, stamp, '2', { questionDigest: undefined }), // an answer that binds to no question releases nothing
-      answer(ref, stamp, '2', { questionDigest: digestOf({ ...ruling(), prompt: 'Another ruling.' }) }),
+      { ts: new Date().toISOString(), ref, questionId: 'q10-other', optionKey: '1', planMtimeMs: stamp, questionDigest: digestOf({ id: 'q10-other', prompt: 'p?', options: recOpts() }) },
+      answer(ref, stamp, '2'), // a real answer to another question is not a release
+      release(ref, { optionKey: '7' }),
+      release(ref, { optionKey: null }),
+      release(ref, { optionKey: '' }),
+      release(ref, { holds: 'false' }),
+      release(ref, { holds: 0 }),
+      release(ref, { questionDigest: undefined }),
+      release(ref, { questionDigest: digestOf({ ...ruling(), prompt: 'Another ruling.' }) }),
+      release(ref, { optionKey: HOLD.hold.key }),
     ];
     for (const line of notReleased) {
       appendAnswer(root, line);
       assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'held', `${JSON.stringify(line)} must not release the hold`);
     }
-    appendAnswer(root, answer(ref, stamp, '2'));
-    assert.notEqual(precompute.hasEnoughInformation(root, ref).reason, 'held', 'a later real answer without holds releases it');
+    appendAnswer(root, release(ref));
+    assert.notEqual(precompute.hasEnoughInformation(root, ref).reason, 'held', "a later release with CTOC's digest releases it");
   });
 
   it('29. readAnsweredQuestionIds reports the chosen option and the holds, and empty ones on a closed path', () => {
     const { root, ref, stamp } = setup('keys', [ruling()]);
-    appendAnswer(root, answer(ref, stamp, '1', { holds: true }));
+    appendAnswer(root, answer(ref, stamp, '1'));
+    appendAnswer(root, hold(ref));
     const read = precompute.readAnsweredQuestionIds(root, ref);
     assert.equal(read.keys.get('q99-gate-ruling'), '1');
-    assert.deepEqual(read.held, ['q99-gate-ruling']);
+    assert.deepEqual(read.held, ['ctoc-hold']);
     const closed = precompute.readAnsweredQuestionIds(root, 'functional/no-such-plan.md');
     assert.equal(closed.ok, false);
     assert.ok(closed.keys instanceof Map && closed.keys.size === 0);
@@ -650,8 +658,16 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
     assert.deepEqual(kept.classification, CLASSIFIED);
     assert.deepEqual(kept.questions.map((q) => q.id), ['q10-db'], 'the weighty question stands');
     assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'open-forks');
-    // Guards: the gate critic may replace its own file; a newer revision may be anyone's.
-    assert.deepEqual(precompute.writePlanQuestions(root, ref, [], stamp, undefined, CLASSIFIED), { ok: true });
+    // The gate critic's own second write for the same revision may only grow the file: a
+    // shrinking write is refused and the weighty question stands ...
+    const shrinking = precompute.writePlanQuestions(root, ref, [], stamp, undefined, CLASSIFIED);
+    assert.equal(shrinking.ok, false);
+    assert.equal(shrinking.reason, 'classification-dropped-question');
+    assert.deepEqual(JSON.parse(fs.readFileSync(precompute.questionsPath(root, ref), 'utf8')).questions.map((q) => q.id), ['q10-db']);
+    // ... and a write that keeps every question is accepted (guard).
+    const grown = [fork(), { id: 'q11-name', prompt: 'Name?', critical: false, important: false, topic: 'detail', options: recOpts() }];
+    assert.deepEqual(precompute.writePlanQuestions(root, ref, grown, stamp, undefined, CLASSIFIED), { ok: true });
+    // A newer revision may be anyone's.
     assert.deepEqual(precompute.writePlanQuestions(root, ref, [fork()], stamp + 1000), { ok: true });
     // A corrupt file at the live path is nothing classified to keep: it is replaced.
     fs.writeFileSync(precompute.questionsPath(root, ref), '{"classification":');
@@ -677,8 +693,15 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
     verdict = precompute.hasEnoughInformation(root, ref);
     assert.equal(verdict.enough, true, verdict.reason);
     assert.deepEqual(verdict.answered, ['q10-db']);
-    // The replay: the critic rewrites the question under the same id for the same revision.
-    assert.deepEqual(precompute.writePlanQuestions(root, ref, [replayed], stamp, undefined, CLASSIFIED), { ok: true });
+    // The replay. Within the same revision the critic may no longer rewrite the question under
+    // the same id: the write is refused and the answered question stands.
+    const sameRevision = precompute.writePlanQuestions(root, ref, [replayed], stamp, undefined, CLASSIFIED);
+    assert.equal(sameRevision.reason, 'classification-dropped-question');
+    assert.deepEqual(precompute.hasEnoughInformation(root, ref).answered, ['q10-db']);
+    // As a new revision of the plan it is written, and the earlier answer is not inherited.
+    const planPath = precompute.refToPlanPath(root, ref);
+    fs.utimesSync(planPath, new Date(stamp + 5000), new Date(stamp + 5000));
+    assert.deepEqual(precompute.writePlanQuestions(root, ref, [replayed], fs.statSync(planPath).mtimeMs, undefined, CLASSIFIED), { ok: true });
     verdict = precompute.hasEnoughInformation(root, ref);
     assert.equal(verdict.reason, 'open-forks', 'the earlier answer is not inherited by the rewritten question');
     assert.deepEqual(verdict.answered, []);

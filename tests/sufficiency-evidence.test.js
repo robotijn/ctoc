@@ -76,16 +76,16 @@ function ledgerFile(root, slug) {
 /**
  * Records an answer the way slice 2's writer will (third security scan of 2026-10-07): stamped
  * with the question set's revision and carrying the digest of the question shown — sha256 of
- * JSON [prompt, [[key, label], ...] by key], each text NFKC-folded, accents removed, control
- * characters stripped, trimmed, lower-cased. Today's `streamAnswer` records no digest, so an
- * answer it records is asked again.
+ * JSON [prompt, [[key, label], ...] by key, [recommended keys] sorted], each text NFKC-folded,
+ * accents removed, control characters stripped, trimmed, lower-cased — the entry `streamAnswer`
+ * writes; these cases test the crossing record, not the writer.
  */
 function recordAnswer(root, ref, questionId, optionKey) {
   const st = precompute.planQuestionsStatus(root, ref);
   const q = st.questions.find((x) => x.id === questionId);
   const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
   const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  const questionDigest = require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs])).digest('hex');
+  const questionDigest = require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs, q.options.filter((o) => o.recommended === true).map((o) => o.key).sort()])).digest('hex');
   const dir = path.join(root, '.ctoc', 'streaming');
   fs.mkdirSync(dir, { recursive: true });
   fs.appendFileSync(path.join(dir, 'answers.jsonl'), JSON.stringify({ ts: new Date().toISOString(), ref, questionId, optionKey, planMtimeMs: st.questionsRevisionMs, questionDigest }) + '\n');

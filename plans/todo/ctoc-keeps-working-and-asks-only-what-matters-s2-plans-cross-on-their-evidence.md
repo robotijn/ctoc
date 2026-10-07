@@ -48,6 +48,10 @@ files:
   # Added 2026-10-07 by the session after the build: the README test-file count and the golden-corpus ceiling move down with this slice
   - README.md
   - .ctoc/golden-corpus-baseline.json
+  # Added 2026-10-07 by the session after the verification round: slice 1's tests encode the digest format and question-id holds this round replaced
+  - tests/question-blocking-default.test.js
+  - tests/streaming-precompute.test.js
+  - tests/sufficiency-evidence.test.js
 approved_by: human
 approved_at: 2026-10-07T13:42:48.628Z
 gate_crossed: implementation → todo
@@ -981,7 +985,7 @@ session derived on the same day that the author must not decide by omission eith
 42). These are the compaction-inventory orders this slice may mark replaced or added, and no
 others:
 
-- `agents/iron-loop/gate-critic.md` — replaced: R-223, R-240, R-251, R-271, R-559, R-688; added: N-010, N-011, N-012, N-013.
+- `agents/iron-loop/gate-critic.md` — replaced: R-223, R-240, R-251, R-271, R-559, R-688; added: N-007, N-009, N-010, N-011, N-012, N-013.
 
 ## Acceptance criteria
 
@@ -1707,3 +1711,44 @@ skipped 0; coverage 99.86%.
   derives the old digest), `tests/sufficiency-evidence.test.js` (2: its answer lines carry the
   old digest). Each needs only its digest helper brought to the new format, and the
   question-blocking cases rewritten to CTOC's own hold and a growing classification.
+
+### The three test files brought to the new contracts
+
+The session widened `files:` with them and re-recorded the approval (e4e6c90f…, verified equal
+to this copy before any edit). Each fixture moved to the new contract, each assertion's intent
+kept, no case deleted (old assertion → new assertion → why):
+
+- `tests/streaming-precompute.test.js` helper `digestOf`: `[prompt, pairs]` → `[prompt, pairs,
+  recommended keys sorted]` → rule D (the digest names the recommendation); its 4 cases pass
+  unchanged.
+- `tests/sufficiency-evidence.test.js` helper `recordAnswer`: the same digest change and its
+  comment made true (the entry `streamAnswer` writes) → rule D; cases 9 and 11 pass unchanged.
+- `tests/question-blocking-default.test.js` helper `digestOf`: the same change → rule D;
+  cases 44, 47 and the group pass unchanged on it.
+- Case 26: a `holds: true` line on the ruling held, blocking named `q99-gate-ruling`, the ruling
+  counted answered → CTOC's own hold (`ctoc-hold`, `HOLD.digest`) holds, blocking names
+  `ctoc-hold`, nothing is answered → rule E: only CTOC's hold holds, and a hold is no answer.
+- Case 27b: an old-revision `holds: true` answer under the plan's earlier stage held → CTOC's hold
+  recorded under the earlier stage holds → rule E; the intent (survives revision and stage) kept.
+- Case 27c: a `holds` line on a question the revision no longer has held, named `q10-removed`
+  → CTOC's hold with `heldOn: 'q10-removed'` holds, named `ctoc-hold` → rule E.
+- Case 28: the older log shape `{answer, at}` set and released a hold on the ruling → the same
+  shape under `ctoc-hold` holds, a line with no answer releases nothing, and a release with
+  `HOLD.digest` in that shape releases → rule E; the older shape still counts.
+- Case 28b: only a later real answer to the same question released a hold → only a later
+  `ctoc-hold` release carrying `HOLD.digest` releases; ten non-releases (an answer to another
+  question, keys `7`, null, empty, `hold`, `holds: 'false'`, `holds: 0`, no digest, another
+  question's digest) each leave it held → rule E.
+- Case 29: `held` listed `q99-gate-ruling` from a `holds` answer → the ruling's answer reports
+  its key and `held` lists `ctoc-hold` → rule E.
+- Case 45: the guard let the critic replace its own classified file with `[]` for the same
+  revision → that shrinking write is refused (`classification-dropped-question`) and the
+  weighty question stands (its own assertion), and a write keeping every question and adding
+  one is accepted → rule C: within a revision a file may only grow.
+- Case 46: the critic rewrote the answered question under the same id for the same revision
+  and the earlier answer was not inherited → that rewrite is now refused and the answer stands;
+  as a new revision of the plan the rewrite is written and the earlier answer is not inherited
+  → rules C and D; the intent (no inherited answer) kept.
+
+Full `npm test` (once, foreground): tests 12680, pass 12680, fail 0, cancelled 0, skipped 0,
+todo 0; coverage 99.88% (floor 99); `[CTOC test-gate] PASS`. Lint zero warnings.
