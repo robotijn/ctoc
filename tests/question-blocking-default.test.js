@@ -38,7 +38,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const crypto = require('node:crypto');
 const precompute = require('../src/lib/streaming-precompute.js');
+const sweeper = require('../src/lib/streaming-questions-sweeper.js');
 
 const STAGES = ['vision', 'canvas', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
 const sandboxes = [];
@@ -81,6 +83,18 @@ function appendAnswer(root, entry) {
   const dir = path.join(root, '.ctoc', 'streaming');
   fs.mkdirSync(dir, { recursive: true });
   fs.appendFileSync(path.join(dir, 'answers.jsonl'), JSON.stringify(entry) + '\n', 'utf8');
+}
+
+/**
+ * The digest an answers-log entry must carry for its answer to count: sha256 hex of
+ * JSON [prompt, [[key, label], ...] sorted by key], each text normalised the way labels are
+ * compared (NFKC, combining marks removed, control characters stripped, trimmed, lower-cased).
+ * Derived here independently of the module, so it pins the format slice 2's writer must use.
+ */
+const ident = (s) => s.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
+function digestOf(q) {
+  const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return crypto.createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs])).digest('hex');
 }
 
 afterEach(() => {
@@ -385,7 +399,8 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
       options: [{ key: '1', label: 'Hold until the red-team critique runs', recommended: true }, { key: '2', label: 'Approve it across Gate 1' }]
     };
   }
-  const answer = (ref, stamp, optionKey, extra) => ({ ts: new Date().toISOString(), ref, questionId: 'q99-gate-ruling', optionKey, planMtimeMs: stamp, ...extra });
+  // Each entry carries the digest of the question it answers (third security scan): slice 2's writer.
+  const answer = (ref, stamp, optionKey, extra) => ({ ts: new Date().toISOString(), ref, questionId: 'q99-gate-ruling', optionKey, planMtimeMs: stamp, questionDigest: digestOf(ruling()), ...extra });
 
   it('25. three unanswered important DETAIL questions with a recommendation are enough — they never stop the plan', () => {
     const questions = [1, 2, 3].map((i) => ({ id: `q1${i}-d`, prompt: `Detail ${i}?`, critical: false, important: true, topic: 'detail', options: recOpts() }));
@@ -433,12 +448,13 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
   it('28. only a LATER answer releases a hold; an entry that records no answer changes nothing; the older log shape counts', () => {
     const { root, ref } = setup('older-shape', [ruling()]);
     const later = new Date(Date.now() + 60000).toISOString();
-    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '2', at: later });
-    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '1', at: later, holds: true });
+    const questionDigest = digestOf(ruling());
+    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '2', at: later, questionDigest });
+    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '1', at: later, holds: true, questionDigest });
     assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'held', 'the later line (the hold) wins');
     appendAnswer(root, { ref, questionId: 'q99-gate-ruling', at: later });
     assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'held', 'a line with no answer releases nothing');
-    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '2', at: later });
+    appendAnswer(root, { ref, questionId: 'q99-gate-ruling', answer: '2', at: later, questionDigest });
     assert.equal(precompute.hasEnoughInformation(root, ref).enough, true, 'a later answer without holds releases it');
   });
 
@@ -452,6 +468,8 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
       answer(ref, stamp, ''),
       answer(ref, stamp, '2', { holds: 'false' }),
       answer(ref, stamp, '2', { holds: 0 }),
+      answer(ref, stamp, '2', { questionDigest: undefined }), // an answer that binds to no question releases nothing
+      answer(ref, stamp, '2', { questionDigest: digestOf({ ...ruling(), prompt: 'Another ruling.' }) }),
     ];
     for (const line of notReleased) {
       appendAnswer(root, line);
@@ -585,6 +603,109 @@ describe('hasEnoughInformation — details move on; a Hold is the human\'s, read
     fs.writeFileSync(precompute.questionsPath(root, ref), JSON.stringify({ ref, planMtimeMs: stamp, questions: [db] }));
     assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'invalid');
   });
+
+  // Third security scan of 2026-10-07.
+  const fork = () => ({ id: 'q10-db', prompt: 'Which database stores the sessions?', critical: false, important: false, topic: 'technology-stack', options: [{ key: '1', label: 'Postgres', recommended: true }, { key: '2', label: 'SQLite' }] });
+  const writePending = (root, payload) => {
+    const file = precompute.pendingQuestionsPath(root, payload.ref);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(payload));
+    return file;
+  };
+  const answerTo = (ref, stamp, q, optionKey, extra) => ({ ts: new Date().toISOString(), ref, questionId: q.id, optionKey, planMtimeMs: stamp, questionDigest: digestOf(q), ...extra });
+
+  it('44. an author\'s empty question list never moves a plan: without the gate critic\'s classification a file is never enough', () => {
+    const root = makeSandbox();
+    writePlan(root, 'functional', 'x');
+    const ref = 'functional/x.md';
+    writePending(root, { ref, questions: [] });
+    assert.deepEqual(sweeper.sweepPendingQuestions(root).promoted, [ref], 'precondition: the author file is promoted');
+    const verdict = precompute.hasEnoughInformation(root, ref);
+    assert.equal(verdict.enough, false, 'an empty author list is not "no forks"');
+    assert.equal(verdict.reason, 'unclassified');
+    // Every question answered by the human, still in an author file: the critic never looked.
+    const a = setup('author-answered', [fork()], 'functional', null);
+    appendAnswer(a.root, answerTo(a.ref, a.stamp, fork(), '1'));
+    const answered = precompute.hasEnoughInformation(a.root, a.ref);
+    assert.deepEqual(answered.answered, ['q10-db'], 'precondition: the answer bound');
+    assert.equal(answered.reason, 'unclassified');
+    // The gate critic's own empty list is the honest "nothing needs the human".
+    const c = setup('classified-empty', []);
+    assert.equal(precompute.hasEnoughInformation(c.root, c.ref).enough, true);
+  });
+
+  it('45. a classified file is never replaced by an unclassified one for the same plan revision — by the writer or by the sweeper, and the refusal is logged', () => {
+    const { root, ref, stamp } = setup('keep-classified', [fork()]);
+    const direct = precompute.writePlanQuestions(root, ref, [], stamp);
+    assert.equal(direct.ok, false);
+    assert.equal(direct.reason, 'would-replace-classified');
+    assert.match(direct.errors.join(' | '), /classified/);
+    const pending = writePending(root, { ref, questions: [] });
+    const report = sweeper.sweepPendingQuestions(root);
+    assert.deepEqual(report.promoted, []);
+    assert.deepEqual(report.discarded, [{ file: path.basename(pending), reason: 'would-replace-classified' }]);
+    const log = fs.readFileSync(path.join(root, '.ctoc', 'logs', 'streaming-sweeper.jsonl'), 'utf8');
+    assert.match(log, /"reason":"would-replace-classified"/, 'never silent');
+    const kept = JSON.parse(fs.readFileSync(precompute.questionsPath(root, ref), 'utf8'));
+    assert.deepEqual(kept.classification, CLASSIFIED);
+    assert.deepEqual(kept.questions.map((q) => q.id), ['q10-db'], 'the weighty question stands');
+    assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'open-forks');
+    // Guards: the gate critic may replace its own file; a newer revision may be anyone's.
+    assert.deepEqual(precompute.writePlanQuestions(root, ref, [], stamp, undefined, CLASSIFIED), { ok: true });
+    assert.deepEqual(precompute.writePlanQuestions(root, ref, [fork()], stamp + 1000), { ok: true });
+    // A corrupt file at the live path is nothing classified to keep: it is replaced.
+    fs.writeFileSync(precompute.questionsPath(root, ref), '{"classification":');
+    assert.deepEqual(precompute.writePlanQuestions(root, ref, [fork()], stamp + 1000), { ok: true });
+  });
+
+  it('46. an answer counts only for the question it was given for: the log entry must carry that question\'s digest', () => {
+    const q = fork();
+    const { root, ref, stamp } = setup('digest', [q]);
+    appendAnswer(root, answerTo(ref, stamp, q, '1', { questionDigest: undefined }));
+    let verdict = precompute.hasEnoughInformation(root, ref);
+    assert.equal(verdict.reason, 'open-forks', 'an entry with no digest is asked again');
+    assert.deepEqual(verdict.answered, []);
+    assert.equal(verdict.unboundAnswers, 1, 'and reported, not silently dropped');
+    const rewritten = { ...q, prompt: 'Which cache holds the sessions?' };
+    const swapped = { ...q, options: [{ key: '1', label: 'SQLite', recommended: true }, { key: '2', label: 'Postgres' }] };
+    const replayed = { ...q, prompt: 'Which database stores the audit log?' };
+    for (const other of [rewritten, swapped]) {
+      appendAnswer(root, answerTo(ref, stamp, other, '1'));
+      assert.equal(precompute.hasEnoughInformation(root, ref).reason, 'open-forks', `an answer to ${JSON.stringify(other.prompt)} with labels ${other.options.map((o) => o.label)} does not answer this question`);
+    }
+    appendAnswer(root, answerTo(ref, stamp, q, '1'));
+    verdict = precompute.hasEnoughInformation(root, ref);
+    assert.equal(verdict.enough, true, verdict.reason);
+    assert.deepEqual(verdict.answered, ['q10-db']);
+    // The replay: the critic rewrites the question under the same id for the same revision.
+    assert.deepEqual(precompute.writePlanQuestions(root, ref, [replayed], stamp, undefined, CLASSIFIED), { ok: true });
+    verdict = precompute.hasEnoughInformation(root, ref);
+    assert.equal(verdict.reason, 'open-forks', 'the earlier answer is not inherited by the rewritten question');
+    assert.deepEqual(verdict.answered, []);
+  });
+
+  it('47. a torn answers-log line that names this plan fails closed for this plan only', () => {
+    const q = fork();
+    const { root, ref, stamp } = setup('torn', [q]);
+    appendAnswer(root, answerTo(ref, stamp, q, '1'));
+    const log = path.join(root, '.ctoc', 'streaming', 'answers.jsonl');
+    fs.appendFileSync(log, '{"ref":"functional/other-plan.md","questionId":"q99-gate-ruling","holds":tr\n');
+    assert.equal(precompute.hasEnoughInformation(root, ref).enough, true, 'a torn line about another plan changes nothing here');
+    fs.appendFileSync(log, `{"ref":"${ref}","questionId":"q99-gate-ruling","holds":tr\n`);
+    const verdict = precompute.hasEnoughInformation(root, ref);
+    assert.equal(verdict.enough, false);
+    assert.equal(verdict.reason, 'answers-unreadable', 'it may have been his Hold');
+  });
+
+  it('48. two labels equal after Unicode compatibility folding and removing accents are refused; different labels pass (guard)', () => {
+    const pair = (a, b) => precompute.validatePlanQuestions([{ id: 'q10-x', prompt: 'p?', critical: false, important: false, topic: 'detail', options: [{ key: '1', label: a, recommended: true }, { key: '2', label: b }] }]);
+    for (const [a, b] of [['Café', 'Cafe'], ['Café', 'Café'], ['Ａpprove', 'approve'], ['ﬁle', 'file'], ['Ⅳ', 'IV']]) {
+      const { valid, errors } = pair(a, b);
+      assert.equal(valid, false, `${JSON.stringify(a)} / ${JSON.stringify(b)}`);
+      assert.ok(errors.some((e) => /label repeats/.test(e)), errors.join('; '));
+    }
+    assert.deepEqual(pair('Postgres', 'SQLite'), { valid: true, errors: [] });
+  });
 });
 
 // The agent rules this slice rewrites are held word for word by the compaction rule
@@ -608,7 +729,9 @@ describe('compaction inventories — a rule the owner replaced or added is recor
    * failed. The fixture holds agents/agent.md, the baseline, an approved plan naming R-3 and N-1.
    */
   /** An approved fixture plan: frontmatter, the order ids in its specification, an execution record. */
-  const PLAN_TEXT = '---\ntitle: fixture plan\n---\n\n# Fixture plan\n\n## Agent rules\nReplaces R-3 and adds N-1.\n\n## Execution Record\nBuilt.\n';
+  const AGENT_LINE = '- `agents/agent.md` — replaced: R-3; added: N-1.';
+  const PLAN_TEXT = `---\ntitle: fixture plan\n---\n\n# Fixture plan\n\n## Agent rules\n${AGENT_LINE}\n- \`agents/other.md\` — replaced: R-4.\n\n## Risks\nNone.\n\n## Execution Record\nBuilt.\n`;
+  const withoutR3 = '- `agents/agent.md` — added: N-1.';
   const approvalFor = (text, extra) => JSON.stringify({ content_sha256: require('../src/lib/approval-ledger').computeSpecHash(text).hash, hash_scope: 'specification', approved_by: 'human', ...extra });
 
   function failingChecks({ agent = NEW, unitFate = 'replaced', order3 = replaced(), extraOrders = [], planText = PLAN_TEXT, approval, agentRel = 'agents/agent.md', kind3 = 'order', kindsSha256 }) {
@@ -672,12 +795,12 @@ describe('compaction inventories — a rule the owner replaced or added is recor
       'plan that does not exist': [{ order3: replaced({ plan: 'no-such-plan' }) }, [3]],
       'plan path that climbs out': [{ order3: replaced({ plan: '../fixture-plan' }) }, [3]],
       'plan with no approval record': [{ approval: false }, [3]],
-      'plan that never names the order': [{ planText: PLAN_TEXT.replace('Replaces R-3 and adds N-1.', 'Replaces nothing.') }, [3]],
+      'plan that never names the order': [{ planText: PLAN_TEXT.replace(AGENT_LINE, 'Replaces nothing.') }, [3]],
       'approval record that is no ledger entry': [{ approval: '{}' }, [3]],
       'approval record of another text': [{ approval: approvalFor(PLAN_TEXT.replace('fixture plan', 'other plan')) }, [3]],
       'approval record that is not human or backfilled': [{ approval: approvalFor(PLAN_TEXT, { advanced_by: 'sufficiency' }) }, [3]],
       'approval record of another hash scope': [{ approval: approvalFor(PLAN_TEXT, { hash_scope: 'content' }) }, [3]],
-      'order id only in the execution record': [{ planText: PLAN_TEXT.replace('Replaces R-3 and adds N-1.', 'Adds N-1.').replace('Built.', 'Built R-3.') }, [3]],
+      'order id only in the execution record': [{ planText: PLAN_TEXT.replace(AGENT_LINE, withoutR3).replace('Built.', 'Built R-3 in agents/agent.md.') }, [3]],
       'new anchor already in the baseline': [{ agent: BASELINE, order3: replaced({ new_anchors: ['Always do A. Never do B.'] }) }, [3]],
     };
     assert.equal(failingChecks({ order3: replaced({ date: today }) }).length, 0, 'today is not the future');
@@ -707,6 +830,48 @@ describe('compaction inventories — a rule the owner replaced or added is recor
     assert.deepEqual(failingChecks({ agent: withD, extraOrders: [added({ added_by: undefined })] }), [3]);
     assert.deepEqual(failingChecks({ agent: withD, extraOrders: [added({ fate: undefined })] }), [3], 'an order no unit lists');
     assert.deepEqual(failingChecks({ agent: withD + 'Never do B.\n', extraOrders: [added({ anchors: ['Never do B.'] })] }), [3, 10], 'an added anchor already in the baseline');
+  });
+
+  it('49. the order id must stand as a whole token, in the hashed specification, on a line naming this agent file', () => {
+    const cases = {
+      'the id on a line naming another agent file': PLAN_TEXT.replace(AGENT_LINE, withoutR3).replace('replaced: R-4.', 'replaced: R-3, R-4.'),
+      'the id only inside a longer id': PLAN_TEXT.replace(AGENT_LINE, '- `agents/agent.md` — replaced: R-30; added: N-1.'),
+      'the id and the path on different lines': PLAN_TEXT.replace(AGENT_LINE, `Replaces R-3.\n${withoutR3}`),
+      'a seven-hash heading hides the line from the hash': PLAN_TEXT.replace(AGENT_LINE, withoutR3).replace('## Risks', '####### Execution Record\nThis slice also replaces R-3 in agents/agent.md.\n\n## Risks'),
+      'the heading of an excluded section names it': PLAN_TEXT.replace(AGENT_LINE, withoutR3).replace('## Execution Record', '## Execution Record — replaces R-3 in agents/agent.md'),
+      'a checkbox line names it': PLAN_TEXT.replace(AGENT_LINE, `${withoutR3}\n- [x] replaces R-3 in agents/agent.md`),
+    };
+    for (const [name, planText] of Object.entries(cases)) {
+      assert.deepEqual(failingChecks({ planText }), [3], name);
+    }
+    assert.deepEqual(failingChecks({}), [], 'the line naming the agent file and the id, in the specification, passes (guard)');
+  });
+
+  it('50. on the real plan: every replaced or added order of the three inventories is named on its own agent\'s line, and R-414 moved into the gate critic\'s inventory is not', () => {
+    const real = (name, mutate) => {
+      const inv = JSON.parse(fs.readFileSync(path.join(__dirname, 'compaction-eval', name, 'rule-inventory.json'), 'utf8'));
+      if (mutate) mutate(inv);
+      const root = makeSandbox();
+      const file = path.join(root, 'inventory.json');
+      fs.writeFileSync(file, JSON.stringify(inv));
+      const checks = [];
+      defineInventoryTests({ test: (n, fn) => checks.push({ n, fn }), label: name, inventoryPath: file, orderFloor: 1 });
+      return { inv, check3: checks.find((c) => / 3\. /.test(c.n)).fn };
+    };
+    for (const name of ['gate-critic', 'product-owner', 'implementation-planner']) {
+      const { inv, check3 } = real(name);
+      assert.ok(inv.orders.some((o) => o.fate === 'replaced') && inv.orders.some((o) => o.fate === 'added'), `${name} holds replaced and added orders`);
+      check3();
+    }
+    // The gate critic's own R-414 marked replaced, with a record copied from one the plan does
+    // name for it: the plan names R-414 only on the product owner's line.
+    const moved = real('gate-critic', (inv) => {
+      const r414 = inv.orders.find((o) => o.id === 'R-414');
+      r414.fate = 'replaced';
+      r414.replaced_by = { ...inv.orders.find((o) => o.id === 'R-165').replaced_by, new_anchors: ['A sentence written for this test only.'] };
+      for (const u of inv.units) if (u.orders.includes('R-414')) u.fate = 'replaced';
+    });
+    assert.throws(() => moved.check3(), /order R-414 has an incomplete replaced or added record/);
   });
 
   it('42. a pinned digest of the units\' kinds catches an order relabelled as a cuttable kind', () => {

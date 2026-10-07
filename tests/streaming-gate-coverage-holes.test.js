@@ -119,6 +119,9 @@ function validFunctionalBody(slug) {
     `## Problem Statement\nThe thing is broken.\n\n## Acceptance Criteria\n- [ ] the thing works\n\n## Scope\nThe module.\n`;
 }
 
+/** The gate critic's classification block: only a file it classified can move a plan (the owner, 2026-10-07). */
+const CLASSIFIED = Object.freeze({ by: 'gate-critic', at: 1786000000000 });
+
 function mtimeOf(p) {
   return fs.statSync(p).mtimeMs;
 }
@@ -205,9 +208,9 @@ describe('streaming-gate — a check that could not run never crosses a plan', (
   it('471-476 + 496-498: a sufficiency predicate that could not run reports enough:false/unavailable and crosses NOTHING', () => {
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'would-cross', validFunctionalBody('would-cross'));
-    // An EMPTY question set is the honest "nothing to ask" — this plan HAS enough
-    // information and, with a working predicate, crosses by itself.
-    precompute.writePlanQuestions(root, 'functional/would-cross.md', [], mtimeOf(p));
+    // An EMPTY question set from the gate critic is the honest "nothing to ask" — this plan
+    // HAS enough information and, with a working predicate, crosses by itself.
+    precompute.writePlanQuestions(root, 'functional/would-cross.md', [], mtimeOf(p), undefined, CLASSIFIED);
 
     const faulted = withBrokenPrecompute(() => streamingGate.pendingGateDecisions(root));
 
@@ -263,8 +266,8 @@ describe('streaming-gate — a check that could not run never crosses a plan', (
   it('1297-1298: enough information at the LAST moment is shown to the human, never crossed automatically', () => {
     const root = makeSandbox();
     const p = writePlan(root, 'review', 'done-ready', `---\ntitle: done-ready title\n---\n\n# done-ready title\n\nBody.\n`);
-    // Ready and empty: the critique ran and found nothing to ask.
-    precompute.writePlanQuestions(root, 'review/done-ready.md', [], mtimeOf(p));
+    // Ready and empty: the gate critic ran and found nothing to ask.
+    precompute.writePlanQuestions(root, 'review/done-ready.md', [], mtimeOf(p), undefined, CLASSIFIED);
 
     const decisions = streamingGate.pendingGateDecisions(root);
     const d = decisions.find((x) => x.slug === 'done-ready');

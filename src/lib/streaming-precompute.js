@@ -75,6 +75,7 @@
  * fail-closed rule, and the same direction the questions' own staleness rule takes.
  */
 
+const crypto = require('crypto');
 const path = require('path');
 const safeFs = require('./safe-fs');
 const { getPlansDir } = require('./state');
@@ -252,9 +253,34 @@ function isGateCriticClassification(c) {
     && c.by === 'gate-critic' && Number.isSafeInteger(c.at) && c.at > 0;
 }
 
-/** A label as the human tells it apart: control characters stripped, trimmed, lower-cased. */
-function labelIdentity(label) {
-  return label.replace(CONTROL, '').trim().toLowerCase();
+/**
+ * A text as the human tells it apart: Unicode compatibility-folded (NFKC, so a full-width
+ * letter, a ligature or a Roman-numeral sign reads as its plain letters), its combining marks
+ * removed (an accent does not make a second answer), control characters stripped, trimmed and
+ * lower-cased. Letters of different scripts that merely look alike (Cyrillic and Latin "A") are
+ * NOT folded together: an accepted limit, recorded in the plan.
+ * @param {string} text
+ * @returns {string}
+ */
+function labelIdentity(text) {
+  return text.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(CONTROL, '').trim().toLowerCase();
+}
+
+/**
+ * The digest that binds an answer to the question it was given for: sha256 (hex) of
+ * `JSON.stringify([prompt, [[key, label], ...]])`, the pairs sorted by key and every text
+ * passed through `labelIdentity`. An answers-log entry counts for a question only when its
+ * `questionDigest` equals this, so a question rewritten under the same id — a new prompt, or
+ * its labels moved between keys — never inherits an answer the human gave to another one.
+ * `null` for a question whose prompt or labels are not strings (nothing can bind to it).
+ * @param {*} question
+ * @returns {string|null}
+ */
+function questionDigest(question) {
+  if (!question || typeof question.prompt !== 'string' || !Array.isArray(question.options)) return null;
+  if (!question.options.every((o) => o && typeof o.key === 'string' && typeof o.label === 'string')) return null;
+  const pairs = question.options.map((o) => [o.key, labelIdentity(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return crypto.createHash('sha256').update(JSON.stringify([labelIdentity(question.prompt), pairs])).digest('hex');
 }
 
 /**
@@ -270,8 +296,9 @@ function labelIdentity(label) {
  * Rules: `id`/`prompt`/`key`/`label` are REQUIRED non-empty strings; a question id
  * matches `q<NN>-<kebab>` (an `-r<digits>` revision suffix included) and is UNIQUE across
  * the array; `options` is REQUIRED with one to three options whose keys are `"1"`, `"2"`
- * or `"3"` and unique — no key can carry a shell word into a typed command — and whose labels are unique once control characters are stripped,
- * the label trimmed and lower-cased; `critical` and `important` are REQUIRED booleans
+ * or `"3"` and unique — no key can carry a shell word into a typed command — and whose labels
+ * are unique as the human tells them apart (`labelIdentity`: compatibility-folded, accents
+ * removed, control characters stripped, trimmed, lower-cased); `critical` and `important` are REQUIRED booleans
  * (a missing flag is an undeclared fork); `topic` is REQUIRED and one of
  * QUESTION_TOPICS, except on the reserved gate ruling and coverage notice, which carry
  * none, so a topic can never turn the ruling into a decided detail;
@@ -492,6 +519,20 @@ function reservedIdErrors(questions, attestation) {
 }
 
 /**
+ * Is the questions file at `file` the gate critic's classified file for the plan revision
+ * `mtime`? An unreadable or unparseable file is not.
+ */
+function holdsClassifiedFor(file, mtime) {
+  try {
+    if (!safeFs.existsSync(file)) return false;
+    const existing = JSON.parse(safeFs.readFileSync(file, 'utf8'));
+    return Boolean(existing) && existing.planMtimeMs === mtime && isGateCriticClassification(existing.classification);
+  } catch {
+    return false; // not readable as a classified file, so there is nothing classified to keep
+  }
+}
+
+/**
  * Atomically write the per-plan questions file for `ref`. Validates the questions
  * FIRST (a malformed set is refused and NO file is written), then commits via a
  * temp-file + rename so a reader never observes a half-written file. NEVER throws:
@@ -517,9 +558,14 @@ function reservedIdErrors(questions, attestation) {
  * object, like the attestation; the reader (`isGateCriticClassification`) decides
  * whether it counts. Without a valid one, every question in the file blocks.
  *
+ * A file the gate critic classified is never replaced by an unclassified one for the SAME
+ * plan revision (the same stamp): that would erase a weighty question the critic found and let
+ * the author's own list decide. Refused with `reason: 'would-replace-classified'`; the critic
+ * may replace its own file, and a new revision of the plan may be written by anyone.
+ *
  * @param {object} [attestation] optional critique-ran record (see validateAttestation)
  * @param {object} [classification] optional `{ by: "gate-critic", at }` record
- * @returns {{ ok: true } | { ok: false, errors: string[] }}
+ * @returns {{ ok: true } | { ok: false, errors: string[], reason?: string }}
  */
 function writePlanQuestions(root, ref, questions, planMtimeMs, attestation, classification) {
   const file = questionsPath(root, ref);
@@ -535,6 +581,9 @@ function writePlanQuestions(root, ref, questions, planMtimeMs, attestation, clas
   // An unusable mtime (non-finite) stamps as 0 → the file reads as STALE against
   // any real plan mtime, forcing regeneration. Safer than storing a bad stamp.
   const mtime = Number.isFinite(planMtimeMs) ? planMtimeMs : 0;
+  if (!isGateCriticClassification(classification) && holdsClassifiedFor(file, mtime)) {
+    return { ok: false, reason: 'would-replace-classified', errors: ['the gate critic classified the questions for this revision of the plan; an unclassified file may not replace them'] };
+  }
   const record = { ref, planMtimeMs: mtime, questions };
   // Carry the attestation ONLY when it is an object — never a stray string/number,
   // and never an `attestation` key at all for a four-arg call (byte-shape unchanged).
@@ -592,8 +641,10 @@ function writePlanQuestions(root, ref, questions, planMtimeMs, attestation, clas
  * non-ready branch collapses to the same `null`.
  *
  * ── The two revision values on 'ready' (they answer different questions) ───────
- * `questionsRevisionMs` identifies THE EXACT QUESTION SET the human was shown — it
- * is the stamp stored in the questions file. `planMtimeMs` is the plan file's
+ * `questionsRevisionMs` is the stamp stored in the questions file: the plan revision the
+ * question set was generated against. It does NOT identify the questions themselves — the
+ * set can be regenerated for the same revision, reusing ids for different questions — so
+ * an answer is bound to its question by `questionDigest`, never by this stamp alone. `planMtimeMs` is the plan file's
  * CURRENT modification time and answers "has the plan changed since a given
  * moment?". They are equal in the normal case and diverge only when a plan is
  * reverted to older text (a stored stamp NEWER than the current mtime, which the
@@ -847,18 +898,21 @@ function planFileOf(ref) {
  * `holds: true` with a recorded key (the human's answer, recorded by CTOC; the key may be a
  * CTOC-added option the question file does not list). A release is a LATER real answer to the
  * same question without a hold: a non-empty string key that, when the question is known, is one
- * of its option keys, and no `holds` field of any other shape. Anything else changes nothing.
+ * of its option keys and carries that question's `questionDigest` — the same binding an answer
+ * needs to count — and no `holds` field of any other shape. Anything else changes nothing.
  * @param {object} entry
  * @param {*} key the entry's chosen key (`chosenKey`)
  * @param {Map<string, Set<string>>|null} optionKeys the current questions' keys, when known
+ * @param {Map<string, (string|null)>|null} digests the current questions' digests, when known
  * @returns {boolean}
  */
-function isHoldOrRelease(entry, key, optionKeys) {
+function isHoldOrRelease(entry, key, optionKeys, digests) {
   if (typeof key !== 'string' || key === '') return false;
   if (entry.holds === true) return true;
   if (entry.holds !== undefined && entry.holds !== false) return false;
-  const known = optionKeys !== null && optionKeys.has(entry.questionId) ? optionKeys.get(entry.questionId) : null;
-  return known === null || known.has(key);
+  if (optionKeys === null || !optionKeys.has(entry.questionId)) return true;
+  return optionKeys.get(entry.questionId).has(key)
+    && typeof entry.questionDigest === 'string' && entry.questionDigest === digests.get(entry.questionId);
 }
 
 /**
@@ -909,15 +963,18 @@ function chosenKey(entry) {
  * `ok:true` with an empty set is knowledge (an ABSENT log is this case: nothing has
  * been answered yet, the normal starting state).
  *
- * A malformed line is skipped rather than fatal: skipping can only ever REMOVE an
- * answer from the set, never add one, so it can only push a verdict toward "not
- * enough". Failing hard on one bad line would let a single junk append deadlock the
- * gate forever, since the log is never pruned.
+ * A malformed line is skipped rather than fatal for OTHER plans: failing hard on one bad
+ * line would let a single junk append deadlock every gate forever, since the log is never
+ * pruned. Skipping is NOT harmless for the plan the line was about — it may have been the
+ * human's Hold, and skipping a hold moves the plan. So a line that fails to parse and
+ * names this plan's file closes the read for this plan (`ok:false`).
  *
- * ── AN ANSWER NAMES ONE OF THE QUESTION'S OPTIONS ──────────────────────────────
+ * ── AN ANSWER NAMES ONE OF THE QUESTION'S OPTIONS, AND IS FOR THAT QUESTION ───────
  * When the questions are known (derived here, or passed as `revision.questions`), an
- * entry binds only when its recorded key is one of that question's option keys; any
- * other entry is counted in `unbound`. A caller that passes a revision WITHOUT the
+ * entry binds only when its recorded key is one of that question's option keys AND its
+ * `questionDigest` equals `questionDigest(question)`; any other entry — including every
+ * entry written without a digest — is counted in `unbound`, and its question is asked
+ * again. A caller that passes a revision WITHOUT the
  * questions keeps the older id-only binding.
  *
  * ── A HOLD IS THE HUMAN'S, RECORDED BY CTOC IN THIS LOG ────────────────────────
@@ -970,9 +1027,9 @@ function readAnsweredQuestionIds(root, ref, revision) {
   // plan's mtime is floored to align the precisions. This is precision alignment,
   // not tolerance: the comparison stays a plain numeric at-or-after.
   const planFloorMs = Math.floor(rev.planMtimeMs);
-  const optionKeys = Array.isArray(rev.questions)
-    ? new Map(rev.questions.filter((q) => q && Array.isArray(q.options)).map((q) => [q.id, new Set(q.options.map((o) => o && o.key))]))
-    : null;
+  const known = Array.isArray(rev.questions) ? rev.questions.filter((q) => q && Array.isArray(q.options)) : null;
+  const optionKeys = known === null ? null : new Map(known.map((q) => [q.id, new Set(q.options.map((o) => o && o.key))]));
+  const digests = known === null ? null : new Map(known.map((q) => [q.id, questionDigest(q)]));
   const planFile = planFileOf(ref);
 
   const file = path.join(root, '.ctoc', 'streaming', 'answers.jsonl');
@@ -993,14 +1050,20 @@ function readAnsweredQuestionIds(root, ref, revision) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     let entry;
-    try { entry = JSON.parse(trimmed); } catch { continue; }
+    try {
+      entry = JSON.parse(trimmed);
+    } catch {
+      if (trimmed.includes(planFile)) return closed; // a torn line about this plan: it may be his Hold
+      continue;
+    }
     if (!entry || typeof entry !== 'object' || typeof entry.questionId !== 'string') continue;
     const key = chosenKey(entry);
-    if (planFileOf(entry.ref) === planFile && isHoldOrRelease(entry, key, optionKeys)) {
+    if (planFileOf(entry.ref) === planFile && isHoldOrRelease(entry, key, optionKeys, digests)) {
       holdState.set(entry.questionId, entry.holds === true);
     }
     if (entry.ref !== ref) continue;
-    if (optionKeys !== null && !(optionKeys.has(entry.questionId) && optionKeys.get(entry.questionId).has(key))) {
+    if (optionKeys !== null && !(optionKeys.has(entry.questionId) && optionKeys.get(entry.questionId).has(key)
+        && typeof entry.questionDigest === 'string' && entry.questionDigest === digests.get(entry.questionId))) {
       unbound++;
       continue;
     }
@@ -1068,9 +1131,12 @@ function readAnsweredQuestionIds(root, ref, revision) {
  *                        critic classified, by isBlockingQuestion; in any other file,
  *                        EVERY unanswered question (the author's own topic decides
  *                        nothing — the owner's decision of 2026-10-07)
+ *   'unclassified'       no open fork remains, but the gate critic never classified the
+ *                        file: the author's list — even an empty one, even fully
+ *                        answered — is not evidence that nothing weighty was left out
  * and `enough: true` with reason 'enough' in every other case — which means: the
- * questions are fresh, nothing the human answered holds the plan, and no unanswered
- * fork remains. Unanswered questions that are not forks do NOT block; each is decided
+ * questions are fresh and classified by the gate critic, nothing the human answered
+ * holds the plan, and no unanswered fork remains. Unanswered questions that are not forks do NOT block; each is decided
  * by its recommended option, and they are still reported honestly in `unanswered`.
  *
  * An unreadable answers log blocks every plan, even one with no questions: the log is
@@ -1152,6 +1218,11 @@ function hasEnoughInformation(root, ref) {
       computed,
       answered,
     };
+  }
+
+  // Only the independent gate critic can say nothing weighty is missing from the list.
+  if (!status.classified) {
+    return { enough: false, reason: 'unclassified', unanswered, blocking: [], unboundAnswers: answers.unbound, computed, answered };
   }
 
   return { enough: true, reason: 'enough', unanswered, blocking: [], unboundAnswers: answers.unbound, computed, answered };

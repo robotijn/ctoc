@@ -748,3 +748,74 @@ R-182 ("It changes NO gate behaviour") and R-205 ("Report the classification you
 no block at all"). A synthesis written with no attestation now has its ruling refused, so the
 whole file is refused and the plan fails closed. Neither order is in the approved list of orders
 this slice may replace, so they were left verbatim.
+
+### Third security scan — findings and fixes
+
+Specification hash before any edit: bcd9cc8c… (equal to the approval record); after: bcd9cc8c…
+(this section is the only change to the plan, and the execution record is outside the hash).
+
+Test-first: the seven new cases (44-50) and two new lines in case 28b were written and run
+against the code of c05f4dbe before any fix — 7 of 61 red, each for the attack it names; all
+green after. Case 49 was tabulated per attack on the old check: four attacks passed it (red), the
+two guards already failed it correctly.
+
+| Finding | Test case | Red before | Green after |
+|---|---|---|---|
+| 1. CRITICAL — an author's empty question list moved a plan | 44: `{"ref":"functional/x.md","questions":[]}` promoted by the sweeper; an author file whose every question the human answered; the gate critic's own empty list | the empty author list read `enough: true` | `hasEnoughInformation` returns `reason: 'unclassified'` for any file without the gate critic's classification once no fork is open (also when every question is answered); a classified empty list is still `enough: true` |
+| 2. CRITICAL — an author file could erase a weighty question the critic found | 45: an unclassified `[]` for the same stamp, by `writePlanQuestions` and through the sweeper; guards: the critic replacing its own file, a newer revision, a corrupt file at the live path | the writer accepted and overwrote the classified file | the writer refuses with `reason: 'would-replace-classified'`; the sweeper discards with that closed-set reason and logs it to `.ctoc/logs/streaming-sweeper.jsonl`; the classified file and its question stand |
+| 3. HIGH — answer replay under a reused question id | 46: an entry with no digest, a digest of a rewritten prompt, a digest with the labels swapped between keys, the right digest, then the critic rewriting the question under the same id for the same revision; 28b: a release with no digest or another question's digest | an entry with no digest read `enough` | an entry counts only when it carries `questionDigest` equal to the question's digest (sha256 of `JSON.stringify([prompt, [[key, label], …]])`, pairs sorted by key, every text through the label identity); entries without one are `unbound` and the question is asked again; a release of a Hold needs the same binding. The false comment about "THE EXACT QUESTION SET" is rewritten |
+| 4. HIGH — an order id matched anywhere in the approved text | 49: the id on a line naming another agent file, the id inside a longer id (`R-30`), the id and the path on different lines; 50: the three real inventories pass check 3, and the gate critic's own R-414 marked replaced fails it | the old check accepted all four | the id must be a whole token on a line that also names the inventory's agent file path |
+| 5. HIGH — the check's heading walk disagreed with the hash | 49: `####### Execution Record` then `This slice also replaces R-3 in agents/agent.md.` before `## Risks`; guards: an excluded heading line naming the id, a checkbox line naming it | the old walk counted the seven-hash text as specification | `approval-ledger.computeSpecHash` alone decides: the id is deleted from the line in place and the hash recomputed; an unchanged hash means the line is not approved text. `src/lib/approval-ledger.js` untouched |
+| 6. LOW — a torn log line about this plan was skipped | 47: a torn line naming another plan changes nothing; a torn line naming this plan's file | skipped, `enough: true` | `answers-unreadable` for this plan only; the "skipping can only ever REMOVE an answer" comment is corrected |
+| 7. LOW — look-alike labels | 48: `Café`/`Cafe`, combining accent/precomposed, full-width `Ａ`, the `ﬁ` ligature, the Roman numeral `Ⅳ`/`IV`; guard: two different labels | all accepted | the label identity is NFKC, then combining marks removed, control characters stripped, trimmed, lower-cased |
+
+Accepted limit (finding 7): letters of different scripts that only look alike (Cyrillic and Latin
+"A") are not folded together; no confusables table ships with the runtime.
+
+Changed tests outside this slice's own file, one line each (old → new → why):
+- `tests/streaming-precompute.test.js` helper `answer`: wrote no digest → writes the digest of the stored question → an answer counts only for the question it was given for (finding 3).
+- `tests/answers-bind-to-plan-revision.test.js` helper `appendAnswer`: wrote the entry as given → adds the digest of the question stored for the plan now, unless the entry names one → finding 3; the binding cases keep their meaning.
+- `tests/sufficiency-evidence.test.js` cases 9 and 11: an author file answered through `streamAnswer` → a classified file answered by a slice-2-format line → these cases test the crossing record; findings 1 and 3.
+- `tests/streaming-gate.test.js` "answering the LAST fork", "MULTIPLE fork questions" and X6 case 8: the real `stream answer` crossed the plan → the real writer's answer leaves the plan where it is (asserted), then the slice-2-format answer crosses it on the next render → findings 1 and 3; cases 11 and 12 use the slice-2-format answer directly.
+- `tests/streaming-gate-coverage-holes.test.js` two cases: an author's empty list was "enough" → the gate critic's empty list is → finding 1.
+- `tests/answer-feeds-sufficiency.test.js` case c: the first `streamAnswer` crossed → it does not (asserted), and after the slice-2-format answer the same call's return names the cross → findings 1 and 3.
+- `tests/streaming-human-loop-e2e.test.js` cases 6 and 7: an author file answered through `streamAnswer` → the gate critic's file; case 6 asserts the real writer's answers move nothing, then the slice-2-format answers cross it; case 7 answers in the slice-2 format → findings 1 and 3.
+
+My own test error, corrected before the green run: case 46's first draft rewrote the question to a
+prompt it had already answered in the loop above, so the replay assertion failed for the test's
+reason, not the code's; the replay now uses a prompt never answered.
+
+Full `npm test` (once, foreground): tests 12619, pass 12619, fail 0, cancelled 0, skipped 0;
+coverage 99.9% (floor 99); `[CTOC test-gate] PASS`. That run showed lines 531-532 of
+`streaming-precompute.js` (a corrupt file at the live path) uncovered; one guard was then added to
+case 45 and its file re-run (63 of 63) with the module's coverage — those lines covered. Lint on
+every changed JavaScript file: zero warnings.
+
+Decisions taken under ambiguity (this round):
+1. "Never enough" is literal: a file without the gate critic's classification is not enough even
+   when the human answered every question in it — the critic never checked what the author left
+   out. Checked after `answers-unreadable`, `held` and `open-forks`, so open questions are still
+   shown first.
+2. The inventory check deletes the order id from the line in place instead of deleting the line:
+   deleting a heading line changes the section walk, so `## Execution Record — replaces R-3 in
+   agents/agent.md` would read as hashed. Case 49 holds both shapes.
+3. The digest binds key to label (sorted by key), so moving labels between keys is a different
+   question; it covers the prompt and the labels only, not pros, cons, flags or topic; the prompt
+   is normalised like the labels.
+4. `questionDigest` is not exported: an export with no live caller fails the dead-export fence.
+   Slice 2 exports it when `streamAnswer` calls it; the tests derive the digest independently, so
+   they pin the format that writer must use.
+5. The digest is required wherever the reader knows the questions (`hasEnoughInformation`); the
+   screen's own answered check passes no questions and keeps the id-only binding (slice 2).
+6. The torn-line check matches the plan's file name as a substring, so a torn line about a plan
+   whose name contains this one also closes this plan — the fail-closed direction.
+
+For slice 2 (not built here):
+- `streamAnswer` must write `questionDigest` for the question it shows, and start every append on
+  a new line (a torn line followed by an append would otherwise fuse two entries).
+- Until then a human's answer through the menu never counts: `streamAnswer` reports "Recorded your
+  answer", the screen's id-only check stops asking, yet the plan never moves on its own; the plain
+  Approve remains. Slice 1 must not reach a user without slice 2.
+- The screen's answered check (`streaming-gate.nextUnansweredQuestion`) must pass the questions so
+  it binds the way the gate does.
+- Every author file now waits for the gate critic's classification before a plan can move.

@@ -78,6 +78,27 @@ function ledgerFile(root, slug) {
   return path.join(root, '.ctoc', 'approvals', slug.toLowerCase() + '.json');
 }
 
+/**
+ * Records an answer the way slice 2's writer will (third security scan of 2026-10-07): stamped
+ * with the question set's revision and carrying the digest of the question shown — sha256 of
+ * JSON [prompt, [[key, label], ...] by key], each text NFKC-folded, accents removed, control
+ * characters stripped, trimmed, lower-cased. Today's `streamAnswer` records no digest, so an
+ * answer it records is asked again.
+ */
+function recordAnswer(root, ref, questionId, optionKey) {
+  const st = precompute.planQuestionsStatus(root, ref);
+  const q = st.questions.find((x) => x.id === questionId);
+  const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
+  const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const questionDigest = require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs])).digest('hex');
+  const dir = path.join(root, '.ctoc', 'streaming');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.appendFileSync(path.join(dir, 'answers.jsonl'), JSON.stringify({ ts: new Date().toISOString(), ref, questionId, optionKey, planMtimeMs: st.questionsRevisionMs, questionDigest }) + '\n');
+}
+
+/** The gate critic's classification block: only a file it classified can move a plan (the owner, 2026-10-07). */
+const CLASSIFIED = Object.freeze({ by: 'gate-critic', at: 1786000000000 });
+
 afterEach(() => {
   while (sandboxes.length) fs.rmSync(sandboxes.pop(), { recursive: true, force: true });
 });
@@ -93,7 +114,8 @@ describe('streaming human loop — end to end, sandboxed, real code', () => {
     //    MODEL, and the subagent's only write is exactly this: the real store-writer,
     //    stamped with the plan's current mtime. No producer module, no model here.
     const planMtimeMs = fs.statSync(planPath).mtimeMs;
-    const produced = precompute.writePlanQuestions(root, ref, magicLinkQuestions(), planMtimeMs);
+    //    The file is the gate critic's, classified: an author's own file never moves a plan.
+    const produced = precompute.writePlanQuestions(root, ref, magicLinkQuestions(), planMtimeMs, undefined, CLASSIFIED);
     assert.equal(produced.ok, true, 'the subagent wrote the questions to the real store');
     assert.deepEqual(precompute.loadPlanQuestions(root, ref).map((q) => q.id),
       ['q10-store', 'q11-expiry', 'q12-transport', 'q13-copy'], 'all four questions were persisted');
@@ -102,6 +124,12 @@ describe('streaming human loop — end to end, sandboxed, real code', () => {
     for (const [qid, key] of [['q10-store', '1'], ['q11-expiry', '1'], ['q12-transport', '1'], ['q13-copy', '1']]) {
       streamingGate.streamAnswer(ref, qid, key, root);
     }
+    //    Until slice 2 that writer records no question digest, so every answer is asked
+    //    again and nothing crosses (third security scan of 2026-10-07) ...
+    streamingGate.pendingGateDecisions(root);
+    assert.ok(fs.existsSync(planPath), 'answers with no question digest do not move the plan');
+    //    ... recorded as slice 2's writer records them, they count.
+    for (const qid of ['q10-store', 'q11-expiry', 'q12-transport', 'q13-copy']) recordAnswer(root, ref, qid, '1');
 
     // 3. Drive the REAL sufficiency-cross path. (streamAnswer already re-renders
     //    through this same path; calling it explicitly asserts the END STATE, not
@@ -137,13 +165,12 @@ describe('streaming human loop — end to end, sandboxed, real code', () => {
     fs.writeFileSync(planPath, magicLinkPlan('fail-closed'));
 
     const produced = precompute.writePlanQuestions(
-      root, ref, magicLinkQuestions(), fs.statSync(planPath).mtimeMs);
+      root, ref, magicLinkQuestions(), fs.statSync(planPath).mtimeMs, undefined, CLASSIFIED);
     assert.equal(produced.ok, true);
 
-    // Answer every question EXCEPT the critical `q12-transport` fork — a real fork left open.
-    for (const [qid, key] of [['q10-store', '1'], ['q11-expiry', '1'], ['q13-copy', '1']]) {
-      streamingGate.streamAnswer(ref, qid, key, root);
-    }
+    // Answer every question EXCEPT the critical `q12-transport` fork — a real fork left open —
+    // recorded as slice 2's writer records them (with the question digest).
+    for (const qid of ['q10-store', 'q11-expiry', 'q13-copy']) recordAnswer(root, ref, qid, '1');
 
     const decisions = streamingGate.pendingGateDecisions(root);
     const d = decisions.find((x) => x.ref === ref);

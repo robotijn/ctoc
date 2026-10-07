@@ -102,10 +102,24 @@ function reviseTo(root, seeded, slug, questions, planMs) {
   return { ...seeded, planMtimeMs, revision: { questionsRevisionMs: planMtimeMs, planMtimeMs } };
 }
 
+/**
+ * Append one answers-log line. Like slice 2's writer, it records the digest of the question
+ * the human was shown (the one stored for the plan now) unless the entry names its own: under
+ * the third security scan of 2026-10-07 an answer counts only for the question it was given for.
+ */
 function appendAnswer(root, entry) {
   const dir = path.join(root, '.ctoc', 'streaming');
   fs.mkdirSync(dir, { recursive: true });
-  fs.appendFileSync(path.join(dir, 'answers.jsonl'), JSON.stringify(entry) + '\n', 'utf8');
+  const shown = typeof entry.ref === 'string' ? (precompute.loadPlanQuestions(root, entry.ref) || []).find((q) => q.id === entry.questionId) : undefined;
+  const line = shown && !('questionDigest' in entry) ? { ...entry, questionDigest: digestOf(shown) } : entry;
+  fs.appendFileSync(path.join(dir, 'answers.jsonl'), JSON.stringify(line) + '\n', 'utf8');
+}
+
+/** The answer digest, derived independently of the module (see streaming-precompute.questionDigest). */
+function digestOf(q) {
+  const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
+  const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs])).digest('hex');
 }
 
 function readAnswerLines(root) {

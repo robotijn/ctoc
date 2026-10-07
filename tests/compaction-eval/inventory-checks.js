@@ -24,7 +24,9 @@
  * lists it, and its own anchors are held like any other. For both records: `plan` names a plan
  * file under `plans/<stage>/` whose approval record `.ctoc/approvals/<plan>.json` is a human or
  * backfilled ledger entry matching the plan's specification hash now, and whose approved
- * specification (never its execution record) names the order id; `date` is a real calendar date, not in the future; no new
+ * specification names the order id as a whole token on a line that also names this inventory's
+ * agent file — hashed text only, as `computeSpecHash` itself decides; `date` is a real calendar
+ * date, not in the future; no new
  * anchor already occurs in the baseline. The inventoried file must live under `agents/` or
  * `skills/`.
  * Everything else is held exactly as strictly as before.
@@ -58,13 +60,11 @@ function isPastDate(date) {
 }
 
 /**
- * The approved SPECIFICATION of plan `slug` under root/plans/<stage>/ — the part its approval
- * hash covers, with the sections the hash excludes (the execution record, the decisions,
- * the checkbox lines) removed — or null when there is no such approved plan. Approved means:
- * `.ctoc/approvals/<slug>.json` parses as a ledger entry of kind human or backfilled, its
- * `hash_scope` is `specification`, and its `content_sha256` equals the plan file's
- * specification hash now. A record anyone could write (`{}`), a record of another text, or a
- * machine crossing never counts.
+ * The text of plan `slug` under root/plans/<stage>/ when it is APPROVED as it stands, or null.
+ * Approved means: `.ctoc/approvals/<slug>.json` parses as a ledger entry of kind human or
+ * backfilled, its `hash_scope` is `specification`, and its `content_sha256` equals the plan
+ * file's specification hash now. A record anyone could write (`{}`), a record of another text,
+ * or a machine crossing never counts.
  */
 function approvedPlanText(root, slug) {
   if (typeof slug !== 'string' || !PLAN_SLUG.test(slug) || slug.includes('..')) return null;
@@ -82,34 +82,30 @@ function approvedPlanText(root, slug) {
     if (!fs.existsSync(file)) continue;
     const text = fs.readFileSync(file, 'utf8');
     const spec = ledger.computeSpecHash(text);
-    return spec.ok && spec.hash === entry.content_sha256 ? specificationPart(text) : null;
+    return spec.ok && spec.hash === entry.content_sha256 ? text : null;
   }
   return null;
 }
 
 /**
- * The plan text the specification hash covers: every section whose heading the hash
- * excludes (`approval-ledger.EXECUTION_SECTIONS`, to the next heading of the same or a higher
- * level) and every checkbox line removed — the same walk `computeSpecHash` makes.
+ * Does the approved plan text name order `id` for the agent file `agentRel`? The id must stand
+ * as a whole token (`R-3` is not named by `R-30`) on a line that also names the agent file's
+ * path, and that line must be inside the hashed specification. The approval hash is the one
+ * judge of what is hashed: the id is deleted from the line in place and `computeSpecHash` is
+ * recomputed — when the hash does not move, the id was never part of the approved text (an
+ * execution section, a checkbox line, or a heading of seven or more `#` the hash walk treats as
+ * excluding). Deleting the id rather than the whole line keeps every heading in place, so the
+ * section walk cannot change around the line being tested.
  */
-function specificationPart(text) {
-  const kept = [];
-  let excludeLevel = 0;
-  for (const line of text.split(/\r?\n/)) {
-    const m = /^(#{1,6})[ \t]+(.*)$/.exec(line.trim());
-    if (m) {
-      const level = m[1].length;
-      if (excludeLevel && level <= excludeLevel) excludeLevel = 0;
-      const title = m[2].trim().toLowerCase();
-      if (!excludeLevel && ledger.EXECUTION_SECTIONS.some((name) => title.startsWith(name))) {
-        excludeLevel = level;
-        continue;
-      }
-    }
-    if (excludeLevel || /^- \[[ xX]\]/.test(line.trim())) continue;
-    kept.push(line);
-  }
-  return kept.join('\n');
+function namedInSpecification(text, id, agentRel) {
+  const token = new RegExp(`(^|[^A-Za-z0-9-])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z0-9-])`, 'g');
+  const lines = text.split(/\r?\n/);
+  const whole = ledger.computeSpecHash(lines.join('\n')).hash;
+  return lines.some((line, i) => {
+    if (!line.includes(agentRel) || !line.match(token)) return false;
+    const without = [...lines.slice(0, i), line.replace(token, '$1'), ...lines.slice(i + 1)].join('\n');
+    return ledger.computeSpecHash(without).hash !== whole;
+  });
 }
 
 /**
@@ -117,8 +113,9 @@ function specificationPart(text) {
  * @param {object} o the order
  * @param {string} root the repository root plans and approvals are read under
  * @param {string} baselineFlat the normalised baseline: a new anchor must not already be in it
+ * @param {string} agentRel the inventoried agent file's path as the inventory names it
  */
-function recordErrors(o, root, baselineFlat) {
+function recordErrors(o, root, baselineFlat, agentRel) {
   if (o.fate === undefined) return [];
   if (!isReplaced(o) && !isAdded(o)) return [`order ${o.id} has fate ${o.fate}`];
   const field = isReplaced(o) ? 'replaced_by' : 'added_by';
@@ -129,7 +126,7 @@ function recordErrors(o, root, baselineFlat) {
   if (!isPastDate(r.date)) errors.push(`order ${o.id}: ${field}.date is not a real YYYY-MM-DD date up to today`);
   const planText = approvedPlanText(root, r.plan);
   if (planText === null) errors.push(`order ${o.id}: ${field}.plan names no approved plan under plans/`);
-  else if (!planText.includes(o.id)) errors.push(`order ${o.id}: the plan ${r.plan} never names this order`);
+  else if (!namedInSpecification(planText, o.id, agentRel)) errors.push(`order ${o.id}: the plan ${r.plan} never names this order for ${agentRel} in its approved specification`);
   const fresh = isReplaced(o) ? r.new_anchors : o.anchors;
   if (!Array.isArray(fresh) || fresh.length === 0 || !fresh.every(nonEmpty)) {
     errors.push(`order ${o.id}: its new anchors are not a non-empty list`);
@@ -221,7 +218,7 @@ function defineInventoryTests({ test, label, inventoryPath, orderFloor, root = R
       assert.ok(listed.has(o.id) || isAdded(o), `order ${o.id} is listed by no unit`);
       assert.ok(o.anchors.length > 0 && o.anchors.every((a) => units.normalize(a).length > 0), `order ${o.id} has an empty anchor`);
       assert.ok(o.says.length <= 160, `order ${o.id}: says is longer than 160 characters`);
-      assert.deepEqual(recordErrors(o, root, baselineFlat), [], `order ${o.id} has an incomplete replaced or added record`);
+      assert.deepEqual(recordErrors(o, root, baselineFlat, inv.agent), [], `order ${o.id} has an incomplete replaced or added record`);
     }
   });
 

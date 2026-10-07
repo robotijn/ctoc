@@ -417,11 +417,26 @@ function normalOnlyQuestions() {
 function answer(root, ref, questionId, optionKey) {
   const dir = path.join(root, '.ctoc', 'streaming');
   fs.mkdirSync(dir, { recursive: true });
+  // The entry carries the digest of the question it answers (third security scan of
+  // 2026-10-07), the format slice 2's writer records; an entry without one is asked again.
+  const question = (precompute.loadPlanQuestions(root, ref) || []).find((q) => q.id === questionId);
+  const questionDigest = question ? digestOf(question) : undefined;
   fs.appendFileSync(
     path.join(dir, 'answers.jsonl'),
-    JSON.stringify({ ts: new Date().toISOString(), ref, questionId, optionKey }) + '\n',
+    JSON.stringify({ ts: new Date().toISOString(), ref, questionId, optionKey, questionDigest }) + '\n',
     'utf8',
   );
+}
+
+/**
+ * The answer digest, derived independently of the module: sha256 hex of JSON [prompt,
+ * [[key, label], ...] sorted by key], each text NFKC-folded, accents removed, control
+ * characters stripped, trimmed and lower-cased.
+ */
+function digestOf(q) {
+  const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
+  const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs])).digest('hex');
 }
 
 /**

@@ -74,6 +74,27 @@ function ledgerFile(root, slug) {
   return path.join(root, '.ctoc', 'approvals', slug.toLowerCase() + '.json');
 }
 
+/**
+ * Records an answer the way slice 2's writer will (third security scan of 2026-10-07): stamped
+ * with the question set's revision and carrying the digest of the question shown — sha256 of
+ * JSON [prompt, [[key, label], ...] by key], each text NFKC-folded, accents removed, control
+ * characters stripped, trimmed, lower-cased. Today's `streamAnswer` records no digest, so an
+ * answer it records is asked again.
+ */
+function recordAnswer(root, ref, questionId, optionKey) {
+  const st = precompute.planQuestionsStatus(root, ref);
+  const q = st.questions.find((x) => x.id === questionId);
+  const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
+  const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const questionDigest = require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs])).digest('hex');
+  const dir = path.join(root, '.ctoc', 'streaming');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.appendFileSync(path.join(dir, 'answers.jsonl'), JSON.stringify({ ts: new Date().toISOString(), ref, questionId, optionKey, planMtimeMs: st.questionsRevisionMs, questionDigest }) + '\n');
+}
+
+/** The gate critic's classification block: only a file it classified can move a plan (the owner, 2026-10-07). */
+const CLASSIFIED = Object.freeze({ by: 'gate-critic', at: 1786000000000 });
+
 afterEach(() => {
   while (sandboxes.length) fs.rmSync(sandboxes.pop(), { recursive: true, force: true });
 });
@@ -519,10 +540,16 @@ describe('streamingGateScreen — precomputed questions vs simple-Approve fallba
         { key: '2', label: 'SQLite', cons: 'No concurrency' },
       ],
     }];
-    precompute.writePlanQuestions(root, 'functional/seq.md', oneFork, planMtimeMs(root, 'functional', 'seq'));
+    precompute.writePlanQuestions(root, 'functional/seq.md', oneFork, planMtimeMs(root, 'functional', 'seq'), undefined, CLASSIFIED);
 
-    // Answer the only fork → the plan has ENOUGH INFORMATION → it CROSSES automatically.
-    const after = route(['stream', 'answer', 'functional/seq.md', 'q10-db', '1'], root);
+    // Answer the only fork through the real menu route. Until slice 2 that writer records no
+    // question digest, so the answer is asked again and nothing crosses (third security scan).
+    route(['stream', 'answer', 'functional/seq.md', 'q10-db', '1'], root);
+    assert.ok(fs.existsSync(p), 'an answer with no question digest does not move the plan');
+    assert.ok(!fs.existsSync(ledgerFile(root, 'seq')), 'and writes no crossing');
+    // The answer as slice 2's writer records it → ENOUGH INFORMATION → it CROSSES on the next render.
+    recordAnswer(root, 'functional/seq.md', 'q10-db', '1');
+    const after = streamingGate.streamingGateScreen(root);
 
     // Pre-X6 this screen offered "Approve seq across Gate 1?". X6 replaces that: the
     // plan crossed as a SUFFICIENCY entry and the human never saw an Approve button.
@@ -545,7 +572,7 @@ describe('streamingGateScreen — precomputed questions vs simple-Approve fallba
       { id: 'q11-auth', prompt: 'Which auth provider?', critical: true, important: false, topic: 'technology-stack',
         options: [{ key: '1', label: 'Clerk', recommended: true }, { key: '2', label: 'Roll your own' }] },
     ];
-    precompute.writePlanQuestions(root, 'functional/multi.md', twoForks, planMtimeMs(root, 'functional', 'multi'));
+    precompute.writePlanQuestions(root, 'functional/multi.md', twoForks, planMtimeMs(root, 'functional', 'multi'), undefined, CLASSIFIED);
 
     // Answer fork 1 (db) → fork 2 (auth) still open → NOT sufficient → screen asks auth.
     const afterFirst = route(['stream', 'answer', 'functional/multi.md', 'q10-db', '1'], root);
@@ -554,8 +581,14 @@ describe('streamingGateScreen — precomputed questions vs simple-Approve fallba
     assert.equal(afterFirst.actions['Clerk'], 'stream answer functional/multi.md q11-auth 1');
     assert.ok(fs.existsSync(path.join(root, 'plans', 'functional', 'multi.md')), 'a fork is still open → stays put');
 
-    // Answer fork 2 (auth) → every fork answered → the plan CROSSES automatically.
+    // Answer fork 2 (auth) through the real route: until slice 2 neither answer carries a
+    // question digest, so nothing crosses. Recorded as slice 2's writer will, every fork is
+    // answered → the plan CROSSES on the next render.
     route(['stream', 'answer', 'functional/multi.md', 'q11-auth', '1'], root);
+    assert.ok(fs.existsSync(path.join(root, 'plans', 'functional', 'multi.md')), 'answers with no question digest move nothing');
+    recordAnswer(root, 'functional/multi.md', 'q10-db', '1');
+    recordAnswer(root, 'functional/multi.md', 'q11-auth', '1');
+    streamingGate.streamingGateScreen(root);
     assert.ok(!fs.existsSync(path.join(root, 'plans', 'functional', 'multi.md')), 'crossed out of functional/');
     assert.ok(fs.existsSync(path.join(root, 'plans', 'implementation', 'multi.md')), 'landed in implementation/');
     assert.equal(JSON.parse(fs.readFileSync(ledgerFile(root, 'multi'), 'utf8')).advanced_by, 'sufficiency');
@@ -651,9 +684,14 @@ describe('X6 — pendingGateDecisions CROSSES a sufficient plan and leaves the p
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff-ok', validFunctionalBody('suff-ok'));
     const ref = 'functional/suff-ok.md';
-    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs);
-    // The REAL answer writer — the predicate reads the log this produces.
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs, undefined, CLASSIFIED);
+    // The REAL answer writer records no question digest until slice 2, so its answer is asked
+    // again: the plan stays pending (third security scan of 2026-10-07).
     streamingGate.streamAnswer(ref, 'q10-db', '1', root);
+    const pending = streamingGate.pendingGateDecisions(root).find((x) => x.ref === ref);
+    assert.equal(pending.sufficiencyReason, 'open-forks', 'an answer with no question digest is asked again');
+    assert.ok(fs.existsSync(p), 'and nothing crossed');
+    recordAnswer(root, ref, 'q10-db', '1'); // the answer as slice 2's writer records it
 
     const decisions = streamingGate.pendingGateDecisions(root);
 
@@ -709,8 +747,8 @@ describe('X6 — pendingGateDecisions CROSSES a sufficient plan and leaves the p
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff-idem', validFunctionalBody('suff-idem'));
     const ref = 'functional/suff-idem.md';
-    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs);
-    streamingGate.streamAnswer(ref, 'q10-db', '1', root);
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs, undefined, CLASSIFIED);
+    recordAnswer(root, ref, 'q10-db', '1');
 
     streamingGate.pendingGateDecisions(root); // first pass: crosses
     const entryPath = ledgerFile(root, 'suff-idem');
@@ -728,8 +766,8 @@ describe('X6 — pendingGateDecisions CROSSES a sufficient plan and leaves the p
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff-walk', validFunctionalBody('suff-walk'));
     const ref = 'functional/suff-walk.md';
-    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs);
-    streamingGate.streamAnswer(ref, 'q10-db', '1', root);
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs, undefined, CLASSIFIED);
+    recordAnswer(root, ref, 'q10-db', '1');
     streamingGate.pendingGateDecisions(root); // cross
 
     const dir = path.join(root, '.ctoc', 'approvals');
