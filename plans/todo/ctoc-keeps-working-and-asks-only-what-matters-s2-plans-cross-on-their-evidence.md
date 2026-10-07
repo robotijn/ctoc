@@ -1654,3 +1654,56 @@ From the security verification of 84bb8501 (verdict: block), test-first on c58f5
   `[prompt, pairs, recommended keys]`, so cases 14, 17, 19, 28, 29, 30, 32 are red until the
   module changes; case 29's rewrite became a new revision (within one revision a file may only
   grow).
+
+Built (green after, inside `files:`):
+
+- **A. The menu by what Node runs.** For a background agent every word of a command is resolved
+  the way Node resolves a script — from the working directory and every `cd`/`pushd` target;
+  exact, `.js`, `.cjs`, `.mjs`, then `index.js` — and its real path checked: `src/commands/
+  start.js` under ANY directory whose `package.json` or `.claude-plugin/plugin.json` names
+  "ctoc" is a CTOC menu (lower-case compare), anything else under its `src/lib/` or
+  `src/commands/` is CTOC code. Every CTOC menu gets the same route list; a word pointing by
+  text into a `src/commands` folder with no such file is refused.
+- **B. Inline code by path.** `-e`, `-p`, `--eval`, `--print`, `--input-type`, or code piped
+  or redirected into a runtime is refused when its text names a path into `src/lib/` or
+  `src/commands/` or the `ctoc` package — whatever it calls. A simple call is read exactly
+  (the eval option among the runtime's options before its script), so a single-quoted
+  `--summary` holding `|` stays allowed.
+- **C. A file only grows within a revision.** Every classified write over a file for the same
+  plan revision — the author's (`classification-dropped-author-question`) or a classified one
+  (`classification-dropped-question`) — must keep every question it replaces with the same id
+  and digest.
+- **D. The digest names the recommendation:** sha256 of
+  `[prompt, [[key, label] by key], [recommended keys sorted]]`. `HOLD.digest` moved with it.
+- **E. Only CTOC's hold holds.** The old reading of `holds` on an agent's question id is
+  removed (`isHoldOrRelease` deleted); `crossOnEvidence` keeps calling the gate's own reader,
+  `readAnsweredQuestionIds`.
+- **F. One task parser.** `parseTaskArgs` is exported from `src/lib/menu-screens.js`; the hook
+  reads `menu task` words with it (`TASK_GRAMMAR` now lists the parser's fields).
+- **Gate critic:** rule D makes two of slice 1's added orders false (N-007: the critic may set
+  a `recommended` flag on an author's question; N-009: a synthesis carries the author's file
+  only when it is unclassified). Both are rewritten and re-recorded under this slice (an added
+  order cannot be marked replaced), slice 1's instruction kept in front. 139,695 → 139,799
+  bytes; `maxBytes` raised by the measured 104 with one more correction. Simulated with N-007
+  and N-009 on the approved line's added list: all ten inventory checks pass.
+- Two of my regular expressions were flagged by the security linter (nested quantifiers);
+  replaced by a set lookup and two flat patterns.
+
+Hook time per call (median of 7): main `ls` 29 ms, main menu call 30 ms; background agent
+`ls` 30 ms, `npm test` 31 ms, `menu task list` 44 ms, completion with a summary 46 ms,
+`stream answer` (refused) 42 ms, `node -e` naming `src/lib` (refused) 32 ms, `cat src/lib/…`
+31 ms — the resolution scan stats each word.
+
+Lint zero warnings, `tsc` zero errors. Full `npm test` (once): tests 12680, pass 12661, fail 19,
+skipped 0; coverage 99.86%.
+
+- 2 expected: inventory check 3 and `question-blocking-default` case 50 — N-007 is not yet on
+  the approved line (N-007 and N-009 belong on its added list).
+- 17 in three test files OUTSIDE `files:` that encode the contracts this round replaces, not
+  edited: `tests/question-blocking-default.test.js` (11: cases 26–29 read holds keyed by a
+  question id — rule E; case 45's guard has the critic replace its own file for the same
+  revision with fewer questions — rule C; cases 44, 46, 47 and the describe derive the digest
+  in the old format — rule D), `tests/streaming-precompute.test.js` (4: its `answer` helper
+  derives the old digest), `tests/sufficiency-evidence.test.js` (2: its answer lines carry the
+  old digest). Each needs only its digest helper brought to the new format, and the
+  question-blocking cases rewritten to CTOC's own hold and a growing classification.

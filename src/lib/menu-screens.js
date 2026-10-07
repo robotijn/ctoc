@@ -2864,6 +2864,9 @@ module.exports = {
   // The task parser's `--b64` decoder; also read by src/hooks/protect-records.js, so the
   // protection decodes a background agent's payload exactly as `menu task` will.
   decodeB64,
+  // The task argument parser; also called by src/hooks/protect-records.js, so the protection
+  // reads a background agent's `menu task` words exactly as the menu will.
+  parseTaskArgs,
   taskBoardScreen,
   taskDetailScreen,
   // Router

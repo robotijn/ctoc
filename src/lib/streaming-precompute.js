@@ -268,10 +268,13 @@ function labelIdentity(text) {
 
 /**
  * The digest that binds an answer to the question it was given for: sha256 (hex) of
- * `JSON.stringify([prompt, [[key, label], ...]])`, the pairs sorted by key and every text
- * passed through `labelIdentity`. An answers-log entry counts for a question only when its
- * `questionDigest` equals this, so a question rewritten under the same id — a new prompt, or
- * its labels moved between keys — never inherits an answer the human gave to another one.
+ * `JSON.stringify([prompt, [[key, label], ...], [recommended keys]])`, the pairs sorted by
+ * key, the recommended keys sorted, and every text passed through `labelIdentity`. An
+ * answers-log entry counts for a question only when its `questionDigest` equals this, so a
+ * question rewritten under the same id — a new prompt, its labels moved between keys, or its
+ * recommendation moved to another option (which changes what an unanswered detail decides) —
+ * never inherits an answer the human gave to another one, and a classification can never move
+ * an author's default unseen.
  * `null` for a question whose prompt or labels are not strings (nothing can bind to it).
  * @param {*} question
  * @returns {string|null}
@@ -280,7 +283,8 @@ function questionDigest(question) {
   if (!question || typeof question.prompt !== 'string' || !Array.isArray(question.options)) return null;
   if (!question.options.every((o) => o && typeof o.key === 'string' && typeof o.label === 'string')) return null;
   const pairs = question.options.map((o) => [o.key, labelIdentity(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  return crypto.createHash('sha256').update(JSON.stringify([labelIdentity(question.prompt), pairs])).digest('hex');
+  const recommended = question.options.filter((o) => o.recommended === true).map((o) => o.key).sort();
+  return crypto.createHash('sha256').update(JSON.stringify([labelIdentity(question.prompt), pairs, recommended])).digest('hex');
 }
 
 /**
@@ -570,12 +574,13 @@ function existingFor(file, mtime) {
 }
 
 /**
- * Does the classified set `questions` keep every question of the author's file `existing` —
- * the same id and the same `questionDigest` (prompt and key-to-label pairs)? The gate critic
- * may add questions to an author's list; it may never drop or reword one, or the author's
- * question would reach nobody.
+ * Does the new set `questions` keep every question of the file `existing` it replaces — the
+ * same id and the same `questionDigest` (prompt, key-to-label pairs, recommendation)? Within
+ * one revision of a plan a classified file may only grow: neither the gate critic's first
+ * classification of an author's list nor a later rewrite of its own file may drop or reword a
+ * question, or that question would reach nobody (or be decided another way).
  */
-function keepsAuthorQuestions(existing, questions) {
+function keepsQuestions(existing, questions) {
   const authored = Array.isArray(existing.questions) ? existing.questions : [];
   return authored.every((a) => {
     const kept = questions.find((q) => q.id === (a && a.id));
@@ -614,10 +619,11 @@ function keepsAuthorQuestions(existing, questions) {
  * the author's own list decide. Refused with `reason: 'would-replace-classified'`; the critic
  * may replace its own file, and a new revision of the plan may be written by anyone.
  *
- * The other way round, a classified file written over an author's file for the SAME revision
- * must keep every author question with the same id and the same `questionDigest`; it may add
- * questions (the omission duty), never drop or reword one. Otherwise refused with
- * `reason: 'classification-dropped-author-question'` and the author's file stays.
+ * The other way round, a classified file written over any file for the SAME revision — the
+ * author's (`classification-dropped-author-question`) or the gate critic's own
+ * (`classification-dropped-question`) — must keep every question it replaces with the same id
+ * and the same `questionDigest`; it may add questions (the omission duty), never drop, reword
+ * or re-recommend one. Otherwise refused, and the file it would replace stays.
  *
  * @param {object} [attestation] optional critique-ran record (see validateAttestation)
  * @param {object} [classification] optional `{ by: "gate-critic", at }` record
@@ -643,8 +649,10 @@ function writePlanQuestions(root, ref, questions, planMtimeMs, attestation, clas
     if (existingClassified) {
       return { ok: false, reason: 'would-replace-classified', errors: ['the gate critic classified the questions for this revision of the plan; an unclassified file may not replace them'] };
     }
-  } else if (existing !== null && !existingClassified && !keepsAuthorQuestions(existing, questions)) {
-    return { ok: false, reason: 'classification-dropped-author-question', errors: ["a classification must keep every question of the author's file for this revision, with the same id and wording; it may only add questions"] };
+  } else if (existing !== null && !keepsQuestions(existing, questions)) {
+    return existingClassified
+      ? { ok: false, reason: 'classification-dropped-question', errors: ['within one revision of the plan a classified file may only grow: every question it replaces must stay, with the same id, wording and recommendation'] }
+      : { ok: false, reason: 'classification-dropped-author-question', errors: ["a classification must keep every question of the author's file for this revision, with the same id, wording and recommendation; it may only add questions"] };
   }
   const record = { ref, planMtimeMs: mtime, questions };
   // Carry the attestation ONLY when it is an object — never a stray string/number,
@@ -956,28 +964,6 @@ function planFileOf(ref) {
 }
 
 /**
- * Does this answers-log entry for the plan set or release a hold on its question? A hold is
- * `holds: true` with a recorded key (the human's answer, recorded by CTOC; the key may be a
- * CTOC-added option the question file does not list). A release is a LATER real answer to the
- * same question without a hold: a non-empty string key that, when the question is known, is one
- * of its option keys and carries that question's `questionDigest` — the same binding an answer
- * needs to count — and no `holds` field of any other shape. Anything else changes nothing.
- * @param {object} entry
- * @param {*} key the entry's chosen key (`chosenKey`)
- * @param {Map<string, Set<string>>|null} optionKeys the current questions' keys, when known
- * @param {Map<string, (string|null)>|null} digests the current questions' digests, when known
- * @returns {boolean}
- */
-function isHoldOrRelease(entry, key, optionKeys, digests) {
-  if (typeof key !== 'string' || key === '') return false;
-  if (entry.holds === true) return true;
-  if (entry.holds !== undefined && entry.holds !== false) return false;
-  if (optionKeys === null || !optionKeys.has(entry.questionId)) return true;
-  return optionKeys.get(entry.questionId).has(key)
-    && typeof entry.questionDigest === 'string' && entry.questionDigest === digests.get(entry.questionId);
-}
-
-/**
  * The option key one answers-log entry chose: `optionKey` (what `streamAnswer`
  * writes), else `answer` (the older agent-written shape `entryRecordedAtMs` also
  * reads), else `undefined` — an entry that records no answer, which binds nothing and
@@ -1042,12 +1028,11 @@ function chosenKey(entry) {
  * ── A HOLD IS THE HUMAN'S, RECORDED BY CTOC IN THIS LOG ────────────────────────
  * A hold is never read from a question file: an author could mark any option. It is
  * an entry carrying `holds: true` for this plan — matched by the plan's file name, so a
- * hold survives revisions and stage moves. CTOC writes every hold under its own stable id
- * `HOLD.questionId` (`ctoc-hold`); such an entry is never an answer, and only a later
+ * hold survives revisions and stage moves. A hold is recognised ONLY under CTOC's own stable
+ * id `HOLD.questionId` (`ctoc-hold`); such an entry is never an answer, and only a later
  * `ctoc-hold` entry with key `release`, no `holds` other than `false`, and `HOLD.digest`
- * releases it. An older entry holding an agent question id lasts until a LATER entry for the
- * same plan and question records a bound answer without it. Entries that record no answer
- * neither set nor release a hold.
+ * releases it. A `holds` field on any other entry means nothing: no writer ever recorded a
+ * hold under an agent's question id.
  *
  * @param {string} root project root
  * @param {string} ref plan reference ("stage/file.md")
@@ -1134,9 +1119,6 @@ function readAnsweredQuestionIds(root, ref, revision) {
             && entry.questionDigest === HOLD.digest) holdState.set(HOLD.questionId, false);
       }
       continue;
-    }
-    if (planFileOf(entry.ref) === planFile && isHoldOrRelease(entry, key, optionKeys, digests)) {
-      holdState.set(entry.questionId, entry.holds === true);
     }
     if (entry.ref !== ref) continue;
     if (optionKeys !== null && !(optionKeys.has(entry.questionId) && optionKeys.get(entry.questionId).has(key)

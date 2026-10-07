@@ -47,7 +47,13 @@
  *   complete` without `--continue`, the task registry, the dashboard, the read-only screens,
  *   `plan <ref>`), matched as the WHOLE route with `menu task` held to its grammar and a
  *   `--b64` payload decoded by the task parser's own decoder; every other route is refused
- *   with its own sentence, fail closed. Its command gets ONE reading (`subagentMenuRefusal`):
+ *   with its own sentence, fail closed. The menu is recognised by what Node runs: every word
+ *   is resolved as Node resolves a script (from the working directory and every `cd`/`pushd`
+ *   target; exact, `.js`, `.cjs`, `.mjs`, `index.js`), and `src/commands/start.js` under ANY
+ *   directory whose manifest names "ctoc" is a CTOC menu (lower-case compare); inline code
+ *   (`-e`, `-p`, `--eval`, `--print`, `--input-type`, piped in) naming `src/lib/`,
+ *   `src/commands/` or the `ctoc` package is refused. `menu task` words are read by the menu's
+ *   own `parseTaskArgs`. Its command gets ONE reading (`subagentMenuRefusal`):
  *   naming the menu, a menu module or a crossing function, it must be one simple call with no
  *   shell operator or expansion outside quotes, and is then allowed only as a read-only
  *   program naming the files or as the direct menu call — `node` (or an absolute node path),
@@ -235,19 +241,22 @@ const READ_INBOX = new Set(['questions', 'decisions', 'gates', 'escalations', 'm
 /** Read-only top-level routes taking exactly one argument. */
 const ONE_ARG_ROUTES = new Set(['task', 'browse', 'section', 'stubs', 'validate', 'plan']);
 /**
- * `menu task <sub>`: the flags each allowed sub-command takes (true = takes a value) and how
- * many positional words it takes. `--force` (the human's override), `--continue` and `--fail`
- * are on none of them; an unknown flag refuses.
+ * `menu task <sub>`: the fields of `menu-screens.parseTaskArgs` each allowed sub-command may
+ * carry, and how many positional words it takes. `force` (the human's override), `continue`
+ * and `fail` are on none of them; a word the parser keeps as positional but that looks like a
+ * flag (`--frob`) refuses.
  */
 const TASK_GRAMMAR = Object.freeze({
-  add: { flags: { '--touches': true, '--blocked': true, '--gitop': false, '--label': true, '--b64': true }, min: 1, max: 2 },
-  start: { flags: { '--agent-id': true }, min: 1, max: 1 },
-  fail: { flags: { '--summary': true }, min: 1, max: 1 },
-  cancel: { flags: {}, min: 1, max: 1 },
-  complete: { flags: { '--summary': true, '--gate': true, '--next': true, '--b64': true }, min: 1, max: 1 },
-  list: { flags: {}, min: 0, max: 0 },
-  board: { flags: {}, min: 0, max: 0 },
+  add: { fields: ['touches', 'blocked', 'gitop', 'label', 'b64'], min: 1, max: 2 },
+  start: { fields: ['agentId'], min: 1, max: 1 },
+  fail: { fields: ['summary'], min: 1, max: 1 },
+  cancel: { fields: [], min: 1, max: 1 },
+  complete: { fields: ['summary', 'gate', 'next', 'b64'], min: 1, max: 1 },
+  list: { fields: [], min: 0, max: 0 },
+  board: { fields: [], min: 0, max: 0 },
 });
+/** Every field `parseTaskArgs` can set from a flag. */
+const TASK_FIELDS = ['touches', 'blocked', 'gitop', 'fail', 'force', 'label', 'summary', 'next', 'agentId', 'gate', 'b64', 'continue'];
 /** The keys a decoded `--b64` payload may carry, per sub-command (what the menu reads). */
 const B64_KEYS = Object.freeze({
   add: new Set(['kind', 'plan', 'label', 'touches', 'blockedBy', 'gitOp']),
@@ -270,22 +279,21 @@ function b64Allowed(sub, value) {
   return decoded.nextAction === undefined || isNavRoute(decoded.nextAction);
 }
 
-/** Do the words after `menu task <sub>` fit that sub-command's grammar exactly? */
+/**
+ * Do the words after `menu task <sub>` fit that sub-command's grammar exactly? They are read
+ * by the menu's own `parseTaskArgs`, so the protection and the menu can never read them
+ * differently.
+ */
 function taskArgsAllowed(sub, words) {
   const grammar = Object.prototype.hasOwnProperty.call(TASK_GRAMMAR, sub) ? TASK_GRAMMAR[sub] : null;
   if (!grammar) return false;
-  let positional = 0;
-  for (let i = 0; i < words.length; i++) {
-    const w = words[i];
-    if (!w.startsWith('--')) { positional += 1; continue; }
-    if (!Object.prototype.hasOwnProperty.call(grammar.flags, w)) return false;
-    if (!grammar.flags[w]) continue;
-    const value = words[++i];
-    if (value === undefined) return false;
-    if (w === '--b64' && !b64Allowed(sub, value)) return false;
-    if (w === '--next' && !isNavRoute(value)) return false;
-  }
-  return positional >= grammar.min && positional <= grammar.max;
+  const parsed = require('../lib/menu-screens').parseTaskArgs(words);
+  const present = (f) => (f === 'gitop' || f === 'fail' ? parsed[f] === true : parsed[f] !== undefined);
+  if (TASK_FIELDS.some((f) => present(f) && !grammar.fields.includes(f))) return false;
+  if (parsed.positional.some((w) => String(w).startsWith('-'))) return false;
+  if (parsed.positional.length < grammar.min || parsed.positional.length > grammar.max) return false;
+  if (parsed.b64 !== undefined && !b64Allowed(sub, parsed.b64)) return false;
+  return parsed.next === undefined || isNavRoute(parsed.next);
 }
 
 /**
@@ -379,36 +387,156 @@ function isNodeProgram(word) {
   return word === 'node' || (path.isAbsolute(word) && /^node(\.exe)?$/i.test(path.basename(word)));
 }
 
+/** The extensions Node tries for a script named without one, in its order. */
+const NODE_EXTENSIONS = ['', '.js', '.cjs', '.mjs'];
+/** A JavaScript runtime or package runner, by the word's last path segment. */
+const RUNTIME_WORD_RE = /^(node[0-9.]*|deno|bun|ts-node|tsx|npx)(\.exe)?$/i;
+/** Node's options that take code instead of a script (an `=value` form included). */
+const EVAL_FLAGS = new Set(['-e', '-p', '-pe', '-ep', '--eval', '--print', '--input-type']);
+const isEvalFlag = (word) => EVAL_FLAGS.has(word.split('=')[0]);
+/** Code text that reaches CTOC's code: a path into `src/lib/` or `src/commands/`, or the `ctoc` package by name. */
+const CTOC_PATH_TEXT_RE = /src[\\/]+(?:lib|commands)(?:[\\/]|\b)/i;
+const CTOC_PACKAGE_TEXT_RE = /['"`/]ctoc(?:['"`/]|$)/i;
+const namesCtocCodeText = (text) => CTOC_PATH_TEXT_RE.test(text) || CTOC_PACKAGE_TEXT_RE.test(text);
+/** A word that points into a `src/commands` folder by its text. */
+const COMMANDS_TEXT_RE = /(^|[\\/])src[\\/]+commands([\\/]|$)/i;
+
+/** Is `file` a regular file? Any fault is "no". */
+function isFile(file) {
+  try {
+    return require('../lib/safe-fs').statSync(file).isFile();
+  } catch {
+    return false;
+  }
+}
+
 /**
- * A background agent's command that names this plugin's menu (`start.js`), a menu module or a
- * gate-crossing function gets ONE reading. It is allowed only as (a) one simple call of a
- * read-only program that merely names the files, or (b) one simple direct call: the program
- * `node` (or an absolute path to a node binary), immediately the real `start.js` of this
- * plugin (real-path compare), then a route that — read by `start.js`'s own
- * `extractLiveAgentIds` and `splitCliArgs` — is on the allowed list. No other script, no
- * `node --test`, no option between the runtime and the script, no `env` or `NAME=value`
- * prefix, no other runtime. A double-quoted argument the shell would still expand gets the one
- * retry sentence; everything else is refused (fail closed).
+ * The real path of the file Node would run for `word` from `dir`: the exact path, then with
+ * `.js`, `.cjs`, `.mjs`, then the directory's `index.js` — or null when none exists.
+ */
+function resolveLikeNode(dir, word) {
+  const base = path.resolve(dir, word);
+  const candidates = NODE_EXTENSIONS.map((ext) => base + ext).concat(path.join(base, 'index.js'));
+  for (const candidate of candidates) {
+    if (!isFile(candidate)) continue;
+    try {
+      return require('../lib/safe-fs').realpathSync(candidate);
+    } catch {
+      return null; // it exists but cannot be resolved: treated as not found, and refused if it points into src/commands
+    }
+  }
+  return null;
+}
+
+/** Does a directory's package.json or .claude-plugin/plugin.json name the package "ctoc"? */
+function namesCtoc(dir) {
+  for (const manifest of [['package.json'], ['.claude-plugin', 'plugin.json']]) {
+    try {
+      const json = JSON.parse(require('../lib/safe-fs').readFileSync(path.join(dir, ...manifest), 'utf8'));
+      if (json && typeof json.name === 'string' && json.name.toLowerCase() === 'ctoc') return true;
+    } catch {
+      continue; // no such manifest, or not JSON: it names nothing
+    }
+  }
+  return false;
+}
+
+/**
+ * What a real file path is to CTOC: `'menu'` for `src/commands/start.js` under ANY directory
+ * whose manifest names "ctoc" (this plugin, the repository, an older marketplace copy), `'code'`
+ * for anything else under such a directory's `src/lib/` or `src/commands/`, else null. Compared
+ * in lower case, so a case-insensitive file system cannot dress the menu up as another file.
+ */
+function ctocKind(real) {
+  let dir = path.dirname(real);
+  for (let depth = 0; depth < 16; depth++) {
+    if (namesCtoc(dir)) {
+      const rel = path.relative(dir, real).split(path.sep).join('/').toLowerCase();
+      if (rel === 'src/commands/start.js') return 'menu';
+      return rel.startsWith('src/lib/') || rel.startsWith('src/commands/') ? 'code' : null;
+    }
+    const up = path.dirname(dir);
+    if (up === dir) return null;
+    dir = up;
+  }
+  return null;
+}
+
+/**
+ * Does any word of `command` — resolved the way Node resolves a script, from the working
+ * directory and from every directory a `cd` or `pushd` in the command names — reach CTOC's menu
+ * or code, or point by its text into a `src/commands` folder that holds no such file?
+ */
+function reachesCtocCode(command, base) {
+  const text = command.split(PLUGIN_ROOT_TOKEN).join(PLUGIN_ROOT);
+  const words = text.split(/[\s;&|<>()`'"=,[\]{}]+/).filter((w) => w && !w.includes('$'));
+  const dirs = [base];
+  for (let i = 0; i < words.length - 1; i++) {
+    if (words[i] === 'cd' || words[i] === 'pushd') dirs.push(path.resolve(dirs[dirs.length - 1], words[i + 1]));
+  }
+  for (const word of words) {
+    if (word.startsWith('-')) continue;
+    let found = false;
+    for (const dir of dirs) {
+      const real = resolveLikeNode(dir, word);
+      if (real === null) continue;
+      found = true;
+      if (ctocKind(real) !== null) return true;
+    }
+    if (!found && COMMANDS_TEXT_RE.test(word)) return true;
+  }
+  return false;
+}
+
+/**
+ * Does the command hand a JavaScript runtime code (an eval option, or code piped or redirected
+ * in) that names CTOC's code? A simple call is read exactly — an eval option among the
+ * runtime's options before its script; any other command is read loosely (any runtime word, any
+ * eval-looking word, any `|` or `<`), the fail-closed direction.
+ */
+function inlineCtocCode(command) {
+  if (!namesCtocCodeText(command)) return false;
+  const simple = simpleWords(command);
+  if (Array.isArray(simple)) {
+    if (!RUNTIME_WORD_RE.test(simple[0].split(/[\\/]/).pop())) return false;
+    const options = [];
+    for (const w of simple.slice(1)) {
+      if (!w.startsWith('-')) break;
+      options.push(w);
+    }
+    return options.some(isEvalFlag) || simple.length === 1;
+  }
+  const words = command.split(/[\s;&|<>()]+/).map((w) => w.replace(/['"`]/g, ''));
+  if (!words.some((w) => RUNTIME_WORD_RE.test(w.split(/[\\/]/).pop()))) return false;
+  return words.some(isEvalFlag) || /[|<]/.test(command);
+}
+
+/**
+ * A background agent's command gets ONE reading whenever it could reach CTOC: it names the
+ * menu, a menu module or a crossing function (`MENU_MENTION_RE`), any of its words resolves —
+ * as Node resolves a script, from the working directory or a directory the command `cd`s into
+ * — to CTOC's menu or code in any CTOC copy, a word points into a `src/commands` folder that
+ * holds no such file, or it hands Node inline code naming CTOC's code. Such a command is
+ * allowed only as (a) one simple call of a read-only program, or (b) one simple direct call:
+ * `node` (or an absolute node path), immediately a script that resolves to a CTOC menu
+ * (`src/commands/start.js` under a directory whose manifest names "ctoc"), then a route that —
+ * read by `start.js`'s own `extractLiveAgentIds` and `splitCliArgs` — is on the allowed list.
+ * Every CTOC menu gets the same list. A double-quoted `--summary` the shell would expand gets
+ * the one retry sentence; everything else is refused (fail closed).
  * @param {string} command
  * @param {string} base - the session's working directory
  * @returns {string|null} the refusal sentence, or null to go on to the record checks
  */
 function subagentMenuRefusal(command, base) {
-  if (!MENU_MENTION_RE.test(command)) return null;
+  if (inlineCtocCode(command)) return REFUSAL_SUBAGENT;
+  if (!MENU_MENTION_RE.test(command) && !reachesCtocCode(command, base)) return null;
   const words = simpleWords(command);
   if (words === 'quote') return REFUSAL_QUOTE;
   if (!words || words.length === 0) return REFUSAL_SUBAGENT;
   if (READ_PROGRAMS.has(words[0])) return null;
   if (!isNodeProgram(words[0]) || !words[1] || words[1].startsWith('-')) return REFUSAL_SUBAGENT;
-  const safeFs = require('../lib/safe-fs');
-  const own = safeFs.realpathSync(path.join(PLUGIN_ROOT, 'src', 'commands', 'start.js'));
-  let real = null;
-  try {
-    real = safeFs.realpathSync(path.resolve(base, words[1].split(ROOT_MARK).join(PLUGIN_ROOT)));
-  } catch {
-    real = null; // no such file: it is not this plugin's menu
-  }
-  if (real !== own) return REFUSAL_SUBAGENT;
+  const real = resolveLikeNode(base, words[1].split(ROOT_MARK).join(PLUGIN_ROOT));
+  if (real === null || ctocKind(real) !== 'menu') return REFUSAL_SUBAGENT;
   const { extractLiveAgentIds, splitCliArgs } = require('../commands/start.js');
   return subagentMayRunRoute(splitCliArgs(extractLiveAgentIds(words.slice(2)).rest)) ? null : REFUSAL_SUBAGENT;
 }
