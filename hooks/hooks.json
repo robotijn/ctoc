@@ -1,0 +1,16 @@
+{
+  "description": "CTOC loads only its write protection for approval records and check records; every other CTOC hook stays unregistered on purpose.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hooks/protect-records.js\""
+          }
+        ]
+      }
+    ]
+  }
+}
