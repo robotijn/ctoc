@@ -664,43 +664,88 @@ New on refresh, 2026-10-07:
 25. **The "Human gates stay foreground" heading stays** because `tests/menu-protocol.test.js`
     pins it; its body says which crossings are the human's.
 
+Taken by the build, 2026-10-07:
+
+26. **Case 47 reads the router's refusal, not a throw.** `route` catches `taskComplete`'s
+    throw and returns `{ ok: false, error }`; the case asserts `ok: false`, the exact
+    `invalid transition done → done` / `failed → done` message, no `alreadyCompleted`, and
+    the done task unchanged — the same refusal the plan names, read where it surfaces.
+27. **Case 46's next slice is built as case 4 builds it**: an implementation slice with a
+    classified empty question file. The continuation moves it to `todo` and on into building,
+    and `promote` holds that claimed build.
+28. **Case 46b records the hold through the real route** (`stream answer <ref> q10-label
+    hold` on a detail question, as case 21 does), which writes CTOC's `ctoc-hold` line with
+    `holds: true` and `HOLD.digest`; the case asserts that line before calling the
+    continuation.
+29. **The CTO Chief's invariant 3 ends "never on yours: you write no approval and do no
+    approving."** R-045 (not on this plan's list) is anchored by "approving. 4.", spanning
+    the end of invariant 3 and the next marker; the plan's proposed ending would have removed
+    it. R-044's `new_anchors` record the words as written.
+30. **The monitoring duties stay three lines**, one per order (R-443, R-444, R-445). Check
+    10 requires each anchor to belong to exactly one order, so the plan's one-line form would
+    have left two orders without an anchor of their own.
+31. **S-001 keeps its first two anchors in `new_anchors`** with the new third; neither is in
+    the baseline, so check 3 accepts them, and check 4 holds all three.
+32. **The implementation-stage copy of this plan was removed in the build's worktree.**
+    `main` at 547bd62c still carries the older revision under `plans/implementation/`;
+    the main checkout already deletes it (the human's approval moved the plan to `todo/`).
+    Inventory check 3 reads the first stage folder holding the plan, found the stale copy,
+    and failed every replaced order until it was removed.
+33. **The two Critical Rule 1 sentences no inventory held** ("Four transitions REQUIRE
+    human approval." and "Only the human moves a plan across these four transitions …") are
+    kept word for word in `docs/OPERATING_LESSONS.md`'s replaced section as well, so no
+    wording `CLAUDE.md` carried is lost.
+34. **`docs/IRON_LOOP.md` keeps "typing the word `done-all` IS the Gate-3 approval"**:
+    `tests/readme-numbers.test.js` (outside `files:`) pins it, and it is still true — when
+    the human types it, it is his approval.
+35. **Ceiling corrections were created in four inventories that had none** (the CTO Chief,
+    the pre-mortem, the devil's advocate and the red team), not only in the CTO Chief's: all
+    five agents sat exactly at their ceiling, and each rose by its measured overage only.
+36. **One `replaced_by.instruction` text for every replaced order**: the owner's words of
+    2026-10-06, the decisions of 2026-10-07, and what the code now crosses.
+37. **The kanban keeps `[HUMAN]` for the vision crossing and marks the others `[EVIDENCE]`
+    and `[CHECKS]`**, with one sentence below the drawing saying what each marker means.
+38. **`docs/ENFORCEMENT.md` names `isBlockingQuestion`'s conditions** as the code has them
+    (a malformed question, a critical one, a high-stakes topic, an important one with no
+    topic, options without exactly one recommendation) instead of a count.
+
 ## Execution Plan
 
 ### Step 8: TEST
-- [ ] Write cases 46, 46b and 47 in `tests/plans-keep-moving-without-the-human.test.js`; run the file; record 46 and 46b red for the named reason (the `done → done` refusal) and 47 green.
-- [ ] Write the rule records before the text: the `new`/`old_home` values and entries r0145–r0147 in `tests/fixtures/claude-md-rule-inventory.json`; each listed order's `replaced_by` record and unit fate in the five compaction inventories. Run `node --test tests/claude-md-keeps-every-rule.test.js tests/cto-chief-compaction.test.js tests/gate-critic-compaction.test.js tests/premortem-critic-rule-inventory.test.js tests/devils-advocate-critic-compaction.test.js tests/red-team-critic-compaction.test.js`; record each failure and confirm it is the right one (new words absent, old words present), with check 3 green.
-- [ ] Run, before any text edit, the tests that hold phrases this slice must keep (Test plan list) and record them green.
+- [x] Write cases 46, 46b and 47 in `tests/plans-keep-moving-without-the-human.test.js`; run the file; record 46 and 46b red for the named reason (the `done → done` refusal) and 47 green.
+- [x] Write the rule records before the text: the `new`/`old_home` values and entries r0145–r0147 in `tests/fixtures/claude-md-rule-inventory.json`; each listed order's `replaced_by` record and unit fate in the five compaction inventories. Run `node --test tests/claude-md-keeps-every-rule.test.js tests/cto-chief-compaction.test.js tests/gate-critic-compaction.test.js tests/premortem-critic-rule-inventory.test.js tests/devils-advocate-critic-compaction.test.js tests/red-team-critic-compaction.test.js`; record each failure and confirm it is the right one (new words absent, old words present), with check 3 green.
+- [x] Run, before any text edit, the tests that hold phrases this slice must keep (Test plan list) and record them green.
 
 ### Step 9: PREPARE
-- [ ] Confirm `main` carries slices 1 and 2 (v6.14.119) and that `.ctoc/approvals/ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does.json` is a human entry matching this plan's specification hash; if not, stop and report (Decision 21).
-- [ ] Record before-numbers: `CLAUDE.md` bytes; each of the five inventoried agents' bytes and `maxBytes`; false-green, dead-export and unreachable-file counts; `.ctoc/unexecutable-instruction-baseline.json`.
-- [ ] Re-read every line this plan names; follow the text where a line has moved.
-- [ ] Check the claims of items 13 and 15 against the code (`crossOnEvidence`, `continueAfterCrossing`, `goesToHuman`, `reservedIdErrors`, `recordDeployReadyNotice`, `streamCheck`); where the code says otherwise, write what it does and record the difference.
+- [x] Confirm `main` carries slices 1 and 2 (v6.14.119) and that `.ctoc/approvals/ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does.json` is a human entry matching this plan's specification hash; if not, stop and report (Decision 21).
+- [x] Record before-numbers: `CLAUDE.md` bytes; each of the five inventoried agents' bytes and `maxBytes`; false-green, dead-export and unreachable-file counts; `.ctoc/unexecutable-instruction-baseline.json`.
+- [x] Re-read every line this plan names; follow the text where a line has moved.
+- [x] Check the claims of items 13 and 15 against the code (`crossOnEvidence`, `continueAfterCrossing`, `goesToHuman`, `reservedIdErrors`, `recordDeployReadyNotice`, `streamCheck`); where the code says otherwise, write what it does and record the difference.
 
 ### Step 10: IMPLEMENT
-- [ ] `src/lib/menu-screens.js` (item 1); cases 46 and 46b green, 47 still green.
-- [ ] `src/commands/start.md`, the seven agent files, `CLAUDE.md`, `.ctoc/templates/operating-lessons.md`, `.ctoc/templates/CLAUDE.md.template`, `docs/OPERATING_LESSONS.md`, `docs/ENFORCEMENT.md`, `docs/PROJECT_REFERENCE.md`, `docs/IRON_LOOP.md`, `docs/AGENT_ARCHITECTURE.md` and the six inventories, as specified; each inventory's `new` and `new_anchors` are the words as written.
-- [ ] Any inventoried agent larger than its `maxBytes`: raise it by exactly the measured overage with one `ceiling_corrections` entry.
-- [ ] Report the order ids actually marked replaced; if they differ from "Agent rules this slice replaces or adds", stop for the session and the human.
+- [x] `src/lib/menu-screens.js` (item 1); cases 46 and 46b green, 47 still green.
+- [x] `src/commands/start.md`, the seven agent files, `CLAUDE.md`, `.ctoc/templates/operating-lessons.md`, `.ctoc/templates/CLAUDE.md.template`, `docs/OPERATING_LESSONS.md`, `docs/ENFORCEMENT.md`, `docs/PROJECT_REFERENCE.md`, `docs/IRON_LOOP.md`, `docs/AGENT_ARCHITECTURE.md` and the six inventories, as specified; each inventory's `new` and `new_anchors` are the words as written.
+- [x] Any inventoried agent larger than its `maxBytes`: raise it by exactly the measured overage with one `ceiling_corrections` entry.
+- [x] Report the order ids actually marked replaced; if they differ from "Agent rules this slice replaces or adds", stop for the session and the human.
 
 ### Step 11: REVIEW
 - [ ] Dispatch `iron-loop-critic`: every changed sentence matches the code it describes (where plans cross, the hold, the classification, the continuation after a build); vision → functional stays the human's on every surface; no surface claims nothing moves when the menu opens; the kept text around each replaced order still reads true; whichever queued agent-improvement slice lands second keeps the other's text.
 
 ### Step 12: OPTIMIZE
-- [ ] `CLAUDE.md` at or under 15,000 bytes; no new sentence longer than its fact needs; no ceiling raised beyond its measured overage; the new branch adds no registry write and no second registry read.
+- [x] `CLAUDE.md` at or under 15,000 bytes; no new sentence longer than its fact needs; no ceiling raised beyond its measured overage; the new branch adds no registry write and no second registry read.
 
 ### Step 13: SECURE
 - [ ] Dispatch `security-scanner`: no instruction tells an agent to write an approval or check record, move a plan file, cross a gate or pass `--continue`; the new branch persists nothing from `--summary`, `--gate`, `--next` or `--b64`; `tests/protect-records.test.js` green, so a background agent's `--continue` is still refused.
 
 ### Step 14: VERIFY
-- [ ] `npm test`: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct`.
-- [ ] Lint `src/lib/menu-screens.js` and `tests/plans-keep-moving-without-the-human.test.js`: zero warnings; `tsc --checkJs`: zero errors.
-- [ ] False-green, dead-export and unreachable counts not higher than the Step 9 numbers; `.ctoc/unexecutable-instruction-baseline.json` unchanged; `CLAUDE.md` at or under 15,000 bytes.
-- [ ] An existing test outside `files:` that fails because it pins a replaced sentence is reported through `src/lib/scope-growth.js`, never edited outside `files:`.
+- [x] `npm test`: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct`.
+- [x] Lint `src/lib/menu-screens.js` and `tests/plans-keep-moving-without-the-human.test.js`: zero warnings; `tsc --checkJs`: zero errors.
+- [x] False-green, dead-export and unreachable counts not higher than the Step 9 numbers; `.ctoc/unexecutable-instruction-baseline.json` unchanged; `CLAUDE.md` at or under 15,000 bytes.
+- [x] An existing test outside `files:` that fails because it pins a replaced sentence is reported through `src/lib/scope-growth.js`, never edited outside `files:`.
 
 ### Step 15: DOCUMENT
-- [ ] JSDoc of `taskComplete` describes the branch for a task its agent already completed and what it ignores.
-- [ ] `docs/ENFORCEMENT.md` carries the review-to-done paragraph and the classification rule (item 13).
+- [x] JSDoc of `taskComplete` describes the branch for a task its agent already completed and what it ignores.
+- [x] `docs/ENFORCEMENT.md` carries the review-to-done paragraph and the classification rule (item 13).
 
 ### Step 16: FINAL-REVIEW
 - [ ] Dispatch `iron-loop-critic` against the acceptance criteria, including the Step 7 text in the places of Decision 13.
@@ -712,20 +757,20 @@ New on refresh, 2026-10-07:
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
 - [ ] Self-review all new code
@@ -733,9 +778,9 @@ New on refresh, 2026-10-07:
 - [ ] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
 - [ ] Validate inputs (no path traversal)
@@ -744,15 +789,15 @@ New on refresh, 2026-10-07:
 - [ ] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
 - [ ] Verify steps 8-15 completed correctly
@@ -768,3 +813,139 @@ quality evaluation. These entries are the integrator's own report on itself, not
 findings from a critic that read this plan._
 
 - **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+
+## Execution Record
+
+Built 2026-10-07 by the build agent in its own worktree, on `main` at 547bd62c (v6.14.119).
+The plan and its approval record were copied in from the main checkout and committed with
+the work. `computeSpecHash` of this plan equals the record's `content_sha256`
+(`8842facd…09534`) before any edit and after the boxes and this record were written; the
+record is a human-kind entry (`entryKind` → `human`), so inventory check 3 accepts it.
+
+### Step 8 — written first, run red
+
+- **Cases 46, 46b, 47** (`tests/plans-keep-moving-without-the-human.test.js`, new describe
+  block "the session continues after a build agent completed its own task"). Red run before
+  any code: 46 and 46b failed for the named reason — the router returned
+  `{"ok":false,"error":"task-registry: invalid transition done → done"}`; 47 passed. Committed
+  red as f316da54.
+- **The rule records before the text.** The five compaction inventories got every listed
+  order's `fate: "replaced"` and `replaced_by` (and every unit listing one fated `replaced`,
+  unit 434 of the CTO Chief included); `tests/fixtures/claude-md-rule-inventory.json` got the
+  `new`/`old_home` values and entries r0145–r0147. Red run of the six inventory tests: check 3
+  green in all five inventories (after Decision 32), checks 4 and 10 red in all five with
+  "missing" (new words absent) and "replaced-but-present" (old words present);
+  `tests/claude-md-keeps-every-rule.test.js` red on checks 2 and 3 (the new words not in
+  their homes, r0032's old words not yet in `docs/OPERATING_LESSONS.md`). Committed red as
+  860bf5cb.
+- **The tests that hold phrases this slice keeps**, run before any text edit, plus
+  `tests/protect-records.test.js`: 415 tests, 415 pass, 0 fail, 0 skipped.
+
+### Step 9 — prepared
+
+- `main` carries slices 1 and 2 (the worktree's base commit is 547bd62c, v6.14.119); the
+  approval record is human-kind and matches this plan's specification hash.
+- Before-numbers: `CLAUDE.md` 14,952 bytes. The CTO Chief 53,365 (maxBytes 53,365), the gate
+  critic 139,799 (139,799), the pre-mortem critic 79,150 (79,150), the devil's advocate
+  critic 80,175 (80,175), the red-team critic 96,537 (96,537); the build agent 17,719 and the
+  iron-loop critic 7,951 (no inventory). The false-green, dead-export, unreachable-file and
+  unexecutable-instruction counts were not recorded as separate numbers; their fences run
+  inside `npm test` against the committed baselines (unchanged by this build) and passed at
+  Step 14.
+- Every claim of items 13 and 15 was checked against the code: `crossOnEvidence`
+  (`src/lib/streaming-gate.js`: admission entry at `todo`, answers log readable and no hold,
+  passing record, pipeline entry, status file cleared, ledger restored on a failed move,
+  deploy-ready notice only with deployment enabled, worded "It finished on its checks —
+  nobody approved it by hand"); `pendingGateDecisions` (the default screen crosses pre-build
+  plans too; without `opts.crossed` nothing finishes when the menu opens);
+  `goesToHuman`/`isBlockingQuestion` and the `unclassified` verdict for an author's list,
+  even empty (`src/lib/streaming-precompute.js`); `reservedIdErrors` (a file carrying the
+  gate ruling or the coverage notice without a valid attestation is refused whole);
+  `streamCheck` (queues the classification and returns `promote`); the gate critic's own
+  text ("a classification may be empty and carries no ruling"). No difference found.
+
+### Step 10 — green per file
+
+- `src/lib/menu-screens.js` `taskComplete`: the branch for a `done` task with `--continue`
+  runs only `continueAfterCrossing` and returns `{ ok, taskId, status: 'done',
+  alreadyCompleted: true, completion: null, text, promote }` (+ `quarantined` when
+  non-empty); it writes nothing to the task. Cases 46 and 46b green, 47 still green; the
+  whole file 51/51. Committed as 701068c2.
+- The five inventoried agents (committed as 2828b3e3): all six inventory checks green per
+  agent after the edits; the only remaining red was check 6 (size), closed by the ceiling
+  corrections below.
+- `src/commands/start.md`, the build agent and the iron-loop critic (committed as
+  04b471cf): the 30 test files that read `start.md` or those agents ran 890/890 green.
+- `CLAUDE.md`, the lessons template, the project template and the five docs (committed as
+  ccbcd46c): one test outside `files:` went red on the first draft —
+  `tests/readme-numbers.test.js` "IRON_LOOP Gate-3 batch names the done-all shortcut and
+  typing-as-approval" — because the draft reworded the pinned phrase; the doc was put back to
+  the pinned (and true) words (Decision 34), not the test.
+- **Order ids marked replaced, as built** — identical to "Agent rules this slice replaces or
+  adds":
+  - `agents/coordinator/cto-chief.md`: R-043, R-044, R-107, R-108, R-132, R-193, R-194,
+    R-195, R-324, R-395, R-438, R-439, R-440, R-443, R-444, R-445, S-001 (units 43, 44, 107,
+    108, 132, 193, 194, 195, 324, 395, 434, 438, 439, 440, 443, 444, 445 fated `replaced`;
+    R-434's own anchor stays).
+  - `agents/iron-loop/gate-critic.md`: R-135, R-182, R-184, R-205, R-680, R-681 (R-183
+    stays).
+  - `agents/iron-loop/premortem-critic.md`: R-378 (unit 482).
+  - `agents/iron-loop/devils-advocate-critic.md`: D-369, D-370 (D-084 stays).
+  - `agents/iron-loop/red-team-critic.md`: RT-604.
+  No order added; no order floor or kinds digest moved; the five inventory test files are
+  unchanged.
+
+### Bytes against the ceilings
+
+| File | Before | After | Ceiling | Correction |
+|---|---|---|---|---|
+| `CLAUDE.md` | 14,952 | 14,971 | 15,000 | — (net +19, as the hand count said) |
+| `agents/coordinator/cto-chief.md` | 53,365 | 54,303 | 53,365 → 54,303 | +938, first `ceiling_corrections` entry |
+| `agents/iron-loop/gate-critic.md` | 139,799 | 140,070 | 139,799 → 140,070 | +271, fifth entry |
+| `agents/iron-loop/premortem-critic.md` | 79,150 | 79,181 | 79,150 → 79,181 | +31, first entry |
+| `agents/iron-loop/devils-advocate-critic.md` | 80,175 | 80,244 | 80,175 → 80,244 | +69, first entry |
+| `agents/iron-loop/red-team-critic.md` | 96,537 | 96,572 | 96,537 → 96,572 | +35, first entry |
+| `agents/iron-loop/iron-loop-executor.md` | 17,719 | 18,064 | none | — |
+| `agents/iron-loop/iron-loop-critic.md` | 7,951 | 8,102 | none | — |
+
+Each correction is `{ date: 2026-10-07, from, to, reason }`, the reason naming this plan and
+the measured overage. The CTO Chief's +938 is mostly the three monitoring lines that now name
+the crossing record and the residency check (Decision 30).
+
+### Step 12 — optimized
+
+The new branch adds no registry write and no second registry read: it reuses the task the
+function already loaded and returns before the transition check. `CLAUDE.md` is 29 bytes
+under its ceiling. No ceiling rose beyond its measured overage.
+
+### Step 14 — VERIFY
+
+- `npm test` (foreground, 600,000 ms timeout; `node_modules` linked from the main checkout
+  for the run and removed after, never committed): tests 12,690, suites 2,111, pass 12,690,
+  fail 0, cancelled 0, skipped 0, todo 0; `[CTOC test-gate] coverage 99.87% (threshold 99%),
+  skipped 0, failed 0`; corpus claims verified 3, refuted 0, unverifiable 0; `[CTOC
+  test-gate] PASS`.
+- `npx eslint . --max-warnings 0`: no output (zero warnings, zero errors).
+  `tests/typecheck.test.js`: pass.
+- `src/lib/menu-screens.js` coverage 99.42% lines; its uncovered lines do not include the
+  new branch.
+- `.ctoc/unexecutable-instruction-baseline.json` unchanged; no test outside `files:` was
+  edited, so nothing went through `src/lib/scope-growth.js`.
+
+### Step 15 — documented
+
+`taskComplete`'s JSDoc describes the branch for a task its agent already completed and what
+it ignores; `docs/ENFORCEMENT.md` carries the review-to-done paragraph and the rule for which
+questions reach the human.
+
+### Not verified, and left for the owner
+
+- Steps 11, 13 and 16 are the session's (the critic's review, the security scan, the final
+  review and the end-to-end run through the real routes); their boxes are open.
+- Untrue sentences outside this plan's list, left as Decision 16 and 17 say: the CTO Chief's
+  invariant 4 and its enforcement paragraph (hooks that auto-revert), the CTO Chief's Step 16
+  synthesizer line "before the CTO Chief approves" and the matching "CTO Chief approves." in
+  `docs/PROJECT_REFERENCE.md` (the plan keeps that sentence), the build agent's "A pre-tool
+  hook monitors ALL tool calls" lines, `docs/IRON_LOOP.md` line 14, `README.md`.
+- The parent's idle-time measurement (Decision 22) needs real use after release.
