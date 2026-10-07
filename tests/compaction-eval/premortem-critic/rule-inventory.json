@@ -3,7 +3,7 @@
   "baseline": "tests/compaction-eval/premortem-critic/baseline-agent.md",
   "baseline_sha256": "cbcbb78c138d50fe66bcc00f8ae074dc79fe701de7074eb62edba7bcf54d9804",
   "baseline_commit": "d57186c0a656bcf207848ecf09763052c0dfa632",
-  "maxBytes": 79150,
+  "maxBytes": 79181,
   "units": [
     {"n":1,"sha":"50ae14eb13dcb1c8c893fca5e43ff8d7776d23a241db61a038327596bcedf52c","kind":"frontmatter","orders":[],"fate":"kept"},
     {"n":2,"sha":"fa91863a64b020ba8a376cf4fc0f6855f0a36e2d7e5068affeedbbb95d058c73","kind":"heading","orders":[],"fate":"kept"},
@@ -915,5 +915,8 @@
     {"id":"R-399","says":"Line numbers are for SOURCE you read this run and cite as `file:line` evidence, where the line is the statement that executes.","now_in":"## Anti-Scope","anchors":["numbers are for SOURCE you read this run and cite as `file:line`"],"pinned_by":null,"wire":false},
     {"id":"R-400","says":"- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no data, say you ...","now_in":"## Honest status (shared rule)","anchors":["- [`skills/agent-fragments/honest-status.md`](../../skills/agent-fragments/honest-status.md) — assert only what you verified; when you have no","[`skills/agent-fragments/honest-status.md`]"],"pinned_by":"src/lib/agent-honesty-scan.js FRAGMENT_REF, case 15e","wire":false},
     {"id":"R-401","says":"Never invent a time, a deadline, or a subsystem's activity.","now_in":"## Honest status (shared rule)","anchors":["Never invent a time, a deadline, or a subsystem's activity."],"pinned_by":null,"wire":false}
+  ],
+  "ceiling_corrections": [
+    {"date":"2026-10-07","from":79150,"to":79181,"reason":"the anti-scope line says who crosses a gate (plan ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does); measured overage 31 bytes"}
   ]
 }

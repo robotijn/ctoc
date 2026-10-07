@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/gate-critic/baseline-agent.md",
  "baseline_sha256": "d8d10528cffd6e9c0af1b1174d5286b79b08d820416894c16ce117e2f39fed5e",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 139799,
+ "maxBytes": 140070,
  "units": [
   {
    "n": 1,
@@ -12701,6 +12701,12 @@
    "from": 139695,
    "to": 139799,
    "reason": "a classification and a synthesis keep every question, its options and its recommendation unchanged (plan ctoc-keeps-working-and-asks-only-what-matters-s2-plans-cross-on-their-evidence, verification round); measured overage 104 bytes"
+  },
+  {
+   "date": "2026-10-07",
+   "from": 139799,
+   "to": 140070,
+   "reason": "rule 5, the attestation section, its report line and two anti-scope rows say who crosses a gate (plan ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does); measured overage 271 bytes"
   }
  ]
 }

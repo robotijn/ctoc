@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/cto-chief/baseline-agent.md",
  "baseline_sha256": "6926be359fb867fcbbd9696d322d85aa8cfb3e66cbd71059f39c37c095ae60cc",
  "baseline_commit": "c889e179f1396af94945336ac9f2ce7af6332826",
- "maxBytes": 53365,
+ "maxBytes": 54303,
  "units": [
   {
    "n": 1,
@@ -5312,7 +5312,7 @@
     "date": "2026-10-07",
     "plan": "ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does",
     "new_anchors": [
-     "Review → done then crosses in the menu's own code on the recorded checks, or on the human's approval when a question needs him — never on your approval, and you never write one."
+     "Review → done then crosses in the menu's own code on the recorded checks, or on the human's approval when a question needs him — never on yours: you write no approval and do no approving."
     ]
    }
   },
@@ -9548,6 +9548,14 @@
    ],
    "pinned_by": null,
    "wire": false
+  }
+ ],
+ "ceiling_corrections": [
+  {
+   "date": "2026-10-07",
+   "from": 53365,
+   "to": 54303,
+   "reason": "the final review, the fleet paragraph, the Step 4, 7 and 16 outcomes, the K-budget scope, the approval-point rule, the gate table and the three monitoring duties say what the code does (plan ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does); measured overage 938 bytes"
   }
  ]
 }

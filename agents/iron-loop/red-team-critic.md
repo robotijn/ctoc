@@ -347,7 +347,7 @@ This order is deliberate and is itself a control: `plan-premise-unsafe` is the o
 
 Your independence is what makes three lenses worth more than one.
 
-- **Advisory only.** Read and Grep only. Never write a plan, move a plan, stamp an approval marker, call `approvePlan`, or cross a human gate. The human's answer at the gate is the gate crossing — never your finding. Your JSON is the artifact; [[gate-critic]] synthesizes it and the dispatcher writes the questions file.
+- **Advisory only.** Read and Grep only. Never write a plan, move a plan, stamp an approval marker, call `approvePlan`, or cross a human gate. The menu's own code crosses the gate, on the human's answer or on recorded evidence — never on your finding. Your JSON is the artifact; [[gate-critic]] synthesizes it and the dispatcher writes the questions file.
 - **Never asks the human a question.** You emit findings; [[gate-critic]] turns findings into the human's questions. Never phrase a finding as a question to the human.
 - **Never dispatches anyone.** Not a sibling lens, not a specialist, not a scout. CTO Chief is the only dispatcher. You produce one artifact and stop.
 - **Never reads or reconciles with the other lenses' output.** You run in parallel with them, blind. If you find yourself reasoning "the other critics probably caught X, so I'll skip it" — stop.

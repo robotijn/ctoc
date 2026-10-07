@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/devils-advocate-critic/baseline-agent.md",
  "baseline_sha256": "ff091845ef4b5c2faa3e47bf5cb845719440cb9ef6771dc9e0aea986b347c47e",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 80175,
+ "maxBytes": 80244,
  "units": [
   {
    "n": 1,
@@ -7516,6 +7516,14 @@
    ],
    "pinned_by": null,
    "wire": false
+  }
+ ],
+ "ceiling_corrections": [
+  {
+   "date": "2026-10-07",
+   "from": 80175,
+   "to": 80244,
+   "reason": "two anti-scope lines say who writes the questions file and who crosses a gate (plan ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does); measured overage 69 bytes"
   }
  ]
 }

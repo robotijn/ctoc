@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/red-team-critic/baseline-agent.md",
  "baseline_sha256": "f7c96106c5a260c920d23845101e33fb1e653dfbd5fd1d26882ffbd1fc4dbafa",
  "baseline_commit": "7cafed08c5992e5b6b8e167b64181edbab58efcc",
- "maxBytes": 96537,
+ "maxBytes": 96572,
  "units": [
   {
    "n": 1,
@@ -10394,6 +10394,14 @@
    ],
    "pinned_by": null,
    "wire": false
+  }
+ ],
+ "ceiling_corrections": [
+  {
+   "date": "2026-10-07",
+   "from": 96537,
+   "to": 96572,
+   "reason": "the advisory line says who crosses a gate (plan ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does); measured overage 35 bytes"
   }
  ]
 }
