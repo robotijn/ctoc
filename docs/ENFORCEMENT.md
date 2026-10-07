@@ -249,12 +249,19 @@ a menu module (`menu-screens`, `streaming-gate`, `streaming-precompute`) or a cr
 ONE simple call the shell reads exactly as written: none of `;` `&` `|` `$` `(` `)` `<` `>`
 `{` `}` `*` `?` `[` `]` `~` `!` `#`, a backtick, a backslash, a newline or a carriage return
 outside quotes; a quoted argument is one pair of
-quotes around the whole word, with no `$`, backtick, backslash or `!` inside double quotes;
-`${CLAUDE_PLUGIN_ROOT}` only in the script word. Such a call is then allowed only as a
-read-only program (`grep`, `rg`, `cat`, `head`, `tail`, `wc`, `ls`, `diff`), as `node --test
-<test files>`, as `node <script>` whose script is not this plugin's `start.js` and whose other
-words name nothing of the menu, or as `node` (or an absolute path to a node binary) on this
-plugin's real `start.js` (real-path compare) with an allowed route. The route is read with
+quotes around the whole word — inside single quotes anything, inside double quotes anything
+but `$`, a backtick and a backslash (which the shell still expands); `${CLAUDE_PLUGIN_ROOT}`
+only in the script word. Such a call is then allowed only as a read-only program that merely
+names the files (`grep`, `rg`, `cat`, `head`, `tail`, `wc`, `ls`, `diff`), or as the direct
+menu call: `node` (or an absolute path to a node binary), immediately this plugin's real
+`start.js` (real-path compare), then an allowed route. No other script, no `node --test`, no
+option between the runtime and the script (`--no-warnings`, `--`, `-r`, `--require`), no
+`env` or `NAME=value` prefix, no other runtime (`bun`, `deno`, `tsx`, `npx`, `sh -c`,
+`bash -c`). The build agent's completion keeps working: a single-quoted `--summary` may hold
+anything, and a double-quoted one may hold `;` `#` `&` `|` `(` `)`; a double-quoted summary
+holding `$`, a backtick or a backslash is refused with one plain retry sentence, "Put the
+summary in single quotes and run the same command again." A claimed build is stamped with
+`menu task start <id> --agent-id <id>` — allowed — and a second stamp is refused by the menu. The route is read with
 `start.js`'s own `extractLiveAgentIds` and `splitCliArgs`, required from the plugin, so the
 hook and the menu cannot read it differently. Every other form is refused (fail closed).
 
@@ -329,10 +336,12 @@ refused on every call; a payload that will not parse is scanned whole. A failure
 - read commands with a write side effect (`find -delete`, `tree -o`), which can delete or
   corrupt a record but never forge one;
 - a background agent reaching the menu's refused routes through a script file it wrote and
-  then ran (including a test file run by `node --test`), a path held in a variable set by an
-  earlier call, or a tool other than the five matched; a background agent's compound command
-  that merely names `start.js` or a menu module (a pipe after a `grep`, say) is refused even
-  when harmless — the fail-closed cost of one reading;
+  then ran (an npm script or a test file run without naming a menu module, say), a path held
+  in a variable set by an earlier call, or a tool other than the five matched. The fail-closed
+  cost of one reading, accepted: a background agent's compound command that merely names
+  `start.js` or a menu module (a pipe after a `grep`, say), `node --test` on a test file whose
+  name names a menu module, and another project's `node …/start.js` are refused even when
+  harmless — the simple read and `npm test` stay allowed;
 - the main session itself running `stream answer` or `stream approve` without the human's
   reply — it carries no `agent_id` by design and is trusted to run only answers the human
   gave; every answer, hold and release stays a timestamped entry in the answers log;

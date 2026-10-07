@@ -2245,6 +2245,16 @@ function taskTransition(root, rest, kind) {
     const task = reg.tasks.find((t) => t.id === id);
     if (!task) throw new Error('task-registry: unknown task id ' + String(id));
 
+    // A build the menu claimed itself (`startAgent`, through `continueAfterCrossing`) is
+    // already running with no agent id: the session launches its agent and stamps it here.
+    // Only that transition — a task that already carries an agent id is refused below, so a
+    // build is never launched twice.
+    if (kind === 'start' && task.status === 'running' && task.agentTaskId == null
+        && typeof p.agentId === 'string' && p.agentId !== '') {
+      taskRegistry.updateTask(reg, id, { agentTaskId: p.agentId });
+      return { ok: true, taskId: id, status: 'running', stamped: true, text: `Task ${id} → running (agent ${stripCtl(p.agentId)} recorded)` };
+    }
+
     // Legality is asked of the registry's ONE lifecycle encoding (item 4) — no local
     // mirror. `start`/`fail` have a fixed target, so the guard is `canTransition`
     // (which correctly PERMITS, e.g., orphaned → failed).

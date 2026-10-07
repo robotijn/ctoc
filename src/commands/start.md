@@ -127,6 +127,14 @@ When a background task fires its task-notification:
 2. Emit **ONE** compact, pull-based inbox notice — a **high-level, human-phrased status line** (see "Foreground status plane" below). **Do not** change or hijack the user's current screen — completions pull, they never push.
 3. **Promote.** For each task in the response's `promote[]` (the scheduler's newly-runnable `nextRunnable` set with the concurrent-edit guard applied — that set MINUS the candidates the guard held, never the raw set), launch `Agent(run_in_background)` + `menu task start <id>`. This is the ONLY sanctioned promotion — never start a queued task the scheduler did not return in `promote[]`.
 
+**Every screen that carries `promote[]` is launched the same way.** `stream answer`,
+`stream approve` and `menu task complete <id> --continue` keep the work moving and can return
+`promote[]` too — planners, the gate critic's classifications, and builds the menu already
+claimed. After any such screen, launch each entry exactly as step 3 does, then stamp it:
+`menu task start <id> --agent-id <the harness agent id>`. A claimed build is already running
+with no agent id, and that command records the id; a task that already carries an agent id
+is refused, so a build is never launched twice.
+
 **Foreground status plane — high-level, human-phrased (Tijn, non-negotiable).** The work
 runs in the background; the FOREGROUND is the status plane. At each milestone show the human
 ONE short, high-level status line — never tool-call noise, never a spinner, never silence.

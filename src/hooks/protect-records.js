@@ -49,8 +49,15 @@
  *   `--b64` payload decoded by the task parser's own decoder; every other route is refused
  *   with its own sentence, fail closed. Its command gets ONE reading (`subagentMenuRefusal`):
  *   naming the menu, a menu module or a crossing function, it must be one simple call with no
- *   shell operator or expansion, read with `start.js`'s own argument functions; anything else
- *   naming them is refused. A call without `agent_id` is unchanged.
+ *   shell operator or expansion outside quotes, and is then allowed only as a read-only
+ *   program naming the files or as the direct menu call — `node` (or an absolute node path),
+ *   immediately this plugin's real `start.js`, an allowed route read with `start.js`'s own
+ *   argument functions. No other script, no `node --test`, no option before the script, no
+ *   `env` or `NAME=value` prefix, no other runtime. A double-quoted `--summary` the shell
+ *   would expand gets one retry sentence ("Put the summary in single quotes …"). A call
+ *   without `agent_id` is unchanged. Limits: a script written and then run without naming a
+ *   menu module, a path held in a variable; and a harmless compound command naming the menu
+ *   is refused (fail closed).
  *   Nothing else is loaded or run: no plan coverage, no escape phrases, no enforcement
  *   mode, no Iron Loop step gates, no irreversible-command net, no plan-move gate.
  *
@@ -97,6 +104,8 @@ const REFUSAL = 'CTOC refused this call because it writes, or could write, the a
   + 'finish your work, report it, and let the menu record the result.';
 const REFUSAL_UNCHECKED = 'CTOC refused this call because it mentions the approval or check records '
   + "and CTOC's protection for them failed to run; tell the human that this protection is broken.";
+/** The one plain retry sentence for a double-quoted argument the shell would still expand. */
+const REFUSAL_QUOTE = 'Put the summary in single quotes and run the same command again.';
 const REFUSAL_SUBAGENT = "CTOC refused this call because a background agent may not answer CTOC's questions, "
   + 'approve a plan or move one on through the menu; report your result and let the main session do it.';
 
@@ -311,20 +320,23 @@ function subagentMayRunRoute(route) {
 const MENU_MENTION_RE = /start\.js|menu-screens|streaming-gate|streaming-precompute|continueAfterCrossing|approveSubplans|approvePlan|streamAnswer|streamApprove|crossBySufficiency|crossOnEvidence|pendingGateDecisions/;
 /** Shell syntax that makes a command more than one plain call; none is accepted outside quotes. */
 const SHELL_SPECIAL_RE = /[;&|`$(){}<>*?[\]~!#\\\r\n]/;
-/** Characters the shell still interprets inside double quotes. */
-const DOUBLE_QUOTE_SPECIAL_RE = /[$`\\!]/;
+/** Characters the shell still interprets inside double quotes (`!` is literal in a non-interactive shell). */
+const DOUBLE_QUOTE_SPECIAL_RE = /[$`\\]/;
 /** Programs that only read the files they are given. */
 const READ_PROGRAMS = new Set(['grep', 'rg', 'cat', 'head', 'tail', 'wc', 'ls', 'diff']);
 const ROOT_MARK = '\u0001';
 
 /**
- * The words of `command` when it is ONE simple call the shell reads exactly as written, or
- * null: no shell operator or expansion outside quotes; each quoted argument is a single pair
- * of quotes around the whole word (no `$`, backtick, backslash or `!` inside double quotes);
- * `${CLAUDE_PLUGIN_ROOT}` only inside the second word, the script. With no expansion and no
- * operator there is nothing the shell can read differently from this.
+ * The words of `command` when it is ONE simple call the shell reads exactly as written: no
+ * shell operator or expansion outside quotes; each quoted argument is a single pair of quotes
+ * around the whole word — inside single quotes anything, inside double quotes anything but
+ * `$`, a backtick and a backslash, which the shell still expands; `${CLAUDE_PLUGIN_ROOT}` only
+ * inside the second word, the script. With no expansion and no operator there is nothing the
+ * shell can read differently from this. Returns `'quote'` when the only fault is an expansion
+ * inside a double-quoted `--summary` value (the caller asks for single quotes), null for any
+ * other fault.
  * @param {string} command
- * @returns {string[]|null}
+ * @returns {string[]|'quote'|null}
  */
 function simpleWords(command) {
   const text = command.trim().split(PLUGIN_ROOT_TOKEN).join(ROOT_MARK);
@@ -334,10 +346,11 @@ function simpleWords(command) {
   let inWord = false;
   let quote = null;
   let closed = false;
+  const expanding = new Set(); // indexes of double-quoted words the shell would still expand
   for (const ch of text) {
     if (quote) {
       if (ch === quote) { quote = null; closed = true; continue; }
-      if (quote === '"' && DOUBLE_QUOTE_SPECIAL_RE.test(ch)) return null;
+      if (quote === '"' && DOUBLE_QUOTE_SPECIAL_RE.test(ch)) expanding.add(words.length);
       cur += ch;
     } else if (ch === ' ' || ch === '\t') {
       if (inWord) words.push(cur);
@@ -356,7 +369,9 @@ function simpleWords(command) {
   if (quote) return null;
   if (inWord) words.push(cur);
   if (words.some((w, i) => i !== 1 && w.includes(ROOT_MARK))) return null;
-  return words;
+  if (expanding.size === 0) return words;
+  // Only a summary gets the retry sentence; any other expanding word is plainly refused.
+  return [...expanding].every((i) => i > 0 && words[i - 1] === '--summary') ? 'quote' : null;
 }
 
 /** `node`, or an absolute path to a node binary. */
@@ -365,12 +380,15 @@ function isNodeProgram(word) {
 }
 
 /**
- * A background agent's command that names the menu, a menu module or a crossing function gets
- * ONE reading. Allowed only when it is (a) one simple call of a read-only program, (b) `node
- * --test <test files>`, (c) one simple `node <script>` whose script is not this plugin's
- * `start.js` and whose other words name nothing of the menu, or (d) one simple direct call of
- * this plugin's real `start.js` whose route — read by `start.js`'s own `extractLiveAgentIds`
- * and `splitCliArgs` — is on the allowed list. Everything else is refused (fail closed).
+ * A background agent's command that names this plugin's menu (`start.js`), a menu module or a
+ * gate-crossing function gets ONE reading. It is allowed only as (a) one simple call of a
+ * read-only program that merely names the files, or (b) one simple direct call: the program
+ * `node` (or an absolute path to a node binary), immediately the real `start.js` of this
+ * plugin (real-path compare), then a route that — read by `start.js`'s own
+ * `extractLiveAgentIds` and `splitCliArgs` — is on the allowed list. No other script, no
+ * `node --test`, no option between the runtime and the script, no `env` or `NAME=value`
+ * prefix, no other runtime. A double-quoted argument the shell would still expand gets the one
+ * retry sentence; everything else is refused (fail closed).
  * @param {string} command
  * @param {string} base - the session's working directory
  * @returns {string|null} the refusal sentence, or null to go on to the record checks
@@ -378,23 +396,19 @@ function isNodeProgram(word) {
 function subagentMenuRefusal(command, base) {
   if (!MENU_MENTION_RE.test(command)) return null;
   const words = simpleWords(command);
+  if (words === 'quote') return REFUSAL_QUOTE;
   if (!words || words.length === 0) return REFUSAL_SUBAGENT;
   if (READ_PROGRAMS.has(words[0])) return null;
-  if (!isNodeProgram(words[0]) || !words[1]) return REFUSAL_SUBAGENT;
-  if (words[1] === '--test') {
-    return words.length > 2 && words.slice(2).every((w) => /^[A-Za-z0-9_./-]+\.test\.js$/.test(w) && !w.startsWith('-'))
-      ? null : REFUSAL_SUBAGENT;
-  }
-  if (words[1].startsWith('-')) return REFUSAL_SUBAGENT;
+  if (!isNodeProgram(words[0]) || !words[1] || words[1].startsWith('-')) return REFUSAL_SUBAGENT;
   const safeFs = require('../lib/safe-fs');
   const own = safeFs.realpathSync(path.join(PLUGIN_ROOT, 'src', 'commands', 'start.js'));
   let real = null;
   try {
     real = safeFs.realpathSync(path.resolve(base, words[1].split(ROOT_MARK).join(PLUGIN_ROOT)));
   } catch {
-    real = null; // no such file: node cannot run it, so it is not the menu
+    real = null; // no such file: it is not this plugin's menu
   }
-  if (real !== own) return words.slice(2).some((w) => MENU_MENTION_RE.test(w)) ? REFUSAL_SUBAGENT : null;
+  if (real !== own) return REFUSAL_SUBAGENT;
   const { extractLiveAgentIds, splitCliArgs } = require('../commands/start.js');
   return subagentMayRunRoute(splitCliArgs(extractLiveAgentIds(words.slice(2)).rest)) ? null : REFUSAL_SUBAGENT;
 }

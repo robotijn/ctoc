@@ -1585,3 +1585,49 @@ escape" in the hook). Test-first, on 84bb8501:
 - Hook cases 80 and 82 changed: their "allowed" `node --test tests/streaming-gate.test.js` and
   `node server/start.js` contradict the replaced rule and moved into case 85's refused list.
 - Inventory: R-223, R-271, R-559 marked replaced with new anchors — red: checks 3, 4, 10.
+
+Built (green after):
+
+1. **Claimed builds are launched.** Chosen: launch, not "claim nothing on the stream paths" —
+   the fix fits the files and the `claude:start-agent` recipe already orders the same stamp.
+   `menu task start <id> --agent-id <id>` now stamps a task that is `running` with no agent id
+   (only that transition); a running task that already carries one, or a running task without
+   `--agent-id`, is refused as before. `src/commands/start.md` gains one paragraph under the
+   COMPLETION recipe: every screen carrying `promote[]` (`stream answer`, `stream approve`,
+   `menu task complete --continue`) is launched as step 3 launches, then stamped with that
+   command.
+2. **One node form for the menu.** For a background agent's command naming the menu, a menu
+   module or a crossing function, the only forms allowed are a read-only program naming the
+   files and the direct menu call (`node` or an absolute node path, immediately this plugin's
+   real `start.js`, an allowed route). The `node --test` and "another script" exceptions are
+   removed; an option before the script, an `env` or `NAME=value` prefix and every other
+   runtime are refused.
+3. **The completion summary.** Inside single quotes anything; inside double quotes anything
+   but `$`, a backtick and a backslash. A double-quoted `--summary` value holding one of those
+   gets exactly "Put the summary in single quotes and run the same command again."; any other
+   expanding double-quoted word is refused with the background-agent sentence. `!` is literal
+   in a non-interactive shell and is accepted inside double quotes.
+4. **Crash rule** unchanged and covered (case 81).
+5. **Case 36** runs every allowed background-agent route through the real hook and the real
+   router in a sandbox with a crossable plan and a finishable plan: both stay, the ledger is
+   byte-identical.
+6. **Gate critic:** replaced R-223 ("Never emit `questions: []`" now "in a synthesis"; a
+   classification may be empty and carries no ruling), R-559 (the "Zero questions survive"
+   row, likewise), R-271 (the answers log is not keyed on reference and id alone: an answer
+   binds to the id, the question's digest and the plan revision; the sentence's lead-in made
+   true to match). Units 223, 271, 559 marked `replaced`. 139,524 → 139,695 bytes; `maxBytes`
+   raised by the measured 171 with one more correction entry. With R-223, R-271 and R-559
+   added to the approved line and the approval re-recorded (simulated in a scratch copy), all
+   ten inventory checks pass.
+7. Hook header and `docs/ENFORCEMENT.md` state the reading rules, the retry sentence, the
+   stamp, and the accepted costs.
+
+Hook time per call (median of 7): main session `ls` 24 ms, main menu call 26 ms; background
+agent `ls` 23 ms, `menu task list` 36 ms, completion with a summary 35 ms, completion with
+`--b64` 37 ms, `stream answer` (refused) 34 ms, `node --test …streaming-gate…` (refused) 24 ms.
+
+Lint zero warnings, `tsc` zero errors. Full `npm test` (once, foreground): tests 12674, pass
+12672, fail 2, cancelled 0, skipped 0; coverage 99.87%. Both failures are the expected one —
+`tests/gate-critic-compaction.test.js` check 3 and `tests/question-blocking-default.test.js`
+case 50 — `order R-223 … never names this order for agents/iron-loop/gate-critic.md in its
+approved specification`, until the session lists R-223, R-271 and R-559 and re-records.
