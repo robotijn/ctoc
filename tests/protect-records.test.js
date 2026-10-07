@@ -384,3 +384,81 @@ describe('a background agent may not answer, approve or move a plan through the 
     }
   });
 });
+
+describe('a background agent: one reading of a command (security review leads, 2026-10-07)', () => {
+  const MENU = 'node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js"';
+  const REFUSAL_SUBAGENT = 'CTOC refused this call because a background agent may not answer CTOC\'s '
+    + 'questions, approve a plan or move one on through the menu; report your result and let the '
+    + 'main session do it.';
+  const agentBash = (command) => ({ ...bash(command), agent_id: 'a1b2c3', agent_type: 'iron-loop-executor' });
+  const refusedAgent = (command) => assertRefused(run(agentBash(command)), command, REFUSAL_SUBAGENT);
+  const allowedAgent = (command) => assertAllowed(run(agentBash(command)), command);
+  const b64 = (obj) => Buffer.from(typeof obj === 'string' ? obj : JSON.stringify(obj)).toString('base64');
+
+  test('82 · anything that reaches the menu but is not one simple direct call is refused', () => {
+    for (const command of [
+      `${MENU} menu task list; node src/commands/start.js stream approve review/x.md`,
+      `${MENU} menu task list && true`,
+      `${MENU} menu task list | cat`,
+      `${MENU} menu task list $(echo x)`,
+      `${MENU} menu task list \`echo x\``,
+      `${MENU} menu task list # note`,
+      `${MENU} menu task list\nnode src/commands/start.js stream approve review/x.md`,
+      `${MENU} "menu task list $HOME"`,
+      'node "$P/src/commands/start.js" menu task list',
+      `sh -c 'node src/commands/start.js stream approve review/x.md'`,
+      'env node src/commands/start.js menu task list',
+      'grep -n route src/commands/start.js | head',
+      `node -e "require('./src/lib/streaming-precompute')"`,
+      `node -e "require('./src/lib/actions').approvePlan('x')"`,
+    ]) refusedAgent(command);
+  });
+  test('82 · the nearest legitimate commands stay allowed', () => {
+    allowedAgent(`${MENU} menu task list`);
+    allowedAgent(`${MENU} 'menu' 'task' 'list'`);
+    allowedAgent(`${MENU} "menu task list"`);
+    allowedAgent(`${MENU} --live-agent-ids a,b menu task list`);
+    allowedAgent(`${process.execPath} "\${CLAUDE_PLUGIN_ROOT}/src/commands/start.js" menu task list`);
+    allowedAgent('grep -n route src/commands/start.js');
+    allowedAgent('cat src/lib/menu-screens.js');
+    allowedAgent('node --test tests/streaming-gate.test.js');
+    fs.mkdirSync(p('server'), { recursive: true });
+    fs.writeFileSync(p('server', 'start.js'), '');
+    allowedAgent('node server/start.js --port 3000');
+  });
+  test('83 · the allowed list matches the whole route: an unknown or extra word refuses', () => {
+    for (const route of ['menu commands extra', 'menu task list extra', 'menu task board x', 'dashboard extra',
+      'tasks extra', 'task t7 extra', 'browse review extra', 'validate review/x.md extra', 'inbox questions extra',
+      'inbox cleanup confirm dead-on-arrival', 'inbox cleanup override s', 'inbox cleanup plan', 'plan review/x.md extra',
+      'menu task start t7 --force', 'menu task cancel t7 --force', 'menu task complete t7 --fail',
+      'menu task complete t7 extra', 'menu task complete', 'menu task add implement p q', 'menu task add',
+      'menu task frob t7']) {
+      refusedAgent(`${MENU} ${route}`);
+    }
+  });
+  test('83 · the nearest allowed routes stay allowed', () => {
+    for (const route of ['menu', 'menu commands', 'menu task list', 'menu task board',
+      'menu task add implement p --touches a.js --label l', 'menu task start t7 --agent-id abc',
+      'menu task fail t7 --summary x', 'menu task cancel t7', 'menu task complete t7 --summary "built" --gate 3 --next dashboard',
+      'dashboard', 'tasks', 'task t7', 'browse review', 'inbox questions', 'inbox verify', 'inbox cleanup',
+      'inbox cleanup category', 'inbox cleanup plan s', 'plan review/x.md', 'validate review/x.md']) {
+      allowedAgent(`${MENU} ${route}`);
+    }
+  });
+  test('84 · --b64 is decoded as the task parser decodes it, and checked', () => {
+    refusedAgent(`${MENU} menu task complete t7 --b64 ${b64({ continue: true })}`);
+    refusedAgent(`${MENU} menu task complete t7 --b64 ${b64({ summary: 'x', stage_to: 'done' })}`);
+    refusedAgent(`${MENU} menu task complete t7 --b64 ${b64({ summary: 'x', nextAction: 'claude:approve review/x.md' })}`);
+    refusedAgent(`${MENU} menu task complete t7 --b64 ${b64('not json at all')}`);
+    refusedAgent(`${MENU} menu task complete t7 --b64 ${b64([1, 2])}`);
+    refusedAgent(`${MENU} menu task add implement p --b64 ${b64({ kind: 'implement', approve: true })}`);
+    allowedAgent(`${MENU} menu task complete t7 --b64 ${b64({ summary: 'built', gate: 3, nextAction: 'dashboard' })}`);
+    allowedAgent(`${MENU} menu task add implement p --b64 ${b64({ kind: 'implement', plan: 'p', touches: ['a.js'] })}`);
+    allowedBash(`${MENU} menu task complete t7 --b64 ${b64({ continue: true })}`);
+  });
+  test('82 · without an agent id the same commands are decided as before', () => {
+    allowedBash(`${MENU} menu task list && true`);
+    allowedBash(`sh -c 'node src/commands/start.js stream approve review/x.md'`);
+    allowedBash('grep -n route src/commands/start.js | head');
+  });
+});

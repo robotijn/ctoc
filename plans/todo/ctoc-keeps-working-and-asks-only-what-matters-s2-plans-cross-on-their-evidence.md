@@ -1522,3 +1522,14 @@ approval (specification hash 5ad76fe4…, verified equal to this copy before any
 
 Full `npm test` (once, foreground): tests 12665, pass 12665, fail 0, cancelled 0, skipped 0,
 todo 0; coverage 99.88% (floor 99); `[CTOC test-gate] PASS`.
+
+### Hook: one reading of a command
+
+From the coordinator's security leads of 2026-10-07 (an authorization bypass through a parser
+difference in `src/hooks/protect-records.js`). Test-first: cases 82–84 in
+`tests/protect-records.test.js` ran red on e8f0bc94, 4 of 87 tests, each for its own reason —
+`menu task list && true` allowed to a background agent (a compound command read word by word),
+`menu task list extra` allowed (only the first words were matched), `--b64` carrying
+`{continue: true}` allowed (not decoded), and the allowed half of 82 red because
+`node server/start.js --port 3000` — another project's `start.js` — was refused (the old
+segment reading took any `…start.js` for the menu).
