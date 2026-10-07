@@ -179,3 +179,25 @@ Run `node .ctoc/audit/speed-and-size/benchmarks/pipeline-time.js` from the repos
 (add `--from 2026-10` to measure only the period after a fix). It rewrites `pipeline-time.json`
 in about ten seconds, and the `monthTotals` cause tables in that file give the after-numbers
 to compare against the tables above.
+
+## Measured 2026-10-07: before and after the sleep-loop rule (split at 2026-10-06 19:51 +0200)
+
+Same transcript reader as above, October split at the commit that shipped the rule
+(a scratch copy that buckets October by that moment; this file's script is unchanged).
+"Before" is 2026-10-01 to the cut, "after" is the roughly 17 hours since.
+
+| Measure | Before | After |
+|---|---|---|
+| CTOC agent runs / hours | 183 / 74.4 h | 64 / 26.4 h |
+| Polling (sleep-and-re-check) in CTOC agents | 6.6 h | 0 h |
+| Human wait per turn: median / slowest tenth | 0.8 / 22.7 min | 1.7 / 6.2 min |
+| Turns over 10 minutes / over an hour | 47 / 14 of 310 | 7 / 2 of 253 |
+| Usage-limit hits (silent hours after) | 25 (67.1 h) | 9 (0 h) |
+
+Caveats, all checked: no profile had a CTOC version with the rule or the compactions
+installed (installed: 6.14.67, 6.14.94, 6.13.6, 6.14.67; the work is 6.14.95 and later),
+so the agents themselves did not change — the polling and wait drops come from the session
+briefing every agent never to sleep-loop and running builds in the background. Time per
+CTOC agent run is flat (about 24 vs 25 minutes). The two windows differ in length and in
+kind of work, so this is an observation, not a controlled comparison. Rerun the split after
+`/ctoc:update` and a day of normal work to measure the installed effect.

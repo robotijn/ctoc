@@ -1,98 +1,146 @@
-# Handoff — CTOC: the improvement run's slice s5 is built and in its second final review; six plans wait for the human
+# Handoff — CTOC: keeps-working (pieces one and two) after the write protection shipped
 
-<!-- Maintained by hand. Left by the previous Claude instance so the next one can
-     continue. Treat as last-known state — VERIFY EVERY CLAIM AGAINST DISK, INCLUDING
-     THIS FILE. -->
+<!-- Maintained by the `handoff` skill. Left by the previous Claude instance so
+     the next one (claude or claudex) can continue. Treat as last-known state —
+     verify against the repo before acting. -->
 
-- Updated: 2026-10-01 13:08 by claude
-- Branch: main
-- Status: in progress
+- Updated: 2026-10-07 13:05 by claude
+- Branch: main (HEAD `00a64b10`, v6.14.118, nothing unpushed before this commit)
+- Status: in progress — paused for a restart; no agent or process running
 
-## The human's standing rulings (verbatim where quoted)
-- "keep going until everything is done then commit and push" — NO push until all done.
-  Commits happen at natural completion points (one per finished slice, patch bump).
-- "stop asking theswe stupid questions fix it" — settle forks as documented choices;
-  only REAL forks (risk, scope, schedule) go to him, flat, no recommendation.
-- Improve every skill and agent 3 times via web research (plan
-  `every-agent-and-specialist-skill-improved-three-times`, 121 slices, s4 done, s5 at its last step).
-- README rebuild (15 slices, queued), deepthink + ask-me-questions ship with CTOC (4 slices, queued).
-- "ctoc is overdoing the usage of ctoc" → `small-changes-take-a-small-path` sliced into 14
-  (plans/implementation/00401–00414), waiting for his read + the "how to build" click.
-- Menu: only start/update/deepthink/ask-me-questions (built, in review, waiting for "finished").
-- Testing agents: affected tests while building, full suite only before push → functional plan
-  written (`plans/functional/affected-tests-while-building-whole-suite-before-push.md`), waiting.
-- Never say a gate number or plan number to him; plain words; no invented abbreviations.
+## Goal
+Make CTOC fast and quiet for the owner: agents keep working without bringing him gate or
+bookkeeping questions, and only weighty questions (technology stack, algorithms, data model,
+security, irreversible, cost) reach him. The work is the parent plan
+`plans/functional/ctoc-keeps-working-and-asks-only-what-matters.md`, cut into a write
+protection (shipped) and three pieces built in order.
 
-## Where things stand
-| Work | Stage | State |
-|---|---|---|
-| Menu fix (single plan) | review | built, v6.14.71 (f1404379); waiting for "finished" |
-| s4 hallucination-detector agent+skill | review | built, v6.14.72 (12e5c009); waiting for "finished" |
-| s5 llm-security-tester agent+skill | review (task t120 completed) | DONE and committed as v6.14.73. Four final-review passes; kickbacks 2 to Step 10, 3 to Step 15, 5 total = circuit breaker reached; the human chose "complete it now" (2026-10-01 13:35) — the last three returns were plan prose only; the two files were judged ready at final review #2 and never changed after (agent sha256:357b4c70…, skill sha256:9ebb12d2…; fifth `npm test` 12,035/0/0, 99.9%). Waiting for "finished". |
-| s6–s121, README s1–s15, deepthink s1–s4 | todo | approved, queued (birthtime order) |
-| 4 functional plans | functional | affected-tests; clean-install (js-yaml); approval-script cannot forge; hooks actually loaded — each has open questions for him |
-| small-changes 14 slices | implementation | need his read, then the "how to build" click |
+## Current status
+- Done and pushed today:
+  - v6.14.117 `842e1c00` — all 142 plans that were in review crossed to done on the owner's
+    "accept everything in review"; three tests that hard-coded the review folder now check
+    their real claims.
+  - v6.14.118 `00a64b10` — the ONE CTOC hook Claude Code loads: `hooks/hooks.json` →
+    `src/hooks/protect-records.js`. It refuses agent writes (editing tools and shell) to
+    `.ctoc/approvals/`, `.ctoc/state/verify/` and `.ctoc/streaming/` (the waiting folder
+    `questions/pending/` stays writable to the editing tools); the menu's own `start.js`
+    routes pass, matched by real path; refusals exit 2 with the reason on stderr. Live-probed
+    with `claude -p --plugin-dir <branch>`: both probe writes refused, `ls` ran.
+- In progress — piece one, "only weighty questions reach the human":
+  - Plan: `plans/todo/ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human.md`
+    (untracked in main; its approval `.ctoc/approvals/…-s1-….json`, spec hash `bcd9cc8c…`,
+    untracked, backfilled by the session under the owner's standing instruction).
+  - Built on worktree `.claude/worktrees/agent-a0b33c6c216a2989c`, branch
+    `worktree-agent-a0b33c6c216a2989c`, last commit `f4838d93`, full suite green (12,612
+    passed, 0 failed, 0 skipped, coverage 99.88%). Not merged, not pushed.
+  - Review history: critic SHIP AFTER (twice) and security BLOCK (twice); every listed fix is
+    built. The second security BLOCK's fixes (reserved ids only in an attested synthesis file;
+    the inventory approval check requires a matching hash and the rule id inside the
+    specification; an unreadable answers log never ignores a hold; Unicode-wide
+    invisible-character class) are in `f4838d93` but NOT yet re-scanned.
+- Next — piece two, "plans cross on their evidence":
+  `plans/implementation/ctoc-keeps-working-and-asks-only-what-matters-s2-plans-cross-on-their-evidence.md`
+  (untracked in main, on disk), amended by the planner and ready to cross to todo: CTOC's fixed
+  hold question id `ctoc-hold` with "Hold this plan" / "Keep holding" / "Release the hold";
+  `streamAnswer` writes `holds` into the protected answers log; a held plan's screen asks keep
+  or release first; a `classify` task launched by the continuation so the gate critic
+  classifies an author's questions; the hook refuses every non-allowlisted menu route when the
+  payload carries `agent_id` (route tables are in the plan). Then piece three (instructions say
+  what the code does), `…-s3-instructions-say-what-the-code-does.md`.
 
-Unpushed: everything since 94334979 (7 commits incl. 12e5c009). Do NOT push.
+## Key decisions
+All from the owner on 2026-10-07, each answered "a" or "yes" to a recommended option:
+- Load exactly one hook, the write protection; every other CTOC hook stays hidden.
+- It also protects his recorded answers and live question files.
+- The independent gate critic assigns every question topic; the author's topic is only a
+  proposal; an unclassified question file blocks every question (fail closed).
+- The hook also refuses the menu's answer and approve routes when a subagent calls them
+  (Claude Code puts `agent_id` and `agent_type` in hook input only for subagent calls:
+  https://code.claude.com/docs/en/hooks).
+- Earlier standing rules: ask only high-stakes questions (never gate or bookkeeping ones); lean,
+  small pushed increments; quiet foreground (git and bookkeeping in the background); use CTOC's
+  own agents; every edit by background agents; verify beliefs; no private personal information
+  on GitHub (only the owner's name and work email may be public).
+- Session decisions: pieces one and two ship TOGETHER (piece one alone would stop important
+  detail findings from blocking before piece two writes them into the plan); scope widenings are
+  re-recorded by the session with `ledger-backfill.js` and a written reason, and piece one's
+  approved specification lists the exact 36 agent-inventory rules it replaces or adds.
 
-## The round protocol (worked twice; ~1h per round)
-Per file, per round — the SESSION dispatches read-only agents (≤5 in flight) and hands
-their reports to ONE long-lived `iron-loop-executor` (SendMessage keeps its context):
-1. `citation-validator` research (budget 30–35 fetches; it hits the 40-turn limit — then
-   SendMessage "stop fetching, write the report"; a second "gaps" pass with budget ~14).
-2. `agent-critic` → findings with exact `proposed_change {old,new}` (old verbatim, unique,
-   pairwise disjoint), each sourced with address + read date.
-3. `citation-validator` validates every claim in the NEW text (+ checks olds verbatim/disjoint
-   + wrapper contract: description one line, no ": " / " #", no approved_by/human_gate/
-   review_gate, no skill-body line ≥25 chars copied).
-4. Executor applies byte-for-byte via script with the validator's leftovers folded in; runs
-   the inventory `tests_reading` + plan fences + record check; new fingerprint.
-5. `citation-validator` re-reads the edited file; leftovers → executor.
-   **NEVER dispatch this while the executor is still editing** (done once in s5 by mistake —
-   the validator saw lines move; remedy was a second, quiet re-read; recorded in the plan).
-6. Executor writes the round entry (shape: s4's records; check
-   `tests/agent-and-skill-improvement-record.test.js`).
-Every report saved VERBATIM to `.ctoc/audit/improvement-run-notes/s5-*` (extract the last
-assistant text block from the subagent JSONL with a small Python loop). Session raw reads/runs
-go to `s5-*-session-runs.md` and OVERRIDE summarised fetches. Then Steps 11 (iron-loop-critic),
-13 (security-scanner), leftovers, 16 (iron-loop-critic), `npm test`, `menu task complete
-<id>`, VERSION bump + `node src/scripts/release.js`, commit by name (never `git add -A`).
-Round source classes: 1 papers+vendor/registry docs; 2 standards/agencies/peer-reviewed;
-3 raw re-reads/regulators/adversarial.
-Raw invisible characters (zero-width, bidi, tags, variation selectors) must NEVER be written
-literally into a note, a plan or an instruction file — write them as `\uXXXX` escapes.
-
-## s5 specifics
-- Files: `agents/ai-quality/llm-security-tester.md`, `skills/ai-quality/llm-security-tester/SKILL.md`,
-  records under `.ctoc/audit/agent-and-skill-improvement/{agents,skills}/ai-quality/llm-security-tester*`,
-  plus `late-corrections.json` (lc-s5-agent-1..6) and `for-the-human.json` (h-s5-*).
-- Notes: `.ctoc/audit/improvement-run-notes/s5-*` — every report verbatim; the executor's three reports
-  for the returns are in `s5-second-step10-return-executor.md`; lint/typecheck in `s5-lint-and-typecheck.md`;
-  curl manual in `s5-curl-q-manual.md`; fifth gate run in `s5-npm-test-final.md`.
-- Settled facts: OWASP LLM Top 10 2026 edition exists (identifiers carry edition); ATLAS `dist/ATLAS.yaml`
-  deprecated (manifest → `dist/v6/ATLAS-2026.09.yaml`); forced tool use → HTTP 400 on current Claude
-  models; Postgres RLS keyed on `current_setting` is injectable, key on `session_user`; "Reverse Shell"
-  is not an ATLAS technique; the Bash tool's shell here is zsh 5.9 with grep = ugrep 7.8.4; curl 8.7.1
-  `-q` first stops `.curlrc` being read (manual quoted); a keycap emoji is digit + U+FE0F + U+20E3.
-- Scratch: session scratchpad `secure-s5/` (18-case recipe harness, bash/zsh/tool-shell runs), `secure-s5-r2/`
-  (the re-scan's new cases, corpus.txt), `s5code/`, `s5-exec/run_llm01.py`.
+## Open questions / blockers
+- None waiting on the owner.
+- The owner must run `/ctoc:update` in every profile: installed CTOC is 6.14.67 (claudey,
+  claudez), 6.14.94 (claude) and 6.13.6 (claudex), so none has the speed work or the hook.
+- Recommended later: add gate-critic rules R-182 and R-205 to piece one's replaced list (they
+  now understate the code: a ruling without attestation is refused).
 
 ## Gotchas
-- ONE build at a time on the shared tree. Never render the dashboard while a build runs.
-- `menu task complete` refuses a plan whose text says "Step 13 … blocked" unquoted — quote verdicts.
-- The fetch tool truncates large files and summarises pages; settle disputes with curl.
-- Hooks are NOT loaded by Claude Code (plan `ctocs-hooks-are-actually-loaded-by-claude-code`).
-- Installed plugin 6.14.67 lacks js-yaml → `menu task complete` can fail on kickback paths.
-- `.ctoc/streaming/questions/` untracked files in the tree are NOT this slice's; leave them.
+- After `/ctoc:update`, a session can no longer run `ledger-backfill.js --plan` or a
+  `node -e` call to `approvePlan`, `streamApprove` or `persistVerifyResult`: the hook refuses
+  them. Cross plans through the menu's own routes.
+- A plan's `files:` list and its specification text are inside the approval hash. A builder
+  must never widen them; the session widens, re-records, and gives the builder the exact lines
+  to insert, and the builder confirms the hash before editing. Checkbox state, the
+  `## Execution Record` and `## Decisions Taken Under Ambiguity` are outside the hash.
+- CTOC's approval step appends a blank generic Steps 8–16 template to plans that already have
+  their own; tick it with a note pointing at the real record, or remove it and re-record.
+- Tests that read live repository state (the review folder, the backfilled-entry count, the
+  stored question files) break when plans cross; three were fixed today.
+- `ship-many.sh` and `ship-crossings.sh` lived in the session scratchpad and are gone; the flow
+  was: tick Steps 8–16 with an accurate note, `move-plan.js todo/<slug>.md in-progress`,
+  `node src/commands/start.js menu task add implement <slug> --touches plans/in-progress/<slug>.md`,
+  `menu task start <id>`, `CTOC_VERIFY_TIMEOUT_MS=900000 … menu task complete <id> --summary "…"`,
+  approve review→done, bump VERSION, `node src/scripts/release.js`, stage by name, check the
+  staged names against
+  `^plans/functional/|00266|dependency-analyzer|HANDOFF|\.ctoc/streaming/|tool-grants-s11|^\.claude/|^plans/.*deepthink.*-s[6-9]-`
+  and the staged diff for private paths (the owner's account name, temporary-folder paths),
+  commit, push.
+- Never stage: the dependency-analyzer improvement files (plan 00266 in progress, uncommitted),
+  deepthink slices 6–9, the tool-grant slice 11 plan, `.ctoc/streaming/*`. HANDOFF.md is
+  committed only through `/handoff`, after a private-path check.
+- Speedup measured today (transcripts split at the sleep-loop rule, 2026-10-06 19:51): CTOC
+  polling 6.6 h → 0 h; owner wait per turn, slowest tenth 22.7 → 6.2 minutes; turns over an hour
+  14 → 2; time per agent run flat (no profile has the new agents installed). Recorded in
+  `.ctoc/audit/speed-and-size/benchmarks/WHERE-THE-HOURS-GO.md`.
+
+## Key files
+- `plans/functional/ctoc-keeps-working-and-asks-only-what-matters.md` — the parent plan (never committed without a privacy check).
+- `plans/implementation/…-s2-plans-cross-on-their-evidence.md`, `…-s3-instructions-say-what-the-code-does.md` — the next two pieces.
+- Worktree `.claude/worktrees/agent-a0b33c6c216a2989c` — piece one, with its plan copy and Execution Record.
+- `src/hooks/protect-records.js`, `hooks/hooks.json`, `tests/protect-records.test.js` — the one loaded hook.
+- `src/lib/streaming-precompute.js` — question validation and what blocks (piece one).
+- `tests/compaction-eval/inventory-checks.js` and the `rule-inventory.json` files — rules held word for word; now with replaced and added fates.
+- `.ctoc/audit/speed-and-size/benchmarks/` — `pipeline-time.js`, `WHERE-THE-HOURS-GO.md`, `RESULTS.md`.
 
 ## Resume here
-1. `git status`; confirm v6.14.73 is committed (s5) and NOT pushed. Three plans now wait in review for his
-   "finished": the menu fix (v6.14.71), s4 (v6.14.72), s5 (v6.14.73).
-2. Start s6 (dependency-analyzer agent + skill; the next todo in `.ctoc/state/todo-order.json` / birthtime):
-   `startAgent(root,{force:true})` picks it; dispatch ONE fresh `iron-loop-executor` briefed with the plan,
-   Rule 1 files, "read s4's and s5's records for the shape", then the round protocol above. Lessons from s5
-   to brief every reviewer and the executor with: never validate while the executor edits; write hidden
-   characters as escapes; when a later run supersedes an earlier one, rewrite every sentence that called the
-   earlier one "final"/"current" at the SAME time (the s5 plan took three documentation returns for that).
-3. Then README slices; deepthink slices. Surface the four functional plans' questions and the small-changes
-   slices when he asks.
+Dispatch `ctoc:security:security-scanner` (no network, write nothing) to re-scan piece one at
+`f4838d93` in worktree `.claude/worktrees/agent-a0b33c6c216a2989c` against its previous BLOCK
+findings (listed in the plan's Execution Record). If it passes or warns: cross piece two to todo
+(`approvePlan` from the session), and dispatch `ctoc:iron-loop:iron-loop-executor` WITHOUT a new
+worktree, told to build piece two in that same worktree on top of `f4838d93`, test-first, inside
+its `files:`. Then review and security-scan piece two, merge the branch into main, ship pieces one
+and two together (piece one's untracked plan copy and approval record in main are replaced by the
+branch's plan; carry the approval record into the commit), and push.
+
+## Appendix — earlier work still open (from the 2026-10-02 handoff, verified 2026-10-07)
+- Dependency-analyzer improvement (plan 00266, in progress): the agent file's three rounds were
+  closed then; the skill's three rounds had not started. All its files are uncommitted on
+  purpose; never stage them without the owner.
+- Deepthink slice 4 (plan 00400, real run in a disposable project) is in todo; slices 1, 2, 3
+  and 5 are in done.
+- The round protocol for "improved three times" slices: per file and round, the session
+  dispatches read-only agents (at most five in flight) and hands their reports to one long-lived
+  executor: `citation-validator` research → `agent-critic` findings with exact old/new text →
+  `citation-validator` validates every new claim → the executor applies byte for byte → a quiet
+  re-read → the executor writes the round entry. Save every report verbatim to the notes folder
+  (extract the last assistant text block from the subagent's output file in the session's
+  temporary tasks folder); then Steps 11, 13 and 16, `npm test`, `menu task complete`, version
+  bump, `release.js`, commit by name. These slices re-grow agents the compaction shrank: re-plan
+  them against the compacted texts and their size ceilings first.
+- Settled facts: OWASP LLM Top 10 has a 2026 edition; MITRE ATLAS `dist/ATLAS.yaml` is deprecated
+  (manifest → `dist/v6/ATLAS-2026.09.yaml`); Robert Martin's instability metric has no thresholds
+  in his texts; madge 8 defaults to `.js` only (0 files on a `.ts` tree is a false pass) and
+  `--ts-config` crashes when the file is absent; under `"type":"module"` programs must be `.cjs`;
+  the Bash tool's shell is zsh with ugrep; the owner's `claude` aliases add
+  `--dangerously-skip-permissions`.
+- Verbatim notes from earlier slices carry the owner's account name in temporary-folder paths
+  (his open item from slice 5); never add more.
