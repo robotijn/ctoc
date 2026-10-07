@@ -289,7 +289,7 @@ order's `new_anchors`. No new text says "User outcome: Gate N".
   evidence, or user approve" (Gate 3: "Menu: recorded checks, or user approve"). The Gate 0
   row stays (R-437, pinned by `tests/cto-chief-compliance-dispatch.test.js`, which needs the
   strings "Gate 0" to "Gate 3").
-- Monitoring duties (lines 722–724; R-443, R-444, R-445): "- [x] No plans in
+- Monitoring duties (lines 722–724; R-443, R-444, R-445): "- [ ] No plans in
   implementation/ (todo/, done/) without a crossing record in `.ctoc/approvals/` that
   `src/lib/approval-residency.js` accepts — the user's approval or the menu's recorded
   evidence."
