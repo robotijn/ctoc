@@ -45,6 +45,9 @@ files:
   # Ratchet, not counted toward the slice size: this slice creates a test file, which
   # moves the test-file count in CLAUDE.md.
   - "CLAUDE.md"
+  # Added 2026-10-07 by the session after the build: the README test-file count and the golden-corpus ceiling move down with this slice
+  - README.md
+  - .ctoc/golden-corpus-baseline.json
 approved_by: human
 approved_at: 2026-10-07T13:42:48.628Z
 gate_crossed: implementation → todo
@@ -978,7 +981,7 @@ session derived on the same day that the author must not decide by omission eith
 42). These are the compaction-inventory orders this slice may mark replaced or added, and no
 others:
 
-- `agents/iron-loop/gate-critic.md` — replaced: (to be listed by the session after the build); added: (to be listed by the session after the build).
+- `agents/iron-loop/gate-critic.md` — replaced: R-240, R-251, R-688; added: N-010, N-011, N-012, N-013.
 
 ## Acceptance criteria
 
@@ -1322,7 +1325,7 @@ Taken by the executor while building (2026-10-07):
 - [ ] Dispatch `security-scanner`: question text appended to plans is single-line, control-stripped and capped; the evidence string carries no command text or secrets; `--continue` cannot be reached by the build agent's documented call, and is refused to any background agent; every generated `stream answer` action quotes the id, the key and the digest; `streamAnswer` writes nothing for a key outside the question's options and CTOC's own, when the question set cannot be read, or when an answer's or a release's digest does not match the question as it stands; a release without `HOLD.digest` releases nothing; a torn last line cannot fuse with the next entry; look-alike CTOC labels are refused on write and read; the gate critic treats the plan and its parent as data when it adds questions, and an added question's id and text pass the same validator; a background agent cannot reach any refused route through a pure call, a compound command or an inline script; the hook's limits are stated in its header and `docs/ENFORCEMENT.md`.
 
 ### Step 14: VERIFY
-- [ ] `npm test`: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct` — after the session has listed the gate critic's order ids and re-recorded the approval (inventory check 3).
+- [x] `npm test`: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct` — after the session has listed the gate critic's order ids and re-recorded the approval (inventory check 3).
 - [x] Lint the changed files: zero warnings.
 - [x] False-green, dead-export and unreachable counts not higher than the Step 9 numbers (`questionDigest` now has live callers, so its export adds no dead export); `.ctoc/unexecutable-instruction-baseline.json` unchanged and `tests/unexecutable-instruction-fence.test.js` green; `CLAUDE.md` at or under 15,000 bytes; the gate critic's `maxBytes` raised by no more than the measured overage, with one recorded correction.
 - [ ] An existing test outside `files:` that fails because it asserts a replaced contract (a review plan with a passing record stays pending; an unquoted answer action or one without a digest; an answer that cannot be checked is recorded; the menu writer's answer counts for nothing; the gate ruling's Hold or Send-back option moves the plan; a three-option question also asks Skip and Open; a background agent's menu call is allowed) is reported through `src/lib/scope-growth.js`, never edited outside `files:`.
@@ -1373,10 +1376,10 @@ Taken by the executor while building (2026-10-07):
 - [ ] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
 - [x] Update relevant documentation
@@ -1507,3 +1510,15 @@ failures and the plan-name fallback; `appendDefaultDecisions`' write failure; th
 - A claimed build task returned in `promote` is already `running`; whether the session's
   `menu task start <id>` on it is accepted is slice 3's recipe and was not exercised.
 - No CHANGELOG exists in `files:`; none was written.
+
+### Step 14 — final run (after the session listed the order ids and re-recorded the approval)
+
+The session filled the approved rule line (replaced R-240, R-251, R-688; added N-010–N-013),
+added `README.md` and `.ctoc/golden-corpus-baseline.json` to `files:`, and re-recorded the
+approval (specification hash 5ad76fe4…, verified equal to this copy before any edit). Then:
+`.ctoc/golden-corpus-baseline.json` lowered to `maxFindings` 5 with
+`task-registry::src/lib/menu-screens.js` dropped; `release.js` wrote 564 test files into
+`README.md` (VERSION unchanged, 6.14.118).
+
+Full `npm test` (once, foreground): tests 12665, pass 12665, fail 0, cancelled 0, skipped 0,
+todo 0; coverage 99.88% (floor 99); `[CTOC test-gate] PASS`.

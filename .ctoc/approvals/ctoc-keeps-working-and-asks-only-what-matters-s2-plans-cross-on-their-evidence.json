@@ -1,9 +1,11 @@
 {
-  "content_sha256": "6d1f9079b1b817fd4b7e328868ab1bdc25059499e8bba5eef692038f0603ede2",
+  "content_sha256": "5ad76fe4cd805aca2d7c59049218722e7ed6662a49923ed46fdc6a64dec15bee",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-10-07T13:42:48.679Z",
+  "approved_at": "2026-10-07T14:24:48.130Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "Session, 2026-10-07: after the build, the approved rule line lists the gate-critic orders this slice replaces (R-240, R-251, R-688) and adds (N-010 to N-013); files widened to the README count and the golden-corpus ceiling, both moving down",
   "plan_basename": "ctoc-keeps-working-and-asks-only-what-matters-s2-plans-cross-on-their-evidence"
 }
