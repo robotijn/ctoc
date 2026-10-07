@@ -62,9 +62,14 @@ function evidenceFor(ref, ids) {
   );
 }
 
-/** A minimal valid streaming Question. */
+/**
+ * A minimal valid streaming Question under the contract the owner replaced on 2026-10-07: a
+ * q<NN>-<kebab> id, key "1", a topic (weighty for a fork, `detail` otherwise), and one
+ * recommended option, since a weighty single option with no recommendation is malformed.
+ */
 function q(id, { critical = false, important = false } = {}) {
-  return { id, prompt: `prompt ${id}`, critical, important, options: [{ key: 'a', label: 'A' }] };
+  const topic = critical || important ? 'technology-stack' : 'detail';
+  return { id, prompt: `prompt ${id}`, critical, important, topic, options: [{ key: '1', label: 'A', recommended: true }] };
 }
 
 // ── 1 — populated ledger, no sufficiency entries → never-crossed ───────────────
@@ -100,8 +105,8 @@ test('an unparseable entry degrades the verdict but keeps the crossings it found
   try {
     // A real sufficiency crossing that MUST still be reported.
     const ref = 'todo/00042-real-crossing.md';
-    ledger.writeSufficiencyEntry('a-suff', { content_sha256: HASH, stage_from: 'implementation', stage_to: 'todo', evidence: evidenceFor(ref, ['q10']) }, root);
-    precompute.writePlanQuestions(root, ref, [q('q10', { critical: true })], 1000);
+    ledger.writeSufficiencyEntry('a-suff', { content_sha256: HASH, stage_from: 'implementation', stage_to: 'todo', evidence: evidenceFor(ref, ['q10-a']) }, root);
+    precompute.writePlanQuestions(root, ref, [q('q10-a', { critical: true })], 1000);
     // A corrupt sibling file in the ledger directory.
     fs.writeFileSync(path.join(ledger.ledgerDir(root), 'b-corrupt.json'), '{ not json');
     const res = auditSufficiencyCrossings(root);
@@ -119,8 +124,10 @@ test('a sufficiency crossing backed by 3 questions is crossed and attested', () 
   const root = tmpRoot();
   try {
     const ref = 'todo/00043-attested.md';
-    ledger.writeSufficiencyEntry('c-attested', { content_sha256: HASH, stage_from: 'implementation', stage_to: 'todo', evidence: evidenceFor(ref, ['q10', 'q11', 'q12']) }, root);
-    precompute.writePlanQuestions(root, ref, [q('q10', { critical: true }), q('q11', { important: true }), q('q12')], 2000);
+    ledger.writeSufficiencyEntry('c-attested', { content_sha256: HASH, stage_from: 'implementation', stage_to: 'todo', evidence: evidenceFor(ref, ['q10-a', 'q11-b', 'q12-c']) }, root);
+    // Classified by the gate critic, so the detail decides itself (owner, 2026-10-07).
+    precompute.writePlanQuestions(root, ref, [q('q10-a', { critical: true }), q('q11-b', { important: true }), q('q12-c')], 2000,
+      undefined, { by: 'gate-critic', at: 1786000000000 });
     const res = auditSufficiencyCrossings(root);
     assert.equal(res.verdict, 'crossed');
     const cr = res.crossings[0];
@@ -130,6 +137,29 @@ test('a sufficiency crossing backed by 3 questions is crossed and attested', () 
     assert.equal(cr.questions.blocking, 2);
     assert.equal(cr.questions.empty, false);
     assert.equal(cr.questions.unattested, false);
+  } finally { cleanup(); }
+});
+
+// ── 4b — the audit counts blocking with the SAME rule the gate uses ───────────────
+// The owner's decision of 2026-10-07: in a file the gate critic did not classify, every
+// question goes to the human, whatever its flags or topic. The audit must agree with the
+// gate's own verdict, never count critical-or-important on its own.
+test('the audit counts blocking exactly as the gate does, classified or not', () => {
+  const root = tmpRoot();
+  try {
+    const questions = [q('q10-a', { critical: true }), q('q11-b', { important: true }), q('q12-c')];
+    for (const [slug, classification, expected] of [['00045-author', undefined, 3], ['00046-classified', { by: 'gate-critic', at: 1786000000000 }, 2]]) {
+      const ref = `todo/${slug}.md`;
+      const planPath = path.join(root, 'plans', 'todo', `${slug}.md`);
+      fs.mkdirSync(path.dirname(planPath), { recursive: true });
+      fs.writeFileSync(planPath, `---\ntitle: ${slug}\n---\n\n# ${slug}\n`);
+      ledger.writeSufficiencyEntry(slug, { content_sha256: HASH, stage_from: 'implementation', stage_to: 'todo', evidence: evidenceFor(ref, []) }, root);
+      precompute.writePlanQuestions(root, ref, questions, fs.statSync(planPath).mtimeMs, undefined, classification);
+      const gate = precompute.hasEnoughInformation(root, ref);
+      const audited = auditSufficiencyCrossings(root).crossings.find((c) => c.ref === ref);
+      assert.equal(audited.questions.blocking, expected, slug);
+      assert.equal(audited.questions.blocking, gate.blocking.length, `${slug}: the audit agrees with the gate`);
+    }
   } finally { cleanup(); }
 });
 
@@ -155,7 +185,7 @@ test('a sufficiency crossing whose questions file is gone is unattested with nul
   const root = tmpRoot();
   try {
     const ref = 'todo/00045-missing-questions.md';
-    ledger.writeSufficiencyEntry('e-missing', { content_sha256: HASH, stage_from: 'implementation', stage_to: 'todo', evidence: evidenceFor(ref, ['q10']) }, root);
+    ledger.writeSufficiencyEntry('e-missing', { content_sha256: HASH, stage_from: 'implementation', stage_to: 'todo', evidence: evidenceFor(ref, ['q10-a']) }, root);
     // deliberately DO NOT write the questions file
     const res = auditSufficiencyCrossings(root);
     const cr = res.crossings[0];
@@ -235,7 +265,7 @@ test('a corrupt questions file reports present-but-unusable with null counts', (
   const root = tmpRoot();
   try {
     const ref = 'todo/00046-corrupt-questions.md';
-    ledger.writeSufficiencyEntry('j-corruptq', { content_sha256: HASH, stage_from: 'implementation', stage_to: 'todo', evidence: evidenceFor(ref, ['q10']) }, root);
+    ledger.writeSufficiencyEntry('j-corruptq', { content_sha256: HASH, stage_from: 'implementation', stage_to: 'todo', evidence: evidenceFor(ref, ['q10-a']) }, root);
     const qp = precompute.questionsPath(root, ref);
     fs.mkdirSync(path.dirname(qp), { recursive: true });
     fs.writeFileSync(qp, '{ not valid json');
@@ -252,7 +282,7 @@ test('a questions file with no questions array reports null counts', () => {
   const root = tmpRoot();
   try {
     const ref = 'todo/00047-no-array.md';
-    ledger.writeSufficiencyEntry('k-noarray', { content_sha256: HASH, stage_from: 'implementation', stage_to: 'todo', evidence: evidenceFor(ref, ['q10']) }, root);
+    ledger.writeSufficiencyEntry('k-noarray', { content_sha256: HASH, stage_from: 'implementation', stage_to: 'todo', evidence: evidenceFor(ref, ['q10-a']) }, root);
     const qp = precompute.questionsPath(root, ref);
     fs.mkdirSync(path.dirname(qp), { recursive: true });
     fs.writeFileSync(qp, JSON.stringify({ ref, planMtimeMs: 1 }));

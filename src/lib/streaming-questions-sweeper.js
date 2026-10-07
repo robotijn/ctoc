@@ -116,7 +116,9 @@ function pendingDir(root) {
  *      plan's current mtime is refused — promoting it would stamp a critique written
  *      against an older revision as fresh and hide that from the human. A missing or
  *      non-finite `planMtimeMs` is NOT a failure (plan decision D-3).
- *  11. `writePlanQuestions` re-validates the full Question/Option contract.
+ *  11. `writePlanQuestions` re-validates the full Question/Option contract, and refuses
+ *      to replace the gate critic's classified file for the same plan revision with an
+ *      unclassified one (reason `would-replace-classified`).
  *
  * THE FRESHNESS STAMP IS THE SWEEPER'S, NEVER THE PAYLOAD'S. Step 11 passes the
  * `currentMtimeMs` read at step 9. A file stamped with anything else reads
@@ -207,11 +209,17 @@ function promotePendingFile(root, absFile) {
   // absent `attestation` is `undefined` and passes straight through — the writer then
   // leaves the file byte-identical to a four-argument call, so the record reads
   // honestly NOT-ATTESTED rather than clean.
+  // The gate critic's classification block rides through the same way: the reader
+  // (`streaming-precompute.isGateCriticClassification`) decides whether it counts, and
+  // without one every question in the file reaches the human (the owner, 2026-10-07).
   const written = precompute.writePlanQuestions(
-    root, ref, payload.questions, currentMtimeMs, payload.attestation,
+    root, ref, payload.questions, currentMtimeMs, payload.attestation, payload.classification,
   );
   if (written.ok === true) return { ok: true, ref };
-  return { ok: false, reason: 'invalid-questions', errors: written.errors };
+  // The writer keeps the gate critic's classified file for this revision; that refusal gets its
+  // own closed-set reason in the discard log, so a human can see why the file did not land.
+  const reason = written.reason === 'would-replace-classified' ? 'would-replace-classified' : 'invalid-questions';
+  return { ok: false, reason, errors: written.errors };
 }
 
 /**

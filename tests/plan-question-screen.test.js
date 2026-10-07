@@ -45,6 +45,9 @@ const gateWords = require('../src/lib/gate-words.js');
 const NO_GATE_NUMBER = /\bgates?\s*[0-9]/i;
 const { route } = require('../src/lib/menu-screens.js');
 
+/** The gate critic's classification block: only a file it checked is put to the human (slice 2). */
+const CLASSIFIED = Object.freeze({ by: 'gate-critic', at: 1786000000000 });
+
 const STAGES = ['vision', 'canvas', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
 const sandboxes = [];
 let counter = 0;
@@ -134,7 +137,7 @@ describe('plan <ref> asks the PRODUCT question first', () => {
     const questions = [{
       id: 'q01-session-idle-timeout',
       prompt: 'A session with no activity — should it end, and when?',
-      critical: true, important: false,
+      critical: true, important: false, topic: 'technology-stack',
       options: [
         {
           key: '1',
@@ -151,7 +154,7 @@ describe('plan <ref> asks the PRODUCT question first', () => {
         },
       ],
     }];
-    const w = precompute.writePlanQuestions(root, 'review/session-expiry.md', questions, fs.statSync(p).mtimeMs);
+    const w = precompute.writePlanQuestions(root, 'review/session-expiry.md', questions, fs.statSync(p).mtimeMs, undefined, CLASSIFIED);
     assert.equal(w.ok, true, 'fixture questions must write');
 
     const r = route(['plan', 'review/session-expiry.md'], root);
@@ -172,7 +175,11 @@ describe('plan <ref> asks the PRODUCT question first', () => {
     assert.match(rec, /Adds a settings surface/, 'the real cons reach the human');
 
     // Answering the product question records an answer; it never crosses a gate.
-    assert.equal(r.actions['Configurable per account'], 'stream answer review/session-expiry.md q01-session-idle-timeout 1');
+    const shown = precompute.loadPlanQuestions(root, 'review/session-expiry.md').find((x) => x.id === 'q01-session-idle-timeout');
+    const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
+    const pairs = shown.options.map((o) => [o.key, ident(o.label)]).sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0));
+    const digest = require('node:crypto').createHash('sha256').update(JSON.stringify([ident(shown.prompt), pairs, shown.options.filter((o) => o.recommended === true).map((o) => o.key).sort()])).digest('hex');
+    assert.equal(r.actions['Configurable per account'], `stream answer review/session-expiry.md 'q01-session-idle-timeout' '1' '${digest}'`);
   });
 
   it('the product question is NOT a gate-approval prompt', () => {
@@ -181,9 +188,9 @@ describe('plan <ref> asks the PRODUCT question first', () => {
     precompute.writePlanQuestions(root, 'functional/export-rules.md', [{
       id: 'q01-export-format',
       prompt: 'Which format should an export produce?',
-      critical: false, important: false,
+      critical: false, important: false, topic: 'detail',
       options: [{ key: '1', label: 'Comma-separated values', recommended: true, pros: 'Opens anywhere.', cons: 'No types.' }],
-    }], fs.statSync(p).mtimeMs);
+    }], fs.statSync(p).mtimeMs, undefined, CLASSIFIED);
 
     const r = route(['plan', 'functional/export-rules.md'], root);
 

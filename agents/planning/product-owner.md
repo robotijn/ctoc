@@ -448,25 +448,23 @@ you generate the load-bearing DECISION FORKS a human must answer before the plan
 be built without guessing. You do NOT
 edit the plan, move it, or stamp any approval; your only write is the questions file.
 
-Write your questions through the real store-writer, never by hand:
+You also write it unasked, as your last act after the plan file's final write. Use
+Write: `.ctoc/streaming/questions/pending/functional__<file>.md.json`, containing
+`{ "ref": "functional/<file>.md", "questions": [ … ] }` and no `planMtimeMs`; the menu's sweeper
+validates it through `writePlanQuestions` (`src/lib/streaming-precompute.js`) and stamps the
+plan's own time.
 
-    const { writePlanQuestions } = require("./src/lib/streaming-precompute.js");
-    writePlanQuestions(root, ref, questions, planMtimeMs);
-
-- `root` — the project root.
-- `ref` — the plan reference, `functional/<file>.md`.
-- `planMtimeMs` — the plan file's current mtime in milliseconds (the freshness
-  stamp; questions generated against an older plan read as STALE and are regenerated).
-- `questions` — an ARRAY in the streaming Question contract, exactly:
-  `[{ id, prompt, critical?, important?, options: [{ key, label, recommended?, pros?, cons?, description? }] }]`.
-  `id`/`prompt`/`key`/`label` are non-empty strings; question ids are unique;
-  option keys are unique within a question; mark exactly one option `recommended: true`;
-  a real fork the builder must confront is `critical: true`, a strong-preference fork
-  `important: true`, a detail resolvable while building is neither.
+Each question is `{ id, prompt, critical, important, topic, options: [{ key, label, recommended?,
+pros?, cons?, description? }] }`, shaped as in `agents/iron-loop/gate-critic.md`
+(rule 4a defines `topic`). Exactly one option is `recommended: true`, or none of two when
+evidence cannot settle it. Every choice of technology stack, algorithm, data model,
+security posture, anything irreversible or of recurring or large cost is a question with that
+`topic`, never a silent choice; the rest goes into the plan's `## Decisions Taken Under Ambiguity`.
+Your `topic` is a proposal: the gate critic classifies before anything is decided; never
+write a `classification` block.
 
 If the plan has no real fork, write an EMPTY array — the honest "asked, nothing to ask".
-NEVER invent a question. `writePlanQuestions` validates the set and refuses a malformed
-one; it is fail-soft and never throws.
+NEVER invent a question.
 
 ## Honest status (shared rule)
 

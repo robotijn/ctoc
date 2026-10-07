@@ -127,6 +127,14 @@ When a background task fires its task-notification:
 2. Emit **ONE** compact, pull-based inbox notice — a **high-level, human-phrased status line** (see "Foreground status plane" below). **Do not** change or hijack the user's current screen — completions pull, they never push.
 3. **Promote.** For each task in the response's `promote[]` (the scheduler's newly-runnable `nextRunnable` set with the concurrent-edit guard applied — that set MINUS the candidates the guard held, never the raw set), launch `Agent(run_in_background)` + `menu task start <id>`. This is the ONLY sanctioned promotion — never start a queued task the scheduler did not return in `promote[]`.
 
+**Every screen that carries `promote[]` is launched the same way.** `stream answer`,
+`stream approve` and `menu task complete <id> --continue` keep the work moving and can return
+`promote[]` too — planners, the gate critic's classifications, and builds the menu already
+claimed. After any such screen, launch each entry exactly as step 3 does, then stamp it:
+`menu task start <id> --agent-id <the harness agent id>`. A claimed build is already running
+with no agent id, and that command records the id; a task that already carries an agent id
+is refused, so a build is never launched twice.
+
 **Foreground status plane — high-level, human-phrased (Tijn, non-negotiable).** The work
 runs in the background; the FOREGROUND is the status plane. At each milestone show the human
 ONE short, high-level status line — never tool-call noise, never a spinner, never silence.
@@ -319,6 +327,19 @@ and on the scheduler's `run`:
 Any failure falls back silently to the plain gate question — the human is never blocked
 or shown a crash. This is the async-overnight / precompute-never-wait principle applied
 to the gates.
+
+**A promoted `classify` task is the gate critic's classification of one plan's questions.**
+The menu records it itself, once per question set, when a plan's question file came from its
+author (an empty one included) — the same record as
+`menu task add classify '{ref}' --touches '.ctoc/streaming/questions/{ref}'`, which you never
+add yourself. Until it is classified, that plan cannot move on without the human. Launch
+`gate-critic` alone as background WORK, then `menu task start <id>`; its brief: the task id,
+the plan path, and "classify the questions of `{ref}`" (its section "Classifying the
+questions", which has it read the plan and its parent plan, classify the author's questions
+and add a question for every weighty choice the author left unasked); never the three lens
+critics. It writes the classified file to the waiting folder; the next continuation sweeps it
+in. If it fails, the plan stays where it is: every question keeps reaching the human, and only
+his approval moves it.
 
 ### Build-flow idea submit — dispatch vision-decomposer (warm, never-wait)
 

@@ -85,9 +85,9 @@ describe('Menu Critique First', () => {
     precompute.writePlanQuestions(testDir, 'review/reviewed-plan.md', [{
       id: 'q01-retention-window',
       prompt: 'How long should an exported report stay downloadable?',
-      critical: false, important: false,
+      critical: false, important: false, topic: 'detail',
       options: [{ key: '1', label: 'Seven days', recommended: true, pros: 'Covers a working week.', cons: 'Storage grows.' }],
-    }], fs.statSync(p).mtimeMs);
+    }], fs.statSync(p).mtimeMs, undefined, { by: 'gate-critic', at: 1786000000000 }); // classified: only a checked file is put to the owner
 
     const result = menuScreens.route(['plan', 'review/reviewed-plan.md'], testDir);
 

@@ -9,7 +9,27 @@
  * compacted file to it. Paths inside the inventory are relative to the repository root.
  *
  * The order floor is passed in by the caller and stays written in the caller's test file, so
- * lowering it takes an edit in a second place.
+ * lowering it takes an edit in a second place. So may a digest of every unit's kind
+ * (`kindsSha256`, sha256 of the `n:kind` lines): with it pinned, an order unit cannot be
+ * relabelled as a cuttable kind and then cut without an edit in the caller as well.
+ *
+ * A RULE THE OWNER REPLACED OR ADDED. An order may end as `fate: "replaced"` only with a
+ * complete `replaced_by` record — `{ instruction, date: "YYYY-MM-DD", plan, new_anchors: [...] }`
+ * — and keeps its old `anchors` as history. It is then held to its NEW anchors (present in its
+ * section, exactly once, each deletion reported), and every sentence of an old anchor must be
+ * gone from the agent or stand inside one of the new anchors, so a replaced rule is really
+ * replaced and never silently duplicated or dropped. A unit carrying a replaced order is never
+ * `kept`; a unit marked `replaced` must carry one. A rule written after the baseline is an
+ * order with `fate: "added"` and an `added_by` record `{ instruction, date, plan }`; no unit
+ * lists it, and its own anchors are held like any other. For both records: `plan` names a plan
+ * file under `plans/<stage>/` whose approval record `.ctoc/approvals/<plan>.json` is a human or
+ * backfilled ledger entry matching the plan's specification hash now, and whose approved
+ * specification names the order id as a whole token on a line that also names this inventory's
+ * agent file — hashed text only, as `computeSpecHash` itself decides; `date` is a real calendar
+ * date, not in the future; no new
+ * anchor already occurs in the baseline. The inventoried file must live under `agents/` or
+ * `skills/`.
+ * Everything else is held exactly as strictly as before.
  */
 
 const assert = require('node:assert/strict');
@@ -18,30 +38,137 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const units = require('./units');
+const ledger = require('../../src/lib/approval-ledger');
 
 const ROOT = path.join(__dirname, '..', '..');
 const KINDS = new Set(['order', 'reason', 'history', 'example', 'reference', 'description', 'heading', 'frontmatter']);
-const FATES = new Set(['kept', 'tightened', 'merged', 'cut']);
+const FATES = new Set(['kept', 'tightened', 'merged', 'cut', 'replaced']);
 const CUTTABLE = new Set(['reason', 'history', 'example', 'description', 'reference']);
+
+const isReplaced = (o) => o.fate === 'replaced';
+const isAdded = (o) => o.fate === 'added';
+const nonEmpty = (v) => typeof v === 'string' && units.normalize(v).length > 0;
+const PLAN_SLUG = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+// The instruction surfaces an inventory may hold: agent definitions and specialist skills.
+const INSTRUCTION_ROOTS = ['agents', 'skills'];
+
+/** True when `date` is a real YYYY-MM-DD calendar date no later than today (UTC). */
+function isPastDate(date) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const ms = Date.parse(`${date}T00:00:00Z`);
+  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === date && date <= new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * The text of plan `slug` under root/plans/<stage>/ when it is APPROVED as it stands, or null.
+ * Approved means: `.ctoc/approvals/<slug>.json` parses as a ledger entry of kind human or
+ * backfilled, its `hash_scope` is `specification`, and its `content_sha256` equals the plan
+ * file's specification hash now. A record anyone could write (`{}`), a record of another text,
+ * or a machine crossing never counts.
+ */
+function approvedPlanText(root, slug) {
+  if (typeof slug !== 'string' || !PLAN_SLUG.test(slug) || slug.includes('..')) return null;
+  let entry;
+  try {
+    entry = JSON.parse(fs.readFileSync(path.join(root, '.ctoc', 'approvals', `${slug}.json`), 'utf8'));
+  } catch {
+    return null; // absent or unparseable: no approval to speak of
+  }
+  if (!['human', 'backfilled'].includes(ledger.entryKind(entry)) || entry.hash_scope !== 'specification') return null;
+  const plans = path.join(root, 'plans');
+  const stages = fs.existsSync(plans) ? fs.readdirSync(plans, { withFileTypes: true }).filter((d) => d.isDirectory()) : [];
+  for (const stage of stages) {
+    const file = path.join(plans, stage.name, `${slug}.md`);
+    if (!fs.existsSync(file)) continue;
+    const text = fs.readFileSync(file, 'utf8');
+    const spec = ledger.computeSpecHash(text);
+    return spec.ok && spec.hash === entry.content_sha256 ? text : null;
+  }
+  return null;
+}
+
+/**
+ * Does the approved plan text name order `id` for the agent file `agentRel`? The id must stand
+ * as a whole token (`R-3` is not named by `R-30`) on a line that also names the agent file's
+ * path, and that line must be inside the hashed specification. The approval hash is the one
+ * judge of what is hashed: the id is deleted from the line in place and `computeSpecHash` is
+ * recomputed — when the hash does not move, the id was never part of the approved text (an
+ * execution section, a checkbox line, or a heading of seven or more `#` the hash walk treats as
+ * excluding). Deleting the id rather than the whole line keeps every heading in place, so the
+ * section walk cannot change around the line being tested.
+ */
+function namedInSpecification(text, id, agentRel) {
+  const token = new RegExp(`(^|[^A-Za-z0-9-])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z0-9-])`, 'g');
+  const lines = text.split(/\r?\n/);
+  const whole = ledger.computeSpecHash(lines.join('\n')).hash;
+  return lines.some((line, i) => {
+    if (!line.includes(agentRel) || !line.match(token)) return false;
+    const without = [...lines.slice(0, i), line.replace(token, '$1'), ...lines.slice(i + 1)].join('\n');
+    return ledger.computeSpecHash(without).hash !== whole;
+  });
+}
+
+/**
+ * What is wrong with an order's fate and its replaced_by / added_by record; empty when nothing is.
+ * @param {object} o the order
+ * @param {string} root the repository root plans and approvals are read under
+ * @param {string} baselineFlat the normalised baseline: a new anchor must not already be in it
+ * @param {string} agentRel the inventoried agent file's path as the inventory names it
+ */
+function recordErrors(o, root, baselineFlat, agentRel) {
+  if (o.fate === undefined) return [];
+  if (!isReplaced(o) && !isAdded(o)) return [`order ${o.id} has fate ${o.fate}`];
+  const field = isReplaced(o) ? 'replaced_by' : 'added_by';
+  const r = o[field];
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return [`order ${o.id} is ${o.fate} with no ${field} record`];
+  const errors = [];
+  if (!nonEmpty(r.instruction)) errors.push(`order ${o.id}: ${field}.instruction is empty`);
+  if (!isPastDate(r.date)) errors.push(`order ${o.id}: ${field}.date is not a real YYYY-MM-DD date up to today`);
+  const planText = approvedPlanText(root, r.plan);
+  if (planText === null) errors.push(`order ${o.id}: ${field}.plan names no approved plan under plans/`);
+  else if (!namedInSpecification(planText, o.id, agentRel)) errors.push(`order ${o.id}: the plan ${r.plan} never names this order for ${agentRel} in its approved specification`);
+  const fresh = isReplaced(o) ? r.new_anchors : o.anchors;
+  if (!Array.isArray(fresh) || fresh.length === 0 || !fresh.every(nonEmpty)) {
+    errors.push(`order ${o.id}: its new anchors are not a non-empty list`);
+  } else {
+    for (const a of fresh) if (baselineFlat.includes(units.normalize(a))) errors.push(`order ${o.id}: a new anchor is already in the baseline: ${a.slice(0, 80)}`);
+  }
+  return errors;
+}
+
+/** The order as the agent is held to it now: a replaced order answers for its new anchors. */
+function liveOrder(o) {
+  return isReplaced(o) && o.replaced_by && Array.isArray(o.replaced_by.new_anchors) ? { ...o, anchors: o.replaced_by.new_anchors } : o;
+}
 
 /**
  * Registers the ten inventory checks for one inventory file. Reads nothing until a check runs.
- * @param {{ test: Function, label: string, inventoryPath: string, orderFloor: number }} opts
+ * @param {{ test: Function, label: string, inventoryPath: string, orderFloor: number, root?: string }} opts
  *   test: `node:test`'s `test`; label: prefixes every test name; inventoryPath: absolute, or
- *   relative to the repository root; orderFloor: the order count at extraction, a positive integer.
- * @throws when orderFloor is not a positive integer or inventoryPath is not a non-empty string
+ *   relative to the repository root; orderFloor: the order count at extraction, a positive integer;
+ *   root: the repository root (default: this repository) — fixtures pass their own;
+ *   kindsSha256: optional sha256 hex of the units' `n:kind` lines, joined by newlines.
+ * @throws when orderFloor is not a positive integer, inventoryPath is not a non-empty string,
+ *   or kindsSha256 is given and is not a sha256 hex digest
  */
-function defineInventoryTests({ test, label, inventoryPath, orderFloor }) {
+function defineInventoryTests({ test, label, inventoryPath, orderFloor, root = ROOT, kindsSha256 }) {
   if (!Number.isInteger(orderFloor) || orderFloor <= 0) throw new Error(`orderFloor must be a positive integer, got ${JSON.stringify(orderFloor)}`);
   if (typeof inventoryPath !== 'string' || !inventoryPath) throw new Error('inventoryPath must be a non-empty string');
-  const inventory = path.resolve(ROOT, inventoryPath);
+  if (kindsSha256 !== undefined && !/^[0-9a-f]{64}$/.test(kindsSha256)) throw new Error('kindsSha256 must be a sha256 hex digest');
+  const inventory = path.resolve(root, inventoryPath);
   const t = (name, fn) => test(`${label}: ${name}`, fn);
 
   function load() {
     const inv = JSON.parse(fs.readFileSync(inventory, 'utf8'));
-    const baseline = fs.readFileSync(path.join(ROOT, inv.baseline), 'utf8');
-    const agent = fs.readFileSync(path.join(ROOT, inv.agent), 'utf8');
-    return { inv, baseline, agent };
+    const agentPath = path.resolve(root, inv.agent);
+    const inside = (dir) => {
+      const rel = path.relative(path.join(root, dir), agentPath);
+      return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel);
+    };
+    if (!INSTRUCTION_ROOTS.some(inside)) throw new Error(`the inventoried file ${inv.agent} is not under ${INSTRUCTION_ROOTS.join('/ or ')}/`);
+    const baseline = fs.readFileSync(path.resolve(root, inv.baseline), 'utf8');
+    const agent = fs.readFileSync(agentPath, 'utf8');
+    return { inv, baseline, agent, live: inv.orders.map(liveOrder) };
   }
 
   t('1. the baseline is the snapshot the inventory was labelled against', () => {
@@ -62,31 +189,51 @@ function defineInventoryTests({ test, label, inventoryPath, orderFloor }) {
   });
 
   t('3. every unit is classified, every order is listed, no id repeats', () => {
-    const { inv } = load();
+    const { inv, baseline } = load();
+    const baselineFlat = units.normalize(baseline);
     const ids = inv.orders.map((o) => o.id);
     assert.equal(new Set(ids).size, ids.length, 'an order id repeats');
+    if (kindsSha256 !== undefined) {
+      const kinds = crypto.createHash('sha256').update(inv.units.map((u) => `${u.n}:${u.kind}`).join('\n')).digest('hex');
+      assert.equal(kinds, kindsSha256, 'a unit\'s kind changed since it was pinned in the caller');
+    }
     const known = new Set(ids);
+    const replaced = new Set(inv.orders.filter(isReplaced).map((o) => o.id));
+    const added = new Set(inv.orders.filter(isAdded).map((o) => o.id));
     const listed = new Set();
     for (const u of inv.units) {
       assert.ok(KINDS.has(u.kind), `unit ${u.n} has kind ${u.kind}`);
       assert.ok(FATES.has(u.fate), `unit ${u.n} has fate ${u.fate}`);
       if (u.fate === 'cut') assert.ok(CUTTABLE.has(u.kind), `unit ${u.n} is a ${u.kind} and may not be cut`);
       if (u.kind === 'order') assert.ok(u.orders.length > 0, `order unit ${u.n} lists no order`);
+      if (u.fate === 'replaced') assert.ok(u.orders.some((id) => replaced.has(id)), `unit ${u.n} is marked replaced but carries no replaced order`);
+      if (u.fate === 'kept') assert.ok(!u.orders.some((id) => replaced.has(id)), `unit ${u.n} is kept but carries a replaced order`);
       for (const id of u.orders) {
         assert.ok(known.has(id), `unit ${u.n} lists unknown order ${id}`);
+        assert.ok(!added.has(id), `unit ${u.n} lists ${id}, an order added after the baseline`);
         listed.add(id);
       }
     }
     for (const o of inv.orders) {
-      assert.ok(listed.has(o.id), `order ${o.id} is listed by no unit`);
+      assert.ok(listed.has(o.id) || isAdded(o), `order ${o.id} is listed by no unit`);
       assert.ok(o.anchors.length > 0 && o.anchors.every((a) => units.normalize(a).length > 0), `order ${o.id} has an empty anchor`);
       assert.ok(o.says.length <= 160, `order ${o.id}: says is longer than 160 characters`);
+      assert.deepEqual(recordErrors(o, root, baselineFlat, inv.agent), [], `order ${o.id} has an incomplete replaced or added record`);
     }
   });
 
   t('4. every anchor of every order is in the agent, inside the section it now lives in', () => {
-    const { inv, agent } = load();
-    const failures = units.anchorFailures(units.sectionize(agent), inv.orders);
+    const { inv, agent, live } = load();
+    const failures = units.anchorFailures(units.sectionize(agent), live);
+    const flat = units.normalize(agent);
+    for (const o of inv.orders.filter(isReplaced)) {
+      const fresh = (Array.isArray(o.replaced_by && o.replaced_by.new_anchors) ? o.replaced_by.new_anchors : []).map(units.normalize);
+      for (const anchor of o.anchors) {
+        for (const sentence of units.splitUnits(anchor).map((u) => units.normalize(u.text))) {
+          if (flat.includes(sentence) && !fresh.some((a) => a.includes(sentence))) failures.push({ id: o.id, anchor: sentence, reason: 'replaced-but-present' });
+        }
+      }
+    }
     assert.deepEqual(failures, [], failures.slice(0, 20).map((f) => `${f.id} (${f.reason}): ${f.anchor}`).join('\n'));
   });
 
@@ -110,10 +257,10 @@ function defineInventoryTests({ test, label, inventoryPath, orderFloor }) {
   });
 
   t('8. deleting any anchor makes check 4 report its order by id', () => {
-    const { inv, agent } = load();
+    const { agent, live } = load();
     const sections = units.sectionize(agent);
     const silent = [];
-    for (const order of inv.orders) {
+    for (const order of live) {
       for (const anchor of order.anchors) {
         const a = units.normalize(anchor);
         const mutated = sections.map((s) => (s.heading === order.now_in ? { ...s, text: s.text.split(a).join('') } : s));
@@ -132,10 +279,10 @@ function defineInventoryTests({ test, label, inventoryPath, orderFloor }) {
   });
 
   t('10. every anchor occurs exactly once in the agent, so it can only stand for its own order', () => {
-    const { inv, agent } = load();
+    const { agent, live } = load();
     const flat = units.normalize(agent);
     const owners = new Map();
-    for (const o of inv.orders) for (const a of o.anchors) owners.set(units.normalize(a), (owners.get(units.normalize(a)) || new Set()).add(o.id));
+    for (const o of live) for (const a of o.anchors) owners.set(units.normalize(a), (owners.get(units.normalize(a)) || new Set()).add(o.id));
     const bad = [];
     for (const [a, ids] of owners) {
       const count = flat.split(a).length - 1;

@@ -61,10 +61,10 @@ function forkQuestion(id) {
   return {
     id,
     prompt: `Which store backs ${id}?`,
-    critical: true, important: false,
+    critical: true, important: false, topic: 'technology-stack',
     options: [
-      { key: 'pg', label: 'Postgres', recommended: true, pros: 'Relational.', cons: 'Ops cost.' },
-      { key: 'sqlite', label: 'SQLite', pros: 'Zero ops.', cons: 'Single writer.' },
+      { key: '1', label: 'Postgres', recommended: true, pros: 'Relational.', cons: 'Ops cost.' },
+      { key: '2', label: 'SQLite', pros: 'Zero ops.', cons: 'Single writer.' },
     ],
   };
 }
@@ -72,6 +72,27 @@ function forkQuestion(id) {
 function ledgerFile(root, slug) {
   return path.join(root, '.ctoc', 'approvals', slug.toLowerCase() + '.json');
 }
+
+/**
+ * Records an answer the way slice 2's writer will (third security scan of 2026-10-07): stamped
+ * with the question set's revision and carrying the digest of the question shown — sha256 of
+ * JSON [prompt, [[key, label], ...] by key, [recommended keys] sorted], each text NFKC-folded,
+ * accents removed, control characters stripped, trimmed, lower-cased — the entry `streamAnswer`
+ * writes; these cases test the crossing record, not the writer.
+ */
+function recordAnswer(root, ref, questionId, optionKey) {
+  const st = precompute.planQuestionsStatus(root, ref);
+  const q = st.questions.find((x) => x.id === questionId);
+  const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
+  const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const questionDigest = require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs, q.options.filter((o) => o.recommended === true).map((o) => o.key).sort()])).digest('hex');
+  const dir = path.join(root, '.ctoc', 'streaming');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.appendFileSync(path.join(dir, 'answers.jsonl'), JSON.stringify({ ts: new Date().toISOString(), ref, questionId, optionKey, planMtimeMs: st.questionsRevisionMs, questionDigest }) + '\n');
+}
+
+/** The gate critic's classification block: only a file it classified can move a plan (the owner, 2026-10-07). */
+const CLASSIFIED = Object.freeze({ by: 'gate-critic', at: 1786000000000 });
 
 afterEach(() => {
   while (sandboxes.length) fs.rmSync(sandboxes.pop(), { recursive: true, force: true });
@@ -219,8 +240,8 @@ describe('crossBySufficiency — the crossing records the enriched evidence and 
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff-nine', validFunctionalBody('suff-nine'));
     const ref = 'functional/suff-nine.md';
-    precompute.writePlanQuestions(root, ref, [forkQuestion('db')], fs.statSync(p).mtimeMs);
-    streamingGate.streamAnswer(ref, 'db', 'pg', root);
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs, undefined, CLASSIFIED);
+    recordAnswer(root, ref, 'q10-db', '1');
 
     streamingGate.pendingGateDecisions(root); // crosses
 
@@ -245,7 +266,7 @@ describe('crossBySufficiency — the crossing records the enriched evidence and 
 
     const v = {
       enough: true, reason: 'enough', computed: 1,
-      answeredQuestionIds: ['db'], unansweredQuestionIds: [], blockingQuestionIds: [], unboundAnswers: 0,
+      answeredQuestionIds: ['q10-db'], unansweredQuestionIds: [], blockingQuestionIds: [], unboundAnswers: 0,
     };
     const crossed = streamingGate.crossBySufficiency(root, p, ref, 'functional', 'implementation', v);
 
@@ -258,8 +279,8 @@ describe('crossBySufficiency — the crossing records the enriched evidence and 
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff-idem', validFunctionalBody('suff-idem'));
     const ref = 'functional/suff-idem.md';
-    precompute.writePlanQuestions(root, ref, [forkQuestion('db')], fs.statSync(p).mtimeMs);
-    streamingGate.streamAnswer(ref, 'db', 'pg', root);
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs, undefined, CLASSIFIED);
+    recordAnswer(root, ref, 'q10-db', '1');
 
     streamingGate.pendingGateDecisions(root); // first pass: crosses
     const entryPath = ledgerFile(root, 'suff-idem');

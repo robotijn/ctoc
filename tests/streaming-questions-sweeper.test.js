@@ -57,21 +57,21 @@ function pendingFileFor(root, ref) {
 function validQuestions() {
   return [
     {
-      id: 'store',
+      id: 'q10-store',
       prompt: 'Which store backs the fixture?',
-      critical: true, important: false,
+      critical: true, important: false, topic: 'technology-stack',
       options: [
-        { key: 'pg', label: 'Postgres', recommended: true, pros: 'Row level security' },
-        { key: 'sqlite', label: 'SQLite', cons: 'Single writer' },
+        { key: '1', label: 'Postgres', recommended: true, pros: 'Row level security' },
+        { key: '2', label: 'SQLite', cons: 'Single writer' },
       ],
     },
     {
-      id: 'expiry',
+      id: 'q11-expiry',
       prompt: 'How long does the fixture token live?',
-      critical: false, important: true,
+      critical: false, important: true, topic: 'security-posture',
       options: [
-        { key: '15m', label: '15 minutes', recommended: true },
-        { key: '1h', label: '1 hour' },
+        { key: '1', label: '15 minutes', recommended: true },
+        { key: '2', label: '1 hour' },
       ],
     },
   ];
@@ -147,7 +147,7 @@ describe('streaming-questions-sweeper — promotion', () => {
     assert.equal(report.errors.length, 0, 'no errors');
     assert.equal(fs.existsSync(file), false, 'the quarantine file was consumed');
     const loaded = precompute.loadPlanQuestions(root, ref);
-    assert.deepEqual(loaded.map((q) => q.id), ['store', 'expiry'], 'both questions are readable');
+    assert.deepEqual(loaded.map((q) => q.id), ['q10-store', 'q11-expiry'], 'both questions are readable');
   });
 
   it('2. the freshness stamp is the plan CURRENT mtime, and the status reads ready', () => {
@@ -187,6 +187,23 @@ describe('streaming-questions-sweeper — promotion', () => {
     assert.deepEqual(report.promoted, [ref]);
     const written = JSON.parse(fs.readFileSync(questionsFile(root, ref), 'utf8'));
     assert.equal(written.planMtimeMs, fs.statSync(planPathFor(root, ref)).mtimeMs);
+  });
+
+  // The owner's decision of 2026-10-07: the independent gate critic assigns every topic. Its
+  // classification block must survive promotion, or no promoted file could ever be classified.
+  it('13b. a gate-critic-classified pending file arrives classified; an author file arrives unclassified', () => {
+    const classified = makeProject();
+    const classification = { by: 'gate-critic', at: 1786000000000 };
+    dropPending(classified.root, classified.ref, { ref: classified.ref, questions: validQuestions(), classification });
+    assert.deepEqual(sweeper.sweepPendingQuestions(classified.root).promoted, [classified.ref]);
+    assert.deepEqual(JSON.parse(fs.readFileSync(questionsFile(classified.root, classified.ref), 'utf8')).classification, classification);
+    assert.equal(precompute.planQuestionsStatus(classified.root, classified.ref).classified, true);
+
+    const author = makeProject();
+    dropPending(author.root, author.ref, { ref: author.ref, questions: validQuestions() });
+    assert.deepEqual(sweeper.sweepPendingQuestions(author.root).promoted, [author.ref]);
+    assert.equal('classification' in JSON.parse(fs.readFileSync(questionsFile(author.root, author.ref), 'utf8')), false);
+    assert.equal(precompute.planQuestionsStatus(author.root, author.ref).classified, false);
   });
 });
 
@@ -525,6 +542,7 @@ describe('streaming-questions-sweeper — REACHABILITY from the live gate screen
       ref,
       planMtimeMs: fs.statSync(planPathFor(root, ref)).mtimeMs,
       questions: validQuestions(),
+      classification: { by: 'gate-critic', at: 1786000000000 }, // critic-authored, so classified
     });
 
     // NO sweeper call here — the live entry point must do the sweeping.
@@ -547,6 +565,7 @@ describe('streaming-questions-sweeper — REACHABILITY from the live gate screen
       ref,
       planMtimeMs: fs.statSync(planPathFor(root, ref)).mtimeMs,
       questions: validQuestions(),
+      classification: { by: 'gate-critic', at: 1786000000000 }, // critic-authored, so classified
     });
 
     streamingGate.streamingGateScreen(root);

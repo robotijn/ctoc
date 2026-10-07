@@ -1,0 +1,828 @@
+---
+iron_loop_verdict: true
+iron_loop: true
+title: "Only weighty questions reach the human, and his answer holds"
+type: implementation
+created: 2026-10-07
+priority: high
+effort: medium
+parent_plan: ctoc-keeps-working-and-asks-only-what-matters
+depends_on: the-approval-and-check-records-are-write-protected
+files:
+  - src/lib/streaming-precompute.js
+  - tests/question-blocking-default.test.js
+  - agents/iron-loop/gate-critic.md
+  - agents/planning/product-owner.md
+  - agents/planning/implementation-planner.md
+  # Added 2026-10-07 by the session under the owner's standing instruction: the rules this slice replaces are held word for word by the compaction inventories
+  - tests/compaction-eval/inventory-checks.js
+  - tests/compaction-eval/gate-critic/rule-inventory.json
+  - tests/compaction-eval/product-owner/rule-inventory.json
+  - tests/compaction-eval/implementation-planner/rule-inventory.json
+  # Added 2026-10-07 by the session: the owner replaced the question contract (topic, classification by the gate critic, fixed key and id shapes); these fixtures encode the old one, and the sweeper must carry the classification
+  - src/lib/streaming-questions-sweeper.js
+  - tests/streaming-precompute.test.js
+  - tests/answers-bind-to-plan-revision.test.js
+  - tests/streaming-gate.test.js
+  - tests/streaming-questions-sweeper.test.js
+  - tests/attestation-round-trip.test.js
+  - tests/real-question-file-render.test.js
+  - tests/questions-attestation.test.js
+  - tests/sufficiency-evidence.test.js
+  - tests/streaming-human-loop-e2e.test.js
+  - tests/streaming-gate-coverage-holes.test.js
+  - tests/plan-question-screen.test.js
+  - tests/answer-feeds-sufficiency.test.js
+  - tests/sufficiency-audit.test.js
+  - tests/menu-critique-first.test.js
+  - tests/golden-corpus-fence.test.js
+  - tests/gate-critic-compaction.test.js
+  # Added 2026-10-07 by the session after the re-review: the rule-count floors must equal the counts, the vision advisor writes question files to the old contract, and the audit counts blocking differently from the gate
+  - tests/product-owner-compaction.test.js
+  - tests/implementation-planner-compaction.test.js
+  - agents/planning/vision-advisor.md
+  - src/lib/sufficiency-audit.js
+approved_by: human
+approved_at: 2026-10-07T16:27:51.118Z
+gate_crossed: review → done
+---
+
+# Only weighty questions reach the human, and his answer holds
+
+Slice 1 of 3 of `plans/functional/ctoc-keeps-working-and-asks-only-what-matters.md`. The
+specification, tests, criteria, risks and decisions below are copied from that plan; only the
+slicing notes under "Decisions Taken Under Ambiguity" are new.
+
+## What the owner asked
+
+> "i am trying to hide the hooks so the llm thinks and ask usefull questions to the user do
+> not bother the user with gates only with questions of high uncertainty or huge importance
+> (like tech stack or algorithms)" — and — "optimize the shit out of ctoc" (2026-10-06)
+
+## Problem statement
+
+What stops a plan today, verified in the code (items 1, 2 and 5 of the parent; the others
+belong to slices 2 and 3):
+
+1. **A plan with no stored questions never moves.** `hasEnoughInformation`
+   (`src/lib/streaming-precompute.js`) returns `enough: false, reason: 'not-computed'` until a
+   question file exists, and since v6.14.93 questions are generated only when the human
+   chooses "Generate its questions". The product owner and the implementation planner are
+   told to call `writePlanQuestions`, but neither holds a shell tool
+   (`tools: Read, Write, Glob, Edit, Grep`), so that order cannot be carried out.
+2. **A "strong preference" stops the plan like a real fork.** `isBlockingQuestion` treats every
+   question except one marked both not critical and not important as blocking, so a detail the
+   critique judged "important" waits for the human exactly like a technology-stack choice.
+5. **A human's "Hold" does not hold.** `hasEnoughInformation` counts a question as answered
+   whatever option was chosen, so answering the gate ruling with "Hold" lets the plan cross on
+   the next render. Harmless while a human approved every crossing; dangerous once crossings
+   are automatic.
+
+## Technical approach
+
+**The classification rule — when a question goes to the human.** One function decides it,
+`isBlockingQuestion` in `src/lib/streaming-precompute.js`. A question goes to the human when
+ANY of these holds, and otherwise is decided by its recommended option and written into the
+plan as a decision taken under ambiguity:
+
+| # | Condition (fields the critique already emits, plus one optional field) | Why |
+|---|---|---|
+| 1 | The question is malformed: not an object, or `critical`/`important` missing or not boolean | unchanged fail-closed rule |
+| 2 | `critical === true` (the critique's own test: unusable result, security hole, data loss, irreversible damage, a crossing on a false basis, a failed critique lens) | huge importance |
+| 3 | `topic` is one of `technology-stack`, `algorithm`, `data-model`, `security-posture`, `irreversible`, `cost` | huge importance, named by the owner |
+| 4 | `important === true` and no `topic` at all | a question written before this change keeps its old meaning |
+| 5 | Two or more options and not exactly one marked `recommended: true` | high uncertainty: nobody could say which answer is better |
+
+`topic` is a new optional question field with the closed values above plus `detail`; an
+unknown value makes the whole file invalid (refused on write and on read). A new optional
+option field `holds: true` marks an answer that means "do not move this plan" (the ruling's
+Hold and Reject, "Hold until the lens runs"); a question answered with such an option makes
+`hasEnoughInformation` return `enough: false, reason: 'held'`.
+
+**Questions without an extra dispatch.** The agent that writes a plan also writes its
+questions, as its last act, into the existing quarantine
+(`.ctoc/streaming/questions/pending/<stage>__<file>.md.json`) with its Write tool; the
+existing sweeper validates and promotes it and stamps the plan's own time. The adversarial
+four-lens fleet still runs only when the human asks.
+
+## Specification
+
+### `src/lib/streaming-precompute.js` (MODIFY)
+
+- Constants (not exported): `HIGH_STAKES_TOPICS = ['technology-stack', 'algorithm',
+  'data-model', 'security-posture', 'irreversible', 'cost']`; `QUESTION_TOPICS =
+  [...HIGH_STAKES_TOPICS, 'detail']`, both frozen.
+- `validatePlanQuestions(raw)`: when `question.topic !== undefined` it must be a string in
+  `QUESTION_TOPICS` (error names the question id, sanitized, and lists the allowed values);
+  when `option.holds !== undefined` it must be boolean. Both fields stay optional.
+- `isBlockingQuestion(question) → boolean`: the five conditions above, in that order.
+  `options.length === 1` is never uncertain (a notice, e.g. the critique-coverage question).
+- `readAnsweredQuestionIds(root, ref, revision)`: also returns `keys: Map<questionId,
+  optionKey>` filled beside every `ids.add` (`entry.optionKey`, else `entry.answer` for the
+  older log shape; the later line wins); an empty `Map` on every closed path.
+- `hasEnoughInformation(root, ref)`: after `answered`, compute `held` = answered questions
+  whose chosen option carries `holds: true`; if any, return `{ enough: false, reason:
+  'held', blocking: held, … }` before the open-fork check. Document `'held'` in the reason
+  list.
+
+### `agents/iron-loop/gate-critic.md` (MODIFY)
+
+- Every finding question carries `topic`, with these definitions (copied into the agent):
+  technology-stack — adding, removing or replacing a language, framework, library, database
+  or hosted service (a version bump inside one major version is a detail); algorithm — the
+  method by which a central result is computed, ranked, matched or scheduled; data-model —
+  the shape of stored data, a migration, or a contract other code or people depend on;
+  security-posture — who may do what, what is exposed, where trust boundaries sit, how
+  secrets are held; irreversible — cannot be undone by a later plan; cost — a recurring cost
+  or a large one-off cost; detail — everything else. The gate ruling and the coverage
+  question carry no `topic`.
+- A finding whose evidence is ambiguous (the existing boundary rule) carries two options and
+  NO recommended option: that is how high uncertainty reaches the human. State it as an
+  exception to "exactly one recommended".
+- Rule 8 becomes: recommend Approve when all three prosecution lenses ran and no surviving
+  question goes to the human under the five conditions; an important finding with topic
+  `detail` no longer holds the plan — its recommended fix is recorded in the plan when the
+  plan moves on.
+- The ruling's Hold and Reject options and the "Hold until the <lens> critique runs" option
+  carry `holds: true`.
+- The pre-emit checklist allows exactly `id, prompt, critical, important, options`, plus
+  `topic` on finding questions, and the optional boolean `holds` on options.
+
+### `agents/planning/product-owner.md`, `agents/planning/implementation-planner.md` (MODIFY)
+
+Replace the "Writing questions to the streaming store" section (it orders a function call the
+agent has no tool to make) with: as the last act after the plan file's final write, Write
+`.ctoc/streaming/questions/pending/<stage>__<file>.md.json` containing
+`{ "ref": "<stage>/<file>.md", "questions": [ … ] }` with no `planMtimeMs` (the menu stamps
+the plan's own time and refuses the file if the plan changed afterwards). The planner writes
+one file per slice. Every choice the agent made of technology stack, algorithm, data model,
+security posture, anything irreversible, or anything with a recurring or large cost becomes a
+question with that `topic` — never a silent choice; everything else goes into the plan's
+`## Decisions Taken Under Ambiguity`. Question shape, `topic` definitions, `holds`, the
+no-recommendation rule and "an empty array is the honest 'nothing needs the human'" as in the
+gate critic.
+
+## Test plan — `tests/question-blocking-default.test.js` (MODIFY — the owner replaced the contract)
+
+- Case 6 (`critical:false, important:false` with `opts()`, two options, none recommended,
+  asserted non-blocking) encodes the old rule. Its fixture gains `recommended: true` on
+  option A — the declared detail it means to test — and a new case asserts the
+  no-recommendation shape now BLOCKS. Tightened, not loosened.
+- New cases (red on today's code unless marked guard): important + `topic:'detail'` + one
+  recommended → not blocking; each of the six high-stakes topics with both flags false →
+  blocking; important with no topic → blocking (guard); critical + `detail` → blocking
+  (guard); single option, none recommended → not blocking (guard); writer refuses
+  `topic:'stack'`, `topic: 7`, `holds:'yes'`; end to end through `writePlanQuestions` +
+  `hasEnoughInformation`: three unanswered detail questions → `enough: true`,
+  `unanswered.length === 3`; a question answered with its `holds:true` option →
+  `reason: 'held'`; the same question answered with the other option → `enough: true`.
+
+## Wiring — the live call sites
+
+- `isBlockingQuestion` and the new `held` verdict are read by `hasEnoughInformation`, which
+  `streaming-gate.sufficiencyFor` calls; `pendingGateDecisions` reaches that from the default
+  `/ctoc:start` screen (`streamingGateScreen`) and from `stream answer`. Root: the shipped
+  slash command `src/commands/start.js`.
+- `validatePlanQuestions` runs inside `writePlanQuestions`, which the quarantine sweeper
+  (`streaming-questions-sweeper.promotePendingFile`) calls when `streaming-gate` sweeps
+  `pending/` on the same menu paths.
+- The three agent files are live on their next dispatch by the CTO Chief. The pending file
+  each one writes is promoted by the sweeper above.
+
+## Agent rules this slice replaces or adds
+
+The owner replaced the question contract on 2026-10-06 ("do not bother the user with gates only with questions of high uncertainty or huge importance (like tech stack or algorithms)") and decided on 2026-10-07 that the independent gate critic assigns every topic and that a Hold belongs to CTOC. These are the compaction-inventory orders this slice may mark replaced or added, and no others:
+
+- `agents/iron-loop/gate-critic.md` — replaced: R-165, R-240, R-269, R-292, R-339, R-437, R-485, R-486, R-505, R-506, R-538, R-569, R-586, R-588, R-593, R-605, R-608, R-636; added: N-001, N-002, N-003, N-004, N-005, N-006, N-007, N-008, N-009.
+- `agents/planning/product-owner.md` — replaced: R-414, R-415, R-416, R-417, R-418, R-419, R-420, R-423; added: N-101.
+- `agents/planning/implementation-planner.md` — replaced: R-310, R-311, R-312, R-313, R-314, R-315, R-316, R-319; added: N-201.
+
+## Acceptance criteria
+
+- [x] A question reaches the human only under the five conditions; every other open question is decided by its recommended option. Proven here by the slice 1 cases (parent criterion 1; its end-to-end half, slice 2 case 1, belongs to slice 2).
+- [x] A human's Hold holds; his other answer moves the plan on. Proven here by the held cases: the `holds:true` answer gives `reason: 'held'`, the other answer gives `enough: true` (parent criterion 4; its screen half, slice 2 case 3, belongs to slice 2).
+- [x] The gate critic, the product owner and the implementation planner say what the code now does: `topic` and its definitions, `holds`, the no-recommendation exception, the quarantine write as the last act, and every stack, algorithm, data-model, security, irreversible or costly choice raised as a question (this slice's share of parent criterion 9; checked at Step 11 and Step 16).
+
+## Risks
+
+| Risk | Mitigation |
+|---|---|
+| Hooks are off, so any agent with Write can write a passing check record or a ledger entry | This slice depends on `the-approval-and-check-records-are-write-protected` (the owner's decision of 2026-10-07: load only the two write protections) |
+| The author critiques its own plan when it writes the questions | Every stack, algorithm, data-model, security, irreversible or costly choice must be a question; the four-lens fleet is one click away; the evidence string records "attested by: not recorded" as today |
+| Queued agent-improvement slices (for example s35 implementation-planner, s37 product-owner) rewrite the same agent files | The scheduler serializes by file; Step 11 checks that whichever lands second keeps the other's text |
+| Coverage floor 99% and the false-green fence | Every new branch has a case above; no empty catch block — each records a named reason |
+
+## Decisions Taken Under Ambiguity
+
+Copied from the parent:
+
+1. **Optional `topic`, legacy reading for its absence.** Making it mandatory would turn every
+   stored question file invalid on read and stall every plan; an important question without
+   a topic keeps blocking, so absence never waves anything through.
+2. **High uncertainty is "no single recommended answer"** — derived from a field the
+   critique already emits, so no new self-reported confidence number is trusted.
+6. **Questions are written by the authoring agent through the quarantine** rather than by
+   auto-running the four-lens fleet: zero extra dispatches, consistent with "no unasked work",
+   and the only write path those agents' tools allow.
+
+New, from slicing:
+
+10. **The slice keeps the parent's boundary** (five files, above the planner's usual one to
+    three), because the brief said to cut along the slices the parent already defines. The
+    module and its test stay together; the three agent files are the instruction half of the
+    same rule.
+11. **Depends on the protection plan.** The parent now depends on
+    `the-approval-and-check-records-are-write-protected`, and this is the first slice to build.
+
+Owner decision, 2026-10-07 (answer "a" to "Who should decide whether a question is weighty
+enough to reach you?"):
+
+12. **The independent gate critic assigns every topic; the plan's author never grades its own
+    question.** A question's `topic` decides blocking only in a questions file that carries the
+    gate critic's classification block `{ "by": "gate-critic", "at": <ms> }` (exactly those two
+    keys). In any other file every open question reaches the human, whatever topic it declares.
+    The product owner and the implementation planner still write their questions with a proposed
+    topic; they never write a classification block. This replaces point E of the fix round.
+13. **The honest limit.** The classification block is written by an agent through the same
+    waiting folder as every other questions file, so a different agent could forge one. That
+    would be deliberate deception visible in the record, not a mislabel; there is no trusted
+    provenance channel for it today.
+
+Recorded 2026-10-07 at the session's instruction, after the security scan of that day:
+
+14. **The `holds` reversal.** A hold belongs to CTOC, never to a question file: it is read only
+    from the answers log (an entry carrying `holds: true` for the plan, released only by a later
+    real answer to the same question without it), and a question file that carries `holds` on any
+    option is refused. The specification's lines about a `holds` option field — in the technical
+    approach, the `validatePlanQuestions` and `hasEnoughInformation` items, the gate critic's
+    ruling options, and the test plan's holds cases — and acceptance criteria 2 and 3 where they
+    describe `holds` as an option field, are superseded by this decision and by the security scan
+    of 2026-10-07.
+
+## Execution Plan
+
+### Step 8: TEST
+- [x] Write the new and changed cases in `tests/question-blocking-default.test.js`; run; record which are red.
+
+### Step 9: PREPARE
+- [x] Confirm `the-approval-and-check-records-are-write-protected` is built.
+- [x] Record before-numbers: false-green scan count, dead-export count, unreachable-file count, `CLAUDE.md` bytes.
+
+### Step 10: IMPLEMENT
+- [x] `src/lib/streaming-precompute.js`, `agents/iron-loop/gate-critic.md`, `agents/planning/product-owner.md`, `agents/planning/implementation-planner.md`, as specified; run the slice 1 tests green.
+
+### Step 11: REVIEW
+- [x] Dispatch `iron-loop-critic`: the five conditions match the table exactly and in order; no instruction surface in this slice contradicts the code; whichever queued agent-improvement slice lands second keeps the other's text.
+
+### Step 12: OPTIMIZE
+- [x] `isBlockingQuestion` stays a pure check of the question object with no file read; `held` is computed from the answers already read for `answered`, with no second read of the answer log.
+
+### Step 13: SECURE
+- [x] Dispatch `security-scanner`: an unknown `topic` or a non-boolean `holds` is refused on write and on read; the error names the question id sanitized; a malformed question still blocks (condition 1).
+
+### Step 14: VERIFY
+- [x] `npm test`: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct`.
+- [x] Lint the changed files: zero warnings.
+- [x] False-green, dead-export and unreachable counts not higher than the Step 9 numbers.
+- [x] An existing test that fails because it asserts the replaced contract (a "Hold" crosses) is reported through `src/lib/scope-growth.js`, never edited outside `files:`.
+
+### Step 15: DOCUMENT
+- [x] JSDoc on every changed function in `src/lib/streaming-precompute.js`, including the `'held'` reason.
+
+### Step 16: FINAL-REVIEW
+- [x] Dispatch `iron-loop-critic` against the acceptance criteria above; each box quotes its evidence.
+
+
+---
+
+## Execution Plan (Steps 8-16)
+
+### Step 8: TEST (TDD Red)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
+
+### Step 9: PREPARE
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
+
+### Step 10: IMPLEMENT
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
+
+### Step 11: REVIEW
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
+
+### Step 12: OPTIMIZE
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
+
+### Step 13: SECURE
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
+
+### Step 14: VERIFY
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
+
+### Step 15: DOCUMENT
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
+
+### Step 16: FINAL-REVIEW
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
+
+
+## Deferred Questions
+
+_Written by the Iron Loop integrator (src/lib/iron-loop.js), which performs NO
+quality evaluation. These entries are the integrator's own report on itself, not
+findings from a critic that read this plan._
+
+- **evaluation**: NOT EVALUATED — no automated critique was performed on this plan. The refinement loop appended the Steps 8-16 template and assessed nothing. (The scores this step used to report were computed from that same template, not from the plan.) A human or a real critic must review this plan before it is built.
+
+## Execution Record
+
+Executor run of 2026-10-07, worktree branch, in two passes. Pass 1 built the code half and
+stopped at a fork (recorded below as it was). The session then widened `files:` with the four
+compaction-inventory files (approval re-recorded, specification hash f6a476234385e6dc…, matched
+after the frontmatter edit) and set the design for the agent half; pass 2 built it. Steps 11, 13
+and 16 are left for the session's dedicated critic and security scan.
+
+### What landed
+
+- `src/lib/streaming-precompute.js`: frozen `HIGH_STAKES_TOPICS` / `QUESTION_TOPICS` (not
+  exported); `validatePlanQuestions` refuses an unknown `topic` (error names the sanitized
+  question id and lists the allowed values) and a non-boolean `holds`; `isBlockingQuestion`
+  is the five conditions in order; `readAnsweredQuestionIds` returns `keys: Map<questionId,
+  optionKey>` (`optionKey`, else `answer`; later line wins; empty Map on every closed path);
+  `hasEnoughInformation` returns `reason: 'held'` with `blocking` = the held questions, before
+  the open-fork check, computed from the same single read of the answers log. JSDoc updated,
+  `'held'` documented in the reason list.
+- `tests/question-blocking-default.test.js`: case 3 now carries `recommended: true` on option
+  A; new cases 3b, 14-29 (with 20b).
+
+### Red before, green after (Step 8 then Step 10)
+
+Red run on the unchanged module: 31 tests, 20 pass, 11 fail. Red: 3b (no recommendation
+blocks), 14 (important + detail does not block), 15 (six high-stakes topics block), 20
+(non-array options block), 21, 22, 23 (unknown topic / non-boolean holds refused on write
+and on read), 25 (three detail questions are enough), 26 (holds answer gives 'held'),
+28 (older log shape and later line), 29 (`keys` Map). Green on the old code as intended
+guards: 16, 17, 18, 19, 24, 27. Case 20b was added during Step 10 (fail-closed on an unknown
+topic reaching the predicate directly). Green run after Step 10: 32 tests, 32 pass, 0 fail.
+
+### Step 9 before-numbers (baselines the fences enforce)
+
+False-green `maxFindings` 207; dead exports `maxDead` 65; unreachable files `maxUnreachable`
+17; `CLAUDE.md` 14,952 bytes. The fences ran inside `npm test` and passed, so none rose.
+`the-approval-and-check-records-are-write-protected` is on the base commit (00a64b10).
+
+### Step 14
+
+`npm test` (once, foreground): tests 12586, pass 12586, fail 0, skipped 0, cancelled 0;
+coverage 99.9% (floor 99); `streaming-precompute.js` 100% line, 98.87% branch, 100% functions;
+`[CTOC test-gate] PASS`. Lint on both changed files: zero warnings. No existing test failed
+on the replaced contract, so no scope-growth report was needed for that item.
+
+### Pass 1 stop (resolved by the session's scope widening): the agent half could not be built inside the original `files:`
+
+All three agent files sit EXACTLY at their byte ceiling (`maxBytes` in
+`tests/compaction-eval/<agent>/rule-inventory.json`), and the sentences this plan says to
+replace or change are inventoried rules that check 9 ("every unit marked kept appears word for
+word") and check 4/10 (anchors present, exactly once) hold verbatim. The inventories are not in
+`files:`.
+
+| Agent file | Bytes now | Ceiling | Editable bytes outside kept units and anchors | What the plan needs |
+|---|---|---|---|---|
+| `agents/iron-loop/gate-critic.md` | 134,683 | 134,683 | 961 | about 1,200-1,500 bytes of additions (topic definitions, holds, Rule 8, the no-recommendation exception, checklist); Rule 8's first sentence is kept unit 485 and cannot be reworded |
+| `agents/planning/product-owner.md` | 30,203 | 30,203 | 1,795 | replace "Writing questions to the streaming store" — all 13 of its units are kept orders R-411..R-423 |
+| `agents/planning/implementation-planner.md` | 27,019 | 27,019 | 784 | replace the same section — all 13 units are kept orders R-307..R-319 |
+
+Also pinned outside `files:`: `tests/session-start-question-dispatch.test.js` case 3 requires
+both planning agents to name `writePlanQuestions` (satisfiable by the new text).
+
+The files that would have to join `files:` (forced by the section replacement in
+`agents/planning/product-owner.md` and `agents/planning/implementation-planner.md`, and by
+Rule 8 in `agents/iron-loop/gate-critic.md`; acceptance criterion 3 cannot be met without
+them): `tests/compaction-eval/gate-critic/rule-inventory.json`,
+`tests/compaction-eval/product-owner/rule-inventory.json`,
+`tests/compaction-eval/implementation-planner/rule-inventory.json` — to re-anchor the replaced
+orders to their new text and to raise the gate critic's ceiling by the measured addition. If
+refused: the code rule ships, but the three agents keep telling producers that every
+`important` question blocks, never emit `topic` or `holds`, and the product owner and planner
+keep an order to call a function they hold no tool to call.
+
+### Pass 2 — the agent half
+
+**A rule the owner replaced is recorded, never silently dropped.**
+`tests/compaction-eval/inventory-checks.js` gains a fourth way an order ends: `fate: "replaced"`,
+allowed only with a complete `replaced_by` record (`instruction`, `date` YYYY-MM-DD, `plan`,
+non-empty `new_anchors`); the old `anchors` stay as history. Still exactly ten checks: check 3
+refuses an incomplete record, an unknown order fate, a unit marked `replaced` that carries no
+replaced order, and a `kept` unit that carries one; check 4 holds a replaced order to its new
+anchors in its section AND fails if any old anchor is still in the agent; checks 8 and 10 run on
+the new anchors. Inventory paths now resolve with `path.resolve` (absolute fixture paths work;
+every relative path resolves as before).
+
+Red/green for it (cases 30-34 in `tests/question-blocking-default.test.js`): before the change,
+30 and 31 were red (2 of 37 failing); 32, 33 and 34 passed only vacuously, because an absolute
+fixture path made every check fail. After: 37 of 37 pass. One expectation of my own (case 31's
+silently rewritten kept rule) first named checks 4, 8, 9; the run showed 4, 9, 10, which is the
+correct behaviour (a missing anchor is already reported by check 4, so check 8 has nothing
+silent; check 10 counts it zero times). Corrected to 4, 9, 10.
+
+**Agents, bytes against ceilings:**
+
+| Agent file | Before | After | Ceiling before | Ceiling after |
+|---|---|---|---|---|
+| `agents/iron-loop/gate-critic.md` | 134,683 | 136,327 | 134,683 | 136,327 (`ceiling_corrections`: 2026-10-07, 134,683 to 136,327, measured overage 1,644) |
+| `agents/planning/product-owner.md` | 30,203 | 30,133 | 30,203 | 30,203 (unchanged) |
+| `agents/planning/implementation-planner.md` | 27,019 | 26,973 | 27,019 | 27,019 (unchanged) |
+
+No earlier `ceiling_corrections` entry existed anywhere in the repository, so the form is the one
+the session specified: `{ date, from, to, reason }`.
+
+**Orders marked replaced** (each with the owner's words of 2026-10-06, the plan's instruction,
+date 2026-10-07 and this plan's slug):
+- gate critic: R-339 (ambiguous evidence: two options, none recommended), R-437 (exactly one
+  recommended, except that case), R-485 (Rule 8: Approve when no surviving question goes to the
+  human; an important `detail` finding no longer holds the plan), R-591 (option keys include
+  `holds`).
+- product owner: R-414, R-415, R-416, R-417, R-418, R-419, R-420, R-423.
+- implementation planner: R-310, R-311, R-312, R-313, R-314, R-315, R-316, R-319.
+
+Added to the gate critic without replacing any order: rule 4a (every finding question carries
+`topic`, with the seven definitions copied from this plan; the ruling and `q98` carry none; the
+five routing conditions in words; `holds: true` means "do not move this plan"); a sentence in
+rule 10 putting `holds: true` on the ruling's Hold and Reject options and on rule 9's
+`Hold until the <lens> critique runs`; and an insertion in the pre-emit checklist after its first
+anchor (which stays whole): a finding question also carries `topic`, `holds` is an optional
+boolean option field.
+
+Kept verbatim in both planning agents: the heading, R-412/R-308 and R-413/R-309 (the dispatch-
+brief sentences, pinned by `tests/session-start-question-dispatch.test.js`), R-421/R-317 and
+R-422/R-318 (empty array is honest; never invent a question). `writePlanQuestions` and
+`streaming-precompute` stay named in both.
+
+Full `npm test` (pass 2, once, foreground): tests 12591, pass 12591, fail 0, skipped 0,
+cancelled 0; coverage 99.89% (floor 99); `[CTOC test-gate] PASS`. Lint on the three changed
+JavaScript files: zero warnings.
+
+### Fix round (Step 11 critic: ship after; Step 13 security scan: block)
+
+Test-first evidence: the new and changed cases were run against the module and the inventory
+checks as they stood at commit 7a9caec7 (saved copies) before the fix took effect: 13 of 46
+slice cases red for A and B (22, 24b, 24c, 24d, 24e, 24f, 26, 27b, 27c, 28, 29, 29b, 29c), and
+all six inventory cases red for C (30-35). After the fix: 47 of 47 pass.
+
+Full `npm test` on the fix round: tests 12601, pass 12600, fail 1, skipped 0; coverage 99.9%.
+The one failure is `tests/streaming-precompute.test.js` "an unreadable answers log does NOT
+deadlock a plan with no forks", which asserts exactly the contract finding A replaces (an
+unreadable log let a plan with only details through). Per Step 14 it is reported here and was
+not edited (outside `files:`). Inventory paths may also point under `skills/` (the
+hallucination-detector and llm-security-tester method inventories hold skill files); anything
+else fails every check.
+
+| Finding | Test | Result |
+|---|---|---|
+| A. A hold was read from the author's question file (bypasses 1a/1b/1c) | 22 (any `holds` on an option is refused), 26, 27 (the same answer without `holds` moves the plan on), 27b (a hold outlives its revision and the plan's stage), 27c (a hold on a question the revision no longer has still holds), 28 (only a later answer releases; a line with no answer releases nothing; older log shape), 29 | Fixed: `hasEnoughInformation` reads a hold only from the answers log — the latest entry with a recorded key for this plan (matched by file name, any revision) and question decides; the validator refuses `holds` |
+| A. An unreadable answers log let a plan with only details through | 29c | Fixed: any question + unreadable log gives `answers-unreadable`; a plan with no questions still moves. The two comments that said otherwise are rewritten |
+| A. An answer naming no option counted as answered | 29b | Fixed when the questions are known (`hasEnoughInformation` passes them); such an entry is counted in `unbound` |
+| B. Invisible and direction-changing characters in human-visible text | 24c | Fixed: refused in prompt, label, pros, cons, description |
+| B. Labels the human cannot tell apart | 24d | Fixed: unique after control-strip, trim, lower-case |
+| B. More than three options | 24e | Fixed |
+| B. A weighty single option with no recommendation decided by default | 24f | Fixed: refused; on a detail it stays a notice |
+| B. A topic on the gate ruling or coverage notice could make the ruling a decided detail | 24, 24b | Fixed: the two reserved ids carry no topic; a look-alike id is ordinary |
+| B. `topic` required; option key `^[1-3]$`; question id `q<NN>-<kebab>` | — | NOT LANDED here: see "Fork" below |
+| C. `replaced` records were self-asserted | 32 (fourteen exact failing-check lists: no record, empty instruction, empty anchors, bad date, impossible date, future date, unknown fate, unit/order mismatch both ways, missing plan, climbing plan path, no approval record, plan not naming the order, new anchor already in the baseline) | Fixed in `inventory-checks.js`, still ten checks |
+| C. An old sentence could survive beside its replacement | 33 | Fixed: every old sentence must be gone or inside a new anchor |
+| C. The agent path could point anywhere | 34 | Fixed: must resolve under `agents/`; otherwise all ten checks fail |
+| C. New rules had no inventory | 35 | Added fate `added` with an `added_by` record; N-001..N-005 pin rule 4a's definitions, the no-topic sentence, the routing sentence, the tie-break sentence and the checklist clause |
+| D. Agent text | the three inventories (orders below) | Done, see below |
+
+Gate critic orders replaced: R-339 (ambiguous evidence, now with its leftover sentence in the
+new anchor), R-437, R-485 (new anchor is the whole rule 8 paragraph, so its kept DEFENSE sentence
+stands inside it), R-486 (findings that go to no human are decided by their recommendation),
+R-538 ("unresolved" added), R-569 (no more "batch-approves it in one keystroke"), R-586 (template
+JSON gains `topic`), R-588 (which flags are required, said exactly), R-636 (worked example gains
+`topic: "detail"`). R-591 is back to its original words and to `kept` (no `holds`). Added:
+N-001, N-002, N-003, N-004, N-005. Removed from all three agents: every mention of `holds` (the
+hold is the human's answer, recorded by CTOC; slice 2 writes it). Rule 4a's `data-model` is
+narrowed to persisted data shapes and interfaces outside code depends on, here and in the
+frozen list's comment. Product owner: R-414, R-415, R-416, R-417, R-418, R-419, R-420, R-423.
+Implementation planner: R-310, R-311, R-312, R-313, R-314, R-315, R-316, R-319.
+
+Bytes after the fix round: gate critic 136,483 (ceiling raised 134,683 to 136,483 by the
+measured overage, one `ceiling_corrections` entry); product owner 30,113 of 30,203; planner
+26,953 of 27,019.
+
+E. Recorded: in this round the topic was still the author's own label. The owner's decision of
+2026-10-07 on who assigns it is recorded under "Decisions Taken Under Ambiguity".
+
+### Owner decision round — the independent gate critic assigns every topic
+
+Folded into the fix round on the session's instruction (decisions 12 and 13 above).
+
+Test-first: cases 13 (changed: a stored file without topics is refused on read and fails
+closed), 16 (changed: a missing topic blocks; the HOLD and APPROVE rulings behave), 36, 37, 38,
+39 and 40 were written and run against the fix-round module: 7 red (13, 16, 36, 37, 38, 39, 40).
+After the change: 52 of 52 pass.
+
+| Owner decision point | Test | Result |
+|---|---|---|
+| 1. Topic decides only in a file the gate critic classified | 36 (an author's own file labelling a database switch `detail` blocks), 37 (the same question in a classified file is decided by default) | `hasEnoughInformation` treats every open question in an unclassified file as going to the human; `planQuestionsStatus` reports `classified` |
+| 1. The block is validated strictly | 38 (`by: "product-owner"`, missing `at`, string, negative or fractional `at`, an extra key, an array, a string — none counts) | `isGateCriticClassification` |
+| 1. The writer carries it | 39 | `writePlanQuestions` sixth parameter; a file without one keeps its exact shape |
+| 1. Topic required for shape | 13, 16, 40 | the validator refuses a finding with no topic; the reserved ruling and notice carry none; the predicate blocks a topicless finding |
+| 2. Product owner and planner propose, never classify | inventory orders N-101, N-201 | "Your `topic` is a proposal: the gate critic classifies before anything is decided; never write a `classification` block." |
+| 3. Gate critic classifies | inventory orders N-006, N-007, N-008, R-165, R-505, R-506 | New section "Classifying the questions — the topic is yours, never the author's"; the pending file carries the classification block (R-165); rule 10's ruling governs every synthesis, not a classification (R-505, R-506) |
+| 4. Recorded | decisions 12 and 13 | the approval hash is unchanged (f6a476234385e6dc…) |
+
+Bytes: gate critic 137,503 (ceiling 134,683 raised to 137,503 by the measured overage, one
+`ceiling_corrections` entry); product owner 30,173 of 30,203; planner 27,013 of 27,019.
+
+The live promotion path does not carry the block yet: `src/lib/streaming-questions-sweeper.js`
+passes only `payload.questions` and `payload.attestation` to `writePlanQuestions`. Until it also
+passes `payload.classification` (one line, outside `files:`), every promoted file is
+unclassified and every question in it reaches the human — the fail-closed direction.
+
+### Fork (resolved by the contract round below): what the fix round and the owner's decision needed outside the original `files:`
+
+Three strictness rules of finding B (topic REQUIRED, option key `^[1-3]$`, question id
+`q<NN>-<kebab>`) and the owner's decision (topics decide only in a file the gate critic
+classified; an unclassified file blocks every question) were built and measured. Both change
+the stored-question contract that test fixtures outside this slice encode (keys `a`/`b`, ids
+`q1`/`q10`, no topic, no classification, details expected to move on). Measured with the full
+suite on the final state (`npm test`: tests 12606, pass 12513, fail 93, skipped 0; coverage
+99.63%): topic required plus classification gating fails 93 tests in 16 files, every one outside
+`files:`, none in this slice's files —
+`tests/streaming-precompute.test.js` (21), `tests/answers-bind-to-plan-revision.test.js` (20),
+`tests/streaming-gate.test.js` (16), `tests/streaming-questions-sweeper.test.js` (7),
+`tests/attestation-round-trip.test.js` (6), `tests/real-question-file-render.test.js` (5),
+`tests/questions-attestation.test.js` (4), `tests/sufficiency-evidence.test.js` (2),
+`tests/streaming-human-loop-e2e.test.js` (2), `tests/streaming-gate-coverage-holes.test.js` (2),
+`tests/plan-question-screen.test.js` (2), `tests/answer-feeds-sufficiency.test.js` (2),
+`tests/sufficiency-audit.test.js` (1), `tests/menu-critique-first.test.js` (1),
+`tests/golden-corpus-fence.test.js` (1), `tests/gate-critic-compaction.test.js` (contract
+fixtures, 1). Classification gating alone (topic optional) still fails tests in
+`tests/streaming-precompute.test.js` (4), `tests/streaming-gate.test.js` (1) and
+`tests/answers-bind-to-plan-revision.test.js` (1). The stored question files would also read
+invalid: 2 in this repository, 15 in the main checkout's `.ctoc/streaming/questions/`. The live
+promotion path also needs one line outside `files:`: `src/lib/streaming-questions-sweeper.js`
+must pass `payload.classification` to `writePlanQuestions` (sixth argument), or no promoted file
+can ever be classified.
+
+### Decisions taken under ambiguity (executor)
+
+1. The test plan's "Case 6" is the file's case 3 (the only case asserting a two-option,
+   none-recommended, both-false question does not block); the fixture change was applied there.
+2. A question whose `options` is not an array, or whose `topic` is outside the closed list,
+   is malformed under condition 1 and blocks (fail closed), even when called directly
+   without the read-side validation.
+3. The unknown-topic error lists the allowed values but does not echo the producer's value.
+4. Until slice 2 lands, the gate screen renders `'held'` through its fallback as
+   "Enough information: NO — held." and does not cross the plan by itself.
+5. Decisions are recorded here, not in the plan's own "Decisions Taken Under Ambiguity", so the
+   approved body is unchanged.
+6. The specification says the menu "refuses the file if the plan changed afterwards". The
+   sweeper checks supersession only when a `planMtimeMs` is present, and the agents write none,
+   so the agent text says only what is true: the sweeper validates through `writePlanQuestions`
+   and stamps the plan's own time. A plan changed after promotion reads its questions as stale.
+7. The inventory-checks cases live in `tests/question-blocking-default.test.js`, the only test
+   file in `files:`; `tests/compaction-eval.test.js` pins exactly ten checks, so the replaced
+   fate was folded into checks 3, 4, 8 and 10 rather than added as an eleventh.
+8. Rule 8's second sentence (R-486, "Surviving `normal` findings do not block Approve — they are
+   tie-breakers the human rules on individually …") and the Hold line of rule 10 (R-532, "one or
+   more `important` findings survived deduplication unresolved") were NOT replaced: the
+   specification names neither, and the new Rule 8 defines an important `detail` finding as
+   resolved "here and in rule 10". Step 11 should judge whether R-486's "the human rules on
+   individually" still reads true now that such questions are decided by their recommendation.
+9. R-588 ("`critical`, `important`, and `recommended` are optional booleans") was already wrong
+   before this slice (the two flags are required) and is not in the specification; left as is.
+10. The worked-example and template JSON blocks (kept units) carry no `topic`; changing them is
+    not in the specification. Rule 4a and the checklist state the field.
+11. For bytes, rule 4a's "that is how high uncertainty reaches the human" was not repeated at the
+    ambiguous-evidence rule; rule 4a's routing sentence says the same.
+
+### Not verified
+
+- The live counts of the false-green, dead-export and unreachable fences were not printed; the
+  evidence is that the fences passed inside `npm test`.
+
+### Contract round — the fork resolved: files widened, key and id shapes, fixtures to the new contract
+
+The owner approved widening `files:` (approval record e4e66836…; the worktree copy's
+specification hash was recomputed after inserting the 18 lines and matched before any edit).
+
+Test-first:
+- Sweeper: case 13b in `tests/streaming-questions-sweeper.test.js` first ran red for the
+  wrong reason (its shared fixture had no topic); with the fixture brought to the contract it
+  ran red for the right one (`classification` was `undefined` on the promoted file). Then the
+  one line in `src/lib/streaming-questions-sweeper.js` passes `payload.classification` as the
+  sixth argument to `writePlanQuestions`; 13b green.
+- Key and id shapes: case 41 in `tests/question-blocking-default.test.js` ran red (no key or
+  id rule), then the validator gained option key `^[1-3]$` and question id
+  `^q[0-9]{2}-[a-z0-9-]+$`. The approved `(-r[0-9]+)?` suffix is itself kebab, so the single
+  class already covers it; writing it as a separate group only added a nested quantifier that
+  the security linter flags. Case 41 green. Every `refused(...)` case now also asserts WHICH
+  rule refused it, so a fixture refused for a different reason cannot pass by accident.
+
+Per changed test (old assertion → new assertion → why):
+- `tests/question-blocking-default.test.js`, shared `opts`/`recOpts` and the writer-path fixtures (cases 9b, 10-12, 21-24f, 36-41): keys `a`/`b` and ids `q`/`q1`/`needs-decl`/`q-stack` → keys `1`/`2`, ids `q10-…`/`q11-…`, each refusal asserting its own error text → the key and id shapes (owner 2026-10-07); a refused write must be refused for the rule the case names.
+- `tests/streaming-precompute.test.js`, fixtures `sampleQuestions`, `tieredQuestions`, `normalOnlyQuestions` and every `answer(...)` call (20 cases): ids `db`/`crit`/... and keys `pg`/`clerk`/... → `q10-db`/`q10-crit`/... and keys `1`/`2`, each question with a topic (stack, security posture, detail) → the same assertions on the renamed ids → the key and id shapes and the required topic (finding B, owner 2026-10-07).
+- `tests/streaming-precompute.test.js`, `seedReady`: wrote an author file → writes a gate-critic-classified file by default (`null` for an author file) → the tier cases test the arithmetic of a classified file; only there may a topic decide (owner 2026-10-07).
+- `tests/streaming-precompute.test.js`, "an unreadable answers log does NOT deadlock a plan with no forks": `enough === true` for a details-only plan with an unreadable log → `enough === false`, reason `answers-unreadable`, and a plan with NO questions still `enough === true` → a Hold is recorded only in the log, so an unread log may hold one (finding A of the fix round, under the contract the owner replaced on 2026-10-07).
+- `tests/answers-bind-to-plan-revision.test.js`, fixtures `fork`, `detail`, `seedAt`, `reviseTo` and every answer line (cases 1-21): ids `q10`/`q11`/`q12`/`q30` and keys `a`/`b` → `q10-a`/`q11-b`/`q12-c`/`q30-d` and keys `1`/`2`, forks topic `technology-stack`, details topic `detail`, every seeded file gate-critic-classified → the same binding assertions on the renamed ids → key and id shapes, required topic, and a detail decides only in a classified file (owner 2026-10-07).
+- `tests/answers-bind-to-plan-revision.test.js`, case 6: the older log shape answered `'Some prose answer'` → it answers `'1'`, and still binds → under the new contract an answer counts only when it names one of the question's options (fix round, finding A); the case still proves both log shapes parse.
+- `tests/streaming-gate.test.js`, fixtures `precomputedQuestions`, `forkQuestion`, `detailQuestion` and the inline question sets (16 cases: the screen, X6 crossing, decision matrix, generate-questions cases): ids `db`/`auth`/`w`/`f`/`q`/`name` and keys `pg`/`sqlite`/`clerk`/`roll`/`a`/`b` → `q10-db`/`q11-auth`/`q10-w`/`q10-f`/`q10-q`/`q12-name` and keys `1`/`2`, each question with a topic, and the expected `stream answer …` action strings carry the new id and key → same assertions → key and id shapes, required topic (owner 2026-10-07).
+- `tests/streaming-gate.test.js`, case 9: an author file whose detail did not block → the same file written gate-critic-classified, and the detail still does not block → only a classified file lets a topic decide (owner 2026-10-07).
+- `tests/streaming-questions-sweeper.test.js`, fixture `validQuestions` (cases 1-13 and the ladder): ids `store`/`expiry`, keys `pg`/`sqlite`/`15m`/`1h` → `q10-store`/`q11-expiry`, keys `1`/`2`, topics `technology-stack`/`security-posture`; case 1 now expects `['q10-store', 'q11-expiry']` → the same promotion assertions → key and id shapes, required topic (owner 2026-10-07).
+- `tests/streaming-questions-sweeper.test.js`, new case 13b: a gate-critic-classified pending file arrives classified, an author file arrives unclassified → covers the one sweeper line that passes `payload.classification` through.
+- `tests/golden-corpus-fence.test.js`, the streaming-questions reader: the real captured sample read back as a non-empty question list → the same real sample is refused by the canonical reader (`invalid`) for missing topics and nothing else, and with only `topic` added reads back every question by id → the real samples predate the required topic (owner 2026-10-07); the fence still drives the real persisted shape through its reader.
+- `tests/real-question-file-render.test.js`, the staged worked example (5 cases): the real sample was copied as is → it is staged with only `topic: "detail"` added to each finding, every other field byte for byte → the renderer cases test the real long text, which an untopiced file no longer reaches (owner 2026-10-07).
+- `tests/attestation-round-trip.test.js`, fixture `validQuestions` (6 cases): id `store` → `q10-store` with topic `technology-stack` → same assertions → id shape and required topic.
+- `tests/questions-attestation.test.js`, fixture `nonEmptyQuestions` (4 cases): id `q10`, keys `pg`/`sqlite` → `q10-datastore`, keys `1`/`2`, topic `technology-stack` → same assertions → id and key shapes, required topic.
+- `tests/sufficiency-evidence.test.js`, fixture `forkQuestion` and cases 9-11: id `db`, keys `pg`/`sqlite` → `q10-db`, keys `1`/`2`, topic `technology-stack`; the evidence's answered ids expect `q10-db` → same assertions → id and key shapes, required topic.
+- `tests/streaming-gate-coverage-holes.test.js`, fixture `forkQuestion`, the wide-token question and the answer-record cases: ids `db`/`wide`, keys `pg`/`sqlite`/`a`/`b` → `q10-db`/`q10-wide`, keys `1`/`2`, topics; the recorded answer expects `q10-db`/`1` → same assertions → id and key shapes, required topic.
+- `tests/streaming-human-loop-e2e.test.js`, fixture `magicLinkQuestions` and cases 6-7: ids `store`/`expiry`/`transport`/`copy`, keys `pg`/`15m`/`resend`/`signin`… → `q10-store`/`q11-expiry`/`q12-transport`/`q13-copy`, keys `1`/`2`, topics stack/security/stack/detail; case 7 expects `['q12-transport']` blocking → same end-to-end assertions → id and key shapes, required topic. The file stays unclassified (an author's file): case 7's verdict holds because the only unanswered question is the fork.
+- `tests/sufficiency-audit.test.js`, helper `q` and its callers: ids `q10`/`q11`/`q12`, key `a`, no recommendation, no topic → `q10-a`/`q11-b`/`q12-c`, key `1` recommended, topic weighty for a fork and `detail` otherwise → the same counts (3 questions, 2 blocking) → id and key shapes, required topic, and a weighty single option must carry a recommendation.
+- `tests/answer-feeds-sufficiency.test.js`, fixture `forkQuestion` and cases a-d: ids `db`/`cache`, keys `pg`/`sqlite` → `q10-db`/`q11-cache`, keys `1`/`2`, topic `technology-stack`; the log assertions expect `"questionId":"q10-db"` → same assertions → id and key shapes, required topic.
+- `tests/plan-question-screen.test.js`, the two product-question fixtures: no topic → topic `technology-stack` (the critical one) and `detail` → same screen assertions → required topic.
+- `tests/menu-critique-first.test.js`, case 8's product question: no topic → topic `detail` → same assertion → required topic.
+- `tests/gate-critic-compaction.test.js`, the adapter fixtures (lens-unavailable question and the finding helper): no topic → topic `detail` → same adapter assertions → every question but the ruling and the coverage notice carries a topic.
+
+Full `npm test`: tests 12608, pass 12608, fail 0, cancelled 0, skipped 0; coverage 99.89%
+(floor 99); `[CTOC test-gate] PASS`. Lint on every changed JavaScript file: zero warnings.
+
+Consequence the owner should know: every questions file stored before this contract (2 in this
+repository, 15 in the main checkout's `.ctoc/streaming/questions/`) now reads `invalid` — they
+carry no topic (the two here; the main checkout's were counted, not inspected) — so each such plan fails closed and asks for its
+questions again (case 13 pins this).
+
+### Re-review round (verdict: ship after) — floors, kinds, contradictions, audit, release
+
+`files:` widened again (approval record 0299d102…); the worktree copy's specification hash
+matched 0299d102… after inserting the 5 lines and before any edit.
+
+Gate critic orders replaced this round: R-240 (the validator refuses any id outside the shape),
+R-292 (the validator refuses any key but "1", "2", "3"), R-269 (the `-r` suffix is the
+whole-millisecond stamp), R-593 and R-608 (the sweeper keeps the attestation and the
+classification block), R-605 (the checklist's suffix item); R-586 re-anchored (template suffix);
+added N-009 (a synthesis carries every question of an unclassified author file into the fleet's
+file, classified, ids unchanged); N-008 re-anchored ("A classification payload …").
+
+| Finding | Test (red first) | Result |
+|---|---|---|
+| 1. Order floors below the counts | the three callers' `ORDER_FLOOR` | Raised to the real counts: gate critic 590 (589 plus N-009 added this round), product owner 256, implementation planner 185 |
+| 1. A unit's kind could be relabelled cuttable unseen | case 42: a pinned digest passes the true kinds and fails a relabel (red: `kindsSha256` was not an option) | `defineInventoryTests` takes an optional `kindsSha256` (sha256 of the `n:kind` lines), checked in check 3; the three callers pin theirs. The digests equal those of the inventories at 00a64b10, so no kind has changed since extraction |
+| 2. Gate critic said the validator only checks a non-empty id and key | inventory orders R-240, R-292 | Now says the validator refuses any other id shape and any key but "1"-"3" |
+| 2. Gate critic said the sweeper discards everything but the questions | R-593, R-608 | Now says the attestation and classification blocks are kept |
+| 2. A fractional plan stamp would put a `.` in an id | R-269, R-605, R-586 | The suffix is the whole-millisecond stamp (`Math.floor`), with the example `1784271999196.2705` → `-r1784271999196` |
+| 2. A synthesis replaced the author's file and dropped its questions | N-009 | A synthesis carries every question of an unclassified author file into the fleet's file, classified, ids unchanged |
+| 3. Vision advisor wrote to the old contract | `tests/session-start-question-dispatch.test.js` still passes (names `writePlanQuestions`, `streaming-precompute`, the dispatch-brief sentence) | Rewritten: Write to the pending file as the last act; required flags; keys "1"-"3"; id shape; topic as a proposal; never a classification block; never `holds`; no invisible characters |
+| 4. The audit counted critical-or-important | `tests/sufficiency-audit.test.js` case 4b: an author file counts 3 blocking and a classified one 2, each equal to `hasEnoughInformation(...).blocking.length` (red: the author file counted 2) | `streaming-precompute.goesToHuman(question, classified)` is the one rule; the gate and `sufficiency-audit.js` both call it, with `isGateCriticClassification` |
+| 5. Any line with any answer released a hold | case 28b: a later answer to another question, a key that is no option, `null`, `""`, `holds: "false"`, `holds: 0` — none releases; a later real answer does (red: key `"7"` released it) | `isHoldOrRelease`: a hold needs `holds: true` and a recorded key; a release needs a later answer to the same question naming one of its options, with no `holds` of any other shape |
+| 6. The `holds` reversal unrecorded | — | Decision 14 under "Decisions Taken Under Ambiguity" |
+
+Changed test, one line each (old → new → why): `tests/sufficiency-audit.test.js` case 4 wrote an
+author file and expected 2 blocking → writes a gate-critic-classified file, still 2 → in an
+author's file every question now blocks (owner 2026-10-07), and the case means a classified one.
+
+Bytes: gate critic 137,962 (ceiling raised 134,683 → 137,962 by the measured overage, the one
+`ceiling_corrections` entry updated); product owner 30,173 of 30,203; planner 27,013 of 27,019;
+vision advisor has no ceiling.
+
+Full `npm test`: tests 12611, pass 12611, fail 0, cancelled 0, skipped 0; coverage 99.89%;
+`[CTOC test-gate] PASS`. `streaming-precompute.js` 100% line, `sufficiency-audit.js` 100% line.
+Lint on every changed JavaScript file: zero warnings.
+
+### Security re-scan round (verdict: block) — reserved ids, approval records, the empty-plan log, invisible characters
+
+Spec sync first: the session's section "## Agent rules this slice replaces or adds" was inserted
+byte for byte before "## Acceptance criteria"; the worktree copy's specification hash then
+equalled the main approval record (bcd9cc8c…) before any other edit.
+
+Test-first: the new and changed cases ran red against the code of 3616c461 — 4 of 56 in
+`tests/question-blocking-default.test.js` (24c, 29c, 32, 43) — and green after.
+
+| Finding | Test | Result |
+|---|---|---|
+| 1. HIGH — the topic-exempt reserved ids could hide a weighty question, any number, anywhere, any author | case 43: an author file with a database question under `q99-gate-ruling-r1` is refused, and so is a classification-only file; two rulings, a ruling not last, two coverage notices — refused; a file written around the writer reads `invalid`; one notice and one ruling, last, in an attested file — accepted | `reservedIdErrors` in `streaming-precompute.js`, checked at the write and on every read: a reserved id only in a file with a valid attestation (the fleet's synthesis), at most one ruling and one notice, the ruling last |
+| 2. HIGH — any file named `.ctoc/approvals/<plan>.json` approved a replaced or added rule | case 32 gains five exact cases: `{}`, a record of another text, a machine (`advanced_by`) record, a record of another hash scope, an order id only in the execution record — each fails check 3 alone; a backfilled record of this text passes | `approvedPlanText` requires a ledger entry of kind human or backfilled, `hash_scope: "specification"`, and `content_sha256` equal to `computeSpecHash` of the plan now; the order id must appear in the hashed specification part (the excluded sections and checkbox lines removed by the same walk) |
+| 3. An unreadable log was ignored when the questions were regenerated as none | case 29c; `tests/streaming-precompute.test.js` "an unreadable answers log blocks …" | The `computed > 0` condition is gone: an unreadable log fails closed for every plan |
+| 4. The invisible-character list was hand-made | case 24c gains U+00AD, U+034F, U+180E, U+2028, U+2029, U+3164, U+115F, U+FE0F, U+E0041, U+2800 in the prompt, a label, pros, cons and description | `/[\p{Default_Ignorable_Code_Point}\p{Cf}\p{Zl}\p{Zp}⠀]/u` |
+| 5. Screen-side items | — | Not this slice (slice 2): the screen's answered-check without the questions, quoting the plan reference in action strings, CTOC's Hold option key. `streaming-gate.js` untouched |
+
+Changed tests, one line each (old → new → why):
+- `tests/question-blocking-default.test.js` helper `setup`: wrote a ruling with no attestation → a set holding a reserved id is written with a valid attestation → only the fleet's attested synthesis may carry the ruling (finding 1).
+- `tests/question-blocking-default.test.js` case 28b: the ruling was the first of two questions → it is the last → the ruling must be last (finding 1).
+- `tests/question-blocking-default.test.js` case 29c: a plan with no questions and an unreadable log was enough → it is `answers-unreadable` → a hold may predate the regeneration (finding 3).
+- `tests/question-blocking-default.test.js` cases 30-35, 42: the fixture approval was `{}` and the plan had no frontmatter → a human ledger entry carrying the plan's specification hash, and a plan with frontmatter naming R-3 and N-1 in its specification → finding 2.
+- `tests/streaming-precompute.test.js` "an unreadable answers log blocks …": a plan with no questions still moved → it is `answers-unreadable` → finding 3.
+- `tests/golden-corpus-fence.test.js` and `tests/real-question-file-render.test.js`: the upgraded real sample gained topics → topics and a valid attestation → its reserved ruling now needs the fleet's attestation, which the real samples predate (finding 1).
+
+Full `npm test`: tests 12612, pass 12612, fail 0, cancelled 0, skipped 0; coverage 99.88%;
+`[CTOC test-gate] PASS`. The first full run of this round failed 7: the two real-sample files
+above (fixed), and "the dead-export fence scans a surface in LINEAR time" in
+`tests/reachability-surface-scan-is-linear.test.js`, a wall-clock bound that passed alone in
+1.3 s and in the second full run; that scanner was not touched. Lint on every changed
+JavaScript file: zero warnings.
+
+Not changed, needs the owner: two kept gate-critic orders now say less than the code does —
+R-182 ("It changes NO gate behaviour") and R-205 ("Report the classification you made, or write
+no block at all"). A synthesis written with no attestation now has its ruling refused, so the
+whole file is refused and the plan fails closed. Neither order is in the approved list of orders
+this slice may replace, so they were left verbatim.
+
+### Third security scan — findings and fixes
+
+Specification hash before any edit: bcd9cc8c… (equal to the approval record); after: bcd9cc8c…
+(this section is the only change to the plan, and the execution record is outside the hash).
+
+Test-first: the seven new cases (44-50) and two new lines in case 28b were written and run
+against the code of c05f4dbe before any fix — 7 of 61 red, each for the attack it names; all
+green after. Case 49 was tabulated per attack on the old check: four attacks passed it (red), the
+two guards already failed it correctly.
+
+| Finding | Test case | Red before | Green after |
+|---|---|---|---|
+| 1. CRITICAL — an author's empty question list moved a plan | 44: `{"ref":"functional/x.md","questions":[]}` promoted by the sweeper; an author file whose every question the human answered; the gate critic's own empty list | the empty author list read `enough: true` | `hasEnoughInformation` returns `reason: 'unclassified'` for any file without the gate critic's classification once no fork is open (also when every question is answered); a classified empty list is still `enough: true` |
+| 2. CRITICAL — an author file could erase a weighty question the critic found | 45: an unclassified `[]` for the same stamp, by `writePlanQuestions` and through the sweeper; guards: the critic replacing its own file, a newer revision, a corrupt file at the live path | the writer accepted and overwrote the classified file | the writer refuses with `reason: 'would-replace-classified'`; the sweeper discards with that closed-set reason and logs it to `.ctoc/logs/streaming-sweeper.jsonl`; the classified file and its question stand |
+| 3. HIGH — answer replay under a reused question id | 46: an entry with no digest, a digest of a rewritten prompt, a digest with the labels swapped between keys, the right digest, then the critic rewriting the question under the same id for the same revision; 28b: a release with no digest or another question's digest | an entry with no digest read `enough` | an entry counts only when it carries `questionDigest` equal to the question's digest (sha256 of `JSON.stringify([prompt, [[key, label], …]])`, pairs sorted by key, every text through the label identity); entries without one are `unbound` and the question is asked again; a release of a Hold needs the same binding. The false comment about "THE EXACT QUESTION SET" is rewritten |
+| 4. HIGH — an order id matched anywhere in the approved text | 49: the id on a line naming another agent file, the id inside a longer id (`R-30`), the id and the path on different lines; 50: the three real inventories pass check 3, and the gate critic's own R-414 marked replaced fails it | the old check accepted all four | the id must be a whole token on a line that also names the inventory's agent file path |
+| 5. HIGH — the check's heading walk disagreed with the hash | 49: `####### Execution Record` then `This slice also replaces R-3 in agents/agent.md.` before `## Risks`; guards: an excluded heading line naming the id, a checkbox line naming it | the old walk counted the seven-hash text as specification | `approval-ledger.computeSpecHash` alone decides: the id is deleted from the line in place and the hash recomputed; an unchanged hash means the line is not approved text. `src/lib/approval-ledger.js` untouched |
+| 6. LOW — a torn log line about this plan was skipped | 47: a torn line naming another plan changes nothing; a torn line naming this plan's file | skipped, `enough: true` | `answers-unreadable` for this plan only; the "skipping can only ever REMOVE an answer" comment is corrected |
+| 7. LOW — look-alike labels | 48: `Café`/`Cafe`, combining accent/precomposed, full-width `Ａ`, the `ﬁ` ligature, the Roman numeral `Ⅳ`/`IV`; guard: two different labels | all accepted | the label identity is NFKC, then combining marks removed, control characters stripped, trimmed, lower-cased |
+
+Accepted limit (finding 7): letters of different scripts that only look alike (Cyrillic and Latin
+"A") are not folded together; no confusables table ships with the runtime.
+
+Changed tests outside this slice's own file, one line each (old → new → why):
+- `tests/streaming-precompute.test.js` helper `answer`: wrote no digest → writes the digest of the stored question → an answer counts only for the question it was given for (finding 3).
+- `tests/answers-bind-to-plan-revision.test.js` helper `appendAnswer`: wrote the entry as given → adds the digest of the question stored for the plan now, unless the entry names one → finding 3; the binding cases keep their meaning.
+- `tests/sufficiency-evidence.test.js` cases 9 and 11: an author file answered through `streamAnswer` → a classified file answered by a slice-2-format line → these cases test the crossing record; findings 1 and 3.
+- `tests/streaming-gate.test.js` "answering the LAST fork", "MULTIPLE fork questions" and X6 case 8: the real `stream answer` crossed the plan → the real writer's answer leaves the plan where it is (asserted), then the slice-2-format answer crosses it on the next render → findings 1 and 3; cases 11 and 12 use the slice-2-format answer directly.
+- `tests/streaming-gate-coverage-holes.test.js` two cases: an author's empty list was "enough" → the gate critic's empty list is → finding 1.
+- `tests/answer-feeds-sufficiency.test.js` case c: the first `streamAnswer` crossed → it does not (asserted), and after the slice-2-format answer the same call's return names the cross → findings 1 and 3.
+- `tests/streaming-human-loop-e2e.test.js` cases 6 and 7: an author file answered through `streamAnswer` → the gate critic's file; case 6 asserts the real writer's answers move nothing, then the slice-2-format answers cross it; case 7 answers in the slice-2 format → findings 1 and 3.
+
+My own test error, corrected before the green run: case 46's first draft rewrote the question to a
+prompt it had already answered in the loop above, so the replay assertion failed for the test's
+reason, not the code's; the replay now uses a prompt never answered.
+
+Full `npm test` (once, foreground): tests 12619, pass 12619, fail 0, cancelled 0, skipped 0;
+coverage 99.9% (floor 99); `[CTOC test-gate] PASS`. That run showed lines 531-532 of
+`streaming-precompute.js` (a corrupt file at the live path) uncovered; one guard was then added to
+case 45 and its file re-run (63 of 63) with the module's coverage — those lines covered. Lint on
+every changed JavaScript file: zero warnings.
+
+Decisions taken under ambiguity (this round):
+1. "Never enough" is literal: a file without the gate critic's classification is not enough even
+   when the human answered every question in it — the critic never checked what the author left
+   out. Checked after `answers-unreadable`, `held` and `open-forks`, so open questions are still
+   shown first.
+2. The inventory check deletes the order id from the line in place instead of deleting the line:
+   deleting a heading line changes the section walk, so `## Execution Record — replaces R-3 in
+   agents/agent.md` would read as hashed. Case 49 holds both shapes.
+3. The digest binds key to label (sorted by key), so moving labels between keys is a different
+   question; it covers the prompt and the labels only, not pros, cons, flags or topic; the prompt
+   is normalised like the labels.
+4. `questionDigest` is not exported: an export with no live caller fails the dead-export fence.
+   Slice 2 exports it when `streamAnswer` calls it; the tests derive the digest independently, so
+   they pin the format that writer must use.
+5. The digest is required wherever the reader knows the questions (`hasEnoughInformation`); the
+   screen's own answered check passes no questions and keeps the id-only binding (slice 2).
+6. The torn-line check matches the plan's file name as a substring, so a torn line about a plan
+   whose name contains this one also closes this plan — the fail-closed direction.
+
+For slice 2 (not built here):
+- `streamAnswer` must write `questionDigest` for the question it shows, and start every append on
+  a new line (a torn line followed by an append would otherwise fuse two entries).
+- Until then a human's answer through the menu never counts: `streamAnswer` reports "Recorded your
+  answer", the screen's id-only check stops asking, yet the plan never moves on its own; the plain
+  Approve remains. Slice 1 must not reach a user without slice 2.
+- The screen's answered check (`streaming-gate.nextUnansweredQuestion`) must pass the questions so
+  it binds the way the gate does.
+- Every author file now waits for the gate critic's classification before a plan can move.
+
+### Review, security and final review — the session's record (2026-10-07)
+
+- Step 11 and Step 16 (iron-loop-critic): first review SHIP AFTER (Hold paths, contradicting gate-critic sentences, replaced-fate holes); re-review SHIP AFTER (rule-count floors, four contradictions, fleet dropping author questions, vision advisor format, fractional stamps). Every listed fix was built (commits 0949c838 to 83a093f0) and is recorded above.
+- Step 13 (security-scanner): BLOCK three times (Hold decided by the agent's file, key changes, duplicate labels, self-declared topic, unquoted command, replaced fate; reserved ids, approval-file check; author's empty list, file swap, answer replay, replaced-rule matching, hash walk). Each was fixed test-first; the targeted re-run of every attack at 83a093f0 returned PASS.
+- Owner decisions folded in: the independent gate critic assigns every topic; a Hold is CTOC's (2026-10-07).
+- Acceptance criteria ticked on the reviews' per-criterion evidence and the full suite on the shipped branch (12,687 passed, 0 failed, 0 skipped, coverage 99.87%, commit 68a0ab2b). The generic Steps 8-16 template appended by CTOC's approval step is covered item by item by this plan's own Steps 8-16 record.

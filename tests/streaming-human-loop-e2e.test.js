@@ -35,6 +35,7 @@ const path = require('node:path');
 const precompute = require('../src/lib/streaming-precompute.js');
 const streamingGate = require('../src/lib/streaming-gate.js');
 const ledger = require('../src/lib/approval-ledger.js');
+const { route } = require('../src/lib/menu-screens.js');
 
 const STAGES = ['vision', 'canvas', 'functional', 'implementation', 'todo', 'in-progress', 'review', 'done'];
 const sandboxes = [];
@@ -63,20 +64,38 @@ function magicLinkPlan(slug) {
 // Every fork must be answered for the plan to be sufficient.
 function magicLinkQuestions() {
   return [
-    { id: 'store', prompt: 'Which store backs sessions?', critical: true, important: false,
-      options: [{ key: 'pg', label: 'Postgres', recommended: true, pros: 'RLS' }, { key: 'sqlite', label: 'SQLite', cons: 'Single writer' }] },
-    { id: 'expiry', prompt: 'How long is a magic link valid?', critical: false, important: true,
-      options: [{ key: '15m', label: '15 minutes', recommended: true }, { key: '1h', label: '1 hour' }] },
-    { id: 'transport', prompt: 'Which email transport?', critical: true, important: false,
-      options: [{ key: 'resend', label: 'Resend', recommended: true }, { key: 'ses', label: 'Amazon SES' }] },
-    { id: 'copy', prompt: 'What does the sign-in button say?', critical: false, important: false,
-      options: [{ key: 'signin', label: 'Sign in', recommended: true }, { key: 'continue', label: 'Continue' }] },
+    { id: 'q10-store', prompt: 'Which store backs sessions?', critical: true, important: false, topic: 'technology-stack',
+      options: [{ key: '1', label: 'Postgres', recommended: true, pros: 'RLS' }, { key: '2', label: 'SQLite', cons: 'Single writer' }] },
+    { id: 'q11-expiry', prompt: 'How long is a magic link valid?', critical: false, important: true, topic: 'security-posture',
+      options: [{ key: '1', label: '15 minutes', recommended: true }, { key: '2', label: '1 hour' }] },
+    { id: 'q12-transport', prompt: 'Which email transport?', critical: true, important: false, topic: 'technology-stack',
+      options: [{ key: '1', label: 'Resend', recommended: true }, { key: '2', label: 'Amazon SES' }] },
+    { id: 'q13-copy', prompt: 'What does the sign-in button say?', critical: false, important: false, topic: 'detail',
+      options: [{ key: '1', label: 'Sign in', recommended: true }, { key: '2', label: 'Continue' }] },
   ];
 }
 
 function ledgerFile(root, slug) {
   return path.join(root, '.ctoc', 'approvals', slug.toLowerCase() + '.json');
 }
+
+/**
+ * The human answers the question the plan's screen asks now, by choosing the option labelled
+ * `label`: the screen's own action runs through the real router exactly as the session runs it
+ * (single quotes delimit one word), so the answer carries the digest of the question shown.
+ * Returns the id of the question that was answered.
+ */
+function answerOnScreen(root, ref, label) {
+  const screen = route(['plan', ref], root);
+  const action = screen.actions[label];
+  assert.match(String(action), /^stream answer \S+ '[^']+' '[1-3]' '[0-9a-f]{64}'$/, `the screen offers ${label} as an answer`);
+  const words = [...action.matchAll(/'([^']*)'|(\S+)/g)].map((m) => (m[1] !== undefined ? m[1] : m[2]));
+  route(words, root);
+  return words[3];
+}
+
+/** The gate critic's classification block: only a file it classified can move a plan (the owner, 2026-10-07). */
+const CLASSIFIED = Object.freeze({ by: 'gate-critic', at: 1786000000000 });
 
 afterEach(() => {
   while (sandboxes.length) fs.rmSync(sandboxes.pop(), { recursive: true, force: true });
@@ -93,15 +112,20 @@ describe('streaming human loop — end to end, sandboxed, real code', () => {
     //    MODEL, and the subagent's only write is exactly this: the real store-writer,
     //    stamped with the plan's current mtime. No producer module, no model here.
     const planMtimeMs = fs.statSync(planPath).mtimeMs;
-    const produced = precompute.writePlanQuestions(root, ref, magicLinkQuestions(), planMtimeMs);
+    //    The file is the gate critic's, classified: an author's own file never moves a plan.
+    const produced = precompute.writePlanQuestions(root, ref, magicLinkQuestions(), planMtimeMs, undefined, CLASSIFIED);
     assert.equal(produced.ok, true, 'the subagent wrote the questions to the real store');
     assert.deepEqual(precompute.loadPlanQuestions(root, ref).map((q) => q.id),
-      ['store', 'expiry', 'transport', 'copy'], 'all four questions were persisted');
+      ['q10-store', 'q11-expiry', 'q12-transport', 'q13-copy'], 'all four questions were persisted');
 
-    // 2. The human ANSWERS every question via the REAL answer writer.
-    for (const [qid, key] of [['store', 'pg'], ['expiry', '15m'], ['transport', 'resend'], ['copy', 'signin']]) {
-      streamingGate.streamAnswer(ref, qid, key, root);
-    }
+    // 2. The human ANSWERS every question the screen asks, through the screen's own actions.
+    //    The weighty ones come first; the last weighty answer moves the plan on by itself.
+    const answered = [];
+    answered.push(answerOnScreen(root, ref, 'Postgres'));
+    answered.push(answerOnScreen(root, ref, '15 minutes'));
+    assert.ok(fs.existsSync(planPath), 'a weighty question is still open, so the plan stays');
+    answered.push(answerOnScreen(root, ref, 'Resend'));
+    assert.deepEqual(answered, ['q10-store', 'q11-expiry', 'q12-transport'], 'weighty questions are asked first');
 
     // 3. Drive the REAL sufficiency-cross path. (streamAnswer already re-renders
     //    through this same path; calling it explicitly asserts the END STATE, not
@@ -137,13 +161,13 @@ describe('streaming human loop — end to end, sandboxed, real code', () => {
     fs.writeFileSync(planPath, magicLinkPlan('fail-closed'));
 
     const produced = precompute.writePlanQuestions(
-      root, ref, magicLinkQuestions(), fs.statSync(planPath).mtimeMs);
+      root, ref, magicLinkQuestions(), fs.statSync(planPath).mtimeMs, undefined, CLASSIFIED);
     assert.equal(produced.ok, true);
 
-    // Answer every question EXCEPT the critical `transport` fork — a real fork left open.
-    for (const [qid, key] of [['store', 'pg'], ['expiry', '15m'], ['copy', 'signin']]) {
-      streamingGate.streamAnswer(ref, qid, key, root);
-    }
+    // The human answers the questions the screen asks, through its own actions, and stops
+    // before the critical `q12-transport` fork — a real fork left open.
+    assert.equal(answerOnScreen(root, ref, 'Postgres'), 'q10-store');
+    assert.equal(answerOnScreen(root, ref, '15 minutes'), 'q11-expiry');
 
     const decisions = streamingGate.pendingGateDecisions(root);
     const d = decisions.find((x) => x.ref === ref);
@@ -152,7 +176,7 @@ describe('streaming human loop — end to end, sandboxed, real code', () => {
     assert.ok(d, 'the plan is STILL a pending decision — it did not cross');
     assert.equal(d.enough, false, 'not enough information while a fork is open');
     assert.equal(d.sufficiencyReason, 'open-forks');
-    assert.deepEqual(d.blockingQuestionIds, ['transport'], 'the unanswered critical fork is what blocks');
+    assert.deepEqual(d.blockingQuestionIds, ['q12-transport'], 'the unanswered critical fork is what blocks');
     assert.ok(fs.existsSync(planPath), 'the plan stays in functional/');
     assert.ok(!fs.existsSync(path.join(root, 'plans', 'implementation', 'fail-closed.md')), 'nothing crossed');
     assert.ok(!fs.existsSync(ledgerFile(root, 'fail-closed')), 'no ledger entry — nothing was crossed');

@@ -66,9 +66,10 @@ function forkQuestion(id) {
     prompt: `Which ${id}?`,
     critical: true,
     important: false,
+    topic: 'technology-stack',
     options: [
-      { key: 'pg', label: 'Postgres', recommended: true, pros: 'Relational.', cons: 'Ops cost.' },
-      { key: 'sqlite', label: 'SQLite', pros: 'Zero ops.', cons: 'Single writer.' },
+      { key: '1', label: 'Postgres', recommended: true, pros: 'Relational.', cons: 'Ops cost.' },
+      { key: '2', label: 'SQLite', pros: 'Zero ops.', cons: 'Single writer.' },
     ],
   };
 }
@@ -90,6 +91,17 @@ function answersLog(root) {
   return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
 }
 
+/** The digest the screen's answer action carries for question `q` (slice 1's format). */
+function digestOf(q) {
+  const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
+  const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs, q.options.filter((o) => o.recommended === true).map((o) => o.key).sort()])).digest('hex');
+}
+const D_DB = digestOf(forkQuestion('q10-db'));
+
+/** The gate critic's classification block: only a file it classified can move a plan (the owner, 2026-10-07). */
+const CLASSIFIED = Object.freeze({ by: 'gate-critic', at: 1786000000000 });
+
 afterEach(() => {
   while (sandboxes.length) fs.rmSync(sandboxes.pop(), { recursive: true, force: true });
 });
@@ -103,19 +115,19 @@ describe('slice 3 — streamAnswer records the answer AND carries the Loop-B dir
     const p = writePlan(root, 'functional', 'reg', validFunctionalBody('reg'));
     const ref = 'functional/reg.md';
     // TWO forks; answer ONE — a fork stays open, so nothing crosses and nothing is buildable.
-    precompute.writePlanQuestions(root, ref, [forkQuestion('db'), forkQuestion('cache')], fs.statSync(p).mtimeMs);
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db'), forkQuestion('q11-cache')], fs.statSync(p).mtimeMs, undefined, CLASSIFIED);
 
-    const out = streamingGate.streamAnswer(ref, 'db', 'pg', root);
+    const out = streamingGate.streamAnswer(ref, 'q10-db', '1', root, D_DB);
 
     // Existing behaviour: the answer landed in the append-only log.
-    assert.match(answersLog(root), /"questionId":"db"/, 'the answer is recorded, as before');
+    assert.match(answersLog(root), /"questionId":"q10-db"/, 'the answer is recorded, as before');
     // Existing behaviour: the screen OBJECT is returned, its fields intact.
     assert.equal(typeof out, 'object', 'still returns the screen object');
     assert.ok(out.ask && out.actions, 'the existing screen fields (ask, actions) are unchanged');
     assert.match(out.text, /Recorded your answer/, 'still carries the recorded-answer status in .text');
     // Nothing crossed / nothing buildable / questions present -> the directive is empty,
     // so the return is deep-equal to the pure screen.
-    assert.deepEqual(out, streamingGate.streamingGateScreen(root, 'Recorded your answer for reg.md.'),
+    assert.deepEqual(out, streamingGate.streamingGateScreen(root, 'Recorded your answer for reg.md.', { banner: false }),
       'with an empty directive the return is exactly the pure screen — existing consumers unchanged');
   });
 
@@ -126,12 +138,12 @@ describe('slice 3 — streamAnswer records the answer AND carries the Loop-B dir
     const p = writePlan(root, 'functional', 'ask', validFunctionalBody('ask'));
     const ref = 'functional/ask.md';
     // Keep a second fork open so THIS plan does not cross — isolates the build line.
-    precompute.writePlanQuestions(root, ref, [forkQuestion('db'), forkQuestion('cache')], fs.statSync(p).mtimeMs);
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db'), forkQuestion('q11-cache')], fs.statSync(p).mtimeMs);
     approveTodo(root, '00042-weekly-summary', 'Send the weekly summary');
 
-    const out = streamingGate.streamAnswer(ref, 'db', 'pg', root);
+    const out = streamingGate.streamAnswer(ref, 'q10-db', '1', root, D_DB);
 
-    assert.match(answersLog(root), /"questionId":"db"/, 'the answer is still recorded');
+    assert.match(answersLog(root), /"questionId":"q10-db"/, 'the answer is still recorded');
     assert.ok(out.text.includes('Send the weekly summary'),
       `.text surfaces the Loop-B build directive: ${JSON.stringify(out.text)}`);
     // The Loop-B directive is APPENDED after the screen — the screen still leads.
@@ -144,10 +156,12 @@ describe('slice 3 — streamAnswer records the answer AND carries the Loop-B dir
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'suff', validFunctionalBody('suff'));
     const ref = 'functional/suff.md';
-    // A single fork: answering it makes the plan sufficient, so it auto-crosses.
-    precompute.writePlanQuestions(root, ref, [forkQuestion('db')], fs.statSync(p).mtimeMs);
+    // A single fork in the gate critic's file: answering it makes the plan sufficient, so it auto-crosses.
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db')], fs.statSync(p).mtimeMs, undefined, CLASSIFIED);
 
-    const out = streamingGate.streamAnswer(ref, 'db', 'pg', root);
+    // The real writer's answer, carrying the digest of the question shown, counts at the gate;
+    // the same call's return surfaces the cross it caused.
+    const out = streamingGate.streamAnswer(ref, 'q10-db', '1', root, D_DB);
 
     // The plan crossed on its own (existing sufficiency side effect) ...
     assert.ok(!fs.existsSync(p), 'the answered plan left functional/ on its own');
@@ -162,14 +176,14 @@ describe('slice 3 — streamAnswer records the answer AND carries the Loop-B dir
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'foe', validFunctionalBody('foe'));
     const ref = 'functional/foe.md';
-    precompute.writePlanQuestions(root, ref, [forkQuestion('db'), forkQuestion('cache')], fs.statSync(p).mtimeMs);
+    precompute.writePlanQuestions(root, ref, [forkQuestion('q10-db'), forkQuestion('q11-cache')], fs.statSync(p).mtimeMs);
 
     const orig = loopBDriver.loopBDirective;
     loopBDriver.loopBDirective = () => { throw new Error('boom'); };
     try {
       let out;
-      assert.doesNotThrow(() => { out = streamingGate.streamAnswer(ref, 'db', 'pg', root); });
-      assert.match(answersLog(root), /"questionId":"db"/, 'the answer is recorded despite the throw');
+      assert.doesNotThrow(() => { out = streamingGate.streamAnswer(ref, 'q10-db', '1', root, D_DB); });
+      assert.match(answersLog(root), /"questionId":"q10-db"/, 'the answer is recorded despite the throw');
       assert.equal(typeof out, 'object', 'a screen object is still returned');
       assert.match(out.text, /Recorded your answer/, 'the screen is intact; the directive is simply omitted');
     } finally {

@@ -612,25 +612,33 @@ you generate the load-bearing DECISION FORKS a human must answer before the plan
 be built without guessing. You do NOT
 edit the plan, move it, or stamp any approval; your only write is the questions file.
 
-Write your questions through the real store-writer, never by hand:
+You also write it unasked, as your last act after the plan file's final write. You hold
+no shell, so you never call `writePlanQuestions` yourself: use Write to create
+`.ctoc/streaming/questions/pending/vision__<file>.md.json` containing
+`{ "ref": "vision/<file>.md", "questions": [ … ] }` and no `planMtimeMs`. The menu's sweeper
+validates it through `writePlanQuestions` (`src/lib/streaming-precompute.js`), refuses a
+malformed file (it never reaches the human), and stamps the plan's own time.
 
-    const { writePlanQuestions } = require("./src/lib/streaming-precompute.js");
-    writePlanQuestions(root, ref, questions, planMtimeMs);
+Each question is `{ id, prompt, critical, important, topic, options: [{ key, label,
+recommended?, pros?, cons?, description? }] }`:
 
-- `root` — the project root.
-- `ref` — the plan reference, `vision/<file>.md`.
-- `planMtimeMs` — the plan file's current mtime in milliseconds (the freshness
-  stamp; questions generated against an older plan read as STALE and are regenerated).
-- `questions` — an ARRAY in the streaming Question contract, exactly:
-  `[{ id, prompt, critical?, important?, options: [{ key, label, recommended?, pros?, cons?, description? }] }]`.
-  `id`/`prompt`/`key`/`label` are non-empty strings; question ids are unique;
-  option keys are unique within a question; mark exactly one option `recommended: true`;
-  a real fork the builder must confront is `critical: true`, a strong-preference fork
-  `important: true`, a detail resolvable while building is neither.
+- `id` matches `q<NN>-<kebab-topic>`: lowercase letters, digits and hyphens, unique in the file.
+- `critical` and `important` are both REQUIRED booleans, never both `true`.
+- `topic` is one of `technology-stack`, `algorithm`, `data-model`, `security-posture`,
+  `irreversible`, `cost`, `detail`, as `agents/iron-loop/gate-critic.md` rule 4a defines them.
+  Your `topic` is only a proposal: the gate critic classifies the file before anything is
+  decided, so never write a `classification` block.
+- One to three options; each `key` is exactly `"1"`, `"2"` or `"3"`, labels distinct.
+  Exactly one option is `recommended: true`, or none of two when the evidence cannot settle it.
+- Never put `holds` on an option: a hold is the human's answer, recorded by CTOC.
+- No zero-width or direction-changing character in any text.
+
+Every choice of technology stack, algorithm, data model, security posture, anything
+irreversible or of recurring or large cost is a question with that `topic`, never a silent
+choice; the rest goes into the plan's `## Decisions Taken Under Ambiguity`.
 
 If the plan has no real fork, write an EMPTY array — the honest "asked, nothing to ask".
-NEVER invent a question. `writePlanQuestions` validates the set and refuses a malformed
-one; it is fail-soft and never throws.
+NEVER invent a question.
 
 ## Searching the repository (shared rule)
 

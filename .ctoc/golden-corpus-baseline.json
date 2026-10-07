@@ -1,8 +1,7 @@
 {
-  "maxFindings": 6,
+  "maxFindings": 5,
   "findings": [
     "task-registry::src/lib/actions.js",
-    "task-registry::src/lib/menu-screens.js",
     "task-registry::src/lib/plan-recovery.js",
     "task-registry::src/lib/state.js",
     "task-registry::src/lib/task-reconcile.js",

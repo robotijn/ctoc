@@ -371,9 +371,17 @@ function renderPlanBody(content) {
  * synthesizes. The read is instant and fail-soft — the human NEVER waits for a
  * critique to run.
  *
+ * It binds answers EXACTLY as the gate does: it passes the questions to the one reader
+ * (`readAnsweredQuestionIds`), so an entry counts only when it names one of the question's
+ * option keys and carries that question's `questionDigest` — the screen never stops asking a
+ * question the gate still counts as open. A plan the human holds gets CTOC's own
+ * keep-or-release question (`holdQuestion`, `held: true`) whatever its question file now
+ * holds. Otherwise the first unanswered question that goes to the human
+ * (`streaming-precompute.goesToHuman`, the gate's own rule), else the first unanswered one.
+ *
  * @param {string} root
  * @param {string} ref
- * @returns {{ question: object, index: number, total: number }|null}
+ * @returns {{ question: object, index: number, total: number, held: boolean }|null}
  */
 function nextUnansweredQuestion(root, ref) {
   if (!isNonEmptyStr(root)) return null;
@@ -398,29 +406,64 @@ function nextUnansweredQuestion(root, ref) {
 
   let questions;
   let answered;
+  let classified;
+  let precompute;
   try {
     // Lazy require avoids a load-time circular dependency (streaming-precompute
     // requires this module at call time for plansNeedingQuestions).
-    const precompute = require('./streaming-precompute');
+    precompute = require('./streaming-precompute');
     // ONE status call, not two: it yields the questions AND the revision in a
     // single read (`loadPlanQuestions` would call the same status internally and
     // then throw the revision away).
     const st = precompute.planQuestionsStatus(root, ref);
     if (st.status !== 'ready') return null;
     questions = st.questions;
+    classified = st.classified;
     answered = precompute.readAnsweredQuestionIds(root, ref, {
       questionsRevisionMs: st.questionsRevisionMs,
       planMtimeMs: st.planMtimeMs,
+      questions,
     });
   } catch {
     return null;
   }
+  if (answered.held.length > 0) return { question: holdQuestion(precompute.HOLD), index: 0, total: 1, held: true };
+  // An author's file the gate critic has not checked is never put to the human as his
+  // decision: the screen says it is being checked, or offers to check it.
+  if (classified !== true) return null;
   if (!Array.isArray(questions) || questions.length === 0) return null;
   // A question whose only answer belongs to an OLDER revision is offered again —
   // that is the point, not a regression: the human never saw this question.
-  const index = questions.findIndex((q) => !answered.ids.has(q.id));
-  if (index === -1) return null;
-  return { question: questions[index], index, total: questions.length };
+  const open = questions.map((q, i) => [q, i]).filter(([q]) => !answered.ids.has(q.id));
+  if (open.length === 0) return null;
+  const [question, index] = open.find(([q]) => precompute.goesToHuman(q, classified)) || open[0];
+  return { question, index, total: questions.length, held: false };
+}
+
+/**
+ * CTOC's own keep-or-release question for a held plan, built from `HOLD` alone — never from a
+ * question file. Neither option is recommended: keeping or releasing is the owner's decision.
+ * Its `questionDigest` equals `HOLD.digest`.
+ * @param {object} HOLD `streaming-precompute.HOLD`
+ * @returns {object} a Question
+ */
+function holdQuestion(HOLD) {
+  return { id: HOLD.questionId, prompt: HOLD.prompt, critical: true, important: false, options: [HOLD.keep, HOLD.release] };
+}
+
+/**
+ * One word for the session's shell: wrapped in single quotes, an embedded quote closed,
+ * escaped and reopened. The stored values are already plain characters; this is a second wall.
+ * @param {*} value
+ * @returns {string}
+ */
+function quoteArg(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
+}
+
+/** Is `id` the gate ruling, bare or with a `-r<digits>` revision suffix? */
+function isGateRuling(id) {
+  return id === 'q99-gate-ruling' || /^q99-gate-ruling-r[0-9]+$/.test(id);
 }
 
 /**
@@ -434,6 +477,9 @@ function nextUnansweredQuestion(root, ref) {
  * @returns {{ question: object, matrix: string, actions: object }}
  */
 function precomputedQuestionParts(q, ref, header) {
+  const { HOLD, questionDigest } = require('./streaming-precompute');
+  const own = q.id === HOLD.questionId;
+  const digest = questionDigest(q);
   const ordered = [
     ...q.options.filter((o) => o.recommended === true),
     ...q.options.filter((o) => o.recommended !== true),
@@ -443,13 +489,23 @@ function precomputedQuestionParts(q, ref, header) {
     label: stripCtl(o.label),
     description: precomputedOptionDescription(o),
   }));
+  // An action that can let a plan move carries the digest of the question exactly as this
+  // screen shows it; an action that holds never needs one (a hold is never refused).
   const actions = {};
-  for (const e of entries) actions[e.label] = `stream answer ${ref} ${q.id} ${e.key}`;
+  const answer = (key, withDigest) => `stream answer ${ref} ${quoteArg(q.id)} ${quoteArg(key)}`
+    + (withDigest && digest ? ` ${quoteArg(digest)}` : '');
+  for (const e of entries) actions[e.label] = answer(e.key, !own || e.key === HOLD.release.key);
+  const options = entries.map((e) => ({ label: e.label, description: e.description }));
+  if (!own) {
+    // CTOC's own Hold, from `HOLD` alone — never text from the question file.
+    options.push({ label: HOLD.hold.label, description: HOLD.hold.description });
+    actions[HOLD.hold.label] = answer(HOLD.hold.key, false);
+  }
   return {
     question: {
       question: stripCtl(q.prompt),
       header,
-      options: entries.map((e) => ({ label: e.label, description: e.description })),
+      options,
     },
     // The same structured fields, tabulated for the screen TEXT. The flattened
     // one-sentence description above stays the ask layer's; the matrix is what the
@@ -497,13 +553,23 @@ function precomputedQuestionParts(q, ref, header) {
  *
  * @param {string} root project root
  * @param {string} ref plan reference ("stage/file.md")
+ * `defaults` are the questions this verdict decides by their recommended option: every
+ * unanswered question NOT in its `blocking` set (so a file the gate critic did not classify,
+ * where every open question blocks, yields none), each `{ id, prompt, choice }` with `choice`
+ * the recommended option's label (or the only option's), every string single-line,
+ * control-stripped and capped at 200 characters. Taken from the SAME verdict, never a second
+ * read of the questions.
+ *
  * @returns {{enough:boolean, reason:string, unansweredQuestionIds:string[],
  *   blockingQuestionIds:string[], computed:(number|null),
- *   answeredQuestionIds:string[], unboundAnswers:number}}
+ *   answeredQuestionIds:string[], unboundAnswers:number,
+ *   defaults:Array<{id:string, prompt:string, choice:string}>,
+ *   questionsClassified:(boolean|null), questionsRevisionMs:(number|null)}} the last two say
+ *   whether the gate critic classified the stored questions, and their revision stamp
  */
 function sufficiencyFor(root, ref) {
   const closed = (reason) => ({
-    enough: false, reason,
+    enough: false, reason, defaults: [], questionsClassified: null, questionsRevisionMs: null,
     unansweredQuestionIds: [], blockingQuestionIds: [],
     // A predicate that could not run knows NEITHER the denominator nor the answered
     // set — `computed: null` (never 0), empty lists, 0 unbound. The evidence composer
@@ -515,8 +581,18 @@ function sufficiencyFor(root, ref) {
     const { hasEnoughInformation } = require('./streaming-precompute');
     const v = hasEnoughInformation(root, ref);
     const ids = (list) => (Array.isArray(list) ? list.map((q) => stripCtl(String(q && q.id))) : []);
+    const blockingIds = new Set(ids(v.blocking));
+    const defaults = (Array.isArray(v.unanswered) ? v.unanswered : [])
+      .filter((q) => q && !blockingIds.has(stripCtl(String(q.id))) && Array.isArray(q.options) && q.options.length > 0)
+      .map((q) => {
+        const chosen = q.options.find((o) => o && o.recommended === true) || q.options[0];
+        return { id: oneLine(q.id), prompt: oneLine(q.prompt), choice: oneLine(chosen && chosen.label) };
+      });
     return {
       enough: v.enough === true,
+      defaults,
+      questionsClassified: typeof v.classified === 'boolean' ? v.classified : null,
+      questionsRevisionMs: Number.isFinite(v.revisionMs) ? v.revisionMs : null,
       reason: stripCtl(String(v.reason)),
       unansweredQuestionIds: ids(v.unanswered),
       blockingQuestionIds: ids(v.blocking),
@@ -530,6 +606,155 @@ function sufficiencyFor(root, ref) {
   } catch {
     // The predicate could not run. That is IGNORANCE, not sufficiency — fail closed.
     return closed('unavailable');
+  }
+}
+
+/** One line of untrusted text for a plan file or a status: whitespace runs to one space,
+ *  control characters stripped, capped at 200 characters. */
+function oneLine(value) {
+  return stripCtl(String(value == null ? '' : value).replace(/\s+/g, ' ')).trim().slice(0, 200);
+}
+
+/**
+ * Append the questions a crossing decided by their recommended option to the plan the
+ * builder reads, under `## Decisions Taken Under Ambiguity` — a heading outside the approval
+ * hash (`approval-ledger.EXECUTION_SECTION_PRODUCERS`), so the crossing record stays valid.
+ * One sentence, then one line per question, `- <prompt> — <choice> (question <id>)`. A line
+ * already in the file is skipped, so a second pass writes nothing twice. Never throws: a
+ * write failure returns 0 and the caller reports it.
+ * @param {string} planPath the plan's path after the crossing
+ * @param {Array<{id:string, prompt:string, choice:string}>} defaults from `sufficiencyFor`
+ * @returns {number} how many lines it wrote
+ */
+function appendDefaultDecisions(planPath, defaults) {
+  try {
+    const text = safeFs.readFileSync(planPath, 'utf8');
+    const lines = defaults
+      .map((d) => `- ${d.prompt} — ${d.choice} (question ${d.id})`)
+      .filter((line, i, all) => all.indexOf(line) === i && !text.includes(line));
+    if (lines.length === 0) return 0;
+    const block = `${text.endsWith('\n') ? '' : '\n'}\n## Decisions Taken Under Ambiguity\n\n`
+      + 'Decided by the recommended option when this plan moved on; none of these needed the human.\n\n'
+      + `${lines.join('\n')}\n`;
+    safeFs.appendFileSync(planPath, block, 'utf8');
+    return lines.length;
+  } catch {
+    return 0; // reported by the caller as decisions that could not be written
+  }
+}
+
+/** A number for the evidence string, or `unknown` — never `0` for a value that cannot be read. */
+function evidenceNumber(n) {
+  return Number.isFinite(n) ? String(n) : 'unknown';
+}
+
+/**
+ * The pipeline evidence for a built plan finishing on its evidence: the check record, its
+ * time, coverage, floor and skipped count, the checked steps, the questions, and that the
+ * human approved nothing. Composed from what was read; every plan-derived text is stripped
+ * and capped; no command text.
+ */
+function composeDoneEvidence(slug, record, verdict) {
+  const tests = record && record.checks && typeof record.checks === 'object' ? record.checks.tests : null;
+  const t = tests && typeof tests === 'object' ? tests : {};
+  const when = record && typeof record.timestamp === 'string' ? oneLine(record.timestamp) : 'unknown';
+  const summary = record && record.summary != null ? oneLine(record.summary) : 'no summary recorded';
+  const questions = verdict.reason === 'not-computed'
+    ? 'none were stored'
+    : `${evidenceNumber(verdict.computed)} stored, none needs the human`;
+  // Coverage is said as it was measured: with its floor, without one, or not at all.
+  const coverage = !Number.isFinite(t.coverage)
+    ? 'coverage not measured'
+    : Number.isFinite(t.coverageFloor)
+      ? `coverage ${t.coverage}% against a floor of ${t.coverageFloor}%`
+      : `coverage ${t.coverage}% (no floor declared)`;
+  return `evidence: review→done — checks passed, recorded ${when} in .ctoc/state/verify/${slug}.json (${summary}); `
+    + `${coverage}, ${evidenceNumber(t.skipped)} skipped; `
+    + 'every required step 8–16 is checked in the plan, including REVIEW, SECURE and FINAL-REVIEW (checked by the build itself); '
+    + `questions: ${questions}; crossed on evidence, not approved by the human`;
+}
+
+/**
+ * Finish a BUILT plan on its evidence: review → done with no human act, recorded as a
+ * pipeline entry (`advanced_by: 'pipeline'`, evidence, never `approved_by`) that
+ * `approval-residency` accepts at done. Called only from the continuation's crossing pass
+ * (`pendingGateDecisions` with `opts.crossed`), and only for a plan whose transition
+ * validation passed (every required step checked, a fresh passing check record) and whose
+ * questions need nobody.
+ *
+ * Requires a recorded admission to building: the plan's ledger entry ends at `todo`. An entry
+ * already at done (or anything else) returns false, so it is idempotent. A plan the human
+ * holds never crosses: the verdict already says `held` when its questions are readable, and
+ * when none are stored the answers log is read here for a hold (an unreadable log is not
+ * knowing, so the plan stays). Entry and move, or neither: when the move fails the ledger file
+ * is restored to its bytes from before. With deployment enabled the plan is recorded
+ * deploy-ready (`actions.recordDeployReadyNotice`); nothing deploys. Never throws.
+ *
+ * @param {string} root
+ * @param {string} planPath the plan in review/
+ * @param {string} ref `review/<file>.md`
+ * @param {object} verdict the verdict `pendingGateDecisions` computed for it
+ * @returns {boolean} true when the plan was recorded and moved to done
+ */
+function crossOnEvidence(root, planPath, ref, verdict) {
+  try {
+    const ledger = require('./approval-ledger');
+    const slug = ledger.slugFromPlanPath(planPath);
+    const existing = ledger.readEntry(slug, root);
+    if (!existing || existing.stage_to !== 'todo') return false;
+    const answers = require('./streaming-precompute').readAnsweredQuestionIds(root, ref, { questionsRevisionMs: 0, planMtimeMs: 0 });
+    if (!answers.ok || answers.held.length > 0) return false;
+    const fileSlug = path.basename(planPath, '.md');
+    const record = require('./step-13-verify').readVerifyEvidence(root, fileSlug);
+    if (!record || record.passed !== true) return false;
+    const content = safeFs.readFileSync(planPath, 'utf8');
+    const ledgerFile = ledger.ledgerPath(slug, root);
+    const prior = safeFs.readFileSync(ledgerFile, 'utf8');
+    ledger.writePipelineEntry(slug, {
+      content,
+      stage_from: 'review',
+      stage_to: 'done',
+      evidence: composeDoneEvidence(stripCtl(fileSlug), record, verdict),
+      plan_basename: fileSlug,
+    }, root);
+    // The plan's status file stays with the stage it leaves, exactly as approvePlan clears it.
+    require('./background').clearStatus(planPath);
+    let newPath;
+    try {
+      newPath = movePlan(planPath, 'done', root);
+    } catch {
+      restoreLedgerFile(ledgerFile, prior, ledger, slug, root);
+      return false;
+    }
+    // Both are fail-soft by contract: the config falls back to its defaults, and the notice
+    // writer logs its own failure; a notice never undoes the crossing.
+    if (require('./deployment').getDeploymentConfig(root).enabled) {
+      require('./actions').recordDeployReadyNotice(newPath, root, 'evidence');
+    }
+    return true;
+  } catch {
+    return false; // fail-soft: never brick the read
+  }
+}
+
+/**
+ * Put the ledger file back to its bytes from before a crossing whose move failed. When even
+ * that write fails, the entry is removed, so no record ever names `done` for a plan still in
+ * review (the plan then lacks its admission record and cannot finish on its evidence — the
+ * fail-closed direction).
+ * @returns {boolean} true when the prior bytes were restored
+ */
+function restoreLedgerFile(ledgerFile, prior, ledger, slug, root) {
+  try {
+    safeFs.writeFileSync(ledgerFile, prior);
+    return true;
+  } catch {
+    try {
+      ledger.removeEntry(slug, root);
+    } catch {
+      return false; // neither restored nor removed: the plan stays in review either way
+    }
+    return false;
   }
 }
 
@@ -685,14 +910,29 @@ function crossBySufficiency(root, planPath, ref, fromStage, toStage, verdict) {
  * `sufficiencyReason`, `unansweredQuestionIds`, `blockingQuestionIds`) so the human
  * SEES exactly which questions are still open — see `sufficiencyFor`.
  *
+ * ── THE CONTINUATION'S PASS (`opts.crossed` is an array) ─────────────────────────
+ * Only `menu-screens.continueAfterCrossing` passes `opts.crossed`, and only on the session's
+ * three live paths (a completion with `--continue`, `stream approve`, `stream answer`). On
+ * that pass every crossing is pushed as `{ ref, toStage, name }` (the new ref, the plan's
+ * human name, and `decisionsNotRecorded: true` when its decided-by-default questions could
+ * not be written into it), and a BUILT plan in review finishes on its evidence
+ * (`crossOnEvidence`) when its transition validation passes, it is not empty, and its
+ * questions need nobody (`enough`, or none stored). Every pre-build crossing, on any call,
+ * appends the questions it decided by default to the plan (`appendDefaultDecisions`). Without `opts.crossed` — the default
+ * screen, the on-open banner, the session-start status — a review plan is listed for the
+ * human exactly as before, so nothing finishes when the menu opens.
+ *
  * @param {string} projectRoot
+ * @param {{crossed?: Array<{ref:string, toStage:string, name:string}>}} [opts]
  * @returns {Array<{ref:string, slug:string, title:string, summary:string,
  *   fromStage:string, toStage:string, moment:string, chip:string,
  *   approveLabel:string, passesValidation:boolean,
  *   critical:boolean, enough:boolean, sufficiencyReason:string,
- *   unansweredQuestionIds:string[], blockingQuestionIds:string[]}>}
+ *   unansweredQuestionIds:string[], blockingQuestionIds:string[],
+ *   questionsClassified:(boolean|null), questionsRevisionMs:(number|null)}>}
  */
-function pendingGateDecisions(projectRoot) {
+function pendingGateDecisions(projectRoot, opts = {}) {
+  const crossed = opts && Array.isArray(opts.crossed) ? opts.crossed : null;
   const plansDir = getPlansDir(projectRoot);
   const out = [];
 
@@ -726,6 +966,22 @@ function pendingGateDecisions(projectRoot) {
       if (sufficiency.enough === true && passesValidation
           && PRE_BUILD_DESTINATIONS.has(meta.toStage)
           && crossBySufficiency(projectRoot, plan.path, ref, stage, meta.toStage, sufficiency)) {
+        // Every crossing writes its decided-by-default questions into the plan, whichever
+        // call made it (the default screen crosses pre-build plans too, as before).
+        const newPath = path.join(plansDir, meta.toStage, `${plan.name}.md`);
+        const written = sufficiency.defaults.length > 0 ? appendDefaultDecisions(newPath, sufficiency.defaults) : 0;
+        if (crossed) {
+          const record = { ref: `${meta.toStage}/${plan.name}.md`, toStage: meta.toStage, name: humanPlanName(planTitle(plan), plan.name) };
+          if (sufficiency.defaults.length > 0 && written === 0) record.decisionsNotRecorded = true;
+          crossed.push(record);
+        }
+        continue;
+      }
+      // A BUILT plan finishes on its evidence — only on the continuation's pass.
+      if (crossed && stage === 'review' && passesValidation && !isEmptyPlan(plan.content)
+          && (sufficiency.enough === true || sufficiency.reason === 'not-computed')
+          && crossOnEvidence(projectRoot, plan.path, ref, sufficiency)) {
+        crossed.push({ ref: `done/${plan.name}.md`, toStage: 'done', name: humanPlanName(planTitle(plan), plan.name) });
         continue;
       }
 
@@ -754,6 +1010,10 @@ function pendingGateDecisions(projectRoot) {
         sufficiencyReason: sufficiency.reason,
         unansweredQuestionIds: sufficiency.unansweredQuestionIds,
         blockingQuestionIds: sufficiency.blockingQuestionIds,
+        // Whether the gate critic classified its stored questions (null: none stored or not
+        // readable) and their revision — so the screen never offers an unchecked author's file.
+        questionsClassified: sufficiency.questionsClassified,
+        questionsRevisionMs: sufficiency.questionsRevisionMs,
       });
     }
   }
@@ -1038,10 +1298,13 @@ function richQuestionScreen(d, index, total, statusLine, root) {
   const parts = precomputedQuestionParts(q, d.ref, d.chip);
   const actions = Object.assign({}, parts.actions);
 
-  // Question options + Skip; add Open the plan only if it fits the harness's
-  // 4-explicit-option cap (comment rides the built-in "Other" free-text path).
+  // The question's options and CTOC's Hold, then Skip and Open the plan while they fit the
+  // harness's 4-explicit-option cap; their actions stay whatever is asked (comment rides the
+  // built-in "Other" free-text path).
   const options = parts.question.options.slice();
-  options.push({ label: 'Skip for now', description: 'Move to the next pending decision (nothing is changed).' });
+  if (options.length < 4) {
+    options.push({ label: 'Skip for now', description: 'Move to the next pending decision (nothing is changed).' });
+  }
   if (options.length < 4) {
     options.push({ label: 'Open the plan', description: 'View the plan before deciding.' });
   }
@@ -1273,6 +1536,21 @@ function planDecisionScreen(ref, projectRoot) {
     actions[approveLabel] = `stream approve ${ref}`;
     actions['Check validation'] = `validate ${stage}/${file}`;
     actions['Other'] = `stream comment ${ref}`;
+    // An author's file the gate critic has not checked: offer the check, never its questions.
+    let st = null;
+    try {
+      st = require('./streaming-precompute').planQuestionsStatus(projectRoot, ref);
+    } catch {
+      st = null; // no stored questions to speak of
+    }
+    if (st && st.status === 'ready' && st.classified === false && options.length < 4) {
+      const state = checkState(projectRoot, ref, st.questionsRevisionMs);
+      text += CHECK_LINES[state];
+      if (state === 'none') {
+        options.push({ label: CHECK_LABEL, description: 'Ask the gate critic to check the questions its author wrote, in the background. Nothing else changes.' });
+        actions[CHECK_LABEL] = `stream check ${ref}`;
+      }
+    }
     questions.push({
       question: gateWords.question(stage, name),
       header: gateWords.chip(stage),
@@ -1346,12 +1624,45 @@ function sufficiencyLine(d) {
     'unknown-plan': 'the plan file could not be read',
     'answers-unreadable': 'the answers log could not be read, and a decision is open',
     'unavailable': 'the check could not run',
+    'held': 'you are holding this plan; choose Release the hold on it to let it move on',
+    'unclassified': 'the gate critic has not yet checked the questions its author wrote, so it cannot move on by itself; it waits for that check or for your approval',
   }[d.sufficiencyReason] || String(d.sufficiencyReason);
   return `  Enough information: NO — ${why}.\n`;
 }
 
 /** The option label that asks for one plan's questions to be generated. */
 const GENERATE_LABEL = 'Generate its questions';
+/** The option label that asks the gate critic to check an author's questions. */
+const CHECK_LABEL = 'Check its questions';
+
+/**
+ * Where the gate critic's check of an author's question file stands, read from the task
+ * registry: `'checking'` while a `classify` task for this revision is queued or running,
+ * `'ended'` when one finished or failed (it is never retried in a loop), `'none'` otherwise.
+ * A registry that cannot be read reads `'none'` (the human may ask; the menu adds nothing twice).
+ * @param {string} root
+ * @param {string} ref
+ * @param {number} revisionMs the question file's revision stamp
+ * @returns {'checking'|'ended'|'none'}
+ */
+function checkState(root, ref, revisionMs) {
+  const label = `revision-${Math.floor(revisionMs)}`;
+  let tasks = [];
+  try {
+    tasks = require('./task-registry').load(root).tasks.filter((t) => t.kind === 'classify' && t.plan === ref && t.label === label);
+  } catch {
+    tasks = []; // an unreadable registry: the menu itself refuses a second task for one revision
+  }
+  if (tasks.some((t) => t.status === 'queued' || t.status === 'running' || t.status === 'cancelling')) return 'checking';
+  return tasks.length > 0 ? 'ended' : 'none';
+}
+
+/** The one plain line a screen shows for a plan whose questions the gate critic has not checked. */
+const CHECK_LINES = Object.freeze({
+  checking: '  Its questions are being checked by the gate critic; it moves on by itself once they are, or when you approve it.\n',
+  none: '  The gate critic has not yet checked the questions its author wrote; choose Check its questions, or approve it yourself.\n',
+  ended: "  The gate critic's check of its questions did not finish; approve it yourself, or change the plan to have them checked again.\n",
+});
 
 /**
  * The sufficiency reasons that ARE a question-store status other than 'ready'
@@ -1477,13 +1788,17 @@ function gateScreenAt(decisions, index, statusLine, root) {
   // second read and no require here: a store that cannot even load yields
   // 'unavailable', which offers nothing, and the screen still renders.
   const canGenerate = isNonEmptyStr(root) && QUESTIONS_NOT_READY.has(d.sufficiencyReason);
+  // An author's file the gate critic has not checked: one plain line, and one action to check
+  // it when no check exists for this revision. Its questions are never offered as options.
+  const unchecked = isNonEmptyStr(root) && d.questionsClassified === false && d.sufficiencyReason !== 'held'
+    ? checkState(root, d.ref, d.questionsRevisionMs) : null;
 
   let text = '';
   if (statusLine) text += `${stripCtl(statusLine)}\n\n`;
   text += `Topic: ${humanPlanName(d.title, d.slug)}  ·  ${d.moment}  ·  decision ${index + 1} of ${total}\n`;
   text += `${'─'.repeat(40)}\n\n`;
   text += `  ${d.summary}\n\n`;
-  text += sufficiencyLine(d);
+  text += unchecked ? CHECK_LINES[unchecked] : sufficiencyLine(d);
   text += '\n\n';
 
   const actions = {
@@ -1494,6 +1809,11 @@ function gateScreenAt(decisions, index, statusLine, root) {
     'Other': `stream comment ${d.ref}`,
   };
   if (canGenerate) actions[GENERATE_LABEL] = `claude:generate-questions ${d.ref}`;
+  const options = buildOptions(d, canGenerate);
+  if (unchecked === 'none') {
+    options.push({ label: CHECK_LABEL, description: 'Ask the gate critic to check the questions its author wrote, in the background. Nothing else changes.' });
+    actions[CHECK_LABEL] = `stream check ${d.ref}`;
+  }
 
   return {
     text,
@@ -1501,7 +1821,7 @@ function gateScreenAt(decisions, index, statusLine, root) {
       questions: [{
         question: gateWords.question(d.fromStage, humanPlanName(d.title, d.slug)),
         header: d.chip,
-        options: buildOptions(d, canGenerate),
+        options,
       }],
     },
     actions,
@@ -1526,6 +1846,18 @@ function gateScreenAt(decisions, index, statusLine, root) {
  *   banner (streamAnswer sets this because it appends loopBDirective itself).
  */
 function streamingGateScreen(projectRoot, statusLine, opts) {
+  // Sweep the waiting folder FIRST, so the banner and the decisions describe the questions
+  // this very render shows (a file swept in later in the render would read as missing above).
+  // Fail-soft: a sweep that throws is reported on the status line, and the render below sweeps
+  // again before it reads any question.
+  let sweepFault = '';
+  if (isNonEmptyStr(projectRoot)) {
+    try {
+      require('./streaming-questions-sweeper').sweepPendingQuestions(projectRoot);
+    } catch (err) {
+      sweepFault = `New questions could not be taken in (${stripCtl((err && err.message) || String(err))}).`;
+    }
+  }
   // THE ON-OPEN ENGINE BANNER. Compute it BEFORE pendingGateDecisions so
   // loopBDirective's own before/after snapshot straddles the sufficiency cross (the
   // same ordering streamAnswer uses at its call site). The banner is added ONCE, here
@@ -1541,7 +1873,7 @@ function streamingGateScreen(projectRoot, statusLine, opts) {
   const notice = unsafe > 0
     ? `${unsafe} plan file(s) have a name CTOC will not pass to a command — rename them.`
     : '';
-  const status = [statusLine, notice].filter((x) => isNonEmptyStr(x)).join('  ');
+  const status = [statusLine, notice, sweepFault].filter((x) => isNonEmptyStr(x)).join('  ');
   const screen = gateScreenAt(decisions, 0, status || statusLine, projectRoot);
   if (banner && screen && typeof screen.text === 'string') {
     screen.text = banner + screen.text;
@@ -1603,6 +1935,10 @@ function advanceExcludingSlug(slug, projectRoot, statusLine) {
  * gate approval. Cross via the gate-safe `approvePlan` (validates + stamps
  * `approved_by: human`; REFUSES an invalid transition). Surface the refusal; never
  * override it. Returns the NEXT pending decision with a one-line status.
+ *
+ * After a successful approve the work keeps moving: `menu-screens.continueAfterCrossing` runs
+ * with the plan just crossed, and what it started (a planner, a classification, a build) rides
+ * on the screen as `promote` for the session to launch, named in one status sentence.
  */
 function streamApprove(ref, projectRoot) {
   const parsed = parseRef(ref);
@@ -1611,6 +1947,7 @@ function streamApprove(ref, projectRoot) {
   }
   const planPath = path.join(getPlansDir(projectRoot), parsed.stage, parsed.file);
   let statusLine;
+  let cont = null;
   try {
     const res = approvePlan(planPath, projectRoot);
     if (res && res.refused) {
@@ -1618,13 +1955,46 @@ function streamApprove(ref, projectRoot) {
     } else {
       // approvePlan crossed the gate (it either returns { newPath, … } or throws /
       // refuses — there is no silent no-op return).
-      statusLine = `Approved ${parsed.file} → ${GATE_META[parsed.stage].toStage} (approved_by: human).`;
+      const to = GATE_META[parsed.stage].toStage;
+      statusLine = `Approved ${parsed.file} → ${to} (approved_by: human).`;
+      cont = continueAfter(projectRoot, [{ ref: `${to}/${parsed.file}`, toStage: to, name: nameOfPlanAt(projectRoot, to, parsed.file) }]);
+      if (cont.sentence) statusLine += `  ${cont.sentence}`;
     }
   } catch (err) {
     statusLine = `Could not approve ${parsed.file}: ${stripCtl((err && err.message) || String(err))}`;
   }
   const slug = parsed.file.replace(/\.md$/, '');
-  return advanceExcludingSlug(slug, projectRoot, statusLine);
+  const screen = advanceExcludingSlug(slug, projectRoot, statusLine);
+  if (cont && cont.promote.length > 0) screen.promote = cont.promote;
+  return screen;
+}
+
+/** The human name of the plan file at `stage/file`, or its slug when it cannot be read. */
+function nameOfPlanAt(root, stage, file) {
+  const slug = file.replace(/\.md$/, '');
+  try {
+    const m = safeFs.readFileSync(path.join(getPlansDir(root), stage, file), 'utf8').match(/^#\s+(.+)$/m);
+    return humanPlanName(m ? m[1].trim() : '', slug);
+  } catch {
+    return stripCtl(slug);
+  }
+}
+
+/**
+ * Run the continuation (`menu-screens.continueAfterCrossing`, required lazily: menu-screens
+ * requires this module) and phrase what it started in one sentence. Fail-soft: a fault
+ * starts nothing and says nothing.
+ * @returns {{crossed: Array<object>, pending: Array<object>, promote: Array<object>, sentence: string}}
+ */
+function continueAfter(root, extraCrossed) {
+  try {
+    const cont = require('./menu-screens').continueAfterCrossing(root, extraCrossed);
+    const started = Array.isArray(cont.started) ? cont.started : [];
+    const sentence = started.length > 0 ? `Started in the background: ${started.join('; ')}.` : '';
+    return { crossed: cont.crossed, pending: cont.pending, promote: Array.isArray(cont.promote) ? cont.promote : [], sentence };
+  } catch {
+    return { crossed: [], pending: [], promote: [], sentence: '' };
+  }
 }
 
 /**
@@ -1667,21 +2037,48 @@ function streamComment(ref, text, projectRoot) {
 }
 
 /**
- * `stream answer <ref> <questionId> <optionKey>` — the human answered ONE
- * precomputed decision question. Records the answer to the append-only log
- * (`.ctoc/streaming/answers.jsonl`) — the LEAST-invasive record: it NEVER edits
- * the plan body and NEVER crosses a gate (the gate crossing stays on the explicit
- * `stream approve`, offered only once every precomputed question is answered).
- * Then re-renders the streaming screen, which advances to this plan's NEXT
- * unanswered question (or the final Approve). Fail-soft: a malformed ref is ignored
- * and a write failure is surfaced, never thrown.
+ * Append one entry to the answers log (`.ctoc/streaming/answers.jsonl`) — the one writer of
+ * that log. The entry is written as `'\n' + JSON + '\n'` in ONE append, so every entry starts on
+ * a new line whatever the log's last byte is: a torn last line stays alone on its line instead
+ * of fusing with the entry after it (the reader skips blank lines). Throws on a write failure;
+ * the caller reports it.
+ * @param {string} root
+ * @param {object} record
+ */
+function appendAnswerEntry(root, record) {
+  const dir = path.join(root, '.ctoc', 'streaming');
+  if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
+  safeFs.appendFileSync(path.join(dir, 'answers.jsonl'), `\n${JSON.stringify(record)}\n`, 'utf8');
+}
+
+/**
+ * `stream answer <ref> '<questionId>' '<optionKey>' ['<digest>']` — the human answered ONE
+ * question, held a plan, kept a hold, or released one. Records exactly one entry in the
+ * answers log through `appendAnswerEntry`, never edits a plan, and then lets the work keep
+ * moving (`menu-screens.continueAfterCrossing`), whose crossings and started work are named
+ * in the screen and returned as `promote`.
+ *
+ * What is recorded, and what is refused (nothing written, the human told why):
+ *   - CTOC's own question (`HOLD.questionId`): key `hold` keeps the hold; key `release` ends
+ *     it only when the screen's digest is `HOLD.digest`. Any other key is refused. Neither
+ *     needs the plan's question file.
+ *   - any other question: its set must be readable and hold the question; the key must be
+ *     `HOLD.hold.key` or one of its option keys. A hold — `hold`, or any gate-ruling option
+ *     whose label does not begin "Approve " — records CTOC's hold (`heldOn` names the
+ *     question) and no answer, whatever the digest: holding is never refused. Any other
+ *     answer is recorded only when `shownDigest` equals the stored question's digest, so a
+ *     question rewritten between showing and clicking is asked again instead of inheriting
+ *     the click.
+ * Every `ctoc-hold` entry carries `HOLD.digest`; every answer carries the digest it was given
+ * for and the question set's revision stamp.
  *
  * @param {string} ref plan reference ("stage/file.md")
  * @param {string} questionId the answered question's id
  * @param {string} optionKey the chosen option's key
  * @param {string} projectRoot
+ * @param {string} [shownDigest] the digest of the question as the screen showed it
  */
-function streamAnswer(ref, questionId, optionKey, projectRoot) {
+function streamAnswer(ref, questionId, optionKey, projectRoot, shownDigest) {
   const parsed = parseRef(ref);
   if (!parsed) {
     return streamingGateScreen(projectRoot, `Ignored an answer for an invalid plan reference: ${stripCtl(String(ref))}`);
@@ -1691,84 +2088,80 @@ function streamAnswer(ref, questionId, optionKey, projectRoot) {
   if (!qid || !key) {
     return streamingGateScreen(projectRoot, `Ignored an incomplete answer for ${parsed.file}.`);
   }
-  // WHICH REVISION was the human answering? Stamping it is what lets the reader
-  // (streaming-precompute.readAnsweredQuestionIds) know this answer was given about
-  // THIS question set — question ids are positional and are reused across
-  // regenerations, so without the stamp an answer can only be bound by inference.
-  //
-  // Fail-soft, but NEVER silently: an unstampable answer is recorded UNSTAMPED and
-  // the reason is carried into the status text the human reads. Swallowing the
-  // failure without recording it would make "no stamp" indistinguishable from "the
-  // stamp lookup broke" — a verdict reported on input that was never received.
-  let planMtimeMs = null;
-  let stampFailure = null;
+  const shownRaw = stripCtl(String(shownDigest == null ? '' : shownDigest)).trim();
+  const shown = /^[0-9a-f]{64}$/.test(shownRaw) ? shownRaw : null;
+  const nothing = (why) => streamingGateScreen(projectRoot, `Nothing was recorded for ${parsed.file}: ${why}`);
+  const notAnAnswer = "that is not one of the question's answers.";
+  const changed = 'this answer does not match the question as it stands now, so it cannot be checked. The question will be asked again.';
+
+  let precompute;
+  let st = null;
   try {
-    const { planQuestionsStatus } = require('./streaming-precompute');
-    const st = planQuestionsStatus(projectRoot, ref);
-    if (st.status === 'ready' && Number.isFinite(st.questionsRevisionMs)) {
-      planMtimeMs = st.questionsRevisionMs;
-    } else {
-      stampFailure = st.status === 'ready' ? 'the question set carries no usable revision stamp' : st.reason;
-    }
+    precompute = require('./streaming-precompute');
+    if (qid !== precompute.HOLD.questionId) st = precompute.planQuestionsStatus(projectRoot, ref);
   } catch (err) {
-    stampFailure = (err && err.message) || String(err);
+    return nothing(`its questions could not be read (${stripCtl((err && err.message) || String(err))}), so your answer cannot be checked. The question will be asked again.`);
+  }
+  const { HOLD } = precompute;
+  const ts = new Date().toISOString();
+  let record;
+  let holds;
+  if (qid === HOLD.questionId) {
+    if (key === HOLD.keep.key) {
+      holds = true;
+      record = { ts, ref, questionId: HOLD.questionId, optionKey: HOLD.keep.key, holds: true, questionDigest: HOLD.digest };
+    } else if (key === HOLD.release.key) {
+      if (shown !== HOLD.digest) return nothing(changed);
+      holds = false;
+      record = { ts, ref, questionId: HOLD.questionId, optionKey: HOLD.release.key, holds: false, questionDigest: HOLD.digest };
+    } else {
+      return nothing(notAnAnswer);
+    }
+  } else {
+    if (st.status !== 'ready') {
+      return nothing(`its questions could not be read (${stripCtl(String(st.reason))}), so your answer cannot be checked. The question will be asked again.`);
+    }
+    const q = st.questions.find((x) => x.id === qid);
+    if (!q) return nothing('it does not ask that question now.');
+    const chosen = q.options.find((o) => o.key === key);
+    if (key !== HOLD.hold.key && !chosen) return nothing(notAnAnswer);
+    holds = key === HOLD.hold.key || (isGateRuling(qid) && !String(chosen.label).startsWith('Approve '));
+    if (holds) {
+      record = { ts, ref, questionId: HOLD.questionId, optionKey: HOLD.hold.key, holds: true, heldOn: qid, questionDigest: HOLD.digest };
+    } else {
+      if (shown === null || shown !== precompute.questionDigest(q)) return nothing(changed);
+      record = { ts, ref, questionId: qid, optionKey: key, holds: false, planMtimeMs: st.questionsRevisionMs, questionDigest: shown };
+    }
   }
 
-  let status;
   try {
-    const dir = path.join(projectRoot, '.ctoc', 'streaming');
-    if (!safeFs.existsSync(dir)) safeFs.mkdirSync(dir, { recursive: true });
-    const record = {
-      ts: new Date().toISOString(),
-      ref,
-      questionId: qid,
-      optionKey: key,
-    };
-    // Only ever a real, established revision — never a fabricated one.
-    if (planMtimeMs !== null) record.planMtimeMs = planMtimeMs;
-    const line = JSON.stringify(record) + '\n';
-    safeFs.appendFileSync(path.join(dir, 'answers.jsonl'), line, 'utf8');
-    // A failure to establish the revision NEVER loses the answer — but the human is
-    // told, because recording it silently would let them discover later that it did
-    // not count.
-    status = planMtimeMs !== null
-      ? `Recorded your answer for ${parsed.file}.`
-      : `Recorded your answer for ${parsed.file} — it could not be tied to a plan revision`
-        + `${stampFailure ? ` (${stripCtl(String(stampFailure))})` : ''}`
-        + `, so this question may be asked again.`;
+    appendAnswerEntry(projectRoot, record);
   } catch (err) {
-    status = `Could not record the answer for ${parsed.file}: ${stripCtl((err && err.message) || String(err))}`;
+    return streamingGateScreen(projectRoot, `Could not record the answer for ${parsed.file}: ${stripCtl((err && err.message) || String(err))}`);
   }
-  // LOOP-A → LOOP-B COUPLING (slice 3). The moment the human answers a fork, the SAME
-  // return also surfaces the Loop-B tick — what just auto-crossed on sufficiency (now
-  // that this answer is recorded) and what is next to build — so the session model
-  // re-runs the tick with no further human action. It is computed BEFORE the screen
-  // render so its own before/after snapshot straddles the sufficiency cross and can
-  // name what THIS answer moved (the screen render's own pendingGateDecisions call is
-  // idempotent). We add NO crossing logic here: the cross is `pendingGateDecisions`'
-  // documented side effect, invoked verbatim inside `loopBDirective`. `loopBDirective`
-  // already guarantees plain-moment language (no gate number, no raw stage word).
-  //
-  // FAIL-OPEN: any fault omits the directive but NEVER loses the recorded answer or
-  // breaks the screen. `loopBDirective` is itself fail-open and returns '' for a bad
-  // root; the try/catch is the belt-and-braces the slice mandates.
+  const released = record.questionId === HOLD.questionId && holds === false;
+  const status = holds
+    ? `You are holding ${parsed.file}. Nothing moves it until you release the hold.`
+    : released ? `Released the hold on ${parsed.file}.` : `Recorded your answer for ${parsed.file}.`;
+
+  // THE WORK KEEPS MOVING: the continuation crosses what this answer allowed, queues a planner
+  // or a classification, and starts approved builds; the directive names what moved. FAIL-OPEN:
+  // any fault omits the directive but NEVER loses the recorded answer or breaks the screen.
+  const cont = continueAfter(projectRoot);
   let directive = '';
   try {
-    directive = require('./loop-b-driver').loopBDirective(projectRoot);
+    directive = require('./loop-b-driver').loopBDirective(projectRoot, { crossed: cont.crossed, pending: cont.pending });
   } catch {
     directive = '';
   }
-  // Stay on the SAME plan (answering never moves it): re-render → next unanswered
-  // question, or the final Approve when all are answered. The directive is APPENDED to
-  // the screen's human-facing `.text`; `.ask` and `.actions` are untouched, so an empty
-  // directive leaves the screen object byte-for-byte unchanged for existing consumers.
-  // `{ banner: false }`: streamAnswer appends `directive` (loopBDirective) itself just
-  // below, so the on-open banner (which also carries loopBDirective) must NOT fire here
-  // — otherwise this rendered screen would show the loop state twice.
-  const screen = streamingGateScreen(projectRoot, status, { banner: false });
-  if (directive && screen && typeof screen.text === 'string') {
-    screen.text += directive;
-  }
+  const statusLine = cont.sentence ? `${status}  ${cont.sentence}` : status;
+  // A hold (or a keep) moves the screen past the plan just held; otherwise the screen shows
+  // the next question or decision. `{ banner: false }`: the directive is appended here.
+  const screen = holds
+    ? advanceAfter(ref, projectRoot, statusLine)
+    : streamingGateScreen(projectRoot, statusLine, { banner: false });
+  if (directive && screen && typeof screen.text === 'string') screen.text += directive;
+  if (cont.promote.length > 0) screen.promote = cont.promote;
   return screen;
 }
 

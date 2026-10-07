@@ -1,0 +1,9 @@
+{
+  "content_sha256": "596b5b3fcf69e9cdfdcb8226b65f9d0f689cb62735e2a1eb8a4177000533ab8d",
+  "hash_scope": "specification",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-07T16:27:51.171Z",
+  "approved_by": "human",
+  "plan_basename": "ctoc-keeps-working-and-asks-only-what-matters-s1-only-weighty-questions-reach-the-human"
+}

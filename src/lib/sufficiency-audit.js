@@ -41,7 +41,7 @@
 
 const safeFs = require('./safe-fs');
 const { ledgerDir, readEntryResult, entryKind } = require('./approval-ledger');
-const { questionsPath } = require('./streaming-precompute');
+const { questionsPath, isGateCriticClassification, goesToHuman } = require('./streaming-precompute');
 
 /**
  * Strip C0/C1 control characters from subagent-influenced ledger text before it is
@@ -102,7 +102,10 @@ function auditQuestions(root, ref) {
     return { present: true, total: null, blocking: null, empty: null, unattested: true };
   }
   const total = qs.length;
-  const blocking = qs.filter((question) => question && (question.critical === true || question.important === true)).length;
+  // The SAME rule the gate uses, never a re-derivation: in a file the gate critic did not
+  // classify, every question goes to the human (the owner's decision of 2026-10-07).
+  const classified = isGateCriticClassification(parsed.classification);
+  const blocking = qs.filter((question) => goesToHuman(question, classified)).length;
   const empty = total === 0;
   // A crossing authorised by an EMPTY question set is unattested — the defect's
   // fingerprint in history.

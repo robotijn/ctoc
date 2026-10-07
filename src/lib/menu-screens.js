@@ -2071,6 +2071,9 @@ function parseTaskArgs(subArgs) {
       case '--agent-id': out.agentId = String(args[++i] == null ? '' : args[i]); break;
       case '--gate': out.gate = args[++i]; break;
       case '--b64': out.b64 = String(args[++i] == null ? '' : args[i]); break;
+      // The SESSION's completion only: after settling the task, keep the work moving
+      // (`continueAfterCrossing`). The build agent's own call carries no flag.
+      case '--continue': out.continue = true; break;
       default: out.positional.push(a);
     }
   }
@@ -2241,6 +2244,16 @@ function taskTransition(root, rest, kind) {
   return taskRegistry.withRegistry(root, (reg, ctx) => {
     const task = reg.tasks.find((t) => t.id === id);
     if (!task) throw new Error('task-registry: unknown task id ' + String(id));
+
+    // A build the menu claimed itself (`startAgent`, through `continueAfterCrossing`) is
+    // already running with no agent id: the session launches its agent and stamps it here.
+    // Only that transition — a task that already carries an agent id is refused below, so a
+    // build is never launched twice.
+    if (kind === 'start' && task.status === 'running' && task.agentTaskId == null
+        && typeof p.agentId === 'string' && p.agentId !== '') {
+      taskRegistry.updateTask(reg, id, { agentTaskId: p.agentId });
+      return { ok: true, taskId: id, status: 'running', stamped: true, text: `Task ${id} → running (agent ${stripCtl(p.agentId)} recorded)` };
+    }
 
     // Legality is asked of the registry's ONE lifecycle encoding (item 4) — no local
     // mirror. `start`/`fail` have a fixed target, so the guard is `canTransition`
@@ -2493,8 +2506,17 @@ function taskComplete(root, rest) {
   // NB3: a completion frees a slot → surface the scheduler's newly-runnable set for
   // the COMPLETION turn to promote (scheduler-consulted every completion, Decision 4),
   // with the concurrent-edit guard applied — the same guard, on the same terms, as the
-  // dashboard-open path.
-  const { promote, quarantined } = computePromote(settled);
+  // dashboard-open path. With `--continue` (the session's call only) the continuation
+  // replaces it: plans cross on their evidence, planners, classifications and builds start.
+  let promote;
+  let quarantined;
+  if (p.continue === true) {
+    const cont = continueAfterCrossing(root);
+    ({ promote, quarantined } = cont);
+    text += continuationText(cont);
+  } else {
+    ({ promote, quarantined } = computePromote(settled));
+  }
   const res = {
     ok: true,
     taskId: id,
@@ -2505,6 +2527,170 @@ function taskComplete(root, rest) {
   };
   if (quarantined.length > 0) res.quarantined = quarantined;
   return res;
+}
+
+/**
+ * THE WORK KEEPS MOVING — called only on the session's three live paths: `menu task complete
+ * <id> --continue` (`taskComplete`), `stream approve` and `stream answer`
+ * (`streaming-gate`). Never at menu open, session start or stop.
+ *
+ *   1. sweep the waiting folder (a classified file the gate critic wrote lands now);
+ *   2. the crossing pass (`pendingGateDecisions` with `opts.crossed`): pre-build plans cross
+ *      on sufficiency, built plans finish on their evidence; `extraCrossed` (a crossing the
+ *      caller made itself) is appended;
+ *   3. a planner task for every plan that just moved into implementation, unless one is live;
+ *   4. one `classify` task per plan whose author's question file the gate critic has not
+ *      classified (verdict `open-forks` or `unclassified`), once per question revision —
+ *      label `revision-<whole millisecond>`, any status, so a failed classification is never
+ *      retried in a loop; such a file never moves its plan, so this is the only way it moves
+ *      without the human;
+ *   5. when approved plans are buildable, `actions.startAgent` (never forced, so a requested
+ *      stop is honoured) up to five times, collecting each claimed build task;
+ *   6. the scheduler's promote list (`computePromote`) plus the claimed tasks.
+ * Each step fails soft with a named reason in `reasons`; a failed crossing pass returns the
+ * plain promote list with `pending: []`. `started` phrases what started, for one status line.
+ *
+ * @param {string} root
+ * @param {Array<{ref:string, toStage:string, name:string}>} [extraCrossed]
+ * @returns {{crossed: Array<object>, promote: Array<object>, quarantined: Array<object>,
+ *   pending: Array<object>, reasons: string[], started: string[], building: string[]}}
+ *   `building` names the plans whose builds it started.
+ */
+function continueAfterCrossing(root, extraCrossed = []) {
+  const reasons = [];
+  const started = [];
+  const extra = Array.isArray(extraCrossed) ? extraCrossed : [];
+  try {
+    require('./streaming-questions-sweeper').sweepPendingQuestions(root);
+  } catch {
+    reasons.push('sweep-failed');
+  }
+  const crossed = [];
+  let pending;
+  try {
+    pending = streamingGate.pendingGateDecisions(root, { crossed });
+  } catch {
+    const plain = computePromote(loadReg(root));
+    return { crossed: extra.slice(), promote: plain.promote, quarantined: plain.quarantined, pending: [], reasons: ['crossing-failed'], started, building: [] };
+  }
+  crossed.push(...extra);
+
+  const planned = [];
+  for (const c of crossed) {
+    if (c.toStage !== 'implementation') continue;
+    const slug = path.basename(String(c.ref), '.md');
+    try {
+      if (taskRegistry.findActivePlanTask(loadReg(root), slug, 'plan')) continue;
+      taskAdd(root, ['plan', slug]);
+      planned.push(c.name);
+    } catch {
+      reasons.push('plan-not-queued');
+    }
+  }
+
+  const classifying = [];
+  for (const d of pending) {
+    if (d.sufficiencyReason !== 'open-forks' && d.sufficiencyReason !== 'unclassified') continue;
+    const queued = queueClassification(root, d.ref);
+    if (queued === 'queued') classifying.push(streamingGate.humanPlanName(d.title, d.slug));
+    else if (queued === 'failed') reasons.push('classify-not-queued');
+  }
+
+  const claimed = [];
+  const building = [];
+  try {
+    if (require('./continuation-queue').nextBuildable(root).buildable.length > 0) {
+      const actions = require('./actions');
+      for (let i = 0; i < 5; i++) {
+        const r = actions.startAgent(root);
+        if (!r || r.started !== true) break;
+        claimed.push({ id: stripCtl(r.task.id), kind: 'implement', plan: r.task.plan == null ? null : stripCtl(r.task.plan), touches: r.task.touches, gitOp: r.task.gitOp === true });
+        building.push(planNameAt(r.plan && r.plan.path, r.plan && r.plan.name));
+      }
+    }
+  } catch {
+    reasons.push('start-failed');
+  }
+
+  const base = computePromote(loadReg(root));
+  const promote = base.promote.concat(claimed.filter((c) => !base.promote.some((t) => t.id === c.id)));
+  if (building.length) started.push(`building ${building.join(', ')}`);
+  if (planned.length) started.push(`planning ${planned.join(', ')}`);
+  if (classifying.length) started.push(`the gate critic checking the questions of ${classifying.join(', ')}`);
+  return { crossed, promote, quarantined: base.quarantined, pending, reasons, started, building };
+}
+
+/**
+ * Queue the gate critic's classification of one plan's question file — once per question
+ * revision (task label `revision-<whole millisecond>`, any status), only for a file its author
+ * wrote. The one encoding the continuation and the human's "Check its questions" share.
+ * @param {string} root
+ * @param {string} ref `stage/file.md`
+ * @returns {'queued'|'exists'|'not-needed'|'failed'}
+ */
+function queueClassification(root, ref) {
+  try {
+    const st = require('./streaming-precompute').planQuestionsStatus(root, ref);
+    if (st.status !== 'ready' || st.classified !== false) return 'not-needed';
+    const label = `revision-${Math.floor(st.questionsRevisionMs)}`;
+    if (taskRegistry.load(root).tasks.some((t) => t.kind === 'classify' && t.plan === ref && t.label === label)) return 'exists';
+    const added = taskAdd(root, ['classify', ref, '--touches', `.ctoc/streaming/questions/${ref}`, '--label', label]);
+    return added && added.ok === true ? 'queued' : 'failed';
+  } catch {
+    return 'failed'; // the plan stays where it is and its questions stay with the human
+  }
+}
+
+/** A plan reference at a gate, in the plain characters the menu passes to a command. */
+const GATE_REF = /^(functional|implementation|review)\/[A-Za-z0-9_][A-Za-z0-9._-]*\.md$/;
+
+/**
+ * `stream check <ref>` — the human chose "Check its questions": queue the gate critic's
+ * classification of that plan's author-written questions (as the continuation does), and
+ * return the screen with the queued task in `promote` for the session to launch. Moves nothing.
+ * @param {string} ref
+ * @param {string} [projectPath]
+ */
+function streamCheck(ref, projectPath) {
+  const root = getProjectPath(projectPath);
+  const safe = typeof ref === 'string' && GATE_REF.test(ref);
+  const file = safe ? ref.slice(ref.indexOf('/') + 1) : stripCtl(String(ref));
+  const outcome = safe ? queueClassification(root, ref) : 'not-needed';
+  const status = {
+    queued: `Asked the gate critic to check the questions of ${file}.`,
+    exists: `The gate critic's check of ${file} is already recorded; nothing was added.`,
+    'not-needed': `Nothing to check for ${file}: it has no unchecked questions.`,
+    failed: `Could not ask for a check of ${file}; its questions stay with you.`,
+  }[outcome];
+  const screen = streamingGate.streamingGateScreen(root, status);
+  const { promote } = computePromote(loadReg(root));
+  if (promote.length > 0) screen.promote = promote;
+  return screen;
+}
+
+/** The human name of the plan at `planPath`, read from its `# Heading`, else its slug. */
+function planNameAt(planPath, slug) {
+  try {
+    const m = safeFs.readFileSync(planPath, 'utf8').match(/^#\s+(.+)$/m);
+    return streamingGate.humanPlanName(m ? m[1].trim() : '', slug);
+  } catch {
+    return stripCtl(String(slug || ''));
+  }
+}
+
+/** The completion's lines for what the continuation did, names capped like the session status. */
+function continuationText(cont) {
+  const { summarize } = require('./loop-b-driver');
+  const names = (list) => summarize(list.map((c) => c.name));
+  const done = cont.crossed.filter((c) => c.toStage === 'done');
+  const moved = cont.crossed.filter((c) => c.toStage !== 'done');
+  const unwritten = cont.crossed.filter((c) => c.decisionsNotRecorded === true);
+  let out = '';
+  if (done.length) out += ` · finished on their checks: ${names(done)}`;
+  if (moved.length) out += ` · moved on: ${names(moved)}`;
+  if (cont.building.length) out += ` · started building: ${summarize(cont.building)}`;
+  if (unwritten.length) out += ` · could not write the questions decided by default into: ${names(unwritten)}`;
+  return out;
 }
 
 /** `menu task list` — a pure read of the registry for rendering. */
@@ -2610,10 +2796,13 @@ function route(args, projectPath, opts = {}) {
       if (sub === 'approve') return streamingGate.streamApprove(ref, projectPath);
       if (sub === 'skip') return streamingGate.streamSkip(ref, projectPath);
       if (sub === 'comment') return streamingGate.streamComment(ref, args.slice(3).join(' '), projectPath);
+      // `stream check <ref>` — the human asks the gate critic to check an author's questions.
+      if (sub === 'check') return streamCheck(ref, projectPath);
       // `stream answer <ref> <questionId> <optionKey>` — record a precomputed-
       // question answer (out-of-band log; never edits the plan, never crosses a
       // gate) and advance to the next question / final Approve.
-      if (sub === 'answer') return streamingGate.streamAnswer(ref, args[3], args[4], projectPath);
+      // The fifth word is the digest of the question as the screen showed it.
+      if (sub === 'answer') return streamingGate.streamAnswer(ref, args[3], args[4], projectPath, args[5]);
       return streamingGate.streamingGateScreen(projectPath);
     }
 
@@ -2711,6 +2900,15 @@ module.exports = {
   validateScreen,
   // NB2 — task wiring
   taskCommand,
+  // The work keeps moving: called by taskComplete here and by streaming-gate's
+  // streamApprove and streamAnswer.
+  continueAfterCrossing,
+  // The task parser's `--b64` decoder; also read by src/hooks/protect-records.js, so the
+  // protection decodes a background agent's payload exactly as `menu task` will.
+  decodeB64,
+  // The task argument parser; also called by src/hooks/protect-records.js, so the protection
+  // reads a background agent's `menu task` words exactly as the menu will.
+  parseTaskArgs,
   taskBoardScreen,
   taskDetailScreen,
   // Router

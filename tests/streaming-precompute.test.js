@@ -58,23 +58,25 @@ function planMtimeMs(planPath) {
 function sampleQuestions() {
   return [
     {
-      id: 'db',
+      id: 'q10-db',
       prompt: 'Which database engine?',
       critical: true,
       important: false,
+      topic: 'technology-stack',
       options: [
-        { key: 'pg', label: 'Postgres', recommended: true, pros: 'Row-level security, mature', cons: 'More ops' },
-        { key: 'sqlite', label: 'SQLite', pros: 'Zero-config', cons: 'No real concurrency' },
+        { key: '1', label: 'Postgres', recommended: true, pros: 'Row-level security, mature', cons: 'More ops' },
+        { key: '2', label: 'SQLite', pros: 'Zero-config', cons: 'No real concurrency' },
       ],
     },
     {
-      id: 'auth',
+      id: 'q11-auth',
       prompt: 'Which auth provider?',
       critical: false,
       important: true,
+      topic: 'security-posture',
       options: [
-        { key: 'clerk', label: 'Clerk', recommended: true, description: 'Managed auth with MFA' },
-        { key: 'roll', label: 'Roll your own', description: 'Full control, more risk' },
+        { key: '1', label: 'Clerk', recommended: true, description: 'Managed auth with MFA' },
+        { key: '2', label: 'Roll your own', description: 'Full control, more risk' },
       ],
     },
   ];
@@ -170,7 +172,7 @@ describe('writePlanQuestions — atomic write of a valid file, refusal of a malf
     assert.equal(parsed.ref, 'functional/w1.md');
     assert.equal(parsed.planMtimeMs, mtime);
     assert.equal(parsed.questions.length, 2);
-    assert.equal(parsed.questions[0].id, 'db');
+    assert.equal(parsed.questions[0].id, 'q10-db');
   });
 
   it('refuses a malformed questions array — returns {ok:false, errors} and writes NO file', () => {
@@ -201,7 +203,7 @@ describe('loadPlanQuestions — fail-soft, freshness-gated read', () => {
     const q = precompute.loadPlanQuestions(root, 'functional/L1.md');
     assert.ok(Array.isArray(q), 'returns an array when fresh');
     assert.equal(q.length, 2);
-    assert.equal(q[0].id, 'db');
+    assert.equal(q[0].id, 'q10-db');
   });
 
   it('returns null when the file is ABSENT', () => {
@@ -379,16 +381,16 @@ describe('plansNeedingQuestions — the set the background dispatcher must (re)g
 function tieredQuestions() {
   return [
     {
-      id: 'crit', prompt: 'Which datastore? (load-bearing)', critical: true, important: false,
-      options: [{ key: 'pg', label: 'Postgres', recommended: true }, { key: 'sqlite', label: 'SQLite' }],
+      id: 'q10-crit', prompt: 'Which datastore? (load-bearing)', critical: true, important: false, topic: 'technology-stack',
+      options: [{ key: '1', label: 'Postgres', recommended: true }, { key: '2', label: 'SQLite' }],
     },
     {
-      id: 'imp', prompt: 'Which auth provider? (load-bearing)', critical: false, important: true,
-      options: [{ key: 'clerk', label: 'Clerk', recommended: true }, { key: 'roll', label: 'Roll your own' }],
+      id: 'q11-imp', prompt: 'Which auth provider? (load-bearing)', critical: false, important: true, topic: 'security-posture',
+      options: [{ key: '1', label: 'Clerk', recommended: true }, { key: '2', label: 'Roll your own' }],
     },
     {
-      id: 'norm', prompt: 'Which date format in the footer?', critical: false, important: false,
-      options: [{ key: 'iso', label: 'ISO 8601', recommended: true }, { key: 'us', label: 'US' }],
+      id: 'q12-norm', prompt: 'Which date format in the footer?', critical: false, important: false, topic: 'detail',
+      options: [{ key: '1', label: 'ISO 8601', recommended: true }, { key: '2', label: 'US' }],
     },
   ];
 }
@@ -396,8 +398,8 @@ function tieredQuestions() {
 /** Only questions that are explicitly NOT forks — small implementation details. */
 function normalOnlyQuestions() {
   return [
-    { id: 'n1', prompt: 'Footer date format?', critical: false, important: false, options: [{ key: 'iso', label: 'ISO 8601' }] },
-    { id: 'n2', prompt: 'Button corner radius?', critical: false, important: false, options: [{ key: 'sm', label: 'Small' }] },
+    { id: 'q10-n1', prompt: 'Footer date format?', critical: false, important: false, topic: 'detail', options: [{ key: '1', label: 'ISO 8601' }] },
+    { id: 'q11-n2', prompt: 'Button corner radius?', critical: false, important: false, topic: 'detail', options: [{ key: '1', label: 'Small' }] },
   ];
 }
 
@@ -415,18 +417,38 @@ function normalOnlyQuestions() {
 function answer(root, ref, questionId, optionKey) {
   const dir = path.join(root, '.ctoc', 'streaming');
   fs.mkdirSync(dir, { recursive: true });
+  // The entry carries the digest of the question it answers (third security scan of
+  // 2026-10-07), the format slice 2's writer records; an entry without one is asked again.
+  const question = (precompute.loadPlanQuestions(root, ref) || []).find((q) => q.id === questionId);
+  const questionDigest = question ? digestOf(question) : undefined;
   fs.appendFileSync(
     path.join(dir, 'answers.jsonl'),
-    JSON.stringify({ ts: new Date().toISOString(), ref, questionId, optionKey }) + '\n',
+    JSON.stringify({ ts: new Date().toISOString(), ref, questionId, optionKey, questionDigest }) + '\n',
     'utf8',
   );
 }
 
-/** Seed a plan at a gate stage with fresh precomputed questions. Returns its ref. */
-function seedReady(root, stage, slug, questions) {
+/**
+ * The answer digest, derived independently of the module: sha256 hex of JSON [prompt,
+ * [[key, label], ...] sorted by key, [recommended keys] sorted], each text NFKC-folded, accents removed, control
+ * characters stripped, trimmed and lower-cased.
+ */
+function digestOf(q) {
+  const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
+  const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs, q.options.filter((o) => o.recommended === true).map((o) => o.key).sort()])).digest('hex');
+}
+
+/**
+ * Seed a plan at a gate stage with fresh precomputed questions. Returns its ref. The file
+ * carries the gate critic's classification by default: under the owner's decision of
+ * 2026-10-07 only a classified file lets a topic decide anything, and these cases test
+ * the tier arithmetic of such a file. Pass `null` for an author's unclassified file.
+ */
+function seedReady(root, stage, slug, questions, classification = { by: 'gate-critic', at: 1786000000000 }) {
   const planPath = writePlan(root, stage, slug, validFunctionalBody(slug));
   const ref = `${stage}/${slug}.md`;
-  const res = precompute.writePlanQuestions(root, ref, questions, planMtimeMs(planPath));
+  const res = precompute.writePlanQuestions(root, ref, questions, planMtimeMs(planPath), undefined, classification);
   assert.equal(res.ok, true, 'fixture precondition: the questions file was written');
   return { ref, planPath };
 }
@@ -440,7 +462,7 @@ describe('planQuestionsStatus — splits the one null into the states the gate m
     assert.equal(st.status, 'ready');
     assert.ok(Array.isArray(st.questions), 'ready carries the questions');
     assert.equal(st.questions.length, 2);
-    assert.equal(st.questions[0].id, 'db');
+    assert.equal(st.questions[0].id, 'q10-db');
   });
 
   it("'ready' with questions: [] — the critique RAN and found NOTHING to ask", () => {
@@ -652,51 +674,51 @@ describe('hasEnoughInformation — THE GATE PREDICATE, and it FAILS CLOSED', () 
   it('ready + an unanswered CRITICAL question → enough:false, reason open-forks, and it is LISTED', () => {
     const root = makeSandbox();
     const { ref } = seedReady(root, 'functional', 'G4', tieredQuestions());
-    answer(root, ref, 'imp', 'clerk');
-    answer(root, ref, 'norm', 'iso');
+    answer(root, ref, 'q11-imp', '1');
+    answer(root, ref, 'q12-norm', '1');
     // 'crit' left unanswered.
 
     const v = precompute.hasEnoughInformation(root, ref);
     assert.equal(v.enough, false, 'an open critical fork is never enough information');
     assert.equal(v.reason, 'open-forks');
-    assert.ok(v.unanswered.some(q => q.id === 'crit'), 'the open critical fork is named, not merely counted');
+    assert.ok(v.unanswered.some(q => q.id === 'q10-crit'), 'the open critical fork is named, not merely counted');
     // The blocking RULE lives in one place. A caller that re-derives "critical or
     // important" from `unanswered` is where drift gets in — so the module states it.
-    assert.deepEqual(v.blocking.map(q => q.id), ['crit'], 'exactly the fork that blocks');
+    assert.deepEqual(v.blocking.map(q => q.id), ['q10-crit'], 'exactly the fork that blocks');
   });
 
   it('ready + an unanswered IMPORTANT question → enough:false', () => {
     const root = makeSandbox();
     const { ref } = seedReady(root, 'functional', 'G5', tieredQuestions());
-    answer(root, ref, 'crit', 'pg');
-    answer(root, ref, 'norm', 'iso');
+    answer(root, ref, 'q10-crit', '1');
+    answer(root, ref, 'q12-norm', '1');
     // 'imp' left unanswered.
 
     const v = precompute.hasEnoughInformation(root, ref);
     assert.equal(v.enough, false);
     assert.equal(v.reason, 'open-forks');
-    assert.ok(v.unanswered.some(q => q.id === 'imp'));
+    assert.ok(v.unanswered.some(q => q.id === 'q11-imp'));
   });
 
   it('ready + only unanswered NORMAL questions → enough:true (small details, solvable while building)', () => {
     const root = makeSandbox();
     const { ref } = seedReady(root, 'functional', 'G6', tieredQuestions());
-    answer(root, ref, 'crit', 'pg');
-    answer(root, ref, 'imp', 'clerk');
+    answer(root, ref, 'q10-crit', '1');
+    answer(root, ref, 'q11-imp', '1');
     // 'norm' left unanswered — a small detail, not a fork.
 
     const v = precompute.hasEnoughInformation(root, ref);
     assert.equal(v.enough, true, 'a normal question is a detail resolvable during implementation');
-    assert.ok(v.unanswered.some(q => q.id === 'norm'), 'it is still honestly reported as open');
+    assert.ok(v.unanswered.some(q => q.id === 'q12-norm'), 'it is still honestly reported as open');
     assert.deepEqual(v.blocking, [], 'a normal question blocks nothing');
   });
 
   it('ready + every question answered → enough:true', () => {
     const root = makeSandbox();
     const { ref } = seedReady(root, 'functional', 'G7', tieredQuestions());
-    answer(root, ref, 'crit', 'pg');
-    answer(root, ref, 'imp', 'clerk');
-    answer(root, ref, 'norm', 'iso');
+    answer(root, ref, 'q10-crit', '1');
+    answer(root, ref, 'q11-imp', '1');
+    answer(root, ref, 'q12-norm', '1');
 
     const v = precompute.hasEnoughInformation(root, ref);
     assert.equal(v.enough, true);
@@ -726,14 +748,14 @@ describe('hasEnoughInformation — THE GATE PREDICATE, and it FAILS CLOSED', () 
       'not json',
       '{"broken":',
       'null',
-      JSON.stringify({ ts: 'x', ref, optionKey: 'pg' }), // parses, but names no question
+      JSON.stringify({ ts: 'x', ref, optionKey: '1' }), // parses, but names no question
       '',
     ].join('\n'));
 
     const v = precompute.hasEnoughInformation(root, ref);
     assert.equal(v.enough, false, 'garbage in the log must never clear a fork');
-    assert.ok(v.unanswered.some(q => q.id === 'crit'), 'the critical fork is still open');
-    assert.deepEqual(v.blocking.map(q => q.id).sort(), ['crit', 'imp'], 'both forks stay closed');
+    assert.ok(v.unanswered.some(q => q.id === 'q10-crit'), 'the critical fork is still open');
+    assert.deepEqual(v.blocking.map(q => q.id).sort(), ['q10-crit', 'q11-imp'], 'both forks stay closed');
   });
 
   it('an UNREADABLE answers log fails CLOSED with its own reason', () => {
@@ -748,17 +770,24 @@ describe('hasEnoughInformation — THE GATE PREDICATE, and it FAILS CLOSED', () 
     assert.equal(v.reason, 'answers-unreadable');
   });
 
-  it('an unreadable answers log does NOT deadlock a plan with no forks', () => {
+  // The contract the owner replaced on 2026-10-07: a human's Hold is recorded only in the
+  // answers log, so an unreadable log is no longer irrelevant to a plan with no forks — it
+  // may hold a Hold. It fails closed for every plan, even one whose questions were regenerated
+  // as none: a hold logged earlier must never be ignored (security re-scan, 2026-10-07).
+  it('an unreadable answers log blocks a plan with only details, and one with no questions (a Hold may be in it)', () => {
     const root = makeSandbox();
     const { ref } = seedReady(root, 'functional', 'G11', normalOnlyQuestions());
     const dir = path.join(root, '.ctoc', 'streaming');
     fs.mkdirSync(dir, { recursive: true });
     fs.mkdirSync(path.join(dir, 'answers.jsonl'), { recursive: true });
 
-    // No critical/important question exists, so the answers log cannot change the
-    // verdict. Blocking here would be a false negative nothing could ever clear.
     const v = precompute.hasEnoughInformation(root, ref);
-    assert.equal(v.enough, true, 'no forks exist → the answer log is irrelevant to the verdict');
+    assert.equal(v.enough, false, 'an unread log may hold the human\'s Hold');
+    assert.equal(v.reason, 'answers-unreadable');
+    const { ref: none } = seedReady(root, 'functional', 'G11b', []);
+    const v2 = precompute.hasEnoughInformation(root, none);
+    assert.equal(v2.enough, false, 'a hold may be logged for questions since regenerated away');
+    assert.equal(v2.reason, 'answers-unreadable');
   });
 
   it("an answer for a DIFFERENT plan never clears this plan's fork", () => {
@@ -766,9 +795,9 @@ describe('hasEnoughInformation — THE GATE PREDICATE, and it FAILS CLOSED', () 
     const { ref: a } = seedReady(root, 'functional', 'G12a', tieredQuestions());
     const { ref: b } = seedReady(root, 'functional', 'G12b', tieredQuestions());
     // Answer every question — but on plan A only.
-    answer(root, a, 'crit', 'pg');
-    answer(root, a, 'imp', 'clerk');
-    answer(root, a, 'norm', 'iso');
+    answer(root, a, 'q10-crit', '1');
+    answer(root, a, 'q11-imp', '1');
+    answer(root, a, 'q12-norm', '1');
 
     assert.equal(precompute.hasEnoughInformation(root, a).enough, true, 'A is answered');
     const vb = precompute.hasEnoughInformation(root, b);

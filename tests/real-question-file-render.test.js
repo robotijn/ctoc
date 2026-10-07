@@ -53,7 +53,16 @@ function renderMatrixFromRealSample() {
   try {
     const qDir = path.join(dir, '.ctoc', 'streaming', 'questions');
     fs.mkdirSync(qDir, { recursive: true });
-    fs.copyFileSync(QUESTION_SAMPLE, path.join(qDir, 'review__00003-r2a-scheduler-lifecycle-honesty.md.json'));
+    // The real sample predates the contract the owner replaced on 2026-10-07 (a topic on every
+    // question but the ruling and the notice). Stage it with only the topics added, exactly as
+    // the gate critic would classify it, and with the fleet's attestation its reserved ruling now
+    // needs (security re-scan, 2026-10-07); every field the renderer is tested on is byte for byte real.
+    const real = JSON.parse(fs.readFileSync(QUESTION_SAMPLE, 'utf8'));
+    const lens = { state: 'clean-pass', coverage: 'full', findings: 0 };
+    const attestation = { generated_by: 'gate-critic', generated_at: 1, lenses: { premortem: lens, 'devils-advocate': lens, 'red-team': lens, advocate: lens } };
+    // The gate critic's classification block too: only a file it classified is put to the owner (slice 2).
+    const upgraded = { ...real, attestation, classification: { by: 'gate-critic', at: 1 }, questions: real.questions.map((q) => (/^q9[89]-/.test(q.id) ? q : { ...q, topic: 'detail' })) };
+    fs.writeFileSync(path.join(qDir, 'review__00003-r2a-scheduler-lifecycle-honesty.md.json'), JSON.stringify(upgraded));
 
     const planDir = path.join(dir, 'plans', 'review');
     fs.mkdirSync(planDir, { recursive: true });

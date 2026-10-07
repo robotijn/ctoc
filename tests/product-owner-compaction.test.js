@@ -26,13 +26,21 @@ const contract = require('./compaction-eval/product-owner/contract');
 const expectations = require('./compaction-eval/product-owner/expectations.json');
 
 /** The order count at extraction. A floor: it may rise, never fall. */
-const ORDER_FLOOR = 255;
+const ORDER_FLOOR = 256;
+
+/**
+ * sha256 of the inventory's units as `n:kind` lines, pinned here so an order unit cannot be
+ * relabelled as a cuttable kind (and then cut) without an edit in this file too. Unchanged
+ * since extraction; the floor above equals the order count, added rules included (2026-10-07).
+ */
+const KINDS_SHA256 = '849e70a7007b4875fe87019dae0b6f939c9035027554ca66e1ffc3818e703b80';
 
 defineInventoryTests({
   test,
   label: 'product-owner',
   inventoryPath: path.join(__dirname, 'compaction-eval', 'product-owner', 'rule-inventory.json'),
-  orderFloor: ORDER_FLOOR
+  orderFloor: ORDER_FLOOR,
+  kindsSha256: KINDS_SHA256
 });
 
 const fx = (name) => expectations.fixtures.find((f) => f.name === name);

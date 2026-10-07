@@ -235,6 +235,92 @@ argument check because the menu's question-generation recipe passes
 `--touches .ctoc/streaming/questions/<ref>` as data. A Bash payload whose `command` is not a
 string is treated as unreadable (the fail rule below).
 
+**A background agent may not answer, approve or move a plan through the menu** (the owner's
+decision of 2026-10-07). Claude Code's `PreToolUse` input carries `agent_id` only when a
+subagent makes the call, never for the main session. When the payload carries a non-empty
+`agent_id`, a menu call runs only if its route is on the allowed list below; every other
+route — including one the router gains later — is refused with "CTOC refused this call
+because a background agent may not answer CTOC's questions, approve a plan or move one on
+through the menu; report your result and let the main session do it." on stderr and exit 2.
+**The menu is recognised by what Node runs, not by its text.** For a background agent, every
+word of a command is resolved the way Node resolves a script — from the working directory and
+from every directory a `cd` or `pushd` in the command names: the exact path, then with `.js`,
+`.cjs`, `.mjs`, then the directory's `index.js` — and its real path is checked. A file is a
+CTOC menu when it is `src/commands/start.js` under ANY directory whose `package.json` or
+`.claude-plugin/plugin.json` names "ctoc" (this plugin, the CTOC repository, an older
+marketplace copy), compared in lower case so a case-insensitive file system cannot disguise
+it; anything else under such a directory's `src/lib/` or `src/commands/` is CTOC code. Every
+CTOC menu gets the same route list; a word pointing by its text into a `src/commands` folder
+that holds no such file is refused. Inline code — `node -e`, `-p`, `--eval`, `--print`,
+`--input-type`, or code piped or redirected into a runtime — is refused when its text names a
+path into `src/lib/` or `src/commands/` or the `ctoc` package, whatever function it calls.
+
+**One reading of a command.** A background agent's command that names the menu (`start.js`),
+a menu module (`menu-screens`, `streaming-gate`, `streaming-precompute`) or a crossing function
+(`continueAfterCrossing`, `approveSubplans`, `approvePlan`, `streamAnswer`, `streamApprove`,
+`crossBySufficiency`, `crossOnEvidence`, `pendingGateDecisions`), or that reaches CTOC's menu
+or code as above, is accepted only when it is
+ONE simple call the shell reads exactly as written: none of `;` `&` `|` `$` `(` `)` `<` `>`
+`{` `}` `*` `?` `[` `]` `~` `!` `#`, a backtick, a backslash, a newline or a carriage return
+outside quotes; a quoted argument is one pair of
+quotes around the whole word — inside single quotes anything, inside double quotes anything
+but `$`, a backtick and a backslash (which the shell still expands); `${CLAUDE_PLUGIN_ROOT}`
+only in the script word. Such a call is then allowed only as a read-only program that merely
+names the files (`grep`, `rg`, `cat`, `head`, `tail`, `wc`, `ls`, `diff`), or as the direct
+menu call: `node` (or an absolute path to a node binary), immediately a script that resolves
+to a CTOC menu, then an allowed route. No other script, no `node --test`, no
+option between the runtime and the script (`--no-warnings`, `--`, `-r`, `--require`), no
+`env` or `NAME=value` prefix, no other runtime (`bun`, `deno`, `tsx`, `npx`, `sh -c`,
+`bash -c`). The build agent's completion keeps working: a single-quoted `--summary` may hold
+anything, and a double-quoted one may hold `;` `#` `&` `|` `(` `)`; a double-quoted summary
+holding `$`, a backtick or a backslash is refused with one plain retry sentence, "Put the
+summary in single quotes and run the same command again." A claimed build is stamped with
+`menu task start <id> --agent-id <id>` — allowed — and a second stamp is refused by the menu. The route is read with
+`start.js`'s own `extractLiveAgentIds` and `splitCliArgs`, required from the plugin, so the
+hook and the menu cannot read it differently. Every other form is refused (fail closed).
+
+**The whole route must match.** Every word must be one the router accepts for that allowed
+route: an extra or unknown word refuses. `menu task` sub-commands are held to their grammar
+(`add <kind> [<plan>]` with `--touches`, `--blocked`, `--gitop`, `--label`, `--b64`; `start
+<id>` with `--agent-id`; `fail <id>` with `--summary`; `cancel <id>`; `complete <id>` with
+`--summary`, `--gate`, `--next`, `--b64`; `list`; `board`); `--force`, `--continue` and
+`--fail` are refused, and a `--next` or decoded `nextAction` must be a navigation route. The
+words are read by the menu's own `parseTaskArgs` (exported from `src/lib/menu-screens.js`),
+so the protection and the menu cannot read them differently. A
+`--b64` value is decoded with the task parser's own decoder (`menu-screens.decodeB64`) and must
+be a plain object carrying only the keys that sub-command reads (`complete`: `summary`,
+`nextAction`, `gate`; `add`: `kind`, `plan`, `label`, `touches`, `blockedBy`, `gitOp`); a value
+that does not decode is refused. Every decision for a call without an `agent_id` is
+unchanged.
+
+| Refused when the call carries an `agent_id` | Why |
+|---|---|
+| No arguments, or only `--live-agent-ids <ids>` | the default screen crosses pre-build plans on sufficiency (an entry in `.ctoc/approvals/` and a move across a gate) |
+| `stream approve <ref>` | `approvePlan`: an approval record and a gate crossing, then the continuation |
+| `stream answer <ref> <id> <key> [<digest>]` | writes the answers log (answers, holds, releases), then the continuation, which crosses plans (review to done included) |
+| `stream skip <ref>` | re-renders through the crossing pass |
+| `stream comment <ref> <text>` | writes `.ctoc/streaming/comments.jsonl`, then the same re-render |
+| `stream check <ref>` | queues the gate critic's classification of that plan's questions (the human's "Check its questions"), then the same re-render |
+| `stream` with no or an unknown sub-command | the default screen |
+| `plan` with no reference | the default screen |
+| `menu task complete <id> … --continue` | the continuation: crossings, planner and classification tasks, builds started |
+| any route not in the allowed table | fail closed |
+
+| Allowed for a background agent | Why |
+|---|---|
+| `menu task complete <id> [--summary …] [--gate N] [--next <route>] [--b64 …]`, no other word | the build agent's documented completion: in-progress to review and its check record; no approval, no answer, no human gate |
+| `menu task add …`, `start <id>`, `fail <id>`, `cancel <id>`, `list`, `board`, each within its grammar | the task registry only |
+| `menu`, `menu commands`, `dashboard` | the pipeline dashboard: task reconcile and orphan recovery (in-progress back to todo, not a human gate) |
+| `tasks`, `task <id>` | read-only task screens |
+| `browse <stage>`, `section <name>`, `stubs <slug>`, `validate <stage>/<file>` | read-only screens |
+| `inbox questions`, `decisions`, `gates`, `escalations`, `migration`, `verify`, `stale`, `cleanup`, `cleanup category`, `cleanup plan <slug>` | read-only screens; `cleanup confirm` and `cleanup override` are refused |
+| `plan <stage>/<file>` | the plan screen: it sweeps the waiting folder (validated promotion) and moves nothing |
+
+A crash on a background agent's call whose tool input mentions `start.js`, `menu-screens` or
+`streaming-gate` refuses with the "protection failed to run" sentence; the same crash on the
+main session's menu call is allowed, so one broken release cannot lock the human out of his
+own menu.
+
 The hook calls `process.chdir(root)` with the project root found from the payload's `cwd`,
 because the reused checks measure against the working directory. That is safe only because
 every call is a fresh subprocess that exits after one decision.
@@ -266,7 +352,19 @@ refused on every call; a payload that will not parse is scanned whole. A failure
 - hard links; more than 128 operands in one segment; file-writing tools other than the five;
 - read commands with a write side effect (`find -delete`, `tree -o`), which can delete or
   corrupt a record but never forge one;
-- any agent with the shell running the menu's own routes (approve, `stream approve`,
-  `stream answer`) — the protection cannot tell the session acting on the human's choice
-  from an agent acting alone;
+- a background agent reaching the menu's refused routes through a script file it wrote and
+  then ran (an npm script or a test file run without naming a menu module, say), a path held
+  in a variable set by an earlier call, or a tool other than the five matched. The fail-closed
+  cost of one reading, accepted: a background agent's compound command that merely names
+  `start.js` or a menu module (a pipe after a `grep`, say), `node --test` on a test file whose
+  name names a menu module, and another project's `node …/start.js` are refused even when
+  harmless — the simple read and `npm test` stay allowed;
+- a copy of CTOC whose manifests no longer name "ctoc", or a menu reached through a path
+  held in a variable or built inside a script — the menu is recognised by name and by the
+  file Node would run, not by its contents;
+- the main session itself running `stream answer` or `stream approve` without the human's
+  reply — it carries no `agent_id` by design and is trusted to run only answers the human
+  gave; every answer, hold and release stays a timestamped entry in the answers log;
+- a future Claude Code that stops sending `agent_id` for subagents: such calls read as the
+  main session's, which only widens back to the behaviour before this rule;
 - on a crash, a call that reaches a record through a link without naming it.

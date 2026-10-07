@@ -119,6 +119,9 @@ function validFunctionalBody(slug) {
     `## Problem Statement\nThe thing is broken.\n\n## Acceptance Criteria\n- [ ] the thing works\n\n## Scope\nThe module.\n`;
 }
 
+/** The gate critic's classification block: only a file it classified can move a plan (the owner, 2026-10-07). */
+const CLASSIFIED = Object.freeze({ by: 'gate-critic', at: 1786000000000 });
+
 function mtimeOf(p) {
   return fs.statSync(p).mtimeMs;
 }
@@ -130,11 +133,19 @@ function forkQuestion(id) {
     prompt: 'Which database engine?',
     critical: true,
     important: false,
+    topic: 'technology-stack',
     options: [
-      { key: 'pg', label: 'Postgres', recommended: true, pros: 'Row-level security.' },
-      { key: 'sqlite', label: 'SQLite', cons: 'No concurrency.' },
+      { key: '1', label: 'Postgres', recommended: true, pros: 'Row-level security.' },
+      { key: '2', label: 'SQLite', cons: 'No concurrency.' },
     ],
   };
+}
+
+/** The digest a screen's answer action carries (slice 1's format, derived here independently). */
+function digestOf(q) {
+  const ident = (t) => t.normalize('NFKC').normalize('NFD').replace(/\p{M}/gu, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim().toLowerCase();
+  const pairs = q.options.map((o) => [o.key, ident(o.label)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return require('node:crypto').createHash('sha256').update(JSON.stringify([ident(q.prompt), pairs, q.options.filter((o) => o.recommended === true).map((o) => o.key).sort()])).digest('hex');
 }
 
 /**
@@ -170,7 +181,7 @@ describe('streaming-gate — a check that could not run never crosses a plan', (
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'broken-store', validFunctionalBody('broken-store'));
     // A REAL unanswered fork is on disk: with a working store this screen asks it.
-    precompute.writePlanQuestions(root, 'functional/broken-store.md', [forkQuestion('db')], mtimeOf(p));
+    precompute.writePlanQuestions(root, 'functional/broken-store.md', [forkQuestion('q10-db')], mtimeOf(p), undefined, CLASSIFIED);
 
     // Sanity, unpatched: the rich question screen is what the human would get.
     const healthy = streamingGate.streamingGateScreen(root);
@@ -204,9 +215,9 @@ describe('streaming-gate — a check that could not run never crosses a plan', (
   it('471-476 + 496-498: a sufficiency predicate that could not run reports enough:false/unavailable and crosses NOTHING', () => {
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'would-cross', validFunctionalBody('would-cross'));
-    // An EMPTY question set is the honest "nothing to ask" — this plan HAS enough
-    // information and, with a working predicate, crosses by itself.
-    precompute.writePlanQuestions(root, 'functional/would-cross.md', [], mtimeOf(p));
+    // An EMPTY question set from the gate critic is the honest "nothing to ask" — this plan
+    // HAS enough information and, with a working predicate, crosses by itself.
+    precompute.writePlanQuestions(root, 'functional/would-cross.md', [], mtimeOf(p), undefined, CLASSIFIED);
 
     const faulted = withBrokenPrecompute(() => streamingGate.pendingGateDecisions(root));
 
@@ -259,20 +270,25 @@ describe('streaming-gate — a check that could not run never crosses a plan', (
       'no ledger entry may survive a failed crossing');
   });
 
-  it('1297-1298: enough information at the LAST moment is shown to the human, never crossed automatically', () => {
+  it('1297-1298: an empty question list alone never finishes a plan', () => {
     const root = makeSandbox();
     const p = writePlan(root, 'review', 'done-ready', `---\ntitle: done-ready title\n---\n\n# done-ready title\n\nBody.\n`);
-    // Ready and empty: the critique ran and found nothing to ask.
-    precompute.writePlanQuestions(root, 'review/done-ready.md', [], mtimeOf(p));
+    // Ready and empty: the gate critic ran and found nothing to ask.
+    precompute.writePlanQuestions(root, 'review/done-ready.md', [], mtimeOf(p), undefined, CLASSIFIED);
 
-    const decisions = streamingGate.pendingGateDecisions(root);
+    // The crossing pass the continuation runs — the only one that may finish a built plan.
+    const crossed = [];
+    const decisions = streamingGate.pendingGateDecisions(root, { crossed });
     const d = decisions.find((x) => x.slug === 'done-ready');
-    assert.ok(d, 'the last moment is never crossed by sufficiency, so the plan stays pending');
-    assert.equal(d.enough, true);
+    assert.ok(d, 'the plan stays pending');
+    assert.equal(d.enough, true, 'nothing is left to ask …');
+    assert.equal(d.passesValidation, false, '… but the built work has no passing check record');
+    assert.deepEqual(crossed, []);
+    const why = require('../src/lib/plan-validator.js').validateReviewToDone(p, root);
+    assert.ok(why.errors.some((e) => /no VERIFY evidence recorded/.test(e)), why.errors.join('; '));
 
     const screen = streamingGate.streamingGateScreen(root);
     assert.match(screen.text, /Enough information: YES — every decision this plan needs has been answered\./);
-    // Shown, not acted on: the plan is still where it was, with no ledger entry.
     assert.equal(fs.existsSync(p), true);
     assert.equal(fs.existsSync(path.join(root, 'plans', 'done', 'done-ready.md')), false);
     assert.equal(fs.existsSync(path.join(root, '.ctoc', 'approvals')), false);
@@ -287,15 +303,16 @@ describe('streaming-gate — the decision matrix never overflows and never drops
     // separator in the column window and must fall back to the column width.
     const TOKEN = 'XQ7'.repeat(70);
     precompute.writePlanQuestions(root, 'functional/wide-token.md', [{
-      id: 'wide',
+      id: 'q10-wide',
       prompt: 'Which engine?',
       critical: true,
       important: false,
+      topic: 'technology-stack',
       options: [
-        { key: 'a', label: 'Alpha', recommended: true, pros: 'A short readable reason.' },
-        { key: 'b', label: 'Beta', pros: TOKEN },
+        { key: '1', label: 'Alpha', recommended: true, pros: 'A short readable reason.' },
+        { key: '2', label: 'Beta', pros: TOKEN },
       ],
-    }], mtimeOf(p));
+    }], mtimeOf(p), undefined, CLASSIFIED);
 
     const screen = streamingGate.streamingGateScreen(root);
     const matrixLines = screen.text.split('\n').filter((l) => l.startsWith('│'));
@@ -322,11 +339,11 @@ describe('streaming-gate — recording an answer is honest about what it could a
   it('1610-1611: an id made only of control characters is refused, and no answer is recorded', () => {
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'ctl', validFunctionalBody('ctl'));
-    precompute.writePlanQuestions(root, 'functional/ctl.md', [forkQuestion('db')], mtimeOf(p));
+    precompute.writePlanQuestions(root, 'functional/ctl.md', [forkQuestion('q10-db')], mtimeOf(p));
 
     // Producer-authored, therefore untrusted: an id that is nothing but control
     // characters and a terminal escape introducer.
-    const screen = streamingGate.streamAnswer('functional/ctl.md', '\x1b\x07\x00\x9b', 'pg', root);
+    const screen = streamingGate.streamAnswer('functional/ctl.md', '\x1b\x07\x00\x9b', '1', root);
 
     assert.match(screen.text, /Ignored an incomplete answer for ctl\.md\./);
     assert.equal(CONTROL_CHARS.test(screen.text), false,
@@ -338,34 +355,27 @@ describe('streaming-gate — recording an answer is honest about what it could a
     assert.equal(fs.existsSync(path.join(root, 'plans', 'implementation', 'ctl.md')), false);
   });
 
-  it('1632-1633: an answer that cannot be tied to a revision is KEPT unstamped and the human is told why', () => {
+  it('1632-1633: an answer that cannot be checked is refused, and the human is told why', () => {
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'nostamp', validFunctionalBody('nostamp'));
-    precompute.writePlanQuestions(root, 'functional/nostamp.md', [forkQuestion('db')], mtimeOf(p));
+    precompute.writePlanQuestions(root, 'functional/nostamp.md', [forkQuestion('q10-db')], mtimeOf(p));
 
     const screen = withBrokenPrecompute(
-      () => streamingGate.streamAnswer('functional/nostamp.md', 'db', 'pg', root),
+      () => streamingGate.streamAnswer('functional/nostamp.md', 'q10-db', '1', root, digestOf(forkQuestion('q10-db'))),
     );
 
-    // The answer is NOT lost.
-    const logPath = path.join(root, '.ctoc', 'streaming', 'answers.jsonl');
-    assert.equal(fs.existsSync(logPath), true);
-    const record = JSON.parse(fs.readFileSync(logPath, 'utf8').trim());
-    assert.equal(record.questionId, 'db');
-    assert.equal(record.optionKey, 'pg');
-    assert.equal('planMtimeMs' in record, false,
-      'a revision that could not be established must never be fabricated into the record');
-
-    // And the human is told, with the reason, that it may be asked again.
-    assert.match(screen.text, /could not be tied to a plan revision/);
+    // Its question could not be read, so its options are unknown: nothing is recorded.
+    assert.equal(fs.existsSync(path.join(root, '.ctoc', 'streaming', 'answers.jsonl')), false);
+    // And the human is told, with the reason, that it will be asked again.
+    assert.match(screen.text, /Nothing was recorded for nostamp\.md: its questions could not be read/);
     assert.match(screen.text, /SIMULATED streaming-precompute load failure/);
-    assert.match(screen.text, /may be asked again/);
+    assert.match(screen.text, /The question will be asked again\./);
   });
 
   it('1658-1659: an answer that could not be written says so, and is not reported as recorded', (t) => {
     const root = makeSandbox();
     const p = writePlan(root, 'functional', 'nowrite', validFunctionalBody('nowrite'));
-    precompute.writePlanQuestions(root, 'functional/nowrite.md', [forkQuestion('db')], mtimeOf(p));
+    precompute.writePlanQuestions(root, 'functional/nowrite.md', [forkQuestion('q10-db')], mtimeOf(p));
 
     const realAppend = safeFs.appendFileSync;
     t.mock.method(safeFs, 'appendFileSync', (target, data, opts) => {
@@ -374,7 +384,7 @@ describe('streaming-gate — recording an answer is honest about what it could a
       return realAppend(target, data, opts);
     });
 
-    const screen = streamingGate.streamAnswer('functional/nowrite.md', 'db', 'pg', root);
+    const screen = streamingGate.streamAnswer('functional/nowrite.md', 'q10-db', '1', root, digestOf(forkQuestion('q10-db')));
 
     assert.match(screen.text, /Could not record the answer for nowrite\.md: injected append failure/);
     assert.doesNotMatch(screen.text, /Recorded your answer/);

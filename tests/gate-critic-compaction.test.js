@@ -24,13 +24,22 @@ const { defineInventoryTests } = require('./compaction-eval/inventory-checks');
 const { check, pendingRel, topic } = require('./compaction-eval/gate-critic/contract');
 
 /** The order count at extraction. A floor: it may rise, never fall. */
-const ORDER_FLOOR = 581;
+const ORDER_FLOOR = 594;
+
+/**
+ * sha256 of the inventory's units as `n:kind` lines, pinned here so an order unit cannot be
+ * relabelled as a cuttable kind (and then cut) without an edit in this file too. Unchanged
+ * since extraction; the floor above equals the order count, added rules included (2026-10-07; re-pinned
+ * when the omission duty added four, the kinds unchanged).
+ */
+const KINDS_SHA256 = 'ba0606ed78d722811dfb8f5f1b6f6347a8815a97e030b7ca50ab6e7acd46aa2c';
 
 defineInventoryTests({
   test,
   label: 'gate-critic',
   inventoryPath: path.join(__dirname, 'compaction-eval', 'gate-critic', 'rule-inventory.json'),
-  orderFloor: ORDER_FLOOR
+  orderFloor: ORDER_FLOOR,
+  kindsSha256: KINDS_SHA256
 });
 
 const REF = 'functional/title-search.md';
@@ -67,7 +76,7 @@ test('gate-critic adapter: the pending path is the sanitised ref under pending/'
 test('gate-critic adapter: a well-formed file yields one finding per question plus the ruling word', () => {
   const lens = {
     id: `q00-lens-unavailable-red-team-r${STAMP}`, prompt: 'The red-team critique did not run. Cross title-search without it?',
-    critical: true, important: false, options: [{ key: '1', label: 'Hold until the red-team critique runs', recommended: true }]
+    critical: true, important: false, topic: 'detail', options: [{ key: '1', label: 'Hold until the red-team critique runs', recommended: true }]
   };
   const c = check(run({ ref: REF, planMtimeMs: STAMP, questions: [lens, ruling('hold')] }), fx);
   assert.equal(c.valid, true, c.errors.join('\n'));
@@ -85,7 +94,7 @@ test('gate-critic adapter: approve is normal, reject is important', () => {
 });
 
 test('gate-critic adapter: forbid_text and count_text are measured on the text the human reads', () => {
-  const finding = (n, text) => ({ id: `q${n}-topic-${n}-r${STAMP}`, prompt: `About ${text}?`, critical: true, important: false, options: [{ key: '1', label: 'Fix', recommended: true }] });
+  const finding = (n, text) => ({ id: `q${n}-topic-${n}-r${STAMP}`, prompt: `About ${text}?`, critical: true, important: false, topic: 'detail', options: [{ key: '1', label: 'Fix', recommended: true }] });
   const payload = { ref: REF, planMtimeMs: STAMP, questions: [finding(10, 'src/routes/export.js'), finding(11, 'src/routes/export.js'), ruling('reject')] };
   const c = check(run(payload), { ...fx, count_text: 'export.js', forbid_text: 'routes/export' });
   assert.equal(c.payload.count_text_questions, 2);
