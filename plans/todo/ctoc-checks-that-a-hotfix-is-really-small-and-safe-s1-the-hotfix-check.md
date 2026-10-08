@@ -1114,10 +1114,317 @@ instead of "tests failed" — still not a pass.
     another git process replaces the index reads one whole version or fails, which stops the
     check (a refusal).
 
+45. **An empty patch is not applied** (the executor, 2026-10-08). When the temporary index
+    already equals the last commit (a judged file whose only change git's line-ending
+    settings undo), `git apply` refuses the empty input ("No valid patches in input",
+    measured on this machine), so the check skips it: the copy then is the last commit,
+    which is exactly the judged change. Any other `apply` failure is still the refusal.
+46. **An installed-package entry is linked only when it leads to a folder** (the executor).
+    `statSync` follows a link, so a `node_modules` that is itself a symbolic link is linked
+    by its real path, and an ignored file named `node_modules` is never linked. The
+    `--directory` listing also shows folders that hold only ignored content (`packages/`,
+    `packages/a/` in Step 9's run); they are neither `node_modules` nor hold `pyvenv.cfg`,
+    so they are skipped.
+47. **A blank context line that git prints empty counts as context** (the executor). Under
+    `diff.suppressBlankEmpty=true` a blank unchanged line prints as an empty line; should a
+    context line appear at all (only if git ignored `--inter-hunk-context=0`), any body line
+    that is not `-`, `+` or the `\` marker advances both sides and closes the group.
+48. **The trial build's reader of git's quoted path names is removed** (the executor). With
+    `core.quotepath=false` git quotes a name in a patch header only for a control
+    character, `"` or `\`, and every such judged name is now refused by the name check
+    before the changed-line diff runs, so the reader could never run (a dead branch). The
+    trial build's quoted-name case moved to a name with spaces, a star and letters beyond
+    ASCII, which still pins `--literal-pathspecs`.
+49. **Both hashings treat a judged file that is not a regular file the same way**
+    (the executor). The second hashing uses the first hashing's rule, so a judged file
+    deleted or replaced while the tests ran reads `deleted` or `not a file`, differs from its
+    temporary-index id and refuses as "changed while it was being checked", instead of
+    stopping the check on a git error.
+50. **A hunk header keeps the trial build's pattern** (the executor). The linter's
+    unsafe-regular-expression rule refuses the optional-group form `(?:,(\d+))?`; the trial
+    build's `,?(\d*)` reads the same headers and passes it (the trial build's decision 25).
+
+## Execution Record
+
+Built by the iron-loop executor in the worktree `.claude/worktrees/hotfix-s1-build`
+(branch `hotfix-s1-build`), 2026-10-08, from `768c097d` (today's main v6.14.123 plus the
+trial build's code, arm B at `3d163d56`, applied three-way, plus this approved plan). The
+specification hash was checked before the first plan edit and after every plan edit:
+`4aaf099b44f61ce1721e1bd2309bc781e49f2b8a2896c60aff3ecb22e80f8003`, equal to the approval
+record's `content_sha256`. Steps 11, 13 and 16 are left to the session's reviewers.
+
+**Commits.** `826be698` the red tests; `7c697132` the check, the runners, safe-fs, the
+registry, the whitelist, the counts; `261c4bea` the hashing branch case and the runners'
+documentation; `44f3bca4` cases 29, 39 and 40 assert their own fault first; the plan
+record follows.
+
+### Carried from the trial build
+
+From arm B's own copy of this plan (`git show trial-hs1-b:plans/todo/…-s1-the-hotfix-check.md`),
+its decisions 15 to 29, with what still holds:
+
+- 15 (fixture scripts name files: `node --test tests/*.test.js`; on Node 24 a folder
+  argument fails) — holds; every fixture follows it.
+- 16 (`NODE_TEST_CONTEXT` cleared around the nested run) — holds; the test helper clears it.
+- 17 (with no test command the first call already answers) — **replaced** by this plan's
+  Decision 33: the first call answers `checking`; a documentation-only pass comes from the
+  `--run-tests` call (case 17).
+- 18 (a pass carries `tests`: `N test(s) passed.`, or the no-test-command sentence) — holds.
+- 19 (a missing sub-command reads `Unknown hotfix command: (none).`) — holds; case 27 now
+  pins the exact text.
+- 20 (the git helper removes git's redirecting variables and sets `GIT_LITERAL_PATHSPECS`)
+  — holds, extended by `diff.autoRefreshIndex=true` and the copy of the index (Decisions 43
+  and 44).
+- 21 (33 sensitive words) — holds (this plan's Decision 28).
+- 22 (the 148 named colours from the installed `color-name` 1.1.4, inlined) — holds; the
+  specification text still could not be opened (no network here), so Step 9's colour-list
+  box stays open.
+- 23 (folder names compared in lower case) — holds.
+- 24 (naming `.` is "outside this project") — holds; case 21 now pins it.
+- 25 (line shapes held to the linter's no-nested-quantifier rule) — holds; Decision 50.
+- 26 (the log never written through a symbolic link) — holds, extended: hard links, the
+  `nlink`/descriptor check, rotation by renaming instead of emptying (Decision 22).
+- 27 (`file://host` shown as written; names and files cleaned, 200 characters) — holds.
+- 28 (the `requirements.txt` trap at `deps/`) — holds.
+- 29 (two files outside the old `files:` needed) — resolved: `README.md` and
+  `src/lib/human-facing-scan.js` are declared now and were edited.
+
+Arm B's record: 94 of 94 red before its code, 107 of 107 green after; its real flow passed
+a one-word change in 0.39 s with the old commit command; its `npm test` ended at 5 failures,
+all five the two then-undeclared files, which this build edits.
+
+Arm B's cases that this plan replaces, changed only toward the new contract (none loosened):
+every `commit` assertion (`--literal-pathspecs`, `--only`, Decision 17); case 4 now also
+runs the commit (the functional plan's scenario); case 17 (Decision 33); case 28 (the
+checking answer writes no line, the pass line comes from `--run-tests`); the 1 MiB emptying
+case → case 39 (rename); the corrupt-index wording → case 34 (fixed clause, `detail`); the
+missing-folder "check stopped" case (fixed clause, `detail`); the quoted-name case
+(Decision 48); the corpus (first call, `checking`; 24 and 58 shapes; arm B's ternary
+`Compare.tsx` is renamed `Pick.tsx`, because the plan's `Compare.tsx` is the comparison
+chain); the selection case (it now asserts the selected test lies in the copy); the
+log-link case (case 41: `.ctoc` as a link added, answers compared with a reference run).
+The edge-shape case gained four `.jsx` closing-element shapes, `.env`, a `webpack` config,
+`docs/CLAUDE.md` and `skills/x/helper.js`.
+
+### Step 9 facts
+
+git 2.50.1 (Apple Git-155), Node v24.14.1, macOS (Darwin 27.0.0).
+
+The session's verified facts of 2026-10-08, recorded as given: (a) after a file's
+modification time changed, every form of `git diff` rewrote the real `.git/index` — plain,
+with `GIT_OPTIONAL_LOCKS=0`, and with `-c diff.autoRefreshIndex=true`; through
+`GIT_INDEX_FILE` set to a temporary copy the real index stayed byte-identical, a file that
+was only touched was not listed, and a real edit was listed. (b) With `core.splitIndex=true`
+and a split index in place, a diff through the copied index left the `.git` folder listing
+and the real index unchanged. (c) A `git diff` naming one file does refresh and rewrite the
+whole real index, other touched files' entries included: **the plan's believed sentence that
+it does not (case 24, "git refreshes only the entries a diff covers") is false.** Case 24
+still holds, because every comparison uses the copy. Repeated here: naming `a.md` while
+`a.md` and `b.md` were only touched rewrote `.git/index` and refreshed `b.md` too, for both
+`diff --quiet -- a.md` and `diff HEAD --raw -- a.md`; when the named file itself needed no
+refresh (it had a real edit) and only `b.md` was touched, the index was not written.
+
+Measured on this machine for this plan's Step 9:
+- Each pinned argument wins over its setting: `--src-prefix=a/ --dst-prefix=b/` gave
+  `diff --git a/docs/guide.md b/docs/guide.md` under `diff.noprefix=true` and
+  `diff.mnemonicPrefix=true` (unpinned: `diff --git docs/guide.md docs/guide.md`); `--text`
+  printed the changed lines of a `-diff` file (without it: `Binary files … differ`);
+  `--no-relative` listed all three changed paths from a sub-folder under
+  `diff.relative=true` (without it: only `a.md`); `--no-color` printed no escape byte under
+  `color.diff=always`; with `-c diff.autoRefreshIndex=false` a file whose time moved was
+  listed by `diff HEAD --raw`, and with the pin over a configured `false` it was not.
+  `--ignore-cr-at-eol` hid a CRLF-only line; `--raw -z --no-renames --no-abbrev` gave full
+  ids and NUL-separated records.
+- Decision 44 repeated for the forms the check runs, a stat-moved committed file present,
+  nothing named: on the repository's own index `diff HEAD --raw -z` REWROTE `.git/index`
+  (main working tree and a linked worktree alike); the `-U0` diff of a really-edited file,
+  `hash-object`, `ls-files --others` and `ls-files --others --ignored --directory` left it
+  unchanged; through a copy made as rule 1 makes it (`rev-parse --git-path index`, `cpSync`
+  with `preserveTimestamps`) all five left the repository's index byte-identical, in the
+  main working tree and in a linked worktree (`rev-parse --git-path index` named
+  `.git/worktrees/<name>/index` there).
+- `worktree add --detach` with `core.hooksPath=<empty folder>` and `core.fsmonitor=false`
+  ran neither `post-checkout` nor `reference-transaction` (marker hooks; a control run
+  without the empty folder ran both, so the believed `reference-transaction` part is now
+  verified on macOS). `worktree remove --force` deleted the worktree's folder and its
+  registration and left a stale registration of another worktree listed (`prunable`).
+- A patch built through a temporary index (`read-tree`, `add --all`, `diff --cached
+  --binary --full-index -U3`) applied with `git apply` inside the worktree under
+  `core.autocrlf=true` with CRLF working files (the copy's file read `one\r\nTWO\r\n`),
+  carried an added and a deleted file, and was refused whole when one hunk did not apply
+  (`error: patch failed: docs/a.md:1`; the added file was not written, the deleted one was
+  still there). An empty patch is refused ("No valid patches in input") — Decision 45.
+- `hash-object -- <file>` equalled the id `ls-files --stage` read from the temporary index
+  after `add --all`, for CRLF working files under `core.autocrlf=true` too. The main
+  `.git/index` bytes were unchanged by all of it.
+- `ls-files --others --ignored --exclude-standard --directory -z` listed `.venv/`,
+  `build/`, `node_modules/`, `packages/`, `packages/a/`, `packages/a/node_modules/` and
+  `vendor/node_modules/` (with `vendor` a symbolic link in the last commit and a real
+  folder in the working folder).
+- The copy's time on this repository (3,635 tracked files): `worktree add` 376 ms, the
+  temporary index, patch and apply of a one-word README change 69 ms, `worktree remove`
+  and the folder's removal 180 ms; 625 ms in all. On a tiny scratch repository: 95–152 ms
+  for add, patch and apply, 9–10 ms for removal.
+- `execFileSync(process.execPath, ['-e', '0'], { shell: true })` printed
+  `[DEP0190] DeprecationWarning: Passing args to a child process with shell option true can
+  lead to security vulnerabilities, as the arguments are not escaped, only concatenated.`
+  `spawnSync` of a program printing 2 MiB with `maxBuffer` 1 MiB answered the error code
+  `ENOBUFS` with the signal `SIGTERM` and status `null`; a missing program `ENOENT`; a
+  timeout `ETIMEDOUT` with `SIGTERM`.
+- Read: `menu-screens.js` and `start.js` as on today's main (the `hotfix` case and the
+  settled print are arm B's, present); `quality-agent.js` exports `runFullTests` and
+  `runSpecificTests`; `tool-detector.detectTools(path).tools`; `coverage-map` exports
+  `findTestsByHeuristic`; `.ctoc/quality-config.yaml` reads `languages:` →
+  `<language>:` → `test: <command>` (space-indented), a `test` override clearing
+  `testFromScript`.
+- Every `tests/quality-agent*.test.js` file and `tests/test-selection-scope.test.js` passed
+  on the unchanged quality agent (110 tests). The three files of Decision 34 fake the
+  runner's `execFileSync` (read, then confirmed by the full suite after the move); the
+  other files that fake `execFileSync` fake it for the security scanners or for git, not
+  for the test runner. No existing test pinned a fault this slice fixes; the one launcher
+  assertion (`npx` or `npx.cmd`) moved to the new contract (`npx` by name off Windows;
+  case g pins Windows).
+
+Believed, not verified here (Windows cannot be run on this machine): Git for Windows reads
+a native `GIT_INDEX_FILE` path and refreshes into the copy the same way; Node's refusal to
+start a `.cmd` file directly; a junction made without administrator rights; `lstatSync`
+reading a junction as a symbolic link; `unlinkSync` on a junction removing the junction and
+not its target; `npm-cli.js` and `npx-cli.js` under `<node folder>/node_modules/npm/bin/` in
+the official installer's layout; npx starting jest's `.cmd` shim through `cmd.exe` with
+npm's own escaping; `pytest` and `go` started by name. Also believed: the existing
+quality-agent argument assertions that find the jest call by `args[0] === 'jest'` read the
+launch off Windows; on a Windows install with `npx-cli.js` beside `node.exe` the first
+argument is that script, so those assertions would need the platform pinned there
+(continuous integration runs on Linux only).
+
+### Step 8 — red before the implementation, green after
+
+Run on the trial build's code (this branch at `826be698`, whose `src/` is `768c097d`'s):
+`tests/hotfix-check.test.js`, `tests/hotfix-check-corpus.test.js`,
+`tests/quality-agent-coverage.test.js`, `tests/safe-fs.test.js` — 220 tests, 126 pass, 94
+fail; the main file again after its runs became subtests: 74 tests, 25 pass, 49 fail.
+
+Red there, each for its own reason: cases 1, 2, 3, 18, 20, 25 (the old commit commands);
+17 and 19 (the first call answered the pass instead of `checking`); 24 (`.git/index`
+changed: the tests ran in the working folder); 29 (the unrelated edit changed the verdict);
+30 (the ignored, then the uncommitted, quality setting chose `always-pass.js`: a pass);
+32 (old commit commands); 33 (`this folder has no commit to compare with`); 34 (`the check
+stopped: git diff failed: …` in the sentence); 35 (b) (`docs/other.md` judged); 36 (`the
+test command reported a failure`: standard error unread); 37 and 38 (`the existing tests
+fail`); 39 (the old log was emptied, not kept under `.1`); 40 (the hard-linked file was
+emptied); 42 (a pass: the working folder's flag); all six runs of 43 (the tests ran in the
+project folder itself; run 6 found no `ctoc-hotfix-` folder); 44 (a pass); 45 (a) and (b)
+(the tests ran in the project folder); 46 (no link made: 0 calls, 3 expected); 47 (a) and
+(b) (a pass); 48 (a pass); 49 and 51 (a pass); 50 and 52 (the tests ran in the project
+folder); 53 (a pass); the branch cases for the missing folder, the sub-folder project, the
+selection, the edge shapes, the log folder that cannot be written and the name with a star
+(new contract). Corpus: all 24 qualifying shapes and 9 traps (`docs/big.md` `-diff`,
+`deps/constraints.txt`, `deps/requirements/base.txt`, `app/runtime.txt`,
+`native/CMakeLists.txt`, `Compare.tsx` chain, `Types.tsx` generic, `.claude/theme.css`,
+`agents/card.html`). Quality agent: cases a to k and the throw-shape case red; the five
+existing argument-vector cases red too, because the helper now fakes `spawnSync` and refuses
+a runner started through `execFileSync`. safe-fs: both round trips and the three surface
+and validation loops (the new names absent).
+
+Green there as planned, each proven able to fail by its named one-line change to the trial
+build's code, run once and reverted (output kept in the build's scratch notes):
+case 4 (the project root as the pathspec: deep-equal failed); 28 (log the `checking`
+answer: "a checking answer writes no log line"); 31 (drop the `.ctoc/` exclusion: the
+answers differed); 35 (a) (drop the pinned prefixes: the answers and log counts differed);
+41 (drop the `.ctoc/logs` folder check: the answers differed, the outside folder gained the
+log); corpus `docs/limit.md` (`n > 21`: the 21-line change passed); `days.html` (`\d`);
+`site.html` (no `i` flag); `Button.spec.tsx` (no `spec`). Also green there and not in the
+plan's red list (the trial build already did them): cases 5 to 16, 21 to 23, 27, the
+invalid-UTF-8, failing-test reader, unreadable-counter and `file://host` cases, 49 traps
+and the mode change.
+
+Red there for another reason, proven instead on the built code by one change, run once and
+reverted: the corpus 20-line shape (`n >= 20`: refused) and three-file shape (`m >= 3`:
+refused); quality-agent case i (the platform test swapped: deep-equal failed); case 43's
+stale entry (`worktree prune`: five runs failed "the worktree list is as before");
+45 (b) (`ENOENT` on unlink a failure: red); 47 (b) (no first-hash comparison: a pass);
+50 (refuse whenever a target is found: red); 52 (judged files not excluded: refused);
+53 (no parent check: a pass, the link made in `outside`); case 24's moved file (reads name
+the repository's own index: ".git/index unchanged" failed).
+
+Green on the built code: the four files above plus the three moved fake files and every
+quality-agent file — 294 tests, 294 pass (`hotfix-check.test.js` 75, the corpus 83,
+every quality-agent file and the selection file 122, safe-fs 14). One case was added after
+the code existed, for branch coverage: the test call refusing a deleted file and a file
+replaced by a link without hashing them (green at once; hashing every judged file turned
+it red, reverted).
+
+### Step 10 — what changed
+
+`src/lib/hotfix-check.js` (the trial build's module, rewritten where the plan changed it:
+the git helper's pins and `GIT_INDEX_FILE`, the copy of the index, the name check, the two
+hashings, the outside-the-repository refusal, the context-line numbering, the texts-differ
+refusal, governing places for every kind, dependency and build lists, the JSX
+closing-element rule, `checking` without tool detection, rule 8's copy, links,
+installed-package targets, removal and `detail`, the fixed "check stopped" clause, the
+commit commands, the log's hard-link check and rotation); `src/lib/quality-agent.js`
+(`spawnSync`, standard error read, `outputTooLarge`/`timedOut`/`notStarted`,
+`npmLauncher`, npm's placeholder, the undetermined result with its own line);
+`src/lib/safe-fs.js` (`mkdtempSync`, `symlinkSync`); `src/lib/human-facing-scan.js`
+(`SCREEN_MODULES`); `tests/cache-freshness.test.js` (the whitelist entry, its reason as the
+plan words it); `README.md` (135 modules, 566 test files, by `node src/scripts/release.js`;
+`CLAUDE.md` already read 135 and 566 from the trial build, and release.js left it
+unchanged). `src/lib/menu-screens.js` and `src/commands/start.js` are the trial build's,
+unchanged. `VERSION` unchanged (6.14.123).
+
+### Step 12 — optimise
+
+Read against the plan's list: per call one `rev-parse --git-path index` and one copy of
+the index, one `diff --raw` and one `ls-files --others` for the judged paths, one `-U0`
+diff for all judged files, one `cat-file` per judged file; in the test call also two
+`hash-object` (all judged files at once), one `worktree add`, one `read-tree`, one `add`,
+one `ls-files --stage`, one `diff --cached`, one `apply` (none for an empty patch), one
+`ls-files --ignored --directory`, the two listings for installed-package targets only when
+a target is found, and one `worktree remove`. Plus the two `rev-parse` calls that read the
+top level and the last commit. No call per rule or per file beyond `cat-file`.
+
+### Step 14 — verify
+
+- Lint: `npm run lint` (`eslint . --max-warnings 0`) clean. Type check: `npx tsc --noEmit`
+  0 errors (0 before the change).
+- Coverage of the changed modules under their own tests: `hotfix-check.js` lines 99.30%,
+  branches 98.21%, functions 99.03%; the lines not run are exactly the three named
+  branches: the context-line numbering (lines 407–413) and the texts-differ refusal
+  (line 581), both reachable only if git ignored `--inter-hunk-context=0` or `--text`, and
+  `O_NOFOLLOW || 0`'s Windows side. Each named branch was run under its Step 8 mutation:
+  case 35 with `--inter-hunk-context=0` removed stayed green and covered lines 407–413 (the
+  numbering holds with context lines); the `docs/big.md` trap with `--text` removed went red
+  (it then reads "I do not recognise docs/big.md as wording or a colour") and covered line
+  581. `safe-fs.js` 100% lines and branches; no line of `quality-agent.js` left unrun by
+  these files falls inside a function this slice changed.
+- The real flow, in a scratch project made by one bare menu call and committed (one word in
+  `src/pages/home.html`; `config/flags.txt` changed so that `npm test` fails in the working
+  folder — it exited 1 there):
+  `node src/commands/start.js hotfix check src/pages/home.html` (108–162 ms) →
+  `{"verdict": "checking", "text": "Checking the hotfix against the existing tests.", "next":
+  "hotfix check --run-tests 'src/pages/home.html'", "ask": {"questions": []}, "actions": {}}`;
+  `… hotfix check --run-tests src/pages/home.html` (388–525 ms in all; the project's own
+  `npm test` alone on a clean checkout took 141–175 ms, so the copy, the checks and the
+  process start took about 250–350 ms) → `{"verdict": "hotfix", "text": "", "tests": "2 tests
+  passed.", "commit": {"files": ["src/pages/home.html"], "add": "git --literal-pathspecs add
+  -- 'src/pages/home.html'", "message": "git --literal-pathspecs commit --only -m 'hotfix:
+  <what changed>' -- 'src/pages/home.html'"}, "ask": {"questions": []}, "actions": {}}`.
+  Running `add` and `message` (filled with "rename the Save button to Store") from the
+  project root made one commit holding `["src/pages/home.html"]`, subject `hotfix: rename
+  the Save button to Store`; `git status` afterwards: ` M config/flags.txt`, `?? .ctoc/logs/`.
+  The log's line: `{"at":"2026-10-08T20:43:40.667Z","verdict":"hotfix","cause":null,
+  "urgent":false,"files":1,"lines":2}`. No `ctoc-hotfix-` folder remained;
+  `git worktree list --porcelain` after both calls equalled its output before.
+  Seen, not acted on: the bare menu call wrote `.ctoc/settings.yaml` and
+  `.ctoc/state/iron-loop.yaml` but no `.gitignore`, so `.ctoc/logs/` showed as untracked;
+  the plan's sentence that `.ctoc/logs/` is in the `.gitignore` CTOC writes at project
+  initialisation did not hold for this path. The check is unaffected (it leaves `.ctoc/`
+  out of the judged change, and the copy holds only tracked files).
+
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
-- [ ] Write `tests/hotfix-check.test.js`. Every case builds a temporary git repository
+- [x] Write `tests/hotfix-check.test.js`. Every case builds a temporary git repository
   (`git init`, `user.name`, `user.email` and `commit.gpgsign=false` set per call, files
   committed), makes the change, and calls `route(['hotfix', 'check', ...], root)` through
   `src/lib/menu-screens.js` (awaiting it). Projects that run tests carry a `package.json`
@@ -1375,7 +1682,7 @@ instead of "tests failed" — still not a pass.
       never ran (its marker is absent), `outside` holds no entry after the call, and the copy
       is gone. Where the copy's `vendor` is checked out as a plain file (Windows with
       `core.symlinks=false`), the same answer comes from `mkdirSync` failing (believed).
-- [ ] Write `tests/hotfix-check-corpus.test.js`: one temporary repository holding every base
+- [x] Write `tests/hotfix-check-corpus.test.js`: one temporary repository holding every base
   file below, committed once, with no test command. Every shape lives in its own file, under a
   path holding none of the sensitive words unless the shape is about one. Each shape writes its
   new content, calls the route naming its file(s) (the first call), asserts the exact verdict
@@ -1445,7 +1752,7 @@ instead of "tests failed" — still not a pass.
     working copy left as it was): on macOS and Linux → do not recognise; on Windows, where git
     ignores the executable bit, → `checking`. One case with a platform-dependent expectation,
     never a skipped case.
-- [ ] Add to `tests/quality-agent-coverage.test.js` (the quality agent's own test file). Where a
+- [x] Add to `tests/quality-agent-coverage.test.js` (the quality agent's own test file). Where a
   process must not really start, the case runs inside its `withExecSpies` helper, which fakes
   both process calls as described under Files: the `spawnSync` fake records and answers; the
   `execFileSync` fake lets `git` through and throws `runner started through execFileSync` for
@@ -1482,17 +1789,17 @@ instead of "tests failed" — still not a pass.
      with code 'ENOBUFS'>, stdout: 'ℹ pass 3', stderr: '' }` → `runFullTests` answers
      `passed: false`, `undetermined: true`, its `output` naming the 10 MiB output limit and not
      a timeout.
-- [ ] Add to `tests/safe-fs.test.js`: `mkdtempSync` and `symlinkSync` in `SYNC_METHODS`,
+- [x] Add to `tests/safe-fs.test.js`: `mkdtempSync` and `symlinkSync` in `SYNC_METHODS`,
   `symlinkSync` in `TWO_PATH_SYNC` (the file's loops then check their path validation), and one
   round trip each: `safeFs.mkdtempSync(path.join(<a temporary folder>, 'x-'))` makes a new
   folder whose name starts with `x-`; `safeFs.symlinkSync(<a folder>, <a link path>,
   process.platform === 'win32' ? 'junction' : 'dir')` makes a link whose real path is the
   folder's.
-- [ ] In `tests/quality-agent-coverage-holes.test.js`, `tests/quality-agent-crossplatform.test.js`
+- [x] In `tests/quality-agent-coverage-holes.test.js`, `tests/quality-agent-crossplatform.test.js`
   and `tests/test-selection-scope.test.js`, move each fake of the runner's `execFileSync` to
   `spawnSync` with the same answers (Files); their git fakes stay on `execFileSync`; no
   assertion changes.
-- [ ] Run `tests/hotfix-check.test.js`, `tests/hotfix-check-corpus.test.js`,
+- [x] Run `tests/hotfix-check.test.js`, `tests/hotfix-check-corpus.test.js`,
   `tests/quality-agent-coverage.test.js` and `tests/safe-fs.test.js` on arm B's code (worktree
   `trial-hs1-b` at its last build commit; its `src/lib/quality-agent.js` and
   `src/lib/safe-fs.js` are unchanged from the main tree) before any implementation change, and
@@ -1539,7 +1846,7 @@ instead of "tests failed" — still not a pass.
   the move broke nothing, not a fix.
 
 ### Step 9: PREPARE
-- [ ] Record `git --version` and `node --version`; confirm `git diff --ignore-cr-at-eol` and
+- [x] Record `git --version` and `node --version`; confirm `git diff --ignore-cr-at-eol` and
   `git diff --raw -z --no-renames --no-abbrev` behave as specified on that version, and record
   the output that shows each pinned argument winning over its setting: `--src-prefix=a/
   --dst-prefix=b/` over `diff.noprefix=true` and `diff.mnemonicPrefix=true`, `--text` over a
@@ -1555,7 +1862,7 @@ instead of "tests failed" — still not a pass.
   main working tree and in a linked worktree. Under the copy the repository's index must be
   byte-identical. This is a record, not a stop: a change found under the copy is a fault in the
   git helper, fixed there before Step 10, and case 24 is never loosened.
-- [ ] In a scratch repository on that git, record: `git -c core.hooksPath=<empty folder> -c
+- [x] In a scratch repository on that git, record: `git -c core.hooksPath=<empty folder> -c
   core.fsmonitor=false worktree add --detach` runs neither a `post-checkout` nor a
   `reference-transaction` hook (each a hook that writes a marker); `git worktree remove
   --force <folder>` deletes the worktree's folder and its registration and leaves a stale
@@ -1570,20 +1877,20 @@ instead of "tests failed" — still not a pass.
   folders, and lists `vendor/node_modules/` when `vendor` is a symbolic link in the last
   commit and a real folder in the working folder (case 53's fixture). Measure the copy's time
   on this repository (worktree add, patch, apply, removal) and record it.
-- [ ] Read keeps-working slice 2's final `src/lib/menu-screens.js` and `src/commands/start.js`
+- [x] Read keeps-working slice 2's final `src/lib/menu-screens.js` and `src/commands/start.js`
   (this slice builds on top of it) and the exports of `quality-agent.js`, `tool-detector.js`
   and `coverage-map.js` used above, and the `languages:` format `tool-detector.js` reads from
   `.ctoc/quality-config.yaml` (the fixtures of cases 30, 38 and 46).
 - [ ] Confirm the CSS Color Module Level 4 named-colour list (148 names) from the
   specification text, not from memory (arm B's decision 22 records why this stayed open).
-- [ ] Run every `tests/quality-agent*.test.js` file and `tests/test-selection-scope.test.js`
+- [x] Run every `tests/quality-agent*.test.js` file and `tests/test-selection-scope.test.js`
   on the unchanged quality agent and read every assertion on a failed run's `output`, on
   `failed` after a spawn failure or timeout, and on the npm launcher; confirm that the three
   files of Decision 34 fake the runner's `execFileSync` and that no other test file does. An
   existing test that pins a fault this slice fixes is changed only toward the new contract
   and named in the Execution Record; when that test lives in a file this plan does not
   declare, the change is requested through `src/lib/scope-growth.js`, never made silently.
-- [ ] Record, on this machine, that `execFileSync(process.execPath, ['-e', '0'], { shell:
+- [x] Record, on this machine, that `execFileSync(process.execPath, ['-e', '0'], { shell:
   true })` prints Node's deprecation warning for arguments passed with a shell (why no launch
   uses a shell), and that `spawnSync` of a program printing more than its `maxBuffer` answers
   the error code `ENOBUFS` with the signal `SIGTERM`. Recorded as believed, for the first
@@ -1595,7 +1902,7 @@ instead of "tests failed" — still not a pass.
   npm's own escaping; `pytest` and `go` started by name.
 
 ### Step 10: IMPLEMENT
-- [ ] `src/lib/hotfix-check.js` (from arm B's build): the git helper's pinned
+- [x] `src/lib/hotfix-check.js` (from arm B's build): the git helper's pinned
   `diff.autoRefreshIndex=true`, the pinned diff arguments and `--text` on every diff but the
   patch, the context-line numbering, the native real paths and the outside-the-repository
   refusal, the name check, the "texts differ, no changed-line group" refusal, the
@@ -1612,16 +1919,16 @@ instead of "tests failed" — still not a pass.
   the removal note in `detail`, the `commit` commands with `--literal-pathspecs` and `--only`,
   and the log's link checks and rename rotation. Every replaced function is looked up at call
   time (the contract under Files).
-- [ ] `src/lib/quality-agent.js`: `spawnSync` in `runCommandArgv` with standard error in every
+- [x] `src/lib/quality-agent.js`: `spawnSync` in `runCommandArgv` with standard error in every
   run's output, `outputTooLarge` read before `timedOut`, `notStarted`, `npmLauncher` for npm
   and npx, npm's placeholder, and the undetermined result with its own line for output past 10
   MiB, a timeout or a runner that cannot start, in `runFullTests` and `runSpecificTests`.
-- [ ] `src/lib/safe-fs.js`: `mkdtempSync` and `symlinkSync`.
-- [ ] `src/lib/menu-screens.js`: the `hotfix` case in `route` (arm B's build).
-- [ ] `src/commands/start.js`: print the route's result once it settles (arm B's build).
-- [ ] `src/lib/human-facing-scan.js`: `'src/lib/hotfix-check.js'` in `SCREEN_MODULES`.
-- [ ] `tests/cache-freshness.test.js`: the whitelist entry with its reason.
-- [ ] `CLAUDE.md` and `README.md`: the library-module and test-file counts.
+- [x] `src/lib/safe-fs.js`: `mkdtempSync` and `symlinkSync`.
+- [x] `src/lib/menu-screens.js`: the `hotfix` case in `route` (arm B's build).
+- [x] `src/commands/start.js`: print the route's result once it settles (arm B's build).
+- [x] `src/lib/human-facing-scan.js`: `'src/lib/hotfix-check.js'` in `SCREEN_MODULES`.
+- [x] `tests/cache-freshness.test.js`: the whitelist entry with its reason.
+- [x] `CLAUDE.md` and `README.md`: the library-module and test-file counts.
 
 ### Step 11: REVIEW
 - [ ] The critic reads every trap against the classifier and tries three new shapes of its own
@@ -1644,7 +1951,7 @@ instead of "tests failed" — still not a pass.
   the worktree or deletes anything, and that no git call prunes worktrees.
 
 ### Step 12: OPTIMIZE
-- [ ] One `rev-parse --git-path index` and one copy of the index per call; one `diff --raw`
+- [x] One `rev-parse --git-path index` and one copy of the index per call; one `diff --raw`
   and one `ls-files --others` for the judged paths, one `-U0` diff for the
   judged files (split by file), and one `cat-file` per judged file; in the `--run-tests` call
   also two `hash-object` (one per hashing, all judged files at once), one `worktree add`, one
@@ -1698,7 +2005,7 @@ instead of "tests failed" — still not a pass.
   (`tests/readme-numbers.test.js`, `tests/doc-counts.test.js`), the count cache
   (`tests/cache-freshness.test.js`) and the `safe-fs` blind spot
   (`tests/safe-fs-blindspot.test.js`).
-- [ ] Drive the real flow once in a scratch copy of a small project: make a wording change and
+- [x] Drive the real flow once in a scratch copy of a small project: make a wording change and
   edit an unrelated file so that a test would fail in the working folder, run both calls
   through `node src/commands/start.js`, then run the answer's `commit.add` and
   `commit.message` from the project root; quote the JSON answers, the commit's file list, the
@@ -1707,10 +2014,10 @@ instead of "tests failed" — still not a pass.
   what it was before.
 
 ### Step 15: DOCUMENT
-- [ ] JSDoc on `hotfixRoute` and on every internal function, naming the rule each one carries;
+- [x] JSDoc on `hotfixRoute` and on every internal function, naming the rule each one carries;
   JSDoc on the changed quality-agent functions and `npmLauncher` naming the new results; JSDoc
   on the two `safe-fs` wrappers.
-- [ ] The module header lists the rules, their order and why, the two hashings and what they
+- [x] The module header lists the rules, their order and why, the two hashings and what they
   compare, the copy of the repository's index and which git calls name it, the temporary copy
   (where it lives, how it is filled, compared and linked, which
   installed-package targets refuse, how it is removed, on which paths), the four kinds and the
