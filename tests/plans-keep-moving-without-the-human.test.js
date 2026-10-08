@@ -1761,6 +1761,30 @@ describe('a real project has no profile folder: the shipped profiles are read (c
     });
   }
 
+  it("case 57 — GDPR on, an author's questions being checked, opened with `plan <ref>`: the compliance reason, never \"moves on by itself\"", () => {
+    const root = makeSandbox();
+    setRegime(root, { profiles: ['gdpr'], copy: false });
+    const ref = 'functional/c57.md';
+    writePlan(root, ref, functionalBody('Unchecked idea'));
+    writeQuestions(root, ref, [detail('q10-label', 'Label text?', ['Save', 'Store'])], { classified: false });
+    route(['stream', 'check', ref], root);
+    assert.ok(tasks(root).some((t) => t.kind === 'classify' && t.plan === ref && t.status === 'queued'), 'fixture: the check is queued');
+
+    const text = route(['plan', ref], root).text;
+    assert.match(text, /Its questions are being checked by the gate critic/);
+    assert.ok(text.includes(REGIME_SENTENCES['compliance-review']), text);
+    assert.doesNotMatch(text, /moves on by itself/);
+
+    // Guard: with no regime the plan screen keeps its promise, which is then true.
+    const plain = makeSandbox();
+    writePlan(plain, ref, functionalBody('Unchecked idea'));
+    writeQuestions(plain, ref, [detail('q10-label', 'Label text?', ['Save', 'Store'])], { classified: false });
+    route(['stream', 'check', ref], plain);
+    const plainText = route(['plan', ref], plain).text;
+    assert.match(plainText, /it moves on by itself once they are/);
+    assert.equal(plainText.includes('It waits for your approval'), false);
+  });
+
   it('case 54 — a misspelled profile, no profile folder: the built plan still waits as unreadable', () => {
     const root = makeSandbox();
     setRegime(root, { profiles: ['do-178c-levl-a'], copy: false });
