@@ -273,16 +273,16 @@ the runtime check that the change reaches a real dispatch.
   525.
 
 ### Step 11: REVIEW
-- [ ] The critic reads the diff of `tests/agent-model-floor.test.js`. It may contain only the new
+- [x] The critic reads the diff of `tests/agent-model-floor.test.js`. It may contain only the new
   entry, the new case and the five texts; every list, constant and comparison is byte-identical.
-- [ ] The critic re-reads every line listed under "Changed" and "Read and left", and runs the
+- [x] The critic re-reads every line listed under "Changed" and "Read and left", and runs the
   literal presence check for the two old forms.
 
 ### Step 12: OPTIMIZE
 - [x] Confirm the new case reuses `AGENTS` and `SONNET_EXEMPT` and reads nothing new from disk.
 
 ### Step 13: SECURE
-- [ ] The security scanner confirms that the build agent's `tools:` line, its network rule and its
+- [x] The security scanner confirms that the build agent's `tools:` line, its network rule and its
   refusal rules are byte-identical, that the reviewers at Steps 11, 13 and 16 still declare opus,
   and that nothing writes the user's Claude Code settings.
 
@@ -324,9 +324,9 @@ the runtime check that the change reaches a real dispatch.
 - [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
 - [x] Remove redundant operations
@@ -334,10 +334,10 @@ the runtime check that the change reaches a real dispatch.
 - [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
 - [x] Run lint + type check
@@ -351,10 +351,10 @@ the runtime check that the change reaches a real dispatch.
 - [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
 - [x] Manual verification if needed
-- [ ] Ready for human review
+- [x] Ready for human review
 
 
 ## Deferred Questions
@@ -475,3 +475,9 @@ Setup: a scratch git project with this branch's agents/iron-loop/iron-loop-execu
 Agent's report: "1. Model id: claude-sonnet-5-5" and "2. The advisor tool was available and answered. Its first sentence: 'report the model id exactly as your environment block states it, then hand back immediately.'"
 Session model usage: claude-haiku-5-5 out 943 (dispatcher), claude-sonnet-5-5 out 139 (the build agent), claude-opus-5-5 in 19,318 / out 439 (the only Opus in the session — the advisor).
 Conclusion: a dispatched build agent defined with `model: sonnet` runs on Sonnet 5.5 and reaches the Opus advisor configured in settings. Not tested: the marketplace-installed copy (it changes after this release ships and the owner updates).
+
+### Review, security and final review — the session's record (2026-10-08)
+
+- Step 11 and Step 16 (iron-loop-critic): SHIP AFTER — the model-floor test diff only adds the exemption, the new case and five sentence edits; no list, constant, comparison or assertion removed or loosened; every changed and read-and-left line holds. Its two fixes are done: the smoke result is recorded verbatim above (the changed build-agent file, no model parameter, advisor from settings only, a Haiku dispatcher; the agent ran on claude-sonnet-5-5 and the advisor answered), and the trial file is committed with this release.
+- Step 13 (security-scanner): WARN — permissions, network rule, watchers' models and the loaded hook unchanged; the reviewers at Steps 11, 13 and 16 were not on the watcher list. Fixed by adding iron-loop-critic and security-scanner to WATCHERS, red first (7534759e).
+- Full suite 12,758 passed, 0 failed, 0 skipped, coverage 99.88%.
