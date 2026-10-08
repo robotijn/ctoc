@@ -592,3 +592,87 @@ describe('the re-verification: any interpreter carrying a path into CTOC code ge
     allowedBash(`python3 -c "import subprocess; subprocess.run(['node','-e','require(\\'./src/lib/loop-b-driver\\').loopBDirective(process.cwd())'])"`);
   });
 });
+
+describe("the regulatory settings and profiles are protected like the records (owner's answer \"a\", 2026-10-08)", () => {
+  const REFUSAL_SETTINGS = "CTOC refused this call because it writes, or could write, the project's settings "
+    + "file or its regulatory profiles, which only CTOC's menu writes; tell the human what you wanted to "
+    + 'change and let the menu change it.';
+  const agentPayload = (input) => ({ ...input, agent_id: 'a1b2c3', agent_type: 'iron-loop-executor' });
+  const MENU_JS = path.join(REPO, 'src', 'commands', 'start.js');
+
+  test('91 · editing tools on .ctoc/settings.yaml and .ctoc/regulatory-regimes/ are refused, main session and background agent alike', () => {
+    fs.mkdirSync(p('.ctoc', 'regulatory-regimes'), { recursive: true });
+    fs.writeFileSync(p('.ctoc', 'settings.yaml'), 'regulatory_regime:\n  active_profiles: []\n');
+    const calls = {
+      'Edit of .ctoc/settings.yaml': payload('Edit', { file_path: p('.ctoc', 'settings.yaml'), old_string: '[]', new_string: '[gdpr]' }),
+      'Write of .ctoc/regulatory-regimes/gdpr.yaml': write(p('.ctoc', 'regulatory-regimes', 'gdpr.yaml')),
+      'MultiEdit of a relative .ctoc/settings.yaml': payload('MultiEdit', { file_path: '.ctoc/settings.yaml', edits: [{ old_string: 'a', new_string: 'b' }] }),
+      'NotebookEdit under .ctoc/regulatory-regimes': payload('NotebookEdit', { notebook_path: p('.ctoc', 'regulatory-regimes', 'n.ipynb'), new_source: 'x' }),
+      'letter case .CTOC/Settings.yaml': write(p('.CTOC', 'Settings.yaml')),
+      '`..` through src': write(`${project}/src/../.ctoc/regulatory-regimes/x.yaml`),
+      'Windows separators': write('.ctoc\\settings.yaml'),
+    };
+    for (const [what, call] of Object.entries(calls)) {
+      assertRefused(run(call), what, REFUSAL_SETTINGS);
+      assertRefused(run(agentPayload(call)), `${what} (background agent)`, REFUSAL_SETTINGS);
+    }
+  });
+
+  test('92 · a symbolic link into the profile folder, and one to the settings file, are refused', () => {
+    fs.mkdirSync(p('.ctoc', 'regulatory-regimes'), { recursive: true });
+    fs.writeFileSync(p('.ctoc', 'settings.yaml'), 'x: 1\n');
+    fs.symlinkSync(p('.ctoc', 'regulatory-regimes'), p('src', 'regimes'), 'junction');
+    fs.symlinkSync(p('.ctoc', 'settings.yaml'), p('src', 'settings-link.yaml'));
+    assertRefused(run(write(p('src', 'regimes', 'gdpr.yaml'))), 'link into the folder', REFUSAL_SETTINGS);
+    assertRefused(run(write(p('src', 'settings-link.yaml'))), 'link to the file', REFUSAL_SETTINGS);
+    assertRefused(run(bash('echo x >> src/settings-link.yaml')), 'shell through the link', REFUSAL_SETTINGS);
+  });
+
+  test('93 · shell writes are refused', () => {
+    fs.mkdirSync(p('.ctoc', 'regulatory-regimes'), { recursive: true });
+    fs.writeFileSync(p('.ctoc', 'settings.yaml'), 'x: 1\n');
+    for (const command of [
+      'echo x >> .ctoc/settings.yaml',
+      "sed -i '' 's/\\[\\]/[gdpr]/' .ctoc/settings.yaml",
+      'sed -i s/a/b/ .ctoc/settings.yaml',
+      'cp /tmp/gdpr.yaml .ctoc/regulatory-regimes/gdpr.yaml',
+      'rm .ctoc/regulatory-regimes/gdpr.yaml',
+      'cd .ctoc && tee settings.yaml < /tmp/x',
+      'printf x > .ctoc/regulatory-regimes/x.yaml',
+    ]) {
+      assertRefused(run(bash(command)), command, REFUSAL_SETTINGS);
+      assertRefused(run(agentPayload(bash(command))), `${command} (background agent)`, REFUSAL_SETTINGS);
+    }
+  });
+
+  test('94 · reading stays allowed', () => {
+    fs.mkdirSync(p('.ctoc', 'regulatory-regimes'), { recursive: true });
+    fs.writeFileSync(p('.ctoc', 'settings.yaml'), 'x: 1\n');
+    for (const command of ['cat .ctoc/settings.yaml', 'grep -n active_profiles .ctoc/settings.yaml',
+      'ls .ctoc/regulatory-regimes', 'head -5 .ctoc/regulatory-regimes/gdpr.yaml', 'git diff .ctoc/settings.yaml']) {
+      allowedBash(command);
+      assertAllowed(run(agentPayload(bash(command))), `${command} (background agent)`);
+    }
+  });
+
+  test("95 · the menu's own routes stay allowed: set-environment, env-keep-defaults, set-compliance-regime, and the menu itself", () => {
+    const md = fs.readFileSync(MENU_MD, 'utf8');
+    const rows = md.split('\n').filter((l) => /^\| `claude:(set-environment|env-keep-defaults|set-compliance-regime)/.test(l));
+    assert.equal(rows.length, 3, 'fixture: the three recipe rows of start.md');
+    const recipes = rows.flatMap((l) => [...l.matchAll(/`(node\s+-e\s+"[^`]*")`/g)].map((m) => m[1]));
+    assert.ok(recipes.length >= 3, `expected the recipes, found ${recipes.length}`);
+    for (const r of recipes) {
+      allowedBash(r);
+      allowedBash(r.split('${CLAUDE_PLUGIN_ROOT}').join(REPO));
+    }
+    allowedBash(`node "${MENU_JS}"`);
+    allowedBash('node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js" menu');
+  });
+
+  test('96 · the earlier protection is unchanged, and nothing else named settings is caught', () => {
+    assertRefused(run(write(p('.ctoc', 'approvals', 'x.json'))), 'approval record');
+    allowedBash('echo x > src/settings.yaml');
+    assertAllowed(run(write(p('src', 'settings.yaml'))), 'a settings.yaml outside .ctoc');
+    assertAllowed(run(write(p('.ctoc', 'settings.yaml.example'))), 'a different file name');
+  });
+});
