@@ -1636,7 +1636,9 @@ function planDecisionScreen(ref, projectRoot) {
     }
     if (st && st.status === 'ready' && st.classified === false && options.length < 4) {
       const state = checkState(projectRoot, ref, st.questionsRevisionMs);
-      text += CHECK_LINES[state];
+      // The same lines as the default screen: the regime's reason, and no promise that a
+      // plan the regime keeps waiting moves on by itself.
+      text += uncheckedLines(state, { regimeHold: regimeHold(projectRoot, stage) });
       if (state === 'none') {
         options.push({ label: CHECK_LABEL, description: 'Ask the gate critic to check the questions its author wrote, in the background. Nothing else changes.' });
         actions[CHECK_LABEL] = `stream check ${ref}`;

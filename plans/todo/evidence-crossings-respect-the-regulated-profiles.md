@@ -320,10 +320,12 @@ Cases 1–47 run without a `.ctoc/settings.yaml` and stay green unchanged.
     charset; a loaded profile whose `required_controls` is not a parsed list. An `active_profiles:`
     key with nothing under it therefore holds (fail closed). Overrides that misparse are not
     checked here (not in the finding).
-21. **(Executor, third round) The `plan <ref>` screen is left as it was.** `planDecisionScreen`
-    also shows the checking line ("it moves on by itself once they are") for an author's
-    unchecked questions and does not know the regime; the session's item named only
-    `gateScreenAt`. Reported, not changed.
+21. **(Executor, third round; superseded in the fifth) The `plan <ref>` screen.** It was first
+    left as it was, because the session's item named only `gateScreenAt`. On the session's
+    instruction (2026-10-08) `planDecisionScreen` now uses the same lines as the default screen
+    for an author's unchecked questions: the regime's reason, and no "moves on by itself" for a
+    plan the regime keeps waiting (case 57). Only that branch changed: a held plan opened
+    with `plan <ref>` and no unchecked questions shows no regime sentence, as before.
 
 ## Execution Plan
 
@@ -564,3 +566,11 @@ sentence and the owner's approve moves it (`approved_by: human`); a do-178c-leve
 waits with the verification sentence and the owner's approve finishes it; a GDPR built plan
 finishes on its checks (`advanced_by: pipeline`); a project with no regime moves its
 functional plan on (`advanced_by: sufficiency`).
+
+**Round 5 — the plan screen (2026-10-08).** Red commit `5908c014`: case 57, a GDPR project's
+functional plan with an author's unchecked questions queued for the check, opened with
+`plan functional/c57.md` — red (no compliance sentence; "it moves on by itself once they
+are"), green after `planDecisionScreen` used `uncheckedLines` with `regimeHold`. Its guard
+(no regime keeps the promise, no regime sentence) is green before and after. `npm test`:
+tests 12744, pass 12744, fail 0, cancelled 0, skipped 0, todo 0; coverage 99.88 % (threshold
+99 %), `PASS`. eslint clean. Specification hash `ddb9ec70…` unchanged.
