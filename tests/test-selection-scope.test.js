@@ -142,6 +142,7 @@ function makeEmptyDeltaClone(prefix) {
 // ---------------------------------------------------------------------------
 const REAL_EXECSYNC = cp.execSync;
 const REAL_EXECFILESYNC = cp.execFileSync;
+const REAL_SPAWNSYNC = cp.spawnSync;
 
 function withGitAbsent(fn) {
   const shellCalls = [];
@@ -154,11 +155,14 @@ function withGitAbsent(fn) {
       err.code = 'ENOENT';
       throw err;
     }
-    // The full-suite CONFIGURED test command now runs via execFileSync (argv, shell:false)
-    // — plan 00203 took it off the shell. Capture the non-git argv calls so the case can
-    // prove the command ran via the injection-safe path, not the shell.
-    fileCalls.push({ bin, args });
     return REAL_EXECFILESYNC(bin, args, opts);
+  };
+  // The full-suite CONFIGURED test command now runs via spawnSync (argv, shell:false)
+  // — plan 00203 took it off the shell. Capture the non-git argv calls so the case can
+  // prove the command ran via the injection-safe path, not the shell.
+  cp.spawnSync = (bin, args, opts) => {
+    fileCalls.push({ bin, args });
+    return REAL_SPAWNSYNC(bin, args, opts);
   };
   cp.execSync = (command) => {
     shellCalls.push(command);
@@ -178,6 +182,7 @@ function withGitAbsent(fn) {
     return fn(qa, { shellCalls, gitFileCalls, fileCalls });
   } finally {
     cp.execFileSync = REAL_EXECFILESYNC;
+    cp.spawnSync = REAL_SPAWNSYNC;
     cp.execSync = REAL_EXECSYNC;
     delete require.cache[QA_PATH];
   }

@@ -1,9 +1,9 @@
 'use strict';
 
-// The classifier corpus: 22 edit shapes that qualify as a hotfix and 45 traps that must
-// not, plus one mode change, each judged through the menu router against ONE committed
-// temporary repository with no test command. A qualifying shape ends at "no test ran"
-// (rules 1 to 7 held) or, for documentation, at the pass.
+// The classifier corpus: 24 edit shapes that qualify as a hotfix and 58 traps that must
+// not, plus one mode change, each judged through the menu router's first call (rules 1
+// to 7; no test runs) against ONE committed temporary repository with no test command.
+// A qualifying shape ends at `verdict: 'checking'`: rules 1 to 7 held.
 // Plan: plans/todo/ctoc-checks-that-a-hotfix-is-really-small-and-safe-s1-the-hotfix-check.md,
 // Step 8, the corpus.
 
@@ -18,8 +18,6 @@ const { route } = require('../src/lib/menu-screens');
 
 const refusal = (clause) => `I did not treat this as a hotfix because ${clause}; `
   + 'it goes through a normal plan, and your edits stay in place, not committed.';
-const NO_TEST = 'no test ran, so nothing confirms the change';
-const PASS = Symbol('documentation pass');
 const unrecognised = (f) => `I do not recognise ${f} as wording or a colour`;
 const riskMarker = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
 
@@ -51,12 +49,17 @@ const BASE = {
   'docs/guide.rst': lines('Guide', '=====', '', 'Read this guide first.'),
   'notes/todo.txt': lines('Write the welcome page.'),
   'docs/intro.md': '# Intro\r\n\r\nThe intro says hello.\r\n',
+  'docs/long.md': lines(...Array.from({ length: 12 }, (_, i) => `Old long line ${String.fromCharCode(97 + i)}.`)),
   // traps
   'src/cart.js': lines('function ok(items) {', '  if (items.length > 0) return true;', '  return false;', '}'),
   'src/server.js': lines("app.post('/order', (req, res) => {", '  res.send("Order saved");', '});'),
   'config/app.yaml': lines('timeout_seconds: 30'),
   'package.json': lines('{', '  "name": "corpus",', '  "version": "1.0.0"', '}'),
   'deps/requirements.txt': lines('requests==2.31.0'),
+  'deps/constraints.txt': lines('urllib3==2.0.0'),
+  'deps/requirements/base.txt': lines('flask==3.0.0'),
+  'app/runtime.txt': lines('python old'),
+  'native/CMakeLists.txt': lines('project(old)'),
   'db/migrations/001_init.sql': lines('CREATE TABLE items (name TEXT);'),
   '.github/workflows/ci.yml': lines('name: build', 'on: push'),
   'Dockerfile': lines('FROM node:20'),
@@ -66,9 +69,13 @@ const BASE = {
   'agents/helper.md': lines('# Helper', '', 'The helper does old things.'),
   'plans/notes.md': lines('# Notes', '', 'Old plan notes.'),
   'src/commands/help.md': lines('# Help', '', 'Old help text.'),
+  '.claude/theme.css': lines('.save { color: #0a58ca; }'),
+  'agents/card.html': page('<p>Hello</p>'),
   'src/pages/links.html': page('<a href="/a">Home</a>'),
   'src/pages/offer.html': page('<p>Only 9 euro a month</p>'),
   'src/pages/visit.html': page('<p>Visit example.org</p>'),
+  'src/pages/days.html': page('<p>Only seven days</p>'),
+  'src/pages/site.html': page('<p>Visit our site</p>'),
   'src/pages/contact.html': page('<p>Write to us</p>'),
   'src/pages/script-block.html': page(lines('<script>', 'const s = "', '<b>Save</b>', '";', '</script>').trimEnd()),
   'src/pages/style-block.html': page(lines('<style>', '/*', '<b>Save</b>', '*/', '</style>').trimEnd()),
@@ -85,7 +92,10 @@ const BASE = {
   'src/styles/property.css': lines('.box {', '  color: red;', '}'),
   'src/styles/display.css': lines('.box {', '  display: none;', '}'),
   'src/styles/hexsel.css': lines('#bad:hover {', '  color: red;', '}'),
-  'src/components/Compare.tsx': lines('export function pick(a: number, b: number, x: number, y: number, z: number) {', '  return a > b ? x : y < z;', '}'),
+  'src/components/Pick.tsx': lines('export function pick(a: number, b: number, x: number, y: number, z: number) {', '  return a > b ? x : y < z;', '}'),
+  'src/components/Compare.tsx': lines('export function within(a: number, b: number, limit: number, c: number) {', '  const ok = a<b>limit<c;', '  return ok;', '}'),
+  'src/components/Types.tsx': lines('type Box<T> = { v: T };', 'type Bag<T> = { w: T };', 'type U = Box<A>|Box<B>;'),
+  'src/components/Button.spec.tsx': lines("it('renders', () => { render(<Button>Save</Button>); });"),
   'src/components/Generic.tsx': lines('import { useState } from "react";', 'export function useLabel() {', '  return useState<string>("a");', '}'),
   'tests/home.test.js': lines("const test = require('node:test');", "test('shows Save', () => {});"),
   'src/__tests__/cart.spec.js': lines("it('adds', () => {});"),
@@ -97,7 +107,10 @@ const BASE = {
   'notes/a.md': lines('Alpha old.'),
   'notes/b.md': lines('Bravo old.'),
   'notes/c.md': lines('Charlie old.'),
-  'notes/d.md': lines('Delta old.')
+  'notes/d.md': lines('Delta old.'),
+  '.gitattributes': lines('docs/big.md -diff'),
+  'docs/big.md': lines(...Array.from({ length: 13 }, (_, i) => `Big old line ${String.fromCharCode(97 + i)}.`)),
+  'docs/limit.md': lines(...Array.from({ length: 11 }, (_, i) => `Limit old line ${String.fromCharCode(97 + i)}.`))
 };
 
 const QUALIFY = [
@@ -119,10 +132,14 @@ const QUALIFY = [
   ['src/styles/accent.less', lines('@accent: tomato;')],
   ['src/styles/link.css', lines('a {', '  color: hsla(210, 50%, 40%, 0.9);', '}')],
   ['src/styles/vars.css', lines(':root {', '  --brand: #fafafa;', '}')],
-  ['README.md', lines('# Fixture', '', 'This project shows the new wording.'), PASS],
-  ['docs/guide.rst', lines('Guide', '=====', '', 'Read this handbook first.'), PASS],
-  ['notes/todo.txt', lines('Write the start page.'), PASS],
-  ['docs/intro.md', '# Intro\r\n\r\nThe intro says welcome.\r\n', PASS]
+  ['README.md', lines('# Fixture', '', 'This project shows the new wording.')],
+  ['docs/guide.rst', lines('Guide', '=====', '', 'Read this handbook first.')],
+  ['notes/todo.txt', lines('Write the start page.')],
+  ['docs/intro.md', '# Intro\r\n\r\nThe intro says welcome.\r\n'],
+  // 20 changed lines in one file: ten lines reworded, the size limit exactly.
+  ['docs/long.md', BASE['docs/long.md'].replace(/Old long line ([a-j])\./g, 'New long line $1.')],
+  // 6 changed lines in 3 files: the file limit exactly.
+  [{ 'notes/a.md': lines('Alpha new.'), 'notes/b.md': lines('Bravo new.'), 'notes/c.md': lines('Charlie new.') }]
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
@@ -132,6 +149,10 @@ const TRAPS = [
   [{ 'config/app.yaml': lines('timeout_seconds: 60') }, null, 'it changes a setting in config/app.yaml, and settings changes are a common cause of outages'],
   [{ 'package.json': BASE['package.json'].replace('1.0.0', '1.0.1') }, null, 'it changes the dependencies in package.json'],
   [{ 'deps/requirements.txt': lines('requests==2.32.0') }, null, 'it changes the dependencies in deps/requirements.txt'],
+  [{ 'deps/constraints.txt': lines('urllib3==2.0.1') }, null, 'it changes the dependencies in deps/constraints.txt'],
+  [{ 'deps/requirements/base.txt': lines('flask==3.0.1') }, null, 'it changes the dependencies in deps/requirements/base.txt'],
+  [{ 'app/runtime.txt': lines('python new') }, null, 'it changes how the project is built or shipped in app/runtime.txt'],
+  [{ 'native/CMakeLists.txt': lines('project(new)') }, null, 'it changes how the project is built or shipped in native/CMakeLists.txt'],
   [{ 'db/migrations/001_init.sql': lines('CREATE TABLE items (title TEXT);') }, null, 'it changes stored data in db/migrations/001_init.sql'],
   [{ '.github/workflows/ci.yml': lines('name: build and test', 'on: push') }, null, 'it changes how the project is built or shipped in .github/workflows/ci.yml'],
   [{ 'Dockerfile': lines('FROM node:22') }, null, 'it changes how the project is built or shipped in Dockerfile'],
@@ -141,9 +162,14 @@ const TRAPS = [
   [{ 'agents/helper.md': lines('# Helper', '', 'The helper does new things.') }, null, unrecognised('agents/helper.md')],
   [{ 'plans/notes.md': lines('# Notes', '', 'New plan notes.') }, null, unrecognised('plans/notes.md')],
   [{ 'src/commands/help.md': lines('# Help', '', 'New help text.') }, null, unrecognised('src/commands/help.md')],
+  // The places that govern the work never qualify, whatever the kind.
+  [{ '.claude/theme.css': lines('.save { color: #0b5ed7; }') }, null, unrecognised('.claude/theme.css')],
+  [{ 'agents/card.html': page('<p>Hi</p>') }, null, unrecognised('agents/card.html')],
   [{ 'src/pages/links.html': page('<a href="/b">Home</a>') }, null, unrecognised('src/pages/links.html')],
   [{ 'src/pages/offer.html': page('<p>Only 7 euro a month</p>') }, null, riskMarker('src/pages/offer.html')],
+  [{ 'src/pages/days.html': page('<p>Only \uff17 days</p>') }, null, riskMarker('src/pages/days.html')],
   [{ 'src/pages/visit.html': page('<p>Visit www.example.org</p>') }, null, riskMarker('src/pages/visit.html')],
+  [{ 'src/pages/site.html': page('<p>Visit WWW.EXAMPLE.ORG</p>') }, null, riskMarker('src/pages/site.html')],
   [{ 'src/pages/contact.html': page('<p>Write to help@example.org</p>') }, null, riskMarker('src/pages/contact.html')],
   [{ 'src/pages/script-block.html': BASE['src/pages/script-block.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/script-block.html')],
   [{ 'src/pages/style-block.html': BASE['src/pages/style-block.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/style-block.html')],
@@ -160,10 +186,15 @@ const TRAPS = [
   [{ 'src/styles/property.css': BASE['src/styles/property.css'].replace('color: red;', 'background: red;') }, null, unrecognised('src/styles/property.css')],
   [{ 'src/styles/display.css': BASE['src/styles/display.css'].replace('none', 'block') }, null, unrecognised('src/styles/display.css')],
   [{ 'src/styles/hexsel.css': BASE['src/styles/hexsel.css'].replace('#bad:hover', '#fed:hover') }, null, unrecognised('src/styles/hexsel.css')],
-  [{ 'src/components/Compare.tsx': BASE['src/components/Compare.tsx'].replace('y < z;', 'y < w;') }, null, unrecognised('src/components/Compare.tsx')],
+  [{ 'src/components/Pick.tsx': BASE['src/components/Pick.tsx'].replace('y < z;', 'y < w;') }, null, unrecognised('src/components/Pick.tsx')],
   [{ 'src/components/Generic.tsx': BASE['src/components/Generic.tsx'].replace('("a")', '("b")') }, null, unrecognised('src/components/Generic.tsx')],
+  // Only the closing-element rule catches these two: the `<` after the text must close the
+  // element whose opening tag ends at the `>` before it.
+  [{ 'src/components/Compare.tsx': BASE['src/components/Compare.tsx'].replace('a<b>limit<c', 'a<b>max<c') }, null, unrecognised('src/components/Compare.tsx')],
+  [{ 'src/components/Types.tsx': BASE['src/components/Types.tsx'].replace('Box<A>|Box<B>', 'Box<A>|Bag<B>') }, null, unrecognised('src/components/Types.tsx')],
   [{ 'tests/home.test.js': BASE['tests/home.test.js'].replace('shows Save', 'shows Store'), 'src/pages/home.html': page('<button>Store</button>') }, null, 'it changes a test (tests/home.test.js)'],
   [{ 'src/__tests__/cart.spec.js': lines("it('adds items', () => {});") }, null, 'it changes a test (src/__tests__/cart.spec.js)'],
+  [{ 'src/components/Button.spec.tsx': lines("it('renders', () => { render(<Button>Store</Button>); });") }, null, 'it changes a test (src/components/Button.spec.tsx)'],
   [{ 'src/pages/login.html': page('<button>Log in</button>') }, null, 'src/pages/login.html sits in an area named login, and such areas are never a hotfix'],
   [{ 'billing/index.html': page('<p>Your summary</p>') }, null, 'billing/index.html sits in an area named billing, and such areas are never a hotfix'],
   [{ 'docs/privacy.md': lines('# Data', '', 'We keep very little.') }, null, 'docs/privacy.md sits in an area named privacy, and such areas are never a hotfix'],
@@ -171,11 +202,15 @@ const TRAPS = [
   [{ 'docs/old.md': null }, ['docs/old.md'], 'it adds, removes or renames docs/old.md'],
   [{ 'docs/logo.png': Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x03]) }, null, 'I could not read the change (docs/logo.png is not text)'],
   ['symlink', ['link'], unrecognised('link')],
+  // A document whose attributes say `-diff` still counts its real lines (13 reworded).
+  [{ 'docs/big.md': BASE['docs/big.md'].replace(/Big old line/g, 'Big new line') }, null, 'it changes 26 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
+  // 21 changed lines in one file: 11 removed, 10 added.
+  [{ 'docs/limit.md': lines(...Array.from({ length: 10 }, (_, i) => `Limit new line ${String.fromCharCode(97 + i)}.`)) }, null, 'it changes 21 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
   [{ 'notes/a.md': lines('Alpha new.'), 'notes/b.md': lines('Bravo new.'), 'notes/c.md': lines('Charlie new.'), 'notes/d.md': lines('Delta new.') }, null, 'it changes 8 lines in 4 files and a hotfix is at most 20 lines in at most 3 files']
 ];
 
-assert.equal(QUALIFY.length, 22, 'the corpus holds 22 shapes that qualify');
-assert.equal(TRAPS.length, 45, 'the corpus holds 45 traps');
+assert.equal(QUALIFY.length, 24, 'the corpus holds 24 shapes that qualify');
+assert.equal(TRAPS.length, 58, 'the corpus holds 58 traps');
 
 let root;
 
@@ -227,24 +262,26 @@ test.after(() => {
   if (root) fs.rmSync(root, { recursive: true, force: true });
 });
 
+/** The first call: rules 1 to 7, no test run. */
 async function judge(files) {
-  return route(['hotfix', 'check', '--run-tests', ...files], root);
+  return route(['hotfix', 'check', ...files], root);
 }
 
-for (const [rel, content, kind] of QUALIFY) {
-  test(`qualifies: ${rel}`, async () => {
-    write(rel, content);
+function assertChecking(res, files) {
+  assert.equal(res.verdict, 'checking', JSON.stringify(res));
+  assert.equal(res.text, 'Checking the hotfix against the existing tests.');
+  assert.equal(res.next, `hotfix check --run-tests ${files.map((f) => `'${f}'`).join(' ')}`);
+}
+
+for (const [shape, content] of QUALIFY) {
+  const writes = typeof shape === 'string' ? { [shape]: content } : shape;
+  const files = Object.keys(writes);
+  test(`qualifies: ${files.join(' + ')}`, async () => {
+    for (const [rel, c] of Object.entries(writes)) write(rel, c);
     try {
-      const res = await judge([rel]);
-      if (kind === PASS) {
-        assert.equal(res.verdict, 'hotfix', JSON.stringify(res));
-        assert.equal(res.text, '');
-        assert.deepEqual(res.commit.files, [rel]);
-      } else {
-        assert.equal(res.text, refusal(NO_TEST), JSON.stringify(res));
-      }
+      assertChecking(await judge(files), files);
     } finally {
-      write(rel, BASE[rel]);
+      for (const rel of files) write(rel, BASE[rel]);
     }
     assert.deepEqual(dirtyOutsideCtoc(), []);
   });
@@ -293,6 +330,6 @@ test('mode change: an executable bit on README.md is not wording (where git trac
   if (process.platform !== 'win32' && fileModeTracked) {
     assert.equal(res.text, refusal(unrecognised('README.md')));
   } else {
-    assert.equal(res.verdict, 'hotfix', JSON.stringify(res));
+    assertChecking(res, ['README.md']);
   }
 });

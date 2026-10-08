@@ -31,7 +31,8 @@ const SYNC_METHODS = [
   'existsSync', 'readFileSync', 'writeFileSync', 'appendFileSync',
   'mkdirSync', 'readdirSync', 'statSync', 'lstatSync',
   'unlinkSync', 'rmSync', 'renameSync', 'copyFileSync', 'cpSync',
-  'realpathSync', 'readlinkSync', 'chmodSync', 'utimesSync', 'openSync'
+  'realpathSync', 'readlinkSync', 'chmodSync', 'utimesSync', 'openSync',
+  'mkdtempSync', 'symlinkSync'
 ];
 const PROMISES_METHODS = [
   'readFile', 'writeFile', 'appendFile', 'mkdir', 'readdir',
@@ -39,7 +40,7 @@ const PROMISES_METHODS = [
   'realpath', 'readlink', 'chmod'
 ];
 // Methods whose FIRST TWO positional args are both paths.
-const TWO_PATH_SYNC = ['renameSync', 'copyFileSync', 'cpSync'];
+const TWO_PATH_SYNC = ['renameSync', 'copyFileSync', 'cpSync', 'symlinkSync'];
 
 function mkTmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-safe-fs-'));
@@ -118,6 +119,32 @@ test('safeFs.rmSync recursively removes a tree', () => {
   fs.writeFileSync(path.join(nested, 'f.txt'), 'z');
   safeFs.rmSync(dir, { recursive: true, force: true });
   assert.ok(!fs.existsSync(dir));
+});
+
+test('safeFs.mkdtempSync makes a new folder whose name starts with the prefix', () => {
+  const dir = mkTmp();
+  try {
+    const made = safeFs.mkdtempSync(path.join(dir, 'x-'));
+    assert.ok(fs.statSync(made).isDirectory());
+    assert.ok(path.basename(made).startsWith('x-'));
+    assert.notStrictEqual(path.basename(made), 'x-');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('safeFs.symlinkSync makes a folder link whose real path is the folder', () => {
+  const dir = mkTmp();
+  try {
+    const target = path.join(dir, 'target');
+    fs.mkdirSync(target);
+    const link = path.join(dir, 'link');
+    safeFs.symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir');
+    assert.ok(fs.lstatSync(link).isSymbolicLink());
+    assert.strictEqual(fs.realpathSync(link), fs.realpathSync(target));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('promises round-trip is behavior-identical to fs.promises', async () => {
