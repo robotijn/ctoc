@@ -574,3 +574,32 @@ are"), green after `planDecisionScreen` used `uncheckedLines` with `regimeHold`.
 (no regime keeps the promise, no regime sentence) is green before and after. `npm test`:
 tests 12744, pass 12744, fail 0, cancelled 0, skipped 0, todo 0; coverage 99.88 % (threshold
 99 %), `PASS`. eslint clean. Specification hash `ddb9ec70…` unchanged.
+
+**Round 6 — the security re-verification at `5908c014` (2026-10-08).** Red commit `4a052ba5`,
+the scanner's own inputs (`s13/f1.js`, `s13/f1c.js` in the session scratchpad):
+
+| Case | Red | Green |
+|---|---|---|
+| loader: a profile with Windows line endings keeps its controls; a trailing `\r` on the last item | do-178c-level-a lost `independent_verification_validation`; `[]` | green |
+| loader: a byte-order mark before the settings header and before a profile | settings read as no regime; profile lost its controls | green |
+| loader: a comment line inside the `active_profiles` block list | items after it dropped | green |
+| loader: a comment line inside the `overrides` map | overrides after it dropped | green |
+| loader: an override `True`, `yes`, `"true"`, `on`, `1`, `true # …`, or no value → `overrides` misread; `true` / `false` → none | silently dropped | green |
+| loader: a second `regulatory_regime` block → `block` misread | the first block read silently | green |
+| loader guard: every shipped profile loads a non-empty list of known controls | green | green |
+| case 58: own do-178c-level-a copy with Windows line endings — waits for verification | finished | green |
+| case 58: a comment between `- gdpr` and `- do-178c-level-a` — waits for verification | finished | green |
+| case 58: `four_eyes_gate3: True` — both crossings wait as unreadable | both crossed | green |
+| case 58: a second regime block — both crossings wait as unreadable | both crossed | green |
+| case 58: a byte-order mark before the header — GDPR is read: the functional plan waits for the compliance review, a built plan finishes | both crossed | green |
+
+Rerun of the scanner's harnesses on the fixed tree: every item of this round reads OK; the
+lines still marked open by `f1.js` are GDPR projects whose `gdpr` is read correctly (functional
+plan held for the compliance review, built plan finishes) — the plan's decision 6, not a
+misread. `npm test`: tests 12756, pass 12756, fail 0, cancelled 0, skipped 0, todo 0; coverage
+99.88 % (threshold 99 %), `PASS`; `regulatory-regime.js` 100 % lines. eslint clean.
+Specification hash `ddb9ec70…` unchanged.
+
+Decision (round 6): a comment line inside the `overrides` map is skipped like one inside the
+`active_profiles` list (the same silent drop, one line away); a commented override value
+(`true # sign-off`) is a misread rather than a value, because the reader does not parse it.

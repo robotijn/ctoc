@@ -106,7 +106,9 @@ const RETENTION_CATEGORIES = [
  */
 function parseYAMLShallow(content) {
   const out = {};
-  const lines = content.split('\n');
+  // CRLF-safe and byte-order-mark-safe, like the settings reader: a profile saved on Windows
+  // must not lose its list items (a `\r` left on a line defeats the `$`-anchored patterns).
+  const lines = stripBom(content).split(/\r?\n/).map((l) => l.replace(/\r$/, ''));
   const stack = [{ obj: out, indent: -1 }];
 
   for (let raw of lines) {
@@ -159,6 +161,11 @@ function parseYAMLShallow(content) {
   return out;
 }
 
+/** The text without a leading byte-order mark. */
+function stripBom(text) {
+  return text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+}
+
 function nextNonEmpty(lines, fromIdx) {
   for (let i = fromIdx + 1; i < lines.length; i++) {
     const s = lines[i].replace(/#.*$/, '').trim();
@@ -183,7 +190,7 @@ function loadActiveProfiles(projectRoot) {
   const settingsPath = path.join(projectRoot, SETTINGS_PATH);
   if (!safeFs.existsSync(settingsPath)) return { profiles: [], overrides: {}, declined: false };
 
-  const content = safeFs.readFileSync(settingsPath, 'utf8');
+  const content = stripBom(safeFs.readFileSync(settingsPath, 'utf8'));
 
   // Extract just the regulatory_regime block
   const blockMatch = content.match(/^regulatory_regime:\s*\n([\s\S]*?)(?=^[a-zA-Z_]+:|(?![\s\S]))/m);
@@ -215,7 +222,7 @@ function parseRegimeBlock(blockBody) {
       profiles = inline[1].split(',').map(s => s.trim()).filter(Boolean);
     } else if (header[1].trim() === '') {
       for (let j = i + 1; j < lines.length; j++) {
-        if (lines[j].trim() === '') continue;         // blank inside list: tolerate
+        if (lines[j].trim() === '' || /^\s*#/.test(lines[j])) continue; // blank or comment inside list: tolerate
         const item = lines[j].match(/^\s+-\s+(\S+)/);
         if (!item) break;                             // dedented / non-item ends list
         profiles.push(item[1]);
@@ -229,7 +236,7 @@ function parseRegimeBlock(blockBody) {
   for (let i = 0; i < lines.length; i++) {
     if (!/^\s+overrides:[ \t]*$/.test(lines[i])) continue;
     for (let j = i + 1; j < lines.length; j++) {
-      if (lines[j].trim() === '') continue;           // blank inside map: tolerate
+      if (lines[j].trim() === '' || /^\s*#/.test(lines[j])) continue; // blank or comment inside map: tolerate
       if (!/^\s+\S+:\s+\S+/.test(lines[j])) break;    // dedented / non-kv ends map
       const kv = lines[j].match(/^\s+(\S+):\s+(\S+)\s*$/);
       if (kv) overrides[kv[1]] = coerce(kv[2]);
@@ -362,6 +369,28 @@ function unloadableProfiles(projectRoot) {
 }
 
 /**
+ * Does the `overrides:` map of a regime block hold anything {@link parseRegimeBlock} would
+ * drop silently? Every non-blank, non-comment line indented under the header must be exactly
+ * `<control>: true` or `<control>: false`, and the header itself must carry nothing after the
+ * colon.
+ * @param {string} blockBody
+ * @returns {boolean}
+ */
+function overridesMisread(blockBody) {
+  const lines = blockBody.split(/\r?\n/);
+  const at = lines.findIndex((l) => /^\s+overrides:/.test(l));
+  if (at === -1) return false;
+  if (!/^\s+overrides:[ \t]*$/.test(lines[at])) return true;
+  const headerIndent = lines[at].match(/^\s*/)[0].length;
+  for (let j = at + 1; j < lines.length; j++) {
+    if (lines[j].trim() === '' || /^\s*#/.test(lines[j])) continue;
+    if (lines[j].match(/^\s*/)[0].length <= headerIndent) break;
+    if (!/^\s+[^\s:]+:[ \t]+(true|false)[ \t]*$/.test(lines[j])) return true;
+  }
+  return false;
+}
+
+/**
  * Why the regime in `.ctoc/settings.yaml` cannot be trusted as read, or null when it can.
  * {@link loadActiveProfiles} and {@link parseYAMLShallow} read a narrow subset of YAML and
  * fall back to "no profiles" / "no controls" on anything else; a caller that gates on the
@@ -374,21 +403,28 @@ function unloadableProfiles(projectRoot) {
  * - a block with no `active_profiles` key, unless it is declined or only overrides → 'block';
  * - a profile name that is not a valid profile name (quoted, a path) → 'profile-name';
  * - a loaded profile without a parsed list of required controls (an empty file, a flow list,
- *   a scalar) → 'required-controls'.
+ *   a scalar) → 'required-controls';
+ * - a second `regulatory_regime` block (the reader would take the first silently) → 'block';
+ * - an `overrides` entry whose value is not exactly `true` or `false` (`True`, `yes`, a quoted
+ *   or commented value, no value), or text after the `overrides:` header → 'overrides'.
  *
  * No settings file, and a settings file with no `regulatory_regime` block, read as no regime.
- * Throws when the settings file exists but cannot be read (the caller holds on a throw).
+ * A leading byte-order mark is ignored. Throws when the settings file exists but cannot be
+ * read (the caller holds on a throw).
  *
  * @param {string} projectRoot
- * @returns {null|'block'|'active-profiles'|'profile-name'|'required-controls'}
+ * @returns {null|'block'|'active-profiles'|'profile-name'|'required-controls'|'overrides'}
  */
 function misreadRegime(projectRoot) {
   const settingsPath = path.join(projectRoot, SETTINGS_PATH);
   if (!safeFs.existsSync(settingsPath)) return null;
-  const content = safeFs.readFileSync(settingsPath, 'utf8');
-  if (!/^regulatory_regime[ \t]*:/m.test(content)) return null;
+  const content = stripBom(safeFs.readFileSync(settingsPath, 'utf8'));
+  const headers = content.match(/^regulatory_regime[ \t]*:/gm);
+  if (!headers) return null;
+  if (headers.length > 1) return 'block'; // a second block: never read the first silently
   const blockMatch = content.match(/^regulatory_regime:\s*\n([\s\S]*?)(?=^[a-zA-Z_]+:|(?![\s\S]))/m);
   if (!blockMatch) return 'block';
+  if (overridesMisread(blockMatch[1])) return 'overrides';
   const { profiles, overrides, declined } = parseRegimeBlock(blockMatch[1]);
   const key = blockMatch[1].match(/^\s+active_profiles:[ \t]*(.*)$/m);
   if (!key) {
