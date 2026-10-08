@@ -1,6 +1,6 @@
 'use strict';
 
-// The classifier corpus: 33 edit shapes that qualify as a hotfix and 139 traps that must
+// The classifier corpus: 34 edit shapes that qualify as a hotfix and 167 traps that must
 // not, plus one mode change, each judged through the menu router's first call (rules 1
 // to 7; no test runs) against ONE committed temporary repository with no test command.
 // A qualifying shape ends at `verdict: 'checking'`: rules 1 to 7 held.
@@ -20,6 +20,7 @@ const { ruleRefusal } = require('../src/lib/hotfix-check');
 const refusal = (clause) => `I did not treat this as a hotfix because ${clause}; `
   + 'it goes through a normal plan, and your edits stay in place, not committed.';
 const unrecognised = (f) => `I do not recognise ${f} as wording or a colour`;
+const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
 const riskMarker = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
 
 const page = (inner) => `<!doctype html>\n<html>\n<body>\n${inner}\n</body>\n</html>\n`;
@@ -201,7 +202,35 @@ const BASE = {
   'docs/raw-span.rst': lines('Text :raw-html:`<b>x</b>` here.'),
   'docs/span-text.rst': lines('Press :kbd:`Ctrl` now.'),
   'docs/span-after.rst': lines('Press `Ctrl`:kbd: now.'),
-  'docs/shortcuts.rst': lines('Press :kbd:`Ctrl` to save the old file.')
+  'docs/shortcuts.rst': lines('Press :kbd:`Ctrl` to save the old file.'),
+  // The fourth round (2026-10-09): the security attack and the code review.
+  'src/components/RunSql.jsx': lines('export const Q = () => <RunSql>SELECT name FROM users</RunSql>;'),
+  'src/components/Charge.vue': lines('<template>', '  <MyAction>charge</MyAction>', '</template>'),
+  'src/pages/widget.html': page('<my-widget>x</my-widget>'),
+  'src/components/SlotPass.vue': lines('<template>', '  <MyAction>', '    <template #label>charge</template>', '  </MyAction>', '</template>'),
+  'src/components/Pay.svelte': lines('<Charge>charge</Charge>'),
+  'docs/wrapped-ref.md': lines('See [the profile][a].', '', '[a]:', '/u/profile'),
+  'docs/wrapped-title.md': lines('See [the profile][a].', '', '[a]:', '/u/profile', '"Old title"'),
+  'src/styles/flags.css': lines(':root {', '  --enabled: green;', '  --mode: red;', '}'),
+  'docs/literal.rst': lines('Install', '=======', '', 'Run this::', '', '   pip install requests'),
+  'docs/expanded.rst': lines('Install', '=======', '', 'Run this:', '', '::', '', '   pip install requests'),
+  'docs/doctest.rst': lines('Example', '=======', '', '>>> print("old")', 'old'),
+  'notes/doctest.txt': lines('Example:', '', '>>> print("old")', 'old'),
+  'docs/doctest.md': lines('# Example', '', '>>> print("old")', 'old'),
+  'docs/ifconfig.rst': lines('.. ifconfig:: release == "old"', '', '   Old words.'),
+  'docs/doctest-dir.rst': lines('.. doctest::', '', '   >>> print("old")', '   old'),
+  'docs/image.rst': lines('.. image:: one.png', '   :alt: The logo'),
+  'docs/toctree.rst': lines('.. toctree::', '   :maxdepth: 2', '', '   intro', '   usage'),
+  'docs/automodule.rst': lines('.. automodule:: one', '   :members:'),
+  'docs/note-class.rst': lines('.. note::', '   :class: one', '', '   Old words.'),
+  'docs/code-el.md': lines('Run <code>pip install requests</code> first.'),
+  'src/pages/code-el.html': page('<p>Run <code>pip install requests</code></p>'),
+  'src/pages/titled.html': lines('<!doctype html>', '<html>', '<head>', '<title>Save</title>', '</head>', '</html>'),
+  'src/components/Cond.vue': lines('<template>', '  <div>', '    <template v-if="a"><p>Save</p></template>', '    <template v-else>Cancel</template>', '  </div>', '</template>'),
+  'src/styles/tokens.css': lines('.save {', '  color: #0a58ca;', '}'),
+  'docs/list.md': lines('- Step one.', '  - Sub step.', '', '    Old words in the sub step.'),
+  'docs/list-code.md': lines('- Install:', '', '      pip install requests'),
+  'src/components/GenStr.tsx': lines('export const f = <T,>(x: T) => x;', 'export const s = "<b>Save</b>";')
 };
 
 const QUALIFY = [
@@ -219,12 +248,7 @@ const QUALIFY = [
   ['lang/app.properties', lines('button.save=Store', 'button.cancel=Cancel')],
   ['messages/en.yml', lines('greeting: "Hi, {{name}}"')],
   ['src/styles/button.css', lines('.save { background-color: #0b5ed7; }')],
-  ['src/styles/theme.scss', lines('$brand: rgb(11, 94, 215);')],
-  ['src/styles/accent.less', lines('@accent: tomato;')],
   ['src/styles/link.css', lines('a {', '  color: hsla(210, 50%, 40%, 0.9);', '}')],
-  ['src/styles/vars.css', lines(':root {', '  --brand: #fafafa;', '}')],
-  // A named colour inside a custom property.
-  ['src/styles/custom.css', lines(':root {', '  --accent: blue;', '}')],
   ['README.md', lines('# Fixture', '', 'This project shows the new wording.')],
   ['docs/guide.rst', lines('Guide', '=====', '', 'Read this handbook first.')],
   ['notes/todo.txt', lines('Write the start page.')],
@@ -247,7 +271,16 @@ const QUALIFY = [
   ['docs/fenced-ok.md', lines('# Setup', '', 'Run the new installer.', '', '```sh', 'pip install requests', '```')],
   // The commit security review: an issue template under `.github/`; plain text beside a role.
   ['.github/ISSUE_TEMPLATE/bug.md', lines('Describe the new bug.')],
-  ['docs/shortcuts.rst', lines('Press :kbd:`Ctrl` to save the new file.')]
+  ['docs/shortcuts.rst', lines('Press :kbd:`Ctrl` to save the new file.')],
+  // The fourth round (2026-10-09). A title is wording; Vue's conditional templates inside
+  // markup render; a design-token stylesheet with a real colour property; a paragraph that
+  // continues a list item; a React project's `src/hooks/` notes (CTOC's enforcement list
+  // is CTOC's own, and this repository is not CTOC).
+  ['src/pages/titled.html', BASE['src/pages/titled.html'].replace('Save', 'Store')],
+  ['src/components/Cond.vue', BASE['src/components/Cond.vue'].replace('Save', 'Store')],
+  ['src/styles/tokens.css', BASE['src/styles/tokens.css'].replace('#0a58ca', '#0b5ed7')],
+  ['docs/list.md', BASE['docs/list.md'].replace('Old', 'New')],
+  ['src/hooks/README.md', BASE['src/hooks/README.md'].replace('Old', 'New')]
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
@@ -404,7 +437,6 @@ const TRAPS = [
   [{ 'tokens.txt': lines('New note.') }, null, 'tokens.txt sits in an area named token, and such areas are never a hotfix'],
   [{ 'config/locales/secrets.yml': lines('title: New') }, null, 'config/locales/secrets.yml sits in an area named secret, and such areas are never a hotfix'],
   [{ 'messages/credentials.json': BASE['messages/credentials.json'].replace('Old', 'New') }, null, 'messages/credentials.json sits in an area named credential, and such areas are never a hotfix'],
-  [{ 'src/hooks/README.md': BASE['src/hooks/README.md'].replace('Old', 'New') }, null, 'src/hooks/README.md sits in an area named enforcement, and such areas are never a hotfix'],
   [{ 'src/payments/index.html': page('<p>New</p>') }, null, 'src/payments/index.html sits in an area named payment, and such areas are never a hotfix'],
   [{ 'docs/passwords.md': BASE['docs/passwords.md'].replace('Old', 'New') }, null, 'docs/passwords.md sits in an area named password, and such areas are never a hotfix'],
   [{ 'docs/id_rsa.md': BASE['docs/id_rsa.md'].replace('Old', 'New') }, null, 'docs/id_rsa.md sits in an area named secret, and such areas are never a hotfix'],
@@ -421,11 +453,50 @@ const TRAPS = [
   [{ 'docs/span-def.rst': lines('Title', '=====', '', '.. role:: raw-html(raw)', '   :format: html', '', 'Old words.') }, null, unrecognised('docs/span-def.rst')],
   [{ 'docs/raw-span.rst': BASE['docs/raw-span.rst'].replace('<b>x</b>', '<b>y</b>') }, null, unrecognised('docs/raw-span.rst')],
   [{ 'docs/span-text.rst': BASE['docs/span-text.rst'].replace('Ctrl', 'Alt') }, null, unrecognised('docs/span-text.rst')],
-  [{ 'docs/span-after.rst': BASE['docs/span-after.rst'].replace('Ctrl', 'Alt') }, null, unrecognised('docs/span-after.rst')]
+  [{ 'docs/span-after.rst': BASE['docs/span-after.rst'].replace('Ctrl', 'Alt') }, null, unrecognised('docs/span-after.rst')],
+  // The fourth round (2026-10-09). Text inside a component or a custom element is whatever
+  // the component makes of it (a query, an action name), never wording, in every markup kind.
+  [{ 'src/components/RunSql.jsx': BASE['src/components/RunSql.jsx'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, unrecognised('src/components/RunSql.jsx')],
+  [{ 'src/components/Charge.vue': BASE['src/components/Charge.vue'].replace('>charge<', '>refund<') }, null, unrecognised('src/components/Charge.vue')],
+  [{ 'src/pages/widget.html': BASE['src/pages/widget.html'].replace('>x<', '>y<') }, null, unrecognised('src/pages/widget.html')],
+  [{ 'src/components/SlotPass.vue': BASE['src/components/SlotPass.vue'].replace('>charge<', '>refund<') }, null, unrecognised('src/components/SlotPass.vue')],
+  [{ 'src/components/Pay.svelte': BASE['src/components/Pay.svelte'].replace('>charge<', '>refund<') }, null, unrecognised('src/components/Pay.svelte')],
+  // A reference definition whose destination, or title, stands on the next line.
+  [{ 'docs/wrapped-ref.md': BASE['docs/wrapped-ref.md'].replace('/u/profile', '/u/delete') }, null, unrecognised('docs/wrapped-ref.md')],
+  [{ 'docs/wrapped-ref.md': BASE['docs/wrapped-ref.md'].replace('/u/profile', '//evil.example/x') }, null, unrecognised('docs/wrapped-ref.md')],
+  [{ 'docs/wrapped-title.md': BASE['docs/wrapped-title.md'].replace('Old title', 'New title') }, null, unrecognised('docs/wrapped-title.md')],
+  // A custom property or a Sass or Less variable is a setting a script or a build can read,
+  // whatever colour it holds (the earlier qualifying shapes, now traps).
+  [{ 'src/styles/flags.css': BASE['src/styles/flags.css'].replace('green', 'red') }, null, setting('src/styles/flags.css')],
+  [{ 'src/styles/flags.css': BASE['src/styles/flags.css'].replace('--mode: red', '--mode: lime') }, null, setting('src/styles/flags.css')],
+  [{ 'src/styles/custom.css': lines(':root {', '  --accent: blue;', '}') }, null, setting('src/styles/custom.css')],
+  [{ 'src/styles/vars.css': lines(':root {', '  --brand: #fafafa;', '}') }, null, setting('src/styles/vars.css')],
+  [{ 'src/styles/theme.scss': lines('$brand: rgb(11, 94, 215);') }, null, setting('src/styles/theme.scss')],
+  [{ 'src/styles/accent.less': lines('@accent: tomato;') }, null, setting('src/styles/accent.less')],
+  // reStructuredText literal blocks and doctest lines are code; so is every directive but
+  // the prose ones, whose options are compared exactly.
+  [{ 'docs/literal.rst': BASE['docs/literal.rst'].replace('requests', 'reqests') }, null, unrecognised('docs/literal.rst')],
+  [{ 'docs/expanded.rst': BASE['docs/expanded.rst'].replace('requests', 'reqests') }, null, unrecognised('docs/expanded.rst')],
+  [{ 'docs/doctest.rst': BASE['docs/doctest.rst'].replace(/old$/m, 'new') }, null, unrecognised('docs/doctest.rst')],
+  [{ 'notes/doctest.txt': BASE['notes/doctest.txt'].replace(/old$/m, 'new') }, null, unrecognised('notes/doctest.txt')],
+  [{ 'docs/doctest.md': BASE['docs/doctest.md'].replace(/old$/m, 'new') }, null, unrecognised('docs/doctest.md')],
+  [{ 'docs/ifconfig.rst': BASE['docs/ifconfig.rst'].replace('"old"', '"new"') }, null, unrecognised('docs/ifconfig.rst')],
+  [{ 'docs/doctest-dir.rst': BASE['docs/doctest-dir.rst'].replace(/old$/m, 'new') }, null, unrecognised('docs/doctest-dir.rst')],
+  [{ 'docs/image.rst': BASE['docs/image.rst'].replace('one.png', 'two.png') }, null, unrecognised('docs/image.rst')],
+  [{ 'docs/toctree.rst': BASE['docs/toctree.rst'].replace('usage', 'install') }, null, unrecognised('docs/toctree.rst')],
+  [{ 'docs/automodule.rst': BASE['docs/automodule.rst'].replace('one', 'two') }, null, unrecognised('docs/automodule.rst')],
+  [{ 'docs/note-class.rst': BASE['docs/note-class.rst'].replace(':class: one', ':class: two') }, null, unrecognised('docs/note-class.rst')],
+  // Text inside an HTML code element is code, in HTML and in Markdown's inline HTML.
+  [{ 'docs/code-el.md': BASE['docs/code-el.md'].replace('requests', 'reqests') }, null, unrecognised('docs/code-el.md')],
+  [{ 'src/pages/code-el.html': BASE['src/pages/code-el.html'].replace('requests', 'reqests') }, null, unrecognised('src/pages/code-el.html')],
+  // A real indented code block inside a list item: four spaces beyond the content column.
+  [{ 'docs/list-code.md': BASE['docs/list-code.md'].replace('requests', 'reqests') }, null, unrecognised('docs/list-code.md')],
+  // A TypeScript generic arrow function is no element: the string after it is code.
+  [{ 'src/components/GenStr.tsx': BASE['src/components/GenStr.tsx'].replace('Save', 'Store') }, null, unrecognised('src/components/GenStr.tsx')]
 ];
 
-assert.equal(QUALIFY.length, 33, 'the corpus holds 33 shapes that qualify');
-assert.equal(TRAPS.length, 139, 'the corpus holds 139 traps');
+assert.equal(QUALIFY.length, 34, 'the corpus holds 34 shapes that qualify');
+assert.equal(TRAPS.length, 167, 'the corpus holds 167 traps');
 
 let root;
 
@@ -538,22 +609,33 @@ for (const [writes, named, clause] of TRAPS) {
 // insert one of these characters at each position of the changed text in turn. Every
 // result must refuse, unless the character sits in visible data text and passes rule 6;
 // each such pass must be named below, with the reason it is still wording.
-const INSERTED = ['<', '>', '"', "'", '{', '}', '(', ')', '=', ':', '/', '\\', '@', '#', ';', '*'];
+const INSERTED = ['<', '>', '"', "'", '{', '}', '(', ')', '=', ':', '/', '\\', '@', '#', ';', '*',
+  '`', '&', '$', '[', ']', '|', '_'];
 const plain = (chars, why) => Object.fromEntries([...chars].map((c) => [c, () => why]));
 const ALLOWED = {
-  markup: plain('"\'()=:/\\#;*', 'plain punctuation in an element\'s visible text, shown as typed'),
-  jsx: plain(':/\\#*', 'punctuation that JSX prints as typed in an element\'s text'),
+  markup: plain('"\'()=:/\\#;*[]|_', 'plain punctuation in an element\'s visible text, shown as typed'),
+  jsx: plain(':/\\#*[]|_', 'punctuation that JSX prints as typed in an element\'s text'),
   catalogue: {
-    ...plain('\'()=:/#;*"', 'punctuation inside a message value, shown as typed'),
+    ...plain('\'()=:/#;*"[]|_&', 'punctuation inside a message value, shown as typed'),
     '\\': (v) => (/\\[tnrbf]/.test(v) ? 'a backslash that makes a tab, line break or other control character in the shown text'
       : 'a backslash before a letter in a .properties value, which the reader drops')
   },
   markdown: {
-    ...plain('>"\'()=:/\\#;*}', 'Markdown punctuation in prose: shown as typed or as emphasis, a heading or a quote'),
+    ...plain('>"\'()=:/\\#;*}|_', 'Markdown punctuation in prose: shown as typed or as emphasis, a heading, a quote or a table cell'),
     '{': () => 'a lone brace in Markdown prose is shown as typed (only {{ and {% start a template)',
-    '<': (v, at) => (/[A-Za-z/!?]/.test(v[at + 1] || '') ? null : 'a < that starts no tag is shown as typed')
+    '<': (v, at) => (/[A-Za-z/!?]/.test(v[at + 1] || '') ? null : 'a < that starts no tag is shown as typed'),
+    '[': () => 'a bracket that names no reference definition is shown as typed (link targets are compared exactly)',
+    ']': () => 'a bracket that names no reference definition is shown as typed (link targets are compared exactly)',
+    '`': () => 'a backtick that pairs with no other is shown as typed (code spans are compared exactly)',
+    '&': (v, at) => (/^&(?:#\d+|#[xX][\da-fA-F]+|[A-Za-z][A-Za-z\d]*);/.test(v.slice(at)) ? null
+      : 'an ampersand that starts no character reference is shown as typed')
   },
-  text: plain('<>"\'{}()=:/\\#;*', 'any punctuation in a plain-text or reStructuredText paragraph is shown as typed'),
+  text: plain('<>"\'{}()=:/\\#;*[]&`|_', 'any punctuation in a plain-text paragraph is shown as typed'),
+  rst: {
+    ...plain('<>"\'{}()=:/\\#;*[]&`|', 'punctuation in a reStructuredText paragraph is shown as typed (spans and references are compared exactly)'),
+    '_': (v, at) => (/[A-Za-z0-9]$/.test(v.slice(0, at)) && /^_?(?:$|[\s)>}'".,;:!?])/.test(v.slice(at + 1)) ? null
+      : 'an underscore that ends no reference name is shown as typed')
+  },
   colour: {}
 };
 const kindOf = (rel) => {
@@ -562,7 +644,7 @@ const kindOf = (rel) => {
   if (['.html', '.htm', '.vue', '.svelte'].includes(ext)) return 'markup';
   if (['.json', '.yaml', '.yml', '.po', '.properties'].includes(ext)) return 'catalogue';
   if (['.css', '.scss', '.sass', '.less'].includes(ext)) return 'colour';
-  return ext === '.md' ? 'markdown' : 'text';
+  return ext === '.md' ? 'markdown' : ext === '.rst' ? 'rst' : 'text';
 };
 
 /** One group per changed line, as git's `-U0` diff gives for two texts with the same lines. */
@@ -657,7 +739,18 @@ test('the whole-file scanners stay linear on input built against them', () => {
     'src/components/Braces.jsx': `export const P = () => <p>Old</p>;\n${'{'.repeat(100000)}\n`,
     'src/components/Tags.jsx': `export const P = () => <p>Old</p>;\n${'x = <a>'.repeat(20000)}\n`,
     'src/components/Nest.vue': `<template>\n<p>Old</p>\n${'<template>'.repeat(30000)}\n</template>\n`,
-    'src/styles/urls.css': `a { color: red; }\n${'url('.repeat(50000)}\n`
+    'src/styles/urls.css': `a { color: red; }\n${'url('.repeat(50000)}\n`,
+    // The fourth round's scanners: nested list items, literal blocks, wrapped reference
+    // definitions, reference words, prose directive options, type parameter lists,
+    // components and variable declarations.
+    'docs/lists.md': `Old words.\n${'- a\n  - b\n    - c\n'.repeat(20000)}`,
+    'docs/literals.rst': `Old words.\n${'Run::\n\n   code\n'.repeat(30000)}`,
+    'docs/defs.md': `Old words.\n${'[a]:\n\n\n'.repeat(30000)}`,
+    'docs/refs.rst': `Old words.\nx${')'.repeat(200000)}a\n`,
+    'docs/options.rst': `Old words.\n.. note::\n${'   :class: x\n'.repeat(30000)}`,
+    'src/components/Params.tsx': `export const P = () => <p>Old</p>;\n${'x = <T extends A<'.repeat(20000)}\n`,
+    'src/components/Holds.vue': `<template>\n<p>Old</p>\n${'<MyThing>'.repeat(30000)}\n</template>\n`,
+    'src/styles/vars.scss': `a { color: red; }\n${'$a: b;'.repeat(50000)}\n`
   };
   for (const [rel, old] of Object.entries(cases)) {
     const changed = rel.endsWith('.css') ? old.replace('red', 'blue') : old.replace('Old', 'New');

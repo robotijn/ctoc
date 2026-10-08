@@ -1691,6 +1691,93 @@ test('round 2, finding 9: a pass names each judged file with its staged id, whic
 
 // The third round (2026-10-09): the whole-file scanners' own branches, each through the
 // first call. [path, base content, new content, the clause, or null for `checking`]
+// The fourth round (2026-10-09): the security attack and the code review, each through
+// the first call. [path, base content, new content, the clause, or null for `checking`]
+test('round 4: components, code elements, conditional templates, variables, literal blocks, directives, lists and generics', async () => {
+  const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
+  const shapes = [
+    // Only HTML host elements carry wording: a lowercase name with no hyphen, in every
+    // markup kind, and nothing anywhere inside a component.
+    ['src/pages/upper.html', '<DIV>Save</DIV>\n', '<DIV>Store</DIV>\n', un('src/pages/upper.html')],
+    ['src/pages/inside.html', '<MyAction><b>charge</b></MyAction>\n', '<MyAction><b>refund</b></MyAction>\n', un('src/pages/inside.html')],
+    ['src/pages/after.html', '<my-widget>x</my-widget>\n<p>Save</p>\n', '<my-widget>x</my-widget>\n<p>Store</p>\n', null],
+    ['src/components/Deep.jsx', 'export const D = () => <Box><p>Save</p></Box>;\n', 'export const D = () => <Box><p>Store</p></Box>;\n', un('src/components/Deep.jsx')],
+    ['src/components/Member.jsx', 'export const M = () => <ui.p>Save</ui.p>;\n', 'export const M = () => <ui.p>Store</ui.p>;\n', un('src/components/Member.jsx')],
+    ['src/components/Frag.jsx', 'export const F = () => <><p>Save</p></>;\n', 'export const F = () => <><p>Store</p></>;\n', null],
+    ['src/components/Head.svelte', '<svelte:head><title>Save</title></svelte:head>\n', '<svelte:head><title>Store</title></svelte:head>\n', un('src/components/Head.svelte')],
+    // Code elements: in JSX too, and an end tag of another element does not leave one.
+    ['src/components/Kbd.jsx', 'export const K = () => <p><kbd>Ctrl</kbd></p>;\n', 'export const K = () => <p><kbd>Alt</kbd></p>;\n', un('src/components/Kbd.jsx')],
+    ['src/pages/pre.html', '<pre></code>pip install requests</pre>\n', '<pre></code>pip install reqests</pre>\n', un('src/pages/pre.html')],
+    ['src/pages/after-code.html', '<p><code>x</code> Save</p>\n', '<p><code>x</code> Store</p>\n', null],
+    ['src/pages/after-code-tag.html', '<p><code>x</code><b>Save</b></p>\n', '<p><code>x</code><b>Store</b></p>\n', null],
+    // Vue's conditional templates render; a loop or a slot template does not count as one.
+    ['src/components/Else.vue', '<template>\n  <div>\n    <template v-if="a">Hi</template>\n    <template v-else>Save</template>\n  </div>\n</template>\n', '<template>\n  <div>\n    <template v-if="a">Hi</template>\n    <template v-else>Store</template>\n  </div>\n</template>\n', null],
+    ['src/components/ElseIf.vue', '<template>\n  <template v-else-if="b"><p>Save</p></template>\n</template>\n', '<template>\n  <template v-else-if="b"><p>Store</p></template>\n</template>\n', null],
+    ['src/components/Loop.vue', '<template>\n  <template v-for="x in xs"><p>Save</p></template>\n</template>\n', '<template>\n  <template v-for="x in xs"><p>Store</p></template>\n</template>\n', un('src/components/Loop.vue')],
+    ['src/components/SlotIf.vue', '<template>\n  <template #x v-if="a"><p>Save</p></template>\n</template>\n', '<template>\n  <template #x v-if="a"><p>Store</p></template>\n</template>\n', un('src/components/SlotIf.vue')],
+    ['src/components/InSlot.vue', '<template>\n  <template #x><template v-if="a"><p>Save</p></template></template>\n</template>\n', '<template>\n  <template #x><template v-if="a"><p>Store</p></template></template>\n</template>\n', un('src/components/InSlot.vue')],
+    // Variables and custom properties: any change to their values, colour or not.
+    ['src/styles/gap.less', '@gap: 4px;\na { color: red; }\n', '@gap: 8px;\na { color: red; }\n', setting('src/styles/gap.less')],
+    ['src/styles/map.scss', '$theme: (\n  main: red,\n  alt: blue\n);\n', '$theme: (\n  main: red,\n  alt: green\n);\n', setting('src/styles/map.scss')],
+    ['src/styles/font.css', ':root { --font: "Old"; }\n', ':root { --font: "New"; }\n', setting('src/styles/font.css')],
+    ['src/styles/beside.scss', '$brand: #0a58ca;\na { color: red; }\n', '$brand: #0a58ca;\na { color: blue; }\n', null],
+    ['src/styles/width.css', 'a { width: #fff; }\n', 'a { width: #000; }\n', un('src/styles/width.css')],
+    ['src/styles/fill.css', 'path { fill: red; stroke: blue; outline-color: red; }\n', 'path { fill: blue; stroke: red; outline-color: blue; }\n', null],
+    ['src/styles/design-tokens.css', '.a { border-color: red; }\n', '.a { border-color: blue; }\n', null],
+    // reStructuredText: a quoted literal block, a nested code directive inside a prose one,
+    // a prose directive's own text, and a paragraph that only mentions `::` mid-line.
+    ['docs/quoted.rst', 'Run this::\n\n> pip install requests\n', 'Run this::\n\n> pip install reqests\n', un('docs/quoted.rst')],
+    ['docs/nested.rst', '.. note::\n\n   Old words.\n\n   .. code-block:: sh\n\n      pip install requests\n', '.. note::\n\n   Old words.\n\n   .. code-block:: sh\n\n      pip install reqests\n', un('docs/nested.rst')],
+    ['docs/note-body.rst', '.. note::\n\n   Old words.\n\n   .. code-block:: sh\n\n      pip install requests\n', '.. note::\n\n   New words.\n\n   .. code-block:: sh\n\n      pip install requests\n', null],
+    ['docs/warning-line.rst', '.. warning:: Old words.\n', '.. warning:: New words.\n', null],
+    ['docs/to-raw.rst', '.. note:: Old words.\n', '.. raw:: Old words.\n', un('docs/to-raw.rst')],
+    ['docs/mid.rst', 'Use a :: in the middle, old words.\n\n   Quoted old words.\n', 'Use a :: in the middle, new words.\n\n   Quoted new words.\n', null],
+    ['docs/footnote.rst', 'Old words.\n\n.. [1] Old note.\n', 'Old words.\n\n.. [1] New note.\n', null],
+    // Markdown lists: a fence inside an item whose content starts at column 4, a thematic
+    // break that is no list item, and code after a list that has ended.
+    ['docs/list-fence.md', '1.  Step:\n\n    ```\n    pip install requests\n    ```\n', '1.  Step:\n\n    ```\n    pip install reqests\n    ```\n', un('docs/list-fence.md')],
+    ['docs/break.md', '* * *\n\n    pip install requests\n', '* * *\n\n    pip install reqests\n', un('docs/break.md')],
+    ['docs/ended.md', '- Item.\n\nText.\n\n    pip install requests\n', '- Item.\n\nText.\n\n    pip install reqests\n', un('docs/ended.md')],
+    ['docs/wide.md', '-     pip install requests\n', '-     pip install reqests\n', un('docs/wide.md')],
+    ['docs/fence-out.md', '- a\n  ```\n  x\n- b\n```\npip install requests\n```\n', '- a\n  ```\n  x\n- b\n```\npip install reqests\n```\n', un('docs/fence-out.md')],
+    ['docs/ordered.md', '1. Step one.\n\n   Old words.\n', '1. Step one.\n\n   New words.\n', null],
+    ['docs/ordered-two.md', 'Text.\n2. foo\n\n      pip install requests\n', 'Text.\n2. foo\n\n      pip install reqests\n', un('docs/ordered-two.md')],
+    ['docs/item-fence.md', '- ```\n  pip install requests\n  ```\n', '- ```\n  pip install reqests\n  ```\n', un('docs/item-fence.md')],
+    ['docs/item-doctest.md', '- >>> print("old")\n  old\n', '- >>> print("old")\n  new\n', un('docs/item-doctest.md')],
+    ['docs/two-defs.md', 'See [it][b].\n\n[a]:\n[b]: /one\n', 'See [it][b].\n\n[a]:\n[b]: /two\n', un('docs/two-defs.md')],
+    ['docs/note-literal.rst', '.. note:: Run this::\n\n   pip install requests\n', '.. note:: Run this::\n\n   pip install reqests\n', un('docs/note-literal.rst')],
+    // TypeScript generics with `extends`, and a reference definition with an inline title.
+    ['src/components/Ext.tsx', 'export const f = <T extends object>(x: T) => x;\nexport const s = "<b>Save</b>";\n', 'export const f = <T extends object>(x: T) => x;\nexport const s = "<b>Store</b>";\n', un('src/components/Ext.tsx')],
+    ['src/components/Const.tsx', 'export const f = <const T,>(x: T) => x;\nexport const s = "<b>Save</b>";\n', 'export const f = <const T,>(x: T) => x;\nexport const s = "<b>Store</b>";\n', un('src/components/Const.tsx')],
+    ['src/components/In.tsx', 'export const P = () => <in >Save</in>;\n', 'export const P = () => <in >Store</in>;\n', null],
+    ['src/components/Arrow.tsx', 'export const f = <T extends () => void,>(x: T) => x;\nexport const P = () => <p>Save</p>;\n', 'export const f = <T extends () => void,>(x: T) => x;\nexport const P = () => <p>Store</p>;\n', null],
+    ['docs/inline-title.md', 'See [it][a].\n\n[a]: /u\n"Old title"\n', 'See [it][a].\n\n[a]: /u\n"New title"\n', un('docs/inline-title.md')],
+    ['docs/after-def.md', 'See [it][a].\n\n[a]: /u\nOld words.\n', 'See [it][a].\n\n[a]: /u\nNew words.\n', null]
+  ];
+  const base = {};
+  for (const [p, b] of shapes) base[p] = b;
+  const root = makeRepo(base);
+  for (const [p, b, n, expected] of shapes) {
+    fs.writeFileSync(path.join(root, ...p.split('/')), n);
+    const res = await check(root, p);
+    fs.writeFileSync(path.join(root, ...p.split('/')), b);
+    if (expected === null) assertChecking(res, [p]);
+    else assert.equal(res.text, refusal(expected), `${p}: ${JSON.stringify(res)}`);
+  }
+});
+
+test('round 4: CTOC\'s enforcement list applies only in CTOC\'s own repository', async () => {
+  const notes = { 'src/hooks/README.md': '# Hooks\n\nOld notes.\n' };
+  const ctoc = makeRepo({ ...notes, 'package.json': '{ "name": "ctoc" }\n', 'CLAUDE.md': '# CTOC Project Instructions\n', '.ctoc/keep.json': '{}\n' });
+  fs.writeFileSync(path.join(ctoc, 'src', 'hooks', 'README.md'), '# Hooks\n\nNew notes.\n');
+  assert.equal((await check(ctoc, 'src/hooks/README.md')).text,
+    refusal('src/hooks/README.md sits in an area named enforcement, and such areas are never a hotfix'));
+  const react = makeRepo({ ...notes, 'package.json': '{ "name": "web" }\n', 'CLAUDE.md': '# Web\n', '.ctoc/keep.json': '{}\n' });
+  fs.writeFileSync(path.join(react, 'src', 'hooks', 'README.md'), '# Hooks\n\nNew notes.\n');
+  assertChecking(await check(react, 'src/hooks/README.md'), ['src/hooks/README.md']);
+});
+
 test('round 3: the whole-file scanners read strings, templates, escapes, comments, Sass and code spans', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const risk = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
@@ -1708,9 +1795,11 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
     ['src/pages/escaped.html', '<script><!--<script></script><b>Save</b></script>\n<p>Hi</p>\n', '<script><!--<script></script><b>Store</b></script>\n<p>Hi</p>\n', un('src/pages/escaped.html')],
     ['src/pages/escaped-after.html', '<script><!--<script></script>--></script>\n<p>Save</p>\n', '<script><!--<script></script>--></script>\n<p>Store</p>\n', null],
     ['src/pages/unclosed.html', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Save</b>\n', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Store</b>\n', un('src/pages/unclosed.html')],
-    ['src/pages/title.html', '<title>Save</title>\n', '<title>Store</title>\n', un('src/pages/title.html')],
+    // A title is wording (the code review, 2026-10-09: it was wrongly refused).
+    ['src/pages/title.html', '<title>Save</title>\n', '<title>Store</title>\n', null],
     ['src/pages/tpl.html', '<template><p>Save</p></template>\n', '<template><p>Store</p></template>\n', un('src/pages/tpl.html')],
-    ['src/components/Slot.vue', '<template>\n  <template v-if="a"><p>Save</p></template>\n  <p>Hi</p>\n</template>\n', '<template>\n  <template v-if="a"><p>Store</p></template>\n  <p>Hi</p>\n</template>\n', un('src/components/Slot.vue')],
+    // A conditional template inside the component's markup renders, so its text is wording.
+    ['src/components/Slot.vue', '<template>\n  <template v-if="a"><p>Save</p></template>\n  <p>Hi</p>\n</template>\n', '<template>\n  <template v-if="a"><p>Store</p></template>\n  <p>Hi</p>\n</template>\n', null],
     ['src/components/After.vue', '<template>\n  <template v-if="a"><p>Hi</p></template>\n  <p>Save</p>\n</template>\n', '<template>\n  <template v-if="a"><p>Hi</p></template>\n  <p>Store</p>\n</template>\n', null],
     ['src/pages/cdata.html', '<svg><![CDATA[ a > <b>Save</b> ]]></svg>\n', '<svg><![CDATA[ a > <b>Store</b> ]]></svg>\n', un('src/pages/cdata.html')],
     ['src/components/Each.svelte', '{#if a}<p>Hi</p>{/if}\n<p>Save</p>\n', '{#if a}<p>Hi</p>{/if}\n<p>Store</p>\n', null],
@@ -1729,9 +1818,10 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
     ['locales/ctl.json', '{\n  "title": "Save"\n}\n', '{\n  "title": "Sto\tre"\n}\n', un('locales/ctl.json')],
     // Stylesheets: SCSS line comments, Sass's indented blocks, a colour function in its
     // space form.
-    ['src/styles/main.scss', '$brand: #0a58ca; // main\n', '$brand: #0b5ed7; // main\n', null],
+    // A Sass variable is a setting, whatever colour it holds (the security attack, 2026-10-09).
+    ['src/styles/main.scss', '$brand: #0a58ca; // main\n', '$brand: #0b5ed7; // main\n', setting('src/styles/main.scss')],
     ['src/styles/note.scss', '$brand: #0a58ca; // main\n', '$brand: #0a58ca; // other\n', un('src/styles/note.scss')],
-    ['src/styles/end.scss', '$brand: #0a58ca; // main', '$brand: #0b5ed7; // main', null],
+    ['src/styles/end.scss', 'a { color: #0a58ca; } // main', 'a { color: #0b5ed7; } // main', null],
     ['src/styles/block.sass', 'a\n  color: red\n\n  display: none\n', 'a\n  color: blue\n\n  display: none\n', null],
     ['src/styles/sel.sass', 'nav:hover #add\n  display: none\n', 'nav:hover #bad\n  display: none\n', un('src/styles/sel.sass')],
     ['src/styles/top.sass', 'color: red\n', 'color: blue\n', un('src/styles/top.sass')],

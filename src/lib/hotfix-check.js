@@ -60,21 +60,32 @@
  *                                          (tags with every attribute, raw text, comments and
  *                                          braces are compared exactly; only text between two
  *                                          tags may change, on one line, never inside raw text,
- *                                          a `<template>` or an `<option>` with no `value`);
- *                                          JSX as JavaScript whose elements are scanned the
- *                                          same way; stylesheets by statements across the
- *                                          whole file (strings, comments and `url(…)` blanked),
- *                                          a colour only in a declaration value on its
- *                                          property's line; Markdown by lines (front matter in
- *                                          three forms is settings, fenced and indented code is
- *                                          code) and by the markup scanner for the prose, with
- *                                          code spans and link targets compared exactly;
- *                                          reStructuredText code and include directives are
- *                                          code; a catalogue value is decoded as its format
- *                                          reads it and read as a browser reads an address
+ *                                          a `<template>` (but Vue's markup and conditional
+ *                                          ones), a code element, a component or a custom
+ *                                          element, or an `<option>` with no `value`; a
+ *                                          `<title>` is text); JSX as JavaScript whose elements
+ *                                          are scanned the same way (a TypeScript type
+ *                                          parameter list is no element); stylesheets by
+ *                                          statements across the whole file (strings, comments
+ *                                          and `url(…)` blanked), a colour only in the value of
+ *                                          a real colour property on its line, and any change
+ *                                          to a custom property or a Sass or Less variable a
+ *                                          setting; Markdown by lines (front matter in three
+ *                                          forms is settings, fenced and indented code, read
+ *                                          inside list items, and doctests are code) and by
+ *                                          the markup scanner for the prose, with code spans
+ *                                          and link targets (a reference definition's next
+ *                                          lines too) compared exactly; in reStructuredText
+ *                                          every directive but the prose ones, literal blocks
+ *                                          and doctests are code, and roles, literals and
+ *                                          references are compared exactly; doctests in plain
+ *                                          text are code; a catalogue value is decoded as its
+ *                                          format reads it and read as a browser reads an
+ *                                          address
  *   5  not in a sensitive area           — 33 whole words, also in the plural, in the path from
- *                                          the repository top (auth, login, ...), CTOC's own
- *                                          secret-file guard and protected paths; the test,
+ *                                          the repository top (auth, login, ...; a stylesheet's
+ *                                          own file name aside), CTOC's own secret-file guard,
+ *                                          and in CTOC's own repository its protected paths; the test,
  *                                          governing, build and database folders are read from
  *                                          the top too
  *   6  no risk marker in wording         — no number, currency, %, address, e-mail, code;
@@ -199,6 +210,7 @@ const { fileURLToPath } = require('url');
 const safeFs = require('./safe-fs');
 const { isSecretTarget } = require('../hooks/guard-files');
 const { isProtectedEnforcementPath } = require('./protected-paths');
+const { isCtocProject } = require('./ctoc-project-detector');
 
 const MAX_LINES = 20;
 const MAX_FILES = 3;
@@ -322,7 +334,7 @@ const ANSI = /\u001b\[[0-9;:<=>?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|
  * @property {string} [kind] the qualifying kind rule 4 placed it in
  * @property {string[]} [runs] the old and new wording rule 6 reads
  */
-/** @typedef {{files: ChangedFile[], lineCount: number, root: string, rootFromTop: string}} Change */
+/** @typedef {{files: ChangedFile[], lineCount: number, root: string, rootFromTop: string, top?: string}} Change */
 /**
  * The check's own state for one call: the repository it reads, and everything rule 8
  * made, so that {@link removeCopy} can take it away on every path.
@@ -666,7 +678,7 @@ function readChange(root, named, ctx, runTests) {
     f.hunks = groups.get(f.topRel) || [];
     for (const h of f.hunks) lineCount += h.removed.length + h.added.length;
   }
-  return { files, lineCount, root: realRoot, rootFromTop };
+  return { files, lineCount, root: realRoot, rootFromTop, top };
 }
 
 /**
@@ -742,8 +754,18 @@ function commonEnds(o, n) {
 /** @typedef {{k: string, v: string, name?: string, end?: boolean, self?: boolean, attrs?: string[], quiet?: boolean}} Tok */
 
 /** Elements whose content a browser reads as raw text, never as markup (`plaintext` runs to the end). */
-const RAW_TEXT = new Set(['script', 'style', 'textarea', 'title', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript', 'plaintext']);
-/** The end of each raw-text element but `<script>` and `<plaintext>`: its closing tag, letter case ignored. */
+const RAW_TEXT = new Set(['script', 'style', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript', 'plaintext']);
+/**
+ * An HTML host element's name: lower case letters and digits, no hyphen. Anything else is a
+ * component (`RunSql`, `ui.p`) or a custom element (`my-widget`, `svelte:head`), whose text
+ * is whatever the component makes of it, never wording.
+ */
+const HOST_NAME = /^[a-z][a-z0-9]*$/;
+/** HTML's code elements: their text is code, compared exactly. */
+const CODE_ELEMENTS = new Set(['code', 'pre', 'kbd', 'samp', 'var']);
+/** @param {string} name @returns {boolean} the element's text, and all inside it, is never wording */
+const holdsText = (name) => name !== '' && (CODE_ELEMENTS.has(name.toLowerCase()) || !HOST_NAME.test(name));
+/** The end of each raw-text element but `<script>` and `<plaintext>`, and of `<title>`: its closing tag, letter case ignored. */
 const RAW_CLOSE = {
   style: /<\/style(?=[\s/>]|$)/gi,
   textarea: /<\/textarea(?=[\s/>]|$)/gi,
@@ -886,6 +908,8 @@ function scanJs(s, i, brace, out) {
     const operand = prev === '' || OPERAND_AFTER.has(prev) || OPERAND_WORDS.has(word);
     word = '';
     if (c === '/' && operand) { j = skipRegex(s, j); prev = 'a'; continue; }
+    const generic = c === '<' && operand ? typeParameters(s, j) : -1;
+    if (generic > 0) { j = generic; prev = 'a'; continue; }
     if (c === '<' && operand && (isLetter(s[j + 1] || '') || s[j + 1] === '>')) {
       flush(j);
       j = scanJsx(s, j, out);
@@ -899,6 +923,42 @@ function scanJs(s, i, brace, out) {
     j++;
   }
   flush(n);
+  return n;
+}
+
+/**
+ * A TypeScript type parameter list where JSX could start, `<T,>` or `<T extends X>` (also
+ * after a `const`, `in` or `out` modifier): the index after its matching `>`, strings
+ * skipped and the `>` of an arrow `=>` not counted; -1 when `s[i]` starts no such list.
+ * Without this, a `.tsx` generic arrow function read as an element made the rest of the
+ * file its children.
+ * @param {string} s @param {number} i the `<` @returns {number}
+ */
+function typeParameters(s, i) {
+  const n = s.length;
+  const word = (at) => {
+    let e = at;
+    while (e < n && isWordChar(s[e])) e++;
+    return e;
+  };
+  let j = word(i + 1);
+  if (j === i + 1) return -1;
+  if (['const', 'in', 'out'].includes(s.slice(i + 1, j)) && isSpace(s[j] || '')) {
+    while (j < n && isSpace(s[j])) j++;
+    const e = word(j);
+    if (e === j) return -1;
+    j = e;
+  }
+  while (j < n && isSpace(s[j])) j++;
+  if (s[j] !== ',' && !(s.startsWith('extends', j) && isSpace(s[j + 7] || ''))) return -1;
+  let depth = 1;
+  while (j < n) {
+    const c = s[j];
+    if (c === '"' || c === "'" || c === '`') { j = c === '`' ? skipTemplate(s, j) : skipString(s, j); continue; }
+    if (c === '<') depth++;
+    else if (c === '>' && s[j - 1] !== '=' && --depth === 0) return j + 1;
+    j++;
+  }
   return n;
 }
 
@@ -994,9 +1054,10 @@ function rawEnd(s, from, name) {
 /**
  * Tokens of a JSX element from its `<` to the end of its matching closing tag (or of a
  * self-closing tag): tags, the text between them, and `{…}` children as opaque expressions
- * (read as JavaScript). Text inside `<script>`, `<style>`, `<textarea>`, `<title>`,
- * `<template>` and the other raw-text elements, or inside an `<option>` with no `value`,
- * is marked `quiet`: never wording.
+ * (read as JavaScript). Text inside `<script>`, `<style>`, `<textarea>`, `<template>` and
+ * the other raw-text elements, inside a code element, a component or a custom element
+ * ({@link holdsText}), or inside an `<option>` with no `value`, is marked `quiet`: never
+ * wording.
  * @param {string} s @param {number} i @param {Tok[]|null} out @returns {number} the index after the element
  */
 function scanJsx(s, i, out) {
@@ -1004,7 +1065,7 @@ function scanJsx(s, i, out) {
   const open = [];
   let quiet = 0;
   let option = false;
-  const quietName = (name) => RAW_TEXT.has(name.toLowerCase()) || name.toLowerCase() === 'template';
+  const quietName = (name) => RAW_TEXT.has(name.toLowerCase()) || name.toLowerCase() === 'template' || holdsText(name);
   const push = (tok) => { if (out) out.push(tok); };
   let j = i;
   while (j < n) {
@@ -1046,12 +1107,16 @@ function scanJsx(s, i, out) {
 
 /**
  * Rule 4 — the tokens of a whole file. `mode` is `jsx` (`.jsx`, `.tsx`: JavaScript with JSX
- * elements), `vue` (the first top-level `<template>` is the component's markup, not raw
- * text), `html` (`.html`, `.htm`, `.svelte`) or `md` (Markdown prose, where only `{{…}}` and
- * `{%…%}` are template braces). A `<template>` element is read as raw text: its text is
- * `quiet`, never wording.
+ * elements), `vue` (a top-level `<template>` is the component's markup, not raw text, and
+ * so is a `<template>` with `v-if`, `v-else-if` or `v-else` and no slot inside it), `svelte`
+ * (as `html`, but `<Name />` closes itself), `html` (`.html`, `.htm`) or `md` (Markdown
+ * prose, where only `{{…}}` and `{%…%}` are template braces). Any other `<template>` is
+ * read as raw text: its text is `quiet`, never wording. So is the text inside a code
+ * element, a component or a custom element ({@link holdsText}), each counted by its own
+ * name so that another element's end tag does not end it, and the text of `<title>` is
+ * read to its closing tag as one text token.
  * @param {string} s the text, line feeds only
- * @param {'jsx'|'vue'|'html'|'md'} mode
+ * @param {'jsx'|'vue'|'svelte'|'html'|'md'} mode
  * @returns {Tok[]}
  */
 function scanMarkup(s, mode) {
@@ -1065,9 +1130,13 @@ function scanMarkup(s, mode) {
   let i = 0;
   let start = 0;
   let template = 0;
-  let component = false;
+  /** @type {boolean[]} per open `<template>`, whether it makes its text quiet */
+  const templates = [];
+  /** @type {Map<string, number>} the open elements whose text is never wording, by name */
+  const holds = new Map();
+  let held = 0;
   let option = false;
-  const text = (end) => { if (end > start) out.push({ k: 'text', v: s.slice(start, end), quiet: template > 0 || option }); };
+  const text = (end) => { if (end > start) out.push({ k: 'text', v: s.slice(start, end), quiet: template > 0 || held > 0 || option }); };
   const take = (k, end) => {
     text(i);
     out.push({ k, v: s.slice(i, end) });
@@ -1087,9 +1156,27 @@ function scanMarkup(s, mode) {
         option = optionState(tag, option);
         const name = /** @type {string} */ (tag.name).toLowerCase();
         if (name === 'template' && !tag.self) {
-          if (tag.end) { if (template > 0) template--; else component = false; }
-          else if (mode === 'vue' && !component && template === 0) component = true;
-          else template++;
+          if (tag.end) { if (templates.length > 0 && templates.pop()) template--; }
+          else {
+            const attrs = /** @type {string[]} */ (tag.attrs);
+            const shown = mode === 'vue' && (templates.length === 0
+              || (attrs.some((a) => a === 'v-if' || a === 'v-else-if' || a === 'v-else')
+                && !attrs.some((a) => a.startsWith('#') || a.startsWith('v-slot'))));
+            templates.push(!shown);
+            if (!shown) template++;
+          }
+        }
+        const raw = /** @type {string} */ (tag.name);
+        if (holdsText(raw) && !(tag.self && (mode === 'vue' || mode === 'svelte'))) {
+          const count = holds.get(raw) || 0;
+          if (!tag.end) { holds.set(raw, count + 1); held++; }
+          else if (count > 0) { holds.set(raw, count - 1); held--; }
+        }
+        if (!tag.end && name === 'title') {
+          i = rawEnd(s, i, name);
+          text(i);
+          start = i;
+          continue;
         }
         if (!tag.end && RAW_TEXT.has(name)) {
           const end = rawEnd(s, i, name);
@@ -1475,11 +1562,36 @@ function colourFunction(t) {
     && (alpha === undefined || colourNumber(alpha.trim()));
 }
 
-/** @param {string} prop @returns {boolean} a custom property or variable, or a property that carries a colour */
-const colourBearing = (prop) => /^(?:--|\$|@)/.test(prop) || /(?:^|-)color$/i.test(prop) || COLOUR_SHORTHANDS.has(prop.toLowerCase());
+/** A custom property (`--x`), a Sass variable (`$x`) or a Less variable (`@x`). */
+const VARIABLE = /^(?:--|\$|@)/;
 
-/** @param {string} t @param {(string|null)} prop @returns {boolean} the token may stand there as a colour */
-const colourMayStand = (t, prop) => prop !== null && (t[0] === '#' || t.includes('(') || colourBearing(prop));
+/**
+ * @param {(string|null)} prop @returns {boolean} a real CSS property whose value is a colour:
+ * a name ending in `color` (`color`, `background-color`, `border-color`, `outline-color`,
+ * ...) or one of {@link COLOUR_SHORTHANDS}; never a variable or custom property
+ */
+const colourMayStand = (prop) => prop !== null && !VARIABLE.test(prop)
+  && (/(?:^|-)color$/i.test(prop) || COLOUR_SHORTHANDS.has(prop.toLowerCase()));
+
+/**
+ * Rule 4 (colour) — every variable and custom property declaration of a whole stylesheet,
+ * `name:value` as written (comments and strings in the value included), in order. A
+ * script reads a custom property (`getComputedStyle`), and a Sass or Less variable feeds
+ * whatever the build makes of it, so any change to one is a setting, whatever it holds.
+ * @param {string} text @param {string} ext @returns {string}
+ */
+function variableDeclarations(text, ext) {
+  const blank = blankCss(text, ext !== '.css');
+  const head = /\s*(--[\w-]+|\$[\w-]+|@[\w-]+)\s*:/y;
+  const out = [];
+  for (const st of cssStatements(blank, ext === '.sass')) {
+    if (st.term === '{') continue;
+    head.lastIndex = st.start;
+    const h = head.exec(blank);
+    if (h && head.lastIndex <= st.end) out.push(`${h[1]}:${text.slice(head.lastIndex, st.end).trim()}`);
+  }
+  return out.join('\u0000');
+}
 
 /** @param {string} text @param {Array<{i: number, j: number}>} toks @returns {string} the text with each token replaced by one marker, built in one pass */
 function masked(text, toks) {
@@ -1497,9 +1609,9 @@ function masked(text, toks) {
  * Rule 4 (colour) — the two whole stylesheets differ only in colours that stand in
  * declaration values: with every colour token replaced by one marker the texts are
  * identical (strings and comments included), at least one token differs, and every changed
- * token stands, on both sides, in the value of a declaration ({@link colourSlots}); a named
- * colour (`red`) only in a property that carries a colour or in a custom property or
- * variable, so `animation: red 2s` is never a colour. Linear in the files' length.
+ * token stands, on both sides, in the value of a real colour property
+ * ({@link colourSlots}, {@link colourMayStand}), so `animation: red 2s` and `width: #fff`
+ * are never a colour. Linear in the files' length.
  * @param {string} o @param {string} n @param {string} ext @returns {boolean}
  */
 function colourEdit(o, n, ext) {
@@ -1510,7 +1622,7 @@ function colourEdit(o, n, ext) {
   for (let k = 0; k < a.length; k++) {
     if (a[k].t === b[k].t) continue;
     changed++;
-    if (!colourMayStand(a[k].t, a[k].prop) || !colourMayStand(b[k].t, b[k].prop)) return false;
+    if (!colourMayStand(a[k].prop) || !colourMayStand(b[k].prop)) return false;
   }
   return changed > 0;
 }
@@ -1554,11 +1666,51 @@ function frontMatterLines(lines) {
   return lines.length;
 }
 
+/** @param {string} line @returns {number} the width of its leading white space, a tab to the next multiple of 4 */
+function indentWidth(line) {
+  let w = 0;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === ' ') w++;
+    else if (line[i] === '\t') w += 4 - (w % 4);
+    else break;
+  }
+  return w;
+}
+
+/** A doctest line, `>>> ` (or `>>>` alone): it and the lines after it up to a blank line are code. */
+const DOCTEST = /^[ \t]*>>>(?:[ \t]|$)/;
+/**
+ * @param {string} line @returns {boolean} a Markdown thematic break (`* * *`, `---`), which
+ * is no list item: at most three spaces, then three or more of one of `-`, `*`, `_` with
+ * only spaces and tabs between. Read by hand, one pass.
+ */
+function thematicBreak(line) {
+  let i = 0;
+  while (i < 3 && line[i] === ' ') i++;
+  const c = line[i];
+  if (c !== '-' && c !== '*' && c !== '_') return false;
+  let count = 0;
+  for (; i < line.length; i++) {
+    if (line[i] === c) count++;
+    else if (line[i] !== ' ' && line[i] !== '\t') return false;
+  }
+  return count >= 3;
+}
+/** A Markdown list item's marker and the white space after it; the item must hold text. */
+const LIST_ITEM = /^([ \t]*)([-+*]|\d{1,9}[.)])([ \t]+)\S/;
+
 /**
  * Rule 4 (documentation) — each line of a Markdown file: `settings` (front matter), `code`
- * (a fenced block of either fence kind, its fences included, unclosed to the end; or an
- * indented block: four spaces or a tab, after a blank line or another such line) or
- * `prose`.
+ * or `prose`. Code is a fenced block of either fence kind (its fences included, unclosed to
+ * the end), an indented block (four columns beyond the list item it stands in, after a
+ * blank line or another such line), a list item whose text starts five or more columns
+ * after its marker, and a doctest ({@link DOCTEST}), also where an item's text opens a
+ * fence or a doctest. The list items are read after CommonMark's rules, so a paragraph
+ * indented to an item's content column is prose; any line indented less than an item's
+ * content column ends that item (a lazy continuation line is read as ending it too, which
+ * only makes more lines code); a thematic break and an item with no text are no items; an
+ * ordered item not numbered 1 starts an item only after a blank line or another item; and
+ * a fence closes only at its own item's column.
  * @param {string} text line feeds only @returns {string[]}
  */
 function markdownLines(text) {
@@ -1566,63 +1718,174 @@ function markdownLines(text) {
   const cls = new Array(lines.length).fill('prose');
   const top = frontMatterLines(lines);
   for (let i = 0; i < top; i++) cls[i] = 'settings';
+  /** @type {{mark: string, col: number}|null} */
   let fence = null;
+  /** @type {number[]} the content columns of the open list items */
+  const cols = [];
   let prevBlank = true;
   let prevIndented = false;
+  let prevItem = false;
+  let doctest = false;
   for (let i = top; i < lines.length; i++) {
     const line = lines[i];
     if (fence) {
       cls[i] = 'code';
-      const close = /^ {0,3}(`+|~+)[ \t]*$/.exec(line);
-      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+      const close = /^[ \t]*(`+|~+)[ \t]*$/.exec(line);
+      const w = indentWidth(line);
+      if (close && w >= fence.col && w - fence.col <= 3 && close[1][0] === fence.mark[0] && close[1].length >= fence.mark.length) fence = null;
       continue;
     }
-    const open = /^ {0,3}(`{3,}|~{3,})/.exec(line);
-    if (open && !(open[1][0] === '`' && line.slice(open[0].length).includes('`'))) {
-      fence = open[1];
+    if (line.trim() === '') {
+      prevBlank = true;
+      doctest = false;
+      continue;
+    }
+    const w = indentWidth(line);
+    while (cols.length > 0 && cols[cols.length - 1] > w) cols.pop();
+    const rel = w - (cols.length > 0 ? cols[cols.length - 1] : 0);
+    const indented = rel >= 4 && (prevBlank || prevIndented);
+    const afterBlank = prevBlank;
+    const afterItem = prevItem;
+    prevIndented = indented;
+    prevBlank = false;
+    prevItem = false;
+    if (indented) { cls[i] = 'code'; continue; }
+    const body = line.trimStart();
+    const open = /^(`{3,}|~{3,})/.exec(body);
+    if (rel <= 3 && open && !(open[1][0] === '`' && body.slice(open[0].length).includes('`'))) {
+      fence = { mark: open[1], col: w - rel };
       cls[i] = 'code';
-      prevBlank = false;
-      prevIndented = false;
       continue;
     }
-    const blank = line.trim() === '';
-    const indented = !blank && /^(?: {4}| {0,3}\t)/.test(line) && (prevBlank || prevIndented);
-    if (indented) cls[i] = 'code';
-    prevIndented = indented || (blank && prevIndented);
-    prevBlank = blank;
+    if (doctest || DOCTEST.test(line)) {
+      doctest = true;
+      cls[i] = 'code';
+      continue;
+    }
+    let item = rel <= 3 && !thematicBreak(line) ? LIST_ITEM.exec(line) : null;
+    // An ordered item that does not start at 1 cannot interrupt a paragraph: it is the
+    // paragraph's text, unless a blank line or another item stands right before it.
+    if (item && /^\d/.test(item[2]) && Number.parseInt(item[2], 10) !== 1 && !afterBlank && !afterItem) item = null;
+    if (item) {
+      prevItem = true;
+      const after = indentWidth(line.slice(item[1].length + item[2].length).replace(/\S[\s\S]*$/, ''));
+      const col = w + item[2].length + (after >= 5 ? 1 : after);
+      cols.push(col);
+      // The item's own text may open a fence or a doctest, or be indented code.
+      const content = line.slice(item[0].length - 1);
+      const inner = /^(`{3,}|~{3,})/.exec(content);
+      if (after >= 5) cls[i] = 'code';
+      else if (inner && !(inner[1][0] === '`' && content.slice(inner[0].length).includes('`'))) {
+        fence = { mark: inner[1], col };
+        cls[i] = 'code';
+      } else if (DOCTEST.test(content)) {
+        doctest = true;
+        cls[i] = 'code';
+      }
+    }
   }
   return cls;
 }
 
-/** A reStructuredText directive whose body is code, another file or a role: its line and its indented body are never wording. */
+/** The start of a reStructuredText explicit markup block: a directive, a target, a substitution, a footnote or a comment. */
 const RST_DIRECTIVE = /^([ \t]*)\.\.[ \t]/;
-const RST_CODE_NAME = /^(?:raw|code|code-block|sourcecode|include|literalinclude|role|default-role)::/i;
+/** A directive's name and its `::`, domains included (`py:function::`). */
+const RST_DIRECTIVE_NAME = /^([A-Za-z0-9][\w:.+-]*?)::(?:[ \t]|$)/;
+/**
+ * The directives whose body is prose: the admonitions, `seealso`, `topic`, `sidebar` and
+ * `rubric`. Every other directive is code, its line and its indented body.
+ */
+const RST_PROSE_DIRECTIVES = new Set(['note', 'warning', 'tip', 'important', 'caution', 'danger', 'error', 'hint',
+  'attention', 'seealso', 'admonition', 'topic', 'sidebar', 'rubric']);
+/** A directive option, `:name:` at the start of the body. */
+const RST_OPTION = /^[ \t]+:[^:\s][^:]*:(?:[ \t]|$)/;
 
 /**
- * Rule 4 (documentation) — each line of a reStructuredText file: `code` for a `raw`,
- * `code`, `code-block`, `sourcecode`, `include`, `literalinclude`, `role` or
- * `default-role` directive or a link target `.. _name:`, and the lines indented beneath it
- * (its options; blank lines between them included), else `prose`.
+ * Rule 4 (documentation) — each line of a reStructuredText file: `code` or `prose`. Code is
+ * every directive but the prose ones ({@link RST_PROSE_DIRECTIVES}), with its indented body;
+ * a prose directive's options (its body's leading `:name:` lines), and the whole of one
+ * whose own line ends in `::` (a literal block follows); a link target
+ * `.. _name:` and its indented lines; a literal block, the indented (or quoted, each line
+ * starting with the same punctuation) block after a paragraph ending in `::` or a line `::`
+ * alone, after a blank line; and a doctest ({@link DOCTEST}). A prose directive's line and
+ * body stay prose, read line by line, so a code directive nested in one is code.
  * @param {string} text line feeds only @returns {string[]}
  */
 function rstLines(text) {
   const lines = text.split('\n');
   const cls = new Array(lines.length).fill('prose');
-  for (let i = 0; i < lines.length; i++) {
-    const m = RST_DIRECTIVE.exec(lines[i]);
-    if (!m) continue;
-    let rest = lines[i].slice(m[0].length).trimStart();
-    if (rest[0] === '|') rest = rest.slice(rest.indexOf('|', 1) + 1).trimStart(); // a substitution: `.. |name| raw:: html`
-    if (!RST_CODE_NAME.test(rest) && rest[0] !== '_') continue; // `_`: a link target, `.. _name: address`
-    cls[i] = 'code';
+  const blank = (k) => lines[k].trim() === '';
+  const indent = (k) => lines[k].length - lines[k].trimStart().length;
+  /** the last line of the block indented deeper than `col` after line `i` (blank lines between included), or `i` */
+  const body = (i, col) => {
     let last = i;
     for (let j = i + 1; j < lines.length; j++) {
-      if (lines[j].trim() === '') continue;
-      if (lines[j].length - lines[j].trimStart().length <= m[1].length) break;
+      if (blank(j)) continue;
+      if (indent(j) <= col) break;
       last = j;
     }
-    for (let k = i + 1; k <= last; k++) cls[k] = 'code';
-    i = last;
+    return last;
+  };
+  const mark = (from, to) => { for (let k = from; k <= to; k++) cls[k] = 'code'; };
+  for (let i = 0; i < lines.length; i++) {
+    if (blank(i)) continue;
+    const m = RST_DIRECTIVE.exec(lines[i]);
+    if (m) {
+      let rest = lines[i].slice(m[0].length).trimStart();
+      if (rest[0] === '|') rest = rest.slice(rest.indexOf('|', 1) + 1).trimStart(); // a substitution: `.. |name| raw:: html`
+      const d = RST_DIRECTIVE_NAME.exec(rest);
+      if (d && RST_PROSE_DIRECTIVES.has(d[1].toLowerCase()) && !rest.slice(d[0].length).trimEnd().endsWith('::')) {
+        let j = i + 1;
+        while (j < lines.length && RST_OPTION.test(lines[j]) && indent(j) > m[1].length) cls[j++] = 'code';
+        i = j - 1;
+        continue;
+      }
+      if (d || rest[0] === '_') { // `_`: a link target, `.. _name: address`
+        const last = body(i, m[1].length);
+        mark(i, last);
+        i = last;
+      }
+      continue;
+    }
+    if (DOCTEST.test(lines[i])) {
+      let j = i;
+      while (j + 1 < lines.length && !blank(j + 1)) j++;
+      mark(i, j);
+      i = j;
+      continue;
+    }
+    if (!lines[i].trimEnd().endsWith('::') || (i + 1 < lines.length && !blank(i + 1))) continue;
+    let j = i + 1;
+    while (j < lines.length && blank(j)) j++;
+    if (j >= lines.length) continue;
+    const col = indent(i);
+    if (indent(j) > col) {
+      const last = body(i, col);
+      mark(j, last);
+      i = last;
+    } else if (indent(j) === col && /^[!-/:-@[-`{-~]/.test(lines[j].trimStart())) {
+      const q = lines[j].trimStart()[0];
+      let last = j;
+      while (last + 1 < lines.length && indent(last + 1) === col && lines[last + 1].trimStart()[0] === q) last++;
+      mark(j, last);
+      i = last;
+    }
+  }
+  return cls;
+}
+
+/**
+ * Rule 4 (plain text) — each line of a `.txt` file: `code` for a doctest ({@link DOCTEST}),
+ * else `prose`.
+ * @param {string} text line feeds only @returns {string[]}
+ */
+function textLines(text) {
+  const lines = text.split('\n');
+  const cls = new Array(lines.length).fill('prose');
+  let doctest = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === '') doctest = false;
+    else if (doctest || DOCTEST.test(lines[i])) { doctest = true; cls[i] = 'code'; }
   }
   return cls;
 }
@@ -1710,11 +1973,27 @@ function backtickPairs(s) {
 }
 
 /**
+ * @param {string} t one word, its surrounding punctuation removed @returns {boolean} a
+ * reStructuredText simple reference (`guide_`, `guide__`), which links to the target of
+ * that name, or a footnote or citation reference (`[1]_`)
+ */
+function rstReference(t) {
+  if (/^\[[^\]]+\]_$/.test(t)) return true;
+  let end = t.length;
+  if (t[end - 1] !== '_') return false;
+  end--;
+  if (t[end - 1] === '_') end--;
+  const name = t.slice(0, end);
+  return /^[A-Za-z0-9][\w.+:-]*$/.test(name) && /[A-Za-z0-9]$/.test(name);
+}
+
+/**
  * Rule 4 (reStructuredText) — the inline spans that are never wording, in order: every role
  * span, `:name:` before or after the backquoted text (a role may be defined as `raw` and
  * carry HTML), with its name; every interpreted text without a role (a `default-role` may
- * make it one); every inline literal; and the target `<…>` of every hyperlink reference,
- * or its whole text when that text names the target.
+ * make it one); every inline literal; the target `<…>` of every hyperlink reference,
+ * or its whole text when that text names the target; and then every simple reference
+ * (`guide_`, which links to the target `guide`) and footnote reference (`[1]_`).
  * @param {string} s the prose, code lines blanked @returns {string}
  */
 function rstSpans(s) {
@@ -1731,6 +2010,14 @@ function rstSpans(s) {
     else if (s[to + 1] === '_') out.push(text.slice(Math.max(0, text.lastIndexOf('<'))));
     else out.push(`\`${text}\``);
   }
+  for (const word of s.split(/\s+/)) {
+    let from = 0;
+    let to = word.length;
+    while (from < to && '(<{\'"'.includes(word[from])) from++;
+    while (to > from && ')>}\'".,;:!?'.includes(word[to - 1])) to--; // by hand: a trailing pattern would rescan
+    const t = word.slice(from, to);
+    if (rstReference(t)) out.push(t);
+  }
   return out.join('\u0000');
 }
 
@@ -1740,7 +2027,8 @@ const labelKey = (label) => label.trim().toLowerCase().replace(/\s+/g, ' ');
 /**
  * Rule 4 (Markdown) — every link and image target of the prose, in order: the `(…)` after
  * `]` (to its matching `)` or the line's end), each reference definition line
- * `[label]: …`, each `[label]` after `]`, and each `[label]` that names a definition. Link
+ * `[label]: …` with its destination and title where they stand on the following lines,
+ * each `[label]` after `]`, and each `[label]` that names a definition. Link
  * text is not part of it. Linear: every search moves forward.
  * @param {string} s the prose, code spans blanked @returns {string}
  */
@@ -1764,11 +2052,30 @@ function linkTargets(s) {
     i = Math.max(i, j - 2);
   }
   const defined = new Set();
-  for (const line of s.split('\n')) {
-    const m = /^ {0,3}\[([^\]\n]*)\]:/.exec(line);
-    if (m) {
-      out.push(line);
-      defined.add(labelKey(m[1]));
+  const lines = s.split('\n');
+  const definition = /^ {0,3}\[([^\]\n]*)\]:/;
+  for (let i = 0; i < lines.length; i++) {
+    const m = definition.exec(lines[i]);
+    if (!m) continue;
+    out.push(lines[i]);
+    defined.add(labelKey(m[1]));
+    // CommonMark lets the destination and the title each stand on the next line.
+    let rest = lines[i].slice(m[0].length).trim();
+    if (rest === '') {
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim() === '') j++;
+      if (j === lines.length) break;
+      if (definition.test(lines[j])) { i = j - 1; continue; } // read as a definition of its own
+      out.push(lines[j]);
+      rest = lines[j].trim();
+      i = j;
+    }
+    const destination = rest[0] === '<' ? rest.indexOf('>') + 1 || rest.length : rest.search(/\s|$/);
+    if (rest.slice(destination).trim() !== '') continue;
+    // A title on the next line: from a line that opens one to the next blank line (a title
+    // may run over several lines, never over a blank one).
+    if (i + 1 < lines.length && /^\s*["'(]/.test(lines[i + 1])) {
+      while (i + 1 < lines.length && lines[i + 1].trim() !== '') out.push(lines[++i]);
     }
   }
   let close = -1;
@@ -1830,6 +2137,16 @@ function rstRefusal(f) {
 }
 
 /**
+ * Rule 4 (plain text) — `code` when a changed line, or an unchanged line whose class moved,
+ * is a doctest ({@link textLines}); else null.
+ * @param {ChangedFile} f @returns {('code'|null)}
+ */
+function textRefusal(f) {
+  const cls = (t) => textLines(lineFeeds(/** @type {string} */ (t)));
+  return lineClassChange(/** @type {Hunk[]} */ (f.hunks), cls(f.oldText), cls(f.newText)) ? 'code' : null;
+}
+
+/**
  * Rule 4 — place the file in the first kind that fits and judge the whole old and new file
  * with that kind's scanner; a place that governs the work never qualifies, whatever the
  * kind; otherwise the clause of the first other kind it matches.
@@ -1868,14 +2185,14 @@ function ruleKind(f) {
 
   if (kind === 'documentation') {
     // Rule 2 has already refused a file with a missing side, so both texts are present.
-    const refused = ext === '.md' ? markdownRefusal(f) : ext === '.rst' ? rstRefusal(f) : null;
+    const refused = ext === '.md' ? markdownRefusal(f) : ext === '.rst' ? rstRefusal(f) : textRefusal(f);
     if (refused) return refused === 'settings' ? setting : unrecognised;
     return { kind, runs: changedWords(f.hunks) };
   }
   if (kind === 'markup') {
     if (!equalHunks(f.hunks)) return unrecognised;
     const jsx = ext === '.jsx' || ext === '.tsx';
-    const mode = jsx ? 'jsx' : ext === '.vue' ? 'vue' : 'html';
+    const mode = jsx ? 'jsx' : ext === '.vue' ? 'vue' : ext === '.svelte' ? 'svelte' : 'html';
     const runs = changedTexts(scanMarkup(lineFeeds(/** @type {string} */ (f.oldText)), mode),
       scanMarkup(lineFeeds(/** @type {string} */ (f.newText)), mode), (toks, k) => markupWording(toks, k, jsx));
     return runs ? { kind, runs } : unrecognised;
@@ -1895,8 +2212,10 @@ function ruleKind(f) {
     return { kind, runs };
   }
   if (kind === 'colour') {
-    const same = equalHunks(f.hunks) && colourEdit(lineFeeds(/** @type {string} */ (f.oldText)), lineFeeds(/** @type {string} */ (f.newText)), ext);
-    return same ? { kind, runs: [] } : unrecognised;
+    const o = lineFeeds(/** @type {string} */ (f.oldText));
+    const n = lineFeeds(/** @type {string} */ (f.newText));
+    if (variableDeclarations(o, ext) !== variableDeclarations(n, ext)) return setting;
+    return equalHunks(f.hunks) && colourEdit(o, n, ext) ? { kind, runs: [] } : unrecognised;
   }
 
   if (isDependency) return { clause: `it changes the dependencies in ${d}`, cause: 'dependencies' };
@@ -1926,20 +2245,26 @@ function sensitiveWord(part) {
 
 /**
  * Rule 5 — not in a sensitive area: no letter run of the path from the repository top is a
- * sensitive word (also in the plural); the path is no secret-bearing file by CTOC's own
- * secret-file guard (`isSecretTarget`: the word `secret`), and no part of CTOC's own
- * enforcement by its protected-paths list (`isProtectedEnforcementPath`: the word
- * `enforcement`). Both lists are CTOC's, read where they live, never copied.
- * @param {ChangedFile} f @returns {Refusal|null}
+ * sensitive word (also in the plural; a stylesheet's own file name aside); the path is no
+ * secret-bearing file by CTOC's own secret-file guard (`isSecretTarget`: the word
+ * `secret`), and, in CTOC's own repository only, no part of CTOC's enforcement by its
+ * protected-paths list (`isProtectedEnforcementPath`: the word `enforcement`), which names
+ * CTOC's own files (`src/hooks/`, ...), not another project's. Both lists are CTOC's, read
+ * where they live, never copied.
+ * @param {ChangedFile} f @param {boolean} ctoc the repository is CTOC's own source
+ * @returns {Refusal|null}
  */
-function ruleSensitiveArea(f) {
+function ruleSensitiveArea(f, ctoc) {
+  // A stylesheet's own name is no area: `tokens.css` and `design-tokens.css` hold design
+  // tokens, not secrets. Its folders still count.
+  const named = COLOUR_EXT.has(nameParts(f).ext) ? f.topRel.slice(0, f.topRel.lastIndexOf('/') + 1) : f.topRel;
   let word = null;
-  for (const part of f.topRel.split(/[^A-Za-z]+/)) {
+  for (const part of named.split(/[^A-Za-z]+/)) {
     word = sensitiveWord(part.toLowerCase());
     if (word) break;
   }
   if (!word && isSecretTarget(f.topRel)) word = 'secret';
-  if (!word && isProtectedEnforcementPath(f.topRel)) word = 'enforcement';
+  if (!word && ctoc && isProtectedEnforcementPath(f.topRel)) word = 'enforcement';
   return word ? { clause: `${f.display} sits in an area named ${word}, and such areas are never a hotfix`, cause: 'sensitive-area' } : null;
 }
 
@@ -2001,7 +2326,10 @@ function ruleRefusal(change) {
     f.kind = r.kind;
     f.runs = r.runs;
   }
-  for (const rule of [ruleSensitiveArea, ruleRiskMarker]) {
+  // CTOC's own repository, detected as CTOC detects it everywhere (`package.json` named
+  // `ctoc` at the project boundary); a change built by hand (the property test) has no top.
+  const ctoc = Boolean(change.top) && isCtocProject(/** @type {string} */ (change.top)).isCtocRepo;
+  for (const rule of [(f) => ruleSensitiveArea(f, ctoc), ruleRiskMarker]) {
     for (const f of change.files) {
       const r = rule(f);
       if (r) return r;
