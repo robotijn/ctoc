@@ -629,12 +629,12 @@ const FLAGS_TEST = nodeTest('flags are on', "  assert.equal(read('config/flags.t
 test('case 29: an unrelated uncommitted edit that would make a test fail does not change the verdict', async () => {
   const twin = testedProject({ 'config/flags.txt': 'on\n', 'tests/flags.test.js': FLAGS_TEST });
   const reference = await buttonWording(twin);
-  assertPass(reference.second, ['src/pages/home.html']);
   const root = testedProject({ 'config/flags.txt': 'on\n', 'tests/flags.test.js': FLAGS_TEST });
   fs.writeFileSync(path.join(root, 'config/flags.txt'), 'off\n');
   const answers = await buttonWording(root);
   assert.deepEqual(answers.first, reference.first);
   assert.deepEqual(answers.second, reference.second);
+  assertPass(reference.second, ['src/pages/home.html']);
 });
 
 test('case 30: the test command comes only from tracked files', async () => {
@@ -767,11 +767,13 @@ test('case 39: a log above 1 MiB is rotated by renaming', async () => {
   fs.writeFileSync(path.join(root, LOG), old);
   fs.writeFileSync(path.join(root, 'README.md'), 'New wording.\n');
   await check(root, 'README.md');
-  assertPass(await check(root, '--run-tests', 'README.md'), ['README.md']);
-  assert.ok(fs.readFileSync(path.join(root, `${LOG}.1`)).equals(old), 'the old log is kept whole under .1');
+  const res = await check(root, '--run-tests', 'README.md');
+  assert.ok(fs.existsSync(path.join(root, `${LOG}.1`)) && fs.readFileSync(path.join(root, `${LOG}.1`)).equals(old),
+    'the old log is kept whole under .1');
   const lines = logLines(root);
   assert.equal(lines.length, 1);
   assert.equal(lines[0].verdict, 'hotfix');
+  assertPass(res, ['README.md']);
 });
 
 test('case 40: a log that is a hard link is never written', async () => {
@@ -787,10 +789,10 @@ test('case 40: a log that is a hard link is never written', async () => {
     fs.writeFileSync(path.join(r, 'README.md'), 'New wording.\n');
     answers.push([await check(r, 'README.md'), await check(r, '--run-tests', 'README.md')]);
   }
-  assert.deepEqual(answers[1], answers[0]);
-  assertPass(answers[1][1], ['README.md']);
   assert.ok(fs.readFileSync(outside).equals(bytes), 'the linked file is unchanged');
   assert.equal(fs.existsSync(path.join(root, `${LOG}.1`)), false);
+  assert.deepEqual(answers[1], answers[0]);
+  assertPass(answers[1][1], ['README.md']);
 });
 
 test('case 41: the log is never written through a symbolic link', async () => {
