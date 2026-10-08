@@ -217,7 +217,9 @@ const q = (files) => files.map((f) => `'${f}'`).join(' ');
 function assertChecking(res, files) {
   assert.equal(res.verdict, 'checking', JSON.stringify(res));
   assert.equal(res.text, STATUS_LINE);
-  assert.equal(res.next, `hotfix check --run-tests -- ${q(files)}`);
+  // `--` only when a judged name starts with `-`, so the usual `next` is exactly the acceptance criterion's.
+  const dashes = files.some((f) => f.startsWith('-')) ? '-- ' : '';
+  assert.equal(res.next, `hotfix check --run-tests ${dashes}${q(files)}`);
   assert.deepEqual(res.ask, { questions: [] });
   assert.deepEqual(res.actions, {});
 }
@@ -285,7 +287,7 @@ test('case 1 + 26: a button wording change passes in two calls; the process is r
   fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
   const first = await check(root, 'src/pages/home.html');
   assertChecking(first, ['src/pages/home.html']);
-  assert.equal(first.next, "hotfix check --run-tests -- 'src/pages/home.html'");
+  assert.equal(first.next, "hotfix check --run-tests 'src/pages/home.html'", 'byte-identical to the acceptance criterion');
 
   const cwdBefore = process.cwd();
   const logBefore = console.log;
@@ -1484,10 +1486,18 @@ test('finding 9: a judged file named like an option reaches the test run after -
   fs.writeFileSync(path.join(root, '--x.md'), 'New wording.\n');
   const first = await check(root, '--', '--x.md');
   assertChecking(first, ['--x.md']);
+  assert.equal(first.next, "hotfix check --run-tests -- '--x.md'");
   const words = shellWords(first.next);
   assert.deepEqual(words.slice(0, 2), ['hotfix', 'check']);
   const second = await check(root, ...words.slice(2));
   assertPass(second, ['--x.md']);
+  fs.writeFileSync(path.join(root, 'notes.md'), 'Other.\n');
+  git(root, ['add', 'notes.md']);
+  git(root, ['commit', '-q', '-m', 'notes']);
+  fs.writeFileSync(path.join(root, 'notes.md'), 'Other, changed.\n');
+  const mixed = await check(root, '--', 'notes.md', '--x.md');
+  assert.equal(mixed.next, "hotfix check --run-tests -- '--x.md' 'notes.md'", 'a mixed set carries --');
+  assertPass(await check(root, ...shellWords(mixed.next).slice(2)), ['--x.md', 'notes.md']);
   assert.equal((await check(root, '--run-tests', '--x.md')).text, `Unknown hotfix command: --x.md. ${USAGE}`,
     'without --, a name that looks like an option is still the usage text');
 });

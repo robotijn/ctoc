@@ -10,8 +10,8 @@
  *       — instant: rules 1 to 7; no test runs and nothing about the project's tools is
  *         read. On a refusal, the sentence. When they hold: `verdict: 'checking'`, the one
  *         status line as `text`, and `next`, the exact route that runs the tests:
- *         `hotfix check --run-tests -- '<file>' ...` (`--` ends the options, so a file named
- *         like an option, `--x.md`, still reaches the test run).
+ *         `hotfix check --run-tests '<file>' ...`, with `--` before the files when a name
+ *         starts with `-` (`--` ends the options, so `--x.md` still reaches the test run).
  *   ... hotfix check --run-tests [--] [<file> ...]
  *       — the background test run: rules 1 to 7 again, then rule 8 in a temporary copy of
  *         the repository.
@@ -1328,7 +1328,10 @@ async function judge(root, named, runTests) {
   const tail = { ...(detail ? { detail } : {}), ask: { questions: [] }, actions: {} };
 
   if ('checking' in outcome) {
-    const next = `hotfix check --run-tests -- ${change.files.map((f) => quoted(f.display)).join(' ')}`;
+    // `--` only when a judged name starts with `-`: the usual `next` stays exactly the
+    // acceptance criterion's, and a name such as `--x.md` still reaches the test run.
+    const dashes = change.files.some((f) => f.display.startsWith('-')) ? '-- ' : '';
+    const next = `hotfix check --run-tests ${dashes}${change.files.map((f) => quoted(f.display)).join(' ')}`;
     return { screen: { verdict: 'checking', text: STATUS_LINE, next, ...tail }, cause: undefined, change };
   }
   if ('tests' in outcome) {

@@ -281,7 +281,7 @@ async function judge(files) {
 function assertChecking(res, files) {
   assert.equal(res.verdict, 'checking', JSON.stringify(res));
   assert.equal(res.text, 'Checking the hotfix against the existing tests.');
-  assert.equal(res.next, `hotfix check --run-tests -- ${files.map((f) => `'${f}'`).join(' ')}`);
+  assert.equal(res.next, `hotfix check --run-tests ${files.map((f) => `'${f}'`).join(' ')}`);
 }
 
 for (const [shape, content] of QUALIFY) {

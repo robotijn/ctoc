@@ -1205,12 +1205,15 @@ instead of "tests failed" — still not a pass.
     item 8). "is outside this project" and "holds no change that git would commit" replace
     control characters with a space, as the name check's sentence already did. Case
     "finding 8" (`nope\u001b[2J.md`).
-61. **`--` ends the options, and `next` carries it** (decision at review; source: the
-    brief's item 9). After `--` every word is a file, so `--x.md` can be judged and tested;
-    `next` is now `hotfix check --run-tests -- '<file>' …`. This differs from the acceptance
-    line that says `next` is exactly `hotfix check --run-tests 'src/pages/home.html'`; the
-    review asked for it, the specification text is not edited, and the cases assert the new
-    form. The usage text keeps the specification's wording. Case "finding 9".
+61. **`--` ends the options; `next` carries it only for a name that starts with `-`**
+    (decision at review; source: the brief's item 9, narrowed by the coordinator the same
+    day). After `--` every word is a file, so `--x.md` can be judged and tested. `next`
+    stays exactly `hotfix check --run-tests '<file>' …`, byte-identical to the acceptance
+    criterion, and becomes `hotfix check --run-tests -- '<file>' …` only when at least one
+    judged name starts with `-` (a mixed set included). The usage text keeps the
+    specification's wording. Cases "case 1 + 26" (the acceptance criterion's `next`, red
+    while `--` was always emitted) and "finding 9" (`--x.md` alone, and with `notes.md`,
+    each `next` routed to a pass).
 62. **Removal never unlinks through a folder that moved outside the copy** (decision at
     review; source: the brief's item 10). Before each unlink the link's folder's real path
     must lie inside the temporary folder; if not, removal stops and `detail` says "a link's
@@ -1559,7 +1562,7 @@ every plan edit: `4aaf099b44f61ce1721e1bd2309bc781e49f2b8a2896c60aff3ecb22e80f80
 | 6 refused command | "the existing tests fail (the test command reported a failure)" where "no test ran" was expected; `res.refused` was `undefined` | pass |
 | 7 counters | `ℹ fail 1` on standard output with `ℹ fail 0` on standard error read as a pass | reads as one failure; jest's standard-error-only counters still read |
 | 8 cleaned names | the sentence held `nope\x1B[2J.md` | `nope [2J.md` and `../x .md` |
-| 9 `--` | `hotfix check -- --x.md` answered "Unknown hotfix command: --" | the first call answers `next` `hotfix check --run-tests -- '--x.md'`, and routing that `next` passes |
+| 9 `--` | `hotfix check -- --x.md` answered "Unknown hotfix command: --"; later, the always-`--` `next` broke the acceptance criterion's exact `next` (case 1 red) | `--` only for a dash-led name: `--x.md` alone and in a mixed set get it and route to a pass; the usual `next` is the acceptance criterion's |
 | 10 swapped copy | removal unlinked `node_modules`, `.venv` and `packages/a/node_modules` in the outside folder (all three gone) | all three intact; `detail` "… could not be removed: a link's folder moved outside it"; with no link git refuses the swapped worktree itself (sub-case b); a link whose folder the tests removed counts as removed (sub-case c, a branch case, green before and after) |
 | 11 kill from outside | a child killed with SIGTERM during its test run left `ctoc-hotfix-…` behind | the child ends by SIGTERM, no copy and no worktree registration remain; the handlers are gone after a normal check |
 
