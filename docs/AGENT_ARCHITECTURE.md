@@ -102,7 +102,7 @@ dispatches: [<all-19-categories>]
 **Frontmatter contract**:
 ```yaml
 tier: 1
-effort: xhigh             # every agent not in EFFORT_EXEMPT; see below
+effort: xhigh             # every agent not in EFFORT_EXEMPT, but iron-loop-critic: high; see below
 reads_ancestry: true
 async_choice_protocol: enabled
 reports_to: cto-chief     # invariant: must equal "cto-chief"
@@ -288,14 +288,16 @@ A watcher — any agent that reads code or artifacts and emits findings — decl
 answering whether effort must rise alongside `model: opus`. It must — to `xhigh`, the
 highest level Anthropic ships no caveat against.
 
+**One watcher thinks at `high`: the iron-loop critic.** The owner decided on 2026-10-08 (answer "a") to move `iron-loop-critic` from `xhigh` to `high`, changing the 2026-07-17 ruling for this one agent. On the effort trial in `.ctoc/audit/speed-and-size/benchmarks/MODEL-TRIAL-2026-10-08.md`, the critic at `high` found the same 5 of 6 known problems and the same two high findings as at `xhigh`, in 43% less time; at `medium` it missed one. The critic stays on Opus, and the security scanner stays at `xhigh`. The fence holds the critic in its own map, `WATCHER_EFFORT`, never in `EFFORT_EXEMPT`: at exactly `high`, so a lower level fails, and `xhigh` fails too until the entry is removed.
+
 The model floor and the effort floor are two separate controls and the first cannot see
 the second: `model: opus` with `effort: low` satisfies every model assertion in the
 corpus and still produces a shallow read — a green record rather than a review. Both are
 fenced in `tests/agent-model-floor.test.js`.
 
 The rule is written as an **exemption**, not a roster. `EFFORT_EXEMPT` in that fence names
-every agent permitted below `xhigh`, each with a written reason; everything else must be
-`xhigh`. A new agent therefore defaults to being a watcher and must be argued *into* the
+every non-watcher permitted below `xhigh`, each with a written reason; everything else must be
+`xhigh`, save the critic's one level above. A new agent therefore defaults to being a watcher and must be argued *into* the
 map to think at anything less. The exempt groups are actuators (they write, they do not
 watch), planners (they ask the human; the bottleneck is the answer, not thinking depth),
 and the `saas/*` agents scheduled for demotion to skills.
