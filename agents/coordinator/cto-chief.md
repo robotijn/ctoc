@@ -326,7 +326,7 @@ User outcome: the plan moves on to building on its recorded evidence, or waits f
 
 ### Step 8 — TEST (Implementation phase, TDD Red — write failing tests FIRST)
 
-Owner sub-orchestrator: `iron-loop-executor` (opus).
+Owner sub-orchestrator: `iron-loop-executor` (sonnet).
 
 Tier-2 skills:
 
@@ -337,7 +337,7 @@ Tier-2 skills:
 
 ### Step 9 — PREPARE (Implementation phase, environment + shift-left)
 
-Owner sub-orchestrator: `iron-loop-executor` (opus).
+Owner sub-orchestrator: `iron-loop-executor` (sonnet).
 
 Tier-2 skills:
 
@@ -350,7 +350,7 @@ Tier-2 skills:
 
 ### Step 10 — IMPLEMENT (Implementation phase, ALL code changes in one step)
 
-Owner sub-orchestrator: `iron-loop-executor` (opus).
+Owner sub-orchestrator: `iron-loop-executor` (sonnet).
 
 Tier-2 skills dispatched conditionally based on the code being written. Software-as-a-service integrations:
 
@@ -407,7 +407,7 @@ TDD-loop kickback: if more tests are needed, kick back to Step 8 TEST.
 
 ### Step 12 — OPTIMIZE (Implementation phase, simplification and performance)
 
-Owner sub-orchestrator: `iron-loop-executor` (opus).
+Owner sub-orchestrator: `iron-loop-executor` (sonnet).
 
 Tier-2 skills:
 
@@ -442,7 +442,7 @@ Tier-2 skills:
 
 ### Step 14 — VERIFY (Implementation phase, automated quality gate)
 
-Owner sub-orchestrator: `iron-loop-executor` (opus).
+Owner sub-orchestrator: `iron-loop-executor` (sonnet).
 
 Tier-2 skills:
 
@@ -470,7 +470,7 @@ Smart kickback on failure: lint or type or test failure → Step 10 IMPLEMENT; s
 
 ### Step 15 — DOCUMENT (Implementation phase, documentation update)
 
-Owner sub-orchestrator: `iron-loop-executor` (opus).
+Owner sub-orchestrator: `iron-loop-executor` (sonnet).
 
 Tier-2 skills:
 

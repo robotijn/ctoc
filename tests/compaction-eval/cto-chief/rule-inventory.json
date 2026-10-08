@@ -3,7 +3,7 @@
  "baseline": "tests/compaction-eval/cto-chief/baseline-agent.md",
  "baseline_sha256": "6926be359fb867fcbbd9696d322d85aa8cfb3e66cbd71059f39c37c095ae60cc",
  "baseline_commit": "c889e179f1396af94945336ac9f2ce7af6332826",
- "maxBytes": 54303,
+ "maxBytes": 54315,
  "units": [
   {
    "n": 1,
@@ -1651,7 +1651,7 @@
    "orders": [
     "R-197"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 198,
@@ -1710,7 +1710,7 @@
    "orders": [
     "R-204"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 205,
@@ -1787,7 +1787,7 @@
    "orders": [
     "R-213"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 214,
@@ -2171,7 +2171,7 @@
    "orders": [
     "R-257"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 258,
@@ -2406,7 +2406,7 @@
    "orders": [
     "R-284"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 285,
@@ -2600,7 +2600,7 @@
    "orders": [
     "R-306"
    ],
-   "fate": "kept"
+   "fate": "replaced"
   },
   {
    "n": 307,
@@ -6420,7 +6420,16 @@
     "ests FIRST) Owner sub-orchestrator: `iron-loop-executor` (opus)."
    ],
    "pinned_by": "tests/agent-dispatch-resolution.test.js",
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-08 (answer \"a\"): the build agent iron-loop-executor runs on Sonnet 5.5 with the Opus advisor instead of Opus, on the measured trial in .ctoc/audit/speed-and-size/benchmarks/MODEL-TRIAL-2026-10-08.md, and keeps being measured.",
+    "date": "2026-10-08",
+    "plan": "the-build-agent-runs-on-sonnet-with-the-opus-advisor",
+    "new_anchors": [
+     "ests FIRST) Owner sub-orchestrator: `iron-loop-executor` (sonnet)."
+    ]
+   }
   },
   {
    "id": "R-199",
@@ -6470,7 +6479,16 @@
     "shift-left) Owner sub-orchestrator: `iron-loop-executor` (opus)."
    ],
    "pinned_by": "tests/agent-dispatch-resolution.test.js",
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-08 (answer \"a\"): the build agent iron-loop-executor runs on Sonnet 5.5 with the Opus advisor instead of Opus, on the measured trial in .ctoc/audit/speed-and-size/benchmarks/MODEL-TRIAL-2026-10-08.md, and keeps being measured.",
+    "date": "2026-10-08",
+    "plan": "the-build-agent-runs-on-sonnet-with-the-opus-advisor",
+    "new_anchors": [
+     "shift-left) Owner sub-orchestrator: `iron-loop-executor` (sonnet)."
+    ]
+   }
   },
   {
    "id": "R-206",
@@ -6540,7 +6558,16 @@
     "n one step) Owner sub-orchestrator: `iron-loop-executor` (opus)."
    ],
    "pinned_by": "tests/agent-dispatch-resolution.test.js",
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-08 (answer \"a\"): the build agent iron-loop-executor runs on Sonnet 5.5 with the Opus advisor instead of Opus, on the measured trial in .ctoc/audit/speed-and-size/benchmarks/MODEL-TRIAL-2026-10-08.md, and keeps being measured.",
+    "date": "2026-10-08",
+    "plan": "the-build-agent-runs-on-sonnet-with-the-opus-advisor",
+    "new_anchors": [
+     "n one step) Owner sub-orchestrator: `iron-loop-executor` (sonnet)."
+    ]
+   }
   },
   {
    "id": "R-214",
@@ -6920,7 +6947,16 @@
     "erformance) Owner sub-orchestrator: `iron-loop-executor` (opus)."
    ],
    "pinned_by": "tests/agent-dispatch-resolution.test.js",
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-08 (answer \"a\"): the build agent iron-loop-executor runs on Sonnet 5.5 with the Opus advisor instead of Opus, on the measured trial in .ctoc/audit/speed-and-size/benchmarks/MODEL-TRIAL-2026-10-08.md, and keeps being measured.",
+    "date": "2026-10-08",
+    "plan": "the-build-agent-runs-on-sonnet-with-the-opus-advisor",
+    "new_anchors": [
+     "erformance) Owner sub-orchestrator: `iron-loop-executor` (sonnet)."
+    ]
+   }
   },
   {
    "id": "R-259",
@@ -7150,7 +7186,16 @@
     "ality gate) Owner sub-orchestrator: `iron-loop-executor` (opus)."
    ],
    "pinned_by": "tests/agent-dispatch-resolution.test.js",
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-08 (answer \"a\"): the build agent iron-loop-executor runs on Sonnet 5.5 with the Opus advisor instead of Opus, on the measured trial in .ctoc/audit/speed-and-size/benchmarks/MODEL-TRIAL-2026-10-08.md, and keeps being measured.",
+    "date": "2026-10-08",
+    "plan": "the-build-agent-runs-on-sonnet-with-the-opus-advisor",
+    "new_anchors": [
+     "ality gate) Owner sub-orchestrator: `iron-loop-executor` (sonnet)."
+    ]
+   }
   },
   {
    "id": "R-286",
@@ -7350,7 +7395,16 @@
     "ion update) Owner sub-orchestrator: `iron-loop-executor` (opus)."
    ],
    "pinned_by": "tests/agent-dispatch-resolution.test.js",
-   "wire": false
+   "wire": false,
+   "fate": "replaced",
+   "replaced_by": {
+    "instruction": "The owner, 2026-10-08 (answer \"a\"): the build agent iron-loop-executor runs on Sonnet 5.5 with the Opus advisor instead of Opus, on the measured trial in .ctoc/audit/speed-and-size/benchmarks/MODEL-TRIAL-2026-10-08.md, and keeps being measured.",
+    "date": "2026-10-08",
+    "plan": "the-build-agent-runs-on-sonnet-with-the-opus-advisor",
+    "new_anchors": [
+     "ion update) Owner sub-orchestrator: `iron-loop-executor` (sonnet)."
+    ]
+   }
   },
   {
    "id": "R-308",
@@ -9556,6 +9610,12 @@
    "from": 53365,
    "to": 54303,
    "reason": "the final review, the fleet paragraph, the Step 4, 7 and 16 outcomes, the K-budget scope, the approval-point rule, the gate table and the three monitoring duties say what the code does (plan ctoc-keeps-working-and-asks-only-what-matters-s3-instructions-say-what-the-code-does); measured overage 938 bytes"
+  },
+  {
+   "date": "2026-10-08",
+   "from": 54303,
+   "to": 54315,
+   "reason": "the six Owner sub-orchestrator lines of Steps 8, 9, 10, 12, 14 and 15 name the build agent iron-loop-executor as (sonnet) instead of (opus), by the owner's decision of 2026-10-08 (plan the-build-agent-runs-on-sonnet-with-the-opus-advisor); measured overage 12 bytes"
   }
  ]
 }

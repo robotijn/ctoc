@@ -75,7 +75,7 @@ agents:
 
   iron-loop-executor:
     path: agents/iron-loop/iron-loop-executor.md
-    model: opus
+    model: sonnet
     category: iron-loop
     role: sub-orchestrator
     reports_to: cto-chief

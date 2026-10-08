@@ -25,6 +25,8 @@ Slash commands are NOT subagents: they run inside the user's session and must ne
 
 **No agent declares `model: haiku`.** The five Haiku pre-screen agents (Tier 3) were deleted on 2026-07-17 — each declared `short_circuits: <a Tier 2 specialist>`, a key whose purpose was to stop a better-equipped agent from looking, and recorded "nothing found" for a scan that never ran. Subagent isolation made Haiku technically *safe* to run; it never made Haiku *adequate* to judge Opus-written code. Enforced by `tests/no-tier-3.test.js`.
 
+**The build agent runs on Sonnet with the Opus advisor** (owner's decision, 2026-10-08, on the measured trial in `.ctoc/audit/speed-and-size/benchmarks/MODEL-TRIAL-2026-10-08.md`: the same blind-review quality as Opus, 39% cheaper, about 15% faster). `iron-loop-executor` declares `model: sonnet`. The advisor comes from the user's Claude Code setting `advisorModel`, which a subagent inherits; CTOC sets and checks nothing about it. When the advisor is off (`CLAUDE_CODE_DISABLE_ADVISOR_TOOL`, or a variable that turns telemetry off), the builder runs on Sonnet alone, which the trial measured in the same review band but slower and dearer than with the advisor. Every watcher stays on Opus, so no reviewer thinks with a smaller model than the builder; `tests/agent-model-floor.test.js` holds both.
+
 ## Step-driven question routing
 
 Questions are asked based on which Iron Loop step the user is currently in, not based on who the user is. Every user goes through the same steps and answers (or accepts defaults for) the same step-scoped questions. There is no persona system; the pipeline is technical only.
@@ -177,14 +179,14 @@ When user selects `[8] release` from dashboard, show:
 | 5 | PLAN | implementation-planner (opus) | Phase 2: Technical |
 | 6 | DESIGN | implementation-planner (opus) | |
 | 7 | SPEC | iron-loop-critic (opus) then iron-loop-integrator+iron-loop-critic (until nothing new, 3 rounds at most) | Gate 2: moves on its evidence |
-| 8 | TEST | iron-loop-executor (opus) | Phase 3: Implementation |
-| 9 | PREPARE | iron-loop-executor (opus) | |
-| 10 | IMPLEMENT | iron-loop-executor (opus) | |
+| 8 | TEST | iron-loop-executor (sonnet) | Phase 3: Implementation |
+| 9 | PREPARE | iron-loop-executor (sonnet) | |
+| 10 | IMPLEMENT | iron-loop-executor (sonnet) | |
 | 11 | REVIEW | iron-loop-critic (opus) | |
-| 12 | OPTIMIZE | iron-loop-executor (opus) | |
+| 12 | OPTIMIZE | iron-loop-executor (sonnet) | |
 | 13 | SECURE | security-scanner (opus) | |
-| 14 | VERIFY | iron-loop-executor (opus) | |
-| 15 | DOCUMENT | iron-loop-executor (opus) | |
+| 14 | VERIFY | iron-loop-executor (sonnet) | |
+| 15 | DOCUMENT | iron-loop-executor (sonnet) | |
 | 16 | FINAL-REVIEW | iron-loop-critic (opus) | Gate 3: finishes on its checks |
 
 **Step labels are MANDATORY.** The wired `src/lib/plan-validator.js` rejects a plan that is missing a required step (matched by step *number*). Label-*text* correctness (e.g. `TEST`, not `TESTING`) is checked by `src/hooks/validate-plan-steps.js`, which today runs only as a standalone script (`node src/hooks/validate-plan-steps.js`) and is NOT wired as a runtime hook — so a present-but-mislabeled step is not auto-rejected at runtime.
