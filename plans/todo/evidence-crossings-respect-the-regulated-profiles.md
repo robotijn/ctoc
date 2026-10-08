@@ -225,13 +225,13 @@ Cases 1–47 run without a `.ctoc/settings.yaml` and stay green unchanged.
 
 ## Acceptance criteria
 
-- [ ] With GDPR or the EU AI Act on, a functional plan with enough information does not cross into implementation on sufficiency, on any path (the default screen, an answer, an approve, the continuation); the owner's approve crosses it as before v6.14.119 — case 48.
-- [ ] With independent verification and validation required, a built plan with passing checks does not finish on them; the owner's approve finishes it — case 49.
-- [ ] With two distinct approvers, the specification-to-code reconciliation or the closing lesson required, a built plan with passing checks does not finish on them; an override that turns the control off restores the crossing — case 52.
-- [ ] A regime CTOC cannot read holds the crossing it would govern — case 50.
-- [ ] A project with no regime crosses exactly as today, and each regime holds only its own crossing — case 51 and cases 1–47.
-- [ ] The screen says in one plain sentence why the plan waits, on the approve screen and on the question screen — cases 48–50 and 52.
-- [ ] `src/commands/start.md` Rule 14 and `docs/ENFORCEMENT.md` say what the code now does, and `tests/compliance-claims-match-code.test.js` stays green — Steps 11 and 14.
+- [x] With GDPR or the EU AI Act on, a functional plan with enough information does not cross into implementation on sufficiency, on any path (the default screen, an answer, an approve, the continuation); the owner's approve crosses it as before v6.14.119 — case 48.
+- [x] With independent verification and validation required, a built plan with passing checks does not finish on them; the owner's approve finishes it — case 49.
+- [x] With two distinct approvers, the specification-to-code reconciliation or the closing lesson required, a built plan with passing checks does not finish on them; an override that turns the control off restores the crossing — case 52.
+- [x] A regime CTOC cannot read holds the crossing it would govern — case 50.
+- [x] A project with no regime crosses exactly as today, and each regime holds only its own crossing — case 51 and cases 1–47.
+- [x] The screen says in one plain sentence why the plan waits, on the approve screen and on the question screen — cases 48–50 and 52.
+- [x] `src/commands/start.md` Rule 14 and `docs/ENFORCEMENT.md` say what the code now does, and `tests/compliance-claims-match-code.test.js` stays green — Steps 11 and 14.
 
 ## Risks
 
@@ -342,13 +342,13 @@ Cases 1–47 run without a `.ctoc/settings.yaml` and stay green unchanged.
 - [x] `src/commands/start.md` Rule 14 and the two `docs/ENFORCEMENT.md` paragraphs, as specified.
 
 ### Step 11: REVIEW
-- [ ] Dispatch `iron-loop-critic`: no crossing on evidence remains on a held stage; projects with no regime behave byte for byte as before; the texts say what the code does and claim no enforcement of the three sign-off controls' own checks.
+- [x] Dispatch `iron-loop-critic`: no crossing on evidence remains on a held stage; projects with no regime behave byte for byte as before; the texts say what the code does and claim no enforcement of the three sign-off controls' own checks.
 
 ### Step 12: OPTIMIZE
 - [x] The regime is read once per stage that has plans, never per plan; the control set once per review read; no new export.
 
 ### Step 13: SECURE
-- [ ] Dispatch `security-scanner`: every failure to read the regime holds the plan; the screen renders only the four fixed sentences; the profile-name path is used for an existence check and a shallow parse only.
+- [x] Dispatch `security-scanner`: every failure to read the regime holds the plan; the screen renders only the four fixed sentences; the profile-name path is used for an existence check and a shallow parse only.
 
 ### Step 14: VERIFY
 - [x] `npm test`: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct`.
@@ -359,8 +359,8 @@ Cases 1–47 run without a `.ctoc/settings.yaml` and stay green unchanged.
 - [x] JSDoc on `regimeHold`, `regimeLine` and the changed `pendingGateDecisions`, `sufficiencyLine` and `richQuestionScreen`.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Dispatch `iron-loop-critic` against the acceptance criteria; each box quotes its evidence.
-- [ ] The main session drives three scratch projects through the real routes and shows the owner, in full: a GDPR project's functional plan on `/ctoc:start` (stays, with its sentence), then his approve; a do-178c-level-a project's and a sox-itgc project's built plan after `menu task complete <id> --continue` (each stays, with its sentence).
+- [x] Dispatch `iron-loop-critic` against the acceptance criteria; each box quotes its evidence.
+- [x] The main session drives three scratch projects through the real routes and shows the owner, in full: a GDPR project's functional plan on `/ctoc:start` (stays, with its sentence), then his approve; a do-178c-level-a project's and a sox-itgc project's built plan after `menu task complete <id> --continue` (each stays, with its sentence).
 
 
 ---
@@ -384,9 +384,9 @@ Cases 1–47 run without a `.ctoc/settings.yaml` and stay green unchanged.
 - [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
 - [x] Remove redundant operations
@@ -394,10 +394,10 @@ Cases 1–47 run without a `.ctoc/settings.yaml` and stay green unchanged.
 - [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
 - [x] Run lint + type check
@@ -411,10 +411,10 @@ Cases 1–47 run without a `.ctoc/settings.yaml` and stay green unchanged.
 - [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
 
 
 ## Deferred Questions
@@ -603,3 +603,10 @@ Specification hash `ddb9ec70…` unchanged.
 Decision (round 6): a comment line inside the `overrides` map is skipped like one inside the
 `active_profiles` list (the same silent drop, one line away); a commented override value
 (`true # sign-off`) is a misread rather than a value, because the reader does not parse it.
+
+### Review, security and final review — the session's record (2026-10-08)
+
+- Step 11 and Step 16 (iron-loop-critic): SHIP AFTER one fix (the regime sentence missing on the screen for questions being checked); fixed, and a profile CTOC cannot load now holds both crossings (session decision, approval re-recorded).
+- Step 13 (security-scanner): BLOCK twice — misread settings read as no regime, the regime files unprotected (owner answer "a", 2026-10-08: the write protection covers them), then Windows line endings, comment lines, malformed overrides and a second regime block; each fixed test-first with the scanner's exact inputs; the scanner's harness rerun reads every one correctly.
+- Step 16's scratch-project runs through the real routes (scratchpad e2e-regimes): no regime crosses; GDPR waits at the idea moment with its reason and the owner's approve moves it; a safety profile waits at review with the verification reason and the owner's approve finishes it; a GDPR built plan finishes on its checks. The run found profiles read only from the project's own folder; the loader now falls back to the shipped profiles.
+- Acceptance criteria ticked on the review's evidence, the runs and the full suite (12,756 passed, 0 failed, 0 skipped, coverage 99.88%).
