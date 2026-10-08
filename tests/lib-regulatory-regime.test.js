@@ -456,6 +456,71 @@ describe('profiles shipped with the plugin (a project with no profile folder)', 
     assert.deepEqual(regime.unloadableProfiles(root), ['ghost']);
   });
 
+  // Security re-verification at 5908c014: the scanner's exact inputs.
+  it('a profile file with Windows line endings keeps its required controls (and a trailing \\r on the last item)', () => {
+    const doA = fs.readFileSync(path.join(SHIPPED_DIR, 'do-178c-level-a.yaml'), 'utf8');
+    const root = makeProject();
+    writeProfile(root, 'do-178c-level-a', doA.replace(/\n/g, '\r\n'));
+    writeActiveProfiles(root, ['do-178c-level-a']);
+    assert.ok(effectiveControls(root).has('independent_verification_validation'));
+    assert.equal(regime.misreadRegime(root), null);
+    const acme = makeProject();
+    writeProfile(acme, 'acme', 'required_controls:\r\n  - four_eyes_gate3\r');
+    writeActiveProfiles(acme, ['acme']);
+    assert.deepEqual(loadProfile(acme, 'acme').required_controls, ['four_eyes_gate3']);
+  });
+
+  it('a leading byte-order mark is stripped from the settings file and from a profile file', () => {
+    const root = bareProject(null);
+    fs.writeFileSync(path.join(root, '.ctoc', 'settings.yaml'), '﻿regulatory_regime:\n  active_profiles: [gdpr]\n');
+    assert.deepEqual(loadActiveProfiles(root).profiles, ['gdpr']);
+    assert.equal(regime.misreadRegime(root), null);
+    const p = makeProject();
+    writeProfile(p, 'acme', '﻿required_controls:\n  - four_eyes_gate3\n');
+    writeActiveProfiles(p, ['acme']);
+    assert.ok(effectiveControls(p).has('four_eyes_gate3'));
+  });
+
+  it('a comment line inside the active_profiles block list keeps the items after it', () => {
+    const root = bareProject('regulatory_regime:\n  active_profiles:\n    - gdpr\n    # aviation\n    - do-178c-level-a\n');
+    assert.deepEqual(loadActiveProfiles(root).profiles, ['gdpr', 'do-178c-level-a']);
+    assert.ok(effectiveControls(root).has('independent_verification_validation'));
+    assert.equal(regime.misreadRegime(root), null);
+  });
+
+  it('a comment line inside the overrides map keeps the overrides after it', () => {
+    const root = bareProject('regulatory_regime:\n  active_profiles: []\n  overrides:\n    # sign-off\n    four_eyes_gate3: true\n');
+    assert.deepEqual(loadActiveProfiles(root).overrides, { four_eyes_gate3: true });
+    assert.equal(regime.misreadRegime(root), null);
+  });
+
+  it('an override value that is not exactly true or false is a misread', () => {
+    for (const value of ['True', 'yes', '"true"', 'on', '1', 'true # sign-off']) {
+      const root = bareProject(`regulatory_regime:\n  active_profiles: []\n  overrides:\n    four_eyes_gate3: ${value}\n`);
+      assert.equal(regime.misreadRegime(root), 'overrides', value);
+    }
+    const missing = bareProject('regulatory_regime:\n  active_profiles: []\n  overrides:\n    four_eyes_gate3:\n');
+    assert.equal(regime.misreadRegime(missing), 'overrides');
+    for (const value of ['true', 'false']) {
+      const root = bareProject(`regulatory_regime:\n  active_profiles: []\n  overrides:\n    four_eyes_gate3: ${value}\n`);
+      assert.equal(regime.misreadRegime(root), null, value);
+    }
+  });
+
+  it('a second regulatory_regime block is a misread', () => {
+    const root = bareProject('regulatory_regime:\n  active_profiles: []\nregulatory_regime:\n  active_profiles: [gdpr]\n');
+    assert.equal(regime.misreadRegime(root), 'block');
+  });
+
+  it('guard: every shipped profile still loads a non-empty list of known controls', () => {
+    const root = bareProject(null);
+    for (const name of SHIPPED) {
+      const profile = loadProfile(root, name);
+      assert.ok(profile && Array.isArray(profile.required_controls) && profile.required_controls.length > 0, name);
+      for (const c of profile.required_controls) assert.ok(KNOWN_CONTROLS.has(c), `${name}: ${c}`);
+    }
+  });
+
   it('misreadRegime throws when the settings file exists but cannot be read', () => {
     const root = makeProject();
     fs.mkdirSync(path.join(root, '.ctoc', 'settings.yaml'));

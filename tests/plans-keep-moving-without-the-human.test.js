@@ -1785,6 +1785,57 @@ describe('a real project has no profile folder: the shipped profiles are read (c
     assert.equal(plainText.includes('It waits for your approval'), false);
   });
 
+  // Security re-verification at 5908c014: the scanner's exact inputs, through the crossings.
+  it("case 58 — a project's own do-178c-level-a copy with Windows line endings: the built plan waits for verification", () => {
+    const root = makeSandbox();
+    writeSettingsText(root, 'regulatory_regime:\n  active_profiles: [do-178c-level-a]\n');
+    const dir = path.join(root, '.ctoc', 'regulatory-regimes');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'do-178c-level-a.yaml'),
+      fs.readFileSync(path.join(REPO_REGIMES, 'do-178c-level-a.yaml'), 'utf8').replace(/\n/g, '\r\n'));
+    seedBuilt(root, 'c58');
+    assertBuiltHeld(root, 'c58', 'independent-verification');
+  });
+
+  it('case 58 — a comment line between gdpr and do-178c-level-a in the block list: the built plan waits for verification', () => {
+    const root = makeSandbox();
+    writeSettingsText(root, 'regulatory_regime:\n  active_profiles:\n    - gdpr\n    # aviation\n    - do-178c-level-a\n');
+    seedBuilt(root, 'c58c');
+    assertBuiltHeld(root, 'c58c', 'independent-verification');
+  });
+
+  it('case 58 — an override `four_eyes_gate3: True`: both crossings wait as unreadable', () => {
+    const root = makeSandbox();
+    writeSettingsText(root, 'regulatory_regime:\n  active_profiles: []\n  overrides:\n    four_eyes_gate3: True\n');
+    const fref = readyPair(root);
+    const crossed = [];
+    const ds = streamingGate.pendingGateDecisions(root, { crossed });
+    assert.deepEqual(crossed, []);
+    assert.equal(exists(root, fref), true);
+    for (const ref of [fref, 'review/c56r.md']) assert.equal(ds.find((d) => d.ref === ref).regimeHold, 'regime-unreadable', ref);
+  });
+
+  it('case 58 — a second regulatory_regime block: both crossings wait as unreadable', () => {
+    const root = makeSandbox();
+    writeSettingsText(root, 'regulatory_regime:\n  active_profiles: []\nregulatory_regime:\n  active_profiles: [gdpr]\n');
+    const fref = readyPair(root);
+    const crossed = [];
+    const ds = streamingGate.pendingGateDecisions(root, { crossed });
+    assert.deepEqual(crossed, []);
+    for (const ref of [fref, 'review/c56r.md']) assert.equal(ds.find((d) => d.ref === ref).regimeHold, 'regime-unreadable', ref);
+  });
+
+  it('case 58 — a byte-order mark before the header: GDPR is read, so the functional plan waits for the compliance review', () => {
+    const root = makeSandbox();
+    writeSettingsText(root, '﻿regulatory_regime:\n  active_profiles: [gdpr]\n');
+    const fref = readyPair(root);
+    const d = descriptorOf(root, fref);
+    assert.equal(d.regimeHold, 'compliance-review');
+    assert.equal(exists(root, fref), true);
+    menuScreens.continueAfterCrossing(root);
+    assert.equal(exists(root, 'done/c56r.md'), true, 'a GDPR project still finishes a built plan on its checks');
+  });
+
   it('case 54 — a misspelled profile, no profile folder: the built plan still waits as unreadable', () => {
     const root = makeSandbox();
     setRegime(root, { profiles: ['do-178c-levl-a'], copy: false });
