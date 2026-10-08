@@ -1239,6 +1239,96 @@ instead of "tests failed" — still not a pass.
     after the rules read its content (the first `readFileSync` of it), still after the first
     hashing and before the content is staged for the copy, to another wording change, so
     only the hashes can tell; the assertion is unchanged.
+65. **The rules judge the bytes `git add` stages; an index bit that hides the working file
+    refuses** (decision at review, 2026-10-08; source: the targeted security check's item 1,
+    high). With a staged edit plus further working-tree edits and the assume-unchanged bit,
+    `core.ignoreStat=true` or the skip-worktree bit, the rules judged the staged copy (2
+    lines) while `git add` and `commit --only` took the working file (32 lines, 30 of them
+    `<script>`); with skip-worktree `git add` failed. Both calls now stage the judged files
+    in the temporary index (`read-tree` of the last commit, `add --all -- <judged>`) right
+    after the listing, read the new text from it (`cat-file blob <id>`) and the changed
+    lines from `diff --cached <last commit> -U0` on it, so the rules judge exactly what
+    `git add` stages; rule 8 builds its patch from the same index instead of making its
+    own. And after the index copy, `ls-files -v -z -- <judged>` refuses any judged file
+    tagged in lower case or `S`: "I could not read the change (<file> is marked in git's
+    index as unchanged or skipped)". The specification's "new content from the working
+    tree" is now "new content from the staged copy of the working tree"; the first hashing
+    moves from before the staging to right after it (still before any rule reads the
+    content), so case 47 (b)'s edit lands between the two and only the hashes tell. Each of
+    the two parts alone refuses all three shapes (part (a) alone: "I do not recognise
+    src/pages/home.html as wording or a colour", the 30 script lines seen).
+66. **A tag ends at its first `>` outside quotes and braces** (decision at review; source:
+    the security check's item 2, high). The text finder took the last `>` before the
+    change and the last `<` before that, so an attribute value holding `>` before the
+    change and `<` plus a letter after it read as visible text (`onclick`, Vue
+    `:disabled`, Angular `(click)`, `href` to `javascript:steal()`, a `style` `url()`).
+    The line is now read from its start: a tag opens at `<` plus a letter or `</` plus a
+    letter and closes at the first `>` outside `"`, `'`, a backtick and braces; a change
+    inside a tag, or with no tag closed before it, is not text. Braces keep JSX's
+    `onClick={() => a > b}` a tag (an edge shape).
+67. **The folder rules read the path from the repository top** (decision at review; source:
+    the security check's item 3). The sensitive-word rule, the test folders, the governing
+    folders, the build folders, the database folders and the `requirements` folder now read
+    `topRel`; the clauses still show the path from the project root. One case per rule
+    kind: projects in `services/payment/`, `tests/e2e/`, `agents/x/`, `.circleci/web/` and
+    `db/migrations/app/`.
+68. **Dependency and build lists that end in `.txt`** (decision at review; source: the
+    security check's item 4). Any `.txt` whose name contains `requirements` or
+    `constraints` is a dependency list; `packages.txt`, `apt.txt` and `version.txt` (any
+    letter case, as `CMakeLists.txt` and `runtime.txt` now are) are build files.
+69. **A catalogue value must read as wording** (decision at review; source: the security
+    check's item 5). A changed value is refused, on either side, when it has no letter
+    outside its placeholders, starts with a scheme (`name:` and a character that is not
+    white space) or `/`, or is an unquoted YAML or properties `true`, `false`, `yes`,
+    `no`, `on`, `off`, `null` or `~`. The executor added one thing the item implies: the
+    escapes `\uXXXX`, `\xXX` and `\UXXXXXXXX` are read as their characters before these
+    tests, so `"javascript:alert()"` is an address too (an edge shape).
+70. **Documentation: changed words, scripts, front matter, other assistants' instruction
+    files, release notes** (a session decision made on the owner's behalf because each
+    item only tightens a security check; source: the security check's item 6). (a) Rule 6
+    now reads documentation too, in the changed words only: for a line replaced line for
+    line, the differing part widened to whole words (runs between white space); every line
+    of a group that adds or removes lines whole; a number, a currency sign, `@`, `://` or
+    `www.` refuses. A typo fixed on a line that holds a link still passes (a qualifying
+    shape). (b) In Markdown, a changed line inside a `<script>`, `<style>` or `<textarea>`
+    block is not recognised. (c) A changed line inside Markdown front matter (a first line
+    `---`, after an optional byte-order mark, closed by `---` or `...`) is a setting; an
+    unclosed first `---` is not front matter. (d) `AGENTS.md`, `GEMINI.md` (with
+    `CLAUDE.md`, any letter case), `.github/copilot-instructions.md` and anything under
+    `.cursor/` govern the work. (e) `.changeset/` is a build folder, and a build folder now
+    refuses every kind, documentation included.
+71. **A colour token before a `{` stands in a selector** (decision at review; source: the
+    security check's item 7). In `nav:hover #add {display:none}`, `nav:` read as a
+    property; now a token followed by `{` before the next `;` or `}` stands in no
+    declaration. Residual, not fixed: a selector whose `{` is on a later line
+    (`nav:hover #add,`) still reads as a declaration.
+72. **An `<option>` with no `value` sends its text** (a session decision; source: the
+    security check's item 8). Its text is the submitted form value, so a change to it is
+    not recognised; with a `value` attribute (quoted attribute values blanked first, so a
+    `value` inside another value does not count) the text is wording.
+73. **A pass names the judged bytes for slice 2's gate** (decision at review; source: the
+    security check's item 9). A project's own pre-commit hook may rewrite the judged file
+    or stage another while `commit.message` runs; `--no-verify` is not added, because
+    project hooks may scan for secrets. The pass now carries `commit.judged`, `[{ path,
+    blob }]`, each judged file with its id in the temporary index. Comparing the real
+    commit with it belongs to slice 2's gate, not to this slice.
+74. **The end of a script block is found in the text itself** (decision at review; source:
+    the re-review's item 10). `toLowerCase` turns U+0130 into two characters, so the
+    closing tag's offset in the lower-cased copy landed one character late per U+0130 and
+    the next block was skipped. The closing tag is now found with a case-insensitive
+    pattern in the original text. No other lower-cased copy in the module is indexed back
+    into its original (each feeds a set lookup).
+75. **The quality agent's line-start counters match spaces and tabs only** (decision at
+    review; source: the re-review's item 11). `parseFailCount`, `parsePassCount` and
+    `hasTestSummaryEvidence` used `^\s*` with the multiline flag, which tries every later
+    blank line from every line start, and the hotfix check reads every passing run twice.
+76. **A failure on either stream fails the run** (decision at review; source: the
+    re-review's item 12, the mirror of Decision 59). With `ℹ fail 0` on standard output and
+    `ℹ fail 1` on standard error, exit 0, the run passed; `runCounters` now takes the
+    larger fail count of the two streams.
+77. **The edge-shape case counts its passes from its table** (the executor). It asserted
+    two `hotfix` log lines; the new unclosed-front-matter shape is a third pass, so the
+    count is now the table's passing shapes plus the two-file pass.
 
 ## Execution Record
 
@@ -1597,6 +1687,58 @@ The owner's decision of 2026-10-08, that the tests run in a separate temporary c
 never in the working folder, is carried out: cases 4, 29 and 42 show that other uncommitted
 work neither changes the verdict nor is committed, and cases 43, 45, 50 and 52 show that the
 tests ran in a copy that is gone afterwards.
+
+### Fix round 2 — the re-review and the targeted security check (2026-10-08)
+
+A second fix round, in this worktree from `f7fde30b`, on the targeted security check (real
+runs, git 2.50.1) and the re-review. Every fix was test-first: the case or corpus trap was
+written and run on `f7fde30b`, seen failing for the stated reason, then the code changed and
+the case passed. Decisions 65 to 77 hold the reasons. Commits: `41f0a865` the quality agent;
+`9f422e71` the check and its cases; the plan record follows. The specification hash after
+every plan edit: `4aaf099b44f61ce1721e1bd2309bc781e49f2b8a2896c60aff3ecb22e80f8003`.
+
+| Item | Red (on `f7fde30b`) | Green |
+|---|---|---|
+| 1 index bits | "round 2, finding 1": assume-unchanged and skip-worktree reached a pass where the refusal was expected; `core.ignoreStat=true` committed 32 changed lines where 2 were judged | all three refuse "src/pages/home.html is marked in git's index as unchanged or skipped"; with that refusal disabled, part (a) alone refuses all three as "I do not recognise src/pages/home.html as wording or a colour" |
+| 2 attributes | the traps `onclick.html`, `Limit.vue`, `angular.html`, `help-link.html` and `banner.html` answered `checking` | refused; with the old text finder put back, all five answer `checking` again |
+| 3 project inside a folder | "round 2, finding 3": `services/payment/README.md` answered `checking` | the five rule kinds give the sensitive-area, test, governing, build and stored-data clauses |
+| 4 `.txt` lists | `dev-requirements.txt`, `test-requirements.txt`, `packages.txt`, `version.txt` answered `checking` | dependency and build clauses |
+| 5 catalogue values | YAML and `.properties` `true`→`false`, `"/help"`→`"javascript:fetch(document.cookie)"`, `"."`→`","` answered `checking` | not recognised |
+| 6 documentation | the install address, the `SECURITY.md` address, the version number, the Markdown script, the front matter, `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `.cursor/rules/style.md` and `.changeset/brave-cats.md` answered `checking` | risk-marker, not-recognised, setting and build clauses; the typo fixed beside a link qualifies |
+| 7 selector | `nav:hover #add` → `#bad` answered `checking` | not recognised |
+| 8 option | `<option>Red</option>` → `Blue` answered `checking` | not recognised; `<option value="m">` text qualifies |
+| 9 judged ids | "round 2, finding 9": `commit.judged` undefined | `[{ path, blob }]` equals `hash-object` of the file; with a rewriting pre-commit hook the commit no longer matches it |
+| 10 U+0130 | the `dotted.html` trap answered `checking` | not recognised; with the lower-cased search put back it answers `checking` again |
+| 11 slow counters | 32 KB of blank lines in a passing run cost 1,413.7 ms more processor time | under the 100 ms bound |
+| 12 either stream | `ℹ fail 0` on standard output, `ℹ fail 1` on standard error, exit 0: a pass | `passed: false`, `failed: 1`, in both runners |
+
+Case 47 (b) moved its edit to the first hashing's `lstat` of the judged file, because the
+rules no longer read the working file (Decision 65); seen red on `f7fde30b` (a pass), green
+after. The corpus now holds 27 shapes that qualify and 87 traps (115 cases with the mode
+change). Six edge shapes cover the new branches: braces in a JSX tag, a stray `}`, an
+unclosed first `---`, front matter after a byte-order mark, an escaped scheme in a catalogue
+value, and `value` inside another attribute's value.
+
+Coverage of `hotfix-check.js` under its own two test files: lines 99.51%, branches 98.25%,
+functions 98.39%; the lines not run are the two named branches, as before (context-line
+numbering, the texts-differ refusal).
+
+Step 14, on `9f422e71`, in this worktree (the main checkout's `node_modules` linked for the
+run and removed after):
+- `npx eslint --max-warnings 0` on the changed files: exit 0. `npx tsc --noEmit`: exit 0.
+- `npm test`:
+  ```
+  ℹ tests 12988 | ℹ suites 2117 | ℹ pass 12988 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0 | ℹ todo 0
+  ℹ all files | 99.86 | 93.63 | 99.36 |
+  [CTOC test-gate] coverage 99.86% (threshold 99%), skipped 0, failed 0
+  [CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+  [CTOC test-gate] PASS
+  ```
+
+Seen, not acted on (outside this plan's files): `src/lib/step-13-verify.js` and
+`src/scripts/test-gate.js` carry the same `^\s*` line-start counters with the multiline
+flag; rule 6 reads catalogue values with their escapes unread, so `@` is not seen as
+`@`; a selector whose `{` is on a later line still reads as a declaration (Decision 71).
 
 ## Execution Plan (Steps 8-16)
 
