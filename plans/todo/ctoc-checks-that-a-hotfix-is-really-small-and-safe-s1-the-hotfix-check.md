@@ -1144,6 +1144,99 @@ instead of "tests failed" — still not a pass.
     unsafe-regular-expression rule refuses the optional-group form `(?:,(\d+))?`; the trial
     build's `,?(\d*)` reads the same headers and passes it (the trial build's decision 25).
 
+51. **Every git call runs no code of the repository's** (decision at review, 2026-10-08;
+    source: the security check, which traced `post-index-change` running twice per
+    `--run-tests` call and a configured file-system monitor 14 times). The check's
+    temporary folder and its empty `no-hooks` folder are now made before the first git call,
+    and `runGit` puts `-c core.hooksPath=<no-hooks> -c core.fsmonitor=false` in front of
+    every call, so no call can miss it; the per-call settings on `worktree add` and `apply`
+    are gone. Reason: Decision 42 turned them off for two calls only, and the temporary
+    index's `read-tree` and `add`, the listings and the hashings still ran the repository's
+    hooks and monitor. The smudge filters still run, as Risks says. Case "finding 1".
+52. **The failing-test reader's line-start patterns match spaces and tabs only**
+    (decision at review; source: the security check, 195 KB of blank lines took 68.6 s).
+    `^\s*` with the multiline flag let every line start try every later line; all five
+    patterns now use `[ \t]*`, and the two trailing `\s*$` too. Case "finding 2a".
+53. **The JSON catalogue tail is `([\s,]*)$` with at most one comma, not the prescribed
+    `(\s*(?:,\s*)?)$`** (decision at review; source: the security check, 3.7 s on 100,000
+    trailing spaces). The prescribed form is linear but the project's
+    `security/detect-unsafe-regex` lint rule refuses it (`eslint --max-warnings 0` failed on
+    it), and warnings are bugs. `([\s,]*)$` plus "the tail holds at most one comma" accepts
+    exactly the lines `(\s*,?\s*)$` accepted, in one pass. Case "finding 2b".
+54. **The colour rule is linear** (decision at review; source: the security check, a 300 KB
+    one-line stylesheet took 0.6 s). The mask is built by joining the parts once, not by
+    slicing the line per token; the property of each declaration is read once, by one
+    forward pass over the line, not by searching back from every changed token (one long
+    declaration whose every colour changed was quadratic too). Case "finding 2c", both shapes.
+55. **The markup block finder counts line breaks once, forward** (decision at review; source:
+    the executor, sweeping finding 2's class: 20,000 `<script>` blocks took 5.3 s, because
+    every block's line number was counted from the top). Not named by either reviewer;
+    fixed because it is the same fault in the same file. Case "finding 2, same class".
+56. **Four argument-vector cases pin the platform to Linux** (decision at review; source:
+    the review and security brief, item 3). They find or fake the jest or vitest call by
+    `args[0]`, which on Windows is npm's own `npx-cli.js`; they now run inside
+    `withPlatform('linux', null, …)` as case i does, and the vitest program is asserted as
+    exactly `'npx'`. The Linux pin is the contract those cases state ("npx by name"); the
+    Windows launch is case g's. Under a simulated `win32` platform (a preload that sets
+    `process.platform`, `--test-isolation=none`) the old four failed and the new four pass.
+57. **Five text files are settings, `url(…)` is never a colour, and a named colour counts
+    only where a colour can stand** (decision at review; source: the brief's item 4, three
+    edits that reached `checking`). `robots.txt`, `ads.txt`, `app-ads.txt`, `security.txt`
+    and `llms.txt` (any letter case) take the settings clause; every `url(…)` span is blanked
+    before the colour tokens are read; a named colour (`red`, `transparent`) passes only in a
+    property ending in `color`, in a colour-carrying shorthand (`background`, `border` and its
+    sides, `outline`, `column-rule`, `fill`, `stroke`, `box-shadow`, `text-shadow`,
+    `text-decoration`, `text-emphasis`) or in a custom property or variable (`--x`, `$x`,
+    `@x`); hexadecimal and functional colours keep the old rule. The corpus gains the three
+    traps and one passing named colour in a custom property (now 25 that qualify and 61
+    traps, where the acceptance line says 24 and 58); the other four names are edge shapes.
+58. **A refused test command is "no test ran"** (decision at review; source: the brief's
+    item 6). The quality agent's `runFullTests` and `runSpecificTests` answer a configured
+    command refused for shell structure with `refused: true` (still `passed: false`, so
+    `/ctoc:push` blocks as before), and rule 8 maps it to "no test ran, so nothing confirms
+    the change" instead of "the existing tests fail (the test command reported a failure)".
+    Cases "finding 6" and the quality agent's "shell structure is refused".
+59. **Counters are read from standard output first** (decision at review; source: the
+    brief's item 7). `runCommandArgv` keeps `stdout` and `stderr` beside `output`; the
+    counters are read from standard output when it carries any counter or summary, else from
+    standard error (jest's case). Before, the two were joined and the last match won, so
+    `ℹ fail 0` on standard error outvoted `ℹ fail 1` on standard output.
+60. **Named files are cleaned in every sentence** (decision at review; source: the brief's
+    item 8). "is outside this project" and "holds no change that git would commit" replace
+    control characters with a space, as the name check's sentence already did. Case
+    "finding 8" (`nope\u001b[2J.md`).
+61. **`--` ends the options, and `next` carries it** (decision at review; source: the
+    brief's item 9). After `--` every word is a file, so `--x.md` can be judged and tested;
+    `next` is now `hotfix check --run-tests -- '<file>' …`. This differs from the acceptance
+    line that says `next` is exactly `hotfix check --run-tests 'src/pages/home.html'`; the
+    review asked for it, the specification text is not edited, and the cases assert the new
+    form. The usage text keeps the specification's wording. Case "finding 9".
+62. **Removal never unlinks through a folder that moved outside the copy** (decision at
+    review; source: the brief's item 10). Before each unlink the link's folder's real path
+    must lie inside the temporary folder; if not, removal stops and `detail` says "a link's
+    folder moved outside it"; a folder that is gone counts its link as removed. Without
+    links, git itself refuses to remove a worktree that was swapped for a link ("validation
+    failed"), so no second guard was added there; case "finding 10" (b) pins that refusal.
+    `removeCopy` now runs once per check (it clears the folder from the context first).
+63. **A kill from outside removes the copy** (decision at review; source: the brief's item
+    11). While the temporary folder exists, SIGINT, SIGTERM and SIGHUP run the same
+    synchronous removal, remove the handlers and raise the signal again; after the normal
+    removal the check yields one turn of the event loop, so a signal that arrived during the
+    test run reaches its handler rather than being dropped, then removes the handlers. A
+    signal that arrives while `spawnSync` runs the tests is handled when that run returns.
+    Case "finding 11": a child process killed with SIGTERM while its tests run ends by
+    SIGTERM with no copy left and its worktree registration gone; on Windows, where an
+    outside kill is a forced end no handler sees, the case checks only that the handlers are
+    removed after a check. The Risks row on a killed process now holds for a forced kill and
+    power loss only; the row on timed-out tests stays accurate: `spawnSync` ends only the
+    program it started, never its process group.
+64. **Case 47 (b) injects its edit at a new seam** (decision at review; the executor). It
+    edited the file on the first `mkdirSync`, which was the `no-hooks` folder inside rule 8;
+    that folder is now made before any git call (Decision 51). It now changes the file right
+    after the rules read its content (the first `readFileSync` of it), still after the first
+    hashing and before the content is staged for the copy, to another wording change, so
+    only the hashes can tell; the assertion is unchanged.
+
 ## Execution Record
 
 Built by the iron-loop executor in the worktree `.claude/worktrees/hotfix-s1-build`
@@ -1416,10 +1509,13 @@ top level and the last commit. No call per rule or per file beyond `cat-file`.
   "urgent":false,"files":1,"lines":2}`. No `ctoc-hotfix-` folder remained;
   `git worktree list --porcelain` after both calls equalled its output before.
   Seen, not acted on: the bare menu call wrote `.ctoc/settings.yaml` and
-  `.ctoc/state/iron-loop.yaml` but no `.gitignore`, so `.ctoc/logs/` showed as untracked;
-  the plan's sentence that `.ctoc/logs/` is in the `.gitignore` CTOC writes at project
-  initialisation did not hold for this path. The check is unaffected (it leaves `.ctoc/`
-  out of the judged change, and the copy holds only tracked files).
+  `.ctoc/state/iron-loop.yaml` but no `.gitignore`, so `.ctoc/logs/` showed as untracked.
+  Corrected at review (2026-10-08): project initialisation never creates a `.gitignore`; it
+  only appends `.ctoc/logs/` and `.ctoc/state/` to one that already exists
+  (`src/lib/init-project.js` lines 839–849), and the scratch project had none. That gap
+  predates this plan and gets its own plan; `init-project.js` is not in this plan's
+  `files:` and is untouched. The check is unaffected (it leaves `.ctoc/` out of the judged
+  change, and the copy holds only tracked files).
 - `npm test` on the final code (`2b71a744`), in this worktree:
   ```
   ℹ tests 12933 | ℹ pass 12930 | ℹ fail 3 | ℹ cancelled 0 | ℹ skipped 0
@@ -1440,6 +1536,64 @@ top level and the last commit. No call per rule or per file beyond `cat-file`.
   ```
   Step 14's `npm test` and fence boxes stay open in this worktree until the approval record
   travels with the branch.
+
+### Fix round — the code review and the security check (2026-10-08)
+
+One fix round on Steps 11 and 13's findings, in this worktree from `72894f5b` (the commit
+that carries the plan's approval record). Every fix was test-first: the case was written,
+run on the code as it stood and seen failing for the stated reason, then the code changed
+and the case passed. Decisions 51 to 64 hold the reasons. Commits: `494a4485` the quality
+agent's refused result, its counter reading and the four Windows-pinned cases; `2e5d791b`
+the check's fixes and their cases; the plan record follows. The specification hash after
+every plan edit: `4aaf099b44f61ce1721e1bd2309bc781e49f2b8a2896c60aff3ecb22e80f8003`.
+
+| Finding | Red (code as it stood) | Green |
+|---|---|---|
+| 1 hooks and monitor | "no repository hook ran during the check" failed (the `post-index-change` marker existed); with only the hooks folder set, "no file-system monitor ran during the check" failed | pass; the case first proves both fire for a plain `git status` and `git add` |
+| 2a failing-test reader | 195 KB of blank lines cost 65,058.3 ms more processor time (run in a scratch clone of `72894f5b`) | 7.9 and 8.4 ms in two runs |
+| 2b catalogue tail | 100,000 trailing spaces cost 3,481.4 ms more | 0.2 and 0.5 ms |
+| 2c colour rule | the 300 KB line of short declarations cost 769.5 ms more | 31.7 and 34.0 ms; one long declaration with every colour changed 33.2 and 34.9 ms |
+| 2, same class: script blocks | 20,000 blocks cost 5,340.2 ms more | 6.3 ms |
+| 3 Windows pins | under a simulated `win32`, all four cases failed ("expected a spawnSync npx jest call") | the four pass on darwin and under the simulated `win32` |
+| 4 slips | the corpus traps `public/robots.txt`, `src/styles/mask.css` and `src/styles/motion.css` answered `checking`; the edge shape `public/ads.txt` answered a pass | all 87 corpus cases pass, the custom-property colour among the 25 that qualify |
+| 6 refused command | "the existing tests fail (the test command reported a failure)" where "no test ran" was expected; `res.refused` was `undefined` | pass |
+| 7 counters | `ℹ fail 1` on standard output with `ℹ fail 0` on standard error read as a pass | reads as one failure; jest's standard-error-only counters still read |
+| 8 cleaned names | the sentence held `nope\x1B[2J.md` | `nope [2J.md` and `../x .md` |
+| 9 `--` | `hotfix check -- --x.md` answered "Unknown hotfix command: --" | the first call answers `next` `hotfix check --run-tests -- '--x.md'`, and routing that `next` passes |
+| 10 swapped copy | removal unlinked `node_modules`, `.venv` and `packages/a/node_modules` in the outside folder (all three gone) | all three intact; `detail` "… could not be removed: a link's folder moved outside it"; with no link git refuses the swapped worktree itself (sub-case b); a link whose folder the tests removed counts as removed (sub-case c, a branch case, green before and after) |
+| 11 kill from outside | a child killed with SIGTERM during its test run left `ctoc-hotfix-…` behind | the child ends by SIGTERM, no copy and no worktree registration remain; the handlers are gone after a normal check |
+
+Timing cases measure the processor time this process spends on the big input over the
+cheaper of two runs on a small one (child processes not counted), bound 100 ms.
+
+Coverage of the changed modules under their own three test files: `hotfix-check.js` lines
+99.44%, branches 98.34%, functions 98.20%; the lines not run are the two named branches
+(context-line numbering 435–441, the texts-differ refusal 619) and `O_NOFOLLOW || 0`'s
+Windows side, as before. In the full run `quality-agent.js` is at 100% lines.
+
+Step 14, on `2e5d791b`, in this worktree (the main checkout's `node_modules` linked for the
+run and removed after):
+- `npm run lint` (`eslint . --max-warnings 0`): exit 0. `npx tsc --noEmit`: exit 0, no error.
+- `npm test`:
+  ```
+  ℹ tests 12952 | ℹ suites 2117 | ℹ pass 12952 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0 | ℹ todo 0
+  ℹ all files | 99.86 | 93.58 | 99.36 |
+  [CTOC test-gate] coverage 99.86% (threshold 99%), skipped 0, failed 0
+  [CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+  [CTOC test-gate] PASS
+  ```
+- The fences, each file run by itself, no baseline file changed (`git diff 72894f5b HEAD --
+  .ctoc` is empty): `tests/reachability.test.js` 30 of 30; `tests/export-reachability.test.js`
+  17 of 17; `tests/gate-numbers-fence.test.js` 44 of 44; `tests/iron-loop-enforcer.test.js`
+  33 of 33 (the self-check now passes here, the approval record travels with the branch);
+  `tests/readme-numbers.test.js` 62 of 62; `tests/doc-counts.test.js` 6 of 6;
+  `tests/cache-freshness.test.js` 23 of 23; `tests/safe-fs-blindspot.test.js` 2 of 2; each
+  0 failed, 0 skipped.
+
+The owner's decision of 2026-10-08, that the tests run in a separate temporary copy and
+never in the working folder, is carried out: cases 4, 29 and 42 show that other uncommitted
+work neither changes the verdict nor is committed, and cases 43, 45, 50 and 52 show that the
+tests ran in a copy that is gone afterwards.
 
 ## Execution Plan (Steps 8-16)
 
@@ -2007,7 +2161,7 @@ top level and the last commit. No call per rule or per file beyond `cat-file`.
   carries no control character.
 
 ### Step 14: VERIFY
-- [ ] `npm test`: lint, typecheck, all tests, coverage at or above the floor in
+- [x] `npm test`: lint, typecheck, all tests, coverage at or above the floor in
   `.ctoc/coverage-baseline.json` with every branch of `hotfix-check.js`, of the changed
   quality-agent functions and of the two `safe-fs` wrappers exercised (including the "check
   stopped" path, the log that cannot be written, the patch that does not apply, both
@@ -2019,7 +2173,7 @@ top level and the last commit. No call per rule or per file beyond `cat-file`.
   only if git ignored `--inter-hunk-context=0` or `--text`; each runs under its Step 8
   mutation — case 35's repository without `--inter-hunk-context=0`, the `-diff` trap without
   `--text` — and the red or green result is recorded).
-- [ ] The fences hold with no baseline change: dead exports, reachability, the human-facing
+- [x] The fences hold with no baseline change: dead exports, reachability, the human-facing
   words (`tests/gate-numbers-fence.test.js` and the self-check in
   `tests/iron-loop-enforcer.test.js`), the README and documented counts
   (`tests/readme-numbers.test.js`, `tests/doc-counts.test.js`), the count cache
