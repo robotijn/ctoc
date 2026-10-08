@@ -409,6 +409,59 @@ describe('profiles shipped with the plugin (a project with no profile folder)', 
     assert.deepEqual(regime.unloadableProfiles(root), ['do-178c-levl-a']);
   });
 
+  it('misreadRegime names every settings or profile text the reader would misread, and nothing else', () => {
+    const cases = [
+      [null, null],
+      ['timezone: "UTC"', null],
+      ['regulatory_regime:\n  active_profiles: []  # opt-in industry profiles (e.g. gdpr); none by default\n', null],
+      ['regulatory_regime:\n  declined: true\n  active_profiles: []\n', null],
+      ['regulatory_regime:\n  declined: true\n', null],
+      ['regulatory_regime:\n  overrides:\n    legal_hold: true\n', null],
+      ['regulatory_regime:\n  active_profiles: [gdpr]\n', null],
+      ['regulatory_regime:\n  active_profiles:\n    - gdpr\n    - sox-itgc\n', null],
+      ['regulatory_regime: # EU\n  active_profiles: [gdpr]\n', 'block'],
+      ['regulatory_regime: {active_profiles: [gdpr]}', 'block'],
+      ['regulatory_regime:\n  active_profile: [gdpr]\n', 'block'],
+      ['regulatory_regime:\n  active_profiles: gdpr\n', 'active-profiles'],
+      ['regulatory_regime:\n  active_profiles: [gdpr,\n    sox-itgc]\n', 'active-profiles'],
+      ['regulatory_regime:\n  active_profiles:\n', 'active-profiles'],
+      ['regulatory_regime:\n  active_profiles: ["gdpr"]\n', 'profile-name'],
+      ['regulatory_regime:\n  active_profiles: [../x]\n', 'profile-name'],
+    ];
+    for (const [settings, expected] of cases) {
+      const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-regime-misread-')));
+      createdDirs.push(root);
+      fs.mkdirSync(path.join(root, '.ctoc'), { recursive: true });
+      if (settings !== null) writeSettings(root, settings);
+      assert.equal(regime.misreadRegime(root), expected, JSON.stringify(settings));
+    }
+  });
+
+  it('misreadRegime: a loaded profile without a parsed list of required controls is a misread', () => {
+    for (const [body, expected] of [
+      ['', 'required-controls'],
+      ['name: acme\nrequired_controls: [legal_hold]\n', 'required-controls'],
+      ['name: acme\nrequired_controls: legal_hold\n', 'required-controls'],
+      ['name: acme\nrequired_controls:\n  - legal_hold\n', null],
+    ]) {
+      const root = makeProject();
+      writeProfile(root, 'acme', body);
+      writeActiveProfiles(root, ['acme']);
+      assert.equal(regime.misreadRegime(root), expected, JSON.stringify(body));
+    }
+    // A profile in neither folder is not a misread here: unloadableProfiles names it.
+    const root = makeProject();
+    writeActiveProfiles(root, ['ghost']);
+    assert.equal(regime.misreadRegime(root), null);
+    assert.deepEqual(regime.unloadableProfiles(root), ['ghost']);
+  });
+
+  it('misreadRegime throws when the settings file exists but cannot be read', () => {
+    const root = makeProject();
+    fs.mkdirSync(path.join(root, '.ctoc', 'settings.yaml'));
+    assert.throws(() => regime.misreadRegime(root));
+  });
+
   it('a name that could climb out of either folder is refused', () => {
     const root = makeProject();
     // `../x` from <project>/.ctoc/regulatory-regimes is <project>/.ctoc/x.yaml: plant it.

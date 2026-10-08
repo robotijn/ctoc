@@ -12,7 +12,14 @@
  *   - the check records, `.ctoc/state/verify/` — the Step-14 evidence a plan reaches done on;
  *   - the owner's answers and the live question files, everything under
  *     `.ctoc/streaming/` except the waiting folder `.ctoc/streaming/questions/pending/`,
- *     where question-writing agents drop new questions with the Write tool.
+ *     where question-writing agents drop new questions with the Write tool;
+ *   - the project's settings file `.ctoc/settings.yaml` and its regulatory profiles,
+ *     everything under `.ctoc/regulatory-regimes/` (owner's answer "a", 2026-10-08): the
+ *     regime they declare decides whether a plan may move on by itself. Same tests as the
+ *     records (letter case, `\`, `..`, symbolic links, `cd`, root-independent), its own
+ *     refusal sentence; reading stays allowed. The menu's own routes write them: `start.js`
+ *     and the start.md recipes `claude:set-environment`, `claude:env-keep-defaults` and
+ *     `claude:set-compliance-regime`, which write through `src/lib/` and name no path.
  * Only CTOC's own menu code writes these (as Node file calls inside the menu process,
  * which never pass through a tool hook).
  *
@@ -114,6 +121,39 @@ const REFUSAL_UNCHECKED = 'CTOC refused this call because it mentions the approv
 const REFUSAL_QUOTE = 'Put the summary in single quotes and run the same command again.';
 const REFUSAL_SUBAGENT = "CTOC refused this call because a background agent may not answer CTOC's questions, "
   + 'approve a plan or move one on through the menu; report your result and let the main session do it.';
+
+const REFUSAL_SETTINGS = "CTOC refused this call because it writes, or could write, the project's settings "
+  + "file or its regulatory profiles, which only CTOC's menu writes; tell the human what you wanted to "
+  + 'change and let the menu change it.';
+
+/** The settings file or the profile folder as a path segment anywhere in an absolute path. */
+const REGIME_SEGMENT_RE = /(^|\/)\.ctoc\/+(settings\.yaml|regulatory-regimes)(\/|$)/i;
+/** The same two, relative to the project root, for the real-path (symbolic link) test. */
+const REGIME_TARGETS = Object.freeze(['.ctoc/settings.yaml', '.ctoc/regulatory-regimes']);
+/** The shell's per-segment tests (`isLedgerWrite`'s spec shape) for the same two. */
+const SETTINGS_SPEC = Object.freeze({
+  dir: '.ctoc/settings.yaml',
+  segmentRe: /(^|[^a-z0-9._-])\.ctoc\/+settings\.yaml([^a-z0-9._-]|$)/i,
+  resolvedRe: /(^|\/)\.ctoc\/+settings\.yaml$/i,
+});
+const REGIMES_SPEC = Object.freeze({
+  dir: '.ctoc/regulatory-regimes',
+  segmentRe: /(^|[^a-z0-9._-])\.ctoc\/+regulatory-regimes(\/|\s|$)/i,
+  resolvedRe: /(^|\/)\.ctoc\/+regulatory-regimes(\/|$)/i,
+});
+
+/**
+ * Is an editing tool's absolute target the settings file or inside the profile folder — by
+ * name in any letter case with `\` read as `/`, or through a symbolic link? The real-path
+ * test refuses on any fault, as it does for the check records.
+ * @param {string} abs
+ * @returns {boolean}
+ */
+function isRegimeFile(abs) {
+  if (REGIME_SEGMENT_RE.test(abs.replace(/\\/g, '/'))) return true;
+  const confinement = require('../lib/real-path-confinement');
+  return REGIME_TARGETS.some((rel) => confinement.resolvesUnder(abs, rel, process.cwd()));
+}
 
 /** A record area as a path segment anywhere in an absolute path; the waiting folder is excluded. */
 const RECORD_SEGMENT_RE = /(^|\/)\.ctoc\/+(approvals|state\/+verify|streaming(?!\/+questions\/+pending(\/|$)))(\/|$)/i;
@@ -569,7 +609,9 @@ function bashRefuses(command, cwdRel, base, bash, subagent = false) {
     || bash.isLedgerWrite(analysed, STREAMING_SPEC)
     || (bash.isInlineEval(command) && CHECK_RECORD_EVAL_TOKENS.some((re) => re.test(command)))
     || runsBackfillBeyondVision(command, bash);
-  return refused ? REFUSAL : null;
+  if (refused) return REFUSAL;
+  return bash.isLedgerWrite(analysed, SETTINGS_SPEC) || bash.isLedgerWrite(analysed, REGIMES_SPEC)
+    ? REFUSAL_SETTINGS : null;
 }
 
 /**
@@ -588,8 +630,9 @@ function decide(payload) {
     const target = edit.getTargetFile(payload);
     if (!target) return null;
     const abs = path.resolve(payload.cwd || root, target);
-    return edit.isProtectedLedgerPath(abs) || edit.isProtectedVerifyPath(abs)
-      || edit.targetsStreamingLive(abs) || RECORD_SEGMENT_RE.test(abs.replace(/\\/g, '/')) ? REFUSAL : null;
+    if (edit.isProtectedLedgerPath(abs) || edit.isProtectedVerifyPath(abs)
+      || edit.targetsStreamingLive(abs) || RECORD_SEGMENT_RE.test(abs.replace(/\\/g, '/'))) return REFUSAL;
+    return isRegimeFile(abs) ? REFUSAL_SETTINGS : null;
   }
   if (tool === 'Bash') {
     const command = payload.tool_input && payload.tool_input.command;

@@ -122,8 +122,15 @@ describe('editing tools — allowed', () => {
     assertAllowed(run(write(p('.ctoc', 'approvals-summary.md'))), 'case 12a');
     assertAllowed(run(write(p('.ctoc', 'state', 'verify-notes.md'))), 'case 12b');
   });
-  test('13 · .ctoc/approvals/../settings.yaml resolves out of the folder', () => {
-    assertAllowed(run(write(`${project}/.ctoc/approvals/../settings.yaml`)), 'case 13');
+  // The settings file itself is protected since the owner's answer "a" (2026-10-08), so this
+  // path now gets the settings sentence, not the records one; a neutral file shows `..` still
+  // resolves out of the approval folder.
+  test('13 · .ctoc/approvals/../<file> resolves out of the folder', () => {
+    assertAllowed(run(write(`${project}/.ctoc/approvals/../notes.md`)), 'case 13');
+    assertRefused(run(write(`${project}/.ctoc/approvals/../settings.yaml`)), 'case 13 (settings)',
+      "CTOC refused this call because it writes, or could write, the project's settings file or its "
+      + "regulatory profiles, which only CTOC's menu writes; tell the human what you wanted to change "
+      + 'and let the menu change it.');
   });
   test('14 · a plan file', () => {
     assertAllowed(run(write(p('plans', 'review', 'x.md'))), 'case 14');

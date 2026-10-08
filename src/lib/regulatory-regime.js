@@ -17,6 +17,18 @@ const path = require('path');
 
 const SETTINGS_PATH = '.ctoc/settings.yaml';
 const PROFILES_DIR = '.ctoc/regulatory-regimes';
+/**
+ * The profiles shipped with the plugin, resolved from this module's own location
+ * (src/lib → the plugin root). A project normally has no profile folder of its own, so a
+ * profile it does not copy is read from here.
+ */
+const SHIPPED_PROFILES_DIR = path.join(__dirname, '..', '..', '.ctoc', 'regulatory-regimes');
+/**
+ * A profile name: lower-case letters, digits and hyphens, starting with a letter or digit —
+ * the same charset `compliance-regime` accepts when activating one. No separator and no dot,
+ * so a name can never leave either profile folder.
+ */
+const PROFILE_NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
 
 // All controls a profile can require. Used as the canonical control vocabulary.
 const KNOWN_CONTROLS = new Set([
@@ -240,10 +252,20 @@ function parseRegimeBlock(blockBody) {
 }
 
 /**
- * Load a profile's required-controls and retention table.
+ * Load a profile's required-controls and retention table: the project's own
+ * `.ctoc/regulatory-regimes/<name>.yaml` when it has one (a project's copy wins), otherwise
+ * the same file shipped with the plugin. Null when the name is not a valid profile name
+ * (it could leave the folder) or the profile is in neither folder — the caller treats that as
+ * unloadable, never as "no controls".
+ * @param {string} projectRoot
+ * @param {string} profileName
+ * @returns {object|null}
  */
 function loadProfile(projectRoot, profileName) {
-  const profilePath = path.join(projectRoot, PROFILES_DIR, `${profileName}.yaml`);
+  if (typeof profileName !== 'string' || !PROFILE_NAME_RE.test(profileName)) return null;
+  const file = `${profileName}.yaml`;
+  const own = path.join(projectRoot, PROFILES_DIR, file);
+  const profilePath = safeFs.existsSync(own) ? own : path.join(SHIPPED_PROFILES_DIR, file);
   if (!safeFs.existsSync(profilePath)) {
     return null;
   }
@@ -340,6 +362,50 @@ function unloadableProfiles(projectRoot) {
 }
 
 /**
+ * Why the regime in `.ctoc/settings.yaml` cannot be trusted as read, or null when it can.
+ * {@link loadActiveProfiles} and {@link parseYAMLShallow} read a narrow subset of YAML and
+ * fall back to "no profiles" / "no controls" on anything else; a caller that gates on the
+ * regime must not take that fallback for "no regime". This names the misreads:
+ *
+ * - a `regulatory_regime` header the block reader cannot take (a comment after the colon, a
+ *   flow mapping) → 'block';
+ * - an `active_profiles` value that parses to no profile but is not an explicitly empty list
+ *   (a scalar, a flow list split over lines, an empty block list) → 'active-profiles';
+ * - a block with no `active_profiles` key, unless it is declined or only overrides → 'block';
+ * - a profile name that is not a valid profile name (quoted, a path) → 'profile-name';
+ * - a loaded profile without a parsed list of required controls (an empty file, a flow list,
+ *   a scalar) → 'required-controls'.
+ *
+ * No settings file, and a settings file with no `regulatory_regime` block, read as no regime.
+ * Throws when the settings file exists but cannot be read (the caller holds on a throw).
+ *
+ * @param {string} projectRoot
+ * @returns {null|'block'|'active-profiles'|'profile-name'|'required-controls'}
+ */
+function misreadRegime(projectRoot) {
+  const settingsPath = path.join(projectRoot, SETTINGS_PATH);
+  if (!safeFs.existsSync(settingsPath)) return null;
+  const content = safeFs.readFileSync(settingsPath, 'utf8');
+  if (!/^regulatory_regime[ \t]*:/m.test(content)) return null;
+  const blockMatch = content.match(/^regulatory_regime:\s*\n([\s\S]*?)(?=^[a-zA-Z_]+:|(?![\s\S]))/m);
+  if (!blockMatch) return 'block';
+  const { profiles, overrides, declined } = parseRegimeBlock(blockMatch[1]);
+  const key = blockMatch[1].match(/^\s+active_profiles:[ \t]*(.*)$/m);
+  if (!key) {
+    if (declined || Object.keys(overrides).length > 0) return null;
+    return 'block';
+  }
+  const value = key[1].replace(/\s+#.*$/, '').trim();
+  if (profiles.length === 0 && !/^\[\s*\]$/.test(value)) return 'active-profiles';
+  for (const name of profiles) {
+    if (!PROFILE_NAME_RE.test(name)) return 'profile-name';
+    const profile = loadProfile(projectRoot, name);
+    if (profile !== null && !Array.isArray(profile.required_controls)) return 'required-controls';
+  }
+  return null;
+}
+
+/**
  * Summary of active regime for display in session-start banner. When any
  * active profile is unloadable, the summary flags it PROMINENTLY — a bare
  * "(0 controls active)" would read as "nothing required" and hide the fact
@@ -359,15 +425,19 @@ function regimeSummary(projectRoot) {
 }
 
 /**
- * List all known profiles available in .ctoc/regulatory-regimes/
+ * List every profile {@link loadProfile} can load: the project's own
+ * `.ctoc/regulatory-regimes/` together with the profiles shipped with the plugin, sorted,
+ * each name once.
  */
 function listAvailableProfiles(projectRoot) {
-  const dir = path.join(projectRoot, PROFILES_DIR);
-  if (!safeFs.existsSync(dir)) return [];
-  return safeFs.readdirSync(dir)
-    .filter(f => f.endsWith('.yaml'))
-    .map(f => f.replace(/\.yaml$/, ''))
-    .sort();
+  const names = new Set();
+  for (const dir of [path.join(projectRoot, PROFILES_DIR), SHIPPED_PROFILES_DIR]) {
+    if (!safeFs.existsSync(dir)) continue;
+    for (const f of safeFs.readdirSync(dir)) {
+      if (f.endsWith('.yaml')) names.add(f.replace(/\.yaml$/, ''));
+    }
+  }
+  return [...names].sort();
 }
 
 module.exports = {
@@ -382,5 +452,6 @@ module.exports = {
   retentionDays,
   regimeSummary,
   unloadableProfiles,
+  misreadRegime,
   listAvailableProfiles,
 };

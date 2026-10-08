@@ -924,11 +924,13 @@ const REVIEW_SIGN_OFF_CONTROLS = Object.freeze(['four_eyes_gate3', 'spec_code_re
  * or null when it does not. CTOC records none of these regimes' own evidence, so the plan
  * waits for the owner's own approve, the path before plans crossed by themselves.
  *
+ * - either stage: a declared profile CTOC cannot load (in neither the project's nor the
+ *   plugin's profile folder), or a settings or profile file the reader misreads
+ *   (`regulatory-regime.misreadRegime`) → 'regime-unreadable'.
  * - functional: the CTO Chief's compliance trigger (`evaluateComplianceTrigger`) reports GDPR
  *   or the EU AI Act on — nothing records that the compliance review ran → 'compliance-review'.
- * - review: a declared profile CTOC cannot load → 'regime-unreadable'; independent
- *   verification and validation required → 'independent-verification'; any of
- *   {@link REVIEW_SIGN_OFF_CONTROLS} → 'review-sign-off'.
+ * - review: independent verification and validation required → 'independent-verification';
+ *   any of {@link REVIEW_SIGN_OFF_CONTROLS} → 'review-sign-off'.
  * - any other stage, or no regime: null.
  *
  * FAIL CLOSED: the trigger reads fail-open, so the settings file is read first, and anything
@@ -944,11 +946,14 @@ function regimeHold(root, stage) {
   try {
     const regime = require('./regulatory-regime');
     regime.loadActiveProfiles(root); // throws when .ctoc/settings.yaml cannot be read: hold
+    // Both crossings: a misspelled or hand-quoted profile never skips the compliance review,
+    // and a settings or profile file the reader misreads is never taken for "no regime".
+    if (regime.unloadableProfiles(root).length > 0) return 'regime-unreadable';
+    if (regime.misreadRegime(root) !== null) return 'regime-unreadable';
     if (stage === 'functional') {
       const t = require('./iron-loop-compliance-trigger').evaluateComplianceTrigger(root);
       return t.runGdpr || t.runEuAiAct ? 'compliance-review' : null;
     }
-    if (regime.unloadableProfiles(root).length > 0) return 'regime-unreadable';
     const controls = regime.effectiveControls(root);
     if (controls.has('independent_verification_validation')) return 'independent-verification';
     return REVIEW_SIGN_OFF_CONTROLS.some((c) => controls.has(c)) ? 'review-sign-off' : null;
@@ -1771,6 +1776,22 @@ const CHECK_LINES = Object.freeze({
   ended: "  The gate critic's check of its questions did not finish; approve it yourself, or change the plan to have them checked again.\n",
 });
 
+/** The checking line for a plan the regime keeps waiting: it never moves on by itself. */
+const CHECKING_REGIME_HELD_LINE = '  Its questions are being checked by the gate critic; it still waits for your approval.\n';
+
+/**
+ * The line(s) for a plan whose author's questions the gate critic has not checked: the
+ * checking line — without the promise that it moves on by itself when the regime keeps it
+ * waiting — followed by {@link regimeLine}.
+ * @param {'checking'|'none'|'ended'} state from {@link checkState}
+ * @param {object} d a pendingGateDecisions descriptor
+ * @returns {string}
+ */
+function uncheckedLines(state, d) {
+  const line = state === 'checking' && d.regimeHold ? CHECKING_REGIME_HELD_LINE : CHECK_LINES[state];
+  return `${line}${regimeLine(d)}`;
+}
+
 /**
  * The sufficiency reasons that ARE a question-store status other than 'ready'
  * (`streaming-precompute.hasEnoughInformation` returns the store status as its reason
@@ -1905,7 +1926,7 @@ function gateScreenAt(decisions, index, statusLine, root) {
   text += `Topic: ${humanPlanName(d.title, d.slug)}  ·  ${d.moment}  ·  decision ${index + 1} of ${total}\n`;
   text += `${'─'.repeat(40)}\n\n`;
   text += `  ${d.summary}\n\n`;
-  text += unchecked ? CHECK_LINES[unchecked] : sufficiencyLine(d);
+  text += unchecked ? uncheckedLines(unchecked, d) : sufficiencyLine(d);
   text += '\n\n';
 
   const actions = {

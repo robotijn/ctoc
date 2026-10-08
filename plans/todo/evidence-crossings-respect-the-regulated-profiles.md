@@ -18,6 +18,9 @@ files:
   # Added 2026-10-07 by the session after the scratch-project run: profiles are read only from the project's own copy, which no real project has; the loader falls back to the profiles shipped with the plugin
   - src/lib/regulatory-regime.js
   - tests/lib-regulatory-regime.test.js
+  # Added 2026-10-08 on the owner's answer "a": the one loaded hook protects the regulatory settings and profile files like the approval records
+  - src/hooks/protect-records.js
+  - tests/protect-records.test.js
 approved_by: human
 approved_at: 2026-10-07T17:38:58.663Z
 gate_crossed: implementation → todo
@@ -298,6 +301,29 @@ Cases 1–47 run without a `.ctoc/settings.yaml` and stay green unchanged.
     compliance-claims fence matches the marker per line, and a wrapped marker would not count.
 16. **(Executor, Step 15) No CHANGELOG edit.** It is not in this plan's `files:`; the release
     step writes it.
+17. **(Executor, second round) Listing profiles is the union.** `listAvailableProfiles` lists the
+    project's own profiles together with the shipped ones, sorted, each once — exactly the set
+    `loadProfile` can load. Its two existing tests asserted the replaced contract (an empty list
+    without a project folder; only the project's names) and were tightened to the new one, not
+    loosened; it has no live caller (it is in the dead-export baseline).
+18. **(Executor, second round) The profile-name rule is `compliance-regime`'s own charset**
+    (`^[a-z0-9][a-z0-9-]*$`), repeated in `regulatory-regime.js` because `compliance-regime`
+    requires that module (importing it back would be circular).
+19. **(Executor, second round) `docs/ENFORCEMENT.md` says "at both crossings".** The specified
+    paragraph said a profile it cannot load holds "at review"; after the session's change to
+    `regimeHold` that sentence was untrue, so it now names both crossings and every misread.
+20. **(Executor, third round) What counts as a misread** (`regulatory-regime.misreadRegime`, a new
+    export whose live caller is `regimeHold`): a `regulatory_regime` header the block reader
+    cannot take; an `active_profiles` value that parses to no profile unless it is literally an
+    empty list (`[]`, a trailing comment allowed — what project setup writes); a block with no
+    `active_profiles` key unless it is declined or carries overrides; a name outside the profile
+    charset; a loaded profile whose `required_controls` is not a parsed list. An `active_profiles:`
+    key with nothing under it therefore holds (fail closed). Overrides that misparse are not
+    checked here (not in the finding).
+21. **(Executor, third round) The `plan <ref>` screen is left as it was.** `planDecisionScreen`
+    also shows the checking line ("it moves on by itself once they are") for an author's
+    unchecked questions and does not know the regime; the session's item named only
+    `gateScreenAt`. Reported, not changed.
 
 ## Execution Plan
 
@@ -459,3 +485,82 @@ marker moved.
 
 Steps 11, 13 and 16 are left to the session (critic, security scanner, final review and the
 three scratch projects shown to the owner).
+
+### Later rounds (2026-10-07 and 2026-10-08)
+
+Specification hash checked equal to the approval record at the start of each round:
+`6c71ba37…` (profiles shipped with the plugin), `c35c2776…` (the review's two items),
+`ddb9ec70…` (the write protection). At the end: `ddb9ec709c425a76652076e441ce08ea1c258e599631b77f1d972f4ab4f15a65`.
+
+**Round 2 — the scratch-project run found every active profile unreadable in a real project**
+(profiles were read only from the project's own `.ctoc/regulatory-regimes/`, which no
+project has). Red commit `9d731b8d`:
+
+| Case | Red | Green |
+|---|---|---|
+| loader: loads a shipped profile with no project copy | null | green |
+| loader: activates a shipped profile's controls | not loadable | green |
+| loader: lists exactly the shipped profiles with no folder | `[]` | green |
+| loader: lists the project's and the shipped profiles | project's only | green |
+| loader: a climbing name (`../x`, `../regulatory-regimes/gdpr`, `a/b`, …) is refused | `../x` loaded `.ctoc/x.yaml` | green |
+| loader: the project's own copy wins | green (guard) | green |
+| loader: a name in neither folder stays unreadable | green (guard) | green |
+| case 54, GDPR with no profile folder: a built plan finishes on its checks | held as unreadable | green |
+| case 54, do-178c-level-a with no folder: the verification reason | "could not read" | green |
+| case 54, sox-itgc with no folder: the sign-off reason | "could not read" | green |
+| case 54, misspelled profile with no folder: held as unreadable | green (guard) | green |
+
+**Round 3a — the review's two items.** Red commit `5d84bcce`:
+
+| Case | Red | Green |
+|---|---|---|
+| case 51(b) `do-178c-levl-a`: both crossings hold | the functional plan crossed | green |
+| case 51(b) `gpdr`: both crossings hold | the functional plan crossed | green |
+| case 51(b) `"gdpr"`: both crossings hold | the functional plan crossed | green |
+| case 55, GDPR, an author's questions being checked: the compliance sentence, never "moves on by itself" | no sentence; "it moves on by itself once they are" | green |
+
+**Round 3b — the security check of `bf484a62`, finding 1.** Red commit `88e710ff`:
+
+| Case 56 | Red | Green |
+|---|---|---|
+| settings: a flow list split over two lines | both crossed | green |
+| settings: a scalar `active_profiles` | both crossed | green |
+| settings: a header with a comment | both crossed | green |
+| settings: a flow mapping | both crossed | green |
+| settings: a misspelled key | both crossed | green |
+| settings: a quoted name | already green: round 3a's uncommitted change held it (its red is case 51(b) `"gdpr"`) | green |
+| profile: an empty file | finished | green |
+| profile: `required_controls` as a flow list | finished | green |
+| profile: `required_controls` as a scalar | finished | green |
+| guards: a fresh project, a declined regime, no block at all | green | green |
+
+Plus direct loader tests of `misreadRegime` (every return value, the throw on an unreadable
+file), written with the implementation of that round.
+
+**Round 4 — the write protection (owner's answer "a", 2026-10-08).** Red commit `d1b38ec0`,
+`tests/protect-records.test.js`:
+
+| Case | Red | Green |
+|---|---|---|
+| 91 · Edit, Write, MultiEdit, NotebookEdit of the settings file or a profile (case, `..`, `\`), main session and background agent | allowed | refused with the settings sentence |
+| 92 · a symbolic link into the profile folder and to the settings file, by tool and by shell | allowed | refused |
+| 93 · `echo x >>`, `sed -i` (both forms), `cp`, `rm`, `cd .ctoc && tee settings.yaml`, `printf >` | allowed | refused, main session and background agent |
+| 94 · `cat`, `grep`, `ls`, `head`, `git diff` of them | green (guard) | allowed |
+| 95 · the start.md recipes `claude:set-environment`, `claude:env-keep-defaults`, `claude:set-compliance-regime` (literal and with the plugin root filled in) and `start.js` itself | green (guard) | allowed |
+| 96 · an approval-record write keeps its own sentence; `src/settings.yaml` and `.ctoc/settings.yaml.example` allowed | green (guard) | green |
+| 13 (existing) · `.ctoc/approvals/../settings.yaml` | asserted allowed — the contract the owner replaced | now refused with the settings sentence; `.ctoc/approvals/../notes.md` still allowed |
+
+**Step 14 (this round, foreground).** `npm test`: tests 12743, pass 12743, fail 0, cancelled 0,
+skipped 0, todo 0; `[CTOC test-gate] coverage 99.85% (threshold 99%), skipped 0, failed 0`,
+`PASS`. New code fully covered (`regulatory-regime.js` 100 % lines; the uncovered lines of
+`streaming-gate.js` and `protect-records.js` are pre-existing). eslint `--max-warnings 0` on the
+three source files and three test files: clean; `tests/typecheck.test.js`: pass; false-green
+findings 207 (unchanged); the reachability and dead-export fences pass inside the suite
+(`misreadRegime` is a new export whose live caller is `regimeHold`).
+
+**End-to-end rerun** (`scratchpad/e2e-regimes/driver.js`, the branch's real `start.js`, no
+profile file copied into any project): GDPR functional plan waits with the compliance
+sentence and the owner's approve moves it (`approved_by: human`); a do-178c-level-a built plan
+waits with the verification sentence and the owner's approve finishes it; a GDPR built plan
+finishes on its checks (`advanced_by: pipeline`); a project with no regime moves its
+functional plan on (`advanced_by: sufficiency`).
