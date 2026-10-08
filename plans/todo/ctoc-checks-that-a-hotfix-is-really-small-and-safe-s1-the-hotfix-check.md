@@ -1420,6 +1420,26 @@ top level and the last commit. No call per rule or per file beyond `cat-file`.
   the plan's sentence that `.ctoc/logs/` is in the `.gitignore` CTOC writes at project
   initialisation did not hold for this path. The check is unaffected (it leaves `.ctoc/`
   out of the judged change, and the copy holds only tracked files).
+- `npm test` on the final code (`2b71a744`), in this worktree:
+  ```
+  ℹ tests 12933 | ℹ pass 12930 | ℹ fail 3 | ℹ cancelled 0 | ℹ skipped 0
+  [CTOC test-gate] coverage 99.86% (threshold 99%), skipped 0, failed 3
+  [CTOC test-gate] FAIL
+  ```
+  The three failures are the self-check in `tests/iron-loop-enforcer.test.js` (fast,
+  thorough, and the summary-counts case), whose block is `gate-destinations-approved`: this
+  plan sits in `plans/todo/` and its approval record
+  (`.ctoc/approvals/ctoc-checks-that-a-hotfix-is-really-small-and-safe-s1-the-hotfix-check.json`)
+  exists only untracked in the main checkout, never in this worktree. The executor does not
+  write approval records. The same commit cloned into a scratch folder with that record
+  copied in (its `content_sha256` is this plan's hash):
+  ```
+  ℹ tests 12933 | ℹ pass 12933 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0
+  [CTOC test-gate] coverage 99.86% (threshold 99%), skipped 0, failed 0
+  [CTOC test-gate] PASS
+  ```
+  Step 14's `npm test` and fence boxes stay open in this worktree until the approval record
+  travels with the branch.
 
 ## Execution Plan (Steps 8-16)
 
