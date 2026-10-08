@@ -126,14 +126,14 @@ Full details: `docs/IRON_LOOP.md`.
 | 5 | PLAN | implementation-planner (opus) | Phase 2: Technical |
 | 6 | DESIGN | implementation-planner (opus) | |
 | 7 | SPEC | iron-loop-critic (opus) then iron-loop-integrator+iron-loop-critic (until nothing new, 3 rounds at most) | Gate 2: moves on its evidence |
-| 8 | TEST | iron-loop-executor (opus) | Phase 3: Implementation |
-| 9 | PREPARE | iron-loop-executor (opus) | |
-| 10 | IMPLEMENT | iron-loop-executor (opus) | |
+| 8 | TEST | iron-loop-executor (sonnet) | Phase 3: Implementation |
+| 9 | PREPARE | iron-loop-executor (sonnet) | |
+| 10 | IMPLEMENT | iron-loop-executor (sonnet) | |
 | 11 | REVIEW | iron-loop-critic (opus) | |
-| 12 | OPTIMIZE | iron-loop-executor (opus) | |
+| 12 | OPTIMIZE | iron-loop-executor (sonnet) | |
 | 13 | SECURE | security-scanner (opus) | |
-| 14 | VERIFY | iron-loop-executor (opus) | |
-| 15 | DOCUMENT | iron-loop-executor (opus) | |
+| 14 | VERIFY | iron-loop-executor (sonnet) | |
+| 15 | DOCUMENT | iron-loop-executor (sonnet) | |
 | 16 | FINAL-REVIEW | iron-loop-critic (opus) | Gate 3: finishes on its checks |
 
 Steps 1–7 are collaborative (agents ask, the user decides); Steps 8–16 run without interruption. Step labels are MANDATORY: `src/lib/plan-validator.js` rejects a missing step; the label-text checker `src/hooks/validate-plan-steps.js` is not wired as a runtime hook. **Step 10 is ONE step** with sub-items per file. One functional plan becomes N small implementation plans (~1–3 files each, linked by `parent_plan`, ordered by `depends_on`). **Step 14 VERIFY** is the quality gate: lint, typecheck, all tests, coverage at or above the floor, 0 skipped, 0 flaky, via `npm test`. **Circuit breaker**: max 3 kickbacks to one step, 5 per plan, then escalate to the user.

@@ -2,8 +2,9 @@
  * Fence: the agent model floor.
  *
  * THE RULE: a reviewer may not think with a smaller model than the builder it
- * reviews. The code writer at Iron Loop Step 10 is Opus. Any agent that READS
- * CODE OR ARTIFACTS AND EMITS FINDINGS — a "watcher" — is therefore Opus too.
+ * reviews. The code writer at Iron Loop Step 10 is Sonnet with the Opus advisor
+ * (owner's decision, 2026-10-08). Any agent that READS CODE OR ARTIFACTS AND EMITS
+ * FINDINGS — a "watcher" — is Opus, above the builder.
  * A watcher on a smaller model does not produce a review; it produces a green
  * record. Owner ruling, 2026-07-17, verbatim:
  *
@@ -32,6 +33,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const projectRoot = path.join(__dirname, '..');
@@ -94,23 +96,26 @@ function agentId(file) {
     .join('/');
 }
 
-/** Load every agent on disk as { id, file, rel, fm, model, models, effort, efforts }. */
+/** Load one agent file as { id, file, rel, fm, model, models, effort, efforts }. */
+function loadAgent(file, id = agentId(file)) {
+  const fm = parseFrontmatter(fs.readFileSync(file, 'utf8'));
+  const models = frontmatterValues(fm, 'model');
+  const efforts = frontmatterValues(fm, 'effort');
+  return {
+    id,
+    file,
+    rel: path.relative(projectRoot, file),
+    fm,
+    models,
+    model: models.length === 1 ? models[0] : null,
+    efforts,
+    effort: efforts.length === 1 ? efforts[0] : null,
+  };
+}
+
+/** Load every agent on disk. */
 function loadAgents() {
-  return walkAgentFiles(agentsRoot).map((file) => {
-    const fm = parseFrontmatter(fs.readFileSync(file, 'utf8'));
-    const models = frontmatterValues(fm, 'model');
-    const efforts = frontmatterValues(fm, 'effort');
-    return {
-      id: agentId(file),
-      file,
-      rel: path.relative(projectRoot, file),
-      fm,
-      models,
-      model: models.length === 1 ? models[0] : null,
-      efforts,
-      effort: efforts.length === 1 ? efforts[0] : null,
-    };
-  });
+  return walkAgentFiles(agentsRoot).map((file) => loadAgent(file));
 }
 
 const AGENTS = loadAgents();
@@ -120,8 +125,8 @@ const AGENTS = loadAgents();
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * WATCHERS — reads code or artifacts, emits findings. Every one of these judges
- * Opus-written code, so every one of these runs on Opus.
+ * WATCHERS — reads code or artifacts, emits findings. Every one of these runs on
+ * Opus, above the Sonnet builder whose code it judges.
  *
  * This is an explicit list, not a name pattern. A pattern ("*-checker",
  * "*-analyzer") would silently capture actuators and silently miss watchers that
@@ -138,6 +143,7 @@ const WATCHERS = [
   'frontend/visual-regression-checker',
   'infrastructure/ci-pipeline-checker',
   'infrastructure/docker-security-checker',
+  'iron-loop/iron-loop-critic',
   'quality/complexity-analyzer',
   'quality/consistency-checker',
   'quality/dead-code-detector',
@@ -145,6 +151,7 @@ const WATCHERS = [
   'quality/type-checker',
   'security/dependency-auditor',
   'security/dependency-checker',
+  'security/security-scanner',
   'specialized/accessibility-checker',
   'specialized/api-contract-validator',
   'specialized/configuration-validator',
@@ -169,6 +176,8 @@ const SONNET_EXEMPT = {
     'Actuator — writes docs. Does not read code and emit findings.',
   'infrastructure/ci-runner-setup': 'Actuator — configures CI. Not a watcher.',
   'infrastructure/deployment-setup': 'Actuator — configures deployment. Not a watcher.',
+  'iron-loop/iron-loop-executor':
+    "Actuator — the builder; it writes the code the watchers judge, and is not a watcher. Sonnet with the Opus advisor by the owner's decision of 2026-10-08, on the measured trial in .ctoc/audit/speed-and-size/benchmarks/MODEL-TRIAL-2026-10-08.md: the same blind-review quality as Opus, 39% cheaper, about 15% faster. Every watcher stays on Opus, above it.",
   'saas/inngest-jobs': 'Scheduled for demotion to a skill by plan W2; raising a doomed file is waste.',
   'saas/posthog-analytics': 'Scheduled for demotion to a skill by plan W2; raising a doomed file is waste.',
   'saas/rate-limiting': 'Scheduled for demotion to a skill by plan W2; raising a doomed file is waste.',
@@ -345,6 +354,11 @@ const TOP_EFFORT = 'xhigh';
 // an empty list.
 const MIN_AGENT_FILES = 100;
 
+/** The watchers in `byId` (a Map of id → agent) that declare a model below opus. */
+function watchersBelowFloor(byId) {
+  return WATCHERS.map((id) => byId.get(id)).filter((a) => a.model !== 'opus');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('fence: agent model floor', () => {
@@ -384,19 +398,45 @@ describe('fence: agent model floor', () => {
         missing.map((id) => `  agents/${id}.md`).join('\n')
     );
 
-    const wrong = WATCHERS.map((id) => byId.get(id)).filter((a) => a.model !== 'opus');
+    const wrong = watchersBelowFloor(byId);
 
     assert.equal(
       wrong.length,
       0,
       `${wrong.length} watcher(s) declare a model below the floor.\n\n` +
         `A watcher reads code and emits findings. The code it judges was written at Iron Loop\n` +
-        `Step 10 by OPUS. A reviewer weaker than the builder does not review — it produces a\n` +
-        `green record. Every watcher runs on opus.\n\n` +
+        `Step 10 by Sonnet with the Opus advisor. A reviewer weaker than the builder does not\n` +
+        `review — it produces a green record. Every watcher runs on opus, above the builder.\n\n` +
         wrong.map((a) => `  ${a.rel}  declares model: ${a.model ?? '(none)'}  — must be opus`).join('\n') +
         `\n\nFIX: set \`model: opus\`. If this agent is NOT a watcher (it does not read code and\n` +
         `emit findings), remove it from WATCHERS and justify it in SONNET_EXEMPT instead.`
     );
+  });
+
+  it('the reviewers of Steps 11, 13 and 16 are watchers: a sonnet copy of either fails the watcher floor', () => {
+    // Read from a temporary copy of the real file with only its model line lowered, so the
+    // check runs on real frontmatter and the agents corpus is never touched.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-model-floor-'));
+    try {
+      for (const id of ['iron-loop/iron-loop-critic', 'security/security-scanner']) {
+        const real = AGENTS.find((a) => a.id === id);
+        assert.ok(real, `agents/${id}.md is missing`);
+        assert.equal(real.model, 'opus', `agents/${id}.md must declare model: opus`);
+        const copy = path.join(dir, path.basename(real.file));
+        const lowered = fs.readFileSync(real.file, 'utf8').replace(/^model: opus$/m, 'model: sonnet');
+        fs.writeFileSync(copy, lowered);
+        const sonnetCopy = loadAgent(copy, id);
+        assert.equal(sonnetCopy.model, 'sonnet', 'the temporary copy must declare model: sonnet');
+        const byId = new Map(AGENTS.map((a) => [a.id, a.id === id ? sonnetCopy : a]));
+        assert.deepEqual(
+          watchersBelowFloor(byId).map((a) => a.id),
+          [id],
+          `agents/${id}.md reviews the Sonnet builder's code; declared as sonnet it must fail the watcher floor`
+        );
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   // ---- Case 3: haiku is pinned to the documented exemption -------------------
@@ -441,7 +481,7 @@ describe('fence: agent model floor', () => {
       0,
       `${unlisted.length} agent(s) declare \`model: sonnet\` without a written justification.\n\n` +
         unlisted.map((id) => `  agents/${id}.md`).join('\n') +
-        `\n\nSonnet is below the floor set by the builder (Opus writes the code at Step 10).\n` +
+        `\n\nSonnet is below the watcher floor: every watcher runs on Opus, above the Sonnet builder.\n` +
         `Every exception must be argued in writing, in SONNET_EXEMPT in this file, with a reason\n` +
         `a reviewer can disagree with.\n\n` +
         `FIX: either raise it to \`model: opus\` (the default answer for anything that reads code\n` +
@@ -464,6 +504,18 @@ describe('fence: agent model floor', () => {
       `Every SONNET_EXEMPT entry needs a real reason, not a placeholder. An exemption without an ` +
         `argument is an exemption nobody can review.`
     );
+  });
+
+  it("the build agent declares `model: sonnet`, justified by the owner's decision of 2026-10-08", () => {
+    const id = 'iron-loop/iron-loop-executor';
+    const builder = AGENTS.find((a) => a.id === id);
+    assert.ok(builder, `agents/${id}.md is missing`);
+    assert.equal(builder.model, 'sonnet',
+      `agents/${id}.md declares model: ${builder.model ?? '(none)'}; the owner chose sonnet with the Opus advisor on 2026-10-08`);
+    const reason = SONNET_EXEMPT[id] ?? '';
+    assert.match(reason, /2026-10-08/);
+    assert.match(reason, /MODEL-TRIAL-2026-10-08\.md/);
+    assert.ok(!WATCHERS.includes(id), 'the builder is not a watcher');
   });
 
   // ---- Case 5: a model is always declared, exactly once ----------------------
@@ -522,7 +574,7 @@ describe('fence: agent effort floor', () => {
       0,
       `${wrong.length} agent(s) do not think at the floor.\n\n` +
         `Owner ruling 2026-07-17, verbatim: "ok let the agents have xhigh" — answering whether\n` +
-        `effort must rise alongside \`model: opus\`. A watcher reads Opus-written code and emits\n` +
+        `effort must rise alongside \`model: opus\`. A watcher reads the built code and emits\n` +
         `findings; at \`medium\` it reads less of it. The model floor cannot see this: \`opus\` +\n` +
         `\`low\` passes every model assertion in this file and still produces a green record.\n\n` +
         wrong

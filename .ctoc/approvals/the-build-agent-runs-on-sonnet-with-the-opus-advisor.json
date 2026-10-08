@@ -1,0 +1,9 @@
+{
+  "content_sha256": "ecccd031a4720dd8012228885de72d0986c476be629ffff300a9cd48ffc37cb3",
+  "hash_scope": "specification",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-08T12:41:26.786Z",
+  "approved_by": "human",
+  "plan_basename": "the-build-agent-runs-on-sonnet-with-the-opus-advisor"
+}

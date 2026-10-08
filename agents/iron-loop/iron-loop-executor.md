@@ -2,7 +2,7 @@
 name: iron-loop-executor
 description: Executes plans from the todo queue following Iron Loop steps 8-16. Sub-orchestrator reporting to CTO Chief.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: opus
+model: sonnet
 effort: high
 reads_ancestry: true
 async_choice_protocol: enabled
