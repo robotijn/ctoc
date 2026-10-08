@@ -1752,6 +1752,20 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
     ['docs/sub.rst', 'Title\n=====\n\n.. |logo| raw:: html\n\n   <b>one</b>\n\nOld words.\n', 'Title\n=====\n\n.. |logo| raw:: html\n\n   <b>two</b>\n\nOld words.\n', un('docs/sub.rst')],
     ['docs/note.rst', 'Title\n=====\n\n.. note::\n\n   Old words.\n', 'Title\n=====\n\n.. note::\n\n   New words.\n', null],
     ['docs/jinja.rst', 'Title\n=====\n\nOld words.\n', 'Title\n=====\n\nNew {{ words }}.\n', un('docs/jinja.rst')],
+    // reStructuredText spans that are never wording (the commit security review, 2026-10-09):
+    // a link target, a hyperlink reference's target, a named reference, an inline literal,
+    // interpreted text without a role, a default role; plain text beside them is wording.
+    ['docs/target.rst', 'Old words.\n\n.. _guide: /one\n', 'Old words.\n\n.. _guide: /two\n', un('docs/target.rst')],
+    ['docs/hyper.rst', 'See `Go <a.html>`_ now.\n', 'See `Go <b.html>`_ now.\n', un('docs/hyper.rst')],
+    ['docs/hyper-text.rst', 'See `Go <a.html>`_ now.\n', 'See `Go <a.html>`_ today.\n', null],
+    ['docs/named.rst', 'See `Guide`_ now.\n', 'See `Other`_ now.\n', un('docs/named.rst')],
+    ['docs/literal.rst', 'Run ``pip install requests`` now.\n', 'Run ``pip install reqests`` now.\n', un('docs/literal.rst')],
+    ['docs/interp.rst', 'Read `old` now.\n', 'Read `new` now.\n', un('docs/interp.rst')],
+    ['docs/default.rst', 'Old words.\n', '.. default-role:: raw-html\n\nOld words.\n', un('docs/default.rst')],
+    // Instruction files by class, and documentation in any other dot-folder.
+    ['docs/GEMINI.local.md', 'Old rule.\n', 'New rule.\n', un('docs/GEMINI.local.md')],
+    ['src/copilot-instructions.md', 'Old rule.\n', 'New rule.\n', un('src/copilot-instructions.md')],
+    ['.vscode/notes.txt', 'Old note.\n', 'New note.\n', un('.vscode/notes.txt')],
     // GitHub's assistant files stay governing under `.github/`.
     ['.github/instructions/web.instructions.md', 'Old rule.\n', 'New rule.\n', un('.github/instructions/web.instructions.md')],
     ['.github/ISSUE_TEMPLATE/bug.md', 'Describe the old bug.\n', 'Describe the new bug.\n', null]

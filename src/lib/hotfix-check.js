@@ -218,12 +218,23 @@ const FIXED_DIFF = ['--no-color', '--no-ext-diff', '--no-textconv', '--no-rename
 
 const GOVERNING_FOLDERS = new Set(['.claude', '.ctoc', '.cursor', '.windsurf', '.clinerules', '.roo', '.kiro', '.junie',
   '.amazonq', '.continue', 'agents', 'skills', 'commands', 'plans']);
-/** The instruction files coding assistants read, by name (any letter case) and by path from the repository top. */
-const GOVERNING_NAMES = new Set(['claude.md', 'claude.local.md', 'agents.md', 'gemini.md', 'conventions.md']);
-const GOVERNING_PATHS = new Set(['.github/copilot-instructions.md']);
-/** The instruction, prompt and chat-mode files of GitHub's assistant, wherever they sit, and its folders under `.github/`. */
-const GOVERNING_SUFFIXES = ['.instructions.md', '.prompt.md', '.chatmode.md'];
+/** The folders of GitHub's assistant under `.github/`, whose files govern whatever their names. */
 const GITHUB_GOVERNING = new Set(['instructions', 'prompts', 'chatmodes']);
+/** The endings of instruction, rule, prompt and chat-mode files, wherever they sit. */
+const GOVERNING_ENDINGS = ['.mdc', '.instructions.md', '.prompt.md', '.chatmode.md'];
+
+/**
+ * The instruction files coding assistants read, by class: they apply per folder, so their
+ * names count at any depth. `AGENTS.md`, `CONVENTIONS.md`, `copilot-instructions.md`,
+ * `.cursorrules`, `.windsurfrules`, any `CLAUDE*.md` or `GEMINI*.md`, and any name ending
+ * in `.mdc`, `.instructions.md`, `.prompt.md` or `.chatmode.md`.
+ * @param {string} lower the base name, lower case @returns {boolean}
+ */
+function governingName(lower) {
+  return ['agents.md', 'conventions.md', 'copilot-instructions.md', '.cursorrules', '.windsurfrules'].includes(lower)
+    || ((lower.startsWith('claude') || lower.startsWith('gemini')) && lower.endsWith('.md'))
+    || GOVERNING_ENDINGS.some((x) => lower.endsWith(x));
+}
 const DOC_EXT = new Set(['.md', '.txt', '.rst']);
 const MARKUP_EXT = new Set(['.html', '.htm', '.jsx', '.tsx', '.vue', '.svelte']);
 const CATALOGUE_EXT = new Set(['.json', '.yaml', '.yml', '.po', '.properties']);
@@ -1583,14 +1594,15 @@ function markdownLines(text) {
   return cls;
 }
 
-/** A reStructuredText directive whose body is code or another file: its line and its indented body are never wording. */
+/** A reStructuredText directive whose body is code, another file or a role: its line and its indented body are never wording. */
 const RST_DIRECTIVE = /^([ \t]*)\.\.[ \t]/;
-const RST_CODE_NAME = /^(?:raw|code|code-block|sourcecode|include|literalinclude)::/i;
+const RST_CODE_NAME = /^(?:raw|code|code-block|sourcecode|include|literalinclude|role|default-role)::/i;
 
 /**
  * Rule 4 (documentation) — each line of a reStructuredText file: `code` for a `raw`,
- * `code`, `code-block`, `sourcecode`, `include` or `literalinclude` directive and the lines
- * indented beneath it (blank lines between them included), else `prose`.
+ * `code`, `code-block`, `sourcecode`, `include`, `literalinclude`, `role` or
+ * `default-role` directive or a link target `.. _name:`, and the lines indented beneath it
+ * (its options; blank lines between them included), else `prose`.
  * @param {string} text line feeds only @returns {string[]}
  */
 function rstLines(text) {
@@ -1601,7 +1613,7 @@ function rstLines(text) {
     if (!m) continue;
     let rest = lines[i].slice(m[0].length).trimStart();
     if (rest[0] === '|') rest = rest.slice(rest.indexOf('|', 1) + 1).trimStart(); // a substitution: `.. |name| raw:: html`
-    if (!RST_CODE_NAME.test(rest)) continue;
+    if (!RST_CODE_NAME.test(rest) && rest[0] !== '_') continue; // `_`: a link target, `.. _name: address`
     cls[i] = 'code';
     let last = i;
     for (let j = i + 1; j < lines.length; j++) {
@@ -1647,6 +1659,25 @@ function lineClassChange(hunks, oldCls, newCls) {
  * @param {string} s @returns {{blanked: string, spans: string}}
  */
 function codeSpans(s) {
+  const spans = [];
+  const parts = [];
+  let at = 0;
+  for (const { from, to } of backtickPairs(s)) {
+    spans.push(s.slice(from, to));
+    parts.push(s.slice(at, from), s.slice(from, to).replace(/[^\n]/g, '\u0002'));
+    at = to;
+  }
+  parts.push(s.slice(at));
+  return { blanked: parts.join(''), spans: spans.join('\u0000') };
+}
+
+/**
+ * Every pair of backtick runs in the text: a run closed by the next run of the same length.
+ * Each run is visited once.
+ * @param {string} s @returns {Array<{open: number, from: number, to: number, len: number}>}
+ * `open` is the opening run's start, `from` and `to` the content's ends, `len` the run length
+ */
+function backtickPairs(s) {
   /** @type {Array<[number, number]>} */
   const runs = [];
   for (let i = 0; i < s.length;) {
@@ -1663,9 +1694,7 @@ function codeSpans(s) {
     /** @type {number[]} */ (byLength.get(len)).push(r);
   });
   const next = new Map();
-  const spans = [];
-  const parts = [];
-  let at = 0;
+  const pairs = [];
   for (let r = 0; r < runs.length;) {
     const [start, len] = runs[r];
     const list = /** @type {number[]} */ (byLength.get(len));
@@ -1674,15 +1703,35 @@ function codeSpans(s) {
     next.set(len, p);
     if (p === list.length) { r++; continue; }
     const close = list[p];
-    const from = start + len;
-    const to = runs[close][0];
-    spans.push(s.slice(from, to));
-    parts.push(s.slice(at, from), s.slice(from, to).replace(/[^\n]/g, '\u0002'));
-    at = to;
+    pairs.push({ open: start, from: start + len, to: runs[close][0], len });
     r = close + 1;
   }
-  parts.push(s.slice(at));
-  return { blanked: parts.join(''), spans: spans.join('\u0000') };
+  return pairs;
+}
+
+/**
+ * Rule 4 (reStructuredText) — the inline spans that are never wording, in order: every role
+ * span, `:name:` before or after the backquoted text (a role may be defined as `raw` and
+ * carry HTML), with its name; every interpreted text without a role (a `default-role` may
+ * make it one); every inline literal; and the target `<…>` of every hyperlink reference,
+ * or its whole text when that text names the target.
+ * @param {string} s the prose, code lines blanked @returns {string}
+ */
+function rstSpans(s) {
+  const out = [];
+  for (const { open, from, to, len } of backtickPairs(s)) {
+    const text = s.slice(from, to);
+    if (len !== 1) {
+      out.push(`\`\`${text}`);
+      continue;
+    }
+    const before = /:[A-Za-z][\w.+-]*:$/.exec(s.slice(Math.max(0, open - 64), open));
+    const after = /^:[A-Za-z][\w.+-]*:/.exec(s.slice(to + 1, to + 65));
+    if (before || after) out.push(`${before ? before[0] : ''}\`${text}\`${after ? after[0] : ''}`);
+    else if (s[to + 1] === '_') out.push(text.slice(Math.max(0, text.lastIndexOf('<'))));
+    else out.push(`\`${text}\``);
+  }
+  return out.join('\u0000');
 }
 
 /** @param {string} label @returns {string} a link label as Markdown matches it */
@@ -1764,13 +1813,19 @@ function markdownRefusal(f) {
 
 /**
  * Rule 4 (reStructuredText) — `code` when a changed line, or an unchanged line whose class
- * moved, lies in a code or include directive ({@link rstLines}), or a changed line holds
- * template braces `{{` or `{%`; else null.
+ * moved, lies in a code, include or role directive or a link target ({@link rstLines}),
+ * when the inline spans that are never wording differ ({@link rstSpans}), or when a changed
+ * line holds template braces `{{` or `{%`; else null. Plain text outside them is wording.
  * @param {ChangedFile} f @returns {('code'|null)}
  */
 function rstRefusal(f) {
   const hunks = /** @type {Hunk[]} */ (f.hunks);
-  if (lineClassChange(hunks, rstLines(lineFeeds(/** @type {string} */ (f.oldText))), rstLines(lineFeeds(/** @type {string} */ (f.newText))))) return 'code';
+  const sides = [f.oldText, f.newText].map((t) => {
+    const text = lineFeeds(/** @type {string} */ (t));
+    const cls = rstLines(text);
+    return { cls, spans: rstSpans(text.split('\n').map((l, i) => (cls[i] === 'prose' ? l : '')).join('\n')) };
+  });
+  if (lineClassChange(hunks, sides[0].cls, sides[1].cls) || sides[0].spans !== sides[1].spans) return 'code';
   return hunks.some((h) => [...h.removed, ...h.added].some((l) => l.includes('{{') || l.includes('{%'))) ? 'code' : null;
 }
 
@@ -1790,14 +1845,17 @@ function ruleKind(f) {
   const build = { clause: `it changes how the project is built or shipped in ${d}`, cause: 'build' };
   const isDependency = DEPENDENCY_NAMES.has(base)
     || (ext === '.txt' && (/requirements|constraints/i.test(base) || topFolders.includes('requirements')));
-  const governing = GOVERNING_NAMES.has(lowerBase) || GOVERNING_PATHS.has(f.topRel.toLowerCase())
-    || GOVERNING_SUFFIXES.some((x) => lowerBase.endsWith(x))
+  const governing = governingName(lowerBase)
     || topFolders.some((p, i) => GOVERNING_FOLDERS.has(p) || (p === '.github' && GITHUB_GOVERNING.has(topFolders[i + 1])));
+  // Markdown under `.github/` outside `.github/workflows/` is the one documentation a
+  // dot-folder may hold; every other dot-folder may be some tool's instructions.
+  const githubDoc = (p, i) => p === '.github' && ext === '.md' && topFolders[i + 1] !== 'workflows';
+  const dotFolder = topFolders.some((p, i) => p.startsWith('.') && p !== '.' && p !== '..' && !githubDoc(p, i));
   const settingsText = SETTINGS_TEXT_NAMES.has(lowerBase);
   const buildText = BUILD_TEXT_NAMES.has(lowerBase);
   // Markdown under `.github/` is documentation (a contributing guide, an issue template),
   // except under `.github/workflows/`; everything else under a build folder is the build.
-  const buildFolder = topFolders.some((p, i) => BUILD_FOLDERS.has(p) && !(p === '.github' && ext === '.md' && topFolders[i + 1] !== 'workflows'));
+  const buildFolder = topFolders.some((p, i) => BUILD_FOLDERS.has(p) && !githubDoc(p, i));
 
   let kind = null;
   if (DOC_EXT.has(ext) && !isDependency && !buildText && !settingsText) kind = 'documentation';
@@ -1806,6 +1864,7 @@ function ruleKind(f) {
   else if (COLOUR_EXT.has(ext)) kind = 'colour';
   if (kind !== null && governing) return unrecognised;
   if (kind !== null && buildFolder) return build;
+  if (kind === 'documentation' && dotFolder) return unrecognised;
 
   if (kind === 'documentation') {
     // Rule 2 has already refused a file with a missing side, so both texts are present.

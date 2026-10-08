@@ -1,6 +1,6 @@
 'use strict';
 
-// The classifier corpus: 31 edit shapes that qualify as a hotfix and 128 traps that must
+// The classifier corpus: 33 edit shapes that qualify as a hotfix and 139 traps that must
 // not, plus one mode change, each judged through the menu router's first call (rules 1
 // to 7; no test runs) against ONE committed temporary repository with no test command.
 // A qualifying shape ends at `verdict: 'checking'`: rules 1 to 7 held.
@@ -187,7 +187,21 @@ const BASE = {
   'src/hooks/README.md': lines('# Hooks', '', 'Old notes.'),
   'src/payments/index.html': page('<p>Old</p>'),
   'docs/passwords.md': lines('# Help', '', 'Old notes.'),
-  'docs/id_rsa.md': lines('# Help', '', 'Old notes.')
+  'docs/id_rsa.md': lines('# Help', '', 'Old notes.'),
+  // The commit security review (2026-10-09): instruction files by class, reStructuredText roles.
+  'docs/sub/AGENTS.md': lines('# Agents', '', 'Old rules.'),
+  'pkg/CLAUDE.md': lines('# Rules', '', 'Old rules.'),
+  '.foo/notes.md': lines('# Notes', '', 'Old notes.'),
+  '.github/instructions/x.instructions.md': lines('Old rules.'),
+  'prompts/review.prompt.md': lines('Old prompt.'),
+  '.cursor/rules/a.mdc': lines('Old rules.'),
+  'rules.mdc': lines('Old rules.'),
+  '.github/ISSUE_TEMPLATE/bug.md': lines('Describe the old bug.'),
+  'docs/span-def.rst': lines('Title', '=====', '', 'Old words.'),
+  'docs/raw-span.rst': lines('Text :raw-html:`<b>x</b>` here.'),
+  'docs/span-text.rst': lines('Press :kbd:`Ctrl` now.'),
+  'docs/span-after.rst': lines('Press `Ctrl`:kbd: now.'),
+  'docs/shortcuts.rst': lines('Press :kbd:`Ctrl` to save the old file.')
 };
 
 const QUALIFY = [
@@ -230,7 +244,10 @@ const QUALIFY = [
   // A tag whose attributes run over two lines: the whole-file scanner still sees the text.
   ['src/pages/wrapped.html', page(lines('<button', '  class="x">Store</button>').trimEnd())],
   // Prose beside a fenced code block that stays the same.
-  ['docs/fenced-ok.md', lines('# Setup', '', 'Run the new installer.', '', '```sh', 'pip install requests', '```')]
+  ['docs/fenced-ok.md', lines('# Setup', '', 'Run the new installer.', '', '```sh', 'pip install requests', '```')],
+  // The commit security review: an issue template under `.github/`; plain text beside a role.
+  ['.github/ISSUE_TEMPLATE/bug.md', lines('Describe the new bug.')],
+  ['docs/shortcuts.rst', lines('Press :kbd:`Ctrl` to save the new file.')]
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
@@ -390,11 +407,25 @@ const TRAPS = [
   [{ 'src/hooks/README.md': BASE['src/hooks/README.md'].replace('Old', 'New') }, null, 'src/hooks/README.md sits in an area named enforcement, and such areas are never a hotfix'],
   [{ 'src/payments/index.html': page('<p>New</p>') }, null, 'src/payments/index.html sits in an area named payment, and such areas are never a hotfix'],
   [{ 'docs/passwords.md': BASE['docs/passwords.md'].replace('Old', 'New') }, null, 'docs/passwords.md sits in an area named password, and such areas are never a hotfix'],
-  [{ 'docs/id_rsa.md': BASE['docs/id_rsa.md'].replace('Old', 'New') }, null, 'docs/id_rsa.md sits in an area named secret, and such areas are never a hotfix']
+  [{ 'docs/id_rsa.md': BASE['docs/id_rsa.md'].replace('Old', 'New') }, null, 'docs/id_rsa.md sits in an area named secret, and such areas are never a hotfix'],
+  // The commit security review (2026-10-09). Instruction files apply per folder, by class:
+  // their names at any depth, and anything in a dot-folder (but `.github/` Markdown).
+  [{ 'docs/sub/AGENTS.md': BASE['docs/sub/AGENTS.md'].replace('Old', 'New') }, null, unrecognised('docs/sub/AGENTS.md')],
+  [{ 'pkg/CLAUDE.md': BASE['pkg/CLAUDE.md'].replace('Old', 'New') }, null, unrecognised('pkg/CLAUDE.md')],
+  [{ '.foo/notes.md': BASE['.foo/notes.md'].replace('Old', 'New') }, null, unrecognised('.foo/notes.md')],
+  [{ '.github/instructions/x.instructions.md': lines('New rules.') }, null, unrecognised('.github/instructions/x.instructions.md')],
+  [{ 'prompts/review.prompt.md': lines('New prompt.') }, null, unrecognised('prompts/review.prompt.md')],
+  [{ '.cursor/rules/a.mdc': lines('New rules.') }, null, unrecognised('.cursor/rules/a.mdc')],
+  [{ 'rules.mdc': lines('New rules.') }, null, unrecognised('rules.mdc')],
+  // reStructuredText roles: a role defined as raw HTML, and any text inside a role span.
+  [{ 'docs/span-def.rst': lines('Title', '=====', '', '.. role:: raw-html(raw)', '   :format: html', '', 'Old words.') }, null, unrecognised('docs/span-def.rst')],
+  [{ 'docs/raw-span.rst': BASE['docs/raw-span.rst'].replace('<b>x</b>', '<b>y</b>') }, null, unrecognised('docs/raw-span.rst')],
+  [{ 'docs/span-text.rst': BASE['docs/span-text.rst'].replace('Ctrl', 'Alt') }, null, unrecognised('docs/span-text.rst')],
+  [{ 'docs/span-after.rst': BASE['docs/span-after.rst'].replace('Ctrl', 'Alt') }, null, unrecognised('docs/span-after.rst')]
 ];
 
-assert.equal(QUALIFY.length, 31, 'the corpus holds 31 shapes that qualify');
-assert.equal(TRAPS.length, 128, 'the corpus holds 128 traps');
+assert.equal(QUALIFY.length, 33, 'the corpus holds 33 shapes that qualify');
+assert.equal(TRAPS.length, 139, 'the corpus holds 139 traps');
 
 let root;
 
@@ -596,6 +627,15 @@ test('property: one inserted character in the changed text of every qualifying s
       if (pure) assert.equal(res.text, refusal(pure.clause));
     } finally {
       write(rel, BASE[rel]);
+    }
+  }
+  // Inside a reStructuredText role span nothing is wording: every insertion refuses.
+  const roleOld = BASE['docs/shortcuts.rst'];
+  for (let at = roleOld.indexOf('`') + 1; at <= roleOld.lastIndexOf('`'); at++) {
+    for (const ch of INSERTED) {
+      variants++;
+      const v = roleOld.slice(0, at) + ch + roleOld.slice(at);
+      assert.ok(ruleRefusal(changeOf('docs/shortcuts.rst', roleOld, v)), `docs/shortcuts.rst: inserting ${JSON.stringify(ch)} at ${at} inside the role passed`);
     }
   }
   t.diagnostic(`${variants} variants, ${[...reasons.values()].reduce((a, b) => a + b, 0)} named passes, ${sample.length} checked through the route`);
