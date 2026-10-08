@@ -547,11 +547,11 @@ function parsePassCount(out) {
   const text = stripAnsi(out);
   const node = lastCap(text, /^[ \t]*(?:#|ℹ)\s+pass\s+(\d+)/gim);
   if (node) return parseInt(node[1], 10);
-  const jest = lastCap(text, /^[ \t]*Tests:\s.*?(\d+)\s+passed/gim);
+  const jest = lastCap(text, /^[ \t]*Tests:\s.*?(?<!\d)(\d+)\s+passed/gim);
   if (jest) return parseInt(jest[1], 10);
   const mocha = lastCap(text, /^[ \t]*(\d+)\s+passing\b/gim);
   if (mocha) return parseInt(mocha[1], 10);
-  const legacy = text.match(/(\d+)\s*(passed|passing)/i);
+  const legacy = text.match(/(?<!\d)(\d+)\s*(passed|passing)/i);
   return legacy ? parseInt(legacy[1], 10) : null;
 }
 
@@ -574,7 +574,7 @@ function parseFailCount(out) {
   const text = stripAnsi(out);
   const node = lastCap(text, /^[ \t]*(?:#|ℹ)\s+fail\s+(\d+)/gim);
   if (node) return parseInt(node[1], 10);
-  const jest = lastCap(text, /^[ \t]*Tests:\s.*?(\d+)\s+failed/gim);
+  const jest = lastCap(text, /^[ \t]*Tests:\s.*?(?<!\d)(\d+)\s+failed/gim);
   if (jest) return parseInt(jest[1], 10);
   const mocha = lastCap(text, /^[ \t]*(\d+)\s+failing\b/gim);
   if (mocha) return parseInt(mocha[1], 10);
@@ -599,9 +599,9 @@ function parseSkippedCount(out) {
     while ((m = re.exec(text)) !== null) n += parseInt(m[1], 10);
   }
   if (n === 0) {
-    const mSkip = text.match(/(\d+)\s+skipped/i);
+    const mSkip = text.match(/(?<!\d)(\d+)\s+skipped/i);
     if (mSkip) n += parseInt(mSkip[1], 10);
-    const mPend = text.match(/(\d+)\s+pending/i);
+    const mPend = text.match(/(?<!\d)(\d+)\s+pending/i);
     if (mPend) n += parseInt(mPend[1], 10);
   }
   return n;

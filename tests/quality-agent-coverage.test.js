@@ -1133,6 +1133,30 @@ describe('runFullTests and runSpecificTests — undetermined runs, standard erro
     assert.ok(extra < 100, `32 KB of blank lines cost ${extra.toFixed(1)} ms more processor time`);
   });
 
+  it('a long run of digits in a run\'s output is read in linear time by the skipped and passed fallbacks', async () => {
+    // The re-review of 2026-10-09: `(\d+)\s+skipped` and `(\d+)\s*(passed|passing)` tried
+    // every start inside a run of digits, each scanning to its end: quadratic.
+    const cpuMs = async (fn) => {
+      const start = process.cpuUsage();
+      const res = await fn();
+      const used = process.cpuUsage(start);
+      return { ms: (used.user + used.system) / 1000, res };
+    };
+    const runWith = (stdout) => () => withExecSpies(() => stdout, async (qa) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
+      return { res };
+    });
+    const digits = '7'.repeat(40 * 1024);
+    for (const [label, head] of [['the skipped fallback', 'ℹ pass 1\nℹ fail 0\n'], ['the passed fallback', '']]) {
+      const small = runWith(`${head}done\n`);
+      const a = await cpuMs(small);
+      const b = await cpuMs(runWith(`${head}${digits}x\n`));
+      const c = await cpuMs(small);
+      const extra = b.ms - Math.min(a.ms, c.ms);
+      assert.ok(extra < 100, `${label}: 40,000 digits cost ${extra.toFixed(1)} ms more processor time`);
+    }
+  });
+
   it('runCommandArgv without allowFail throws the shape execFileSync threw', () => {
     assert.throws(() => qualityAgent.runCommandArgv(NODE, ['-e', 'process.exit(3)'], { silent: true }), (err) => {
       assert.equal(err.status, 3);
