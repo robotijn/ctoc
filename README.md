@@ -1129,7 +1129,7 @@ ctoc/
 │   ├── hooks/       18 Claude Code hooks (session start, user-prompt-submit routing
 │   │                reminder, pre/post tool use, stop-continuation gate, subagent fence,
 │   │                record write protection — the only one Claude Code loads)
-│   ├── lib/         134 JS modules (planning, streaming gate, scheduler, quality,
+│   ├── lib/         135 JS modules (planning, streaming gate, scheduler, quality,
 │   │                enforcement, the EU-compliance program, the fences) plus plan-index/
 │   │                (the local semantic vector search)
 │   ├── areas/       5 dashboard areas (pipeline, inbox, agent, library, system)
@@ -1142,7 +1142,7 @@ ctoc/
 │                    61 quality configs, 6 agent-fragments/ — the cross-cutting
 │                    rules every agent carries: ancestry-read, async-choice-protocol,
 │                    honest-status, no-stub-rule, plain-gate-words, warnings-are-critical)
-├── tests/           564 test files (run with `npm test`)
+├── tests/           566 test files (run with `npm test`)
 ├── .ctoc/           Config, templates, operations, audit, loop journals, baselines
 │   ├── templates/   CLAUDE.md.template, canvas templates, SaaS templates,
 │   │                questions.yaml, product-kpis.yaml

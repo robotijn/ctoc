@@ -533,6 +533,9 @@ describe('CF1 completeness — every count-mutating writer invalidates', () => {
     // One-time scaffold (CLAUDE.md, .ctoc/settings, .ctoc/state, .gitignore)
     // that runs BEFORE any cache exists — nothing to invalidate.
     ['init-project.js', 'one-time project scaffold before any cache exists; writes CLAUDE.md/.ctoc/settings/.gitignore, no plan/vision/inbox file'],
+    // The hotfix check: its log is rotated by a rename, and its file-kind table holds the
+    // folder word "plans" (a place that governs the work), so the broad detector flags it.
+    ['hotfix-check.js', 'writes only .ctoc/logs/hotfix-checks.jsonl (one appended line per final answer), renames it to .ctoc/logs/hotfix-checks.jsonl.1 above 1 MiB, and makes and removes one temporary copy of the repository under the system temporary folder; the plans token is the governing-folder name in its file-kind table, never a write target; no plan, vision or inbox file is written, so no count can change'],
     // (iron-loop.js is no longer whitelisted, and the removal is a FENCE FINDING,
     // not collateral damage from the edit that exposed it. The broad detector ever
     // only flagged that file on a SINGLE count-relevant token, and the token was the

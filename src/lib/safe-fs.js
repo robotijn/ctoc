@@ -135,6 +135,17 @@ function openSync(p, flags, mode) {
   validatePath(p, 'openSync');
   return fs.openSync(p, flags, mode);
 }
+/**
+ * Make a new folder with a unique name that starts with `prefix` (fs.mkdtempSync). On
+ * macOS and Linux it is readable only by this user (mode 0700).
+ * @param {string} prefix the path of the new folder up to its random suffix
+ * @param {*} [options]
+ * @returns {string} the new folder's path
+ */
+function mkdtempSync(prefix, options) {
+  validatePath(prefix, 'mkdtempSync');
+  return fs.mkdtempSync(prefix, options);
+}
 
 // ── Sync wrappers (two path arguments) ──────────────────────────────────────
 
@@ -152,6 +163,18 @@ function cpSync(src, dest, options) {
   validatePath(src, 'cpSync');
   validatePath(dest, 'cpSync');
   return fs.cpSync(src, dest, options);
+}
+/**
+ * Make a link at `p` that points at `target` (fs.symlinkSync). Both are validated as
+ * paths; `type` is `'dir'`, `'file'` or, on Windows, `'junction'`.
+ * @param {string} target
+ * @param {string} p
+ * @param {*} [type]
+ */
+function symlinkSync(target, p, type) {
+  validatePath(target, 'symlinkSync');
+  validatePath(p, 'symlinkSync');
+  return fs.symlinkSync(target, p, type);
 }
 
 // ── Promise wrappers (fs.promises) ──────────────────────────────────────────
@@ -183,8 +206,8 @@ module.exports = /** @type {(
     'existsSync' | 'readFileSync' | 'writeFileSync' | 'appendFileSync' |
     'mkdirSync' | 'readdirSync' | 'statSync' | 'lstatSync' |
     'unlinkSync' | 'rmSync' | 'realpathSync' | 'readlinkSync' |
-    'chmodSync' | 'utimesSync' | 'openSync' |
-    'renameSync' | 'copyFileSync' | 'cpSync'>
+    'chmodSync' | 'utimesSync' | 'openSync' | 'mkdtempSync' |
+    'renameSync' | 'copyFileSync' | 'cpSync' | 'symlinkSync'>
   & {
     promises: Pick<typeof import('fs').promises,
       'readFile' | 'writeFile' | 'appendFile' | 'mkdir' | 'readdir' |
@@ -196,8 +219,8 @@ module.exports = /** @type {(
   existsSync, readFileSync, writeFileSync, appendFileSync,
   mkdirSync, readdirSync, statSync, lstatSync,
   unlinkSync, rmSync, realpathSync, readlinkSync,
-  chmodSync, utimesSync, openSync,
-  renameSync, copyFileSync, cpSync,
+  chmodSync, utimesSync, openSync, mkdtempSync,
+  renameSync, copyFileSync, cpSync, symlinkSync,
   promises,
   // Exposed for callers/tests that want the validation primitive directly.
   validatePath
