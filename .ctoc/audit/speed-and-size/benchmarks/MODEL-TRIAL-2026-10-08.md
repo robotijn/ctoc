@@ -48,3 +48,28 @@ registry, the cache-freshness whitelist); arm C also hit a timing test that is f
   at about a nineteenth of Sonnet's cost — suited to the lookups the plans missed.
 - Caveats: one task, one run per arm, shared machine load, reviewers who count differently.
   Evidence, not proof.
+
+## Effort trial (same day, same plan and commit)
+
+**Builder effort** — arm E: Sonnet 5.5 at medium with the Opus advisor configured, run alone (its
+wall time is not comparable with the four arms that shared the machine; turns and cost are).
+
+| Arm | Effort | Turns | Cost | Advisor used | Blind review (W5 vs W2) | Builder-caused high |
+|---|---|---|---|---|---|---|
+| D | high | 68 | $5.71 | yes ($0.77) | ship after fixes, 1 / 6 / 11 | 1 (binary-file pass) |
+| E | medium | 63 | $4.06 | no | ship after fixes, 2 / 7 / 13 (one high inherited from the plan) | 1 (the same binary-file pass) |
+
+At medium the builder never consulted the advisor.
+
+**Reviewer effort** — the same critic instructions reviewed arm D's build three times, headless,
+scored against six known important problems in that build.
+
+| Effort | Time | Cost | Known problems found | High findings |
+|---|---|---|---|---|
+| extra-high (today's reviewer setting) | 21.9 min | $4.54 | 5 of 6 | 2 |
+| high | 12.5 min | $4.03 | 5 of 6 | the same 2 |
+| medium | 10.7 min | $3.39 | 4 of 6 (missed the git-settings problem) | the same 2 |
+
+Reading: on this build, high found what extra-high found in 43% less time; medium missed one
+medium-severity problem. Builder at medium matched high on review quality at 29% lower cost but
+stopped consulting the advisor. One build each — evidence, not proof.

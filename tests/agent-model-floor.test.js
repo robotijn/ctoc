@@ -205,7 +205,7 @@ const SONNET_EXEMPT = {
 const HAIKU_EXEMPT = [];
 
 /**
- * EFFORT_EXEMPT — the ONLY agents permitted to declare an effort below `max`, each
+ * EFFORT_EXEMPT — the ONLY non-watchers permitted to declare an effort below `xhigh`, each
  * with a written reason.
  *
  * THE SECOND RULE, and the reason this map is shaped as an EXEMPTION rather than a
@@ -348,11 +348,45 @@ const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
  */
 const TOP_EFFORT = 'xhigh';
 
+/**
+ * WATCHER_EFFORT — the ONLY watchers held to an effort other than TOP_EFFORT, each at exactly
+ * one level, with the owner's decision that set it. This is NOT an exemption: EFFORT_EXEMPT
+ * stays closed to watchers (case 5 below), and a watcher here is held to its one level as
+ * strictly as every other watcher is held to TOP_EFFORT. Lower fails, and higher fails too:
+ * a decision nobody uses is removed, like a stale exemption.
+ */
+const WATCHER_EFFORT = {
+  'iron-loop/iron-loop-critic': {
+    effort: 'high',
+    reason:
+      "The owner's decision of 2026-10-08 (answer \"a\"), changing his ruling of 2026-07-17 for this agent only: on the effort trial in .ctoc/audit/speed-and-size/benchmarks/MODEL-TRIAL-2026-10-08.md the critic at high found the same 5 of 6 known problems and the same two high findings as at extra-high, in 43% less time. It stays on Opus; the security scanner stays at xhigh.",
+  },
+};
+
+/** The one effort `id` must declare: its owner decision in WATCHER_EFFORT, else TOP_EFFORT. */
+function requiredEffort(id) {
+  return Object.hasOwn(WATCHER_EFFORT, id) ? WATCHER_EFFORT[id].effort : TOP_EFFORT;
+}
+
+/** The agents outside EFFORT_EXEMPT whose declared effort is not exactly the one required. */
+function offEffortFloor(agents) {
+  return agents.filter((a) => !Object.hasOwn(EFFORT_EXEMPT, a.id) && a.effort !== requiredEffort(a.id));
+}
+
 // The corpus is 123 agents (128 before plan F3b deleted the five Tier-3 scouts). This
 // floor is far below that so ordinary churn never trips it — only a mis-rooted scan
 // that reads nothing does. Without it, every assertion below passes vacuously against
 // an empty list.
 const MIN_AGENT_FILES = 100;
+
+/**
+ * The ids of the agents on `model` (sonnet or haiku, both below the watcher floor) that the
+ * model's exemption list does not name.
+ */
+function unexemptOn(agents, model) {
+  const exempt = model === 'haiku' ? (id) => HAIKU_EXEMPT.includes(id) : (id) => Object.hasOwn(SONNET_EXEMPT, id);
+  return agents.filter((a) => a.model === model && !exempt(a.id)).map((a) => a.id);
+}
 
 /** The watchers in `byId` (a Map of id → agent) that declare a model below opus. */
 function watchersBelowFloor(byId) {
@@ -448,7 +482,7 @@ describe('fence: agent model floor', () => {
 
   it('no agent declares `model: haiku`', () => {
     const haiku = AGENTS.filter((a) => a.model === 'haiku').map((a) => a.id);
-    const unexpected = haiku.filter((id) => !HAIKU_EXEMPT.includes(id));
+    const unexpected = unexemptOn(AGENTS, 'haiku');
     const vanished = HAIKU_EXEMPT.filter((id) => !haiku.includes(id));
 
     assert.equal(
@@ -474,7 +508,7 @@ describe('fence: agent model floor', () => {
 
   it('the sonnet exemption list is exhaustive and accurate', () => {
     const sonnet = AGENTS.filter((a) => a.model === 'sonnet').map((a) => a.id);
-    const unlisted = sonnet.filter((id) => !(id in SONNET_EXEMPT));
+    const unlisted = unexemptOn(AGENTS, 'sonnet');
 
     assert.equal(
       unlisted.length,
@@ -562,12 +596,10 @@ describe('fence: agent model floor', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('fence: agent effort floor', () => {
-  const nonExempt = () => AGENTS.filter((a) => !(a.id in EFFORT_EXEMPT));
-
   // ---- Case 1: every watcher thinks at the top of the scale -------------------
 
-  it('every non-exempt agent declares `effort: xhigh`', () => {
-    const wrong = nonExempt().filter((a) => a.effort !== TOP_EFFORT);
+  it('every non-exempt agent declares `effort: xhigh`, or the one level WATCHER_EFFORT sets', () => {
+    const wrong = offEffortFloor(AGENTS);
 
     assert.equal(
       wrong.length,
@@ -578,9 +610,9 @@ describe('fence: agent effort floor', () => {
         `findings; at \`medium\` it reads less of it. The model floor cannot see this: \`opus\` +\n` +
         `\`low\` passes every model assertion in this file and still produces a green record.\n\n` +
         wrong
-          .map((a) => `  ${a.rel}  declares effort: ${a.effort ?? '(none)'}  — must be ${TOP_EFFORT}`)
+          .map((a) => `  ${a.rel}  declares effort: ${a.effort ?? '(none)'}  — must be ${requiredEffort(a.id)}`)
           .join('\n') +
-        `\n\nFIX: set \`effort: ${TOP_EFFORT}\`. If this agent does NOT read code and emit findings\n` +
+        `\n\nFIX: set the effort named above. If this agent does NOT read code and emit findings\n` +
         `(it is an actuator, or a planner that asks the human), add it to EFFORT_EXEMPT in this\n` +
         `file with a written reason a reviewer can disagree with.`
     );
@@ -635,16 +667,17 @@ describe('fence: agent effort floor', () => {
         `corpus. Fix the id or remove the entry.`
     );
 
-    const below = AGENTS.filter((a) => a.effort !== TOP_EFFORT).map((a) => a.id);
-    const unlisted = below.filter((id) => !(id in EFFORT_EXEMPT));
+    const unlisted = offEffortFloor(AGENTS).map((a) => a.id);
     assert.equal(
       unlisted.length,
       0,
-      `${unlisted.length} agent(s) think below \`${TOP_EFFORT}\` without a written justification:\n` +
+      `${unlisted.length} agent(s) think at an effort other than the one this file requires (\`${TOP_EFFORT}\`, or the level WATCHER_EFFORT sets) without a written justification:\n` +
         unlisted.map((id) => `  agents/${id}.md`).join('\n') +
-        `\n\nEvery exception must be ARGUED, in EFFORT_EXEMPT in this file, in a sentence a reviewer\n` +
-        `can disagree with. This map is an exemption list, not a roster: a new agent defaults to\n` +
-        `being a watcher and must be justified INTO the map to think at anything less.`
+        `\n\nFIX: raise the agent's effort to the level it needs (\`${TOP_EFFORT}\`, or its level in\n` +
+        `WATCHER_EFFORT). Only for a non-watcher: add it to EFFORT_EXEMPT in this file with the\n` +
+        `owner's reason, in a sentence a reviewer can disagree with. A watcher may not be exempted\n` +
+        `(see 'no agent the owner ruled on is exempt from the effort floor'); a new agent defaults\n` +
+        `to being a watcher and must be argued INTO the map to think at anything less.`
     );
 
     const stale = Object.keys(EFFORT_EXEMPT).filter((id) => byId.get(id)?.effort === TOP_EFFORT);
@@ -714,11 +747,11 @@ describe('fence: agent effort floor', () => {
   // ---- Case 5: the exemption map cannot quietly undo the owner's ruling --------
 
   it('no agent the owner ruled on is exempt from the effort floor', () => {
-    const smuggled = WATCHERS.filter((id) => id in EFFORT_EXEMPT);
+    const smuggled = WATCHERS.filter((id) => Object.hasOwn(EFFORT_EXEMPT, id));
     assert.equal(
       smuggled.length,
       0,
-      `${smuggled.length} of the 25 watchers raised to \`model: opus\` by the owner's ruling (plan ` +
+      `${smuggled.length} of the ${WATCHERS.length} watchers raised to \`model: opus\` by the owner's ruling (plan ` +
         `F3a) have been exempted from the effort floor:\n` +
         smuggled.map((id) => `  agents/${id}.md  — ${EFFORT_EXEMPT[id]}`).join('\n') +
         `\n\nThese are the exact agents the ruling was ABOUT. Exempting one here reverses the ruling\n` +
@@ -726,6 +759,65 @@ describe('fence: agent effort floor', () => {
         `is the precise defect this plan exists to close. If one of these genuinely is not a\n` +
         `watcher, remove it from WATCHERS first, in the open, and argue that instead.`
     );
+  });
+
+  it("the iron-loop critic declares `effort: high` by the owner's decision of 2026-10-08, the only watcher with an effort decision", () => {
+    const id = 'iron-loop/iron-loop-critic';
+    assert.deepEqual(Object.keys(WATCHER_EFFORT), [id],
+      'WATCHER_EFFORT holds exactly the critic. Another watcher below xhigh needs its own owner decision, argued here in the open.');
+    assert.ok(WATCHERS.includes(id), 'an effort decision for a watcher applies only to a watcher');
+    assert.equal(WATCHER_EFFORT[id].effort, 'high');
+    assert.match(WATCHER_EFFORT[id].reason, /2026-10-08/);
+    assert.match(WATCHER_EFFORT[id].reason, /MODEL-TRIAL-2026-10-08\.md/);
+    const critic = AGENTS.find((a) => a.id === id);
+    assert.ok(critic, `agents/${id}.md is missing`);
+    assert.equal(critic.model, 'opus', `agents/${id}.md stays on opus`);
+    assert.equal(critic.effort, 'high',
+      `agents/${id}.md declares effort: ${critic.effort ?? '(none)'}; the owner chose high on 2026-10-08`);
+  });
+
+  it('off its one level an effort fails: every other watcher at `high`, the critic at `medium`, `low` or `xhigh`', () => {
+    const critic = 'iron-loop/iron-loop-critic';
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-effort-floor-'));
+    try {
+      const copyAt = (id, effort) => {
+        const real = AGENTS.find((a) => a.id === id);
+        assert.ok(real, `agents/${id}.md is missing`);
+        const copy = path.join(dir, `${id.split('/').join('__')}.md`);
+        fs.writeFileSync(copy, fs.readFileSync(real.file, 'utf8').replace(/^effort: .*$/m, `effort: ${effort}`));
+        const agent = loadAgent(copy, id);
+        assert.equal(agent.effort, effort, `the copy of agents/${id}.md must declare effort: ${effort}`);
+        return agent;
+      };
+      const failing = [
+        ...WATCHERS.filter((id) => id !== critic).map((id) => [id, 'high']),
+        [critic, 'medium'],
+        [critic, 'low'],
+        [critic, 'xhigh'],
+      ];
+      for (const [id, effort] of failing) {
+        assert.deepEqual(offEffortFloor([copyAt(id, effort)]).map((a) => a.id), [id],
+          `agents/${id}.md at effort: ${effort} must fail the effort floor`);
+      }
+      assert.deepEqual(offEffortFloor([copyAt(critic, 'high')]), [], 'the critic at high meets its level');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('an agent named after a built-in object property gets no exemption from either floor', () => {
+    // A root-level agents/constructor.md has the id `constructor`. The `in` operator finds that
+    // name on every object's prototype, so an `in` lookup read it as exempt and let it pass at
+    // any effort and on sonnet. Only an exemption map's own keys may exempt.
+    for (const id of ['constructor', 'hasOwnProperty', 'toString', '__proto__']) {
+      const agent = { id, model: 'opus', effort: 'low' };
+      assert.deepEqual(offEffortFloor([agent]).map((a) => a.id), [id],
+        `agents/${id}.md at effort: low must fail the effort floor`);
+      for (const model of ['sonnet', 'haiku']) {
+        assert.deepEqual(unexemptOn([{ ...agent, model, effort: TOP_EFFORT }], model), [id],
+          `agents/${id}.md on model: ${model} must fail the model floor`);
+      }
+    }
   });
 
   // ---- Case 6: `max` is gone from the corpus (plan F3d) -----------------------
