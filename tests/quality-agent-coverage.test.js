@@ -285,7 +285,10 @@ describe('runTypecheck', () => {
 // framework's argv, goes red here — including the command-injection regression.
 // ---------------------------------------------------------------------------
 describe('runSpecificTests — per-framework argv construction (injection-safe process boundary)', () => {
-  it('SECURITY (RCE regression): a shell-metacharacter test path is a LITERAL argv element, never interpolated into a shell string', () => {
+  // The four cases below find or fake the jest or vitest call by its first argument, which is
+  // the program's own name only where npx starts by name; on Windows node starts npm's own
+  // npx-cli.js (case g pins that launch). So they run with the platform set to Linux.
+  it('SECURITY (RCE regression): a shell-metacharacter test path is a LITERAL argv element, never interpolated into a shell string', async () => {
     // A path like this arrives verbatim from .ctoc/state/coverage-map.json (entry.tests)
     // with NO sanitization. On the old string-interpolation path
     // (`npx jest ${testFiles.join(' ')}` → execSync → /bin/sh -c) the `$(...)` was a
@@ -294,7 +297,7 @@ describe('runSpecificTests — per-framework argv construction (injection-safe p
     // ever sees it. This test fails LOUDLY against the vulnerable string code (which
     // never calls execFileSync and leaks the payload into a shell string).
     const evil = 'a$(touch /tmp/ctoc_pwn).test.js';
-    withExecSpies(() => '0 passed', (qa, fileCalls, shellCalls) => {
+    await withExecSpies(() => '0 passed', (qa, fileCalls, shellCalls) => withPlatform('linux', null, () => {
       qa.runSpecificTests({ js: { test: 'ignored', testFramework: 'jest' } }, [evil]);
 
       const jestCall = fileCalls.find(c => Array.isArray(c.args) && c.args[0] === 'jest');
@@ -308,11 +311,11 @@ describe('runSpecificTests — per-framework argv construction (injection-safe p
       assert.ok(!shellCalls.some(c => c.includes(evil)),
         `the malicious path must never appear in a shell command string; shell calls=${JSON.stringify(shellCalls)}`);
       return {};
-    });
+    }));
   });
 
-  it('builds an `npx jest <files>` ARGV vector for the jest framework', () => {
-    withExecSpies(() => '5 passed', (qa, fileCalls) => {
+  it('builds an `npx jest <files>` ARGV vector for the jest framework', async () => {
+    await withExecSpies(() => '5 passed', (qa, fileCalls) => withPlatform('linux', null, () => {
       const res = qa.runSpecificTests({ js: { test: 'ignored', testFramework: 'jest' } }, ['a.test.js', 'b.test.js']);
       assert.equal(res.passed, true);
       const c = fileCalls.find(x => x.args && x.args[0] === 'jest');
@@ -323,19 +326,19 @@ describe('runSpecificTests — per-framework argv construction (injection-safe p
       assert.deepEqual(c.args, ['jest', 'a.test.js', 'b.test.js']);
       assert.equal(c.opts && c.opts.shell, false);
       return {};
-    });
+    }));
   });
 
-  it('builds an `npx vitest run <files>` ARGV vector for the vitest framework', () => {
-    withExecSpies(() => '', (qa, fileCalls) => {
+  it('builds an `npx vitest run <files>` ARGV vector for the vitest framework', async () => {
+    await withExecSpies(() => '', (qa, fileCalls) => withPlatform('linux', null, () => {
       qa.runSpecificTests({ js: { test: 'ignored', testFramework: 'vitest' } }, ['a.test.js']);
       const c = fileCalls.find(x => x.args && x.args[0] === 'vitest');
       assert.ok(c, `expected an execFileSync npx vitest call; got ${JSON.stringify(fileCalls)}`);
-      assert.match(c.bin, /^npx(\.cmd)?$/);
+      assert.equal(c.bin, 'npx', 'vitest launches via npx by name');
       assert.deepEqual(c.args, ['vitest', 'run', 'a.test.js']);
       assert.equal(c.opts && c.opts.shell, false);
       return {};
-    });
+    }));
   });
 
   it('builds a `pytest <files>` ARGV vector for the pytest framework', () => {
@@ -385,17 +388,18 @@ describe('runSpecificTests — per-framework argv construction (injection-safe p
     });
   });
 
-  it('returns a failing result (failed:1, passCount preserved) when a framework command exits non-zero', () => {
-    withExecSpies((bin, args) => {
+  it('returns a failing result (failed:1, passCount preserved) when a framework command exits non-zero', async () => {
+    const { fileCalls } = await withExecSpies((bin, args) => {
       if (args && args[0] === 'jest') { const e = new Error('boom'); e.stdout = 'nope'; throw e; }
       return '';
-    }, (qa) => {
+    }, (qa) => withPlatform('linux', null, () => {
       const res = qa.runSpecificTests({ js: { test: 'ignored', testFramework: 'jest' } }, ['a.test.js']);
       assert.equal(res.passed, false);
       assert.equal(res.failed, 1);
       assert.equal(res.passCount, 0);
       return {};
-    });
+    }));
+    assert.equal(fileCalls.length, 1, 'the one jest call was the one that failed');
   });
 
   it('short-circuits to a NON-pass (undetermined) before running anything', async () => {
@@ -1060,6 +1064,36 @@ describe('runFullTests and runSpecificTests — undetermined runs, standard erro
       assert.equal(res.undetermined, true);
       assert.match(res.output, /10 MiB/);
       assert.doesNotMatch(res.output, /timed out/);
+      return {};
+    });
+  });
+
+  it('a configured test command with shell structure is refused, and the result says so', async () => {
+    const { res } = await captureLog(() => qualityAgent.runFullTests({ javascript: { test: 'npm run build && npm test' } }));
+    assert.equal(res.passed, false);
+    assert.equal(res.refused, true);
+    assert.match(res.output, /REFUSED/);
+    const specific = qualityAgent.runSpecificTests({ javascript: { test: 'npm run build && npm test' } }, ['a.test.js']);
+    assert.equal(specific.passed, false);
+    assert.equal(specific.refused, true);
+  });
+
+  it('counters are read from standard output; standard error only when standard output has none', async () => {
+    const both = () => ({ status: 0, signal: null, stdout: '\u2139 pass 2\n\u2139 fail 1\n', stderr: '\u2139 pass 3\n\u2139 fail 0\n' });
+    await withExecSpies(both, async (qa) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
+      assert.equal(res.passed, false, 'standard output reports a failure; standard error cannot outvote it');
+      assert.equal(res.failed, 1);
+      const specific = qa.runSpecificTests({ javascript: { test: 'node x' } }, ['a.test.js']);
+      assert.equal(specific.passed, false);
+      assert.equal(specific.failed, 1);
+      return {};
+    });
+    const errOnly = () => ({ status: 0, signal: null, stdout: 'Determining test suites to run...\n', stderr: 'Tests:       4 passed, 4 total\n' });
+    await withExecSpies(errOnly, async (qa) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
+      assert.equal(res.passed, true);
+      assert.equal(res.passCount, 4, 'jest\'s case: the counters on standard error are read');
       return {};
     });
   });

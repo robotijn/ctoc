@@ -161,7 +161,9 @@ function runCommand(cmd, options = {}) {
  * @param {string} bin - the executable (an argv[0], never a shell string)
  * @param {string[]} args - argument vector; each element is passed literally
  * @param {{silent?: boolean, allowFail?: boolean, timeout?: number}} [options]
- * @returns {{success: boolean, output: string, error?: string, timedOut?: boolean, outputTooLarge?: boolean, notStarted?: boolean}}
+ * @returns {{success: boolean, output: string, stdout: string, stderr: string, error?: string, timedOut?: boolean, outputTooLarge?: boolean, notStarted?: boolean}}
+ *   `output` is standard output and standard error together; `stdout` and `stderr` are
+ *   kept apart so the counters are read from standard output first ({@link counterText}).
  */
 function runCommandArgv(bin, args, options = {}) {
   const { silent = false, allowFail = false, timeout = 300000 } = options;
@@ -174,14 +176,16 @@ function runCommandArgv(bin, args, options = {}) {
     windowsHide: true
   });
   const text = (v) => (typeof v === 'string' ? v.trim() : '');
-  const output = [text(r.stdout), text(r.stderr)].filter(Boolean).join('\n');
-  if (!r.error && r.status === 0) return { success: true, output };
+  const stdout = text(r.stdout);
+  const stderr = text(r.stderr);
+  const output = [stdout, stderr].filter(Boolean).join('\n');
+  if (!r.error && r.status === 0) return { success: true, output, stdout, stderr };
 
   const code = r.error ? /** @type {NodeJS.ErrnoException} */ (r.error).code : undefined;
   const error = r.error ? r.error.message
     : `Command failed: ${bin} exited with ${r.status !== null ? r.status : r.signal}`;
-  /** @type {{success: boolean, output: string, error: string, timedOut?: boolean, outputTooLarge?: boolean, notStarted?: boolean}} */
-  const result = { success: false, output, error };
+  /** @type {{success: boolean, output: string, stdout: string, stderr: string, error: string, timedOut?: boolean, outputTooLarge?: boolean, notStarted?: boolean}} */
+  const result = { success: false, output, stdout, stderr, error };
   if (code === 'ENOBUFS') result.outputTooLarge = true;
   else if (r.signal === 'SIGTERM' || code === 'ETIMEDOUT') result.timedOut = true;
   const shellMissing = process.platform === 'win32' ? 9009 : 127;
@@ -470,6 +474,21 @@ function undeterminedRunResult(lang, result, passCount, skipped) {
   return { passed: false, undetermined: true, passCount, failed: 0, skipped, flaky: 0, output: msg };
 }
 
+/**
+ * The NON-pass result for a configured test command that was refused before it ran (shell
+ * structure, {@link runConfiguredCommand}). Still a failed check, so `/ctoc:push` blocks on
+ * `!passed` as before; `refused: true` tells a reader that no test ran (the hotfix check
+ * answers "no test ran", never "the existing tests fail").
+ * @param {{error?: string}} result the refused command's result
+ * @param {number} passCount
+ * @param {number} failed
+ * @param {number} skipped
+ * @returns {{passed:false, refused:true, passCount:number, failed:number, skipped:number, flaky:number, output:string}}
+ */
+function refusedTestsResult(result, passCount, failed, skipped) {
+  return { passed: false, refused: true, passCount, failed: failed + 1, skipped, flaky: 0, output: String(result.error) };
+}
+
 /** @param {{outputTooLarge?: boolean, timedOut?: boolean, notStarted?: boolean}} result */
 const cannotCertify = (result) => Boolean(result.outputTooLarge || result.timedOut || result.notStarted);
 
@@ -644,6 +663,22 @@ function readRunnerCounters(out) {
 }
 
 /**
+ * The text a run's counters are read from: standard output, where every runner but jest
+ * reports; standard error only when standard output carries no counter at all, which is
+ * jest's case. Reading both together let a `fail 0` on standard error outvote a `fail 1`
+ * on standard output (the last match wins). A result with no separate streams (a refused
+ * or unstarted command) is read from its `output`.
+ * @param {{output: string, stdout?: string, stderr?: string}} result
+ * @returns {string}
+ */
+function counterText(result) {
+  if (typeof result.stdout !== 'string') return result.output;
+  const reads = parseFailCount(result.stdout) !== null || parsePassCount(result.stdout) !== null
+    || hasTestSummaryEvidence(result.stdout);
+  return reads ? result.stdout : String(result.stderr);
+}
+
+/**
  * The NON-pass result for a run whose instrument was PRESENT but ILLEGIBLE.
  *
  * Decision 4: reuses this module's EXISTING `undetermined` state rather than inventing a
@@ -811,6 +846,7 @@ function runSpecificTests(tools, testFiles) {
     // sast-runner.js / secrets-scanner.js.
     // npx starts through npmLauncher: node running npm's own npx-cli.js on Windows (Node
     // refuses to start npx.cmd without a shell), `npx` by name elsewhere.
+    /** @type {{success: boolean, output: string, stdout?: string, stderr?: string, error?: string, timedOut?: boolean, outputTooLarge?: boolean, notStarted?: boolean, refused?: boolean}} */
     let result;
     if (langTools.testFramework === 'jest') {
       result = runNpmTool('npx', ['jest', ...testFiles], { allowFail: true, silent: true });
@@ -838,6 +874,7 @@ function runSpecificTests(tools, testFiles) {
     }
 
     if (!result.success && cannotCertify(result)) return undeterminedRunResult(lang, result, totalPassed, totalSkipped);
+    if (!result.success && result.refused) return refusedTestsResult(result, totalPassed, totalFailed, totalSkipped);
     if (!result.success) {
       return {
         passed: false,
@@ -851,7 +888,7 @@ function runSpecificTests(tools, testFiles) {
 
     // X4 — the runner exited 0. That is its CLAIM, not a verdict: read the instrument
     // and cross-check it. Same contract as runFullTests below.
-    const counters = readRunnerCounters(result.output);
+    const counters = readRunnerCounters(counterText(result));
 
     if (counters.unreadable) {
       return unreadableTestsResult(lang, totalPassed, totalSkipped);
@@ -906,6 +943,7 @@ async function runFullTests(tools) {
     const result = runProjectTestCommand(langTools, { allowFail: true, silent: true, label: `${lang} test` });
 
     if (!result.success && cannotCertify(result)) return undeterminedRunResult(lang, result, totalPassed, totalSkipped);
+    if (!result.success && result.refused) return refusedTestsResult(result, totalPassed, totalFailed, totalSkipped);
     if (!result.success) {
       const output = result.output || result.error || '';
 
@@ -936,7 +974,7 @@ async function runFullTests(tools) {
     // report FAILURES on stdout yet exit 0 (a wrapping `|| true`, `set +e`, jest
     // --passWithNoTests, or a reporter that swallows the child's exit code). This module's
     // verdict gates the push, so read the instrument and cross-check the claim.
-    const counters = readRunnerCounters(result.output);
+    const counters = readRunnerCounters(counterText(result));
 
     if (counters.unreadable) {
       // The instrument was THERE and we could not read it → UNCERTIFIED, never clean.
