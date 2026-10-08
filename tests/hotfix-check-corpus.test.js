@@ -1,6 +1,6 @@
 'use strict';
 
-// The classifier corpus: 27 edit shapes that qualify as a hotfix and 87 traps that must
+// The classifier corpus: 31 edit shapes that qualify as a hotfix and 128 traps that must
 // not, plus one mode change, each judged through the menu router's first call (rules 1
 // to 7; no test runs) against ONE committed temporary repository with no test command.
 // A qualifying shape ends at `verdict: 'checking'`: rules 1 to 7 held.
@@ -15,6 +15,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const { route } = require('../src/lib/menu-screens');
+const { ruleRefusal } = require('../src/lib/hotfix-check');
 
 const refusal = (clause) => `I did not treat this as a hotfix because ${clause}; `
   + 'it goes through a normal plan, and your edits stay in place, not committed.';
@@ -143,7 +144,50 @@ const BASE = {
   '.changeset/brave-cats.md': lines('---', '"corpus": patch', '---', '', 'Old change note.'),
   'src/styles/nav.css': lines('nav:hover #add {display:none}'),
   'src/pages/colour-pick.html': page('<select><option>Red</option></select>'),
-  'src/pages/dotted.html': page(lines('<p>\u0130\u0130\u0130\u0130\u0130\u0130\u0130\u0130\u0130\u0130</p><script>a()</script><script>', "el.innerHTML = '<b>Save</b>';", '</script>').trimEnd())
+  'src/pages/dotted.html': page(lines('<p>\u0130\u0130\u0130\u0130\u0130\u0130\u0130\u0130\u0130\u0130</p><script>a()</script><script>', "el.innerHTML = '<b>Save</b>';", '</script>').trimEnd()),
+  // The security check's third round and the re-review (2026-10-09): whole-file scanners.
+  '.github/CONTRIBUTING.md': lines('# Contributing', '', 'Open an issue first.'),
+  '.github/workflows/README.md': lines('# Workflows', '', 'The old build notes.'),
+  'docs/linktext.md': lines('Read [the old guide](/guide) first.'),
+  'src/pages/wrapped.html': page(lines('<button', '  class="x">Save</button>').trimEnd()),
+  'docs/fenced-ok.md': lines('# Setup', '', 'Run the old installer.', '', '```sh', 'pip install requests', '```'),
+  'src/pages/tip.html': page(lines('<button title="x', ' <i>tip</i>" onclick="go(\'one\')<b">Save</button>').trimEnd()),
+  'src/pages/status-pick.html': page('<select><option><b>Pending</b></option></select>'),
+  'locales/far.json': lines('{', '  "go": "Help"', '}'),
+  'lang/far.properties': lines('link=Help'),
+  'docs/click.md': lines('# Click', '', '<a onclick="go(\'one\')">Help</a>'),
+  'docs/js-link.md': lines('Read [x](javascript:go()) now.'),
+  'docs/tpl.md': lines('Hello {{ one() }} there.'),
+  'docs/raw.rst': lines('Title', '=====', '', '.. raw:: html', '', '   <b>one</b>'),
+  'content/post.md': lines('+++', 'draft = false', '+++', '', 'The post.'),
+  'CLAUDE.local.md': lines('# Local', '', 'Old local rules.'),
+  '.windsurf/rules/style.md': lines('# Style', '', 'Old style rules.'),
+  '.clinerules/style.md': lines('# Style', '', 'Old style rules.'),
+  '.kiro/steering/style.md': lines('# Style', '', 'Old style rules.'),
+  'CONVENTIONS.md': lines('# Conventions', '', 'Old conventions.'),
+  'src/styles/nextline.css': lines('nav:hover #add', '{display:none}'),
+  'src/styles/commented.css': lines('#add /* ; */ {display:none}'),
+  'docs/setup.md': lines('# Setup', '', '```sh', 'pip install requests', '```'),
+  'docs/indented.md': lines('# Setup', '', '    pip install requests'),
+  'docs/tilde.md': lines('# Setup', '', '~~~', 'pip install requests', '~~~'),
+  'docs/json-front.md': lines('{', '  "title": "Old"', '}', '', 'Body.'),
+  'docs/ref.md': lines('See [the guide][g].', '', '[g]: /guide'),
+  'docs/auto.md': lines('Visit <https://one.example> now.'),
+  'docs/liquid.md': lines('{% include one.html %}', '', 'Body.'),
+  'docs/code.rst': lines('Setup', '=====', '', '.. code-block:: sh', '', '   pip install requests'),
+  'docs/inc.rst': lines('Guide', '=====', '', '.. include:: one.rst'),
+  'src/pages/entity.html': page('<a title="a&gt;b" href="/x">Go</a>'),
+  'src/pages/unquoted.html': page('<a href=/one>Home</a>'),
+  'src/components/Clicker.vue': lines('<template>', '  <button @click="go(\'one\')">Go</button>', '</template>'),
+  'src/components/Bind.vue': lines('<template>', '  <p v-bind:title="one">Hi</p>', '</template>'),
+  'src/components/Nested.jsx': lines('export const N = () => (', '  <button onClick={() => { if (a > b) { go(\'one\'); } }}>Go</button>', ');'),
+  'tokens.txt': lines('Old note.'),
+  'config/locales/secrets.yml': lines('title: Old'),
+  'messages/credentials.json': lines('{', '  "title": "Old"', '}'),
+  'src/hooks/README.md': lines('# Hooks', '', 'Old notes.'),
+  'src/payments/index.html': page('<p>Old</p>'),
+  'docs/passwords.md': lines('# Help', '', 'Old notes.'),
+  'docs/id_rsa.md': lines('# Help', '', 'Old notes.')
 };
 
 const QUALIFY = [
@@ -178,7 +222,15 @@ const QUALIFY = [
   // A typo fixed on a line that also holds a web address: only the changed word is wording.
   ['docs/links.md', lines('Read the guide at https://example.org/guide.')],
   // The text of an option with a `value` attribute is wording; the value is what is sent.
-  ['src/pages/size-pick.html', page('<select><option value="m">Middle</option></select>')]
+  ['src/pages/size-pick.html', page('<select><option value="m">Middle</option></select>')],
+  // The third round (2026-10-09). Markdown under `.github/` is documentation again.
+  ['.github/CONTRIBUTING.md', lines('# Contributing', '', 'Open a discussion first.')],
+  // Link text is wording; the target is not.
+  ['docs/linktext.md', lines('Read [the new guide](/guide) first.')],
+  // A tag whose attributes run over two lines: the whole-file scanner still sees the text.
+  ['src/pages/wrapped.html', page(lines('<button', '  class="x">Store</button>').trimEnd())],
+  // Prose beside a fenced code block that stays the same.
+  ['docs/fenced-ok.md', lines('# Setup', '', 'Run the new installer.', '', '```sh', 'pip install requests', '```')]
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
@@ -285,11 +337,64 @@ const TRAPS = [
   // An option with no `value` attribute submits its text.
   [{ 'src/pages/colour-pick.html': page('<select><option>Blue</option></select>') }, null, unrecognised('src/pages/colour-pick.html')],
   // A letter whose lower case is longer (U+0130) must not move the end of a script block.
-  [{ 'src/pages/dotted.html': BASE['src/pages/dotted.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/dotted.html')]
+  [{ 'src/pages/dotted.html': BASE['src/pages/dotted.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/dotted.html')],
+  // The security check's third round (2026-10-09). The high finding: a tag whose quoted
+  // value runs over two lines, so the second line looks like text after a tag.
+  [{ 'src/pages/tip.html': BASE['src/pages/tip.html'].replace("'one'", "'two'") }, null, unrecognised('src/pages/tip.html')],
+  // An option with no `value` sends its text, whatever tags sit inside it.
+  [{ 'src/pages/status-pick.html': BASE['src/pages/status-pick.html'].replace('Pending', 'Approved') }, null, unrecognised('src/pages/status-pick.html')],
+  // Catalogue values read as a browser reads an address: escapes decoded, tabs removed.
+  [{ 'locales/far.json': BASE['locales/far.json'].replace('"Help"', '"\\/\\/other.example\\/go"') }, null, unrecognised('locales/far.json')],
+  [{ 'locales/far.json': BASE['locales/far.json'].replace('"Help"', '"java\\tscript:go()"') }, null, unrecognised('locales/far.json')],
+  [{ 'locales/far.json': BASE['locales/far.json'].replace('"Help"', '"\\tjavascript:go()"') }, null, unrecognised('locales/far.json')],
+  [{ 'locales/far.json': BASE['locales/far.json'].replace('"Help"', '"\\\\\\\\evil"') }, null, unrecognised('locales/far.json')],
+  [{ 'lang/far.properties': lines('link=java\\script:go()') }, null, unrecognised('lang/far.properties')],
+  // Markdown: inline HTML, link targets, template braces, code, front matter.
+  [{ 'docs/click.md': BASE['docs/click.md'].replace("'one'", "'two'") }, null, unrecognised('docs/click.md')],
+  [{ 'docs/js-link.md': BASE['docs/js-link.md'].replace('go()', 'stop()') }, null, unrecognised('docs/js-link.md')],
+  [{ 'docs/tpl.md': BASE['docs/tpl.md'].replace('one()', 'two()') }, null, unrecognised('docs/tpl.md')],
+  [{ 'docs/raw.rst': BASE['docs/raw.rst'].replace('one', 'two') }, null, unrecognised('docs/raw.rst')],
+  [{ 'content/post.md': BASE['content/post.md'].replace('false', 'true') }, null, 'it changes a setting in content/post.md, and settings changes are a common cause of outages'],
+  // Other assistants' instruction files.
+  [{ 'CLAUDE.local.md': BASE['CLAUDE.local.md'].replace('Old', 'New') }, null, unrecognised('CLAUDE.local.md')],
+  [{ '.windsurf/rules/style.md': BASE['.windsurf/rules/style.md'].replace('Old', 'New') }, null, unrecognised('.windsurf/rules/style.md')],
+  [{ '.clinerules/style.md': BASE['.clinerules/style.md'].replace('Old', 'New') }, null, unrecognised('.clinerules/style.md')],
+  [{ '.kiro/steering/style.md': BASE['.kiro/steering/style.md'].replace('Old', 'New') }, null, unrecognised('.kiro/steering/style.md')],
+  [{ 'CONVENTIONS.md': BASE['CONVENTIONS.md'].replace('Old', 'New') }, null, unrecognised('CONVENTIONS.md')],
+  // A selector whose `{` is on the next line, or behind a comment.
+  [{ 'src/styles/nextline.css': BASE['src/styles/nextline.css'].replace('#add', '#bad') }, null, unrecognised('src/styles/nextline.css')],
+  [{ 'src/styles/commented.css': BASE['src/styles/commented.css'].replace('#add', '#bad') }, null, unrecognised('src/styles/commented.css')],
+  // Code blocks, front matter as a JSON object, reference definitions, autolinks, Liquid tags,
+  // reStructuredText code and include directives, and a workflow folder's Markdown.
+  [{ 'docs/setup.md': BASE['docs/setup.md'].replace('requests', 'reqests') }, null, unrecognised('docs/setup.md')],
+  [{ 'docs/indented.md': BASE['docs/indented.md'].replace('requests', 'reqests') }, null, unrecognised('docs/indented.md')],
+  [{ 'docs/tilde.md': BASE['docs/tilde.md'].replace('requests', 'reqests') }, null, unrecognised('docs/tilde.md')],
+  [{ 'docs/json-front.md': BASE['docs/json-front.md'].replace('Old', 'New') }, null, 'it changes a setting in docs/json-front.md, and settings changes are a common cause of outages'],
+  [{ 'docs/ref.md': BASE['docs/ref.md'].replace('/guide', '/other') }, null, unrecognised('docs/ref.md')],
+  [{ 'docs/auto.md': BASE['docs/auto.md'].replace('one.example', 'two.example') }, null, unrecognised('docs/auto.md')],
+  [{ 'docs/liquid.md': BASE['docs/liquid.md'].replace('one.html', 'two.html') }, null, unrecognised('docs/liquid.md')],
+  [{ 'docs/code.rst': BASE['docs/code.rst'].replace('requests', 'reqests') }, null, unrecognised('docs/code.rst')],
+  [{ 'docs/inc.rst': BASE['docs/inc.rst'].replace('one.rst', 'two.rst') }, null, unrecognised('docs/inc.rst')],
+  [{ '.github/workflows/README.md': BASE['.github/workflows/README.md'].replace('old', 'new') }, null, 'it changes how the project is built or shipped in .github/workflows/README.md'],
+  // Attribute shapes: a character reference in a value, an unquoted value, Vue's `@click`
+  // and `v-bind:`, and nested braces in a JSX handler.
+  [{ 'src/pages/entity.html': BASE['src/pages/entity.html'].replace('a&gt;b', 'a&gt;c') }, null, unrecognised('src/pages/entity.html')],
+  [{ 'src/pages/unquoted.html': BASE['src/pages/unquoted.html'].replace('/one', '/two') }, null, unrecognised('src/pages/unquoted.html')],
+  [{ 'src/components/Clicker.vue': BASE['src/components/Clicker.vue'].replace("'one'", "'two'") }, null, unrecognised('src/components/Clicker.vue')],
+  [{ 'src/components/Bind.vue': BASE['src/components/Bind.vue'].replace('"one"', '"two"') }, null, unrecognised('src/components/Bind.vue')],
+  [{ 'src/components/Nested.jsx': BASE['src/components/Nested.jsx'].replace("'one'", "'two'") }, null, unrecognised('src/components/Nested.jsx')],
+  // CTOC's own lists: sensitive words in the plural, the secret-file guard, the protected paths.
+  [{ 'tokens.txt': lines('New note.') }, null, 'tokens.txt sits in an area named token, and such areas are never a hotfix'],
+  [{ 'config/locales/secrets.yml': lines('title: New') }, null, 'config/locales/secrets.yml sits in an area named secret, and such areas are never a hotfix'],
+  [{ 'messages/credentials.json': BASE['messages/credentials.json'].replace('Old', 'New') }, null, 'messages/credentials.json sits in an area named credential, and such areas are never a hotfix'],
+  [{ 'src/hooks/README.md': BASE['src/hooks/README.md'].replace('Old', 'New') }, null, 'src/hooks/README.md sits in an area named enforcement, and such areas are never a hotfix'],
+  [{ 'src/payments/index.html': page('<p>New</p>') }, null, 'src/payments/index.html sits in an area named payment, and such areas are never a hotfix'],
+  [{ 'docs/passwords.md': BASE['docs/passwords.md'].replace('Old', 'New') }, null, 'docs/passwords.md sits in an area named password, and such areas are never a hotfix'],
+  [{ 'docs/id_rsa.md': BASE['docs/id_rsa.md'].replace('Old', 'New') }, null, 'docs/id_rsa.md sits in an area named secret, and such areas are never a hotfix']
 ];
 
-assert.equal(QUALIFY.length, 27, 'the corpus holds 27 shapes that qualify');
-assert.equal(TRAPS.length, 87, 'the corpus holds 87 traps');
+assert.equal(QUALIFY.length, 31, 'the corpus holds 31 shapes that qualify');
+assert.equal(TRAPS.length, 128, 'the corpus holds 128 traps');
 
 let root;
 
@@ -397,6 +502,132 @@ for (const [writes, named, clause] of TRAPS) {
     assert.deepEqual(dirtyOutsideCtoc(), []);
   });
 }
+
+// The property test (the session's decision of 2026-10-09): for each qualifying shape,
+// insert one of these characters at each position of the changed text in turn. Every
+// result must refuse, unless the character sits in visible data text and passes rule 6;
+// each such pass must be named below, with the reason it is still wording.
+const INSERTED = ['<', '>', '"', "'", '{', '}', '(', ')', '=', ':', '/', '\\', '@', '#', ';', '*'];
+const plain = (chars, why) => Object.fromEntries([...chars].map((c) => [c, () => why]));
+const ALLOWED = {
+  markup: plain('"\'()=:/\\#;*', 'plain punctuation in an element\'s visible text, shown as typed'),
+  jsx: plain(':/\\#*', 'punctuation that JSX prints as typed in an element\'s text'),
+  catalogue: {
+    ...plain('\'()=:/#;*"', 'punctuation inside a message value, shown as typed'),
+    '\\': (v) => (/\\[tnrbf]/.test(v) ? 'a backslash that makes a tab, line break or other control character in the shown text'
+      : 'a backslash before a letter in a .properties value, which the reader drops')
+  },
+  markdown: {
+    ...plain('>"\'()=:/\\#;*}', 'Markdown punctuation in prose: shown as typed or as emphasis, a heading or a quote'),
+    '{': () => 'a lone brace in Markdown prose is shown as typed (only {{ and {% start a template)',
+    '<': (v, at) => (/[A-Za-z/!?]/.test(v[at + 1] || '') ? null : 'a < that starts no tag is shown as typed')
+  },
+  text: plain('<>"\'{}()=:/\\#;*', 'any punctuation in a plain-text or reStructuredText paragraph is shown as typed'),
+  colour: {}
+};
+const kindOf = (rel) => {
+  const ext = path.extname(rel).toLowerCase();
+  if (['.jsx', '.tsx'].includes(ext)) return 'jsx';
+  if (['.html', '.htm', '.vue', '.svelte'].includes(ext)) return 'markup';
+  if (['.json', '.yaml', '.yml', '.po', '.properties'].includes(ext)) return 'catalogue';
+  if (['.css', '.scss', '.sass', '.less'].includes(ext)) return 'colour';
+  return ext === '.md' ? 'markdown' : 'text';
+};
+
+/** One group per changed line, as git's `-U0` diff gives for two texts with the same lines. */
+function hunksOf(oldText, newText) {
+  const o = oldText.split('\n');
+  const n = newText.split('\n');
+  assert.equal(o.length, n.length, 'an inserted character adds no line');
+  const hunks = [];
+  for (let i = 0; i < o.length; i++) {
+    if (o[i] !== n[i]) hunks.push({ oldStart: i + 1, newStart: i + 1, removed: [o[i].replace(/\r$/, '')], added: [n[i].replace(/\r$/, '')] });
+  }
+  return hunks;
+}
+const changeOf = (rel, oldText, newText) => {
+  const hunks = hunksOf(oldText, newText);
+  return {
+    files: [{ display: rel, topRel: rel, status: 'M', oldMode: '100644', newMode: '100644', oldSha: null, oldText, newText, hunks }],
+    lineCount: hunks.length * 2
+  };
+};
+
+test('property: one inserted character in the changed text of every qualifying shape refuses, or is named wording', async (t) => {
+  const reasons = new Map();
+  const sample = [];
+  let variants = 0;
+  for (const [shape, content] of QUALIFY) {
+    const writes = typeof shape === 'string' ? { [shape]: content } : shape;
+    for (const [rel, neu] of Object.entries(writes)) {
+      const old = BASE[rel];
+      assert.equal(ruleRefusal(changeOf(rel, old, neu)), null, `${rel}: the shape itself qualifies`);
+      let p = 0;
+      while (p < old.length && p < neu.length && old[p] === neu[p]) p++;
+      let s = 0;
+      while (s < old.length - p && s < neu.length - p && old[old.length - 1 - s] === neu[neu.length - 1 - s]) s++;
+      let refusedOne = null;
+      let passedOne = null;
+      for (let at = p; at <= neu.length - s; at++) {
+        for (const ch of INSERTED) {
+          const v = neu.slice(0, at) + ch + neu.slice(at);
+          if (v === old) continue;
+          variants++;
+          const r = ruleRefusal(changeOf(rel, old, v));
+          if (r) { refusedOne = refusedOne || v; continue; }
+          const allow = ALLOWED[kindOf(rel)][ch];
+          const why = allow ? allow(v, at) : null;
+          assert.ok(why, `${rel}: inserting ${JSON.stringify(ch)} at ${at} passed: ${JSON.stringify(v.slice(Math.max(0, at - 20), at + 20))}`);
+          const key = `${kindOf(rel)} ${JSON.stringify(ch)}: ${why}`;
+          reasons.set(key, (reasons.get(key) || 0) + 1);
+          passedOne = passedOne || v;
+        }
+      }
+      for (const v of [refusedOne, passedOne]) if (v !== null) sample.push([rel, v]);
+    }
+  }
+  // The pure rules and the real route agree: one refused and one passing variant per shape.
+  for (const [rel, v] of sample) {
+    write(rel, v);
+    try {
+      const res = await judge([rel]);
+      const pure = ruleRefusal(changeOf(rel, BASE[rel], v));
+      assert.equal(res.verdict, pure ? 'refused' : 'checking', `${rel}: ${JSON.stringify(res)}`);
+      if (pure) assert.equal(res.text, refusal(pure.clause));
+    } finally {
+      write(rel, BASE[rel]);
+    }
+  }
+  t.diagnostic(`${variants} variants, ${[...reasons.values()].reduce((a, b) => a + b, 0)} named passes, ${sample.length} checked through the route`);
+  for (const [key, n] of reasons) t.diagnostic(`${n} x ${key}`);
+});
+
+// Each scanner moves forward only. Inputs built to make a backtracking or rescanning
+// scanner quadratic are judged in well under a quarter of a second (a quadratic scan of
+// these 100,000 to 400,000 characters takes seconds).
+test('the whole-file scanners stay linear on input built against them', () => {
+  const cases = {
+    'docs/brackets.md': `${'['.repeat(400000)}]\nOld words.\n`,
+    'docs/ticks.md': `${Array.from({ length: 450 }, (_, i) => `${'`'.repeat(i + 1)} x `).join('')}\nOld words.\n`,
+    'docs/targets.md': `${']('.repeat(50000)}\nOld words.\n`,
+    'docs/blocks.md': `Old words.\n${'    code\n\n'.repeat(30000)}`,
+    'docs/raws.rst': `Old words.\n${'.. raw:: html\n'.repeat(30000)}`,
+    'src/pages/quotes.html': `<p>Old</p>\n${'<a b="'.repeat(20000)}\n`,
+    'src/pages/escapes.html': `<p>Old</p>\n${'<script><!--'.repeat(20000)}\n`,
+    'src/components/Braces.jsx': `export const P = () => <p>Old</p>;\n${'{'.repeat(100000)}\n`,
+    'src/components/Tags.jsx': `export const P = () => <p>Old</p>;\n${'x = <a>'.repeat(20000)}\n`,
+    'src/components/Nest.vue': `<template>\n<p>Old</p>\n${'<template>'.repeat(30000)}\n</template>\n`,
+    'src/styles/urls.css': `a { color: red; }\n${'url('.repeat(50000)}\n`
+  };
+  for (const [rel, old] of Object.entries(cases)) {
+    const changed = rel.endsWith('.css') ? old.replace('red', 'blue') : old.replace('Old', 'New');
+    const start = process.cpuUsage();
+    ruleRefusal(changeOf(rel, old, changed));
+    const used = process.cpuUsage(start);
+    const ms = (used.user + used.system) / 1000;
+    assert.ok(ms < 250, `${rel}: ${old.length} characters took ${ms.toFixed(1)} ms`);
+  }
+});
 
 test('mode change: an executable bit on README.md is not wording (where git tracks the bit)', async () => {
   git(['update-index', '--chmod=+x', 'README.md']);

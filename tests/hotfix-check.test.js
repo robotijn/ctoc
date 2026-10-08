@@ -1621,7 +1621,7 @@ test('round 2, finding 1: a staged edit hidden behind an index bit is refused, o
   const marked = 'I could not read the change (src/pages/home.html is marked in git\'s index as unchanged or skipped)';
   const shapes = [
     ['assume-unchanged', ['update-index', '--assume-unchanged', 'src/pages/home.html'], null, true],
-    ['core.ignoreStat=true', null, ['config', 'core.ignoreStat', 'true'], false],
+    ['core.ignoreStat=true', null, ['config', 'core.ignoreStat', 'true'], true],
     ['skip-worktree', ['update-index', '--skip-worktree', 'src/pages/home.html'], null, true]
   ];
   for (const [label, mark, config, mustRefuse] of shapes) {
@@ -1687,4 +1687,83 @@ test('round 2, finding 9: a pass names each judged file with its staged id, whic
   const committed = spawnSync('git', ['rev-parse', 'HEAD:src/pages/home.html'], { cwd: root, encoding: 'utf8' }).stdout.trim();
   const names = git(root, ['show', '--name-only', '--format=', 'HEAD']).trim().split('\n');
   assert.ok(committed !== blob || names.length > 1, `the hook changed the commit: ${committed} ${names.join(' ')}`);
+});
+
+// The third round (2026-10-09): the whole-file scanners' own branches, each through the
+// first call. [path, base content, new content, the clause, or null for `checking`]
+test('round 3: the whole-file scanners read strings, templates, escapes, comments, Sass and code spans', async () => {
+  const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const risk = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
+  const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
+  const shapes = [
+    // JavaScript around JSX: a template literal with a substitution, a regular expression
+    // with a class and flags, a self-closing element, an unclosed string and regular
+    // expression at the end of the file.
+    ['src/components/Tpl.jsx', 'export const T = () => <p className={`a ${b}`}>Save</p>;\n', 'export const T = () => <p className={`a ${b}`}>Store</p>;\n', null],
+    ['src/components/Re.jsx', 'const r = /[/]x/g;\nexport const B = () => <br/>;\nexport const P = () => <p>Save</p>;\nconst q = /abc', 'const r = /[/]x/g;\nexport const B = () => <br/>;\nexport const P = () => <p>Store</p>;\nconst q = /abc', null],
+    ['src/components/Str.jsx', "export const P = () => <p>Save</p>;\nconst s = 'abc", "export const P = () => <p>Store</p>;\nconst s = 'abc", null],
+    ['src/components/Tick.jsx', 'export const P = () => <p>Save</p>;\nconst t = `abc', 'export const P = () => <p>Store</p>;\nconst t = `abc', null],
+    ['src/components/Gen.tsx', 'const f = <T,>(x: T) => x;\nexport const P = () => <p>Save</p>;\n', 'const f = <T,>(x: T) => x;\nexport const P = () => <p>Store</p>;\n', null],
+    // A script block's escape states: `</script>` inside `<!--<script>` does not end it.
+    ['src/pages/escaped.html', '<script><!--<script></script><b>Save</b></script>\n<p>Hi</p>\n', '<script><!--<script></script><b>Store</b></script>\n<p>Hi</p>\n', un('src/pages/escaped.html')],
+    ['src/pages/escaped-after.html', '<script><!--<script></script>--></script>\n<p>Save</p>\n', '<script><!--<script></script>--></script>\n<p>Store</p>\n', null],
+    ['src/pages/unclosed.html', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Save</b>\n', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Store</b>\n', un('src/pages/unclosed.html')],
+    ['src/pages/title.html', '<title>Save</title>\n', '<title>Store</title>\n', un('src/pages/title.html')],
+    ['src/pages/tpl.html', '<template><p>Save</p></template>\n', '<template><p>Store</p></template>\n', un('src/pages/tpl.html')],
+    ['src/components/Slot.vue', '<template>\n  <template v-if="a"><p>Save</p></template>\n  <p>Hi</p>\n</template>\n', '<template>\n  <template v-if="a"><p>Store</p></template>\n  <p>Hi</p>\n</template>\n', un('src/components/Slot.vue')],
+    ['src/components/After.vue', '<template>\n  <template v-if="a"><p>Hi</p></template>\n  <p>Save</p>\n</template>\n', '<template>\n  <template v-if="a"><p>Hi</p></template>\n  <p>Store</p>\n</template>\n', null],
+    ['src/pages/cdata.html', '<svg><![CDATA[ a > <b>Save</b> ]]></svg>\n', '<svg><![CDATA[ a > <b>Store</b> ]]></svg>\n', un('src/pages/cdata.html')],
+    ['src/components/Each.svelte', '{#if a}<p>Hi</p>{/if}\n<p>Save</p>\n', '{#if a}<p>Hi</p>{/if}\n<p>Store</p>\n', null],
+    // Catalogue escapes: Gettext's hexadecimal and octal, YAML's \x and \u; an unknown or
+    // short escape is not wording.
+    ['translations/esc.po', 'msgid "x"\nmsgstr "Speichern"\n', 'msgid "x"\nmsgstr "Sp\\x65ichern \\101b"\n', null],
+    ['translations/bad.po', 'msgid "x"\nmsgstr "Speichern"\n', 'msgid "x"\nmsgstr "Spei\\qchern"\n', un('translations/bad.po')],
+    ['translations/nohex.po', 'msgid "x"\nmsgstr "Speichern"\n', 'msgid "x"\nmsgstr "Spei\\xzhern"\n', un('translations/nohex.po')],
+    ['i18n/esc.yaml', 'title: "Save"\n', 'title: "Sto\\x72e"\n', null],
+    ['i18n/at.yaml', 'title: "Save"\n', 'title: "Mail \\u0040x"\n', risk('i18n/at.yaml')],
+    ['i18n/short.yaml', 'title: "Save"\n', 'title: "Sto\\x7"\n', un('i18n/short.yaml')],
+    ['i18n/plain.yaml', 'title: Save\n', 'title: Store: now\n', un('i18n/plain.yaml')],
+    ['i18n/hashstart.yaml', 'title: Save\n', 'title: #Store\n', un('i18n/hashstart.yaml')],
+    ['lang/uni.properties', 'title=Save\n', 'title=Sto\\u0072e\n', null],
+    ['lang/badu.properties', 'title=Save\n', 'title=Sto\\u00zz\n', un('lang/badu.properties')],
+    ['locales/ctl.json', '{\n  "title": "Save"\n}\n', '{\n  "title": "Sto\tre"\n}\n', un('locales/ctl.json')],
+    // Stylesheets: SCSS line comments, Sass's indented blocks, a colour function in its
+    // space form.
+    ['src/styles/main.scss', '$brand: #0a58ca; // main\n', '$brand: #0b5ed7; // main\n', null],
+    ['src/styles/note.scss', '$brand: #0a58ca; // main\n', '$brand: #0a58ca; // other\n', un('src/styles/note.scss')],
+    ['src/styles/end.scss', '$brand: #0a58ca; // main', '$brand: #0b5ed7; // main', null],
+    ['src/styles/block.sass', 'a\n  color: red\n\n  display: none\n', 'a\n  color: blue\n\n  display: none\n', null],
+    ['src/styles/sel.sass', 'nav:hover #add\n  display: none\n', 'nav:hover #bad\n  display: none\n', un('src/styles/sel.sass')],
+    ['src/styles/top.sass', 'color: red\n', 'color: blue\n', un('src/styles/top.sass')],
+    ['src/styles/space.css', 'a { color: rgb(1 2 3 / 50%); }\n', 'a { color: rgb(1 2 4 / 50%); }\n', null],
+    ['src/styles/badfn.css', 'a { color: rgb(1 2 3); }\n', 'a { color: rgb(1 2 3 / 4 / 5); }\n', un('src/styles/badfn.css')],
+    ['src/styles/str.css', 'a { color: red; content: "x"; }\n', 'a { color: red; content: "y"; }\n', un('src/styles/str.css')],
+    ['src/styles/quoted.css', 'a { background: url("one.png") red; }\n', 'a { background: url("one.png") blue; }\n', null],
+    // Markdown: code spans, unmatched backticks, a JSON front matter never closed, a link
+    // target in angle brackets, a full reference, a heading after an indented block.
+    ['docs/span.md', 'Run `pip install requests` first.\n', 'Run `pip install reqests` first.\n', un('docs/span.md')],
+    ['docs/beside.md', 'Run `npm test` first, ``x`` and ` alone.\n', 'Run `npm test` now, ``x`` and ` alone.\n', null],
+    ['docs/open-json.md', '{\n  "title": "Old"\n\nBody old.\n', '{\n  "title": "Old"\n\nBody new.\n', setting('docs/open-json.md')],
+    ['docs/angle.md', 'See [the guide](<a b.md>) now.\n', 'See [the guide](<a c.md>) now.\n', un('docs/angle.md')],
+    ['docs/full.md', 'See [the guide][a] now.\n\n[a]: /a\n[b]: /b\n', 'See [the guide][b] now.\n\n[a]: /a\n[b]: /b\n', un('docs/full.md')],
+    ['docs/escaped.md', 'See [x](a\\)b) old.\n', 'See [x](a\\)b) new.\n', null],
+    ['docs/after-code.md', 'Text.\n\n    code here\n\nOld words.\n', 'Text.\n\n    code here\n\nNew words.\n', null],
+    ['docs/unfence.md', '```\ncode\n```\nOld words.\n', '```\ncode\n\nOld words.\n', un('docs/unfence.md')],
+    ['docs/sub.rst', 'Title\n=====\n\n.. |logo| raw:: html\n\n   <b>one</b>\n\nOld words.\n', 'Title\n=====\n\n.. |logo| raw:: html\n\n   <b>two</b>\n\nOld words.\n', un('docs/sub.rst')],
+    ['docs/note.rst', 'Title\n=====\n\n.. note::\n\n   Old words.\n', 'Title\n=====\n\n.. note::\n\n   New words.\n', null],
+    ['docs/jinja.rst', 'Title\n=====\n\nOld words.\n', 'Title\n=====\n\nNew {{ words }}.\n', un('docs/jinja.rst')],
+    // GitHub's assistant files stay governing under `.github/`.
+    ['.github/instructions/web.instructions.md', 'Old rule.\n', 'New rule.\n', un('.github/instructions/web.instructions.md')],
+    ['.github/ISSUE_TEMPLATE/bug.md', 'Describe the old bug.\n', 'Describe the new bug.\n', null]
+  ];
+  const base = {};
+  for (const [p, b] of shapes) base[p] = b;
+  const root = makeRepo(base);
+  for (const [p, b, n, expected] of shapes) {
+    fs.writeFileSync(path.join(root, ...p.split('/')), n);
+    const res = await check(root, p);
+    fs.writeFileSync(path.join(root, ...p.split('/')), b);
+    if (expected === null) assertChecking(res, [p]);
+    else assert.equal(res.text, refusal(expected), `${p}: ${JSON.stringify(res)}`);
+  }
 });
