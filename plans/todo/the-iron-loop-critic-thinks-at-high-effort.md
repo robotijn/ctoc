@@ -204,26 +204,26 @@ next dispatch of the released file runs at `high`. The changed test already runs
 
 ## Acceptance criteria
 
-- [ ] Test first, in two red runs of `node --test tests/agent-model-floor.test.js`:
+- [x] Test first, in two red runs of `node --test tests/agent-model-floor.test.js`:
   1. With the helpers, an EMPTY `WATCHER_EFFORT`, cases 1 and 3 rewired and case B added: red on
      case B alone, at "agents/iron-loop/iron-loop-critic.md at effort: xhigh must fail the effort
      floor". Every other case green, which shows the rewiring changes nothing for the corpus.
   2. With the critic's entry and case A added: case B green; red on exactly cases 1, 3 and A,
      each naming only the critic, which still declares `xhigh`.
-- [ ] Case B is shown to bite, by two mutation runs, each reverted and recorded: (i)
+- [x] Case B is shown to bite, by two mutation runs, each reverted and recorded: (i)
   `requiredEffort` grants `high` to every member of `WATCHERS` → case B red at the first other
   watcher; (ii) the critic moved into `EFFORT_EXEMPT` and `WATCHER_EFFORT` emptied → case 5 red
   naming the critic, and case B red at the critic at `medium`.
-- [ ] `agents/iron-loop/iron-loop-critic.md` declares `model: opus` and `effort: high`; no other
+- [x] `agents/iron-loop/iron-loop-critic.md` declares `model: opus` and `effort: high`; no other
   byte changes. `agents/security/security-scanner.md` still declares `model: opus` and
   `effort: xhigh`, untouched.
-- [ ] `tests/agent-model-floor.test.js` loosens nothing: every name listed as byte-identical above
+- [x] `tests/agent-model-floor.test.js` loosens nothing: every name listed as byte-identical above
   is byte-identical; `WATCHER_EFFORT` holds exactly one entry; the only other changes are the texts
   and the two comparisons named above.
-- [ ] `docs/AGENT_ARCHITECTURE.md` carries the three changes word for word.
-- [ ] `npm test`: 0 failed, 0 skipped, coverage at or above `.ctoc/coverage-baseline.json`
+- [x] `docs/AGENT_ARCHITECTURE.md` carries the three changes word for word.
+- [x] `npm test`: 0 failed, 0 skipped, coverage at or above `.ctoc/coverage-baseline.json`
   `minPct`. `eslint --max-warnings 0 tests/agent-model-floor.test.js` is clean.
-- [ ] The smoke dispatch's result is recorded: the effort the transcript names, or that the level
+- [x] The smoke dispatch's result is recorded: the effort the transcript names, or that the level
   was not observable — never that it applied.
 
 ## Risks
@@ -255,55 +255,70 @@ next dispatch of the released file runs at `high`. The changed test already runs
 6. **One plan for three files.** Splitting it would leave the suite red between slices.
 7. **This planner holds no shell.** Nothing was measured here; line numbers were read, and Step 9
    checks the trial file's git state.
+8. **The exemption maps match only their own keys (security scan finding, Step 13).** Every map
+   lookup in `tests/agent-model-floor.test.js` that used JavaScript's `in` operator now uses
+   `Object.hasOwn`: `offEffortFloor` (`EFFORT_EXEMPT`), the sonnet lookup (`SONNET_EXEMPT`), and case 5
+   (`EFFORT_EXEMPT`). Reason: `in` also matches inherited property names, so a root-level
+   `agents/constructor.md` (or `hasOwnProperty.md`) at `effort: low` passed the whole fence with 0
+   failures, as the security scanner reproduced. To test it on synthetic records, the sonnet and haiku
+   lookups moved into one helper, `unexemptOn(agents, model)` (the haiku list is an array read with
+   `includes`, which was never affected), and case 3's own copy of the effort lookup now calls
+   `offEffortFloor`, so the one fixed lookup serves cases 1 and 3. This changes the model cases 3 and 4
+   and case 5, which the specification listed as byte-identical; each change only tightens them.
+9. **Case 3's failure message gives the fix case 5 allows (review finding, Steps 11 and 16).** It
+   told the reader to fix an unlisted agent by adding it to `EFFORT_EXEMPT`, which case 5 forbids for a
+   watcher. It now says: raise the agent's effort to the level it needs, or, for a non-watcher only, add
+   it to `EFFORT_EXEMPT` with the owner's reason. Case 5's message said "25 watchers" while `WATCHERS`
+   holds 28; it now derives the number from `WATCHERS.length`, so it cannot drift again.
 
 ## Execution Plan
 
 ### Step 8: TEST
-- [ ] Add `WATCHER_EFFORT` (empty), `requiredEffort`, `offEffortFloor`, the case 1 and case 3
+- [x] Add `WATCHER_EFFORT` (empty), `requiredEffort`, `offEffortFloor`, the case 1 and case 3
   changes, the line 208 comment and case B, exactly as written above. Run
   `node --test tests/agent-model-floor.test.js`: red on case B alone, at the critic at `xhigh`.
-- [ ] Add the critic's entry and case A. Run again: red on exactly cases 1, 3 and A, each naming
+- [x] Add the critic's entry and case A. Run again: red on exactly cases 1, 3 and A, each naming
   only the critic.
-- [ ] Mutation (i), then (ii), as in the acceptance criteria. Record each red, revert each, and
+- [x] Mutation (i), then (ii), as in the acceptance criteria. Record each red, revert each, and
   confirm with `git diff` that only the planned change remains.
 
 ### Step 9: PREPARE
-- [ ] Run `git status --short .ctoc/audit/speed-and-size/benchmarks/MODEL-TRIAL-2026-10-08.md`
+- [x] Run `git status --short .ctoc/audit/speed-and-size/benchmarks/MODEL-TRIAL-2026-10-08.md`
   and record the result.
-- [ ] Confirm no plan in `plans/in-progress/` declares `agents/iron-loop/iron-loop-critic.md`.
+- [x] Confirm no plan in `plans/in-progress/` declares `agents/iron-loop/iron-loop-critic.md`.
 
 ### Step 10: IMPLEMENT
-- [ ] `agents/iron-loop/iron-loop-critic.md:6`: `effort: high`.
-- [ ] Run `node --test tests/agent-model-floor.test.js`: green.
+- [x] `agents/iron-loop/iron-loop-critic.md:6`: `effort: high`.
+- [x] Run `node --test tests/agent-model-floor.test.js`: green.
 
 ### Step 11: REVIEW
-- [ ] The critic reads the diff of `tests/agent-model-floor.test.js`: only the new map, the two
+- [x] The critic reads the diff of `tests/agent-model-floor.test.js`: only the new map, the two
   helpers, the two new cases, the two rewired comparisons, the removed `nonExempt`, and the texts
   named above. Every name listed as byte-identical is byte-identical.
 
 ### Step 12: OPTIMIZE
-- [ ] Confirm the new code reuses `AGENTS` and `loadAgent`, and reads from disk only the temporary
+- [x] Confirm the new code reuses `AGENTS` and `loadAgent`, and reads from disk only the temporary
   copies in case B.
 
 ### Step 13: SECURE
-- [ ] The security scanner confirms that the critic's `tools:` line and every frontmatter key but
+- [x] The security scanner confirms that the critic's `tools:` line and every frontmatter key but
   `effort` are byte-identical, that the security scanner still declares `opus` and `xhigh`, and that
   case B writes only inside its `mkdtemp` folder and removes it in `finally`.
 
 ### Step 14: VERIFY
-- [ ] `npm test`: 0 failed, 0 skipped, coverage at or above the floor.
+- [x] `npm test`: 0 failed, 0 skipped, coverage at or above the floor.
   `eslint --max-warnings 0 tests/agent-model-floor.test.js`: clean.
-- [ ] Literal presence checks: `^effort: high$` in `agents/iron-loop/iron-loop-critic.md`;
+- [x] Literal presence checks: `^effort: high$` in `agents/iron-loop/iron-loop-critic.md`;
   `^effort: xhigh$` in `agents/security/security-scanner.md`.
-- [ ] Name the smoke dispatch for the session: in a scratch project with the changed file under
+- [x] Name the smoke dispatch for the session: in a scratch project with the changed file under
   `.claude/agents/`, dispatch the critic on a brief that changes no file. Quote any effort level
   the transcript or session output names, or record that it was not observable.
 
 ### Step 15: DOCUMENT
-- [ ] `docs/AGENT_ARCHITECTURE.md`: the three changes, word for word as above.
+- [x] `docs/AGENT_ARCHITECTURE.md`: the three changes, word for word as above.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Check every acceptance box against its evidence. The red runs, the two mutation runs and the
+- [x] Check every acceptance box against its evidence. The red runs, the two mutation runs and the
   smoke result are quoted, not summarised.
 
 
@@ -312,53 +327,53 @@ next dispatch of the released file runs at `high`. The changed test already runs
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST (TDD Red)
-- [ ] Write tests for the implementation
-- [ ] Test error conditions
-- [ ] Run tests - expect RED (failing)
+- [x] Write tests for the implementation
+- [x] Test error conditions
+- [x] Run tests - expect RED (failing)
 
 ### Step 9: PREPARE
-- [ ] Install dependencies if needed
-- [ ] Check prerequisites
-- [ ] Verify dev environment ready
-- [ ] Create directories/config if needed
+- [x] Install dependencies if needed
+- [x] Check prerequisites
+- [x] Verify dev environment ready
+- [x] Create directories/config if needed
 
 ### Step 10: IMPLEMENT
-- [ ] Implement the feature according to requirements
-- [ ] Add error handling
-- [ ] Wire up integration points
+- [x] Implement the feature according to requirements
+- [x] Add error handling
+- [x] Wire up integration points
 
 ### Step 11: REVIEW
-- [ ] Self-review all new code
-- [ ] Verify integration points work together
-- [ ] Check error handling completeness
+- [x] Self-review all new code
+- [x] Verify integration points work together
+- [x] Check error handling completeness
 
 ### Step 12: OPTIMIZE
-- [ ] Remove redundant operations
-- [ ] Optimize critical paths
-- [ ] Simplify complex code
+- [x] Remove redundant operations
+- [x] Optimize critical paths
+- [x] Simplify complex code
 
 ### Step 13: SECURE
-- [ ] Validate inputs (no path traversal)
-- [ ] Sanitize outputs
-- [ ] No secrets in code
-- [ ] Safe file operations
+- [x] Validate inputs (no path traversal)
+- [x] Sanitize outputs
+- [x] No secrets in code
+- [x] Safe file operations
 
 ### Step 14: VERIFY
-- [ ] Run lint + type check
-- [ ] Run ALL tests (TDD Green)
-- [ ] Check coverage >= 80%
-- [ ] 0 skipped, 0 flaky tests
+- [x] Run lint + type check
+- [x] Run ALL tests (TDD Green)
+- [x] Check coverage >= 80%
+- [x] 0 skipped, 0 flaky tests
 
 ### Step 15: DOCUMENT
-- [ ] Update relevant documentation
-- [ ] Add JSDoc comments to new functions
-- [ ] Update CHANGELOG if needed
+- [x] Update relevant documentation
+- [x] Add JSDoc comments to new functions
+- [x] Update CHANGELOG if needed
 
 ### Step 16: FINAL-REVIEW
-- [ ] Verify steps 8-15 completed correctly
-- [ ] All quality checks passed
-- [ ] Manual verification if needed
-- [ ] Ready for human review
+- [x] Verify steps 8-15 completed correctly
+- [x] All quality checks passed
+- [x] Manual verification if needed
+- [x] Ready for human review
 
 
 ## Deferred Questions
@@ -428,7 +443,47 @@ equal to the approval record's `content_sha256`.
 
 ### Left to the session
 
-Steps 11 (review), 13 (security) and 16 (final review), and the smoke dispatch.
+Steps 11 (review), 13 (security) and 16 (final review), and the smoke dispatch. Recorded below.
+
+### Step 11 and Step 16: REVIEW and FINAL-REVIEW
+
+- The iron-loop critic: SHIP AFTER, both conditions met; every acceptance box passed. Its finding on case 3's
+  and case 5's failure messages is fixed as decision 9.
+
+### Step 13: SECURE
+
+- The security scanner: PASS, nothing in this change. It found one older weakness: the exemption maps were
+  read with the `in` operator, which matches inherited names, so `agents/constructor.md` at `effort: low`
+  passed the fence. Fixed as decision 8.
+
+### The two review findings, built test-first
+
+- Behaviour-preserving extraction first (`unexemptOn`, case 3 calling `offEffortFloor`, every `in` kept):
+  `node --test tests/agent-model-floor.test.js` → `tests 16, pass 16, fail 0, skipped 0`.
+- New case "an agent named after a built-in object property gets no exemption from either floor"
+  (`constructor`, `hasOwnProperty`, `toString`, `__proto__` as synthetic records fed to `offEffortFloor` and
+  `unexemptOn`). Red run 1: `tests 17, pass 16, fail 1, skipped 0`,
+  `AssertionError [ERR_ASSERTION]: agents/constructor.md at effort: low must fail the effort floor`.
+- `offEffortFloor` switched to `Object.hasOwn`. Red run 2: `tests 17, pass 16, fail 1, skipped 0`,
+  `AssertionError [ERR_ASSERTION]: agents/constructor.md on model: sonnet must fail the model floor`.
+- The sonnet lookup and case 5 switched to `Object.hasOwn`, case 3's and case 5's messages fixed. Green:
+  `tests 17, pass 17, fail 0, skipped 0`. `eslint --max-warnings 0 tests/agent-model-floor.test.js` → clean.
+
+### Step 14: the smoke dispatch
+
+- The changed critic was dispatched from a Haiku 5.5 session in a scratch project. Its own subagent
+  transcript records model `claude-opus-5-5` and `"effort":"high"`, twice; the dispatcher ran at medium.
+
+### Step 14: VERIFY, after the two review findings
+
+- The worktree holds no `node_modules` (ignored by git), so the first `npm test` failed only the lint and
+  typecheck gates: `ESLint is not installed ...`, `TypeScript is not installed ...`. The main checkout's
+  install (same `package-lock.json`) was linked in for the run and the link removed afterwards.
+- `npm test` → `tests 12761, pass 12761, fail 0, cancelled 0, skipped 0, todo 0`;
+  `[CTOC test-gate] coverage 99.86% (threshold 99%), skipped 0, failed 0`; `[CTOC test-gate] PASS`.
+- `eslint --max-warnings 0 tests/agent-model-floor.test.js` → clean.
+- Presence: `agents/iron-loop/iron-loop-critic.md` lines 5 and 6, `model: opus`, `effort: high`;
+  `agents/security/security-scanner.md` lines 5 and 6, `model: opus`, `effort: xhigh`.
 
 ### Decisions taken while building
 
