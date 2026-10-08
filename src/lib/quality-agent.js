@@ -545,11 +545,11 @@ function lastCap(text, re) {
  */
 function parsePassCount(out) {
   const text = stripAnsi(out);
-  const node = lastCap(text, /^\s*(?:#|ℹ)\s+pass\s+(\d+)/gim);
+  const node = lastCap(text, /^[ \t]*(?:#|ℹ)\s+pass\s+(\d+)/gim);
   if (node) return parseInt(node[1], 10);
-  const jest = lastCap(text, /^\s*Tests:\s.*?(\d+)\s+passed/gim);
+  const jest = lastCap(text, /^[ \t]*Tests:\s.*?(\d+)\s+passed/gim);
   if (jest) return parseInt(jest[1], 10);
-  const mocha = lastCap(text, /^\s*(\d+)\s+passing\b/gim);
+  const mocha = lastCap(text, /^[ \t]*(\d+)\s+passing\b/gim);
   if (mocha) return parseInt(mocha[1], 10);
   const legacy = text.match(/(\d+)\s*(passed|passing)/i);
   return legacy ? parseInt(legacy[1], 10) : null;
@@ -572,11 +572,11 @@ function parsePassCount(out) {
  */
 function parseFailCount(out) {
   const text = stripAnsi(out);
-  const node = lastCap(text, /^\s*(?:#|ℹ)\s+fail\s+(\d+)/gim);
+  const node = lastCap(text, /^[ \t]*(?:#|ℹ)\s+fail\s+(\d+)/gim);
   if (node) return parseInt(node[1], 10);
-  const jest = lastCap(text, /^\s*Tests:\s.*?(\d+)\s+failed/gim);
+  const jest = lastCap(text, /^[ \t]*Tests:\s.*?(\d+)\s+failed/gim);
   if (jest) return parseInt(jest[1], 10);
-  const mocha = lastCap(text, /^\s*(\d+)\s+failing\b/gim);
+  const mocha = lastCap(text, /^[ \t]*(\d+)\s+failing\b/gim);
   if (mocha) return parseInt(mocha[1], 10);
   return null;
 }
@@ -630,14 +630,14 @@ function hasTestSummaryEvidence(out) {
   const text = stripAnsi(out);
   return (
     // A sibling summary counter from the same block as `fail` (TAP `#` or spec `ℹ`).
-    /^\s*(?:#|ℹ)\s+(?:tests|suites|pass|cancelled|skipped|todo|duration_ms)\b/im.test(text)
+    /^[ \t]*(?:#|ℹ)\s+(?:tests|suites|pass|cancelled|skipped|todo|duration_ms)\b/im.test(text)
     // A fail-SHAPED counter line we could not read a number out of — a renamed key
     // (`ℹ failures 2`) or a malformed value. The dial is there; it is illegible.
-    || /^\s*(?:#|ℹ)\s+fail\w*\b/im.test(text)
+    || /^[ \t]*(?:#|ℹ)\s+fail\w*\b/im.test(text)
     // Raw TAP failure output with no readable aggregate: failures are evident and
     // unquantified. That is uncertified, never clean.
-    || /^\s*not ok\b/im.test(text)
-    || /^\s*TAP version\b/im.test(text)
+    || /^[ \t]*not ok\b/im.test(text)
+    || /^[ \t]*TAP version\b/im.test(text)
   );
 }
 
@@ -676,6 +676,24 @@ function counterText(result) {
   const reads = parseFailCount(result.stdout) !== null || parsePassCount(result.stdout) !== null
     || hasTestSummaryEvidence(result.stdout);
   return reads ? result.stdout : String(result.stderr);
+}
+
+/**
+ * The counters of an exit-0 run ({@link readRunnerCounters} on {@link counterText}), with
+ * one guard: a failure counted on EITHER stream fails the run. Standard output is read
+ * first so that standard error cannot outvote a failure there; the mirror case, a clean
+ * `fail 0` on standard output beside a `fail 1` on standard error, must not pass either.
+ * Every line-start pattern read here matches spaces and tabs only, never a line break,
+ * so a long blank stretch costs linear time.
+ * @param {{output: string, stdout?: string, stderr?: string}} result
+ * @returns {{passCount: number, failCount: (number|null), skipped: number, unreadable: boolean}}
+ */
+function runCounters(result) {
+  const read = readRunnerCounters(counterText(result));
+  if (typeof result.stdout !== 'string') return read;
+  const worst = Math.max(parseFailCount(result.stdout) || 0, parseFailCount(String(result.stderr)) || 0);
+  if (worst > (read.failCount || 0)) read.failCount = worst;
+  return read;
 }
 
 /**
@@ -888,7 +906,7 @@ function runSpecificTests(tools, testFiles) {
 
     // X4 — the runner exited 0. That is its CLAIM, not a verdict: read the instrument
     // and cross-check it. Same contract as runFullTests below.
-    const counters = readRunnerCounters(counterText(result));
+    const counters = runCounters(result);
 
     if (counters.unreadable) {
       return unreadableTestsResult(lang, totalPassed, totalSkipped);
@@ -974,7 +992,7 @@ async function runFullTests(tools) {
     // report FAILURES on stdout yet exit 0 (a wrapping `|| true`, `set +e`, jest
     // --passWithNoTests, or a reporter that swallows the child's exit code). This module's
     // verdict gates the push, so read the instrument and cross-check the claim.
-    const counters = readRunnerCounters(counterText(result));
+    const counters = runCounters(result);
 
     if (counters.unreadable) {
       // The instrument was THERE and we could not read it → UNCERTIFIED, never clean.

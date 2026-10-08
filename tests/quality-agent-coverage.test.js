@@ -1098,6 +1098,41 @@ describe('runFullTests and runSpecificTests — undetermined runs, standard erro
     });
   });
 
+  it('a failure on standard error refuses the run even when standard output reports none', async () => {
+    const mirrored = () => ({ status: 0, signal: null, stdout: '\u2139 pass 2\n\u2139 fail 0\n', stderr: '\u2139 pass 3\n\u2139 fail 1\n' });
+    await withExecSpies(mirrored, async (qa) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
+      assert.equal(res.passed, false, 'standard error reports a failure; a clean standard output cannot hide it');
+      assert.equal(res.failed, 1);
+      const specific = qa.runSpecificTests({ javascript: { test: 'node x' } }, ['a.test.js']);
+      assert.equal(specific.passed, false);
+      assert.equal(specific.failed, 1);
+      return {};
+    });
+  });
+
+  it('a passing run with a long blank stretch is read in linear time', async () => {
+    const cpuMs = async (fn) => {
+      const start = process.cpuUsage();
+      const res = await fn();
+      const used = process.cpuUsage(start);
+      return { ms: (used.user + used.system) / 1000, res };
+    };
+    const runWith = (stdout) => () => withExecSpies(() => stdout, async (qa) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
+      return { res };
+    });
+    const head = '\u2139 pass 1\n\u2139 fail 0\n';
+    const small = runWith(`${head}done\n`);
+    const a = await cpuMs(small);
+    const b = await cpuMs(runWith(`${head}${'\n'.repeat(32 * 1024)}done\n`));
+    const c = await cpuMs(small);
+    const extra = b.ms - Math.min(a.ms, c.ms);
+    assert.equal(b.res.res.passed, true, JSON.stringify(b.res.res));
+    assert.equal(b.res.res.passCount, 1);
+    assert.ok(extra < 100, `32 KB of blank lines cost ${extra.toFixed(1)} ms more processor time`);
+  });
+
   it('runCommandArgv without allowFail throws the shape execFileSync threw', () => {
     assert.throws(() => qualityAgent.runCommandArgv(NODE, ['-e', 'process.exit(3)'], { silent: true }), (err) => {
       assert.equal(err.status, 3);
