@@ -782,7 +782,10 @@ async function runTypecheck(tools) {
 }
 
 /**
- * Run specific test files using the appropriate framework command
+ * Run specific test files using the appropriate framework command. jest and vitest start
+ * through npx ({@link npmLauncher}); a run that printed more than 10 MiB, timed out or
+ * could not start answers the `undetermined` result ({@link undeterminedRunResult}),
+ * never a failure and never a pass.
  * @param {Object} tools - Detected tools per language
  * @param {string[]} testFiles - Specific test file paths
  * @returns {Object} Test result
@@ -879,7 +882,9 @@ function runSpecificTests(tools, testFiles) {
 }
 
 /**
- * Run all tests (full suite fallback)
+ * Run all tests (full suite fallback). A run that printed more than 10 MiB, timed out,
+ * could not start, or whose package.json test script is npm's placeholder answers the
+ * `undetermined` result ({@link undeterminedRunResult}), never a failure and never a pass.
  */
 async function runFullTests(tools) {
   // Finding A: a detector-undetermined test command is NOT a silent pass.

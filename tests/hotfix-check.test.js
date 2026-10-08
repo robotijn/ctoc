@@ -719,22 +719,22 @@ test('case 35: git settings in the repository change no answer', async (t) => {
   edit(plain);
   edit(set);
   await t.test('(a) the diff settings', async () => {
-    const reference = await both(plain, ['docs/guide.md']);
-    assert.equal(reference.log[reference.log.length - 1].lines, 4);
-    assert.deepEqual(await both(set, ['docs/guide.md']), reference);
-    assert.equal(reference.second.verdict, 'hotfix', JSON.stringify(reference.second));
+      const reference = await both(plain, ['docs/guide.md']);
+      assert.equal(reference.log[reference.log.length - 1].lines, 4);
+      assert.deepEqual(await both(set, ['docs/guide.md']), reference);
+      assert.equal(reference.second.verdict, 'hotfix', JSON.stringify(reference.second));
   });
   await t.test('(b) diff.autoRefreshIndex=false beside a file whose modification time moved', async () => {
-    const make = (config) => {
-      const root = makeRepo({ 'docs/guide.md': guide, 'docs/other.md': 'Other.\n' }, { config });
-      edit(root);
-      const later = new Date(Date.now() + 60000);
-      fs.utimesSync(path.join(root, 'docs/other.md'), later, later);
-      return root;
-    };
-    const refB = await both(make([]), []);
-    assert.deepEqual(await both(make([['diff.autoRefreshIndex', 'false']]), []), refB);
-    assertPass(refB.second, ['docs/guide.md']);
+      const make = (config) => {
+        const root = makeRepo({ 'docs/guide.md': guide, 'docs/other.md': 'Other.\n' }, { config });
+        edit(root);
+        const later = new Date(Date.now() + 60000);
+        fs.utimesSync(path.join(root, 'docs/other.md'), later, later);
+        return root;
+      };
+      const refB = await both(make([]), []);
+      assert.deepEqual(await both(make([['diff.autoRefreshIndex', 'false']]), []), refB);
+      assertPass(refB.second, ['docs/guide.md']);
   });
 });
 
@@ -847,37 +847,37 @@ test('case 43: the copy is gone after a pass, a refusal, failing tests, a timeou
     }, () => { throw new Error('runner exploded'); }]
   ];
   for (const [label, make, expect, replacement] of runs) await t.test(label, async () => {
-    const root = make();
-    addStaleWorktree(root);
-    const before = worktrees(root);
-    fs.rmSync(path.join(probe, 'ran.txt'), { force: true });
-    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-    if (replacement) {
-      t.mock.method(qualityAgent, 'runFullTests', async () => {
-        fs.writeFileSync(path.join(probe, 'ran.txt'), process.cwd());
-        return replacement();
-      });
-    }
-    const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/pages/home.html'));
-    t.mock.restoreAll();
-    const folder = probeRead(probe);
-    assert.ok(folder, `${label}: the tests ran`);
-    assert.notEqual(folder, root, `${label}: the tests ran in a copy`);
-    assert.equal(fs.existsSync(folder), false, `${label}: the copy is gone`);
-    assert.equal(fs.existsSync(copyParent(folder)), false, `${label}: its folder is gone`);
-    assert.equal(worktrees(root), before, `${label}: the worktree list is as before, the stale entry still listed`);
-    expect(res);
+      const root = make();
+      addStaleWorktree(root);
+      const before = worktrees(root);
+      fs.rmSync(path.join(probe, 'ran.txt'), { force: true });
+      fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+      if (replacement) {
+        t.mock.method(qualityAgent, 'runFullTests', async () => {
+          fs.writeFileSync(path.join(probe, 'ran.txt'), process.cwd());
+          return replacement();
+        });
+      }
+      const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/pages/home.html'));
+      t.mock.restoreAll();
+      const folder = probeRead(probe);
+      assert.ok(folder, `${label}: the tests ran`);
+      assert.notEqual(folder, root, `${label}: the tests ran in a copy`);
+      assert.equal(fs.existsSync(folder), false, `${label}: the copy is gone`);
+      assert.equal(fs.existsSync(copyParent(folder)), false, `${label}: its folder is gone`);
+      assert.equal(worktrees(root), before, `${label}: the worktree list is as before, the stale entry still listed`);
+      expect(res);
   });
   await t.test('a copy that cannot be removed is named in detail; the verdict stands', async () => {
-  const root = testedProject();
-  const before = worktrees(root);
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-  const realRm = fs.rmSync;
-  t.mock.method(fs, 'rmSync', (p, options) => {
-    if (path.basename(String(p)).startsWith('ctoc-hotfix-')) {
-      throw Object.assign(new Error('EBUSY: resource busy'), { code: 'EBUSY' });
-    }
-    return realRm(p, options);
+    const root = testedProject();
+    const before = worktrees(root);
+    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+    const realRm = fs.rmSync;
+    t.mock.method(fs, 'rmSync', (p, options) => {
+      if (path.basename(String(p)).startsWith('ctoc-hotfix-')) {
+        throw Object.assign(new Error('EBUSY: resource busy'), { code: 'EBUSY' });
+      }
+      return realRm(p, options);
   });
   const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/pages/home.html'));
   t.mock.restoreAll();
@@ -936,28 +936,28 @@ const LINK_REPORT = "  assert.equal(require('greet'), 'hello');\n"
 test('case 45: installed-package folders are linked into the copy, one link each, and left intact', async (t) => {
   const probe = probeDir();
   await t.test('(a) one link each, a directory link, no build folder, the owner\'s folders intact', async () => {
-  const root = linkedProject(LINK_REPORT);
-  const owned = () => ({ ...treeBytes(path.join(root, 'node_modules')), ...treeBytes(path.join(root, 'packages', 'a', 'node_modules')),
-    ...treeBytes(path.join(root, '.venv')) });
-  const before = owned();
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/pages/home.html'));
-  assert.notEqual(probeRead(probe), root, 'the tests ran in a copy');
-  assert.deepEqual(JSON.parse(probeRead(probe, 'links.json')), { node_modules: true, nested: true, venv: true, build: false });
-  assert.deepEqual(owned(), before, 'the owner\'s package folders are byte-identical');
-  assertPass(res, ['src/pages/home.html']);
+    const root = linkedProject(LINK_REPORT);
+    const owned = () => ({ ...treeBytes(path.join(root, 'node_modules')), ...treeBytes(path.join(root, 'packages', 'a', 'node_modules')),
+      ...treeBytes(path.join(root, '.venv')) });
+    const before = owned();
+    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+    const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/pages/home.html'));
+    assert.notEqual(probeRead(probe), root, 'the tests ran in a copy');
+    assert.deepEqual(JSON.parse(probeRead(probe, 'links.json')), { node_modules: true, nested: true, venv: true, build: false });
+    assert.deepEqual(owned(), before, 'the owner\'s package folders are byte-identical');
+    assertPass(res, ['src/pages/home.html']);
   });
   await t.test('(b) a link the tests removed counts as removed', async () => {
-  const removing = linkedProject(LINK_REPORT
-    + "  if (fs.lstatSync('node_modules').isSymbolicLink()) fs.unlinkSync('node_modules');\n");
-  const greet = treeBytes(path.join(removing, 'node_modules'));
-  fs.writeFileSync(path.join(removing, 'src/pages/home.html'), HOME_STORE);
-  const res2 = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(removing, '--run-tests', 'src/pages/home.html'));
-  const folder = probeRead(probe);
-  assert.equal(fs.existsSync(folder), false);
-  assert.equal(fs.existsSync(copyParent(folder)), false);
-  assert.deepEqual(treeBytes(path.join(removing, 'node_modules')), greet);
-  assertPass(res2, ['src/pages/home.html']);
+    const removing = linkedProject(LINK_REPORT
+      + "  if (fs.lstatSync('node_modules').isSymbolicLink()) fs.unlinkSync('node_modules');\n");
+    const greet = treeBytes(path.join(removing, 'node_modules'));
+    fs.writeFileSync(path.join(removing, 'src/pages/home.html'), HOME_STORE);
+    const res2 = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(removing, '--run-tests', 'src/pages/home.html'));
+    const folder = probeRead(probe);
+    assert.equal(fs.existsSync(folder), false);
+    assert.equal(fs.existsSync(copyParent(folder)), false);
+    assert.deepEqual(treeBytes(path.join(removing, 'node_modules')), greet);
+    assertPass(res2, ['src/pages/home.html']);
   });
 });
 
@@ -993,28 +993,28 @@ test('case 46: on Windows the links are directory junctions, elsewhere directory
 test('case 47: a judged file that changes during the check is refused', async (t) => {
   const probe = probeDir();
   await t.test('(a) while the tests run', async () => {
-  const edits = nodeTest('has a button', "  if (process.env.CTOC_HOTFIX_EDIT) fs.appendFileSync(process.env.CTOC_HOTFIX_EDIT, ' again');\n"
-    + "  assert.ok(read('src/pages/home.html').includes('<button>'));");
-  const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': edits }, { testScript: SCRIPT });
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-  const res = await withEnv({ CTOC_HOTFIX_EDIT: path.join(root, 'src', 'pages', 'home.html'), CTOC_HOTFIX_PROBE: probe },
-    () => check(root, '--run-tests', 'src/pages/home.html'));
-  assert.equal(res.text, unreadable('src/pages/home.html changed while it was being checked'), JSON.stringify(res));
-  assert.equal(logLines(root).pop().cause, 'unreadable');
-  assert.ok(probeRead(probe), 'the tests ran');
+    const edits = nodeTest('has a button', "  if (process.env.CTOC_HOTFIX_EDIT) fs.appendFileSync(process.env.CTOC_HOTFIX_EDIT, ' again');\n"
+      + "  assert.ok(read('src/pages/home.html').includes('<button>'));");
+    const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': edits }, { testScript: SCRIPT });
+    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+    const res = await withEnv({ CTOC_HOTFIX_EDIT: path.join(root, 'src', 'pages', 'home.html'), CTOC_HOTFIX_PROBE: probe },
+      () => check(root, '--run-tests', 'src/pages/home.html'));
+    assert.equal(res.text, unreadable('src/pages/home.html changed while it was being checked'), JSON.stringify(res));
+    assert.equal(logLines(root).pop().cause, 'unreadable');
+    assert.ok(probeRead(probe), 'the tests ran');
   });
   await t.test('(b) after the first hashing and before the content reaches the copy', async () => {
-  fs.rmSync(path.join(probe, 'ran.txt'), { force: true });
-  const other = testedProject();
-  fs.writeFileSync(path.join(other, 'src/pages/home.html'), HOME_STORE);
-  const realMkdir = safeFs.mkdirSync;
-  let first = true;
-  t.mock.method(safeFs, 'mkdirSync', (p, options) => {
-    if (first) {
-      first = false;
-      fs.appendFileSync(path.join(other, 'src', 'pages', 'home.html'), ' again');
-    }
-    return realMkdir(p, options);
+    fs.rmSync(path.join(probe, 'ran.txt'), { force: true });
+    const other = testedProject();
+    fs.writeFileSync(path.join(other, 'src/pages/home.html'), HOME_STORE);
+    const realMkdir = safeFs.mkdirSync;
+    let first = true;
+    t.mock.method(safeFs, 'mkdirSync', (p, options) => {
+      if (first) {
+        first = false;
+        fs.appendFileSync(path.join(other, 'src', 'pages', 'home.html'), ' again');
+      }
+      return realMkdir(p, options);
   });
   const res2 = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(other, '--run-tests', 'src/pages/home.html'));
   t.mock.restoreAll();
@@ -1141,6 +1141,20 @@ test('case 53: a link whose parent lies outside the copy stops the check before 
 });
 
 // Every branch of the check exercised (the trial build's cases, moved to the new contract).
+
+test('the test call refuses a deleted file or one replaced by a link before any copy, without hashing it', async () => {
+  const root = makeRepo({ 'docs/old.md': 'Old page.\n', 'docs/page.md': 'A page.\n' });
+  fs.rmSync(path.join(root, 'docs/old.md'));
+  await refusedUntouched(root, ['--run-tests', 'docs/old.md'], 'it adds, removes or renames docs/old.md');
+  let linked = true;
+  try {
+    fs.rmSync(path.join(root, 'docs/page.md'));
+    fs.symlinkSync('old.md', path.join(root, 'docs/page.md'));
+  } catch {
+    linked = false; // a platform that cannot make links has no such change
+  }
+  if (linked) await refusedUntouched(root, ['--run-tests', 'docs/page.md'], 'I do not recognise docs/page.md as wording or a colour');
+});
 
 test('a file that is not valid UTF-8 is not text', async () => {
   const root = makeRepo({ 'docs/latin.md': Buffer.from('Café old\n', 'latin1') });
