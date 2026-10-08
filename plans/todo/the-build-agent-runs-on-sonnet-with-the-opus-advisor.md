@@ -204,7 +204,7 @@ the runtime check that the change reaches a real dispatch.
   `tests/cto-chief-compaction.test.js` passes all ten checks.
 - [x] `npm test`: 0 failed, 0 skipped, coverage at or above `.ctoc/coverage-baseline.json`
   `minPct`.
-- [ ] Measured: one smoke dispatch of `iron-loop-executor` after the change. Its transcript shows
+- [x] Measured: one smoke dispatch of `iron-loop-executor` after the change. Its transcript shows
   the model identifier and whether the Opus advisor answered, and the record quotes both. If the
   transcript holds no advisor call, the record says the advisor was not exercised, never that it
   works.
@@ -289,7 +289,7 @@ the runtime check that the change reaches a real dispatch.
 ### Step 14: VERIFY
 - [x] `npm test`: 0 failed, 0 skipped, coverage at or above the floor. Re-measure `CLAUDE.md` and
   `agents/coordinator/cto-chief.md`.
-- [ ] Name the smoke dispatch for the session to run: `iron-loop-executor` with a brief that
+- [x] Name the smoke dispatch for the session to run: `iron-loop-executor` with a brief that
   changes no file, names the model it runs on and puts one question to its advisor. The session
   quotes the model identifier and the advisor lines from the transcript into the execution
   record, or writes that the advisor was not exercised.
@@ -299,7 +299,7 @@ the runtime check that the change reaches a real dispatch.
   above.
 
 ### Step 16: FINAL-REVIEW
-- [ ] Check every acceptance box against its evidence. The smoke result is quoted, not
+- [x] Check every acceptance box against its evidence. The smoke result is quoted, not
   summarised.
 
 
@@ -353,7 +353,7 @@ the runtime check that the change reaches a real dispatch.
 ### Step 16: FINAL-REVIEW
 - [ ] Verify steps 8-15 completed correctly
 - [ ] All quality checks passed
-- [ ] Manual verification if needed
+- [x] Manual verification if needed
 - [ ] Ready for human review
 
 
@@ -437,3 +437,41 @@ The model-rules paragraph stands after the "No agent declares `model: haiku`" pa
    it is needed — only its tracking.
 3. The `ceiling_corrections` entry follows the shape of the existing 2026-10-07 entry
    (`date`, `from`, `to`, `reason`).
+
+### Step 13 tightening (the security check's warning, 2026-10-08)
+
+The security check warned that the model-floor test's header claims no reviewer thinks with a
+smaller model than the builder, while `iron-loop/iron-loop-critic` (Steps 11 and 16) and
+`security/security-scanner` (Step 13) were not on `WATCHERS`, so only the Sonnet exemption list
+guarded them. By the coordinator's direction this round changes `WATCHERS`, which the plan's
+fourth acceptance criterion had held byte-identical; it only tightens.
+
+- Before adding: both agents declare `model: opus` and `effort: xhigh`; neither is in
+  `EFFORT_EXEMPT`, so the watcher effort guard ("no agent the owner ruled on is exempt from the
+  effort floor") holds for both. No other test reads `WATCHERS`. `iron-loop/iron-loop-integrator`
+  is left alone (classed as an actuator).
+- Change in `tests/agent-model-floor.test.js`: `loadAgents` now maps through a one-file
+  `loadAgent(file, id)`; the watcher comparison moved, text unchanged (`a.model !== 'opus'`), into
+  `watchersBelowFloor(byId)`, which the existing watcher case calls. New case "the reviewers of
+  Steps 11, 13 and 16 are watchers: a sonnet copy of either fails the watcher floor": for each of
+  the two agents it writes a temporary copy of the real file with only `model: opus` →
+  `model: sonnet`, parses its frontmatter, swaps it into the corpus map, and asserts the watcher
+  floor reports exactly that agent.
+- Red: `node --test tests/agent-model-floor.test.js`: tests 14, pass 13, fail 1, skipped 0; the new
+  case failed with `actual: []` (the sonnet copy was not caught).
+- Green after adding both ids to `WATCHERS` (in sorted position): the model-floor, CTO Chief
+  compaction, dispatch resolution, `CLAUDE.md` rule, watcher-shape and agent-modernization tests:
+  tests 74, pass 74, fail 0, skipped 0. `eslint --max-warnings 0` clean.
+- `npm test` (second run): tests 12,758, pass 12,758, fail 0, cancelled 0, skipped 0, todo 0;
+  coverage 99.88% (floor 99%); corpus claims verified 3, refuted 0; `[CTOC test-gate] PASS`.
+- Left as it is: the effort-guard failure message says "the 25 watchers raised to `model: opus`
+  by the owner's ruling (plan F3a)". The list already held 26 before this change and now holds 28;
+  the sentence describes that ruling's set, so it was not rewritten.
+- The trial results file is committed by the session with the release.
+
+### Smoke dispatch (session, 2026-10-08)
+
+Setup: a scratch git project with this branch's agents/iron-loop/iron-loop-executor.md copied to .claude/agents/iron-loop-executor.md (frontmatter `model: sonnet`, `effort: high`); the advisor came only from the user settings (`advisorModel: opus`), no `--advisor` flag; the dispatching headless session ran on `--model haiku`. Dispatch: Agent tool, `subagent_type` "iron-loop-executor", no `model` parameter, a no-edit smoke brief.
+Agent's report: "1. Model id: claude-sonnet-5-5" and "2. The advisor tool was available and answered. Its first sentence: 'report the model id exactly as your environment block states it, then hand back immediately.'"
+Session model usage: claude-haiku-5-5 out 943 (dispatcher), claude-sonnet-5-5 out 139 (the build agent), claude-opus-5-5 in 19,318 / out 439 (the only Opus in the session — the advisor).
+Conclusion: a dispatched build agent defined with `model: sonnet` runs on Sonnet 5.5 and reaches the Opus advisor configured in settings. Not tested: the marketplace-installed copy (it changes after this release ships and the owner updates).

@@ -33,6 +33,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const projectRoot = path.join(__dirname, '..');
@@ -95,23 +96,26 @@ function agentId(file) {
     .join('/');
 }
 
-/** Load every agent on disk as { id, file, rel, fm, model, models, effort, efforts }. */
+/** Load one agent file as { id, file, rel, fm, model, models, effort, efforts }. */
+function loadAgent(file, id = agentId(file)) {
+  const fm = parseFrontmatter(fs.readFileSync(file, 'utf8'));
+  const models = frontmatterValues(fm, 'model');
+  const efforts = frontmatterValues(fm, 'effort');
+  return {
+    id,
+    file,
+    rel: path.relative(projectRoot, file),
+    fm,
+    models,
+    model: models.length === 1 ? models[0] : null,
+    efforts,
+    effort: efforts.length === 1 ? efforts[0] : null,
+  };
+}
+
+/** Load every agent on disk. */
 function loadAgents() {
-  return walkAgentFiles(agentsRoot).map((file) => {
-    const fm = parseFrontmatter(fs.readFileSync(file, 'utf8'));
-    const models = frontmatterValues(fm, 'model');
-    const efforts = frontmatterValues(fm, 'effort');
-    return {
-      id: agentId(file),
-      file,
-      rel: path.relative(projectRoot, file),
-      fm,
-      models,
-      model: models.length === 1 ? models[0] : null,
-      efforts,
-      effort: efforts.length === 1 ? efforts[0] : null,
-    };
-  });
+  return walkAgentFiles(agentsRoot).map((file) => loadAgent(file));
 }
 
 const AGENTS = loadAgents();
@@ -139,6 +143,7 @@ const WATCHERS = [
   'frontend/visual-regression-checker',
   'infrastructure/ci-pipeline-checker',
   'infrastructure/docker-security-checker',
+  'iron-loop/iron-loop-critic',
   'quality/complexity-analyzer',
   'quality/consistency-checker',
   'quality/dead-code-detector',
@@ -146,6 +151,7 @@ const WATCHERS = [
   'quality/type-checker',
   'security/dependency-auditor',
   'security/dependency-checker',
+  'security/security-scanner',
   'specialized/accessibility-checker',
   'specialized/api-contract-validator',
   'specialized/configuration-validator',
@@ -348,6 +354,11 @@ const TOP_EFFORT = 'xhigh';
 // an empty list.
 const MIN_AGENT_FILES = 100;
 
+/** The watchers in `byId` (a Map of id → agent) that declare a model below opus. */
+function watchersBelowFloor(byId) {
+  return WATCHERS.map((id) => byId.get(id)).filter((a) => a.model !== 'opus');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('fence: agent model floor', () => {
@@ -387,7 +398,7 @@ describe('fence: agent model floor', () => {
         missing.map((id) => `  agents/${id}.md`).join('\n')
     );
 
-    const wrong = WATCHERS.map((id) => byId.get(id)).filter((a) => a.model !== 'opus');
+    const wrong = watchersBelowFloor(byId);
 
     assert.equal(
       wrong.length,
@@ -400,6 +411,32 @@ describe('fence: agent model floor', () => {
         `\n\nFIX: set \`model: opus\`. If this agent is NOT a watcher (it does not read code and\n` +
         `emit findings), remove it from WATCHERS and justify it in SONNET_EXEMPT instead.`
     );
+  });
+
+  it('the reviewers of Steps 11, 13 and 16 are watchers: a sonnet copy of either fails the watcher floor', () => {
+    // Read from a temporary copy of the real file with only its model line lowered, so the
+    // check runs on real frontmatter and the agents corpus is never touched.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-model-floor-'));
+    try {
+      for (const id of ['iron-loop/iron-loop-critic', 'security/security-scanner']) {
+        const real = AGENTS.find((a) => a.id === id);
+        assert.ok(real, `agents/${id}.md is missing`);
+        assert.equal(real.model, 'opus', `agents/${id}.md must declare model: opus`);
+        const copy = path.join(dir, path.basename(real.file));
+        const lowered = fs.readFileSync(real.file, 'utf8').replace(/^model: opus$/m, 'model: sonnet');
+        fs.writeFileSync(copy, lowered);
+        const sonnetCopy = loadAgent(copy, id);
+        assert.equal(sonnetCopy.model, 'sonnet', 'the temporary copy must declare model: sonnet');
+        const byId = new Map(AGENTS.map((a) => [a.id, a.id === id ? sonnetCopy : a]));
+        assert.deepEqual(
+          watchersBelowFloor(byId).map((a) => a.id),
+          [id],
+          `agents/${id}.md reviews the Sonnet builder's code; declared as sonnet it must fail the watcher floor`
+        );
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   // ---- Case 3: haiku is pinned to the documented exemption -------------------
