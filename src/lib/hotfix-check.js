@@ -9,8 +9,10 @@
  *   node "${CLAUDE_PLUGIN_ROOT}/src/commands/start.js" hotfix check [<file> ...]
  *       — instant: rules 1 to 7; no test runs and nothing about the project's tools is
  *         read. On a refusal, the sentence. When they hold: `verdict: 'checking'`, the one
- *         status line as `text`, and `next`, the exact route that runs the tests.
- *   ... hotfix check --run-tests [<file> ...]
+ *         status line as `text`, and `next`, the exact route that runs the tests:
+ *         `hotfix check --run-tests -- '<file>' ...` (`--` ends the options, so a file named
+ *         like an option, `--x.md`, still reaches the test run).
+ *   ... hotfix check --run-tests [--] [<file> ...]
  *       — the background test run: rules 1 to 7 again, then rule 8 in a temporary copy of
  *         the repository.
  * A pass answers `verdict: 'hotfix'`, `text: ''`, `tests` and `commit: { files, add,
@@ -32,8 +34,12 @@
  *   2  same files, same names            — nothing added, removed, renamed, re-moded, linked
  *   7  no test is edited                 — fix the code, not the tests
  *   4  only kinds that qualify           — documentation, visible text in markup, message
- *                                          catalogue values, colour values in stylesheets;
- *                                          never in a place that governs the work
+ *                                          catalogue values, colour values in stylesheets
+ *                                          (a named colour only in a property that carries
+ *                                          a colour or a custom property; `url(…)` is never
+ *                                          a colour); never in a place that governs the
+ *                                          work; `robots.txt`, `ads.txt`, `app-ads.txt`,
+ *                                          `security.txt` and `llms.txt` are settings
  *   5  not in a sensitive area           — 33 whole words in the path (auth, login, ...)
  *   6  no risk marker in wording         — no number, currency, %, address, e-mail, code
  *   3  size                              — at most 20 changed lines in at most 3 files
@@ -42,11 +48,18 @@
  * name an edited test and the kind of change ahead of size; all of 2 to 7 read the same
  * diff, so the order costs nothing, and the tests still run last.
  *
+ * NO CODE OF THE REPOSITORY'S RUNS. The check's temporary folder (`mkdtemp` under the
+ * system's temporary folder) and its empty `no-hooks` folder are made before the first git
+ * call, and every git call carries `-c core.hooksPath=<no-hooks> -c core.fsmonitor=false`
+ * (in `runGit`, so no call can miss it): no repository hook (`post-index-change` among
+ * them) and no configured file-system monitor command runs. The repository's smudge
+ * filters still run where git writes files (`worktree add`), on purpose.
+ *
  * THE COPY OF THE REPOSITORY'S INDEX. A diff against the working tree refreshes the index
  * it reads and rewrites it, whatever GIT_OPTIONAL_LOCKS says (verified, the plan's
  * Decision 44). So each call copies the repository's own index (`rev-parse --git-path
  * index`, the right one for a linked worktree too) into the check's own temporary folder
- * (`mkdtemp` under the system's temporary folder) with its modification time kept, and
+ * with its modification time kept, and
  * every git call in the main repository names that copy through GIT_INDEX_FILE: the
  * listings, the diffs, `cat-file`, the hashings. The exceptions are rule 8's: the four
  * calls on its temporary index name that one, and `worktree add`, `worktree remove` and
@@ -61,9 +74,8 @@
  * records are one set.
  *
  * RULE 8 — THE TEMPORARY COPY. The tests never run in the working folder. In the check's
- * temporary folder: an empty `no-hooks` folder; `tree`, a detached worktree of the last
- * commit made with that empty hooks folder and the file-system monitor off (the
- * repository's smudge filters still run, on purpose); the judged change carried in as a
+ * temporary folder: `tree`, a detached worktree of the last commit; the judged change
+ * carried in as a
  * `--binary --full-index` patch built through a temporary index (`read-tree`, `add
  * --all`, `ls-files --stage`, `diff --cached`) and applied by `git apply` inside the copy;
  * every ignored `node_modules` and every ignored folder holding `pyvenv.cfg` linked in
@@ -76,9 +88,12 @@
  * else the whole suite, all through the quality agent, with the working directory set to
  * the copy and the quality agent's progress lines kept off the menu's JSON.
  * Removal, on every path of both calls, after the working directory is restored: every
- * link unlinked by itself (one already gone counts as removed), then `git worktree remove
- * --force` of exactly the copy's worktree, then the folder; the first failure stops it and
- * is named in `detail`. Worktrees are never pruned.
+ * link unlinked by itself (one already gone, or whose folder is gone, counts as removed),
+ * each only while its folder's real path still lies inside the temporary folder (the tests
+ * may have swapped the copy for a link elsewhere), then `git worktree remove --force` of
+ * exactly the copy's worktree, then the folder; the first failure stops it and is named in
+ * `detail`. Worktrees are never pruned. While the temporary folder exists, SIGINT, SIGTERM
+ * and SIGHUP first run the same removal, then raise the signal again.
  *
  * THE CLAUSES (inside "I did not treat this as a hotfix because <clause>; it goes through
  * a normal plan, and your edits stay in place, not committed."), with the cause word the
@@ -173,6 +188,8 @@ const BUILD_TEXT_NAMES = new Set(['CMakeLists.txt', 'runtime.txt']);
 const BUILD_NAMES = new Set(['Makefile', 'Jenkinsfile', 'Procfile', 'Vagrantfile', '.gitlab-ci.yml',
   'docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml', ...BUILD_TEXT_NAMES]);
 const BUILD_FOLDERS = new Set(['.github', '.gitlab', '.circleci', '.buildkite']);
+/** Text files that crawlers, advertisers, security researchers and language models read as settings. */
+const SETTINGS_TEXT_NAMES = new Set(['robots.txt', 'ads.txt', 'app-ads.txt', 'security.txt', 'llms.txt']);
 const SETTINGS_EXT = new Set(['.json', '.yaml', '.yml', '.toml', '.ini', '.conf', '.cfg', '.properties',
   '.xml', '.plist']);
 const CODE_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.py', '.rb', '.go', '.rs', '.java',
@@ -183,6 +200,10 @@ const SENSITIVE_WORDS = new Set(['auth', 'login', 'logout', 'password', 'session
   'credential', 'key', 'permission', 'role', 'admin', 'payment', 'billing', 'checkout', 'price', 'pricing',
   'invoice', 'tax', 'legal', 'terms', 'privacy', 'consent', 'cookie', 'gdpr', 'license', 'migration',
   'schema', 'database', 'sql', 'deploy', 'workflow', 'ci']);
+/** The shorthand properties that may carry a colour; every property ending in `color` may too. */
+const COLOUR_SHORTHANDS = new Set(['background', 'border', 'border-top', 'border-right', 'border-bottom', 'border-left',
+  'border-block', 'border-block-start', 'border-block-end', 'border-inline', 'border-inline-start', 'border-inline-end',
+  'outline', 'column-rule', 'fill', 'stroke', 'box-shadow', 'text-shadow', 'text-decoration', 'text-emphasis']);
 /** The 148 named colours of CSS Color Module Level 4, plus `transparent`. */
 const NAMED_COLOURS = new Set(('aliceblue antiquewhite aqua aquamarine azure beige bisque black '
   + 'blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue '
@@ -240,6 +261,7 @@ const ANSI = /\u001b\[[0-9;:<=>?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|
  * @property {(string|null)} top the repository's top level (real path)
  * @property {(string|null)} head the last commit's full id
  * @property {(string|null)} tmp the check's temporary folder (real path)
+ * @property {(string|null)} noHooks the empty folder inside `tmp` every git call names as its hooks folder
  * @property {(string|null)} repoIndex the copy of the repository's index, inside `tmp`
  * @property {(string|null)} worktree the copy's worktree, once `worktree add` made it
  * @property {string[]} links every link made in the copy
@@ -258,21 +280,26 @@ class Unreadable extends Error {
 
 /**
  * Rule 1 — the one way git is called: an argument vector (no shell), fixed settings and
- * environment, git's redirecting variables removed, output kept as a buffer. `index`
+ * environment, git's redirecting variables removed, output kept as a buffer. Every call
+ * runs no code of the repository's: `core.hooksPath` names the check's own empty
+ * `no-hooks` folder (so no hook, `post-index-change` among them, runs) and
+ * `core.fsmonitor=false` (so no configured file-system monitor command runs). `index`
  * names the index the call reads (GIT_INDEX_FILE); `input` is handed on standard input.
  * A missing git is the "not installed" clause.
+ * @param {Context} ctx the check's context; its `noHooks` folder exists before any git call
  * @param {string} cwd
  * @param {string[]} args
  * @param {{index?: (string|null), input?: Buffer}} [opts]
  * @returns {{status: (number|null), stdout: Buffer, stderr: Buffer}}
  */
-function runGit(cwd, args, { index = null, input } = {}) {
+function runGit(ctx, cwd, args, { index = null, input } = {}) {
   /** @type {NodeJS.ProcessEnv} */
   const env = { ...process.env, LC_ALL: 'C', GIT_PAGER: 'cat', GIT_OPTIONAL_LOCKS: '0',
     GIT_TERMINAL_PROMPT: '0', GIT_LITERAL_PATHSPECS: '1' };
   for (const name of GIT_REDIRECTS) delete env[name];
   if (index) env.GIT_INDEX_FILE = index;
-  const r = spawnSync('git', ['-c', 'core.quotepath=false', '-c', 'diff.autoRefreshIndex=true', ...args],
+  const r = spawnSync('git', ['-c', `core.hooksPath=${ctx.noHooks}`, '-c', 'core.fsmonitor=false',
+    '-c', 'core.quotepath=false', '-c', 'diff.autoRefreshIndex=true', ...args],
     { cwd, env, input, maxBuffer: 64 * 1024 * 1024, windowsHide: true });
   if (r.error) {
     if (/** @type {NodeJS.ErrnoException} */ (r.error).code === 'ENOENT') throw new Unreadable('git is not installed');
@@ -283,13 +310,14 @@ function runGit(cwd, args, { index = null, input } = {}) {
 
 /**
  * {@link runGit} that throws (the "check stopped" clause) when git exits non-zero.
+ * @param {Context} ctx
  * @param {string} cwd
  * @param {string[]} args
  * @param {{index?: (string|null), input?: Buffer}} [opts]
  * @returns {Buffer}
  */
-function gitOut(cwd, args, opts) {
-  const r = runGit(cwd, args, opts);
+function gitOut(ctx, cwd, args, opts) {
+  const r = runGit(ctx, cwd, args, opts);
   if (r.status !== 0) throw new Error(`git ${args.find((a) => !a.startsWith('-') && !a.includes('='))} failed: ${r.stderr.toString('utf8').trim()}`);
   return r.stdout;
 }
@@ -434,25 +462,35 @@ function hashJudged(ctx, files) {
     else ids.set(f.topRel, st ? 'not a file' : 'deleted');
   }
   if (regular.length > 0) {
-    const out = gitOut(top, ['hash-object', '--', ...regular], { index: ctx.repoIndex }).toString('utf8').trim().split('\n');
+    const out = gitOut(ctx, top, ['hash-object', '--', ...regular], { index: ctx.repoIndex }).toString('utf8').trim().split('\n');
     regular.forEach((rel, i) => ids.set(rel, out[i]));
   }
   return ids;
 }
 
 /**
- * Rule 1 — the copy of the repository's index (Decision 44): the check's own temporary
- * folder under the system's temporary folder, and in it the index `rev-parse --git-path
- * index` names, its modification time kept (git trusts a cached file time only when it is
- * older than the index file's own). Every later read in the main repository names it.
+ * The check's own temporary folder under the system's temporary folder (real path), made
+ * before any git call, and in it the empty `no-hooks` folder every git call names as its
+ * hooks folder ({@link runGit}).
+ * @param {Context} ctx
+ */
+function makeTmp(ctx) {
+  ctx.tmp = realPath(safeFs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-hotfix-')));
+  ctx.noHooks = path.join(ctx.tmp, 'no-hooks');
+  safeFs.mkdirSync(ctx.noHooks);
+}
+
+/**
+ * Rule 1 — the copy of the repository's index (Decision 44): in the check's temporary
+ * folder, the index `rev-parse --git-path index` names, its modification time kept (git
+ * trusts a cached file time only when it is older than the index file's own). Every later
+ * read in the main repository names it.
  * @param {Context} ctx
  */
 function copyIndex(ctx) {
   const top = /** @type {string} */ (ctx.top);
-  const index = path.resolve(top, gitOut(top, ['rev-parse', '--git-path', 'index']).toString('utf8').trim());
-  ctx.tmp = safeFs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-hotfix-'));
-  ctx.tmp = realPath(ctx.tmp);
-  ctx.repoIndex = path.join(ctx.tmp, 'repo-index');
+  const index = path.resolve(top, gitOut(ctx, top, ['rev-parse', '--git-path', 'index']).toString('utf8').trim());
+  ctx.repoIndex = path.join(/** @type {string} */ (ctx.tmp), 'repo-index');
   safeFs.cpSync(index, ctx.repoIndex, { preserveTimestamps: true });
 }
 
@@ -469,24 +507,24 @@ function copyIndex(ctx) {
  */
 function readChange(root, named, ctx, runTests) {
   const realRoot = realPath(root);
-  const topRun = runGit(realRoot, ['rev-parse', '--show-toplevel']);
+  const topRun = runGit(ctx, realRoot, ['rev-parse', '--show-toplevel']);
   if (topRun.status !== 0) throw new Unreadable('this folder is not a git repository');
   const top = realPath(topRun.stdout.toString('utf8').trim());
   const rootRel = path.relative(top, realRoot);
   if (climbsOut(rootRel)) throw new Unreadable('this folder lies outside the repository git reports');
-  const headRun = runGit(top, ['rev-parse', '--verify', '-q', 'HEAD^{commit}']);
+  const headRun = runGit(ctx, top, ['rev-parse', '--verify', '-q', 'HEAD^{commit}']);
   if (headRun.status !== 0) throw new Unreadable('this folder has no commit to compare with');
   ctx.top = top;
   ctx.head = headRun.stdout.toString('utf8').trim();
   copyIndex(ctx);
-  const read = (args) => gitOut(top, args, { index: ctx.repoIndex });
+  const read = (args) => gitOut(ctx, top, args, { index: ctx.repoIndex });
 
   const rootFromTop = slash(rootRel);
   const toTop = (rel) => (rootFromTop ? `${rootFromTop}/${rel}` : rel);
   const wanted = named.map((arg) => {
     const written = arg.replace(/\\/g, '/');
     const rel = path.relative(realRoot, path.resolve(realRoot, written));
-    if (rel === '' || climbsOut(rel)) throw new Unreadable(`${written} is outside this project`);
+    if (rel === '' || climbsOut(rel)) throw new Unreadable(`${written.replace(CONTROL_CHARS, ' ')} is outside this project`);
     return { display: slash(rel), topRel: toTop(slash(rel)) };
   });
   const specs = wanted.length > 0 ? wanted.map((w) => w.topRel) : (rootFromTop ? [rootFromTop] : []);
@@ -507,7 +545,7 @@ function readChange(root, named, ctx, runTests) {
 
   for (const w of wanted) {
     if (!entries.some((e) => e.topRel === w.topRel || e.topRel.startsWith(`${w.topRel}/`))) {
-      throw new Unreadable(`${w.display} holds no change that git would commit`);
+      throw new Unreadable(`${w.display.replace(CONTROL_CHARS, ' ')} holds no change that git would commit`);
     }
   }
   /** @type {ChangedFile[]} */
@@ -627,17 +665,24 @@ function closesElement(line, at, name) {
 
 /**
  * Rule 4 (markup) — the 1-based line numbers inside `<script>`, `<style>` and
- * `<textarea>` blocks (letter case ignored; an unclosed block runs to the end).
+ * `<textarea>` blocks (letter case ignored; an unclosed block runs to the end). Blocks are
+ * found in order, so line breaks are counted once, forward (counting from the top for every
+ * block took 5.3 s for 20,000 blocks).
  * @param {string} text
  * @returns {Set<number>}
  */
 function blockedLines(text) {
   const blocked = new Set();
   const lower = text.toLowerCase();
+  let line = 1;
+  let nextBreak = text.indexOf('\n');
+  /** @param {number} idx an offset no smaller than the one asked before @returns {number} its line */
   const lineAt = (idx) => {
-    let n = 1;
-    for (let i = text.indexOf('\n'); i !== -1 && i < idx; i = text.indexOf('\n', i + 1)) n++;
-    return n;
+    while (nextBreak !== -1 && nextBreak < idx) {
+      line++;
+      nextBreak = text.indexOf('\n', nextBreak + 1);
+    }
+    return line;
   };
   const open = /<(script|style|textarea)(?=[\s>/]|$)/gi;
   let m;
@@ -671,8 +716,11 @@ function* linePairs(hunks) {
 function catalogueEntry(line, ext) {
   let m;
   if (ext === '.json') {
-    m = /^(\s*"(?:[^"\\]|\\.)*"\s*:\s*)"((?:[^"\\]|\\.)*)"(\s*,?\s*)$/.exec(line);
-    return m ? { key: `${m[1]}\u0000${m[3]}`, value: m[2] } : null;
+    // The tail is one run of white space and commas, at most one comma, read in one pass
+    // (`\s*,?\s*` tried every split of the white space: 100,000 trailing spaces before a
+    // stray character took 3.7 s; `\s*(?:,\s*)?` is refused by the unsafe-pattern lint rule).
+    m = /^(\s*"(?:[^"\\]|\\.)*"\s*:\s*)"((?:[^"\\]|\\.)*)"([\s,]*)$/.exec(line);
+    return m && m[3].indexOf(',') === m[3].lastIndexOf(',') ? { key: `${m[1]}\u0000${m[3]}`, value: m[2] } : null;
   }
   if (ext === '.po') {
     m = /^(msgstr(?:\[\d\]|\[\d\d\])?[ \t]+)"((?:[^"\\]|\\.)*)"\s*$/.exec(line);
@@ -697,12 +745,14 @@ const placeholders = (value) => (value.match(PLACEHOLDER) || []).sort().join('\u
 
 /**
  * Rule 4 (colour) — the colour tokens on a line, each standing alone between the
- * separators the plan names.
- * @param {string} line
+ * separators the plan names. Every `url(…)` span is blanked first (same length), so a
+ * fragment address such as `url(#fade)` is never read as a colour.
+ * @param {string} text
  * @returns {Array<{t: string, i: number, j: number}>}
  */
-function colourTokens(line) {
+function colourTokens(text) {
   const out = [];
+  const line = text.replace(/url\([^)]*\)?/gi, (span) => '\u0002'.repeat(span.length));
   const re = /#[0-9A-Fa-f]+|(?:rgba?|hsla?)\([^()]*\)|[A-Za-z]+/g;
   let m;
   while ((m = re.exec(line)) !== null) {
@@ -717,23 +767,75 @@ function colourTokens(line) {
   return out;
 }
 
-/** Rule 4 (colour) — a token stands in a declaration value (`prop: … <token>`). */
-function inDeclaration(line, i) {
-  const from = i === 0 ? 0 : Math.max(line.lastIndexOf('{', i - 1), line.lastIndexOf(';', i - 1)) + 1;
-  return /^\s*(--[\w-]+|\$[\w-]+|@[\w-]+|[A-Za-z-]+)\s*:[^;{}]*$/.test(line.slice(from, i));
+/**
+ * Rule 4 (colour) — for each token, in order, the property whose declaration value it
+ * stands in (`prop: … <token>`, the declaration starting after the last `{` or `;`, with no
+ * `}` since), or null. One pass over the line, the property read once per declaration.
+ * @param {string} line
+ * @param {Array<{i: number}>} toks the line's tokens, in order
+ * @returns {Array<(string|null)>}
+ */
+function declarationsOf(line, toks) {
+  const head = /\s*(--[\w-]+|\$[\w-]+|@[\w-]+|[A-Za-z-]+)\s*:/y;
+  const out = [];
+  let scan = 0;
+  let start = 0;
+  let afterBrace = false;
+  /** @type {{name: string, valueAt: number}|null|undefined} the current declaration's property, once read */
+  let prop;
+  for (const t of toks) {
+    for (; scan < t.i; scan++) {
+      const c = line[scan];
+      if (c === '{' || c === ';' || c === '}') {
+        start = scan + 1;
+        afterBrace = c === '}';
+        prop = undefined;
+      }
+    }
+    if (prop === undefined) {
+      head.lastIndex = start;
+      const m = afterBrace ? null : head.exec(line);
+      prop = m ? { name: m[1], valueAt: head.lastIndex } : null;
+    }
+    out.push(prop && prop.valueAt <= t.i ? prop.name : null);
+  }
+  return out;
 }
 
-/** Rule 4 (colour) — the pair differs only in colours that stand in declaration values. */
+/** @param {string} prop @returns {boolean} a custom property or variable, or a property that carries a colour */
+const colourBearing = (prop) => /^(?:--|\$|@)/.test(prop) || /(?:^|-)color$/i.test(prop) || COLOUR_SHORTHANDS.has(prop.toLowerCase());
+
+/** @param {string} t @param {(string|null)} prop @returns {boolean} the token may stand there as a colour */
+const colourMayStand = (t, prop) => prop !== null && (t[0] === '#' || t.includes('(') || colourBearing(prop));
+
+/** @param {string} line @param {Array<{i: number, j: number}>} toks @returns {string} the line with each token replaced by one marker, built in one pass */
+function masked(line, toks) {
+  const parts = [];
+  let at = 0;
+  for (const t of toks) {
+    parts.push(line.slice(at, t.i));
+    at = t.j;
+  }
+  parts.push(line.slice(at));
+  return parts.join('\u0001');
+}
+
+/**
+ * Rule 4 (colour) — the pair differs only in colours that stand in declaration values; a
+ * named colour (`red`) only in a property that carries a colour or in a custom property or
+ * variable, so `animation: red 2s` is never a colour. Linear in the line's length.
+ */
 function colourEdit(o, n) {
   const a = colourTokens(o);
   const b = colourTokens(n);
-  const mask = (line, toks) => toks.reduceRight((s, t) => s.slice(0, t.i) + '\u0001' + s.slice(t.j), line);
-  if (a.length !== b.length || mask(o, a) !== mask(n, b)) return false;
+  if (a.length !== b.length || masked(o, a) !== masked(n, b)) return false;
+  const pa = declarationsOf(o, a);
+  const pb = declarationsOf(n, b);
   let changed = 0;
   for (let k = 0; k < a.length; k++) {
     if (a[k].t === b[k].t) continue;
     changed++;
-    if (!inDeclaration(o, a[k].i) || !inDeclaration(n, b[k].i)) return false;
+    if (!colourMayStand(a[k].t, pa[k]) || !colourMayStand(b[k].t, pb[k])) return false;
   }
   return changed > 0;
 }
@@ -767,9 +869,10 @@ function ruleKind(f) {
   const isDependency = DEPENDENCY_NAMES.has(base) || /^(requirements|constraints).*\.txt$/i.test(base)
     || (ext === '.txt' && folders.includes('requirements'));
   const governing = base.toLowerCase() === 'claude.md' || folders.some((p) => GOVERNING_FOLDERS.has(p));
+  const settingsText = SETTINGS_TEXT_NAMES.has(base.toLowerCase());
 
   let kind = null;
-  if (DOC_EXT.has(ext) && !isDependency && !BUILD_TEXT_NAMES.has(base)) kind = 'documentation';
+  if (DOC_EXT.has(ext) && !isDependency && !BUILD_TEXT_NAMES.has(base) && !settingsText) kind = 'documentation';
   else if (MARKUP_EXT.has(ext)) kind = 'markup';
   else if (CATALOGUE_EXT.has(ext) && folders.some((p) => CATALOGUE_FOLDERS.has(p))) kind = 'catalogue';
   else if (COLOUR_EXT.has(ext)) kind = 'colour';
@@ -815,7 +918,7 @@ function ruleKind(f) {
     || folders.some((p) => BUILD_FOLDERS.has(p))) {
     return { clause: `it changes how the project is built or shipped in ${d}`, cause: 'build' };
   }
-  if (SETTINGS_EXT.has(ext) || base === '.env' || base.startsWith('.env.')) {
+  if (SETTINGS_EXT.has(ext) || settingsText || base === '.env' || base.startsWith('.env.')) {
     return { clause: `it changes a setting in ${d}, and settings changes are a common cause of outages`, cause: 'setting' };
   }
   if (CODE_EXT.has(ext)) {
@@ -901,7 +1004,9 @@ async function inProject(dir, fn) {
 
 /**
  * Rule 8 — the first failing test, read from the run's output: `<file>: <name>`, or
- * whichever of the two was read, or a plain statement that the command failed.
+ * whichever of the two was read, or a plain statement that the command failed. Every
+ * line-start pattern matches spaces and tabs only, never a line break, so it cannot try
+ * every later line from every line start (195 KB of blank lines took 68.6 s that way).
  * @param {string} output standard output and standard error together
  * @param {string} root the copy's project root (real path), so the file reads as the same path in the working folder
  * @returns {string}
@@ -910,7 +1015,7 @@ function firstFailingTest(output, root) {
   const text = String(output).replace(ANSI, '');
   const lines = text.split(/\r?\n/);
   let name = null;
-  let m = /^\s*not ok \d+ - (.+)$/m.exec(text);
+  let m = /^[ \t]*not ok \d+ - (.+)$/m.exec(text);
   if (m) name = m[1].trim();
   if (!name) {
     for (const line of lines) {
@@ -918,9 +1023,9 @@ function firstFailingTest(output, root) {
       if (s && s[1].trim() !== 'failing tests:') { name = s[1].replace(/ \([\d.]+m?s\)$/, '').trim(); break; }
     }
   }
-  if (!name && (m = /^\s*● (.+)$/m.exec(text))) name = m[1].trim();
+  if (!name && (m = /^[ \t]*● (.+)$/m.exec(text))) name = m[1].trim();
   let file = null;
-  for (const re of [/^\s*location: '(.+):\d+:\d+'\s*$/m, /^\s*test at (.+):\d+:\d+\s*$/m, /^\s*FAIL (\S+)/m]) {
+  for (const re of [/^[ \t]*location: '(.+):\d+:\d+'[ \t]*$/m, /^[ \t]*test at (.+):\d+:\d+[ \t]*$/m, /^[ \t]*FAIL (\S+)/m]) {
     if ((m = re.exec(text))) { file = m[1]; break; }
   }
   if (file !== null) {
@@ -954,7 +1059,7 @@ function linkInstalledPackages(ctx, tree) {
   const top = /** @type {string} */ (ctx.top);
   const treeReal = realPath(tree);
   const linked = { nodeModules: [], venvs: [] };
-  const listed = gitOut(top, ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z'],
+  const listed = gitOut(ctx, top, ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z'],
     { index: ctx.repoIndex }).toString('utf8').split('\0').filter(Boolean);
   for (const entry of listed) {
     const rel = entry.replace(/\/$/, '');
@@ -1035,7 +1140,7 @@ function refuseWorkBehindLinks(change, ctx, linked) {
   const top = /** @type {string} */ (ctx.top);
   const targets = installedTargets(top, linked);
   if (targets.length === 0) return;
-  const read = (args) => gitOut(top, args, { index: ctx.repoIndex }).toString('utf8').split('\0').filter(Boolean);
+  const read = (args) => gitOut(ctx, top, args, { index: ctx.repoIndex }).toString('utf8').split('\0').filter(Boolean);
   const judged = new Set(change.files.map((f) => f.topRel));
   const ctoc = change.rootFromTop ? `${change.rootFromTop}/.ctoc/` : '.ctoc/';
   const work = [...read(['diff', 'HEAD', '--name-only', '-z', ...FIXED_DIFF]), ...read(['ls-files', '--others', '--exclude-standard', '-z'])]
@@ -1061,20 +1166,18 @@ async function ruleTestsInCopy(change, ctx) {
   const top = /** @type {string} */ (ctx.top);
   const tmp = /** @type {string} */ (ctx.tmp);
   const head = /** @type {string} */ (ctx.head);
-  const noHooks = path.join(tmp, 'no-hooks');
-  safeFs.mkdirSync(noHooks);
   const tree = path.join(tmp, 'tree');
-  gitOut(top, ['-c', `core.hooksPath=${noHooks}`, '-c', 'core.fsmonitor=false', 'worktree', 'add', '--detach', '--quiet', tree, head]);
+  gitOut(ctx, top, ['worktree', 'add', '--detach', '--quiet', tree, head]);
   ctx.worktree = tree;
 
   // The patch, through a temporary index that holds exactly the last commit plus the
   // judged files as they are in the working folder; the repository's index is never named.
   const temp = { index: path.join(tmp, 'index') };
   const judged = change.files.map((f) => f.topRel);
-  gitOut(top, ['read-tree', head], temp);
-  gitOut(top, ['add', '--all', '--', ...judged], temp);
+  gitOut(ctx, top, ['read-tree', head], temp);
+  gitOut(ctx, top, ['add', '--all', '--', ...judged], temp);
   const staged = new Map();
-  for (const entry of gitOut(top, ['ls-files', '--stage', '-z', '--', ...judged], temp).toString('utf8').split('\0').filter(Boolean)) {
+  for (const entry of gitOut(ctx, top, ['ls-files', '--stage', '-z', '--', ...judged], temp).toString('utf8').split('\0').filter(Boolean)) {
     const tab = entry.indexOf('\t');
     staged.set(entry.slice(tab + 1), entry.slice(0, tab).split(' ')[1]);
   }
@@ -1082,10 +1185,10 @@ async function ruleTestsInCopy(change, ctx) {
     f.stagedId = staged.get(f.topRel) || 'deleted';
     if (f.stagedId !== f.firstHash) throw new Unreadable(`${f.display} changed while it was being checked`);
   }
-  const patch = gitOut(top, ['-c', 'diff.suppressBlankEmpty=false', 'diff', '--cached', head, '--binary', '--full-index',
+  const patch = gitOut(ctx, top, ['-c', 'diff.suppressBlankEmpty=false', 'diff', '--cached', head, '--binary', '--full-index',
     '-U3', '--no-color', '--no-ext-diff', '--no-textconv', '--no-renames', '--no-relative', '--src-prefix=a/', '--dst-prefix=b/'], temp);
   if (patch.length > 0) {
-    const applied = runGit(tree, ['-c', 'core.fsmonitor=false', '-c', 'apply.ignoreWhitespace=no', 'apply', '--whitespace=nowarn'], { input: patch });
+    const applied = runGit(ctx, tree, ['-c', 'apply.ignoreWhitespace=no', 'apply', '--whitespace=nowarn'], { input: patch });
     if (applied.status !== 0) {
       throw new Unreadable('the change does not apply cleanly to a fresh copy of the last commit',
         clean(applied.stderr.toString('utf8').split('\n')[0]));
@@ -1115,34 +1218,76 @@ async function ruleTestsInCopy(change, ctx) {
     return change.files.every((f) => f.kind === 'documentation') ? { tests: DOC_ONLY } : NO_TEST_RAN;
   }
   if (run.passed === true && run.passCount > 0) return { tests: `${run.passCount} ${run.passCount === 1 ? 'test' : 'tests'} passed.` };
-  if (run.passed === true || run.undetermined) return NO_TEST_RAN;
+  // A run that never started, could not be read, or whose command was refused before it ran
+  // (shell structure in a tracked quality setting) is "no test ran", never a failing test.
+  if (run.passed === true || run.undetermined || run.refused) return NO_TEST_RAN;
   return { clause: `the existing tests fail (${firstFailingTest(run.output, copyRoot)})`, cause: 'tests-fail' };
 }
 
 /**
  * Remove everything the check made, in this order, stopping at the first failure: every
- * link by itself (never the folder it points to; one already gone counts as removed), the
- * copy's own worktree registration and files (`worktree remove --force`; nothing is
- * pruned), then the temporary folder. Never throws.
+ * link by itself (never the folder it points to; one already gone, or whose folder is gone,
+ * counts as removed), the copy's own worktree registration and files (`worktree remove
+ * --force`; nothing is pruned; git refuses a worktree that is no longer the one it
+ * registered), then the temporary folder. Before each link is unlinked, its folder's real
+ * path must still lie inside the temporary folder: the tests may have replaced the copy, or
+ * a folder in it, by a link to somewhere else, and unlinking through that would delete a
+ * file outside the copy; then removal stops and says so. Runs once: a second call (the
+ * signal handler's, or the normal path's after it) finds nothing to do. Never throws.
  * @param {Context} ctx
  * @returns {(string|null)} what could not be removed, for `detail`
  */
 function removeCopy(ctx) {
-  if (!ctx.tmp) return null;
+  const tmp = ctx.tmp;
+  if (!tmp) return null;
+  ctx.tmp = null;
   try {
     for (const link of ctx.links) {
+      let folder;
+      try {
+        folder = realPath(path.dirname(link));
+      } catch {
+        continue; // its folder is gone, and the link with it
+      }
+      if (!within(tmp, folder)) throw new Error("a link's folder moved outside it");
       try {
         safeFs.unlinkSync(link);
       } catch (err) {
         if (/** @type {NodeJS.ErrnoException} */ (err).code !== 'ENOENT') throw err;
       }
     }
-    if (ctx.worktree) gitOut(/** @type {string} */ (ctx.top), ['worktree', 'remove', '--force', ctx.worktree]);
-    safeFs.rmSync(ctx.tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    if (ctx.worktree) gitOut(ctx, /** @type {string} */ (ctx.top), ['worktree', 'remove', '--force', ctx.worktree]);
+    safeFs.rmSync(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     return null;
   } catch (err) {
-    return clean(`the temporary copy at ${ctx.tmp} could not be removed: ${messageOf(err)}`);
+    return clean(`the temporary copy at ${tmp} could not be removed: ${messageOf(err)}`);
   }
+}
+
+/** The signals a person or a supervisor ends a process with. */
+const ENDING_SIGNALS = /** @type {const} */ (['SIGINT', 'SIGTERM', 'SIGHUP']);
+
+/**
+ * While the copy exists, a SIGINT, SIGTERM or SIGHUP first removes it (the same synchronous
+ * {@link removeCopy}), then removes these handlers and raises the signal again, so the
+ * process still ends the way it was told to. A signal that arrives while a test runs is
+ * handled when that run returns: `spawnSync` blocks the process, and Node cannot end the
+ * test's own process group from here (the plan's Risks).
+ * @param {Context} ctx
+ * @returns {() => void} removes the handlers
+ */
+function guardSignals(ctx) {
+  const uninstall = () => {
+    for (const signal of ENDING_SIGNALS) process.removeListener(signal, handler);
+  };
+  /** @param {NodeJS.Signals} signal */
+  function handler(signal) {
+    uninstall();
+    removeCopy(ctx);
+    process.kill(process.pid, signal);
+  }
+  for (const signal of ENDING_SIGNALS) process.on(signal, handler);
+  return uninstall;
 }
 
 /** @param {string} s @returns {string} the path single-quoted; the name check leaves nothing to escape */
@@ -1158,12 +1303,15 @@ const quoted = (s) => `'${s}'`;
  */
 async function judge(root, named, runTests) {
   /** @type {Context} */
-  const ctx = { top: null, head: null, tmp: null, repoIndex: null, worktree: null, links: [] };
+  const ctx = { top: null, head: null, tmp: null, noHooks: null, repoIndex: null, worktree: null, links: [] };
   /** @type {Change|null} */
   let change = null;
   /** @type {Refusal|{tests: string}|{checking: true}} */
   let outcome;
+  let unguard = () => {};
   try {
+    makeTmp(ctx);
+    unguard = guardSignals(ctx);
     change = readChange(root, named, ctx, runTests);
     outcome = ruleRefusal(change) || (runTests ? await ruleTestsInCopy(change, ctx) : { checking: true });
   } catch (err) {
@@ -1172,11 +1320,15 @@ async function judge(root, named, runTests) {
       : { clause: 'I could not read the change (the check stopped)', cause: 'unreadable', detail: clean(messageOf(err)) };
   }
   const removal = removeCopy(ctx);
+  // One turn of the event loop first, so a signal that arrived while a test ran reaches its
+  // handler (which then ends the process) instead of being dropped with the handlers.
+  await new Promise((resolve) => setImmediate(resolve));
+  unguard();
   const detail = [/** @type {Refusal} */ (outcome).detail, removal].filter(Boolean).join('; ');
   const tail = { ...(detail ? { detail } : {}), ask: { questions: [] }, actions: {} };
 
   if ('checking' in outcome) {
-    const next = `hotfix check --run-tests ${change.files.map((f) => quoted(f.display)).join(' ')}`;
+    const next = `hotfix check --run-tests -- ${change.files.map((f) => quoted(f.display)).join(' ')}`;
     return { screen: { verdict: 'checking', text: STATUS_LINE, next, ...tail }, cause: undefined, change };
   }
   if ('tests' in outcome) {
@@ -1246,8 +1398,8 @@ function logVerdict(root, entry) {
 }
 
 /**
- * The `hotfix` menu route. `hotfix check [--run-tests] [<file> ...]` judges the change;
- * anything else answers the usage text. Never rejects: a fault can never read as a pass.
+ * The `hotfix` menu route. `hotfix check [--run-tests] [--] [<file> ...]` judges the
+ * change; after `--` every word is a file. Anything else answers the usage text. Never rejects: a fault can never read as a pass.
  * Every final answer (a pass or a refusal) appends one line to the log of verdicts.
  * @param {string[]} subArgs the words after `hotfix`
  * @param {string} root the project root
@@ -1259,9 +1411,11 @@ async function hotfixRoute(subArgs, root) {
   if (args[0] !== 'check') return usage(args[0] === undefined ? '(none)' : args[0]);
   let runTests = false;
   const named = [];
+  let options = true;
   for (const a of args.slice(1)) {
-    if (a === '--run-tests') runTests = true;
-    else if (a.startsWith('--')) return usage(a);
+    if (options && a === '--') options = false;
+    else if (options && a === '--run-tests') runTests = true;
+    else if (options && a.startsWith('--')) return usage(a);
     else named.push(a);
   }
   const { screen, cause, change } = await judge(root, named, runTests);

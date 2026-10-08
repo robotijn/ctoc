@@ -1,6 +1,6 @@
 'use strict';
 
-// The classifier corpus: 24 edit shapes that qualify as a hotfix and 58 traps that must
+// The classifier corpus: 25 edit shapes that qualify as a hotfix and 61 traps that must
 // not, plus one mode change, each judged through the menu router's first call (rules 1
 // to 7; no test runs) against ONE committed temporary repository with no test command.
 // A qualifying shape ends at `verdict: 'checking'`: rules 1 to 7 held.
@@ -45,6 +45,7 @@ const BASE = {
   'src/styles/accent.less': lines('@accent: red;'),
   'src/styles/link.css': lines('a {', '  color: hsl(210, 50%, 40%);', '}'),
   'src/styles/vars.css': lines(':root {', '  --brand: #ffffff;', '}'),
+  'src/styles/custom.css': lines(':root {', '  --accent: red;', '}'),
   'README.md': lines('# Fixture', '', 'This project shows the old wording.'),
   'docs/guide.rst': lines('Guide', '=====', '', 'Read this guide first.'),
   'notes/todo.txt': lines('Write the welcome page.'),
@@ -110,6 +111,9 @@ const BASE = {
   'notes/d.md': lines('Delta old.'),
   '.gitattributes': lines('docs/big.md -diff'),
   'docs/big.md': lines(...Array.from({ length: 13 }, (_, i) => `Big old line ${String.fromCharCode(97 + i)}.`)),
+  'public/robots.txt': lines('User-agent: *', 'Allow: /'),
+  'src/styles/mask.css': lines('.fade {', '  mask: url(#fade);', '}'),
+  'src/styles/motion.css': lines('.pulse {', '  animation: red 2s;', '}'),
   'docs/limit.md': lines(...Array.from({ length: 11 }, (_, i) => `Limit old line ${String.fromCharCode(97 + i)}.`))
 };
 
@@ -132,6 +136,8 @@ const QUALIFY = [
   ['src/styles/accent.less', lines('@accent: tomato;')],
   ['src/styles/link.css', lines('a {', '  color: hsla(210, 50%, 40%, 0.9);', '}')],
   ['src/styles/vars.css', lines(':root {', '  --brand: #fafafa;', '}')],
+  // A named colour inside a custom property.
+  ['src/styles/custom.css', lines(':root {', '  --accent: blue;', '}')],
   ['README.md', lines('# Fixture', '', 'This project shows the new wording.')],
   ['docs/guide.rst', lines('Guide', '=====', '', 'Read this handbook first.')],
   ['notes/todo.txt', lines('Write the start page.')],
@@ -186,6 +192,11 @@ const TRAPS = [
   [{ 'src/styles/property.css': BASE['src/styles/property.css'].replace('color: red;', 'background: red;') }, null, unrecognised('src/styles/property.css')],
   [{ 'src/styles/display.css': BASE['src/styles/display.css'].replace('none', 'block') }, null, unrecognised('src/styles/display.css')],
   [{ 'src/styles/hexsel.css': BASE['src/styles/hexsel.css'].replace('#bad:hover', '#fed:hover') }, null, unrecognised('src/styles/hexsel.css')],
+  // Neither wording nor colour, found by the security check of 2026-10-08: a crawler's
+  // settings, a mask's fragment address, and an animation whose name is a colour word.
+  [{ 'public/robots.txt': lines('User-agent: *', 'Disallow: /') }, null, 'it changes a setting in public/robots.txt, and settings changes are a common cause of outages'],
+  [{ 'src/styles/mask.css': BASE['src/styles/mask.css'].replace('#fade', '#face') }, null, unrecognised('src/styles/mask.css')],
+  [{ 'src/styles/motion.css': BASE['src/styles/motion.css'].replace('red 2s', 'blue 2s') }, null, unrecognised('src/styles/motion.css')],
   [{ 'src/components/Pick.tsx': BASE['src/components/Pick.tsx'].replace('y < z;', 'y < w;') }, null, unrecognised('src/components/Pick.tsx')],
   [{ 'src/components/Generic.tsx': BASE['src/components/Generic.tsx'].replace('("a")', '("b")') }, null, unrecognised('src/components/Generic.tsx')],
   // Only the closing-element rule catches these two: the `<` after the text must close the
@@ -209,8 +220,8 @@ const TRAPS = [
   [{ 'notes/a.md': lines('Alpha new.'), 'notes/b.md': lines('Bravo new.'), 'notes/c.md': lines('Charlie new.'), 'notes/d.md': lines('Delta new.') }, null, 'it changes 8 lines in 4 files and a hotfix is at most 20 lines in at most 3 files']
 ];
 
-assert.equal(QUALIFY.length, 24, 'the corpus holds 24 shapes that qualify');
-assert.equal(TRAPS.length, 58, 'the corpus holds 58 traps');
+assert.equal(QUALIFY.length, 25, 'the corpus holds 25 shapes that qualify');
+assert.equal(TRAPS.length, 61, 'the corpus holds 61 traps');
 
 let root;
 
@@ -270,7 +281,7 @@ async function judge(files) {
 function assertChecking(res, files) {
   assert.equal(res.verdict, 'checking', JSON.stringify(res));
   assert.equal(res.text, 'Checking the hotfix against the existing tests.');
-  assert.equal(res.next, `hotfix check --run-tests ${files.map((f) => `'${f}'`).join(' ')}`);
+  assert.equal(res.next, `hotfix check --run-tests -- ${files.map((f) => `'${f}'`).join(' ')}`);
 }
 
 for (const [shape, content] of QUALIFY) {

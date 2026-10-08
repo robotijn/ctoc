@@ -217,7 +217,7 @@ const q = (files) => files.map((f) => `'${f}'`).join(' ');
 function assertChecking(res, files) {
   assert.equal(res.verdict, 'checking', JSON.stringify(res));
   assert.equal(res.text, STATUS_LINE);
-  assert.equal(res.next, `hotfix check --run-tests ${q(files)}`);
+  assert.equal(res.next, `hotfix check --run-tests -- ${q(files)}`);
   assert.deepEqual(res.ask, { questions: [] });
   assert.deepEqual(res.actions, {});
 }
@@ -285,7 +285,7 @@ test('case 1 + 26: a button wording change passes in two calls; the process is r
   fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
   const first = await check(root, 'src/pages/home.html');
   assertChecking(first, ['src/pages/home.html']);
-  assert.equal(first.next, "hotfix check --run-tests 'src/pages/home.html'");
+  assert.equal(first.next, "hotfix check --run-tests -- 'src/pages/home.html'");
 
   const cwdBefore = process.cwd();
   const logBefore = console.log;
@@ -1009,14 +1009,19 @@ test('case 47: a judged file that changes during the check is refused', async (t
     fs.rmSync(path.join(probe, 'ran.txt'), { force: true });
     const other = testedProject();
     fs.writeFileSync(path.join(other, 'src/pages/home.html'), HOME_STORE);
-    const realMkdir = safeFs.mkdirSync;
+    // The rules read the judged file's content after its first hashing and before it is
+    // staged for the copy (the empty hooks folder, once this seam, is now made before any
+    // git call).
+    const judged = path.join(other, 'src', 'pages', 'home.html');
+    const realRead = safeFs.readFileSync;
     let first = true;
-    t.mock.method(safeFs, 'mkdirSync', (p, options) => {
-      if (first) {
+    t.mock.method(safeFs, 'readFileSync', (p, options) => {
+      const content = realRead(p, options);
+      if (first && String(p) === judged) {
         first = false;
-        fs.appendFileSync(path.join(other, 'src', 'pages', 'home.html'), ' again');
+        fs.writeFileSync(judged, HOME_STORE.replace('Store', 'Stored')); // still wording: only the hashes can tell
       }
-      return realMkdir(p, options);
+      return content;
   });
   const res2 = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(other, '--run-tests', 'src/pages/home.html'));
   t.mock.restoreAll();
@@ -1266,6 +1271,10 @@ test('edge shapes of every kind give the exact verdict', async () => {
     ['src/open.js', 'const s = "abc\n', 'const s = "abd\n', 'it changes program logic in src/open.js, and only wording and colours qualify'],
     ['src/tpl.js', 'say(`Hi ${name}`);\n', 'say(`Hey ${name}`);\n', 'it changes program logic in src/tpl.js, and only wording and colours qualify'],
     ['src/bt.js', 'say(`Hi there`);\n', 'say(`Hey there`);\n', 'it changes text inside program code in src/bt.js, and no check can tell whether people read that text or the program depends on it'],
+    ['public/ads.txt', 'example.com, 1, DIRECT\n', 'example.org, 1, DIRECT\n', 'it changes a setting in public/ads.txt, and settings changes are a common cause of outages'],
+    ['public/app-ads.txt', 'example.com, 1, DIRECT\n', 'example.org, 1, DIRECT\n', 'it changes a setting in public/app-ads.txt, and settings changes are a common cause of outages'],
+    ['public/.well-known/security.txt', 'Contact: a\n', 'Contact: b\n', 'it changes a setting in public/.well-known/security.txt, and settings changes are a common cause of outages'],
+    ['public/LLMS.txt', 'Old guide.\n', 'New guide.\n', 'it changes a setting in public/LLMS.txt, and settings changes are a common cause of outages'],
     ['src/settings/.env', 'MODE=old\n', 'MODE=new\n', 'it changes a setting in src/settings/.env, and settings changes are a common cause of outages'],
     ['tools/webpack.config.js', 'module.exports = {};\n', 'module.exports = { a: 1 };\n', 'it changes how the project is built or shipped in tools/webpack.config.js'],
     ['docs/CLAUDE.md', 'Old rule.\n', 'New rule.\n', un('docs/CLAUDE.md')],
@@ -1344,4 +1353,241 @@ test('a log folder that cannot be written changes no answer', async () => {
   // Permissions bind only a non-administrator account on a system that enforces them.
   const enforced = process.platform !== 'win32' && typeof process.getuid === 'function' && process.getuid() !== 0;
   if (enforced) assert.equal(fs.existsSync(path.join(ctoc, 'logs')), false);
+});
+
+// The code review's and the security check's findings of 2026-10-08 (Steps 11 and 13),
+// each case written and seen failing before its fix.
+
+/** The CPU time this process spends in `fn`, in milliseconds; child processes are not counted. */
+async function cpuMs(fn) {
+  const start = process.cpuUsage();
+  const result = await fn();
+  const used = process.cpuUsage(start);
+  return { ms: (used.user + used.system) / 1000, result };
+}
+
+/** The extra CPU time `big` costs over the cheaper of two `small` runs of the same check. */
+async function extraCpuMs(small, big) {
+  const a = await cpuMs(small);
+  const b = await cpuMs(big);
+  const c = await cpuMs(small);
+  return { extra: b.ms - Math.min(a.ms, c.ms), small: a.result, big: b.result };
+}
+
+test('finding 1: no repository hook and no file-system monitor runs during either call', async () => {
+  const markers = tmpDir('hotfix-markers-');
+  const hookMarker = path.join(markers, 'hook.txt');
+  const monitorMarker = path.join(markers, 'monitor.txt');
+  const fwd = (p) => p.split(path.sep).join('/');
+  const root = testedProject();
+  fs.writeFileSync(path.join(root, '.git', 'hooks', 'post-index-change'),
+    `#!/bin/sh\necho hook >> '${fwd(hookMarker)}'\n`, { mode: 0o755 });
+  const monitor = path.join(markers, 'fsmonitor.sh');
+  fs.writeFileSync(monitor, `#!/bin/sh\necho monitor >> '${fwd(monitorMarker)}'\nexit 1\n`, { mode: 0o755 });
+  git(root, ['config', 'core.fsmonitor', fwd(monitor)]);
+  // Both are live in this repository: a plain status runs the monitor, a plain add the hook.
+  git(root, ['status', '--porcelain']);
+  git(root, ['add', 'src/pages/home.html']);
+  assert.ok(fs.existsSync(hookMarker), 'the hook runs for an ordinary git call');
+  assert.ok(fs.existsSync(monitorMarker), 'the monitor runs for an ordinary git call');
+  fs.rmSync(hookMarker);
+  fs.rmSync(monitorMarker);
+
+  fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+  const first = await check(root, 'src/pages/home.html');
+  const second = await check(root, '--run-tests', 'src/pages/home.html');
+  assertChecking(first, ['src/pages/home.html']);
+  assertPass(second, ['src/pages/home.html']);
+  assert.equal(fs.existsSync(hookMarker), false, 'no repository hook ran during the check');
+  assert.equal(fs.existsSync(monitorMarker), false, 'no file-system monitor ran during the check');
+});
+
+test('finding 2a: the first failing test is read from 195 KB of blank lines in linear time', async (t) => {
+  const root = testedProject();
+  fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+  const failingWith = (output) => async () => {
+    t.mock.method(qualityAgent, 'runFullTests', async () => ({ passed: false, passCount: 0, failed: 1, skipped: 0, flaky: 0, output }));
+    try {
+      return await check(root, '--run-tests', 'src/pages/home.html');
+    } finally {
+      t.mock.restoreAll();
+    }
+  };
+  const { extra, big } = await extraCpuMs(failingWith('boom\n'), failingWith(`${'\n'.repeat(195 * 1024)}boom\n`));
+  assert.equal(big.text, refusal('the existing tests fail (the test command reported a failure)'));
+  t.diagnostic(`195 KB of blank lines: ${extra.toFixed(1)} ms more processor time`);
+  assert.ok(extra < 100, `195 KB of blank lines cost ${extra.toFixed(1)} ms more`);
+});
+
+test('finding 2b: a catalogue line with 100,000 trailing spaces is read in linear time', async (t) => {
+  const base = '{\n  "save": "Save"\n}\n';
+  const root = makeRepo({ 'locales/en.json': base });
+  const judgeLine = (line) => async () => {
+    fs.writeFileSync(path.join(root, 'locales', 'en.json'), `{\n${line}\n}\n`);
+    return check(root, 'locales/en.json');
+  };
+  const { extra, big } = await extraCpuMs(judgeLine('  "save": "Store" x'), judgeLine(`  "save": "Store"${' '.repeat(100000)}x`));
+  assert.equal(big.text, refusal('I do not recognise locales/en.json as wording or a colour'));
+  t.diagnostic(`100,000 trailing spaces: ${extra.toFixed(1)} ms more processor time`);
+  assert.ok(extra < 100, `100,000 trailing spaces cost ${extra.toFixed(1)} ms more`);
+});
+
+test('finding 2c: a colour change in a 300 KB one-line stylesheet is judged in linear time', async (t) => {
+  const many = '.a { color: red; } '.repeat(Math.ceil(300 * 1024 / 19));
+  const long = `.a { box-shadow:${' red'.repeat(75 * 1024)}; }`;
+  const shapes = [
+    ['short declarations, the last colour changed', many, `${many.slice(0, many.lastIndexOf('red'))}blue; } `],
+    ['one long declaration, every colour changed', long, long.replace(/red/g, 'tan')]
+  ];
+  for (const [label, base, changed] of shapes) {
+    const root = makeRepo({ 'src/styles/site.css': `${base}\n`, 'src/styles/small.css': '.a { color: red; }\n' });
+    const judgeFile = (file, content) => async () => {
+      fs.writeFileSync(path.join(root, 'src', 'styles', file), content);
+      return check(root, `src/styles/${file}`);
+    };
+    const { extra, big } = await extraCpuMs(judgeFile('small.css', '.a { color: blue; }\n'), judgeFile('site.css', `${changed}\n`));
+    assertChecking(big, ['src/styles/site.css']);
+    t.diagnostic(`${label}: ${extra.toFixed(1)} ms more processor time`);
+    assert.ok(extra < 100, `${label}: 300 KB cost ${extra.toFixed(1)} ms more`);
+  }
+});
+
+test('finding 2, same class: a page with 20,000 script blocks is judged in linear time', async (t) => {
+  const blocks = `${'<script>x</script>\n'.repeat(20000)}<p>Save</p>\n`;
+  const root = makeRepo({ 'src/pages/big.html': blocks, 'src/pages/small.html': '<script>x</script>\n<p>Save</p>\n' });
+  const judgeFile = (file, content) => async () => {
+    fs.writeFileSync(path.join(root, 'src', 'pages', file), content);
+    return check(root, `src/pages/${file}`);
+  };
+  const { extra, big } = await extraCpuMs(judgeFile('small.html', '<script>x</script>\n<p>Store</p>\n'),
+    judgeFile('big.html', blocks.replace('<p>Save</p>', '<p>Store</p>')));
+  assertChecking(big, ['src/pages/big.html']);
+  t.diagnostic(`20,000 script blocks: ${extra.toFixed(1)} ms more processor time`);
+  assert.ok(extra < 100, `20,000 script blocks cost ${extra.toFixed(1)} ms more`);
+});
+
+test('finding 6: a tracked test command with shell structure runs no test and says so', async () => {
+  const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': PASSING_TEST,
+    '.ctoc/quality-config.yaml': 'languages:\n  javascript:\n    test: npm run build && npm test\n' }, { testScript: SCRIPT });
+  fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+  await refusedUntouched(root, ['--run-tests', 'src/pages/home.html'], NO_TEST);
+});
+
+test('finding 8: a named file with control characters is quoted cleaned in every sentence', async () => {
+  const root = makeRepo({ 'README.md': 'Old wording.\n' });
+  assert.equal((await check(root, 'nope\u001b[2J.md')).text, unreadable('nope [2J.md holds no change that git would commit'));
+  assert.equal((await check(root, '../x\u001b.md')).text, unreadable('../x .md is outside this project'));
+});
+
+test('finding 9: a judged file named like an option reaches the test run after --', async () => {
+  const root = makeRepo({ '--x.md': 'Old wording.\n' });
+  fs.writeFileSync(path.join(root, '--x.md'), 'New wording.\n');
+  const first = await check(root, '--', '--x.md');
+  assertChecking(first, ['--x.md']);
+  const words = shellWords(first.next);
+  assert.deepEqual(words.slice(0, 2), ['hotfix', 'check']);
+  const second = await check(root, ...words.slice(2));
+  assertPass(second, ['--x.md']);
+  assert.equal((await check(root, '--run-tests', '--x.md')).text, `Unknown hotfix command: --x.md. ${USAGE}`,
+    'without --, a name that looks like an option is still the usage text');
+});
+
+test('finding 10: removal never follows a copy the tests swapped for a link to an outside folder', async (t) => {
+  const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+  /** Replace the copy, from inside the test run, by a link to `outside`; returns where the copy was. */
+  const swapCopyFor = (outside) => {
+    const where = { tree: null };
+    t.mock.method(qualityAgent, 'runFullTests', async () => {
+      where.tree = process.cwd();
+      process.chdir(PRIVATE_TMP);
+      fs.renameSync(where.tree, `${where.tree}-moved`);
+      fs.symlinkSync(outside, where.tree, linkType);
+      return { passed: true, passCount: 1, failed: 0, skipped: 0, flaky: 0 };
+    });
+    return where;
+  };
+  const OUTSIDE = 'outside file\n';
+  await t.test('(a) with linked package folders: no link is unlinked through the swapped copy', async () => {
+    const outside = tmpDir('hotfix-outside-');
+    writeFiles(outside, { 'node_modules': OUTSIDE, '.venv': OUTSIDE, 'packages/a/node_modules': OUTSIDE });
+    const root = linkedProject("  assert.equal(require('greet'), 'hello');\n");
+    fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+    const where = swapCopyFor(outside);
+    const res = await check(root, '--run-tests', 'src/pages/home.html');
+    t.mock.restoreAll();
+    assert.deepEqual(treeBytes(outside), { 'node_modules': sha(OUTSIDE), '.venv': sha(OUTSIDE),
+      'packages/a/node_modules': sha(OUTSIDE) }, 'nothing outside the copy was deleted');
+    assert.equal(res.verdict, 'hotfix', JSON.stringify(res));
+    assert.match(res.detail, /^the temporary copy at .+ could not be removed: a link's folder moved outside it$/);
+    fs.unlinkSync(where.tree);
+    fs.rmSync(copyParent(where.tree), { recursive: true, force: true });
+  });
+  await t.test('(b) with no link: git refuses to remove the swapped copy as its worktree', async () => {
+    const outside = tmpDir('hotfix-outside-');
+    writeFiles(outside, { 'keep.txt': OUTSIDE, 'src/pages/home.html': OUTSIDE });
+    const root = testedProject();
+    fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+    const where = swapCopyFor(outside);
+    const res = await check(root, '--run-tests', 'src/pages/home.html');
+    t.mock.restoreAll();
+    assert.deepEqual(treeBytes(outside), { 'keep.txt': sha(OUTSIDE), 'src/pages/home.html': sha(OUTSIDE) },
+      'nothing outside the copy was deleted');
+    assert.equal(res.verdict, 'hotfix', JSON.stringify(res));
+    // git itself refuses to remove a worktree that is no longer the one it registered.
+    assert.match(res.detail, /^the temporary copy at .+ could not be removed: git worktree failed: fatal: validation failed/);
+    fs.unlinkSync(where.tree);
+    fs.rmSync(copyParent(where.tree), { recursive: true, force: true });
+  });
+  await t.test('(c) a link whose folder the tests removed counts as removed', async () => {
+    const root = linkedProject("  assert.equal(require('greet'), 'hello');\n");
+    const owned = treeBytes(path.join(root, 'packages', 'a', 'node_modules'));
+    fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+    const where = { tree: null };
+    t.mock.method(qualityAgent, 'runFullTests', async () => {
+      where.tree = process.cwd();
+      fs.rmSync(path.join(where.tree, 'packages'), { recursive: true, force: true });
+      return { passed: true, passCount: 1, failed: 0, skipped: 0, flaky: 0 };
+    });
+    const res = await check(root, '--run-tests', 'src/pages/home.html');
+    t.mock.restoreAll();
+    assertPass(res, ['src/pages/home.html']);
+    assert.equal(fs.existsSync(copyParent(where.tree)), false, 'the copy is gone');
+    assert.deepEqual(treeBytes(path.join(root, 'packages', 'a', 'node_modules')), owned, 'the owner\'s folder is intact');
+  });
+});
+
+test('finding 11: a kill from outside removes the copy, then the signal ends the process', async () => {
+  const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+  const listeners = () => signals.map((s) => process.listenerCount(s));
+  const before = listeners();
+  const plain = testedProject();
+  fs.writeFileSync(path.join(plain, 'src', 'pages', 'home.html'), HOME_STORE);
+  assertPass(await check(plain, '--run-tests', 'src/pages/home.html'), ['src/pages/home.html']);
+  assert.deepEqual(listeners(), before, 'the handlers are removed after the check');
+  // A signal from outside reaches a process on Windows only as a forced end, which no
+  // handler sees; there the in-process half above is the whole contract.
+  if (process.platform === 'win32') return;
+  const probe = probeDir();
+  const childTmp = tmpDir('hotfix-child-tmp-');
+  const slow = "const fs = require('fs');\nconst path = require('path');\n"
+    + "fs.writeFileSync(path.join(process.env.CTOC_HOTFIX_PROBE, 'started.txt'), process.cwd());\n"
+    + 'Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500);\n'
+    + "process.stdout.write('\\u2139 pass 1\\n\\u2139 fail 0\\n');\n";
+  const root = makeRepo({ 'src/pages/home.html': HOME, 'slow.js': slow }, { testScript: 'node slow.js' });
+  fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+  const runner = path.join(tmpDir('hotfix-runner-'), 'run.js');
+  fs.writeFileSync(runner, `const { route } = require(${JSON.stringify(path.join(__dirname, '..', 'src', 'lib', 'menu-screens'))});\n`
+    + "route(['hotfix', 'check', '--run-tests', 'src/pages/home.html'], process.argv[2]).then((r) => process.stdout.write(JSON.stringify(r)));\n");
+  const env = { ...process.env, TMPDIR: childTmp, TEMP: childTmp, TMP: childTmp, CTOC_HOTFIX_PROBE: probe };
+  delete env.NODE_TEST_CONTEXT;
+  const child = require('child_process').spawn(NODE, [runner, root], { env, stdio: 'ignore' });
+  const exited = new Promise((resolve) => child.on('exit', (code, signal) => resolve({ code, signal })));
+  const deadline = Date.now() + 30000;
+  while (probeRead(probe, 'started.txt') === null && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20));
+  assert.ok(probeRead(probe, 'started.txt'), 'the tests started in the copy');
+  child.kill('SIGTERM');
+  const { signal } = await exited;
+  assert.equal(signal, 'SIGTERM', 'the signal is raised again and ends the process');
+  assert.deepEqual(fs.readdirSync(childTmp).filter((n) => n.startsWith('ctoc-hotfix-')), [], 'no copy remains');
+  assert.equal(worktrees(root).split('\n\n').filter(Boolean).length, 1, 'the copy\'s worktree registration is gone');
 });
