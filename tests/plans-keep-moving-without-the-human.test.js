@@ -1433,3 +1433,413 @@ describe("a held plan is always asked CTOC's keep-or-release question first (cas
     }
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// On a regulated project a plan waits for the owner where the regime's own check has no
+// record (plan `evidence-crossings-respect-the-regulated-profiles`; its cases 48–52 are this
+// file's cases 49–53, numbered after the last case the file already held).
+
+const REPO_REGIMES = path.join(__dirname, '..', '.ctoc', 'regulatory-regimes');
+
+/**
+ * Write `.ctoc/settings.yaml` as a `regulatory_regime:` block and copy each named profile
+ * CTOC ships into the sandbox (a name with no shipped file is not copied). `copy: false`
+ * leaves the sandbox with no profile folder at all, as a real project has.
+ */
+function setRegime(root, { profiles = [], overrides = {}, declined = false, copy = true } = {}) {
+  let yaml = `regulatory_regime:\n  active_profiles: [${profiles.join(', ')}]\n`;
+  if (declined) yaml += '  declined: true\n';
+  const entries = Object.entries(overrides);
+  if (entries.length > 0) yaml += `  overrides:\n${entries.map(([k, v]) => `    ${k}: ${v}\n`).join('')}`;
+  fs.writeFileSync(path.join(root, '.ctoc', 'settings.yaml'), yaml);
+  if (!copy) return;
+  const dir = path.join(root, '.ctoc', 'regulatory-regimes');
+  fs.mkdirSync(dir, { recursive: true });
+  for (const name of profiles) {
+    const src = path.join(REPO_REGIMES, `${name}.yaml`);
+    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dir, `${name}.yaml`));
+  }
+}
+
+const REGIME_SENTENCES = Object.freeze({
+  'compliance-review': 'It waits for your approval: this project has an EU compliance profile on (GDPR or the EU AI Act), and nothing records that the compliance review ran for this version of the plan, so it does not move on by itself.',
+  'independent-verification': "It waits for your approval: this project requires independent verification and validation, and CTOC cannot read the verification chief's findings, so it does not finish on its checks by itself.",
+  'review-sign-off': "It waits for your approval: this project's regulatory regime requires a sign-off here that CTOC does not check — two distinct approvers, a reconciliation of the specification against the code, or a closing lesson — so it does not finish on its checks by itself.",
+  'regime-unreadable': "It waits for your approval: CTOC could not read this project's regulatory settings, so it does not move on by itself.",
+});
+
+const descriptorOf = (root, ref, opts) => streamingGate.pendingGateDecisions(root, opts).find((d) => d.ref === ref);
+
+/** A built plan held by `reason`: it stays through the continuation, its record untouched. */
+function assertBuiltHeld(root, slug, reason) {
+  const ref = `review/${slug}.md`;
+  const ledgerFile = ledger.ledgerPath(slug, root);
+  const before = fs.readFileSync(ledgerFile);
+  const cont = menuScreens.continueAfterCrossing(root);
+  assert.equal(exists(root, ref), true, `${slug}: the built plan stays in review`);
+  assert.equal(exists(root, `done/${slug}.md`), false);
+  assert.deepEqual(fs.readFileSync(ledgerFile), before, `${slug}: the crossing record is byte-identical`);
+  assert.equal((cont.crossed || []).some((c) => c.toStage === 'done'), false, `${slug}: nothing finished`);
+  const d = descriptorOf(root, ref);
+  assert.ok(d, `${slug}: still a pending decision`);
+  assert.equal(d.regimeHold, reason);
+  assert.equal(d.passesValidation, true, `${slug}: held by the regime, not by its validation`);
+  const screen = streamingGate.streamingGateScreen(root);
+  assert.ok(screen.text.includes(REGIME_SENTENCES[reason]), `${slug}: the screen says why:\n${screen.text}`);
+  return { ref, d, screen };
+}
+
+describe('a regulated project: the plan waits where the regime has no record (cases 49–53)', () => {
+  for (const profile of ['gdpr', 'eu-ai-act-high-risk']) {
+    it(`case 49 — ${profile} on: a functional plan with enough information waits for the owner, and his approve crosses it`, () => {
+      const root = makeSandbox();
+      setRegime(root, { profiles: [profile] });
+      const ref = 'functional/c49.md';
+      writePlan(root, ref, functionalBody('Search by title'));
+      writeQuestions(root, ref, [
+        { ...detail('q10-name', 'What is the button called?', ['Short name', 'Long name']), important: true },
+        detail('q11-color', 'Which colour?', ['Blue', 'Red']),
+      ]);
+
+      menuScreens.continueAfterCrossing(root);
+      const screen = streamingGate.streamingGateScreen(root);
+
+      assert.equal(exists(root, ref), true, 'the plan stays in functional');
+      assert.equal(ledger.readEntry('c49', root), null, 'no crossing was recorded');
+      assert.equal(tasks(root).some((t) => t.kind === 'plan' && t.plan === 'c49'), false, 'no planner was queued');
+      const d = descriptorOf(root, ref);
+      assert.ok(d);
+      assert.equal(d.regimeHold, 'compliance-review');
+      assert.equal(d.passesValidation, true);
+      assert.equal(d.enough, true, 'held by the regime, not by an open question');
+      assert.equal(promptOf(screen), 'What is the button called?', 'the rich screen asks the first detail');
+      assert.ok(screen.text.includes(REGIME_SENTENCES['compliance-review']), screen.text);
+
+      route(['stream', 'approve', ref], root);
+      assert.equal(exists(root, 'implementation/c49.md'), true, "the owner's approve crosses it");
+      assert.equal(ledger.readEntry('c49', root).approved_by, 'human');
+    });
+  }
+
+  it('case 50 — independent verification and validation on: a built plan with passing checks does not finish on them', () => {
+    const root = makeSandbox();
+    setRegime(root, { profiles: ['do-178c-level-a'] });
+    seedBuilt(root, 'c50');
+
+    const { ref, d, screen } = assertBuiltHeld(root, 'c50', 'independent-verification');
+
+    assert.ok(screen.ask.questions[0].options.some((o) => o.label === d.approveLabel), 'the approve option is offered');
+    assert.equal(screen.actions[d.approveLabel], `stream approve ${ref}`);
+    route(['stream', 'approve', ref], root);
+    assert.equal(exists(root, 'done/c50.md'), true, "the owner's approve finishes it");
+    assert.equal(ledger.readEntry('c50', root).approved_by, 'human');
+  });
+
+  it('case 51(a) — fail closed: an unreadable settings file holds both crossings', () => {
+    const root = makeSandbox();
+    fs.mkdirSync(path.join(root, '.ctoc', 'settings.yaml'));
+    const fref = 'functional/c51.md';
+    writePlan(root, fref, functionalBody('Unreadable regime'));
+    writeQuestions(root, fref, []);
+    seedBuilt(root, 'c51b');
+
+    const crossed = [];
+    const ds = streamingGate.pendingGateDecisions(root, { crossed });
+
+    assert.deepEqual(crossed, [], 'nothing crossed');
+    assert.equal(exists(root, fref), true);
+    assert.equal(exists(root, 'review/c51b.md'), true);
+    const f = ds.find((d) => d.ref === fref);
+    const b = ds.find((d) => d.ref === 'review/c51b.md');
+    assert.equal(f.regimeHold, 'regime-unreadable');
+    assert.equal(f.passesValidation, true);
+    assert.equal(f.enough, true);
+    assert.equal(b.regimeHold, 'regime-unreadable');
+    assert.equal(b.passesValidation, true);
+    const text = streamingGate.streamingGateScreen(root).text;
+    assert.ok(text.includes(REGIME_SENTENCES['regime-unreadable']), text);
+  });
+
+  // Session decision 2026-10-07 after the review: a profile CTOC cannot load holds both
+  // crossings, so a misspelled or hand-quoted name never lets a plan skip the compliance review.
+  for (const name of ['do-178c-levl-a', 'gpdr', '"gdpr"']) {
+    it(`case 51(b) — fail closed: a declared profile CTOC cannot load (${name}) holds both crossings`, () => {
+      const root = makeSandbox();
+      setRegime(root, { profiles: [name], copy: false });
+      const fref = 'functional/c51f.md';
+      writePlan(root, fref, functionalBody('Misspelled regime'));
+      writeQuestions(root, fref, []);
+      seedBuilt(root, 'c51r');
+
+      const crossed = [];
+      const ds = streamingGate.pendingGateDecisions(root, { crossed });
+
+      assert.deepEqual(crossed, [], 'nothing crossed');
+      assert.equal(exists(root, fref), true, 'the functional plan stays');
+      assert.equal(exists(root, 'review/c51r.md'), true, 'the built plan stays');
+      const f = ds.find((d) => d.ref === fref);
+      assert.equal(f.regimeHold, 'regime-unreadable');
+      assert.equal(f.passesValidation, true);
+      assert.equal(f.enough, true);
+      const b = ds.find((d) => d.ref === 'review/c51r.md');
+      assert.equal(b.regimeHold, 'regime-unreadable');
+      assert.equal(b.passesValidation, true);
+    });
+  }
+
+  it('case 52 — guards: no regime changes nothing, and each regime holds only the crossing it governs', () => {
+    // No regime, declined: both crossings happen.
+    let root = makeSandbox();
+    setRegime(root, { profiles: [], declined: true });
+    writePlan(root, 'functional/c52a.md', functionalBody('No regime idea'));
+    writeQuestions(root, 'functional/c52a.md', []);
+    seedBuilt(root, 'c52b');
+    let ds = streamingGate.pendingGateDecisions(root);
+    assert.equal(exists(root, 'implementation/c52a.md'), true, 'no regime: the functional plan moves on');
+    assert.equal(descriptorOf(root, 'review/c52b.md').regimeHold, null);
+    assert.ok(ds.every((d) => d.regimeHold === null));
+    menuScreens.continueAfterCrossing(root);
+    assert.equal(exists(root, 'done/c52b.md'), true, 'no regime: the built plan finishes on its checks');
+
+    // GDPR: implementation → todo and review → done are not its crossings.
+    root = makeSandbox();
+    setRegime(root, { profiles: ['gdpr'] });
+    writePlan(root, 'implementation/c52c.md', implBody('GDPR slice', ['src/c52c.js']));
+    writeQuestions(root, 'implementation/c52c.md', []);
+    seedBuilt(root, 'c52d');
+    ds = streamingGate.pendingGateDecisions(root);
+    assert.equal(exists(root, 'todo/c52c.md'), true, 'gdpr: the slice moves into the build queue');
+    assert.ok(ds.every((d) => d.regimeHold === null));
+    menuScreens.continueAfterCrossing(root);
+    assert.equal(exists(root, 'done/c52d.md'), true, 'gdpr: the built plan finishes on its checks');
+
+    // Independent verification: functional → implementation is not its crossing.
+    root = makeSandbox();
+    setRegime(root, { profiles: ['do-178c-level-a'] });
+    writePlan(root, 'functional/c52e.md', functionalBody('Verified idea'));
+    writeQuestions(root, 'functional/c52e.md', []);
+    streamingGate.pendingGateDecisions(root);
+    assert.equal(exists(root, 'implementation/c52e.md'), true, 'do-178c-level-a: the functional plan moves on');
+  });
+
+  const signOffProjects = [
+    ['four_eyes_gate3 alone', { overrides: { four_eyes_gate3: true } }],
+    ['spec_code_reconciliation alone', { overrides: { spec_code_reconciliation: true } }],
+    ['lessons_learned_closure alone', { overrides: { lessons_learned_closure: true } }],
+    ['the sox-itgc profile', { profiles: ['sox-itgc'] }],
+  ];
+  for (const [label, regime] of signOffProjects) {
+    it(`case 53 — ${label}: a built plan with passing checks does not finish on them`, () => {
+      const root = makeSandbox();
+      setRegime(root, regime);
+      seedBuilt(root, 'c53');
+      assertBuiltHeld(root, 'c53', 'review-sign-off');
+    });
+  }
+
+  it('case 53 — an override that turns the only sign-off control off restores the crossing', () => {
+    const root = makeSandbox();
+    setRegime(root, { profiles: ['pci-dss-v4'], overrides: { four_eyes_gate3: false } });
+    seedBuilt(root, 'c53p');
+    assert.equal(descriptorOf(root, 'review/c53p.md').regimeHold, null);
+    menuScreens.continueAfterCrossing(root);
+    assert.equal(exists(root, 'done/c53p.md'), true, 'it finishes on its checks');
+  });
+});
+
+describe('a real project has no profile folder: the shipped profiles are read (case 54)', () => {
+  it('case 54 — GDPR on, no profile folder: a built plan still finishes on its checks', () => {
+    const root = makeSandbox();
+    setRegime(root, { profiles: ['gdpr'], copy: false });
+    assert.equal(fs.existsSync(path.join(root, '.ctoc', 'regulatory-regimes')), false, 'fixture: no profile folder');
+    seedBuilt(root, 'c54g');
+    assert.equal(descriptorOf(root, 'review/c54g.md').regimeHold, null);
+    menuScreens.continueAfterCrossing(root);
+    assert.equal(exists(root, 'done/c54g.md'), true, 'it finishes on its checks');
+  });
+
+  for (const [profile, reason] of [['do-178c-level-a', 'independent-verification'], ['sox-itgc', 'review-sign-off']]) {
+    it(`case 54 — ${profile} on, no profile folder: the built plan waits with the ${reason} reason, not "could not read"`, () => {
+      const root = makeSandbox();
+      setRegime(root, { profiles: [profile], copy: false });
+      seedBuilt(root, 'c54');
+      const { screen } = assertBuiltHeld(root, 'c54', reason);
+      assert.equal(screen.text.includes(REGIME_SENTENCES['regime-unreadable']), false, screen.text);
+    });
+  }
+
+  it('case 55 — GDPR on, an author\'s questions being checked: the screen gives the compliance reason and never says it moves on by itself', () => {
+    const root = makeSandbox();
+    setRegime(root, { profiles: ['gdpr'], copy: false });
+    const ref = 'functional/c55.md';
+    writePlan(root, ref, functionalBody('Unchecked idea'));
+    writeQuestions(root, ref, [detail('q10-label', 'Label text?', ['Save', 'Store'])], { classified: false });
+    const queued = route(['stream', 'check', ref], root);
+    assert.ok(tasks(root).some((t) => t.kind === 'classify' && t.plan === ref && t.status === 'queued'),
+      `fixture: the check is queued (${JSON.stringify(queued.text || queued)})`);
+
+    const d = descriptorOf(root, ref);
+    assert.equal(d.regimeHold, 'compliance-review');
+    assert.equal(d.questionsClassified, false);
+    const text = streamingGate.streamingGateScreen(root).text;
+    assert.match(text, /Its questions are being checked by the gate critic/);
+    assert.ok(text.includes(REGIME_SENTENCES['compliance-review']), text);
+    assert.doesNotMatch(text, /moves on by itself/);
+    assert.equal(exists(root, ref), true);
+  });
+
+  // Security check of bf484a62 (finding 1): a settings or profile file that opens but is misread
+  // must never read as "no regime" or "fewer controls".
+  const INIT_LINE = '  active_profiles: []  # opt-in industry profiles (e.g. gdpr); none by default\n';
+  /** A functional plan with a classified empty question file and a built plan, both ready to cross. */
+  function readyPair(root) {
+    const fref = 'functional/c56f.md';
+    writePlan(root, fref, functionalBody('Misread regime'));
+    writeQuestions(root, fref, []);
+    seedBuilt(root, 'c56r');
+    return fref;
+  }
+  const writeSettingsText = (root, text) => fs.writeFileSync(path.join(root, '.ctoc', 'settings.yaml'), text);
+
+  const misreadSettings = {
+    'a flow list split over two lines': 'regulatory_regime:\n  active_profiles: [do-178c-level-a,\n    sox-itgc]\n',
+    'a scalar active_profiles': 'regulatory_regime:\n  active_profiles: gdpr\n',
+    'a header with a comment': 'regulatory_regime: # EU\n  active_profiles: [gdpr]\n',
+    'a flow mapping': 'regulatory_regime: {active_profiles: [gdpr]}\n',
+    'a quoted name': 'regulatory_regime:\n  active_profiles: ["gdpr"]\n',
+    'a misspelled key': 'regulatory_regime:\n  active_profile: [gdpr]\n',
+  };
+  for (const [label, text] of Object.entries(misreadSettings)) {
+    it(`case 56 — settings with ${label}: both crossings wait as unreadable`, () => {
+      const root = makeSandbox();
+      writeSettingsText(root, text);
+      const fref = readyPair(root);
+      const crossed = [];
+      const ds = streamingGate.pendingGateDecisions(root, { crossed });
+      assert.deepEqual(crossed, [], 'nothing crossed');
+      assert.equal(exists(root, fref), true);
+      assert.equal(exists(root, 'review/c56r.md'), true);
+      for (const ref of [fref, 'review/c56r.md']) {
+        const d = ds.find((x) => x.ref === ref);
+        assert.equal(d.regimeHold, 'regime-unreadable', ref);
+        assert.equal(d.passesValidation, true, ref);
+      }
+    });
+  }
+
+  const misreadProfiles = {
+    'an empty profile file': '',
+    'required_controls as a flow list': 'name: acme\nrequired_controls: [four_eyes_gate3]\n',
+    'required_controls as a scalar': 'name: acme\nrequired_controls: four_eyes_gate3\n',
+  };
+  for (const [label, body] of Object.entries(misreadProfiles)) {
+    it(`case 56 — ${label}: the built plan waits as unreadable`, () => {
+      const root = makeSandbox();
+      writeSettingsText(root, 'regulatory_regime:\n  active_profiles: [acme]\n');
+      fs.mkdirSync(path.join(root, '.ctoc', 'regulatory-regimes'), { recursive: true });
+      fs.writeFileSync(path.join(root, '.ctoc', 'regulatory-regimes', 'acme.yaml'), body);
+      seedBuilt(root, 'c56p');
+      assertBuiltHeld(root, 'c56p', 'regime-unreadable');
+    });
+  }
+
+  const noRegime = {
+    'a fresh project (an empty list with its comment)': `regulatory_regime:\n${INIT_LINE}`,
+    'a declined regime': `regulatory_regime:\n  declined: true\n${INIT_LINE}`,
+    'no regulatory_regime block at all': 'timezone: "UTC"\n',
+  };
+  for (const [label, text] of Object.entries(noRegime)) {
+    it(`case 56 — guard, ${label}: both plans cross as today`, () => {
+      const root = makeSandbox();
+      writeSettingsText(root, text);
+      const fref = readyPair(root);
+      assert.equal(descriptorOf(root, 'review/c56r.md').regimeHold, null);
+      assert.equal(exists(root, 'implementation/c56f.md'), true, 'the functional plan moved on');
+      menuScreens.continueAfterCrossing(root);
+      assert.equal(exists(root, 'done/c56r.md'), true, 'the built plan finished on its checks');
+      assert.equal(exists(root, fref), false);
+    });
+  }
+
+  it("case 57 — GDPR on, an author's questions being checked, opened with `plan <ref>`: the compliance reason, never \"moves on by itself\"", () => {
+    const root = makeSandbox();
+    setRegime(root, { profiles: ['gdpr'], copy: false });
+    const ref = 'functional/c57.md';
+    writePlan(root, ref, functionalBody('Unchecked idea'));
+    writeQuestions(root, ref, [detail('q10-label', 'Label text?', ['Save', 'Store'])], { classified: false });
+    route(['stream', 'check', ref], root);
+    assert.ok(tasks(root).some((t) => t.kind === 'classify' && t.plan === ref && t.status === 'queued'), 'fixture: the check is queued');
+
+    const text = route(['plan', ref], root).text;
+    assert.match(text, /Its questions are being checked by the gate critic/);
+    assert.ok(text.includes(REGIME_SENTENCES['compliance-review']), text);
+    assert.doesNotMatch(text, /moves on by itself/);
+
+    // Guard: with no regime the plan screen keeps its promise, which is then true.
+    const plain = makeSandbox();
+    writePlan(plain, ref, functionalBody('Unchecked idea'));
+    writeQuestions(plain, ref, [detail('q10-label', 'Label text?', ['Save', 'Store'])], { classified: false });
+    route(['stream', 'check', ref], plain);
+    const plainText = route(['plan', ref], plain).text;
+    assert.match(plainText, /it moves on by itself once they are/);
+    assert.equal(plainText.includes('It waits for your approval'), false);
+  });
+
+  // Security re-verification at 5908c014: the scanner's exact inputs, through the crossings.
+  it("case 58 — a project's own do-178c-level-a copy with Windows line endings: the built plan waits for verification", () => {
+    const root = makeSandbox();
+    writeSettingsText(root, 'regulatory_regime:\n  active_profiles: [do-178c-level-a]\n');
+    const dir = path.join(root, '.ctoc', 'regulatory-regimes');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'do-178c-level-a.yaml'),
+      fs.readFileSync(path.join(REPO_REGIMES, 'do-178c-level-a.yaml'), 'utf8').replace(/\n/g, '\r\n'));
+    seedBuilt(root, 'c58');
+    assertBuiltHeld(root, 'c58', 'independent-verification');
+  });
+
+  it('case 58 — a comment line between gdpr and do-178c-level-a in the block list: the built plan waits for verification', () => {
+    const root = makeSandbox();
+    writeSettingsText(root, 'regulatory_regime:\n  active_profiles:\n    - gdpr\n    # aviation\n    - do-178c-level-a\n');
+    seedBuilt(root, 'c58c');
+    assertBuiltHeld(root, 'c58c', 'independent-verification');
+  });
+
+  it('case 58 — an override `four_eyes_gate3: True`: both crossings wait as unreadable', () => {
+    const root = makeSandbox();
+    writeSettingsText(root, 'regulatory_regime:\n  active_profiles: []\n  overrides:\n    four_eyes_gate3: True\n');
+    const fref = readyPair(root);
+    const crossed = [];
+    const ds = streamingGate.pendingGateDecisions(root, { crossed });
+    assert.deepEqual(crossed, []);
+    assert.equal(exists(root, fref), true);
+    for (const ref of [fref, 'review/c56r.md']) assert.equal(ds.find((d) => d.ref === ref).regimeHold, 'regime-unreadable', ref);
+  });
+
+  it('case 58 — a second regulatory_regime block: both crossings wait as unreadable', () => {
+    const root = makeSandbox();
+    writeSettingsText(root, 'regulatory_regime:\n  active_profiles: []\nregulatory_regime:\n  active_profiles: [gdpr]\n');
+    const fref = readyPair(root);
+    const crossed = [];
+    const ds = streamingGate.pendingGateDecisions(root, { crossed });
+    assert.deepEqual(crossed, []);
+    for (const ref of [fref, 'review/c56r.md']) assert.equal(ds.find((d) => d.ref === ref).regimeHold, 'regime-unreadable', ref);
+  });
+
+  it('case 58 — a byte-order mark before the header: GDPR is read, so the functional plan waits for the compliance review', () => {
+    const root = makeSandbox();
+    writeSettingsText(root, '﻿regulatory_regime:\n  active_profiles: [gdpr]\n');
+    const fref = readyPair(root);
+    const d = descriptorOf(root, fref);
+    assert.equal(d.regimeHold, 'compliance-review');
+    assert.equal(exists(root, fref), true);
+    menuScreens.continueAfterCrossing(root);
+    assert.equal(exists(root, 'done/c56r.md'), true, 'a GDPR project still finishes a built plan on its checks');
+  });
+
+  it('case 54 — a misspelled profile, no profile folder: the built plan still waits as unreadable', () => {
+    const root = makeSandbox();
+    setRegime(root, { profiles: ['do-178c-levl-a'], copy: false });
+    seedBuilt(root, 'c54m');
+    assertBuiltHeld(root, 'c54m', 'regime-unreadable');
+  });
+});

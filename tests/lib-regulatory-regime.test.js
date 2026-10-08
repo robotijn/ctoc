@@ -342,24 +342,203 @@ describe('regimeSummary shape', () => {
 // listAvailableProfiles
 // ---------------------------------------------------------------------------
 
+// The profiles CTOC ships, read here straight from the repository folder (independent of the
+// module under test).
+const SHIPPED_DIR = path.join(__dirname, '..', '.ctoc', 'regulatory-regimes');
+const SHIPPED = fs.readdirSync(SHIPPED_DIR).filter(f => f.endsWith('.yaml')).map(f => f.slice(0, -5)).sort();
+
 describe('listAvailableProfiles', () => {
-  it('returns an empty array when the profiles directory is absent', () => {
+  // Contract replaced by the session decision of 2026-10-07: a project with no profile folder
+  // still knows the profiles shipped with the plugin (it used to list none).
+  it('lists exactly the profiles shipped with the plugin when the project has no profile folder', () => {
     const raw = fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-regime-empty-'));
     const root = fs.realpathSync(raw);
     createdDirs.push(root);
     // no .ctoc/regulatory-regimes directory created
-    assert.deepEqual(listAvailableProfiles(root), []);
+    assert.ok(SHIPPED.includes('gdpr') && SHIPPED.length >= 10, 'fixture: the shipped folder was read');
+    assert.deepEqual(listAvailableProfiles(root), SHIPPED);
   });
 
-  it('lists .yaml profiles by base name, sorted, ignoring non-yaml files', () => {
+  it("lists the project's .yaml profiles with the shipped ones, by base name, sorted, once each, ignoring non-yaml files", () => {
     const root = makeProject();
     writeProfile(root, 'zeta', shippedStyleProfile(['audit_hash_chain']));
     writeProfile(root, 'alpha', shippedStyleProfile(['legal_hold']));
+    writeProfile(root, 'gdpr', shippedStyleProfile(['legal_hold']));
     fs.writeFileSync(
       path.join(root, '.ctoc', 'regulatory-regimes', 'README.md'),
       '# not a profile\n'
     );
-    assert.deepEqual(listAvailableProfiles(root), ['alpha', 'zeta']);
+    assert.deepEqual(listAvailableProfiles(root), [...new Set(['alpha', 'zeta', ...SHIPPED])].sort());
+  });
+});
+
+describe('profiles shipped with the plugin (a project with no profile folder)', () => {
+  function bareProject(settingsBody) {
+    const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-regime-bare-')));
+    createdDirs.push(root);
+    fs.mkdirSync(path.join(root, '.ctoc'), { recursive: true });
+    if (settingsBody) writeSettings(root, settingsBody);
+    return root;
+  }
+
+  it('loads a shipped profile when the project has no copy of it', () => {
+    const root = bareProject('regulatory_regime:\n  active_profiles: [gdpr]\n');
+    const profile = loadProfile(root, 'gdpr');
+    assert.ok(profile, 'the shipped gdpr profile loads');
+    assert.equal(profile.name, 'gdpr');
+    assert.deepEqual(regime.unloadableProfiles(root), []);
+  });
+
+  it('activates the controls of a shipped profile', () => {
+    const root = bareProject('regulatory_regime:\n  active_profiles: [do-178c-level-a]\n');
+    assert.deepEqual(regime.unloadableProfiles(root), []);
+    assert.ok(effectiveControls(root).has('independent_verification_validation'));
+  });
+
+  it("a project's own copy still wins over the shipped one", () => {
+    const root = makeProject();
+    writeProfile(root, 'gdpr', 'name: project-own-gdpr\nrequired_controls:\n  - legal_hold\n');
+    writeActiveProfiles(root, ['gdpr']);
+    assert.equal(loadProfile(root, 'gdpr').name, 'project-own-gdpr');
+    assert.deepEqual([...effectiveControls(root)], ['legal_hold']);
+  });
+
+  it('a name in neither folder stays unreadable', () => {
+    const root = bareProject('regulatory_regime:\n  active_profiles: [do-178c-levl-a]\n');
+    assert.equal(loadProfile(root, 'do-178c-levl-a'), null);
+    assert.deepEqual(regime.unloadableProfiles(root), ['do-178c-levl-a']);
+  });
+
+  it('misreadRegime names every settings or profile text the reader would misread, and nothing else', () => {
+    const cases = [
+      [null, null],
+      ['timezone: "UTC"', null],
+      ['regulatory_regime:\n  active_profiles: []  # opt-in industry profiles (e.g. gdpr); none by default\n', null],
+      ['regulatory_regime:\n  declined: true\n  active_profiles: []\n', null],
+      ['regulatory_regime:\n  declined: true\n', null],
+      ['regulatory_regime:\n  overrides:\n    legal_hold: true\n', null],
+      ['regulatory_regime:\n  active_profiles: [gdpr]\n', null],
+      ['regulatory_regime:\n  active_profiles:\n    - gdpr\n    - sox-itgc\n', null],
+      ['regulatory_regime: # EU\n  active_profiles: [gdpr]\n', 'block'],
+      ['regulatory_regime: {active_profiles: [gdpr]}', 'block'],
+      ['regulatory_regime:\n  active_profile: [gdpr]\n', 'block'],
+      ['regulatory_regime:\n  active_profiles: gdpr\n', 'active-profiles'],
+      ['regulatory_regime:\n  active_profiles: [gdpr,\n    sox-itgc]\n', 'active-profiles'],
+      ['regulatory_regime:\n  active_profiles:\n', 'active-profiles'],
+      ['regulatory_regime:\n  active_profiles: ["gdpr"]\n', 'profile-name'],
+      ['regulatory_regime:\n  active_profiles: [../x]\n', 'profile-name'],
+    ];
+    for (const [settings, expected] of cases) {
+      const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ctoc-regime-misread-')));
+      createdDirs.push(root);
+      fs.mkdirSync(path.join(root, '.ctoc'), { recursive: true });
+      if (settings !== null) writeSettings(root, settings);
+      assert.equal(regime.misreadRegime(root), expected, JSON.stringify(settings));
+    }
+  });
+
+  it('misreadRegime: a loaded profile without a parsed list of required controls is a misread', () => {
+    for (const [body, expected] of [
+      ['', 'required-controls'],
+      ['name: acme\nrequired_controls: [legal_hold]\n', 'required-controls'],
+      ['name: acme\nrequired_controls: legal_hold\n', 'required-controls'],
+      ['name: acme\nrequired_controls:\n  - legal_hold\n', null],
+    ]) {
+      const root = makeProject();
+      writeProfile(root, 'acme', body);
+      writeActiveProfiles(root, ['acme']);
+      assert.equal(regime.misreadRegime(root), expected, JSON.stringify(body));
+    }
+    // A profile in neither folder is not a misread here: unloadableProfiles names it.
+    const root = makeProject();
+    writeActiveProfiles(root, ['ghost']);
+    assert.equal(regime.misreadRegime(root), null);
+    assert.deepEqual(regime.unloadableProfiles(root), ['ghost']);
+  });
+
+  // Security re-verification at 5908c014: the scanner's exact inputs.
+  it('a profile file with Windows line endings keeps its required controls (and a trailing \\r on the last item)', () => {
+    const doA = fs.readFileSync(path.join(SHIPPED_DIR, 'do-178c-level-a.yaml'), 'utf8');
+    const root = makeProject();
+    writeProfile(root, 'do-178c-level-a', doA.replace(/\n/g, '\r\n'));
+    writeActiveProfiles(root, ['do-178c-level-a']);
+    assert.ok(effectiveControls(root).has('independent_verification_validation'));
+    assert.equal(regime.misreadRegime(root), null);
+    const acme = makeProject();
+    writeProfile(acme, 'acme', 'required_controls:\r\n  - four_eyes_gate3\r');
+    writeActiveProfiles(acme, ['acme']);
+    assert.deepEqual(loadProfile(acme, 'acme').required_controls, ['four_eyes_gate3']);
+  });
+
+  it('a leading byte-order mark is stripped from the settings file and from a profile file', () => {
+    const root = bareProject(null);
+    fs.writeFileSync(path.join(root, '.ctoc', 'settings.yaml'), '﻿regulatory_regime:\n  active_profiles: [gdpr]\n');
+    assert.deepEqual(loadActiveProfiles(root).profiles, ['gdpr']);
+    assert.equal(regime.misreadRegime(root), null);
+    const p = makeProject();
+    writeProfile(p, 'acme', '﻿required_controls:\n  - four_eyes_gate3\n');
+    writeActiveProfiles(p, ['acme']);
+    assert.ok(effectiveControls(p).has('four_eyes_gate3'));
+  });
+
+  it('a comment line inside the active_profiles block list keeps the items after it', () => {
+    const root = bareProject('regulatory_regime:\n  active_profiles:\n    - gdpr\n    # aviation\n    - do-178c-level-a\n');
+    assert.deepEqual(loadActiveProfiles(root).profiles, ['gdpr', 'do-178c-level-a']);
+    assert.ok(effectiveControls(root).has('independent_verification_validation'));
+    assert.equal(regime.misreadRegime(root), null);
+  });
+
+  it('a comment line inside the overrides map keeps the overrides after it', () => {
+    const root = bareProject('regulatory_regime:\n  active_profiles: []\n  overrides:\n    # sign-off\n    four_eyes_gate3: true\n');
+    assert.deepEqual(loadActiveProfiles(root).overrides, { four_eyes_gate3: true });
+    assert.equal(regime.misreadRegime(root), null);
+  });
+
+  it('an override value that is not exactly true or false is a misread', () => {
+    for (const value of ['True', 'yes', '"true"', 'on', '1', 'true # sign-off']) {
+      const root = bareProject(`regulatory_regime:\n  active_profiles: []\n  overrides:\n    four_eyes_gate3: ${value}\n`);
+      assert.equal(regime.misreadRegime(root), 'overrides', value);
+    }
+    const missing = bareProject('regulatory_regime:\n  active_profiles: []\n  overrides:\n    four_eyes_gate3:\n');
+    assert.equal(regime.misreadRegime(missing), 'overrides');
+    for (const value of ['true', 'false']) {
+      const root = bareProject(`regulatory_regime:\n  active_profiles: []\n  overrides:\n    four_eyes_gate3: ${value}\n`);
+      assert.equal(regime.misreadRegime(root), null, value);
+    }
+  });
+
+  it('a second regulatory_regime block is a misread', () => {
+    const root = bareProject('regulatory_regime:\n  active_profiles: []\nregulatory_regime:\n  active_profiles: [gdpr]\n');
+    assert.equal(regime.misreadRegime(root), 'block');
+  });
+
+  it('guard: every shipped profile still loads a non-empty list of known controls', () => {
+    const root = bareProject(null);
+    for (const name of SHIPPED) {
+      const profile = loadProfile(root, name);
+      assert.ok(profile && Array.isArray(profile.required_controls) && profile.required_controls.length > 0, name);
+      for (const c of profile.required_controls) assert.ok(KNOWN_CONTROLS.has(c), `${name}: ${c}`);
+    }
+  });
+
+  it('misreadRegime throws when the settings file exists but cannot be read', () => {
+    const root = makeProject();
+    fs.mkdirSync(path.join(root, '.ctoc', 'settings.yaml'));
+    assert.throws(() => regime.misreadRegime(root));
+  });
+
+  it('a name that could climb out of either folder is refused', () => {
+    const root = makeProject();
+    // `../x` from <project>/.ctoc/regulatory-regimes is <project>/.ctoc/x.yaml: plant it.
+    fs.writeFileSync(path.join(root, '.ctoc', 'x.yaml'), 'name: escaped\nrequired_controls:\n  - legal_hold\n');
+    // and the shipped folder's parent is the plugin's .ctoc/: `../regulatory-regimes/gdpr`
+    // would reach a real file through a climb.
+    for (const name of ['../x', '../regulatory-regimes/gdpr', 'a/b', 'a\\b', '..', '', 'GDPR', '-gdpr', 'gdpr.yaml', ' gdpr']) {
+      assert.equal(loadProfile(root, name), null, `refused: ${JSON.stringify(name)}`);
+    }
+    writeActiveProfiles(root, ['../x']);
+    assert.deepEqual(regime.unloadableProfiles(root), ['../x']);
+    assert.equal(effectiveControls(root).size, 0);
   });
 });
 

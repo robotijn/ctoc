@@ -190,6 +190,24 @@ clears the plan's status file. A plan whose checks failed stays in review. Done 
 with deployment enabled it records the deploy-ready notice ("It finished on its checks —
 nobody approved it by hand"). Held by `tests/plans-keep-moving-without-the-human.test.js`.
 
+**Regulated projects.** While the GDPR or EU AI Act high-risk profile is on (the CTO Chief's
+compliance trigger), a functional plan never crosses into implementation on sufficiency,
+because nothing records that the compliance review ran for that version of the plan; while the
+regime requires independent verification and validation, a built plan never finishes on its
+checks, because CTOC cannot read the verification chief's findings; a regime CTOC cannot read
+holds the plan the same way at both crossings — an unreadable `.ctoc/settings.yaml`, a
+regulatory block or `active_profiles` line it cannot parse into profile names, a declared
+profile it can load from neither the project's own `.ctoc/regulatory-regimes/` nor the
+profiles shipped with the plugin, or a profile with no list of required controls. Each waits for the owner's approve and the screen says why in one
+sentence (`streaming-gate.regimeHold`). A project with no regime is unchanged. Held by
+`tests/plans-keep-moving-without-the-human.test.js`.
+
+While `four_eyes_gate3`, `spec_code_reconciliation` or `lessons_learned_closure` is active, a
+built plan also never finishes on its checks and waits for the owner's approve.
+**NOT ENFORCED**: their own checks (two distinct approvers, the reconciliation, the closing
+lesson) do not run; only the crossing on evidence waits, so the owner's approve still crosses
+with one approver.
+
 **Which questions reach the human.** `streaming-precompute.goesToHuman(question,
 classified)` is the one rule the gate, the screen and the audit share: in a file carrying the
 gate critic's classification block, a question reaches the human only under the conditions of
@@ -227,6 +245,23 @@ irreversible-command net or plan-move gate.
 `.ctoc/streaming/` except the waiting folder `.ctoc/streaming/questions/pending/`, which the
 question-writing agents reach with the Write tool). On the shell the whole
 `.ctoc/streaming/` folder counts, because those agents hold no shell.
+
+**The regulatory settings (owner's answer "a", 2026-10-08).** The project's settings file
+`.ctoc/settings.yaml` and everything under `.ctoc/regulatory-regimes/` are protected the same
+way, because the regime they declare decides whether a plan may move on by itself: every
+Write, Edit, MultiEdit and NotebookEdit and every shell write to them is refused — by name in
+any letter case, with `\` read as `/`, after `..`, after a `cd`, through a symbolic link and
+root-independently — for the main session and background agents alike; reading them stays
+allowed. The refusal is its own sentence: "CTOC refused this call because it writes, or could
+write, the project's settings file or its regulatory profiles, which only CTOC's menu writes;
+tell the human what you wanted to change and let the menu change it." The menu's own routes
+write them: `start.js`, and the start.md recipes `claude:set-environment`,
+`claude:env-keep-defaults` and `claude:set-compliance-regime`, which write through `src/lib/`
+and name no path (a background agent cannot run those: inline code naming `src/lib/` is
+refused for it). Limits are those of the records below; in addition, any inline script that
+writes the file without naming its path passes on the main session. A `~/.ctoc/settings.yaml`
+counts too, because the test does not depend on the project root. Held by
+`tests/protect-records.test.js` (cases 91–96, and case 13).
 
 **What it refuses:**
 

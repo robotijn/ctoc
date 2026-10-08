@@ -912,6 +912,57 @@ function crossBySufficiency(root, planPath, ref, fromStage, toStage, verdict) {
 }
 
 /**
+ * The regime controls that act at review → done and that no code checks: two distinct
+ * approvers, the specification-to-code reconciliation, the closing lesson. Read from the
+ * effective control set, never through `isControlEnabled`, because their own checks still do
+ * not run — only the crossing on evidence waits for the owner.
+ */
+const REVIEW_SIGN_OFF_CONTROLS = Object.freeze(['four_eyes_gate3', 'spec_code_reconciliation', 'lessons_learned_closure']);
+
+/**
+ * Why the project's regulatory regime keeps the plans at `stage` from crossing on evidence,
+ * or null when it does not. CTOC records none of these regimes' own evidence, so the plan
+ * waits for the owner's own approve, the path before plans crossed by themselves.
+ *
+ * - either stage: a declared profile CTOC cannot load (in neither the project's nor the
+ *   plugin's profile folder), or a settings or profile file the reader misreads
+ *   (`regulatory-regime.misreadRegime`) → 'regime-unreadable'.
+ * - functional: the CTO Chief's compliance trigger (`evaluateComplianceTrigger`) reports GDPR
+ *   or the EU AI Act on — nothing records that the compliance review ran → 'compliance-review'.
+ * - review: independent verification and validation required → 'independent-verification';
+ *   any of {@link REVIEW_SIGN_OFF_CONTROLS} → 'review-sign-off'.
+ * - any other stage, or no regime: null.
+ *
+ * FAIL CLOSED: the trigger reads fail-open, so the settings file is read first, and anything
+ * that throws (an unreadable `.ctoc/settings.yaml`, a profile that cannot be parsed) holds the
+ * plan as 'regime-unreadable'. Reads the regime once per call; never writes.
+ *
+ * @param {string} root project root
+ * @param {string} stage the gate source stage
+ * @returns {null|'compliance-review'|'independent-verification'|'review-sign-off'|'regime-unreadable'}
+ */
+function regimeHold(root, stage) {
+  if (stage !== 'functional' && stage !== 'review') return null;
+  try {
+    const regime = require('./regulatory-regime');
+    regime.loadActiveProfiles(root); // throws when .ctoc/settings.yaml cannot be read: hold
+    // Both crossings: a misspelled or hand-quoted profile never skips the compliance review,
+    // and a settings or profile file the reader misreads is never taken for "no regime".
+    if (regime.unloadableProfiles(root).length > 0) return 'regime-unreadable';
+    if (regime.misreadRegime(root) !== null) return 'regime-unreadable';
+    if (stage === 'functional') {
+      const t = require('./iron-loop-compliance-trigger').evaluateComplianceTrigger(root);
+      return t.runGdpr || t.runEuAiAct ? 'compliance-review' : null;
+    }
+    const controls = regime.effectiveControls(root);
+    if (controls.has('independent_verification_validation')) return 'independent-verification';
+    return REVIEW_SIGN_OFF_CONTROLS.some((c) => controls.has(c)) ? 'review-sign-off' : null;
+  } catch {
+    return 'regime-unreadable'; // a regime CTOC cannot read holds the plan
+  }
+}
+
+/**
  * The ORDERED list of plans currently sitting at a human gate awaiting a decision.
  *
  * X6 — THE GATE CROSSES ITSELF. This is no longer a pure read: before listing, any
@@ -944,6 +995,15 @@ function crossBySufficiency(root, planPath, ref, fromStage, toStage, verdict) {
  * screen, the on-open banner, the session-start status — a review plan is listed for the
  * human exactly as before, so nothing finishes when the menu opens.
  *
+ * ── A REGULATED PROJECT (`regimeHold`) ───────────────────────────────────────────
+ * The regime is read once per stage that holds plans. Where it governs the crossing and
+ * CTOC records none of its evidence — GDPR or the EU AI Act at functional; independent
+ * verification, two distinct approvers, the reconciliation or the closing lesson at review;
+ * an unreadable regime at either — neither the sufficiency crossing nor the crossing on
+ * evidence happens, and the plan waits for the owner's approve. Every descriptor carries the
+ * reason as `regimeHold` (null when none); `enough`, `sufficiencyReason` and every other
+ * field are unchanged.
+ *
  * @param {string} projectRoot
  * @param {{crossed?: Array<{ref:string, toStage:string, name:string}>}} [opts]
  * @returns {Array<{ref:string, slug:string, title:string, summary:string,
@@ -951,7 +1011,8 @@ function crossBySufficiency(root, planPath, ref, fromStage, toStage, verdict) {
  *   approveLabel:string, passesValidation:boolean,
  *   critical:boolean, enough:boolean, sufficiencyReason:string,
  *   unansweredQuestionIds:string[], blockingQuestionIds:string[],
- *   questionsClassified:(boolean|null), questionsRevisionMs:(number|null)}>}
+ *   questionsClassified:(boolean|null), questionsRevisionMs:(number|null),
+ *   regimeHold:(null|'compliance-review'|'independent-verification'|'review-sign-off'|'regime-unreadable')}>}
  */
 function pendingGateDecisions(projectRoot, opts = {}) {
   const crossed = opts && Array.isArray(opts.crossed) ? opts.crossed : null;
@@ -966,6 +1027,8 @@ function pendingGateDecisions(projectRoot, opts = {}) {
     } catch {
       plans = []; // a stage read failure must never brick the whole list
     }
+    // Once per stage, and no read for an empty stage.
+    const regime = plans.length > 0 ? regimeHold(projectRoot, stage) : null;
     for (const plan of plans) {
       // A name CTOC will not pass to a command gets NO descriptor, so no action can
       // carry it, and it is never validated; `countUnsafePlanFiles` tells the human
@@ -985,7 +1048,7 @@ function pendingGateDecisions(projectRoot, opts = {}) {
 
       // X6: enough information at a pre-build gate crosses the plan by itself and it
       // stops being a pending decision. Fail-closed conditions are all short-circuited.
-      if (sufficiency.enough === true && passesValidation
+      if (sufficiency.enough === true && passesValidation && !regime
           && PRE_BUILD_DESTINATIONS.has(meta.toStage)
           && crossBySufficiency(projectRoot, plan.path, ref, stage, meta.toStage, sufficiency)) {
         // Every crossing writes its decided-by-default questions into the plan, whichever
@@ -1000,7 +1063,7 @@ function pendingGateDecisions(projectRoot, opts = {}) {
         continue;
       }
       // A BUILT plan finishes on its evidence — only on the continuation's pass.
-      if (crossed && stage === 'review' && passesValidation && !isEmptyPlan(plan.content)
+      if (crossed && stage === 'review' && passesValidation && !regime && !isEmptyPlan(plan.content)
           && (sufficiency.enough === true || sufficiency.reason === 'not-computed')
           && crossOnEvidence(projectRoot, plan.path, ref, sufficiency)) {
         crossed.push({ ref: `done/${plan.name}.md`, toStage: 'done', name: humanPlanName(planTitle(plan), plan.name) });
@@ -1036,6 +1099,8 @@ function pendingGateDecisions(projectRoot, opts = {}) {
         // readable) and their revision — so the screen never offers an unchecked author's file.
         questionsClassified: sufficiency.questionsClassified,
         questionsRevisionMs: sufficiency.questionsRevisionMs,
+        // Why the regime keeps it from crossing on evidence (null: it does not).
+        regimeHold: regime,
       });
     }
   }
@@ -1303,7 +1368,8 @@ function precomputedQuestionMatrix(q, ordered) {
  * returned when there are no fresh precomputed questions OR when every precomputed
  * question has already been answered (in which case the fallback screen offers the
  * FINAL gate crossing — `stream approve <ref>` — which stays the human's explicit
- * answer).
+ * answer). After the separator it shows {@link regimeLine}, so a plan the regime keeps
+ * waiting says why while its question is asked.
  *
  * @param {object} d one pendingGateDecisions descriptor
  * @param {number} index its position in the ordered list (for the counter text)
@@ -1343,6 +1409,9 @@ function richQuestionScreen(d, index, total, statusLine, root) {
   text += `Topic: ${humanPlanName(d.title, d.slug)}  ·  ${d.moment}  ·  `
     + `decision ${index + 1} of ${total}  ·  question ${nextIdx + 1} of ${qTotal}\n`;
   text += `${'─'.repeat(40)}\n\n`;
+  // Why the regime keeps the plan waiting, also while a question is being asked.
+  const regime = regimeLine(d);
+  if (regime) text += `${regime}\n`;
   // Matrix FIRST, then the question sentence (the ask-me-questions contract).
   if (parts.matrix) text += `${parts.matrix}\n\n`;
   text += `  ${stripCtl(q.prompt)}\n\n\n`;
@@ -1567,7 +1636,9 @@ function planDecisionScreen(ref, projectRoot) {
     }
     if (st && st.status === 'ready' && st.classified === false && options.length < 4) {
       const state = checkState(projectRoot, ref, st.questionsRevisionMs);
-      text += CHECK_LINES[state];
+      // The same lines as the default screen: the regime's reason, and no promise that a
+      // plan the regime keeps waiting moves on by itself.
+      text += uncheckedLines(state, { regimeHold: regimeHold(projectRoot, stage) });
       if (state === 'none') {
         options.push({ label: CHECK_LABEL, description: 'Ask the gate critic to check the questions its author wrote, in the background. Nothing else changes.' });
         actions[CHECK_LABEL] = `stream check ${ref}`;
@@ -1628,12 +1699,14 @@ function planDecisionScreen(ref, projectRoot) {
  * Each not-ready reason is spelled out in plain words — a human should never have
  * to decode a status code (`not-computed`, `open-forks`) to know what is going on.
  *
+ * Followed by {@link regimeLine}, so an open fork and the regime's reason both show.
+ *
  * @param {object} d a pendingGateDecisions descriptor
  * @returns {string}
  */
 function sufficiencyLine(d) {
   if (d.enough === true) {
-    return '  Enough information: YES — every decision this plan needs has been answered.\n';
+    return `  Enough information: YES — every decision this plan needs has been answered.\n${regimeLine(d)}`;
   }
   const open = Array.isArray(d.blockingQuestionIds) ? d.blockingQuestionIds : [];
   const why = {
@@ -1649,7 +1722,26 @@ function sufficiencyLine(d) {
     'held': 'you are holding this plan; choose Release the hold on it to let it move on',
     'unclassified': 'the gate critic has not yet checked the questions its author wrote, so it cannot move on by itself; it waits for that check or for your approval',
   }[d.sufficiencyReason] || String(d.sufficiencyReason);
-  return `  Enough information: NO — ${why}.\n`;
+  return `  Enough information: NO — ${why}.\n${regimeLine(d)}`;
+}
+
+/** The one plain sentence per reason the regime keeps a plan waiting (`regimeHold`). */
+const REGIME_LINES = Object.freeze({
+  'compliance-review': 'It waits for your approval: this project has an EU compliance profile on (GDPR or the EU AI Act), and nothing records that the compliance review ran for this version of the plan, so it does not move on by itself.',
+  'independent-verification': "It waits for your approval: this project requires independent verification and validation, and CTOC cannot read the verification chief's findings, so it does not finish on its checks by itself.",
+  'review-sign-off': "It waits for your approval: this project's regulatory regime requires a sign-off here that CTOC does not check — two distinct approvers, a reconciliation of the specification against the code, or a closing lesson — so it does not finish on its checks by itself.",
+  'regime-unreadable': "It waits for your approval: CTOC could not read this project's regulatory settings, so it does not move on by itself.",
+});
+
+/**
+ * The screen line saying why the regime keeps this plan waiting: `''` when it does not,
+ * otherwise one of the four fixed {@link REGIME_LINES}, indented and newline-terminated.
+ * @param {object} d a pendingGateDecisions descriptor
+ * @returns {string}
+ */
+function regimeLine(d) {
+  const line = d && d.regimeHold ? REGIME_LINES[d.regimeHold] : '';
+  return line ? `  ${line}\n` : '';
 }
 
 /** The option label that asks for one plan's questions to be generated. */
@@ -1685,6 +1777,22 @@ const CHECK_LINES = Object.freeze({
   none: '  The gate critic has not yet checked the questions its author wrote; choose Check its questions, or approve it yourself.\n',
   ended: "  The gate critic's check of its questions did not finish; approve it yourself, or change the plan to have them checked again.\n",
 });
+
+/** The checking line for a plan the regime keeps waiting: it never moves on by itself. */
+const CHECKING_REGIME_HELD_LINE = '  Its questions are being checked by the gate critic; it still waits for your approval.\n';
+
+/**
+ * The line(s) for a plan whose author's questions the gate critic has not checked: the
+ * checking line — without the promise that it moves on by itself when the regime keeps it
+ * waiting — followed by {@link regimeLine}.
+ * @param {'checking'|'none'|'ended'} state from {@link checkState}
+ * @param {object} d a pendingGateDecisions descriptor
+ * @returns {string}
+ */
+function uncheckedLines(state, d) {
+  const line = state === 'checking' && d.regimeHold ? CHECKING_REGIME_HELD_LINE : CHECK_LINES[state];
+  return `${line}${regimeLine(d)}`;
+}
 
 /**
  * The sufficiency reasons that ARE a question-store status other than 'ready'
@@ -1820,7 +1928,7 @@ function gateScreenAt(decisions, index, statusLine, root) {
   text += `Topic: ${humanPlanName(d.title, d.slug)}  ·  ${d.moment}  ·  decision ${index + 1} of ${total}\n`;
   text += `${'─'.repeat(40)}\n\n`;
   text += `  ${d.summary}\n\n`;
-  text += unchecked ? CHECK_LINES[unchecked] : sufficiencyLine(d);
+  text += unchecked ? uncheckedLines(unchecked, d) : sufficiencyLine(d);
   text += '\n\n';
 
   const actions = {
