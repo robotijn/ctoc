@@ -2389,6 +2389,10 @@ test('round 7: names, frames, options, noscript, end tags, text over lines and b
     row(10, 'docs/lazy-quote.md', '> A quote that\nruns @ lazily.\n\nAfter.\n', ['on', 'along'], null),
     row(10, 'docs/lazy-item.md', '- an item that\nruns @ lazily\n- the next item\n', ['on', 'along'], null),
     row(10, 'docs/lazy-none.md', '> ```\n> code\n> ```\n@ words.\n', words, null),
+    // Under a quote inside a quote, a line four columns in that would start a block:
+    // markdown-it ends both quotes and reads it as code, CommonMark's text makes it a lazy line (red).
+    row(10, 'docs/lazy-nested.md', '> > Quote\n    <div>@</div>\n', save, exact('docs/lazy-nested.md')),
+    row(10, 'docs/lazy-indented.md', '> Quote\n    <b>@</b> lazily\n', save, null),
     // 11. What a Markdown reader does not pass on as a tag is none: an end tag behind a
     // backslash leaves the code element open (red); an image's text is an attribute (red).
     row(11, 'docs/escaped-end.md', 'Run <code>x\\</code> and @ it.</code>\n', ['save', 'store'], un('docs/escaped-end.md')),

@@ -841,6 +841,10 @@ function block(r, depth) {
     [1, () => ['> <a', `> href="/${w}">${x}</a>`]],
     [1, () => [`> <span title="${w}`, `> ${x}">${word(r)}</span>`]],
     [1, () => ['> <div>', `> <code>${w}</code>`, '> </div>', x]],
+    [1, () => [`>> ${w}`, `    <div>${x}</div>`]],
+    [1, () => [`> > ${w}`, `     ${pick(r, ['- ', '# ', '```', '***', '<!-- ', '1. '])}${x}`]],
+    [1, () => [`> - ${w}`, `      ${pick(r, ['- ', '# ', '<div>', '2. ', '> '])}${x}`, word(r)]],
+    [1, () => [`- > ${w}`, `${pick(r, ['', ' ', '    ', '      '])}${pick(r, ['', '- ', '# ', '<div>', '| a |'])}${x}`]],
     [1, () => [`- <div>`, `  ${w}`, '', `  ${x}`]],
     [1, () => [`{${w}}`]]
   ])();
@@ -1221,7 +1225,8 @@ const BY_HAND = {
     '| Name |\n| --- |\n| alpha | bravo |\n', '| ` | `alpha` |\n', '| a | b |\n| - | - |\n| ` | `alpha` |\n', '# The &DD; alpha\n\nbravo\n',
     '# alpha\n\n## bravo charlie\n\ndelta\n', 'alpha\n===\n\nbravo\n---\n', '[alpha](/x) and <https://bravo.example/charlie> and `delta`\n',
     '[alpha][guide] and [guide]\n\n[guide]: /bravo "charlie"\n', '1. alpha\n7. bravo\n\n- charlie\n  - delta\n', '>\n    > <code>\nalpha\n',
-    'alpha  \nbravo\\\ncharlie\n', 'A <b title="`">x</b> then `alpha` now.\n', 'See <https://example.org/a b> alpha.\n'
+    'alpha  \nbravo\\\ncharlie\n', 'A <b title="`">x</b> then `alpha` now.\n', 'See <https://example.org/a b> alpha.\n',
+    '>>e\n    <div>alpha</div>\n', '> e\n    <div>alpha</div>\n', '> > e\n     - alpha\n', '> - e\n      # alpha\nbravo\n'
   ]
 };
 
