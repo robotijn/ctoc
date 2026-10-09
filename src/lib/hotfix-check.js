@@ -1328,7 +1328,12 @@ const TABLE_PARTS = new Map(Object.entries({
 function scanMarkup(pieces, file, defined) {
   /** @type {Tok[]} */
   const out = [];
-  /** @type {Array<{name: string, holds: boolean, component: boolean, placeholder: boolean, made: boolean}>} the open elements, the innermost last */
+  /**
+   * @typedef {{name: string, holds: boolean, component: boolean, placeholder: boolean, made: boolean, holder: number, item: number}} Open
+   * an open element: whether it holds its text, is a component, is a placeholder of inline text, was made by the
+   * Markdown reader; which kind of list it is ({@link ITEM_HOLDERS}) or is an item of ({@link ITEMS}), or -1
+   */
+  /** @type {Open[]} the open elements, the innermost last */
   const stack = [];
   /** @type {Map<string, number>} how many open elements carry each name */
   const open = new Map();
@@ -1342,23 +1347,34 @@ function scanMarkup(pieces, file, defined) {
   let own = 0; // how many open elements are the file's own, not made by the Markdown reader
   const top = () => (stack.length > 0 ? stack[stack.length - 1] : null);
   const pop = () => {
-    const el = /** @type {{name: string, holds: boolean, component: boolean, made: boolean}} */ (stack.pop());
+    const el = /** @type {Open} */ (stack.pop());
     open.set(el.name, /** @type {number} */ (open.get(el.name)) - 1);
     if (!el.made) own--;
     if (el.holds) held--;
     if (el.component) components--;
-    if (ITEM_HOLDERS.has(el.name)) items[/** @type {number} */ (ITEM_HOLDERS.get(el.name))].pop();
-    else if (ITEMS.has(el.name)) { const of = items[/** @type {number} */ (ITEMS.get(el.name))]; of[of.length - 1]--; }
+    if (el.holder >= 0) items[el.holder].pop();
+    else if (el.item >= 0) items[el.item][items[el.item].length - 1]--;
   };
-  /** @param {string} name @param {boolean} holds @param {boolean} component @param {boolean} placeholder @param {boolean} [byReader] */
-  const push = (name, holds, component, placeholder, byReader = false) => {
-    stack.push({ name, holds, component, placeholder, made: byReader });
-    open.set(name, (open.get(name) || 0) + 1);
-    if (!byReader) own++;
-    if (holds) held++;
-    if (component) components++;
-    if (ITEM_HOLDERS.has(name)) items[/** @type {number} */ (ITEM_HOLDERS.get(name))].push(0);
-    else if (ITEMS.has(name)) { const of = items[/** @type {number} */ (ITEMS.get(name))]; of[of.length - 1]++; }
+  /** @param {Open} el */
+  const enter = (el) => {
+    stack.push(el);
+    open.set(el.name, (open.get(el.name) || 0) + 1);
+    if (!el.made) own++;
+    if (el.holds) held++;
+    if (el.component) components++;
+    if (el.holder >= 0) items[el.holder].push(0);
+    else if (el.item >= 0) items[el.item][items[el.item].length - 1]++;
+  };
+  /** @param {string} name @param {boolean} holds @param {boolean} component @param {boolean} placeholder @param {boolean} [byReader] @returns {Open} */
+  const element = (name, holds, component, placeholder, byReader = false) => ({ name, holds, component, placeholder, made: byReader,
+    holder: ITEM_HOLDERS.get(name) ?? -1, item: ITEMS.get(name) ?? -1 });
+  /** @type {Map<string, Open>} the elements of the tags the reader makes, one for each name (an open element is never changed) */
+  const readerMade = new Map();
+  /** @param {string} name an element the Markdown reader makes */
+  const enterMade = (name) => {
+    let el = readerMade.get(name);
+    if (el === undefined) readerMade.set(name, el = element(name, false, false, false, true));
+    enter(el);
   };
   /** @param {number} back @returns {string} the name of the element `back` places under the top, or '' */
   const nameAt = (back) => (stack.length > back ? stack[stack.length - 1 - back].name : '');
@@ -1412,18 +1428,40 @@ function scanMarkup(pieces, file, defined) {
     if (name === 'table' && (nameAt(0) === 'table' || (TABLE_PARTS.has(nameAt(0)) && !['td', 'th', 'caption'].includes(nameAt(0))))) outside();
     if (nameAt(0) === 'colgroup' && name !== 'col' && name !== 'template') outside();
   };
+  let s = ''; // the piece being read, how far it is read, and where its text token in progress starts
+  let i = 0;
+  let start = 0;
+  /** @param {number} end the text token in progress ends here */
+  const text = (end) => {
+    if (end <= start) return;
+    const v = s.slice(start, end);
+    const el = top();
+    const blank = !NOT_HTML_SPACE.test(v);
+    if (!blank) initial = false;
+    // After the body's end, and directly inside a `<colgroup>`, a browser moves text elsewhere.
+    if ((ended || (el !== null && el.name === 'colgroup')) && !blank) outside();
+    const unsent = Boolean(open.get('select')) && !(el !== null && el.name === 'option' && !el.holds);
+    out.push({ k: 'text', v, quiet: held > 0 || unsent, inexact: components > 0 });
+  };
+  /** @param {string} k @param {number} end one token of kind `k` from where the scan stands to `end` */
+  const take = (k, end) => {
+    text(i);
+    out.push({ k, v: s.slice(i, end) });
+    i = end;
+    start = end;
+  };
   /** A tag the Markdown reader makes: its start tag as any start tag, its end tag closing the placeholders left open above its element. */
   const made = (piece) => {
     const name = /** @type {string} */ (piece.name);
     out.push(piece);
     if (own === 0) { // only the reader's own tags are open, and those it nests itself
-      if (piece.k === 'open') { if (!VOID_ELEMENTS.has(name)) push(name, false, false, false, true); } else if (nameAt(0) === name) pop();
+      if (piece.k === 'open') { if (name !== 'hr') enterMade(name); } else if (nameAt(0) === name) pop();
       return;
     }
     if (open.get('select') || (piece.k === 'open' && piece.maybe && open.get('p'))) outside();
     if (piece.k === 'open') {
       closeBefore(name, false);
-      if (!VOID_ELEMENTS.has(name)) push(name, false, false, false, true);
+      if (name !== 'hr') enterMade(name);
     } else if (open.get(name)) {
       // A `<p>` the reader may have left out closes nothing but itself.
       while (!piece.maybe && nameAt(0) !== name && /** @type {{placeholder: boolean}} */ (top()).placeholder) pop();
@@ -1434,30 +1472,22 @@ function scanMarkup(pieces, file, defined) {
   /**
    * One piece of text: an HTML file, a raw HTML block, or (`inline`) a run of Markdown's
    * inline text.
-   * @param {string} s @param {boolean} inline
+   * @param {string} piece @param {boolean} inline
    */
-  const scan = (s, inline) => {
+  const scan = (piece, inline) => {
+    s = piece;
     const n = s.length;
-    let i = 0;
-    let start = 0;
+    i = 0;
+    start = 0;
     let close = -1; // the next `]` at or after the last `[` looked at; `n` when there is none
-    const text = (end) => {
-      if (end <= start) return;
-      const v = s.slice(start, end);
-      const el = top();
-      const blank = !NOT_HTML_SPACE.test(v);
-      if (!blank) initial = false;
-      // After the body's end, and directly inside a `<colgroup>`, a browser moves text elsewhere.
-      if ((ended || (el !== null && el.name === 'colgroup')) && !blank) outside();
-      const unsent = Boolean(open.get('select')) && !(el !== null && el.name === 'option' && !el.holds);
-      out.push({ k: 'text', v, quiet: held > 0 || unsent, inexact: components > 0 });
-    };
-    const take = (k, end) => {
-      text(i);
-      out.push({ k, v: s.slice(i, end) });
-      i = end;
-      start = end;
-    };
+    /** @type {(number[]|null)} inline text: where each run of backticks ends, in order */
+    let runs = null;
+    /** @type {(Map<number, number[]>|null)} for each length, the runs of backticks of that length */
+    let sameLength = null;
+    /** @type {(Map<number, number>|null)} for each length, how far the search for a closing run has come */
+    let closer = null;
+    let run = 0; // the run of backticks the scan stands in, or the next one
+    if (s.indexOf('<') < 0 && (!inline || !/[`\\[\]]/.test(s))) i = n; // nothing but text: one token
     while (i < n && scanFault === null) {
       const c = s[i];
       if (inline && c === '\\') { i += 2; continue; }
@@ -1468,18 +1498,30 @@ function scanMarkup(pieces, file, defined) {
         continue;
       }
       if (inline && c === '`') {
-        let e = i + 1;
-        while (s[e] === '`') e++;
-        let end = -1; // the end of the next run of the same length
-        for (let from = e; end < 0;) {
-          const a = s.indexOf('`', from);
-          if (a < 0) break;
-          from = a + 1;
-          while (s[from] === '`') from++;
-          if (from - a === e - i) end = from;
+        if (runs === null) { // the last run of backticks in the text closes no span
+          let e = i + 1;
+          while (s[e] === '`') e++;
+          if (s.indexOf('`', e) < 0) { i = e; continue; }
         }
-        if (end < 0) i = e;
-        else take('code', end);
+        if (runs === null || sameLength === null || closer === null) { // every run of backticks in the text, and the runs of each length, read once
+          runs = [];
+          sameLength = new Map();
+          closer = new Map();
+          for (let k = s.indexOf('`'), e = 0; k >= 0; k = s.indexOf('`', e)) {
+            for (e = k + 1; s[e] === '`';) e++;
+            if (!sameLength.has(e - k)) sameLength.set(e - k, []);
+            /** @type {number[]} */ (sameLength.get(e - k)).push(runs.length);
+            runs.push(e);
+          }
+        }
+        while (runs[run] <= i) run++;
+        // The span ends with the next run as long as what is left of this one (a backslash may have taken its start).
+        const list = sameLength.get(runs[run] - i) || [];
+        let p = closer.get(runs[run] - i) || 0;
+        while (p < list.length && list[p] <= run) p++;
+        closer.set(runs[run] - i, p);
+        if (p === list.length) i = runs[run];
+        else take('code', runs[list[p]]);
         continue;
       }
       if (inline && c === ']' && s[i + 1] === '(') {
@@ -1537,8 +1579,8 @@ function scanMarkup(pieces, file, defined) {
         if (!VOID_ELEMENTS.has(name)) {
           const code = CODE_ELEMENTS.has(name) || name === 'template';
           const component = !code && isComponent(name, attrs);
-          push(name, code || component || (name === 'option' && !attrs.includes('value')), component,
-            inline && !HOST_ELEMENTS.has(name) && !PARSER_KNOWN.has(name));
+          enter(element(name, code || component || (name === 'option' && !attrs.includes('value')), component,
+            inline && !HOST_ELEMENTS.has(name) && !PARSER_KNOWN.has(name)));
         }
         if (name === 'title') {
           i = rawEnd(s, i, name);
@@ -1563,10 +1605,12 @@ function scanMarkup(pieces, file, defined) {
     }
     text(n);
   };
+  // A Markdown file without a `<` holds no tag of its own: the reader's tags nest by themselves, and need no stack.
+  const tagless = !file && !pieces.some((piece) => (piece.k === 'raw' || piece.k === 'inline') && piece.v.includes('<'));
   for (const piece of pieces) {
     if (scanFault !== null) break;
-    if (piece.k === 'open' || piece.k === 'close') made(piece);
-    else if (piece.k === 'fixed') out.push(piece);
+    if (piece.k === 'fixed' || (tagless && piece.k !== 'inline')) out.push(piece);
+    else if (piece.k === 'open' || piece.k === 'close') made(piece);
     else scan(piece.v, piece.k === 'inline');
   }
   if (stack.length > 0) outside(); // an element never closed
@@ -2170,6 +2214,8 @@ function thematicBreak(line) {
 }
 /** How deep block quotes and list items are followed; deeper is outside the subset. */
 const NESTING_DEPTH = 16;
+/** No lines: what a block quote or list item without a lazy line keeps of its lines. */
+const NO_LINES = /** @type {any[]} */ (Object.freeze([]));
 /** @param {string} t @returns {boolean} a line a Markdown reader takes as empty: spaces and tabs only */
 function isBlank(t) {
   for (let k = 0; k < t.length; k++) if (t[k] !== ' ' && t[k] !== '\t') return false;
@@ -2216,10 +2262,14 @@ const ATX = /^#{1,6}(?:[ \t]|$)/;
  */
 function markerOf(body) {
   const c = body.charCodeAt(0);
-  if (c !== 45 && c !== 43 && c !== 42 && !(c >= 48 && c <= 57)) return null; // no `-`, `+`, `*` and no digit
-  const m = /^(?:[-+*]|(\d{1,9})[.)])(?=[ \t]|$)/.exec(body);
+  if (c === 45 || c === 43 || c === 42) { // a bullet: `-`, `+` or `*`
+    const next = body.charCodeAt(1);
+    return body.length === 1 || next === 32 || next === 9 ? { width: 1, ordered: false, mark: body[0], first: false, rest: body.slice(1) } : null;
+  }
+  if (!(c >= 48 && c <= 57)) return null;
+  const m = /^(\d{1,9})[.)](?=[ \t]|$)/.exec(body);
   if (!m) return null;
-  return { width: m[0].length, ordered: m[1] !== undefined, mark: m[0][m[0].length - 1], first: Number(m[1]) === 1, rest: body.slice(m[0].length) };
+  return { width: m[0].length, ordered: true, mark: m[0][m[0].length - 1], first: Number(m[1]) === 1, rest: body.slice(m[0].length) };
 }
 /*
  * WHERE AN HTML BLOCK STARTS AND ENDS, after CommonMark's seven start conditions as
@@ -2346,21 +2396,23 @@ function markdownBlocks(lines) {
    * @type {boolean[]}
    */
   const lazy = new Array(count).fill(false);
+  // Most files hold no doctest and no `import` or `export` line: then no line is looked at for one.
+  const scripts = lines.some((l) => l.includes('>>>') || l.includes('import ') || l.includes('export '));
   /** @type {string[]} */
   const anchors = [];
   /** @type {Set<string>} */
   const defined = new Set();
   /** @type {Piece[]} */
   const pieces = [];
-  /** @type {Map<string, Piece>} the tags the reader makes, one piece for each */
-  const tags = new Map();
-  const tag = (k, v, name, maybe) => {
-    let piece = tags.get(v);
-    if (piece === undefined) tags.set(v, piece = { k, v: v.replace('?', ''), name, maybe });
+  /** @type {Array<Map<string, Piece>>} the tags the reader makes, one piece for each: start tags, end tags, and those of a `<p>` it may leave out */
+  const tags = [new Map(), new Map(), new Map(), new Map()];
+  const tag = (kind, name) => {
+    let piece = tags[kind].get(name);
+    if (piece === undefined) tags[kind].set(name, piece = { k: kind % 2 ? 'close' : 'open', v: kind % 2 ? `</${name}>` : `<${name}>`, name, maybe: kind > 1 });
     pieces.push(piece);
   };
-  const open = (name, maybe = false) => tag('open', maybe ? `<${name}>?` : `<${name}>`, name, maybe);
-  const close = (name, maybe = false) => tag('close', maybe ? `</${name}>?` : `</${name}>`, name, maybe);
+  const open = (name, maybe = false) => tag(maybe ? 2 : 0, name);
+  const close = (name, maybe = false) => tag(maybe ? 3 : 1, name);
   const inline = (v) => pieces.push({ k: 'inline', v });
   const fixed = (v) => pieces.push({ k: 'fixed', v });
   /** @param {string} text a heading's text; one that holds a character reference is kept whole, because a reference may spell a letter */
@@ -2437,8 +2489,10 @@ function markdownBlocks(lines) {
       outside();
       return to;
     }
-    for (let k = from; k < to; k++) if (T[k].includes('>>>') && DOCTEST.test(T[k])) doctest[k] = true;
+    for (let k = from; scripts && k < to; k++) if (T[k].includes('>>>') && DOCTEST.test(T[k])) doctest[k] = true;
     let pos = from;
+    /** @type {ReturnType<typeof markerOf>} */
+    let marker = null;
     while (pos < to) {
       const t = T[pos];
       if (isBlank(t)) { pos++; continue; }
@@ -2489,16 +2543,16 @@ function markdownBlocks(lines) {
         let empty = false; // the last quoted line holds nothing: no lazy line follows it
         let first = -1; // the first lazy line
         /** @type {string[]} the lines from the first lazy line on, as they were */
-        const kept = [];
-        /** @type {number[]} */
-        const mine = [];
+        let kept = NO_LINES;
+        /** @type {number[]} the lines taken as lazy here */
+        let mine = NO_LINES;
         for (; end < to && !isBlank(T[end]); end++) {
           const at = indentOf(T[end]);
           const quoted = !lazy[end] && T[end][at] === '>';
           // A `>` line indented four columns right under the quote: readers disagree whether it is quoted.
           if (quoted && at > 3) outside();
           if (!quoted && (empty || (!lazy[end] && !mayBeLazy(end, to, null)))) break;
-          if (!quoted && first < 0) first = end;
+          if (!quoted && first < 0) { first = end; kept = []; mine = []; }
           if (first >= 0) kept.push(T[end]);
           if (!quoted && !lazy[end]) { lazy[end] = true; mine.push(end); }
           if (!quoted) continue;
@@ -2515,8 +2569,8 @@ function markdownBlocks(lines) {
       } else if (thematicBreak(body)) {
         open('hr');
         pos++;
-      } else if (markerOf(body) !== null) {
-        let m = /** @type {NonNullable<ReturnType<typeof markerOf>>} */ (markerOf(body));
+      } else if ((marker = markerOf(body)) !== null) {
+        let m = marker;
         const list = m.ordered ? 'ol' : 'ul';
         const mark = m.mark;
         open(list);
@@ -2525,24 +2579,27 @@ function markdownBlocks(lines) {
           const blank = isBlank(m.rest);
           const spaces = indentOf(m.rest);
           const gap = blank || spaces > 4 ? 1 : spaces;
-          const column = indentOf(T[pos]) + m.width + gap;
-          fixed(T[pos].slice(indentOf(T[pos]), indentOf(T[pos]) + m.width));
+          const at = indentOf(T[pos]);
+          const column = at + m.width + gap;
+          fixed(T[pos].slice(at, at + m.width));
           T[pos] = blank ? '' : m.rest.slice(gap);
           level[pos] = depth + 1;
           let end = pos + 1;
           let first = -1; // the first lazy line
           /** @type {string[]} the lines from the first lazy line on, as they were */
-          const kept = [];
-          /** @type {number[]} */
-          const mine = [];
+          let kept = NO_LINES;
+          /** @type {number[]} the lines taken as lazy here */
+          let mine = NO_LINES;
           // An item whose first line is empty and whose next line is blank is empty. Else it
           // holds the lines indented to its content column, the blank lines between them, and
           // the lazy lines right under one of its lines.
-          for (let k = end; k < to && !(blank && isBlank(T[pos + 1])); k++) {
-            if (isBlank(T[k])) { if (first >= 0) kept.push(T[k]); continue; }
+          for (let k = end, under = true; k < to && !(blank && isBlank(T[pos + 1])); k++) {
+            if (isBlank(T[k])) { if (first >= 0) kept.push(T[k]); under = false; continue; }
             const inside = !lazy[k] && indentOf(T[k]) >= column;
-            if (!inside && !lazy[k] && (isBlank(T[k - 1]) || !mayBeLazy(k, to, m))) break;
-            if (!inside && first < 0) { first = k; kept.length = 0; }
+            // `under`: no blank line stands between this line and the item's line above it.
+            if (!inside && !lazy[k] && (!under || (k === pos + 1 && blank) || !mayBeLazy(k, to, m))) break;
+            under = true;
+            if (!inside && first < 0) { first = k; kept = []; mine = []; }
             if (first >= 0) kept.push(T[k]);
             if (inside) { T[k] = T[k].slice(column); level[k] = depth + 1; } else if (!lazy[k]) { lazy[k] = true; mine.push(k); }
             end = k + 1;
@@ -2555,8 +2612,9 @@ function markdownBlocks(lines) {
           pos = stop;
           while (pos < to && isBlank(T[pos])) pos++;
           if (pos === to || lazy[pos]) break;
-          const next = T[pos].slice(indentOf(T[pos]));
-          const following = indentOf(T[pos]) > 3 || fenceOf(next) !== null || next[0] === '>' || thematicBreak(next) ? null : markerOf(next);
+          const nextAt = indentOf(T[pos]);
+          const next = T[pos].slice(nextAt);
+          const following = nextAt > 3 || fenceOf(next) !== null || next[0] === '>' || thematicBreak(next) ? null : markerOf(next);
           if (following === null || following.ordered !== m.ordered || following.mark !== mark) break;
           m = following;
         }
@@ -2606,7 +2664,7 @@ function markdownBlocks(lines) {
     // A doctest and an `import` or `export` block: code as well, up to the next blank line.
     // A line read into a block quote or a list item is no blank line and starts no such block here.
     let script = false;
-    for (let k = from; k < pos; k++) {
+    for (let k = from; scripts && k < pos; k++) {
       const t = level[k] > depth ? '>' : T[k];
       if (isBlank(t)) script = false;
       else if (script || doctest[k]
@@ -2713,6 +2771,7 @@ function braceReach(lines, prose) {
       after = unsure;
       continue;
     }
+    if (depth === 0 && !prose[i].includes('{') && !prose[i].includes('}')) continue; // no brace, and none open
     for (const c of prose[i]) {
       if (c === '{') { depth++; braced = true; }
       else if (c === '}') { braced = true; if (--depth < 0) { depth = 0; after = true; } }
