@@ -35,8 +35,9 @@
  * unreadable: git would then read its index instead of the file. No language model is
  * involved; the same change always gets the same answer.
  *
- * THE RULES, in the order they run (the first that fails gives the clause; files are
- * looked at in sorted display-path order):
+ * THE RULES. They run in this order: 1, 2, 7, the kind of each file (the first half of rule
+ * 4), 3, the content of each file (the rest of rule 4), 5, 6, and 8 last. The first that
+ * fails gives the clause; files are looked at in sorted display-path order:
  *   1  the change can be read            — a git repository with a commit, the project
  *                                          inside it, every judged name one the commit
  *                                          command can carry, no index bit that hides the
@@ -124,9 +125,13 @@
  *                                          there also no word of 7 to 40 hexadecimal digits
  *   3  size                              — at most 20 changed lines in at most 3 files
  *   8  the existing tests pass           — only in the `--run-tests` call, in a copy
- * Rule 7 and the kind rule run before size because the functional plan's own scenarios
- * name an edited test and the kind of change ahead of size; all of 2 to 7 read the same
- * diff, so the order costs nothing, and the tests still run last.
+ * Rule 7 and the kind of each file (rule 4: where it is placed by its name and its place) run
+ * before size because the functional plan's own scenarios name an edited test and the kind of
+ * change ahead of size. Size then runs BEFORE any reader reads a file's content (the rest of
+ * rule 4), before rule 5 and before rule 6 (the decision at review of 2026-10-09), so a change
+ * over the limit gets the size clause the functional plan's scenario expects whatever its
+ * content holds. All of 2 to 7 read the same diff, so the order costs nothing, and the tests
+ * still run last.
  *
  * NO CODE OF THE REPOSITORY'S RUNS. The check's temporary folder (`mkdtemp` under the
  * system's temporary folder) and its empty `no-hooks` folder are made before the first git
@@ -2028,15 +2033,29 @@ const lineFeeds = (s) => s.replace(/\r\n/g, '\n');
  * in pure prose, defined so that every renderer shows the same thing.
  *   1  A PLAIN PROSE LINE has 0 to 3 leading spaces, holds no white space but the space,
  *      starts with a letter or an opening quotation mark, and consists of letters, combining
- *      marks, decimal digits, spaces and `, . ; ? ! ' " -`, the typographic quotes, the two
- *      dashes and the ellipsis. Each of `. , ; ? !` stands before a space, a closing quote or
- *      the end of the line (so no `example.com`), and `-` only between two letters. A changed
- *      line keeps its leading and its trailing spaces (two trailing spaces are a line break).
+ *      marks, decimal digits, spaces and `, . ; : ? ! ' " - ( )`, the typographic quotes, the
+ *      two dashes and the ellipsis. Each of `. , ; ? !` stands before a space, a closing
+ *      quote, a closing parenthesis or the end of the line (so no `example.com`), and `-` only
+ *      between two letters. A changed line keeps its leading and its trailing spaces (two
+ *      trailing spaces are a line break).
+ *      WIDENED IN THE NINTH ROUND (the decisions at review of 2026-10-09, each step taken only
+ *      because the differential test stayed at zero disagreements with it): (a) a COLON that
+ *      follows a letter, a digit, a closing quote or a closing parenthesis and stands before a
+ *      space or the end of the line, everywhere but in the file's first paragraph, where a
+ *      metadata reader takes `Key: value` lines; (b) PARENTHESES: the paragraph still holds no
+ *      `[`, `]`, `<`, `>` and no backtick, so no link and no tag can form; (c) LIST ITEMS: a
+ *      line that starts with an item's prefix ({@link ITEM_PREFIX}) and goes on as plain
+ *      prose, the prefix identical on both sides.
  *   2  A PLAIN PARAGRAPH is the run of non-blank lines around a changed line; every line of it
- *      is a plain prose line, on both sides, and an empty line or the file's start or end
- *      bounds it (a line of spaces counts as empty, a line of other white space does not).
+ *      is a plain prose line or a list item of plain prose, on both sides, and an empty line
+ *      or the file's start or end bounds it (a line of spaces counts as empty, a line of other
+ *      white space does not). The brief for (c) would let another item's line bound the run
+ *      too; the run stays bounded by empty lines only, because renderers do not agree on what
+ *      ends an item (a `2.` under a bullet, a `1)`, a list right under a paragraph), and with
+ *      every line of the run plain, whichever way a renderer divides it only words change.
  *   3  POSITION. The paragraph does not lie inside front matter or a metadata block, inside a
- *      code fence, or below raw HTML ({@link proseHeld}).
+ *      code fence, or below raw HTML ({@link proseHeld}), and the file holds no raw start tag
+ *      anywhere ({@link RAW_START}).
  *   4  CHANGED WORDS. Rule 6 reads them, and also refuses a word of 7 to 40 hexadecimal
  *      digits, which sites link as a commit id ({@link HEX_WORD}).
  *   5  NOTHING ELSE in the file changes: no line comes or goes, no line ending and no
@@ -2047,10 +2066,31 @@ const lineFeeds = (s) => s.replace(/\r\n/g, '\n');
  * the build machine, 2026-10-09) showed beyond the decision's own words is marked "found"
  * below; each is on the refusing side.
  */
-/** A plain prose line, by its characters. */
-const PLAIN_LINE = /^ {0,3}[\p{L}"'\u201c\u2018][\p{L}\p{M}\p{Nd} ,.;?!'"\u201c\u201d\u2018\u2019\u2013\u2014\u2026-]*$/u;
-/** What a plain prose line does not hold: sentence punctuation before anything but a space, a closing quote or the end of the line; a hyphen that does not stand between two letters. */
-const PLAIN_BREAK = /[.,;?!](?![ "'\u201d\u2019]|$)|(?<!\p{L})-|-(?!\p{L})/u;
+/** A plain prose line, by its characters (since the ninth round a colon and parentheses among them). */
+const PLAIN_LINE = /^ {0,3}[\p{L}"'\u201c\u2018][\p{L}\p{M}\p{Nd} ,.;:?!'"()\u201c\u201d\u2018\u2019\u2013\u2014\u2026-]*$/u;
+/**
+ * What a plain prose line does not hold: sentence punctuation before anything but a space, a
+ * closing quote, a closing parenthesis or the end of the line; a hyphen that does not stand
+ * between two letters; a colon that does not follow a letter, a digit, a closing quote or a
+ * closing parenthesis, or does not stand before a space or the end of the line (so no scheme,
+ * no time of day, no emoticon and no `: ` at a line start).
+ */
+const PLAIN_BREAK = /[.,;?!](?![ "'\u201d\u2019)]|$)|(?<!\p{L})-|-(?!\p{L})|(?<![\p{L}\p{Nd}"'\u201d\u2019)]):|:(?! |$)/u;
+/**
+ * A list item's prefix (the ninth round): 0 to 3 spaces, a bullet (`-`, `*`, `+`) or one to
+ * nine digits and `.` or `)`, then 1 to 4 spaces; the item's text follows, and must be plain
+ * prose. Five spaces after the marker start code, and a marker with nothing after it may
+ * underline the line above into a heading, so neither is a prefix.
+ */
+const ITEM_PREFIX = /^ {0,3}(?:[-*+]|\d{1,9}[.)]) {1,4}(?! )/;
+/**
+ * The raw start tags (the decision at review of 2026-10-09): a file that holds one of them
+ * anywhere, in any letter case, is refused whole. What follows such a start is raw text to
+ * some renderer whatever seems to close it, above the changed paragraph or below it (found,
+ * Python-Markdown: a `<script>` in a block quote below the paragraph, its end tag outside the
+ * quote, came out in four different ways by the length of the paragraph above).
+ */
+const RAW_START = /<(?:script|style|pre|textarea|xmp|plaintext|title|noscript|iframe|!--|!\[CDATA\[|\?)/i;
 /** Found (pandoc): a first word that is one letter or a Roman numeral, with a full stop, starts a list. */
 const LIST_WORD = /^(?:\p{L}|[ivxlcdm]+)\.(?: |$)/iu;
 /**
@@ -2063,8 +2103,8 @@ const CODE_WORD = /^(?:import|export) /;
 const FENCE_LIKE = /^(\s*)(`{3,}|~{3,})(.*)$/su;
 /** What may follow an opening fence: one word at most (Python-Markdown reads no fence with two). */
 const FENCE_WORD = /^\.?[A-Za-z0-9_#.+-]*$/;
-/** A `<` before a letter, `!`, `?` or `/`: where a renderer may start a tag, a comment or a declaration. */
-const TAG_START = /<[A-Za-z!?/]/;
+/** A `<` before a letter, `!` or `/`: where a renderer may start a tag or a declaration (`<?` and `<!--` refuse the file: {@link RAW_START}). */
+const TAG_START = /<[A-Za-z!/]/;
 /** A word of 7 to 40 hexadecimal digits: sites link such a word as a commit id. */
 const HEX_WORD = /(?<![\p{L}\p{N}])[0-9a-f]{7,40}(?![\p{L}\p{N}])/iu;
 /** @param {string} line @returns {boolean} an empty line, or one of spaces only */
@@ -2105,23 +2145,10 @@ function metaOpener(line) {
 }
 
 /**
- * @param {string} line @returns {boolean} the line is one comment and nothing else: `<!--` at
- * its start, `-->` at its end (spaces may follow), and between them no `<`, no `>` and no
- * `--`. Every renderer reads it as closed where it stands.
- */
-function commentLine(line) {
-  let end = line.length;
-  while (end > 0 && line[end - 1] === ' ') end--;
-  if (end < 7 || !line.startsWith('<!--') || !line.startsWith('-->', end - 3)) return false;
-  const body = line.slice(4, end - 3);
-  return !/[<>]|--/.test(body) && !body.endsWith('-');
-}
-
-/**
  * @param {string} line @param {boolean} unsure a line above, in the same run of lines, left
  * a backtick or a backslash unpaired
  * @returns {{raw: boolean, unsure: boolean}} `raw`: the line holds a `<` before a letter,
- * `!`, `?` or `/` outside every code span that opens and closes on this line (a run of
+ * `!` or `/` outside every code span that opens and closes on this line (a run of
  * backticks up to the next run of the same length, with no `|` between: a table cell ends
  * there). `unsure`: the line leaves a run of backticks unpaired, or holds a backslash, on
  * which readers disagree (found, Python-Markdown: `\<script>` is a tag there); from there
@@ -2131,7 +2158,7 @@ function rawOutsideSpans(line, unsure) {
   let i = 0;
   while (i < line.length) {
     const c = line[i];
-    if (c === '<' && /[A-Za-z!?/]/.test(line[i + 1] || '')) return { raw: true, unsure };
+    if (c === '<' && /[A-Za-z!/]/.test(line[i + 1] || '')) return { raw: true, unsure };
     if (c === '\\') unsure = true;
     if (c !== '`' || unsure) { i++; continue; }
     let run = i + 1;
@@ -2167,13 +2194,14 @@ function rawOutsideSpans(line, unsure) {
  *   opening one (found, Python-Markdown reads neither as that fence); a fence right under a
  *   line that ends in `]:` (found: it is that definition's destination); a fence inside a
  *   metadata block (a reader that hides the block does not see it).
- *   RAW HTML ABOVE. The decision names twelve raw starts and their closers. Found: a closer
- *   can be escaped by the Markdown around it, a block quote or list item can end before it,
- *   and any element left open holds the paragraphs below it. So every `<` before a letter,
- *   `!`, `?` or `/` holds every line from there on, front matter included. Two shapes are
- *   closed for every renderer and hold nothing: a comment alone on its line
- *   ({@link commentLine}) and a tag inside a code span on one line
- *   ({@link rawOutsideSpans}). A tag inside a code fence holds what follows like any other
+ *   RAW HTML ABOVE. A file that holds one of the twelve raw starts anywhere is refused
+ *   before this is asked ({@link RAW_START}). Of every other tag: a closer can be escaped by
+ *   the Markdown around it, a block quote or list item can end before it, and any element
+ *   left open holds the paragraphs below it. So every `<` before a letter, `!` or `/` holds
+ *   every line from there on, front matter included. One shape is closed for every renderer
+ *   and holds nothing: a tag inside a code span on one line ({@link rawOutsideSpans}; until
+ *   the ninth round a comment alone on its line was a second one, and a `<!--` anywhere now
+ *   refuses the file). A tag inside a code fence holds what follows like any other
  *   (found, Python-Markdown without its fenced-code extension: a renderer that knows no
  *   fences reads the fence's lines as Markdown, runs a `<script>` there, and lets a block
  *   tag left open hold the rest of the file).
@@ -2214,7 +2242,7 @@ function proseHeld(lines) {
     }
     if (isBlank(line)) unsure = false;
     if (!raw && fence !== null) raw = TAG_START.test(line);
-    else if (!raw && !commentLine(line)) ({ raw, unsure } = rawOutsideSpans(line, unsure));
+    else if (!raw) ({ raw, unsure } = rawOutsideSpans(line, unsure));
     if (raw) held[i] = true;
   }
   return held;
@@ -2225,18 +2253,27 @@ function proseHeld(lines) {
  * it is anything but a wording change in pure prose (the rule above). The two sides are
  * compared line by line: the same lines with the same endings, none added or removed; no carriage return
  * on its own (found: to a Markdown reader it ends a line, to the count of lines here it does
- * not); every changed line in a plain paragraph, on both sides, outside what
- * {@link proseHeld} holds; the paragraph's first line not indented (found: a list item above
- * holds an indented paragraph) and starting with no list word ({@link LIST_WORD}) and no code
- * word ({@link CODE_WORD}). The words are the changed part of each changed line, widened to
- * whole words, for rule 6. Linear in the two texts.
+ * not) and no raw start tag anywhere ({@link RAW_START}); every changed line in a plain
+ * paragraph, on both sides, outside what {@link proseHeld} holds; each line of the paragraph
+ * plain prose behind its item prefix, if it has one ({@link ITEM_PREFIX}); the paragraph's
+ * first line not indented unless it is an item (found: a list item above holds an indented
+ * paragraph) and starting with no code word ({@link CODE_WORD}); no list word
+ * ({@link LIST_WORD}) at the start of the first line's text, nor, in a paragraph that holds
+ * an item, of any line's text (pandoc reads `a.` there as a marker of a list inside the
+ * item); no colon in the file's first paragraph; and a changed line's item prefix the same on
+ * both sides. The words are the changed part of each changed line, widened to whole words,
+ * for rule 6. Linear in the two texts.
  * @param {string} oldText @param {string} newText @returns {(string[]|null)}
  */
 function proseChange(oldText, newText) {
-  if (/\r(?!\n)/.test(oldText) || /\r(?!\n)/.test(newText)) return null;
+  if (/\r(?!\n)/.test(oldText) || /\r(?!\n)/.test(newText) || RAW_START.test(oldText) || RAW_START.test(newText)) return null;
   const sides = [proseLines(oldText), proseLines(newText)];
   const [o, n] = sides;
   const count = o.lines.length;
+  /** Where the file's first paragraph starts, on each side: a metadata reader takes `Key: value` lines there. */
+  const lead = sides.map(({ lines }) => lines.findIndex((line) => !isBlank(line)));
+  /** @param {string} line @returns {string} its item prefix, or none */
+  const prefix = (line) => { const m = ITEM_PREFIX.exec(line); return m ? m[0] : ''; };
   // The same endings line for line; a line that comes or goes moves the file's last ending, so this holds the number of lines too.
   if (o.ends.some((end, i) => end !== n.ends[i])) return null;
   const held = [proseHeld(o.lines), proseHeld(n.lines)];
@@ -2254,12 +2291,22 @@ function proseChange(oldText, newText) {
       while (done + 1 < count && !isBlank(o.lines[done + 1]) && !isBlank(n.lines[done + 1])) done++;
       for (let side = 0; side < 2; side++) {
         const lines = sides[side].lines;
-        if (lines[first][0] === ' ' || LIST_WORD.test(lines[first]) || CODE_WORD.test(lines[first])) return null;
+        const texts = [];
+        let items = false;
         for (let k = first; k <= done; k++) {
-          if (/** @type {boolean[]} */ (held[side])[k] || !PLAIN_LINE.test(lines[k]) || PLAIN_BREAK.test(lines[k])) return null;
+          const at = prefix(lines[k]).length;
+          items = items || at > 0;
+          texts.push(lines[k].slice(at));
+        }
+        if ((lines[first][0] === ' ' && prefix(lines[first]) === '') || CODE_WORD.test(lines[first])) return null;
+        for (let k = first; k <= done; k++) {
+          const text = texts[k - first];
+          if (/** @type {boolean[]} */ (held[side])[k] || !PLAIN_LINE.test(text) || PLAIN_BREAK.test(text)
+            || ((k === first || items) && LIST_WORD.test(text.trimStart())) || (first === lead[side] && text.includes(':'))) return null;
         }
       }
     }
+    if (prefix(a) !== prefix(b)) return null;
     const { p, s } = commonEnds(a, b);
     const spaces = (line, from, step) => { let k = from; while (line[k] === ' ') k += step; return Math.abs(k - from); };
     if (spaces(a, 0, 1) !== spaces(b, 0, 1) || spaces(a, a.length - 1, -1) !== spaces(b, b.length - 1, -1)) return null;
@@ -2281,18 +2328,16 @@ function proseChange(oldText, newText) {
 const inexactClause = (display) => `it changes ${display} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
 
 /**
- * Rule 4 — place the file in the first kind that fits and judge the whole old and new file
- * with that kind's scanner; a place that governs the work never qualifies, whatever the
- * kind; otherwise the clause of the first other kind it matches. When a scanner of either
- * side ended inside an unfinished construct or lost its place, the change could not be read
- * (every scanner fails closed); when the markup scanner met something outside its strict
- * subset, the change cannot be read exactly.
- * @param {ChangedFile} f
- * @returns {{kind: string, runs: string[]}|{clause: string, cause: string}}
+ * Rule 4, the content — judge the whole old and new file with its kind's reader. When a
+ * scanner of either side ended inside an unfinished construct or lost its place, the change
+ * could not be read (every scanner fails closed); when the markup scanner met something
+ * outside its strict subset, the change cannot be read exactly.
+ * @param {ChangedFile} f a file {@link kindOf} placed in a qualifying kind
+ * @returns {{runs: string[]}|{clause: string, cause: string}}
  */
-function ruleKind(f) {
+function ruleContent(f) {
   scanFault = null;
-  const judged = kindOf(f);
+  const judged = readKind(f);
   if (!scanFault) return judged;
   if (scanFault === 'subset') return { clause: inexactClause(f.display), cause: 'unreadable' };
   const why = scanFault === 'open' ? 'leaves a tag, quote, comment, block, fence or span open' : 'holds something I cannot follow';
@@ -2300,10 +2345,12 @@ function ruleKind(f) {
 }
 
 /**
- * Rule 4 — the kind of one file and its wording, or the clause that refuses it; the
- * scanners' faults are read by {@link ruleKind}.
+ * Rule 4, the kind — place one file by its name and its place, before any reader reads its
+ * content: the first qualifying kind that fits, or the clause that refuses it. A place that
+ * governs the work never qualifies, whatever the kind; a file of no qualifying kind gets the
+ * clause of the first other kind it matches.
  * @param {ChangedFile} f
- * @returns {{kind: string, runs: string[]}|{clause: string, cause: string}}
+ * @returns {{kind: string}|{clause: string, cause: string}}
  */
 function kindOf(f) {
   const { base, ext, folders, topFolders } = nameParts(f);
@@ -2312,7 +2359,6 @@ function kindOf(f) {
   const unrecognised = { clause: `I do not recognise ${d} as wording or a colour`, cause: 'unrecognised' };
   const setting = { clause: `it changes a setting in ${d}, and settings changes are a common cause of outages`, cause: 'setting' };
   const build = { clause: `it changes how the project is built or shipped in ${d}`, cause: 'build' };
-  const inexact = { clause: inexactClause(d), cause: 'unrecognised' };
   const isDependency = DEPENDENCY_NAMES.has(base)
     || (ext === '.txt' && (/requirements|constraints/i.test(base) || topFolders.includes('requirements')));
   const governing = governingName(lowerBase)
@@ -2341,11 +2387,43 @@ function kindOf(f) {
   if (kind !== null && (f.oldText === '') !== (f.newText === '')) return unrecognised;
   if (kind !== null && buildFolder) return build;
   if (kind === 'documentation' && dotFolder) return unrecognised;
+  if (kind !== null) return { kind };
 
+  if (isDependency) return { clause: `it changes the dependencies in ${d}`, cause: 'dependencies' };
+  if (ext === '.sql' || topFolders.some((p) => DATABASE_FOLDERS.has(p))) return { clause: `it changes stored data in ${d}`, cause: 'stored-data' };
+  if (base === 'Dockerfile' || base.startsWith('Dockerfile.') || BUILD_NAMES.has(base) || buildText || ext === '.gradle'
+    || base.endsWith('.gradle.kts') || /^(webpack|vite|rollup|esbuild|babel|tsup|turbo)\.config\./.test(base)
+    || buildFolder) {
+    return build;
+  }
+  if (SETTINGS_EXT.has(ext) || settingsText || base === '.env' || base.startsWith('.env.')) return setting;
+  if (CODE_EXT.has(ext)) {
+    const onlyText = equalHunks(f.hunks) && [...linePairs(f.hunks)].every((p) => emptyLiterals(p.o) === emptyLiterals(p.n));
+    return onlyText
+      ? { clause: `it changes text inside program code in ${d}, and no check can tell whether people read that text or the program depends on it`, cause: 'text-in-code' }
+      : { clause: `it changes program logic in ${d}, and only wording and colours qualify`, cause: 'program-logic' };
+  }
+  return unrecognised;
+}
+
+/**
+ * Rule 4, the content — the wording one file's change alters, read by the reader of the kind
+ * {@link kindOf} placed it in, or the clause that refuses it; the scanners' faults are read
+ * by {@link ruleContent}.
+ * @param {ChangedFile} f
+ * @returns {{runs: string[]}|{clause: string, cause: string}}
+ */
+function readKind(f) {
+  const { ext } = nameParts(f);
+  const d = f.display;
+  const kind = f.kind;
+  const unrecognised = { clause: `I do not recognise ${d} as wording or a colour`, cause: 'unrecognised' };
+  const setting = { clause: `it changes a setting in ${d}, and settings changes are a common cause of outages`, cause: 'setting' };
+  const inexact = { clause: inexactClause(d), cause: 'unrecognised' };
   if (kind === 'documentation') {
     // Rule 2 has already refused a file with a missing side, so both texts are present.
     const runs = proseChange(/** @type {string} */ (f.oldText), /** @type {string} */ (f.newText));
-    return runs ? { kind, runs } : inexact;
+    return runs ? { runs } : inexact;
   }
   if (kind === 'markup') {
     if (!equalHunks(f.hunks)) return unrecognised;
@@ -2354,7 +2432,7 @@ function kindOf(f) {
     if (marked(f.oldText) !== marked(f.newText)) return unrecognised;
     const tokens = (text) => scanMarkup(lineFeeds(/** @type {string} */ (text)).slice(marked(text) ? 1 : 0));
     const texts = changedTexts(tokens(f.oldText), tokens(f.newText), markupWording);
-    return texts.runs ? { kind, runs: texts.runs } : texts.inexact ? inexact : unrecognised;
+    return texts.runs ? { runs: texts.runs } : texts.inexact ? inexact : unrecognised;
   }
   if (kind === 'catalogue') {
     if (!equalHunks(f.hunks)) return unrecognised;
@@ -2374,39 +2452,22 @@ function kindOf(f) {
       if (oldValue === null || newValue === null) return unrecognised;
       runs.push(oldValue.replace(PLACEHOLDER, ''), newValue.replace(PLACEHOLDER, ''));
     }
-    return { kind, runs };
+    return { runs };
   }
-  if (kind === 'colour') {
-    const o = lineFeeds(/** @type {string} */ (f.oldText));
-    const n = lineFeeds(/** @type {string} */ (f.newText));
-    // A custom property's change is a setting, unless the property is named for a colour and
-    // holds exactly one colour before and after (any other value of such a property cannot be
-    // read exactly); those values are then levelled, and what is left must be identical or a
-    // colour that is the whole value of a real colour property.
-    const levelled = colourNamedEdit(o, n);
-    if (levelled === 'inexact') return { clause: inexactClause(d), cause: 'setting' };
-    if (!levelled) return setting;
-    if (!equalHunks(f.hunks)) return unrecognised;
-    const [a, b] = levelled;
-    const edit = a === b ? o !== n : colourEdit(a, b);
-    return edit === true ? { kind, runs: [] } : edit === 'inexact' ? inexact : unrecognised;
-  }
-
-  if (isDependency) return { clause: `it changes the dependencies in ${d}`, cause: 'dependencies' };
-  if (ext === '.sql' || topFolders.some((p) => DATABASE_FOLDERS.has(p))) return { clause: `it changes stored data in ${d}`, cause: 'stored-data' };
-  if (base === 'Dockerfile' || base.startsWith('Dockerfile.') || BUILD_NAMES.has(base) || buildText || ext === '.gradle'
-    || base.endsWith('.gradle.kts') || /^(webpack|vite|rollup|esbuild|babel|tsup|turbo)\.config\./.test(base)
-    || buildFolder) {
-    return build;
-  }
-  if (SETTINGS_EXT.has(ext) || settingsText || base === '.env' || base.startsWith('.env.')) return setting;
-  if (CODE_EXT.has(ext)) {
-    const onlyText = equalHunks(f.hunks) && [...linePairs(f.hunks)].every((p) => emptyLiterals(p.o) === emptyLiterals(p.n));
-    return onlyText
-      ? { clause: `it changes text inside program code in ${d}, and no check can tell whether people read that text or the program depends on it`, cause: 'text-in-code' }
-      : { clause: `it changes program logic in ${d}, and only wording and colours qualify`, cause: 'program-logic' };
-  }
-  return unrecognised;
+  // The fourth kind: a colour in a stylesheet.
+  const o = lineFeeds(/** @type {string} */ (f.oldText));
+  const n = lineFeeds(/** @type {string} */ (f.newText));
+  // A custom property's change is a setting, unless the property is named for a colour and
+  // holds exactly one colour before and after (any other value of such a property cannot be
+  // read exactly); those values are then levelled, and what is left must be identical or a
+  // colour that is the whole value of a real colour property.
+  const levelled = colourNamedEdit(o, n);
+  if (levelled === 'inexact') return { clause: inexactClause(d), cause: 'setting' };
+  if (!levelled) return setting;
+  if (!equalHunks(f.hunks)) return unrecognised;
+  const [a, b] = levelled;
+  const edit = a === b ? o !== n : colourEdit(a, b);
+  return edit === true ? { runs: [] } : edit === 'inexact' ? inexact : unrecognised;
 }
 
 /** @param {string} part a letter run, lower case @returns {string|null} the sensitive word it is, also in the plural (`s`, `es`) */
@@ -2464,8 +2525,13 @@ function ruleRiskMarker(f) {
 }
 
 /**
- * Rules 2, 7, 4, 5, 6 and 3, in that order; the first failing file of the first failing
- * rule gives the clause. Rule 4 also records each file's kind and wording for rule 6.
+ * Rules 2, 7, 4 (the kind of each file), 3, 4 (the content of each file), 5 and 6, in that
+ * order; the first failing file of the first failing rule gives the clause. The size rule
+ * runs once every file's kind is known and before any reader reads a file's content (the
+ * decision at review of 2026-10-09): a change over the limit gets the size clause of the
+ * functional plan's scenario, whatever a reader would have said of it, and a change that is
+ * program code or a setting is still named for what it is. Rule 4 records each file's kind
+ * and wording for rule 6.
  * @param {Change} change
  * @returns {Refusal|null}
  */
@@ -2477,9 +2543,22 @@ function ruleRefusal(change) {
     }
   }
   for (const f of change.files) {
-    const r = ruleKind(f);
+    const r = kindOf(f);
     if ('clause' in r) return r;
     f.kind = r.kind;
+  }
+  const n = change.lineCount;
+  const m = change.files.length;
+  if (n > MAX_LINES || m > MAX_FILES) {
+    return {
+      clause: `it changes ${n} ${n === 1 ? 'line' : 'lines'} in ${m} ${m === 1 ? 'file' : 'files'} `
+        + `and a hotfix is at most ${MAX_LINES} lines in at most ${MAX_FILES} files`,
+      cause: 'too-big'
+    };
+  }
+  for (const f of change.files) {
+    const r = ruleContent(f);
+    if ('clause' in r) return r;
     f.runs = r.runs;
   }
   // CTOC's own repository, detected as CTOC detects it everywhere (`package.json` named
@@ -2490,15 +2569,6 @@ function ruleRefusal(change) {
       const r = rule(f);
       if (r) return r;
     }
-  }
-  const n = change.lineCount;
-  const m = change.files.length;
-  if (n > MAX_LINES || m > MAX_FILES) {
-    return {
-      clause: `it changes ${n} ${n === 1 ? 'line' : 'lines'} in ${m} ${m === 1 ? 'file' : 'files'} `
-        + `and a hotfix is at most ${MAX_LINES} lines in at most ${MAX_FILES} files`,
-      cause: 'too-big'
-    };
   }
   return null;
 }
