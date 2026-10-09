@@ -815,6 +815,39 @@ instead of "tests failed" — still not a pass.
 
 ## Decisions Taken Under Ambiguity
 
+**Owner's decision 2026-10-09: formats the check reads.** Read this entry before the
+specification above: the specification's text is left as approved (so its hash holds), and
+this decision supersedes parts of it. A later reader who follows the specification's lists of
+formats builds the wrong check.
+- *The formats that stay:* plain HTML (`.html`, `.htm`); colours in plain CSS (`.css`);
+  catalogue wording in JSON, YAML and Java properties files (`.json`, `.yaml`, `.yml`,
+  `.properties` under a catalogue folder); plain prose in Markdown (`.md`) and plain text
+  (`.txt`).
+- *The formats removed:* Vue (`.vue`) and Svelte (`.svelte`); JSX and TSX (`.jsx`, `.tsx`);
+  MDX (`.mdx`); reStructuredText (`.rst`); Sass and Less (`.scss`, `.sass`, `.less`); gettext
+  (`.po`). A file of a removed format gets `I do not recognise <file> as wording or a colour`.
+- *The specification sections it supersedes:*
+  - **"Rule 4 — the four kinds, and everything else"**: kind 1 (documentation, `.rst`), kind 2
+    (markup, `.jsx`, `.tsx`, `.vue`, `.svelte`, and both `.jsx`/`.tsx` clauses of that
+    paragraph), kind 3 (message catalogue, `.po` and the gettext `msgstr` form) and kind 4
+    (colour, `.scss`, `.sass`, `.less`, and the Sass and Less variable alternatives of the
+    declaration pattern).
+  - **The corpus box of "Acceptance criteria"** ("The corpus — 82 edit shapes …"), where it
+    names a `.tsx` comparison chain and a generic type: both are refused because the file's
+    kind is not recognised. Its counts are stale too; the counts that hold are in Decision 130.
+  - **The first row of "Risks"**, where it names JavaScript comparisons and generic types in
+    `.jsx`/`.tsx` and their mitigation: no such file is read.
+  - **Step 8** (TEST), the corpus list, where it names `Greeting.jsx`, `CancelButton.tsx`,
+    `NameField.vue`, `Loading.svelte`, `translations/de.po`, `theme.scss`, `accent.less` and
+    `docs/guide.rst` as shapes that qualify, and its `.jsx` and `.vue` traps: each is kept as
+    a test and asserts the "not recognised" refusal.
+  - **Step 11** (REVIEW), its first box, where it asks for "`.jsx`/`.tsx` lines where `<` and
+    `>` are code".
+- *Where the detail is:* Decision 105 (the decision as taken, with every sentence it
+  supersedes quoted), Decisions 117 to 130 (the sixth round: within the formats that stay,
+  the HTML reader keeps to a strict subset, and the functional plan's sentence for a change
+  the check cannot read exactly).
+
 1. **Rule order 1, 2, 7, 4, 5, 6, 3, 8.** The functional plan says the rules run in its listed
    order, but its own scenarios require an edited test to read "it changes a test" (rule 7)
    rather than "program logic" (rule 4), and the urgent 40-line scenario to name "program
@@ -1720,12 +1753,12 @@ instead of "tests failed" — still not a pass.
     copied into the module with a comment naming the source, and matched in lower case. An
     element of any other name, a custom element (a hyphen in the name, whatever the lists
     hold: `color-profile` and `annotation-xml` therefore hold their text) and any element
-    carrying an `is` attribute hold their text. Honest status of the copy: this machine has
-    no copy of Vue and the round ran without network, so the three lists were written from
-    the executor's memory of `packages/shared/src/domTagConfig.ts` (believed, not compared
-    with the source in this round); a name missing from the copy only makes its text
-    refused, never passed, and a wrongly added name would pass text the browser treats as
-    an unknown element's — the reviewers should compare the list with the source. This also
+    carrying an `is` attribute hold their text. Status of the copy, corrected in the sixth
+    round: the list was first written from the executor's memory of
+    `packages/shared/src/domTagConfig.ts`; the session then compared `HOST_ELEMENTS` with
+    that file, downloaded 2026-10-09: 225 distinct names, none extra, none missing. Since
+    the sixth round (Decision 120) the list holds the 111 HTML names of `HTML_TAGS` only;
+    the SVG and MathML names are dropped. This also
     supersedes Decision 90's choice (a): the open-element count was keyed by the name as
     written, so `<DIV>…</div>` never closed; names are lower-cased, and `<DIV>Save</DIV>` is
     the host element `div`, whose text is wording. The round-4 branch case
@@ -1818,6 +1851,176 @@ instead of "tests failed" — still not a pass.
     plus the mode change: 229 tests in the file with the two property cases and the
     linear-time case. The main test file holds 99 tests; 75 rows of its four tables are
     converted cases of removed formats.
+117. **The strict HTML subset** (decision at review, 2026-10-09; source: the session's design
+    decision of this round, after a final code reading and a security attack; it follows the
+    owner's decision that the check keeps only what it can read exactly). The HTML reader
+    (`.html`, `.htm`, and inline HTML in Markdown) accepts only a subset of HTML in which it
+    agrees with a browser's parser by construction, and refuses the WHOLE file for anything
+    outside it. It does not copy the browser's recovery rules. Decisions 118 to 122 say what
+    is outside. Kept as it was: the stack of open elements, `is`, custom elements, code
+    elements, raw-text elements, an option without a value.
+118. **A brace inside a tag is outside the subset** (decision at review, 2026-10-09; source:
+    the session's item 1; supersedes Decision 79 part (c)). The brace reading is removed
+    entirely (`skipBraces` and its three call sites): a browser knows no braces. A `{` or `}`
+    anywhere between `<name` and its closing `>` refuses the file; in text a brace is a plain
+    character, judged by the existing text rules (a changed text token with a brace is still
+    refused). The executor's reading of "anywhere inside a tag": a quoted attribute value
+    too, so `<p title="{a}">` refuses. Reason for the decision: `<button { is="run-sql" }>`
+    hid the `is` attribute from the reader, and `{<run-sql>}` and `{<script>/*}` hid a whole
+    tag. Cost: a page with a brace in any attribute (inline JSON in a `data-` attribute, an
+    inline `onclick` with a block) no longer qualifies. Two former passes refuse:
+    `src/pages/braced.html` and `src/pages/stray.html` (`<p data-x=}>`).
+119. **`<!`, `<?` and `</` before no letter** (decision at review, 2026-10-09; source: the
+    session's item 2). Inside the subset are only `<!DOCTYPE html>` in any letter case and a
+    standard comment: it starts `<!--`, is not followed at once by `>` or `->`, holds no
+    `<!--` and no `--!>`, and ends at the first `-->`. `<![CDATA[`, `<?…`, `<!x>` and `</ x>`
+    are outside. The same comment rule holds inside a script block (`rawEnd`). The executor's
+    choices, each on the refusing side: the doctype is exactly the fifteen characters
+    `<!doctype html>`, so a legacy doctype (`<!DOCTYPE html PUBLIC …>`) refuses; a comment
+    that ends in `<!-` refuses (the HTML standard names it with the other three); inside a
+    script, `--!>` refuses only inside a `<!--`. Found while fixing, a pass on `5326daae`:
+    the closing tag of a raw-text element was recognised before any character JavaScript
+    calls white space, so `<script>x</script ><b></b>run()<b></b></script>` ended the
+    script for the reader where a browser reads on (a no-break space is no HTML white
+    space) and `run()` → `drop()` answered `checking`; a closing tag now ends before a tab,
+    line feed, form feed, carriage return, space, `/` or `>` only.
+120. **Foreign content is opaque, and the host elements are HTML's only** (decision at
+    review, 2026-10-09; source: the session's item 3). Everything from `<svg` to its matching
+    `</svg>`, and from `<math` to `</math>`, is one piece, compared exactly; no text inside
+    counts as wording. `HOST_ELEMENTS` holds the 111 names of Vue's `HTML_TAGS` only, so
+    `<unknown>`, `<set>` and `<text>` outside `<svg>` are no host elements and hold their
+    text. An `<svg>` or `<math>` that is not closed in the file is outside the subset. The
+    executor's choices, needed so that the reader and a browser agree where the piece ends
+    (a browser leaves foreign content at many HTML start tags, which is what the trap
+    `<svg><style><pre></style>…` used): inside the piece the tags are read on a stack of
+    their own, `/>` closes (never after an unquoted value, as the tokenizer reads it), and
+    the file is outside the subset when an end tag does not close the element on top; when
+    any tag stands inside an element where a browser reads HTML again (`foreignObject`,
+    `desc`, `title`, MathML's `mi`, `mo`, `mn`, `ms`, `mtext`, and `annotation-xml`), so
+    only text may stand there; or when a start tag carries an HTML element's name other than
+    `a`, `script`, `style` and `title`, or one of the obsolete names the parser still knows
+    (`PARSER_KNOWN`). Honest status: that last list and the list of elements where HTML is
+    read again were written from the executor's memory of the HTML standard's rules for
+    foreign content, not compared with the standard (the round ran without network); no
+    browser was run. **The cost, recorded:** text inside inline SVG or MathML no longer
+    qualifies (`<svg><text>Save</text></svg>` → `Store` and `<math><mtext>…` were passes and
+    refuse now), and a page whose inline SVG holds HTML in a `<foreignObject>`, a tag inside
+    its `<title>` or `<desc>`, or a CDATA section refuses whole.
+121. **Inside `<select>` only options are followed** (the executor, under the session's
+    design decision; found while fixing, a pass on `5326daae`). While a `<select>` is open,
+    any tag but `<option>`, `<optgroup>`, `<hr>` and the end tags of `option`, `optgroup`
+    and `select` is outside the subset. Reason: the HTML standard's older "in select" rules
+    ignore every other tag there, a `<style>` among them, but still honour `<script>`, and
+    newer browsers have relaxed those rules; so `<select><style><script>/*</style>*/ run()
+    /*<b></b>*/</script></select>` is a style sheet to this reader and a running script to
+    such a browser, and `run()` → `drop()` answered `checking`. The same through an end tag
+    that the reader took to close the `<select>` (`<div><select></div>…`). Honest status:
+    the claim about browsers is the executor's reading of the standard from memory; no
+    browser was run. The session did not list this item.
+122. **An element never closed is outside the subset** (decision at review, 2026-10-09;
+    source: the functional plan as amended today, scenario "A plain HTML file outside the
+    strict subset is refused whole": a `<div>` that is never closed, and `<p>Save</p>` on
+    another line). In an HTML file, any element still open at the end of the file refuses
+    it. An end tag that closes several elements (`</ul>` over `<li>`, `</body>` over `<p>`)
+    stays everyday HTML. Not in Markdown, where a placeholder may stay open (Decision 124).
+    This goes beyond the session's list of what is outside the subset; it is taken from the
+    scenario. Cost: a page that leaves out its last end tags no longer qualifies.
+123. **A changed `import` or `export` line** (decision at review, 2026-10-09; source: the
+    session's item 5; extends Decision 108). In `.md`, a changed line that starts with
+    lower-case `import ` or `export ` is code wherever it stands. The executor's addition: a
+    block of such lines (to the next blank line) also starts after any line that is no
+    paragraph's text (a heading, a closed fence), not only after a blank line, so a wrapped
+    `import` under a heading is code in its second line too. Inside a paragraph the line
+    keeps its class, so that a code span running into it is still compared exactly.
+124. **Autolinks and placeholders** (decision at review, 2026-10-09; source: the session's
+    item 6). An autolink — `<http://…>`, `<https://…>`, `<mailto:…>`, or `<name@host>` as
+    CommonMark reads an e-mail autolink — is one opaque piece, compared exactly; before, it
+    was read as an unknown element that never closes, which refused every later typo.
+    **What `<file>` in prose did:** the same — an unknown element, never closed, so every
+    text after it to the end of the file was held and refused. **What was chosen:** at a
+    blank line, the elements opened in the paragraph before it and still open are closed,
+    when (a) no line of that paragraph starts with `<` (behind white space and the markers of
+    a list item or a quote), so no HTML block starts there and the paragraph is rendered
+    inside an element of its own, whose end tag a browser closes everything in it with, and
+    (b) every tag of the paragraph is the start tag of a name the HTML parser does not know
+    (no host element, none of `PARSER_KNOWN`), or the end tag of such an element opened in
+    the same paragraph. So `<file>` refuses a change in its own paragraph only. In every
+    other case — a tag at the start of a line, any known HTML tag in the paragraph, an end
+    tag for something opened earlier — the element stays open to the end of the file, as
+    before. Honest status: `PARSER_KNOWN` is from memory (Decision 120). Cost that stays:
+    `</3` or `<?` in Markdown prose refuses the file (Decision 119).
+125. **A heading qualifies only while its generated anchor stays the same** (decision at
+    review, 2026-10-09; source: the session's item 7). For every ATX and setext heading the
+    anchor is: lower case, everything dropped that is no letter, digit, space, hyphen or
+    underscore, the spaces then turned into hyphens; the old and the new file's anchors are
+    compared in order. `# Install` → `# Setup` is refused, `# instal the App` → `# Instal
+    the app` qualifies. The executor's addition: an `&` is kept, so that `copy` → `&copy;`
+    (a character reference, which a site generator drops) changes the anchor. The sentence
+    is the functional plan's (Decision 128), not the "not recognised" one the session's item
+    named before the plan was amended.
+126. **A brace reaches its own paragraph** (decision at review, 2026-10-09; source: the
+    session's item 8; narrows Decisions 108 and 109, whose "text run" was the whole file in
+    Markdown without inline HTML). A changed line is code when its paragraph (bounded by
+    blank lines) holds a `{` or `}`; a brace in another paragraph no longer refuses it
+    (`docs/mdx-far.md`: a `{` in one paragraph, a typo in a later one, qualifies). The
+    executor's addition, so that the narrowing opens no hole: where the Markdown is built as
+    MDX an expression that starts a block may run on over blank lines (`{/*` … `*/}`), so a
+    paragraph that leaves a brace open, closes one never opened, or holds a quote, a
+    backtick or a `/` inside braces reaches every line after it. Markdown's own `{{…}}` and
+    `{%…%}` reading is removed with the brace reading (Decision 118). Not closed, and the
+    same on `5326daae`: an expression that starts on a line the reader takes for indented
+    code (MDX has no indented code) is not seen.
+127. **Paths are folded, and camel-case sub-words count** (decision at review, 2026-10-09;
+    source: the security attack, the session's items 9 and 10; replaces the "known gap" the
+    module's header named). Rule 5 folds the path with Unicode NFKC and lower case, splits it
+    at every character that is no letter (`\P{L}`), and also reads the sub-words of each
+    part, split where a capital letter follows a small one (digits already split). So a
+    folder `ＡＵＴＨ` in full-width letters, `AuthPanel.html`, `paymentForm.html` and
+    `userTokens.html` sit in a sensitive area, and `Author.html` does not. To the letter of
+    the item: `HTMLLogin` has no small-to-capital boundary before `Login` and is one word.
+128. **The functional plan's sentence for a change the check cannot read exactly** (decision
+    at review, 2026-10-09; source: the session's addition to this round, from the functional
+    plan as amended today). The clause `it changes <file> in a way the check cannot read
+    exactly, and only what it can read exactly qualifies` is given in five cases, each under
+    the log cause it had before (the plan's table names no cause word): text inside a
+    component or custom element (`unrecognised`); text inside `<svg>` or `<math>`
+    (`unrecognised`); an HTML file, or inline HTML in Markdown, outside the strict subset
+    (`unreadable`; this replaces "I could not read the change (… cannot follow)" and "(…
+    leaves a tag, quote, comment … open)" where the markup reader said them; the style
+    sheet, catalogue, fence and front-matter readers keep those sentences); a Markdown
+    heading whose anchor changes (`unrecognised`); a colour that is not the whole value of a
+    colour property (`unrecognised`), and a custom property named for a colour whose value
+    is not exactly one colour (`setting`). A file of a removed format keeps "I do not
+    recognise". **The tests:** every assertion and corpus row that pinned the old sentence
+    for one of these cases asserts the new one; that is the wording the functional plan now
+    specifies on a refusal that stays a refusal, not a weakened test. **A behaviour change
+    that comes with it:** the plan's table says "a colour that is not the whole value of a
+    colour property" and its scenario refuses `border: 1px solid #0a58ca` → `#0b5ed7`, which
+    passed; a colour now qualifies only as the whole value of its property (an `!important`
+    after it aside). Three former passes refuse (Decision 130). **Disagreements reported:**
+    the plan's table and its scenarios agree with each other; the session's list of the five
+    cases is narrower than both in two places — it names only custom properties under the
+    fifth case, and no element left open under the third (Decision 122) — and the plan was
+    followed in both.
+129. **The host-element list was compared** (source: the session's item 11; corrects
+    Decision 106 and the fifth round's "Not done"). The session compared `HOST_ELEMENTS` with
+    Vue's `packages/shared/src/domTagConfig.ts`, downloaded 2026-10-09: 225 distinct names,
+    none extra, none missing. After Decision 120 the list is the 111 HTML names; the
+    executor counted them in code (111 distinct).
+130. **The tests of the sixth round, and the counts** (the executor; replaces Decision 116).
+    Former passes that refuse by a decision above: `src/pages/braced.html` and
+    `src/pages/stray.html` (118), `src/pages/svg-text.html` and `src/pages/math.html` (120),
+    `src/styles/quoted.css` and the long `box-shadow` list of the linear-time case (128).
+    Two rows of this round were wrong as first written and were corrected, not loosened: the
+    e-mail autolink row lost its `@` to the row helper's own placeholder; and
+    `<https://example.org/a b>` is no autolink and no tag a Markdown reader passes on, so it
+    is a placeholder that its paragraph closes (a second row pins the refusal in its own
+    paragraph). The cut-short case's own check of "closed plain text" now knows that an
+    autolink is closed. Comments that stood above nothing after the removed formats are
+    gone from the three tables of the main test file and from the corpus. The corpus file
+    holds 34 shapes that qualify and 211 traps, 42 of them the kept cases of removed
+    formats, plus the mode change: 249 tests with the two property cases and the
+    linear-time case. The main test file holds 100 tests; its sixth-round table holds 92 rows.
 
 ## Execution Record
 
@@ -2537,8 +2740,9 @@ and through `node src/commands/start.js`, run in the project:
   process also wrote its own `.ctoc/`, `CLAUDE.md` and `IRON_LOOP.md` into the scratch
   project on its first call, untracked and not in the commit.
 
-**Not done, said plainly.** The host-element list was written from memory, not compared
-with Vue's source (Decision 106). Steps 11, 13 and 16 stay with the session's reviewers, as
+**Not done, said plainly.** The host-element list was written from memory in this round;
+corrected in the sixth round: the session has since compared it with Vue's source (225
+distinct names, none extra, none missing; Decisions 106 and 129). Steps 11, 13 and 16 stay with the session's reviewers, as
 before; no box is ticked in this round.
 
 Step 14, on `ddb7f201`, in this worktree (the main checkout's `node_modules` linked for
@@ -2555,6 +2759,114 @@ the run and removed after), before this record was written:
   ```
 - `npm test` again on `f07a9d14`, with this record in place: 13,108 tests, 13,108 pass, 0 fail,
   0 skipped; coverage 99.87%; `[CTOC test-gate] PASS`. This one line was added after that run.
+
+### Fix round 6 — the strict HTML subset and the functional plan's sentence (2026-10-09)
+
+A sixth round, in this worktree from `5326daae`, on a final code reading and a security
+attack: the session's design decision that the HTML reader keeps to a strict subset
+(Decisions 117 to 122), four Markdown items (123 to 126), two path items (127), and the
+session's addition during the round, the functional plan's sentence for a change the check
+cannot read exactly (128). Test first: commit `2c0387bb` holds only the two test files, run
+on `5326daae`'s module; commit `048f9ffa` holds the module and the test corrections named in
+Decision 130. The specification hash after every plan edit:
+`4aaf099b44f61ce1721e1bd2309bc781e49f2b8a2896c60aff3ecb22e80f8003`.
+
+**Red on `5326daae`** (commit `2c0387bb`: 349 tests, 330 pass, 19 fail): 15 corpus traps, 2
+new qualifying shapes refused (`docs/autolink.md`, `docs/mdx-far.md`), the inserted-character
+property case (it asserts every shape qualifies first), and the sixth-round table. Per item,
+each answer read from that table's run:
+
+| Item | Red (on `5326daae`) | Green (on `048f9ffa`) |
+|---|---|---|
+| 1 braces in a tag | `<button { is="run-sql" }>SELECT name FROM users</button>` → `SELECT pass FROM admins`, `{<run-sql>}<span>…</span></run-sql>`, `{<script>/*}<b></b>*/ run() /*<b></b>*/</script>` → `drop()` and `<p title="{a}">` answered `checking` | the first, second and fourth: "cannot read exactly"; the script: not recognised; `<p>{a}</p>` beside a changed paragraph still `checking`, a change beside `{a}` in one text still not recognised (guards) |
+| 2 `<!`, `<?`, `</ x` | `<!--><run-sql>--><span>…`, `<!---><run-sql>-->…`, `<!-- a --!><run-sql> -->…`, a comment holding `<!--`, `<![CDATA[><run-sql>]]>…`, `<?php echo 1 ?>`, `<!x>`, `</ x>`, a legacy doctype, and in a script `<!-->`, a nested `<!--` and `--!>` answered `checking`; so did `<script>x</script ><b></b>run()<b></b></script>` → `drop()` and the same with `<style>` (found while fixing); the first shape in `.md` too | "cannot read exactly"; the two no-break-space shapes not recognised; `<!DocType HTML>` with standard comments (also `<!---->`), and a script wrapped in `<!--` … `//-->`, still `checking` |
+| 3 foreign content, host names | `<svg><style><pre></style><span>pip install requests</span></pre></svg>` → `reqests`, `<unknown>`, `<set>` and `<text>` outside `<svg>`, an `<svg>` never closed, a tag inside an SVG `<title>`, HTML in `<foreignObject>`, `<g x=1/>`, and a changed SVG `<title>` answered `checking`; `<svg><text>Save</text></svg>` → `Store` and `<math><mtext>` were passes | "cannot read exactly"; a page with a closed `<svg>` (title, group, path), a `<math>` and an `<svg/>` beside a changed paragraph still `checking` |
+| `<select>` (found while fixing) | `<select><style><script>/*</style>*/ run() /*<b></b>*/</script></select>` → `drop()`, and the same behind `<div><select></div>`, answered `checking` | "cannot read exactly"; options in an `<optgroup>` beside an `<hr>` still `checking` |
+| an element never closed (the functional plan) | `<div>`, then `<p>Save</p>` → `Store` answered `checking` | "cannot read exactly"; `<ul><li>One<li>Save</ul>` still `checking` |
+| 5 `import` / `export` | `# Title` then `import Chart from './chart'` → `'./other'`; the same wrapped over two lines; `export` after a closed fence; `import` inside a paragraph: all `checking` | not recognised; `# Title` then `important old words.` still `checking` |
+| 6 autolinks, placeholders | a typo in the paragraph after `<https://…>`, beside `<http://…>` in one paragraph, after `<mailto:…>` and `<team@example.org>`, and after `Edit <file> and <your-name> then save.` was refused (not recognised) | `checking`; the autolink's own text changed stays not recognised (refused before); a change beside `<file>` in its own paragraph, after `<file>` at the start of a line or of a list item, after `<object><runsql>`, `<div>` … `<runsql>`, `</p>` … `<runsql>`, `<center>` … `<runsql>`, and with a fence but no blank line between: "cannot read exactly" (refused before, as not recognised) |
+| 7 headings | `# Install` → `# Setup`, `## Getting started` → `going`, a setext heading, a heading in a quote and in a list item, `# The copy` → `# The &copy;` answered `checking` | "cannot read exactly"; `# instal the App` → `# Instal the app` (ATX and setext), `# Install.` → `# Install!` and a typo under a heading still `checking` |
+| 8 a brace's reach | `Hello {name} there.`, blank line, a typo: refused, and so was a typo in the paragraph before a brace | `checking`; a typo in the same paragraph (same line, and the next line), after `{/*` left open, and after `{"}" +` stay not recognised (refused before); after `{% if a %}` and `{{ name }}` `checking` (as before) |
+| 9 folded paths | a folder `ＡＵＴＨ` (full-width) holding `index.html` answered `checking` | sits in an area named `auth`; `src/état/index.html` still `checking` |
+| 10 camel case | `AuthPanel.html`, `paymentForm.html`, `userTokens.html` answered `checking` | sit in `auth`, `payment`, `token`; `Author.html` and `brandTokens.css` `checking` |
+| the functional plan's sentence | `<my-card>Save</my-card>` → not recognised; `--brand-color: red` → `red url(x)` and `--color-mode: dark` → `light` → the settings sentence; `border: 1px solid #0a58ca` → `#0b5ed7` and a colour in `box-shadow: 0 0 2px red` answered `checking` | "cannot read exactly"; `--enabled: green` → `red` keeps the settings sentence, `width: #fff` not recognised, `border: red`, `outline-color: red` and `color: red !important` `checking`; the whole sentence in `text` reads "I did not treat this as a hotfix because it changes src/pages/card.html in a way the check cannot read exactly, and only what it can read exactly qualifies; it goes through a normal plan, and your edits stay in place, not committed."; the log's causes for the three kinds: `unrecognised`, `unreadable`, `setting` |
+
+**What the strict subset refuses that passed legitimately before** (each a cost, taken by
+the decisions named): text inside inline `<svg>` or `<math>`; a page with a brace in any
+attribute; a page with a legacy doctype, a `<?…?>` piece, a CDATA section or a comment that
+holds `<!--`; a page whose inline SVG holds HTML in `<foreignObject>` or a tag inside
+`<title>` or `<desc>`; a page with any tag but options inside a `<select>`; a page that
+leaves an element open at its end; Markdown prose with `</3` or `<?`; a colour that is not
+the whole value of its property (`border: 1px solid red`, `background: url(x) red`); a
+heading whose words change.
+
+**Counts.** The corpus: 34 shapes that qualify and 211 traps, 42 of them the kept cases of
+removed formats, plus the mode change; 249 tests in the file. The main test file: 100 tests;
+the sixth-round table 92 rows. Both files: 349 tests, all passing. The character property
+test: 8,395 variants; 5,503 pass, each with its character named; 67 variants give the same
+answer through the real route. The cut-short property case: 1,758 cuts, 459 pass, each
+ending in closed plain text. The linear-time case keeps its 29 inputs and gains 13 (foreign
+content 30,000 deep, 20,000 pieces of it, 40,000 never closed; 20,000 comments holding a
+comment start; 40,000 comment starts; a script with 30,000 comment marks; 40,000 tags in a
+`<select>`; 40,000 autolink starts; 40,000 e-mail starts; 30,000 placeholders; 30,000 braced
+paragraphs and 100,000 open braces; 20,000 headings; one value of 100,000 tokens), each
+under the case's 250 ms of processor time. Coverage of `hotfix-check.js` under its own two
+test files: lines 99.97%, branches 97.45%, functions 98.35%; the one line not run is the
+"texts differ, no changed-line group" refusal, as before. The module: 2,734 lines on
+`5326daae`, 3,001 now.
+
+**Three real runs (item 14)**, on `048f9ffa`, the last commit that changes code (the commit
+after it holds this plan only), through `node src/commands/start.js`, in a scratch project
+made for it and committed: `package.json` with `"test": "node --test"`, `tests/app.test.js`
+with two node:test tests, `src/pages/home.html`, `src/styles/button.css`, `locales/en.json`.
+- Button wording, `<button>Save</button>` → `<button>Store</button>`:
+  `hotfix check src/pages/home.html` →
+  `{ "verdict": "checking", "text": "Checking the hotfix against the existing tests.", "next": "hotfix check --run-tests 'src/pages/home.html'", "ask": { "questions": [] }, "actions": {} }`;
+  `hotfix check --run-tests 'src/pages/home.html'` →
+  `{ "verdict": "hotfix", "text": "", "tests": "2 tests passed.", "commit": { "files": [ "src/pages/home.html" ], "add": "git --literal-pathspecs add -- 'src/pages/home.html'", "message": "git --literal-pathspecs commit --only -m 'hotfix: <what changed>' -- 'src/pages/home.html'", "judged": [ { "path": "src/pages/home.html", "blob": "da15ff4851987deceee519450275211f968e4b43" } ] }, "ask": { "questions": [] }, "actions": {} }`.
+- A colour, `.save { background-color: #0a58ca; }` → `#0b5ed7`: the first call →
+  `{ "verdict": "checking", "text": "Checking the hotfix against the existing tests.", "next": "hotfix check --run-tests 'src/styles/button.css'", "ask": { "questions": [] }, "actions": {} }`;
+  the second →
+  `{ "verdict": "hotfix", "text": "", "tests": "2 tests passed.", "commit": { "files": [ "src/styles/button.css" ], "add": "git --literal-pathspecs add -- 'src/styles/button.css'", "message": "git --literal-pathspecs commit --only -m 'hotfix: <what changed>' -- 'src/styles/button.css'", "judged": [ { "path": "src/styles/button.css", "blob": "26d9708543d05ebc3bef99ddc4a2a0ff8b7eec67" } ] }, "ask": { "questions": [] }, "actions": {} }`.
+- Catalogue wording, `"Save {count} items"` → `"Store {count} items"`: the first call →
+  `{ "verdict": "checking", "text": "Checking the hotfix against the existing tests.", "next": "hotfix check --run-tests 'locales/en.json'", "ask": { "questions": [] }, "actions": {} }`;
+  the second →
+  `{ "verdict": "hotfix", "text": "", "tests": "2 tests passed.", "commit": { "files": [ "locales/en.json" ], "add": "git --literal-pathspecs add -- 'locales/en.json'", "message": "git --literal-pathspecs commit --only -m 'hotfix: <what changed>' -- 'locales/en.json'", "judged": [ { "path": "locales/en.json", "blob": "2d04620e18ddae077f01341157b2c1e4e6b3a435" } ] }, "ask": { "questions": [] }, "actions": {} }`.
+- The three were judged one after the other with all three edits in the working folder
+  (each call named one file), then each answer's two commands were run from the project
+  root with the message filled in: commits `02f119d` (`hotfix: the button says Store`),
+  `c454fe0` (`hotfix: the button colour`) and `bd5a1bc` (`hotfix: the catalogue says
+  Store`), each `1 file changed, 1 insertion(+), 1 deletion(-)` and holding its one file;
+  `git rev-parse HEAD:<file>` gives the judged id for each of the three. The log's three
+  lines: `{"at":"2026-10-09T10:40:30.868Z","verdict":"hotfix","cause":null,"urgent":false,"files":1,"lines":2}`
+  and two more of the same shape. No `ctoc-hotfix-` folder remains and `git worktree list`
+  lists one worktree. The menu process wrote its own `.ctoc/`, `CLAUDE.md` and
+  `IRON_LOOP.md` into the scratch project on its first call, untracked and in no commit.
+
+**Not done, said plainly.**
+- No browser and no HTML parser was run in this round (none is installed, and the round ran
+  without network): every statement here about what a browser does is the executor's
+  reading of the HTML standard from memory. The lists that rest on it are `PARSER_KNOWN`,
+  the elements inside `<svg>` and `<math>` where HTML is read again, and the `<select>`
+  rule (Decisions 120, 121, 124); the reviewers should compare them with the standard.
+- Where Markdown is built as MDX, an expression that starts on a line the reader takes for
+  indented code is not seen (Decision 126); the same on `5326daae`.
+- `HTMLLogin` is one word to rule 5 (Decision 127), to the letter of the session's item.
+- Steps 11, 13 and 16 stay with the session's reviewers, as before; no box is ticked in this
+  round.
+
+Step 14, on `048f9ffa`, in this worktree (the main checkout's `node_modules` linked for
+the run and removed after), before this record was written:
+- `npx eslint --max-warnings 0` on the three changed files: exit 0. `npx tsc --noEmit -p .`:
+  exit 0.
+- `npm test`:
+  ```
+  ℹ tests 13129 | ℹ suites 2117 | ℹ pass 13129 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0 | ℹ todo 0
+  ℹ all files | 99.87 | 93.72 | 99.34 |
+  [CTOC test-gate] coverage 99.87% (threshold 99%), skipped 0, failed 0
+  [CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+  [CTOC test-gate] PASS
+  ```
 
 ## Execution Plan (Steps 8-16)
 
