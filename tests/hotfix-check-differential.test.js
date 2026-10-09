@@ -1302,7 +1302,7 @@ const NEVER_PASSES = {
  * share measured on 2026-10-09 (the numbers are beside each test), so that a rule which
  * starts to refuse far more than it did fails here.
  */
-const PASS_FLOOR = { html: 0.02, markdown: 0.02 };
+const PASS_FLOOR = { html: 0.03, markdown: 0.09 };
 
 function run(kind, count) {
   const started = Date.now();
@@ -1375,12 +1375,12 @@ function assertRun(t, kind, count) {
   if (stats.cases >= 10000) assert.deepEqual(missing, [], `the check passed no edit in a document with: ${missing.join(', ')}`);
 }
 
-// Measured on 2026-10-09, seed 20261009, default size: not yet.
+// Measured on 2026-10-09, seed 20261009, default size: 47,352 edits, 2,857 passed (6.0%).
 test('HTML: every edit the check passes is a change to plain visible text for the HTML parser', (t) => {
   assertRun(t, 'html', HTML_CASES);
 });
 
-// Measured on 2026-10-09, seed 20261009, default size: not yet.
+// Measured on 2026-10-09, seed 20261009, default size: 11,236 edits, 2,024 passed (18.0%).
 test('Markdown: every edit the check passes changes only the words of a paragraph, for markdown-it in four configurations', (t) => {
   assertRun(t, 'markdown', MARKDOWN_CASES);
 });
@@ -1411,10 +1411,10 @@ const WITNESSES = [
   ['a comment holds no `<!--`', '<!-- a <!-- b --><p>alpha</p>'],
   ['a comment holds no `--!>`', '<!-- a --!> b --><p>alpha</p>'],
   ['a comment does not end in `<!-`', '<!-- a <!---><p>alpha</p>'],
-  ['`<!` starts only a comment or the doctype', '<!x><p>alpha</p>'],
-  ['`<?` is outside the subset', '<?x?><p>alpha</p>'],
-  ['`</` stands before a letter', '</ x><p>alpha</p>'],
-  ['the doctype is `<!DOCTYPE html>` and no other', '<!DOCTYPE html PUBLIC "x"><p>alpha</p>'],
+  ['`<!`, `<?` and `</` start only a standard comment, `<!DOCTYPE html>` or an end tag', '<!x><p>alpha</p>'],
+  ['`<!`, `<?` and `</` start only a standard comment, `<!DOCTYPE html>` or an end tag', '<?x?><p>alpha</p>'],
+  ['`<!`, `<?` and `</` start only a standard comment, `<!DOCTYPE html>` or an end tag', '</ x><p>alpha</p>'],
+  ['`<!`, `<?` and `</` start only a standard comment, `<!DOCTYPE html>` or an end tag', '<!DOCTYPE html PUBLIC "x"><p>alpha</p>'],
   ['only white space and comments stand before the doctype', 'Draft<!DOCTYPE html><p>alpha</p>'],
   ['only white space and comments stand before the doctype', '<br><!DOCTYPE html><p>alpha</p>'],
   // Raw text: a script block's comment marks.
@@ -1422,7 +1422,7 @@ const WITNESSES = [
   ['in a script, a `<!--` holds no second `<!--`', '<script><!-- a <!-- b --></script><p>alpha</p>'],
   ['in a script, a `<!--` holds no `--!>`', '<script><!-- a --!> b --></script><p>alpha</p>'],
   // `<svg>` and `<math>`: one opaque piece each.
-  ['inside svg or math an end tag closes the element on top', '<svg><g></path></g></svg><p>alpha</p>'],
+  ['inside svg or math an end tag closes the element on top', '<svg><g></path></svg><p>alpha</p>'],
   ['inside svg or math no tag stands where HTML is read again', '<svg><title><g></g></title></svg><p>alpha</p>'],
   ['inside svg or math no HTML element name stands', '<svg><b>x</b></svg><p>alpha</p>'],
   ['inside svg or math no name stands that the parser treats in a way of its own', '<svg><font>x</font></svg><p>alpha</p>'],
@@ -1433,7 +1433,7 @@ const WITNESSES = [
   ['after the body\'s end no text follows', '<body><p>alpha</p></body>x'],
   ['white space after the body\'s end is no wording', '<html><body><p>x</p></body> </html>', '<html><body><p>x</p></body>  </html>'],
   ['an end tag closes the element on top, or elements that may leave their end tag out', '<p>alpha</p></div>'],
-  ['an end tag closes the element on top, or elements that may leave their end tag out', '<div><span>x</div><p>alpha</p>'],
+  ['an end tag closes the element on top, or elements that may leave their end tag out', '<p>alpha</p><span></div></span>'],
   ['a frameset refuses the file', '<p>alpha</p><frameset></frameset>'],
   ['a frame refuses the file', '<p>alpha</p><frame></frame>'],
   ['`html` carries no `is` attribute', '<p>alpha</p><html is="x"></html>'],
@@ -1453,8 +1453,10 @@ const WITNESSES = [
   ['a column group holds columns only', '<table><colgroup><b>x</b></colgroup></table><p>alpha</p>'],
   ['a column group holds no text', '<table><colgroup>x</colgroup></table><p>alpha</p>'],
   ['a noscript ends where its raw text ends', '<noscript><!-- </noscript> --></noscript><p>alpha</p>'],
-  ['a noscript ends with nothing left open inside it', '<noscript><p>x</noscript><p>alpha</p>'],
   ['an element must be closed', '<div><p>alpha</p>'],
+  ['an element must be closed', '<p>alpha</p><style>x'],
+  ['an element must be closed', '<p>alpha</p><script>x'],
+  ['an element must be closed', '<p>alpha</p><title>x'],
   // What may change: text between two tags or comments, and nothing else.
   ['nothing but text between tags may change', '<p class="alpha">x</p>'],
   ['nothing but text between tags may change', '<p>x</p>', '<p>x<br></p>'],
@@ -1469,7 +1471,6 @@ const WITNESSES = [
   ['an element whose name is no HTML element holds its text', '<x-foo>alpha</x-foo>'],
   ['an element with an `is` attribute holds its text', '<p is="x">alpha</p>'],
   ['the text of a noscript is not shown to every reader', '<noscript>alpha</noscript>'],
-  ['changed text holds no template or script character', '<p>alpha $</p>'],
   ['changed text holds no character reference but the plain ones', '<p>alpha &commat;</p>'],
   ['changed text holds no control or format character', '<p>alpha\u200b</p>'],
   ['changed text stands between two tags or comments', 'alpha<p>x</p>'],

@@ -2569,6 +2569,11 @@ test('round 8: Markdown and plain text qualify only as a wording change in pure 
     row('plain', 'Cafe\u0301 and na\u00efve @ words, \u041f\u0440\u0438\u0432\u0435\u0442 \u4e16\u754c.\n', words, null),
     row('plain', 'The @ words run on\n   in a second line\n  and a third.\n', words, null),
     row('plain', 'One.\n\nThe @ words.\n\nThree.\n', words, null),
+    // A line of the paragraph that is indented more than three spaces is no plain prose line,
+    // also when it is not the first one; and both sides are held to the rule, so a change that
+    // takes brackets off a line is none.
+    row('not plain', 'The @ words\n     and five spaces.\n', words, true),
+    ['not plain', 'docs/r8/brackets-gone.md', 'See [the old guide] now.\n', 'See the old guide now.\n', exact('docs/r8/brackets-gone.md')],
     // Not plain: white space other than a space, punctuation that is not prose, a character
     // of the control or format categories; and the limits on the punctuation that is prose.
     ...['a\tb', 'a\u00a0b', 'a.b', 'a,b', 'a;b', 'what?!', 'a -b', 'a- b', 'a--b', 'pre-2', 'a: b', '(a)', 'a/b', 'a_b', '*a*', '#a', '`a`',
@@ -2606,6 +2611,12 @@ test('round 8: Markdown and plain text qualify only as a wording change in pure 
     row('front matter', '---\n\nThe @ words under a rule.\n', words, null),
     row('front matter', 'Text.\n\n---\nkey: x\n\nThe @ words inside\n\n---\n', words, true),
     row('front matter', '```\n---\ntitle: x\n```\n\nThe @ words.\n', words, null),
+    // A closing line that is itself directly followed by a non-blank line opens the next block,
+    // and groups of dashes with spaces between open one too (pandoc reads both as a table, or
+    // as more metadata, when the first block was none to it; run on this machine, 2026-10-09).
+    row('front matter', '---\ntitle: x\n---\nText right after.\n\nThe @ words.\n', words, true),
+    row('front matter', '---\ntitle: x\n---\n\nText after an empty line.\n\nThe @ words.\n', words, null),
+    row('front matter', '----------- -------\nFirst row here\n\nThe @ words\n\nThird row\n----------- -------\n', words, true),
     // Position: a code fence. Three or more backticks or tildes at the start of a line open
     // one; a line of as many of the same, followed only by spaces, closes it; an unclosed one
     // makes the rest of the file code.
@@ -2632,6 +2643,7 @@ test('round 8: Markdown and plain text qualify only as a wording change in pure 
     row('fence, ambiguous', 'The @ words.\n\n```\ncode\n````\n', words, true),
     row('fence, ambiguous', 'The @ words.\n\n[ref]:\n```\ncode\n```\n', words, true),
     row('fence, ambiguous', 'The @ words.\n\n---\ntitle: x\n```\n---\n', words, true),
+    ['fence, ambiguous', 'docs/r8/mark-fence.md', '\uFEFF```\ncode\n```\n\nThe old words.\n\n```\n', '\uFEFF```\ncode\n```\n\nThe new words.\n\n```\n', exact('docs/r8/mark-fence.md')],
     // Position: a raw `<` above. The decision names twelve raw starts and their closers; the
     // differential test showed that a closer can be escaped by the Markdown around it and that
     // any element left open holds the paragraph, so every `<` before a letter, `!`, `?` or
@@ -2703,6 +2715,7 @@ test('round 8: Markdown and plain text qualify only as a wording change in pure 
     row('names', 'Read the @ guide.\n', words, un('docs/readme-first.txt'), 'txt', 'docs/readme-first.txt'),
     row('names', 'Read the @ guide.\n', words, un('docs/guide.txt'), 'txt', 'docs/guide.txt'),
     row('names', 'Read the @ guide.\n', words, un('docs/notes.backup.old.txt'), 'txt', 'docs/notes.backup.old.txt'),
+    row('names', 'Read the @ guide.\n', words, un('docs/readme.backup.txt'), 'txt', 'docs/readme.backup.txt'),
     row('names', '# Read the @ guide.\n', words, exact('docs/INSTALL.txt'), 'txt', 'docs/INSTALL.txt'),
     row('names', '```\n\nRead the @ guide.\n\n```\n', words, exact('docs/NEWS.txt'), 'txt', 'docs/NEWS.txt'),
     // 7. Legal texts never qualify, `.md` or `.txt`: the sensitive-area clause, with `license`

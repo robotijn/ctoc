@@ -1228,6 +1228,12 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     'src/pages/cells.html': (n) => `<p>Old</p>\n<table>${'<tr><td>a<td>b'.repeat(8 * n)}</table>\n`,
     'src/pages/noscripts.html': (n) => `<p>Old</p>\n${'<noscript><p>x</p></noscript>'.repeat(4 * n)}\n`,
     'src/pages/options.html': (n) => `<p>Old</p>\n<select>${'<option>a<optgroup>'.repeat(6 * n)}</select>\n`,
+    // The eighth round's HTML reader: text inside many open elements; the content of
+    // `<noscript>` read in place, with no end tag, with one far away, and with many.
+    'src/pages/deep-text.html': (n) => `<p>Old</p>\n${'<i>a'.repeat(20 * n)}\n`,
+    'src/pages/noscript-open.html': (n) => `<p>Old</p>\n${'<noscript>'.repeat(10 * n)}\n`,
+    'src/pages/noscript-deep.html': (n) => `<p>Old</p>\n${'<noscript>'.repeat(10 * n)}</noscript>\n`,
+    'src/pages/noscript-many.html': (n) => `<p>Old</p>\n${'<noscript><b>x</b></noscript>'.repeat(4 * n)}\n`,
     // The eighth round's reader of Markdown and plain text (the decision at review of
     // 2026-10-09): one pass over the lines. Many plain paragraphs, one very long paragraph,
     // one very long line, many closed fences, metadata blocks, one-line comments and code
