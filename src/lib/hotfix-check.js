@@ -173,16 +173,18 @@
  * lies inside the copy. A workspace link inside a linked `node_modules`, or an editable
  * Python install in a linked virtual environment (`.pth` lines, `__editable__` finder
  * files), that leads back into the repository refuses when other uncommitted work lies
- * under it. The project's tools are then detected in the copy, the tests selected by file
- * name in the copy (`coverage-map.findTestsByHeuristic`) when every judged file has one,
- * else the whole suite, all through the quality agent, with the working directory set to
- * the copy and the quality agent's progress lines kept off the menu's JSON.
+ * under it. The project's tools are then detected in the copy and the project's whole
+ * suite runs there (never a selection of it: the decision at review of 2026-10-09), through
+ * the quality agent and under its time limit, with the working directory set to the copy
+ * and the quality agent's progress lines kept off the menu's JSON.
  * Removal, on every path of both calls, after the working directory is restored: every
  * link unlinked by itself (one already gone, or whose folder is gone, counts as removed),
  * each only while its folder's real path still lies inside the temporary folder (the tests
- * may have swapped the copy for a link elsewhere), then `git worktree remove --force` of
- * exactly the copy's worktree, then the folder; the first failure stops it and is named in
- * `detail`. Worktrees are never pruned. While the temporary folder exists, SIGINT, SIGTERM
+ * may have swapped the copy for a link elsewhere), then every real folder of the temporary
+ * folder made writable for its owner (a test may leave one that is not; a link is never
+ * followed), then `git worktree remove --force` of exactly the copy's worktree, then the
+ * folder; the first failure stops it and is named in `detail`, its reason cut in the
+ * middle when it is long, so that what failed and where both stay. Worktrees are never pruned. While the temporary folder exists, SIGINT, SIGTERM
  * and SIGHUP first run the same removal, then raise the signal again.
  *
  * THE CLAUSES (inside "I did not treat this as a hotfix because <clause>; it goes through
@@ -233,8 +235,7 @@
  * emptied. Best effort: a log that cannot be written never changes an answer.
  *
  * CALL-TIME LOOKUPS (the tests replace these for one call): the quality agent's
- * `runFullTests` and `runSpecificTests` through `require('./quality-agent')` inside the
- * test run, and `mkdtempSync`, `mkdirSync`, `symlinkSync`, `rmSync` and `unlinkSync` only
+ * `runFullTests` through `require('./quality-agent')` inside the test run, and `mkdtempSync`, `mkdirSync`, `symlinkSync`, `rmSync` and `unlinkSync` only
  * as properties of the `safe-fs` module object.
  *
  * WHAT THIS CHECK CANNOT ANSWER (from the functional plan): whether a string in program
@@ -272,7 +273,7 @@ const GIT_REDIRECTS = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT
 const FIXED_DIFF = ['--no-color', '--no-ext-diff', '--no-textconv', '--no-renames', '--no-relative', '--text'];
 
 const GOVERNING_FOLDERS = new Set(['.claude', '.ctoc', '.cursor', '.windsurf', '.clinerules', '.roo', '.kiro', '.junie',
-  '.amazonq', '.continue', 'agents', 'skills', 'commands', 'plans']);
+  '.amazonq', '.continue', 'agents', 'skills', 'commands', 'plans', 'prompts', 'output-styles']);
 /** The folders of GitHub's assistant under `.github/`, whose files govern whatever their names. */
 const GITHUB_GOVERNING = new Set(['instructions', 'prompts', 'chatmodes']);
 /** The endings of instruction, rule, prompt and chat-mode files, wherever they sit. */
@@ -281,12 +282,13 @@ const GOVERNING_ENDINGS = ['.mdc', '.instructions.md', '.prompt.md', '.chatmode.
 /**
  * The instruction files coding assistants read, by class: they apply per folder, so their
  * names count at any depth. `AGENTS.md`, `CONVENTIONS.md`, `copilot-instructions.md`,
- * `.cursorrules`, `.windsurfrules`, any `CLAUDE*.md` or `GEMINI*.md`, and any name ending
- * in `.mdc`, `.instructions.md`, `.prompt.md` or `.chatmode.md`.
+ * `.cursorrules`, `.windsurfrules`, `IRON_LOOP.md`, `SKILL.md`, `MEMORY.md` (the decision at
+ * review of 2026-10-09), any `CLAUDE*.md` or `GEMINI*.md`, and any name ending in `.mdc`,
+ * `.instructions.md`, `.prompt.md` or `.chatmode.md`.
  * @param {string} lower the base name, lower case @returns {boolean}
  */
 function governingName(lower) {
-  return ['agents.md', 'conventions.md', 'copilot-instructions.md', '.cursorrules', '.windsurfrules'].includes(lower)
+  return ['agents.md', 'conventions.md', 'copilot-instructions.md', '.cursorrules', '.windsurfrules', 'iron_loop.md', 'skill.md', 'memory.md'].includes(lower)
     || ((lower.startsWith('claude') || lower.startsWith('gemini')) && lower.endsWith('.md'))
     || GOVERNING_ENDINGS.some((x) => lower.endsWith(x));
 }
@@ -475,10 +477,11 @@ const ANSI = /\u001b\[[0-9;:<=>?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|
  * @property {(string|null)} [oldText]
  * @property {(string|null)} [newText]
  * @property {Hunk[]} [hunks]
+ * @property {boolean} [linked] an instruction file of the last commit links to it
  * @property {string} [kind] the qualifying kind rule 4 placed it in
  * @property {string[]} [runs] the old and new wording rule 6 reads
  */
-/** @typedef {{files: ChangedFile[], lineCount: number, root: string, rootFromTop: string, top?: string}} Change */
+/** @typedef {{files: ChangedFile[], lineCount: number, root: string, rootFromTop: string, top?: string, governed?: Set<string>}} Change `governed`: the files the last commit's instruction files link to ({@link instructionLinks}); a change read from a repository always carries it */
 /**
  * The check's own state for one call: the repository it reads, and everything rule 8
  * made, so that {@link removeCopy} can take it away on every path.
@@ -715,6 +718,112 @@ function copyIndex(ctx) {
   safeFs.cpSync(index, ctx.repoIndex, { preserveTimestamps: true });
 }
 
+/** The instruction files whose links name more files that govern the work, by name in lower case, at any depth. */
+const LINKING_NAMES = new Set(['claude.md', 'agents.md']);
+/** @param {string} rel a path from the repository's top @returns {string} the path as two spellings of one file compare equal: composed, lower case */
+const foldPath = (rel) => rel.normalize('NFC').toLowerCase();
+
+/**
+ * Every destination a Markdown link, an image or a link definition in the text may name:
+ * what stands behind `](` and behind `[label]:`, between angle brackets on one line, or up
+ * to the next white space or the closing bracket that balances. More than a renderer
+ * follows (a code span counts, and a destination with brackets is also taken to its first
+ * closing bracket): a file named here is treated as governing, so reading too much is the
+ * safe side. A destination ends where the next `](` starts (`[![badge](a.png)](b.md)` names
+ * both), so every character is read once.
+ * @param {string} text @returns {string[]}
+ */
+function linkTargets(text) {
+  const out = [];
+  const starts = /\]\(\s*|^ {0,3}\[[^\]\n]*\]:[ \t]*/gm;
+  while (starts.exec(text) !== null) {
+    const from = starts.lastIndex;
+    let i = from;
+    if (text[i] === '<') {
+      i++;
+      while (i < text.length && text[i] !== '>' && text[i] !== '<' && text[i] !== '\n') i++;
+      if (text[i] === '>') out.push(text.slice(from + 1, i));
+      continue;
+    }
+    let open = 0;
+    let first = -1;
+    while (i < text.length && !isSpace(text[i]) && !(text[i] === ']' && text[i + 1] === '(')) {
+      if (text[i] === '(') open++;
+      else if (text[i] === ')') {
+        if (first === -1) first = i;
+        if (open === 0) break;
+        open--;
+      }
+      i++;
+    }
+    for (const end of new Set([first, i])) if (end > from) out.push(text.slice(from, end));
+  }
+  return out;
+}
+
+/**
+ * Rule 4, the files that govern the work by being linked (the decision at review of
+ * 2026-10-09): every file a relative Markdown link in a `CLAUDE.md` or an `AGENTS.md` of
+ * the LAST COMMIT names, at any depth, each link read from its file's folder (a leading `/`
+ * from the repository's top), with and without what stands behind a `#` or a `?`, and with
+ * `%20` read as the character it spells. The working folder's copies are never read: a
+ * link removed there still counts. An instruction file that is a link stands for the file
+ * it points to, which governs too and whose links are read from both folders. A committed
+ * instruction file that cannot be read (bytes that are no text, a link that leaves the
+ * repository or leads to no regular file) refuses the change: its links cannot be listed.
+ * KNOWN LIMITS: a link to a folder governs no file in it, and a path written without a
+ * link (in a code span, behind `@`) is not read.
+ * @param {Context} ctx
+ * @returns {Set<string>} the linked files, each as {@link foldPath} spells it
+ */
+function instructionLinks(ctx) {
+  const top = /** @type {string} */ (ctx.top);
+  const head = /** @type {string} */ (ctx.head);
+  /** @param {string} line one `ls-tree` entry */
+  const entryOf = (line) => {
+    const tab = line.indexOf('\t');
+    const [mode, , id] = line.slice(0, tab).split(' ');
+    return { mode, id, rel: line.slice(tab + 1) };
+  };
+  /** @type {Set<string>} */
+  const governed = new Set();
+  for (const line of gitOut(ctx, top, ['ls-tree', '-r', '-z', '--full-tree', head]).toString('utf8').split('\0')) {
+    if (line === '') continue;
+    let e = entryOf(line);
+    if (!LINKING_NAMES.has(path.posix.basename(e.rel).toLowerCase())) continue;
+    const name = e.rel;
+    const folders = [path.posix.dirname(name)];
+    if (e.mode === '120000') {
+      const target = path.posix.normalize(path.posix.join(folders[0], gitOut(ctx, top, ['cat-file', 'blob', e.id]).toString('utf8')));
+      const found = target.startsWith('..') || target.startsWith('/') ? ''
+        : gitOut(ctx, top, ['ls-tree', '-z', '--full-tree', head, '--', target]).toString('utf8').split('\0')[0];
+      e = found === '' ? e : entryOf(found);
+      governed.add(foldPath(e.rel));
+      folders.push(path.posix.dirname(e.rel));
+    }
+    if (e.mode !== '100644' && e.mode !== '100755') throw new Unreadable(`${clean(name)} is a link the check cannot follow`);
+    const text = asText(gitOut(ctx, top, ['cat-file', 'blob', e.id]), clean(name));
+    for (const written of linkTargets(text)) {
+      if (/^[A-Za-z][A-Za-z0-9+.-]*:|^\/\/|^#/.test(written)) continue; // an address elsewhere, or a place in this file
+      const spellings = new Set([written, written.split(/[#?]/)[0]]);
+      for (const spelling of [...spellings]) {
+        try {
+          spellings.add(decodeURIComponent(spelling));
+        } catch {
+          // no percent-encoding a reader could decode: the spelling as written stays
+        }
+      }
+      for (const spelling of spellings) {
+        for (const folder of spelling.startsWith('/') ? ['.'] : folders) {
+          const rel = path.posix.normalize(path.posix.join(folder, spelling.replace(/^\/+/, '')));
+          if (rel !== '.' && !rel.startsWith('..')) governed.add(foldPath(rel));
+        }
+      }
+    }
+  }
+  return governed;
+}
+
 /**
  * Rule 1 — read the change: which files, their old and new text, and their changed-line
  * groups; in the `--run-tests` call also each file's first hash, taken before any rule
@@ -789,6 +898,15 @@ function readChange(root, named, ctx, runTests) {
   const hidden = files.find((f) => marked.has(f.topRel));
   if (hidden) throw new Unreadable(`${hidden.display} is marked in git's index as unchanged or skipped`);
 
+  const governed = instructionLinks(ctx);
+  // An added or a deleted path is refused by rule 2 whatever it holds, so nothing is staged
+  // for such a change (the decision at review of 2026-10-09): `add --all` writes every file
+  // it stages into the repository's object store, and a call that names no file would write
+  // every untracked file there. Only the count of changed lines is still read, for the log.
+  if (files.some((f) => f.status === 'A' || f.status === 'D')) {
+    return { files, lineCount: unstagedLineCount(ctx, files), root: realRoot, rootFromTop, top, governed };
+  }
+
   // The judged bytes are exactly what `git add` stages: a temporary index holding the last
   // commit plus the judged files as `add --all` puts them there (git's own clean filters and
   // line-ending conversion). The rules read their new text and changed lines from it, and
@@ -824,7 +942,48 @@ function readChange(root, named, ctx, runTests) {
     f.hunks = groups.get(f.topRel) || [];
     for (const h of f.hunks) lineCount += h.removed.length + h.added.length;
   }
-  return { files, lineCount, root: realRoot, rootFromTop, top };
+  return { files, lineCount, root: realRoot, rootFromTop, top, governed };
+}
+
+/**
+ * The changed lines of a change that is refused before it is staged ({@link readChange}),
+ * for the log: git's own count for every path git tracks (`diff --numstat` against the last
+ * commit, which writes nothing), and for an untracked file its lines as they stand in the
+ * working folder, read in pieces (a link counts as the one line git would store for it).
+ * @param {Context} ctx @param {ChangedFile[]} files @returns {number}
+ */
+function unstagedLineCount(ctx, files) {
+  const top = /** @type {string} */ (ctx.top);
+  let count = 0;
+  const tracked = files.filter((f) => f.oldSha !== null).map((f) => f.topRel);
+  if (tracked.length > 0) {
+    const out = gitOut(ctx, top, ['diff', /** @type {string} */ (ctx.head), '--numstat', '-z', '--ignore-cr-at-eol', ...FIXED_DIFF, '--', ...tracked],
+      { index: ctx.repoIndex }).toString('utf8');
+    for (const entry of out.split('\0')) {
+      const [added, removed] = entry.split('\t');
+      count += (Number(added) || 0) + (Number(removed) || 0);
+    }
+  }
+  const piece = Buffer.alloc(1024 * 1024);
+  for (const f of files) {
+    if (f.oldSha !== null) continue;
+    const abs = path.join(top, ...f.topRel.split('/'));
+    const st = safeFs.lstatSync(abs);
+    if (st.isSymbolicLink()) count += 1;
+    if (!st.isFile()) continue;
+    const fd = safeFs.openSync(abs, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+    try {
+      let last = 10;
+      for (let n = fs.readSync(fd, piece); n > 0; n = fs.readSync(fd, piece)) {
+        for (let i = 0; i < n; i++) if (piece[i] === 10) count++;
+        last = piece[n - 1];
+      }
+      if (last !== 10) count++; // a last line without a line break
+    } finally {
+      fs.closeSync(fd);
+    }
+  }
+  return count;
 }
 
 /**
@@ -2738,7 +2897,7 @@ function kindOf(f) {
   const setting = { clause: `it changes a setting in ${d}, and settings changes are a common cause of outages`, cause: 'setting' };
   const build = { clause: `it changes how the project is built or shipped in ${d}`, cause: 'build' };
   const named = namedKind(lowerBase, ext, topFolders);
-  const governing = governingName(lowerBase)
+  const governing = governingName(lowerBase) || f.linked === true
     || topFolders.some((p, i) => GOVERNING_FOLDERS.has(p) || (p === '.github' && GITHUB_GOVERNING.has(topFolders[i + 1])));
   // Markdown under `.github/` outside `.github/workflows/` is the one documentation a
   // dot-folder may hold; every other dot-folder may be some tool's instructions.
@@ -2847,36 +3006,43 @@ function sensitiveWord(part) {
   return null;
 }
 
+/** @param {string} text @returns {string} the text as its letters read: compatibility forms taken apart (a full-width letter is the plain one, a letter with a mark its letter and the mark), then every mark and every format character (a zero-width space, a joiner) dropped */
+const lettersOf = (text) => text.normalize('NFKD').replace(/[\p{Cf}\p{M}]/gu, '');
+
 /**
  * Rule 5 — not in a sensitive area: no letter run of the path from the repository top is a
- * sensitive word, and no camel-case sub-word of one (`AuthPanel` holds `auth`, `Author`
- * does not). The path is folded first (Unicode NFKC, so full-width letters read as plain
- * ones, then lower case) and split at every character that is no letter; a sub-word starts
- * where a capital letter follows a small one. The words count also in the plural, but not in a stylesheet's own file name: `tokens.css`
- * holds design tokens, while `login.css` and `payment.css` still name their area); the path is no
- * secret-bearing file by CTOC's own secret-file guard (`isSecretTarget`: the word
- * `secret`), and, in CTOC's own repository only, no part of CTOC's enforcement by its
- * protected-paths list (`isProtectedEnforcementPath`: the word `enforcement`), which names
- * CTOC's own files (`src/hooks/`, ...), not another project's. Both lists are CTOC's, read
- * where they live, never copied.
+ * sensitive word, and no camel-case sub-word of one (`AuthPanel` holds `auth`, `APIKey`
+ * holds `key`, `Author` and `APIKeyboard` hold none). The path is folded first
+ * ({@link lettersOf}: `pay<zero-width space>ment` and a `payment` written with an accent
+ * or in full-width letters read as `payment`), split at every character that is no letter,
+ * and each run again where a capital letter follows a small one and where the last capital
+ * of a run of capitals starts a word (the decision at review of 2026-10-09). The words count
+ * also in the plural; in a stylesheet's own file name one plural does not, `tokens`
+ * (`design-tokens.css` holds design tokens; `payments.css` and `keys.css` name their area).
+ * The path is no secret-bearing file by CTOC's own secret-file guard (`isSecretTarget`: the
+ * word `secret`), asked with the path as written and as folded, and, in CTOC's own
+ * repository only, no part of CTOC's enforcement by its protected-paths list
+ * (`isProtectedEnforcementPath`: the word `enforcement`), which names CTOC's own files
+ * (`src/hooks/`, ...), not another project's. Both lists are CTOC's, read where they live,
+ * never copied.
  * @param {ChangedFile} f @param {boolean} ctoc the repository is CTOC's own source
  * @returns {Refusal|null}
  */
 function ruleSensitiveArea(f, ctoc) {
   const nameAt = f.topRel.lastIndexOf('/') + 1;
-  /** @param {string} text @param {boolean} plural @returns {string|null} the first sensitive word among its letter runs and their camel-case sub-words */
-  const wordIn = (text, plural) => {
-    for (const run of text.normalize('NFKC').split(/\P{L}+/u)) {
-      for (const piece of [run, ...run.split(/(?<=\p{Ll})(?=\p{Lu})/u)]) {
+  /** @param {string} text @param {boolean} stylesheet the text is a stylesheet's own name @returns {string|null} the first sensitive word among its letter runs and their camel-case sub-words */
+  const wordIn = (text, stylesheet) => {
+    for (const run of lettersOf(text).split(/\P{L}+/u)) {
+      for (const piece of [run, ...run.split(/(?<=\p{Ll})(?=\p{Lu})|(?<=\p{Lu})(?=\p{Lu}\p{Ll})/u)]) {
         const part = piece.toLowerCase();
-        const found = plural ? sensitiveWord(part) : SENSITIVE_WORDS.has(part) ? part : null;
+        const found = stylesheet && part === 'tokens' ? null : sensitiveWord(part);
         if (found) return found;
       }
     }
     return null;
   };
-  let word = wordIn(f.topRel.slice(0, nameAt), true) || wordIn(f.topRel.slice(nameAt), nameParts(f).ext !== '.css');
-  if (!word && isSecretTarget(f.topRel)) word = 'secret';
+  let word = wordIn(f.topRel.slice(0, nameAt), false) || wordIn(f.topRel.slice(nameAt), nameParts(f).ext === '.css');
+  if (!word && (isSecretTarget(f.topRel) || isSecretTarget(lettersOf(f.topRel)))) word = 'secret';
   if (!word && ctoc && isProtectedEnforcementPath(f.topRel)) word = 'enforcement';
   return word ? { clause: `${f.display} sits in an area named ${word}, and such areas are never a hotfix`, cause: 'sensitive-area' } : null;
 }
@@ -2912,13 +3078,19 @@ function ruleRefusal(change) {
       if (r) return r;
     }
   }
+  // A change read from a repository names what the instruction files link to; one that does
+  // not was read by nothing this check knows, and is never judged without the list.
+  const governed = change.governed;
+  if (change.top && !(governed instanceof Set)) throw new Error('the change carries no list of the files the instruction files link to');
   for (const f of change.files) {
+    f.linked = governed instanceof Set && governed.has(foldPath(f.topRel));
     const r = kindOf(f);
     if ('clause' in r) return r;
     f.kind = r.kind;
   }
   const n = change.lineCount;
   const m = change.files.length;
+  if (!Number.isInteger(n) || n < 0) throw new Error('the change carries no count of its changed lines');
   if (n > MAX_LINES || m > MAX_FILES) {
     return {
       clause: `it changes ${n} ${n === 1 ? 'line' : 'lines'} in ${m} ${m === 1 ? 'file' : 'files'} `
@@ -3154,12 +3326,9 @@ async function ruleTestsInCopy(change, ctx) {
   const run = await inProject(copyRoot, async () => {
     const tools = require('./tool-detector').detectTools(copyRoot).tools;
     if (!Object.values(tools).some((t) => t && t.test)) return null;
-    const coverageMap = require('./coverage-map');
-    const selected = change.files.map((f) => coverageMap.findTestsByHeuristic(path.join(tree, ...f.topRel.split('/'))));
-    const qa = require('./quality-agent');
-    return selected.every((s) => s.length > 0)
-      ? qa.runSpecificTests(tools, [...new Set(selected.flat())])
-      : await qa.runFullTests(tools);
+    // The whole suite, always (the decision at review of 2026-10-09): a selection by file
+    // name ran one test file and left a failing test under another name unrun.
+    return await require('./quality-agent').runFullTests(tools);
   });
 
   const second = hashJudged(ctx, change.files);
@@ -3180,7 +3349,8 @@ async function ruleTestsInCopy(change, ctx) {
 /**
  * Remove everything the check made, in this order, stopping at the first failure: every
  * link by itself (never the folder it points to; one already gone, or whose folder is gone,
- * counts as removed), the copy's own worktree registration and files (`worktree remove
+ * counts as removed), every real folder made writable for its owner ({@link openFolders}),
+ * the copy's own worktree registration and files (`worktree remove
  * --force`; nothing is pruned; git refuses a worktree that is no longer the one it
  * registered), then the temporary folder. Before each link is unlinked, its folder's real
  * path must still lie inside the temporary folder: the tests may have replaced the copy, or
@@ -3209,11 +3379,39 @@ function removeCopy(ctx) {
         if (/** @type {NodeJS.ErrnoException} */ (err).code !== 'ENOENT') throw err;
       }
     }
+    openFolders(tmp);
     if (ctx.worktree) gitOut(ctx, /** @type {string} */ (ctx.top), ['worktree', 'remove', '--force', ctx.worktree]);
     safeFs.rmSync(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     return null;
   } catch (err) {
-    return clean(`the temporary copy at ${tmp} could not be removed: ${messageOf(err)}`);
+    // The reason keeps its start (what failed) and its end (where: a path's last part).
+    const why = String(messageOf(err)).replace(CONTROL_CHARS, ' ').trim();
+    return `the temporary copy at ${tmp} could not be removed: ${why.length > 163 ? `${why.slice(0, 80)} … ${why.slice(-80)}` : why}`;
+  }
+}
+
+/**
+ * Give the owner back the right to read, write and enter every real folder under `dir`
+ * (and `dir` itself), so that what a test left read-only can be removed. A link is never
+ * followed and never changed: only what `lstat` calls a folder is opened and entered. A
+ * folder that cannot be opened or listed is left to the removal, which then names it.
+ * Iterative: the depth of what a test left does not grow the call stack.
+ * @param {string} dir
+ */
+function openFolders(dir) {
+  const todo = [dir];
+  while (todo.length > 0) {
+    const folder = /** @type {string} */ (todo.pop());
+    try {
+      const st = safeFs.lstatSync(folder);
+      if (!st.isDirectory()) continue;
+      if ((st.mode & 0o700) !== 0o700) safeFs.chmodSync(folder, st.mode | 0o700);
+      for (const e of safeFs.readdirSync(folder, { withFileTypes: true })) {
+        if (e.isDirectory()) todo.push(path.join(folder, String(e.name)));
+      }
+    } catch {
+      // not ours to open, or gone: the removal below reports what it cannot remove
+    }
   }
 }
 
