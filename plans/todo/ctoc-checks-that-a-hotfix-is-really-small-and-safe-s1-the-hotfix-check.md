@@ -2867,6 +2867,8 @@ the run and removed after), before this record was written:
   [CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
   [CTOC test-gate] PASS
   ```
+- `npm test` again on `32ec7beb`, with this record in place: 13,129 tests, 13,129 pass, 0 fail,
+  0 skipped; coverage 99.87%; `[CTOC test-gate] PASS`. This one line was added after that run.
 
 ## Execution Plan (Steps 8-16)
 
